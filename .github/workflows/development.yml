@@ -55,9 +55,41 @@ jobs:
       - name: Checkout repository submodules
         run: git submodule update --init --recursive
 
+      # ========== 新增：验证源代码分离 ==========
+      - name: Validate source separation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -e JavaApp/src/lwjgl/org/lwjgl/LWJGLException.java ]; then
+            echo "LWJGL 3.3.1-only classes must stay outside JavaApp/src/lwjgl."
+            exit 1
+          fi
+          test -f JavaApp/src_lwjgl331/org/lwjgl/LWJGLException.java
+
+          if grep -R -I -n -E 'auto\.optimized|ZinkNext|libOSMesa-ZinkNext|resolveRendererNameForMinecraft|rendererUsesOSMesaForMinecraft|MESA_LOADER_DRIVER_OVERRIDE|resolveLWJGLOpenGLLibraryName|OPENGL_LIBRARY_NAME' Natives JavaApp; then
+            echo "Renderer stack must stay unchanged in this branch."
+            exit 1
+          fi
+
+      # ========== 新增：验证 CurseForge API Key ==========
+      - name: Validate CurseForge API key
+        shell: bash
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY || vars.CURSEFORGE_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${CURSEFORGE_API_KEY:-}" ]; then
+            echo "CURSEFORGE_API_KEY is required for CurseForge support. Add it as a repository secret or variable."
+            exit 1
+          fi
+
       - name: Build for ${{ matrix.platform_name }}
         env:
           IPHONEOS_DEPLOYMENT_TARGET: 14.0
+          # ========== 新增：传递 API Key 到构建环境 ==========
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY || vars.CURSEFORGE_API_KEY }}
         run: |
           set -o pipefail
           export PATH=/opt/homebrew/bin:$PATH
