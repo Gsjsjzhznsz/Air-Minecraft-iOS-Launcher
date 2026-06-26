@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.6)
 project(AngelAuraAmethyst)
 
+# ===== 新增：从环境变量读取 CurseForge API Key（用于 GitHub Actions）=====
+if(DEFINED ENV{CURSEFORGE_API_KEY} AND NOT "$ENV{CURSEFORGE_API_KEY}" STREQUAL "")
+  set(CONFIG_CURSEFORGE_API_KEY "$ENV{CURSEFORGE_API_KEY}")
+endif()
+# =====================================================================
+
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${CMAKE_CURRENT_LIST_DIR}/config.h)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -target arm64-apple-ios -mcpu=apple-a8 -fcommon -fobjc-arc -ObjC -F'${CMAKE_OSX_SYSROOT}/System/Cryptexes/OS/System/Library/Frameworks'")
@@ -148,7 +154,7 @@ add_executable(AngelAuraAmethyst
   installer/modpack/ModpackUtils.m
   installer/modpack/ModpackAPI.m
   installer/modpack/ModrinthAPI.m
-	installer/modpack/CurseForgeAPI.m
+  installer/modpack/CurseForgeAPI.m
 
   input/ControllerInput.m
   input/GyroInput.m
