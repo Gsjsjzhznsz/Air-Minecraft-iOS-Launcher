@@ -17,8 +17,37 @@ static const NSInteger kCurseForgeClassIDShaders = 6552;
 static const NSInteger kCurseForgeClassIDDataPacks = 6945;
 static const NSInteger kCurseForgeCategoryIDServerUtility = 435;
 
+// NSError userInfo keys for diagnostic information
+NSString *const CurseForgeResponseContentTypeKey = @"CurseForgeResponseContentTypeKey";
+NSString *const CurseForgeResponseSnippetKey = @"CurseForgeResponseSnippetKey";
+
+/// 安全获取编译时 CurseForge API Key（避免 @nil 非法表达式）
+/// 参考 CurseForgeAPIKeyViewController.m 中的 CFKCompiledAPIKey() 实现
+static NSString *CFACompiledAPIKey(void) {
+#define CFA_STR_INNER(x) #x
+#define CFA_STR(x) CFA_STR_INNER(x)
+    NSString *compiledKey = [NSString stringWithUTF8String:CFA_STR(CONFIG_CURSEFORGE_API_KEY)];
+#undef CFA_STR
+#undef CFA_STR_INNER
+    // 处理字符串字面量两端的引号（CONFIG_CURSEFORGE_API_KEY 宏定义为 "actual_key" 时，字符串化后为 "\"actual_key\""）
+    if (compiledKey.length >= 2 && [compiledKey hasPrefix:@"\""] && [compiledKey hasSuffix:@"\""]) {
+        compiledKey = [compiledKey substringWithRange:NSMakeRange(1, compiledKey.length - 2)];
+    }
+    // 宏未定义时预处理器字符串化后得到宏名本身 "CONFIG_CURSEFORGE_API_KEY"，或为 nil 时得到 "nil"
+    if ([compiledKey isEqualToString:@"nil"] || compiledKey.length == 0 ||
+        [compiledKey isEqualToString:@"CONFIG_CURSEFORGE_API_KEY"]) {
+        return @"";
+    }
+    return compiledKey;
+}
+
 @interface CurseForgeAPI ()
 @property (nonatomic, strong) NSURLSession *session;   // 用于异步请求
+// 错误诊断辅助方法：将 HTTP 响应信息封装进 NSError userInfo
+- (NSError *)errorWithResponse:(NSURLResponse *)response
+                          data:(NSData *)data
+                 originalError:(NSError *)originalError
+                       snippet:(NSString *)snippet;
 @end
 
 @implementation CurseForgeAPI
@@ -46,9 +75,9 @@ static const NSInteger kCurseForgeCategoryIDServerUtility = 435;
     // 1. 运行时偏好（优先级最高）
     NSString *runtimeKey = [PLPreferences curseForgeAPIKey];
     if ([runtimeKey isKindOfClass:NSString.class] && runtimeKey.length > 0) return runtimeKey;
-    // 2. 编译时宏
-    NSString *compiledKey = @CONFIG_CURSEFORGE_API_KEY;
-    if ([compiledKey isKindOfClass:NSString.class] && ![compiledKey isEqualToString:@"nil"] && compiledKey.length > 0) {
+    // 2. 编译时宏（使用字符串化宏方案，避免 @nil 边界问题）
+    NSString *compiledKey = CFACompiledAPIKey();
+    if (compiledKey.length > 0) {
         return compiledKey;
     }
     // 3. Info.plist
@@ -71,6 +100,52 @@ static const NSInteger kCurseForgeCategoryIDServerUtility = 435;
     return [NSError errorWithDomain:@"CurseForgeAPI"
                                code:401
                            userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API key is missing. Set CURSEFORGE_API_KEY before building."}];
+}
+
+#pragma mark - 错误诊断辅助
+
+- (NSError *)errorWithResponse:(NSURLResponse *)response
+                          data:(NSData *)data
+                 originalError:(NSError *)originalError
+                       snippet:(NSString *)snippet {
+    NSHTTPURLResponse *httpResponse = [response isKindOfClass:[NSHTTPURLResponse class]] ? (NSHTTPURLResponse *)response : nil;
+    NSInteger statusCode = httpResponse.statusCode;
+    NSString *contentType = httpResponse.allHeaderFields[@"Content-Type"];
+
+    // 取响应体前 256 字节作为 snippet（如果调用方未提供）
+    if (!snippet && data.length > 0) {
+        NSUInteger len = MIN(data.length, 256);
+        NSData *prefixData = [data subdataWithRange:NSMakeRange(0, len)];
+        snippet = [[NSString alloc] initWithData:prefixData encoding:NSUTF8StringEncoding];
+    }
+
+    // 构造 userInfo
+    NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
+    if (originalError) {
+        [userInfo addEntriesFromDictionary:originalError.userInfo];
+        if (originalError.localizedDescription.length > 0) {
+            userInfo[NSLocalizedDescriptionKey] = originalError.localizedDescription;
+        }
+    } else {
+        userInfo[NSLocalizedDescriptionKey] = @"CurseForge API request failed";
+    }
+    if (statusCode > 0) {
+        userInfo[@"CurseForgeHTTPStatusCodeKey"] = @(statusCode);
+    }
+    if (contentType.length > 0) {
+        userInfo[CurseForgeResponseContentTypeKey] = contentType;
+    }
+    if (snippet.length > 0) {
+        userInfo[CurseForgeResponseSnippetKey] = snippet;
+    }
+
+    // 打印诊断日志
+    NSLog(@"[CurseForgeAPI] Request failed - statusCode=%ld, contentType=%@, error=%@, snippet=%@",
+          (long)statusCode, contentType, originalError.localizedDescription, snippet);
+
+    return [NSError errorWithDomain:@"CurseForgeAPI"
+                               code:originalError.code ?: 0
+                           userInfo:[userInfo copy]];
 }
 
 #pragma mark - 同步网络请求（原有 AFNetworking 实现，保持兼容）
@@ -323,7 +398,7 @@ static const NSInteger kCurseForgeCategoryIDServerUtility = 435;
     NSUInteger total = NSUIntegerMax;
     while (index < total) {
         NSDictionary *response = [self getEndpoint:[NSString stringWithFormat:@"mods/%@/files", projectId]
-                                            params:@{@"pageSize": @50, @"index": @(index)}];
+                                            params:@{@"pageSize": @10000, @"index": @(index)}];
         if (!response) return;
         
         NSArray *files = [response[@"data"] isKindOfClass:NSArray.class] ? response[@"data"] : @[];
@@ -423,13 +498,31 @@ static const NSInteger kCurseForgeCategoryIDServerUtility = 435;
     request.timeoutInterval = 30.0;
     
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        if (error) { if (completion) completion(nil, error); return; }
-        if (!data) { if (completion) completion(nil, [NSError errorWithDomain:@"CurseForgeAPI" code:2 userInfo:@{NSLocalizedDescriptionKey: @"No data"}]); return; }
-        
+        if (error) {
+            // 网络错误：透传原 NSError 并附带 HTTP 诊断信息（如可获取）
+            NSError *diagnosticError = [self errorWithResponse:response data:data originalError:error snippet:nil];
+            if (completion) completion(nil, diagnosticError);
+            return;
+        }
+        if (!data || data.length == 0) {
+            // 响应数据为空：返回包含 HTTP 状态码的 NSError
+            NSError *emptyError = [NSError errorWithDomain:@"CurseForgeAPI"
+                                                      code:2
+                                                  userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned empty response"}];
+            NSError *diagnosticError = [self errorWithResponse:response data:data originalError:emptyError snippet:nil];
+            if (completion) completion(nil, diagnosticError);
+            return;
+        }
+
         NSError *jsonError = nil;
         NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
         if (jsonError || ![json isKindOfClass:NSDictionary.class]) {
-            if (completion) completion(nil, jsonError ?: [NSError errorWithDomain:@"CurseForgeAPI" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Invalid JSON"}]);
+            // JSON 解析失败：附带响应体前 256 字节，便于诊断 401 HTML 错误页等场景
+            NSError *baseError = jsonError ?: [NSError errorWithDomain:@"CurseForgeAPI"
+                                                                   code:3
+                                                               userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned non-JSON response"}];
+            NSError *diagnosticError = [self errorWithResponse:response data:data originalError:baseError snippet:nil];
+            if (completion) completion(nil, diagnosticError);
             return;
         }
         
@@ -642,7 +735,7 @@ submitDownloadTasksFromPackage:(NSString *)packagePath
 
 - (NSMutableDictionary *)projectForFileHash:(NSString *)murmurHash projectType:(NSString *)projectType {
     if (!murmurHash || murmurHash.length == 0) return nil;
-    NSString *urlStr = [NSString stringWithFormat:@"%@/fingerprints", self.baseURL];
+    NSString *urlStr = [NSString stringWithFormat:@"%@/fingerprints/%ld", self.baseURL, (long)kCurseForgeGameIDMinecraft];
     NSURL *url = [NSURL URLWithString:urlStr];
     if (!url) return nil;
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
@@ -680,7 +773,7 @@ submitDownloadTasksFromPackage:(NSString *)packagePath
 
 - (NSArray<NSMutableDictionary *> *)fileFingerprints:(NSArray<NSNumber *> *)fingerprints {
     if (!fingerprints || fingerprints.count == 0) return @[];
-    NSString *urlStr = [NSString stringWithFormat:@"%@/fingerprints", self.baseURL];
+    NSString *urlStr = [NSString stringWithFormat:@"%@/fingerprints/%ld", self.baseURL, (long)kCurseForgeGameIDMinecraft];
     NSURL *url = [NSURL URLWithString:urlStr];
     if (!url) return @[];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
@@ -740,10 +833,33 @@ submitDownloadTasksFromPackage:(NSString *)packagePath
 
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(error); });
+            // 网络错误：透传并附带诊断信息
+            NSError *diagnosticError = [self errorWithResponse:response data:data originalError:error snippet:nil];
+            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(diagnosticError); });
             return;
         }
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        if (!data || data.length == 0) {
+            // 响应数据为空
+            NSError *emptyError = [NSError errorWithDomain:@"CurseForgeAPI"
+                                                      code:2
+                                                  userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned empty response"}];
+            NSError *diagnosticError = [self errorWithResponse:response data:data originalError:emptyError snippet:nil];
+            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(diagnosticError); });
+            return;
+        }
+
+        NSError *jsonError = nil;
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+        if (jsonError || ![json isKindOfClass:NSDictionary.class]) {
+            // JSON 解析失败：附带响应体前 256 字节
+            NSError *baseError = jsonError ?: [NSError errorWithDomain:@"CurseForgeAPI"
+                                                                   code:3
+                                                               userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned non-JSON response"}];
+            NSError *diagnosticError = [self errorWithResponse:response data:data originalError:baseError snippet:nil];
+            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(diagnosticError); });
+            return;
+        }
+
         NSArray *files = [json isKindOfClass:NSDictionary.class] ? json[@"data"] : nil;
         if (![files isKindOfClass:NSArray.class]) files = @[];
         NSMutableArray *versions = [NSMutableArray array];
