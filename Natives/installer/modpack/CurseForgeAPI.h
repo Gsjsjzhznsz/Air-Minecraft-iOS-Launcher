@@ -4,6 +4,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// NSError userInfo keys for diagnostic information (CurseForge API)
+extern NSString *const CurseForgeResponseContentTypeKey;
+extern NSString *const CurseForgeResponseSnippetKey;
+
 /// CurseForge API 实现，支持模组、资源包、光影、数据包、整合包等
 @interface CurseForgeAPI : ModpackAPI
 
