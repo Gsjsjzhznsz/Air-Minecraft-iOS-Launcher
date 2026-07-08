@@ -353,16 +353,15 @@ dep_mobilegl:
 	grep -q 'Range1D() = default' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h || perl -i -pe 'if (/struct Range1D {/) { $$_ .= "        Range1D() = default; Range1D(SizeT s, SizeT e) : start(s), end(e) {}\n" }' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h
 	grep -q 'unique_ptr<T>(new T{' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h || perl -i -pe 's/return std::make_unique<T>\(std::forward<Args>\(args\)\.\.\.\);/return std::unique_ptr<T>(new T{std::forward<Args>(args)...});/' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h
 	grep -q 'BufferChange() = default' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_State/GLState/BufferState/BufferObject.h || perl -i -pe 'if (/struct BufferChange {/) { $$_ .= "        BufferChange() = default; BufferChange(Flags<BufferChangeBits> bits) : Bits(bits) {}\n" }' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_State/GLState/BufferState/BufferObject.h
-	# 新版本 MobileGL（含 DecomposeWorkgroupVec3Pass.cpp）已修复 make_unique/initializer_list 兼容性，
-	# brace-init 补丁（make_unique -> unique_ptr(new T{...})）会破坏新版本（int->uint32_t narrowing），
-	# 检测到新版本时还原 make_unique 补丁。
-	# 注意：Range1D 和 BufferChange 的显式构造函数补丁必须保留——
-	# 新版本源码（如 GL_Buffer.cpp）仍使用 Range1D(x, y) 圆括号语法调用，
-	# 而 Range1D 在 Types.h 中是聚合体无显式构造函数，C++17 下圆括号语法对聚合体不可用，
-	# 移除构造函数补丁会导致编译失败。BufferChange 同理。
-	if [ -f "$(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/ShaderTranspiler/SpirvPasses/DecomposeWorkgroupVec3Pass.cpp" ]; then \
-		perl -i -pe 's/return std::unique_ptr<T>\(new T\{std::forward<Args>\(args\)\.\.\.\}\);/return std::make_unique<T>(std::forward<Args>(args)...);/' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h; \
-	fi
+	# MobileGL 用 C++23 编译，但 AppleClang 15（Xcode 15.4）对 P0960（聚合体圆括号初始化）支持不完整，
+	# 导致 std::make_unique<T>(args) 在 T 为聚合体（如 DefaultFramebufferInfo/Range1D/BufferChange）时
+	# 用圆括号 new T(args) 初始化失败。把 MakeUnique 改成 brace-init（new T{args}）可通用解决：
+	# - 聚合体（如 DefaultFramebufferInfo，4 个 shared_ptr 字段）brace-init 安全（不 narrowing）
+	# - 有显式构造函数的类型（如加了补丁的 Range1D/BufferChange）brace-init 调用构造函数
+	# Range1D/BufferChange 的显式构造函数补丁必须保留：
+	# 1. GL_Buffer.cpp 等源码仍用 Range1D(x,y) 圆括号直接构造临时对象（不经 MakeUnique）
+	# 2. MakeUnique<Range1D>(0,0) brace-init 时，若无构造函数则 int->SizeT(size_t) narrowing；
+	#    有构造函数则调用 Range1D(SizeT,SizeT)，int->size_t 为普通隐式转换（非 brace narrowing）
 	mkdir -p $(WORKINGDIR)/mobilegl
 	cd $(WORKINGDIR)/mobilegl && cmake \
 		-DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) \
