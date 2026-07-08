@@ -295,17 +295,21 @@ jre: native
 	if [ ! -f "$(SOURCEDIR)/depends/java-25-openjdk/release" ] || [ ! -f "$(SOURCEDIR)/depends/java-25-openjdk/lib/server/libjvm.dylib" ]; then \
 		JRE25_URL="https://github.com/Taylen-chud/Amethyst-iOS/releases/download/Java-25/jre25-ios-arm64-20260614-release.tar.xz"; \
 		echo "[jre25] downloading iOS-built OpenJDK 25..."; \
-		curl -L --fail -o /tmp/jre25.tar.xz "$$JRE25_URL"; \
-		mkdir -p $(SOURCEDIR)/depends/java-25-openjdk; \
-		tar xf /tmp/jre25.tar.xz -C $(SOURCEDIR)/depends/java-25-openjdk; \
-		rm -f /tmp/jre25.tar.xz; \
-		if vtool -show $(SOURCEDIR)/depends/java-25-openjdk/lib/server/libjvm.dylib 2>/dev/null | grep -q "platform IOS"; then \
-			echo "[jre25] confirmed: libjvm.dylib has platform IOS"; \
+		if curl -L --fail -o /tmp/jre25.tar.xz "$$JRE25_URL"; then \
+			mkdir -p $(SOURCEDIR)/depends/java-25-openjdk; \
+			tar xf /tmp/jre25.tar.xz -C $(SOURCEDIR)/depends/java-25-openjdk; \
+			rm -f /tmp/jre25.tar.xz; \
+			if vtool -show $(SOURCEDIR)/depends/java-25-openjdk/lib/server/libjvm.dylib 2>/dev/null | grep -q "platform IOS"; then \
+				echo "[jre25] confirmed: libjvm.dylib has platform IOS"; \
+			else \
+				echo "[jre25] WARNING: libjvm.dylib is not tagged as iOS"; \
+			fi; \
+			echo "[jre25] done. Final size:"; \
+			du -sh $(SOURCEDIR)/depends/java-25-openjdk; \
 		else \
-			echo "[jre25] WARNING: libjvm.dylib is not tagged as iOS"; \
+			echo "[jre25] WARNING: JRE25 download failed (404 or network error), skipping. Java 25 games will not be supported in this build."; \
+			rm -f /tmp/jre25.tar.xz; \
 		fi; \
-		echo "[jre25] done. Final size:"; \
-		du -sh $(SOURCEDIR)/depends/java-25-openjdk; \
 	else \
 		echo "[jre25] already present, skipping download"; \
 	fi; \
@@ -314,11 +318,15 @@ jre: native
 	cp -R $(POJAV_JRE8_DIR) $(OUTPUTDIR)/java_runtimes; \
 	cp -R $(POJAV_JRE17_DIR) $(OUTPUTDIR)/java_runtimes; \
 	cp -R $(POJAV_JRE21_DIR) $(OUTPUTDIR)/java_runtimes; \
-	cp -R $(POJAV_JRE25_DIR) $(OUTPUTDIR)/java_runtimes; \
+	if [ -d "$(POJAV_JRE25_DIR)" ] && [ -f "$(POJAV_JRE25_DIR)/release" ]; then \
+		cp -R $(POJAV_JRE25_DIR) $(OUTPUTDIR)/java_runtimes; \
+	else \
+		echo "[jre25] skipping cp to java_runtimes (JRE25 not present)"; \
+	fi; \
 	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-8-openjdk/lib; \
 	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-17-openjdk/lib;
 	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-21-openjdk/lib
-	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-25-openjdk/lib
+	if [ -d "$(OUTPUTDIR)/java_runtimes/java-25-openjdk" ]; then cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-25-openjdk/lib; fi
 	echo '[Amethyst v$(VERSION)] jre - end'
 
 dep_mg:
@@ -354,11 +362,14 @@ dep_mobilegl:
 	grep -q 'unique_ptr<T>(new T{' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h || perl -i -pe 's/return std::make_unique<T>\(std::forward<Args>\(args\)\.\.\.\);/return std::unique_ptr<T>(new T{std::forward<Args>(args)...});/' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h
 	grep -q 'BufferChange() = default' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_State/GLState/BufferState/BufferObject.h || perl -i -pe 'if (/struct BufferChange {/) { $$_ .= "        BufferChange() = default; BufferChange(Flags<BufferChangeBits> bits) : Bits(bits) {}\n" }' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_State/GLState/BufferState/BufferObject.h
 	# 新版本 MobileGL（含 DecomposeWorkgroupVec3Pass.cpp）已修复 make_unique/initializer_list 兼容性，
-	# 上述补丁反而会破坏新版本（brace-init 导致 int→uint32_t narrowing 错误）。检测到新版本时还原。
+	# brace-init 补丁（make_unique -> unique_ptr(new T{...})）会破坏新版本（int->uint32_t narrowing），
+	# 检测到新版本时还原 make_unique 补丁。
+	# 注意：Range1D 和 BufferChange 的显式构造函数补丁必须保留——
+	# 新版本源码（如 GL_Buffer.cpp）仍使用 Range1D(x, y) 圆括号语法调用，
+	# 而 Range1D 在 Types.h 中是聚合体无显式构造函数，C++17 下圆括号语法对聚合体不可用，
+	# 移除构造函数补丁会导致编译失败。BufferChange 同理。
 	if [ -f "$(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/ShaderTranspiler/SpirvPasses/DecomposeWorkgroupVec3Pass.cpp" ]; then \
 		perl -i -pe 's/return std::unique_ptr<T>\(new T\{std::forward<Args>\(args\)\.\.\.\}\);/return std::make_unique<T>(std::forward<Args>(args)...);/' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h; \
-		perl -i -0pe 's/        Range1D\(\) = default; Range1D\(SizeT s, SizeT e\) : start\(s\), end\(e\) \{\}\n//g' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_Util/Types.h; \
-		perl -i -0pe 's/        BufferChange\(\) = default; BufferChange\(Flags<BufferChangeBits> bits\) : Bits\(bits\) \{\}\n//g' $(MOBILEGL_SOURCE_DIR)/MobileGL/MG_State/GLState/BufferState/BufferObject.h; \
 	fi
 	mkdir -p $(WORKINGDIR)/mobilegl
 	cd $(WORKINGDIR)/mobilegl && cmake \
