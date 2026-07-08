@@ -6,6 +6,7 @@
 //
 
 #import "BackgroundManager.h"
+#import "LiquidGlassCompat.h"
 #import <Photos/Photos.h>
 
 static NSString * const kBackgroundTypeKey = @"background_type";
@@ -464,24 +465,19 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)applyEffectToCell:(UITableViewCell *)cell {
     if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果 - use UIBlurEffect on cell background
-        if (@available(iOS 13.0, *)) {
-            UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark];
-            UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
-            blurView.frame = cell.bounds;
-            blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            
-            // Remove old background views
-            for (UIView *subview in cell.contentView.superview.subviews) {
-                if ([subview isKindOfClass:[UIVisualEffectView class]] && subview != blurView) {
-                    [subview removeFromSuperview];
-                }
+        // iOS 26+: 液态玻璃 / iOS 14-25: 毛玻璃
+        UIVisualEffectView *blurView = LGCCreateGlassEffectView(YES);
+        blurView.frame = cell.bounds;
+        blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+
+        // Remove old background views
+        for (UIView *subview in cell.contentView.superview.subviews) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview != blurView) {
+                [subview removeFromSuperview];
             }
-            
-            cell.backgroundView = blurView;
-        } else {
-            cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
         }
+
+        cell.backgroundView = blurView;
         cell.contentView.backgroundColor = [UIColor clearColor];
     } else {
         // 半透明效果 - simple semi-transparent background
@@ -523,15 +519,20 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)applyEffectToNavigationBar:(UINavigationBar *)navigationBar {
     if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果
+        // iOS 26+: 液态玻璃 - 移除自定义背景让系统接管
+        if (LGCIsLiquidGlassAvailable()) {
+            LGCAdaptNavigationBar(navigationBar);
+            return;
+        }
+        // 毛玻璃效果（iOS 14-25）
         if (@available(iOS 13.0, *)) {
             UINavigationBarAppearance *appearance = [[UINavigationBarAppearance alloc] init];
             [appearance configureWithTransparentBackground];
             appearance.backgroundColor = [UIColor clearColor];
-            
+
             UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark];
             appearance.backgroundEffect = blur;
-            
+
             navigationBar.standardAppearance = appearance;
             navigationBar.scrollEdgeAppearance = appearance;
             navigationBar.compactAppearance = appearance;
@@ -558,7 +559,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)applyEffectToToolbar:(UIToolbar *)toolbar {
     if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果
+        // iOS 26+: 液态玻璃 - 移除自定义背景让系统接管
+        if (LGCIsLiquidGlassAvailable()) {
+            LGCAdaptBar(toolbar);
+            return;
+        }
+        // 毛玻璃效果（iOS 14-25）
         if (@available(iOS 13.0, *)) {
             UIToolbarAppearance *appearance = [[UIToolbarAppearance alloc] init];
             [appearance configureWithTransparentBackground];
@@ -609,24 +615,23 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)applyEffectToView:(UIView *)view {
     if (!view) return;
-    
+
     if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果 - 创建 UIVisualEffectView 作为子视图
+        // iOS 26+: 液态玻璃 / iOS 14-25: 毛玻璃
         // 先移除已有的 blur view
         for (UIView *subview in view.subviews) {
             if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
                 [subview removeFromSuperview];
             }
         }
-        
-        UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark];
-        UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+
+        UIVisualEffectView *blurView = LGCCreateGlassEffectView(YES);
         blurView.tag = kBackgroundBlurTag;
         blurView.frame = view.bounds;
         blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         blurView.layer.cornerRadius = view.layer.cornerRadius;
         blurView.layer.masksToBounds = YES;
-        
+
         [view insertSubview:blurView atIndex:0];
         view.backgroundColor = [UIColor clearColor];
     } else {
@@ -642,23 +647,22 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
     if (!cell) return;
-    
+
     if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果
+        // iOS 26+ 液态玻璃 / 低版本毛玻璃效果
         for (UIView *subview in cell.contentView.subviews) {
             if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
                 [subview removeFromSuperview];
             }
         }
-        
-        UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark];
-        UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+
+        UIVisualEffectView *blurView = LGCCreateGlassEffectView(YES);
         blurView.tag = kBackgroundBlurTag;
         blurView.frame = cell.contentView.bounds;
         blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         blurView.layer.cornerRadius = cell.contentView.layer.cornerRadius;
         blurView.layer.masksToBounds = YES;
-        
+
         [cell.contentView insertSubview:blurView atIndex:0];
         cell.backgroundColor = [UIColor clearColor];
         cell.contentView.backgroundColor = [UIColor clearColor];

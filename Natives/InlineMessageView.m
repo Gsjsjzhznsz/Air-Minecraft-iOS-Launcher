@@ -6,6 +6,7 @@
 //
 
 #import "InlineMessageView.h"
+#import "LiquidGlassCompat.h"
 #import "utils.h"
 
 @interface InlineMessageView ()
@@ -80,9 +81,8 @@
     self.containerView.layer.borderWidth = 1;
     self.containerView.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.1].CGColor;
 
-    // 根据类型设置背景色
-    UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
+    // 根据类型设置背景色（iOS 26+ 液态玻璃 / 低版本毛玻璃）
+    UIVisualEffectView *blurView = LGCCreateGlassEffectView(NO);
     blurView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.containerView addSubview:blurView];
 

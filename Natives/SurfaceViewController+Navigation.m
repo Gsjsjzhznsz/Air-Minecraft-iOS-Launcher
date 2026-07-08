@@ -7,6 +7,7 @@
 #import "TrackedTextField.h"
 #import "utils.h"
 #import "ScreenUtils.h"
+#import "LiquidGlassCompat.h"
 #import <objc/runtime.h>
 
 // 暴露 class extension 中的私有属性，供 category 使用
@@ -71,10 +72,24 @@ static const void *kMenuDimViewKey = &kMenuDimViewKey;
     self.menuView.clipsToBounds = YES;
     self.menuView.scrollEnabled = YES;
     self.menuView.separatorInset = UIEdgeInsetsMake(0, 16, 0, 16);
-    // FCL 风格：半透明深色背景
-    self.menuView.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
-        return [UIColor colorWithRed:28.0/255.0 green:28.0/255.0 blue:30.0/255.0 alpha:0.95];
-    }];
+    // iOS 26+: 液态玻璃背景 / 低版本半透明深色
+    if (LGCIsLiquidGlassAvailable()) {
+        UIVisualEffectView *glassView = LGCCreateGlassEffectView(YES);
+        glassView.frame = self.menuView.bounds;
+        glassView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        // UITableView 的背景需设为 clear 让 glass effect 透出
+        self.menuView.backgroundColor = [UIColor clearColor];
+        // 将 glass view 作为 table view 的 backgroundView（iOS 26+ 液态玻璃在 table 后面）
+        UIView *bgWrapper = [[UIView alloc] initWithFrame:self.menuView.bounds];
+        bgWrapper.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [bgWrapper addSubview:glassView];
+        self.menuView.backgroundView = bgWrapper;
+    } else {
+        // FCL 风格：半透明深色背景
+        self.menuView.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor * _Nonnull(UITraitCollection * _Nonnull traitCollection) {
+            return [UIColor colorWithRed:28.0/255.0 green:28.0/255.0 blue:30.0/255.0 alpha:0.95];
+        }];
+    }
     // 添加阴影
     self.menuView.layer.shadowColor = [UIColor blackColor].CGColor;
     self.menuView.layer.shadowOffset = CGSizeMake(0, -2);

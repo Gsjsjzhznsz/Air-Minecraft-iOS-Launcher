@@ -124,6 +124,7 @@ add_executable(AngelAuraAmethyst
   external/fishhook/fishhook.c
   UIKit+hook.m
   ScreenUtils.m
+  LiquidGlassCompat.m
 
   authenticator/BaseAuthenticator.m
   authenticator/LocalAuthenticator.m

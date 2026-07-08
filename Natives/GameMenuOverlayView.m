@@ -8,6 +8,7 @@
 
 #import "GameMenuOverlayView.h"
 #import "LauncherPreferences.h"
+#import "LiquidGlassCompat.h"
 
 // 位置持久化的 pref key
 static NSString *const kPrefMenuButtonX = @"game.menu_button_x";
@@ -69,10 +70,24 @@ static const CGFloat kDragThreshold = 10.0;
     self.menuButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.menuButton.frame = CGRectMake(0, 0, kMenuButtonSize, kMenuButtonSize);
     self.menuButton.layer.cornerRadius = kMenuButtonSize / 2;
-    // 半透明深色背景，确保在游戏画面上可见
-    self.menuButton.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:0.6];
-    self.menuButton.layer.borderWidth = 1.5;
-    self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.4].CGColor;
+    // iOS 26+: 液态玻璃背景 / 低版本半透明深色背景
+    if (LGCIsLiquidGlassAvailable()) {
+        self.menuButton.backgroundColor = [UIColor clearColor];
+        UIVisualEffectView *glassBg = LGCCreateGlassEffectView(NO);
+        glassBg.frame = self.menuButton.bounds;
+        glassBg.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        glassBg.layer.cornerRadius = kMenuButtonSize / 2;
+        glassBg.layer.masksToBounds = YES;
+        [self.menuButton insertSubview:glassBg atIndex:0];
+        // 液态玻璃下保留细边框增强可见性
+        self.menuButton.layer.borderWidth = 0.5;
+        self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.3].CGColor;
+    } else {
+        // 半透明深色背景，确保在游戏画面上可见
+        self.menuButton.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:0.6];
+        self.menuButton.layer.borderWidth = 1.5;
+        self.menuButton.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.4].CGColor;
+    }
     // 参照 FCL：使用设置图标（gearshape）
     UIImage *icon = [UIImage systemImageNamed:@"gearshape.fill"]
                     ?: [UIImage systemImageNamed:@"gear"];
@@ -224,8 +239,12 @@ static const CGFloat kDragThreshold = 10.0;
         self.isDragging = NO;
         self.dragStartPoint = [sender locationInView:self];
         self.dragStartCenter = self.menuButton.center;
-        // 拖拽时高亮
-        self.menuButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.9 alpha:0.8];
+        // 拖拽时高亮：iOS 26+ 改 tintColor（背景为液态玻璃），低版本改 backgroundColor
+        if (LGCIsLiquidGlassAvailable()) {
+            self.menuButton.tintColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.9 alpha:1.0];
+        } else {
+            self.menuButton.backgroundColor = [UIColor colorWithRed:0.2 green:0.5 blue:0.9 alpha:0.8];
+        }
     } else if (sender.state == UIGestureRecognizerStateChanged) {
         CGFloat dx = [sender locationInView:self].x - self.dragStartPoint.x;
         CGFloat dy = [sender locationInView:self].y - self.dragStartPoint.y;
@@ -244,7 +263,11 @@ static const CGFloat kDragThreshold = 10.0;
         }
     } else if (sender.state == UIGestureRecognizerStateEnded || sender.state == UIGestureRecognizerStateCancelled) {
         // 恢复背景
-        self.menuButton.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:0.6];
+        if (LGCIsLiquidGlassAvailable()) {
+            self.menuButton.tintColor = [UIColor whiteColor];
+        } else {
+            self.menuButton.backgroundColor = [UIColor colorWithRed:0.1 green:0.1 blue:0.1 alpha:0.6];
+        }
         if (self.isDragging) {
             // 拖拽结束保存位置
             [self savePositions];

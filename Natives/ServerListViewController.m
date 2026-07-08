@@ -5,6 +5,7 @@
 
 #import "ServerListViewController.h"
 #import "BackgroundManager.h"
+#import "LiquidGlassCompat.h"
 #import "InlineMessageView.h"
 #import "PLPreferences.h"
 #import "PLProfiles.h"
@@ -221,8 +222,8 @@
         cell.contentView.backgroundColor = [UIColor clearColor];
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
 
-        // 毛玻璃卡片
-        UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial]];
+        // iOS 26+ 液态玻璃 / 低版本毛玻璃卡片
+        UIVisualEffectView *blur = LGCCreateGlassEffectView(NO);
         blur.translatesAutoresizingMaskIntoConstraints = NO;
         blur.layer.cornerRadius = 12;
         blur.layer.masksToBounds = YES;

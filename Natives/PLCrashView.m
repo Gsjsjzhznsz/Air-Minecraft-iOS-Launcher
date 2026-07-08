@@ -3,6 +3,7 @@
 #import "SurfaceViewController.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
+#import "LiquidGlassCompat.h"
 #import "AIFixViewController.h"
 
 @interface PLCrashView ()
@@ -90,9 +91,8 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     self.backgroundColor = [UIColor clearColor];
     self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     
-    // 毛玻璃背景
-    UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+    // iOS 26+ 液态玻璃 / 低版本毛玻璃
+    UIVisualEffectView *blurView = LGCCreateGlassEffectView(YES);
     blurView.frame = self.bounds;
     blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self addSubview:blurView];

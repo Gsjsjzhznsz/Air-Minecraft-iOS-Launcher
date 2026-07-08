@@ -1,5 +1,6 @@
 #import "ModpackInstallViewController.h"
 #import "BackgroundManager.h"
+#import "LiquidGlassCompat.h"
 #import "InlineMessageView.h"
 #import "modpack/ModrinthAPI.h"
 #import "MinecraftResourceDownloadTask.h"
@@ -166,8 +167,8 @@
         }
         cell.backgroundColor = [UIColor clearColor];
         cell.contentView.backgroundColor = [UIColor clearColor];
-        // 添加毛玻璃效果卡片
-        UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial]];
+        // iOS 26+ 液态玻璃 / 低版本毛玻璃效果卡片
+        UIVisualEffectView *blurView = LGCCreateGlassEffectView(NO);
         blurView.translatesAutoresizingMaskIntoConstraints = NO;
         blurView.layer.cornerRadius = 12;
         blurView.layer.masksToBounds = YES;

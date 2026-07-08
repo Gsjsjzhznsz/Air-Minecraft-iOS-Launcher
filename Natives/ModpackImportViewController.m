@@ -8,6 +8,7 @@
 
 #import "ModpackImportViewController.h"
 #import "BackgroundManager.h"
+#import "LiquidGlassCompat.h"
 #import "ModpackImportService.h"
 #import "ModpackExportService.h"
 #import "PLProfiles.h"
@@ -430,7 +431,7 @@
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     cell.backgroundColor = [UIColor clearColor];
 
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial]];
+    UIVisualEffectView *blurView = LGCCreateGlassEffectView(NO);
     blurView.translatesAutoresizingMaskIntoConstraints = NO;
     blurView.layer.cornerRadius = 12;
     blurView.layer.masksToBounds = YES;

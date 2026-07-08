@@ -24,6 +24,7 @@
 #import "ModService.h"
 #import "ModItem.h"
 #import "PLProfiles.h"
+#import "LiquidGlassCompat.h"
 
 static UIColor *AFHexColor(NSString *hex) {
     hex = [hex stringByReplacingOccurrencesOfString:@"#" withString:@""];
@@ -237,9 +238,8 @@ typedef NS_ENUM(NSInteger, MessageBubbleType) {
 }
 
 - (void)setupBackground {
-    // 毛玻璃背景
-    UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark];
-    UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
+    // iOS 26+ 液态玻璃 / 低版本毛玻璃
+    UIVisualEffectView *blurView = LGCCreateGlassEffectView(YES);
     blurView.frame = self.view.bounds;
     blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [self.view addSubview:blurView];
@@ -1274,7 +1274,7 @@ typedef NS_ENUM(NSInteger, MessageBubbleType) {
         self.layer.cornerCurve = kCACornerCurveContinuous;
         self.clipsToBounds = NO;
 
-        _blurView = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterialDark]];
+        _blurView = LGCCreateGlassEffectView(YES);
         _blurView.translatesAutoresizingMaskIntoConstraints = NO;
         _blurView.layer.cornerRadius = 18;
         _blurView.layer.cornerCurve = kCACornerCurveContinuous;
