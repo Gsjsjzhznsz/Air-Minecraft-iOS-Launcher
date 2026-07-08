@@ -293,23 +293,19 @@ jre: native
 	if [ -f "$(ls jre*.tar.xz)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
 	if [ ! -f "$(SOURCEDIR)/depends/java-25-openjdk/release" ] || [ ! -f "$(SOURCEDIR)/depends/java-25-openjdk/lib/server/libjvm.dylib" ]; then \
-		JRE25_URL="https://github.com/Taylen-chud/Amethyst-iOS/releases/download/Java-25/jre25-ios-arm64-20260614-release.tar.xz"; \
+		JRE25_URL="https://github.com/Taylen-chud/Amethyst-iOS/releases/download/Java-25/jre25-ios-arm64-20260707-release.tar.xz"; \
 		echo "[jre25] downloading iOS-built OpenJDK 25..."; \
-		if curl -L --fail -o /tmp/jre25.tar.xz "$$JRE25_URL"; then \
-			mkdir -p $(SOURCEDIR)/depends/java-25-openjdk; \
-			tar xf /tmp/jre25.tar.xz -C $(SOURCEDIR)/depends/java-25-openjdk; \
-			rm -f /tmp/jre25.tar.xz; \
-			if vtool -show $(SOURCEDIR)/depends/java-25-openjdk/lib/server/libjvm.dylib 2>/dev/null | grep -q "platform IOS"; then \
-				echo "[jre25] confirmed: libjvm.dylib has platform IOS"; \
-			else \
-				echo "[jre25] WARNING: libjvm.dylib is not tagged as iOS"; \
-			fi; \
-			echo "[jre25] done. Final size:"; \
-			du -sh $(SOURCEDIR)/depends/java-25-openjdk; \
+		curl -L --fail -o /tmp/jre25.tar.xz "$$JRE25_URL"; \
+		mkdir -p $(SOURCEDIR)/depends/java-25-openjdk; \
+		tar xf /tmp/jre25.tar.xz -C $(SOURCEDIR)/depends/java-25-openjdk; \
+		rm -f /tmp/jre25.tar.xz; \
+		if vtool -show $(SOURCEDIR)/depends/java-25-openjdk/lib/server/libjvm.dylib 2>/dev/null | grep -q "platform IOS"; then \
+			echo "[jre25] confirmed: libjvm.dylib has platform IOS"; \
 		else \
-			echo "[jre25] WARNING: JRE25 download failed (404 or network error), skipping. Java 25 games will not be supported in this build."; \
-			rm -f /tmp/jre25.tar.xz; \
+			echo "[jre25] WARNING: libjvm.dylib is not tagged as iOS"; \
 		fi; \
+		echo "[jre25] done. Final size:"; \
+		du -sh $(SOURCEDIR)/depends/java-25-openjdk; \
 	else \
 		echo "[jre25] already present, skipping download"; \
 	fi; \
@@ -318,15 +314,11 @@ jre: native
 	cp -R $(POJAV_JRE8_DIR) $(OUTPUTDIR)/java_runtimes; \
 	cp -R $(POJAV_JRE17_DIR) $(OUTPUTDIR)/java_runtimes; \
 	cp -R $(POJAV_JRE21_DIR) $(OUTPUTDIR)/java_runtimes; \
-	if [ -d "$(POJAV_JRE25_DIR)" ] && [ -f "$(POJAV_JRE25_DIR)/release" ]; then \
-		cp -R $(POJAV_JRE25_DIR) $(OUTPUTDIR)/java_runtimes; \
-	else \
-		echo "[jre25] skipping cp to java_runtimes (JRE25 not present)"; \
-	fi; \
+	cp -R $(POJAV_JRE25_DIR) $(OUTPUTDIR)/java_runtimes; \
 	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-8-openjdk/lib; \
 	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-17-openjdk/lib;
 	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-21-openjdk/lib
-	if [ -d "$(OUTPUTDIR)/java_runtimes/java-25-openjdk" ]; then cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-25-openjdk/lib; fi
+	cp $(WORKINGDIR)/libawt_xawt.dylib $(OUTPUTDIR)/java_runtimes/java-25-openjdk/lib
 	echo '[Amethyst v$(VERSION)] jre - end'
 
 dep_mg:
