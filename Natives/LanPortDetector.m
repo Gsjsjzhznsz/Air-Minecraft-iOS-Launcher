@@ -65,6 +65,49 @@ static NSString *const kLatestLogPath = @"%s/latestlog.txt";
 
 @end
 
+/// 检查一行日志是否来自启动器自身（而非 MC）
+///
+/// 启动器各组件通过 NSLog 输出的日志会被 PLLogOutputView 捕获并重新发送给
+/// LanPortDetector。如果不过滤，genericPortRegex 的 "lan\s*(?:port|server)"
+/// 模式会匹配 "[LanPortDetector]" 中的 "LanPort" 字样，导致递归循环。
+/// 此函数在 processLogLine: 和 detectFromLogFile 中都被调用。
+static BOOL LanPortDetectorIsLauncherLogLine(NSString *line) {
+    static NSArray<NSString *> *markers = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        markers = @[
+            @"[LanPortDetector]",
+            @"[PortForwarder]",
+            @"[MultiplayerManager]",
+            @"[MultiplayerVC]",
+            @"[SOCKS5Proxy]",
+            @"[ZeroTierBridge]",
+            @"[SurfaceVC]",
+            @"[SurfaceViewController]",
+            @"[JavaLauncher]",
+            @"[TouchController]",
+            @"[Pre-init]",
+            @"[Pre-Init]",
+            @"[Debugging]",
+            @"[MCDL]",
+            @"[MDCL]",
+            @"[DyldLVBypass]",
+            @"[Init]",
+            @"[egl_bridge]",
+            @"[gl_bridge]",
+            @"[input_bridge]",
+            @"[MobileGlues]",
+            @"[EGLBridge]",
+        ];
+    });
+    for (NSString *marker in markers) {
+        if ([line rangeOfString:marker].location != NSNotFound) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 @implementation LanPortDetector
 
 #pragma mark - 单例
@@ -149,6 +192,25 @@ static NSString *const kLatestLogPath = @"%s/latestlog.txt";
 /// 处理一行日志，检测是否包含 LAN 端口信息
 - (void)processLogLine:(NSString *)line {
     if (!line || line.length == 0) return;
+
+    // 关键修复（递归循环 bug 导致端口检测错误）：
+    //
+    // 根因：启动器各组件（PortForwarder / MultiplayerManager / LanPortDetector
+    // 等）通过 NSLog 输出的日志会被 PLLogOutputView 捕获并重新发送给
+    // LanPortDetector 处理。其中 genericPortRegex 的模式 "lan\s*(?:port|server)"
+    // （大小写不敏感）会匹配到 "[LanPortDetector]" 中的 "LanPort" 字样，
+    // 导致把启动器自己的端口号（如 25565）误识别为 MC LAN 端口。
+    //
+    // 随后 LanPortDetector 打印检测日志 "[LanPortDetector] 从日志检测到 LAN 端口..."
+    // 该日志又被 PLLogOutputView 捕获，触发新一轮匹配，形成无限递归。
+    // 递归过程中日志行不断嵌套变长（引号层层嵌套），最终正则匹配到被
+    // 截断的 "2556"（4位数字），导致分享代码中的端口变成 2556 而非正确的
+    // MC LAN 端口（如 50798）。
+    //
+    // 修复：识别并跳过所有启动器组件的日志行，只处理真正的 MC 日志。
+    if (LanPortDetectorIsLauncherLogLine(line)) {
+        return;
+    }
 
     NSString *port = [self parsePortFromLogLine:line];
     if (port) {
@@ -272,6 +334,10 @@ static NSString *const kLatestLogPath = @"%s/latestlog.txt";
 
     for (NSInteger i = lines.count - 1; i >= 0; i--) {
         NSString *line = lines[i];
+        // 跳过启动器自身的日志行，避免误匹配（同 processLogLine: 中的过滤）
+        if (LanPortDetectorIsLauncherLogLine(line)) {
+            continue;
+        }
         NSString *port = [self parsePortFromLogLine:line];
         if (port) {
             NSLog(@"[LanPortDetector] 从日志文件第 %ld 行检测到端口：%@（行内容：%@）", (long)i, port, line);
