@@ -1269,6 +1269,16 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
 
+        // 关键诊断日志：记录 completion 回调时的状态，便于排查房客复制到错误地址的问题
+        NSLog(@"[MultiplayerVC] connectToRoom completion 回调：success=%d, error=%@, guestRoom=%@, guestRoom.hostIP=%@, parsedRoom指针=%p, guestRoom指针=%p, 是否同一对象=%d",
+              success,
+              error.localizedDescription,
+              strongSelf.guestRoom,
+              strongSelf.guestRoom.hostIP,
+              parsedRoom,
+              strongSelf.guestRoom,
+              (parsedRoom == strongSelf.guestRoom));
+
         // 先关闭进度提示 Alert，再显示结果
         [strongSelf dismissConnectionProgressAlertWithCompletion:^{
             if (success) {
@@ -1302,6 +1312,13 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 ///   3. 显示清晰的操作引导
 - (void)showGuestConnectedAlert {
     MultiplayerRoom *room = self.guestRoom;
+    // 关键诊断日志：记录 guestRoom 的完整状态，便于排查房客复制到错误地址的问题
+    NSLog(@"[MultiplayerVC] showGuestConnectedAlert 诊断：guestRoom=%@, currentLocalIP=%@, currentForwardingPort=%u, PortForwarder.isRunning=%d, PortForwarder.listeningPort=%u",
+          room,
+          [[MultiplayerManager sharedManager] currentLocalIP],
+          [[MultiplayerManager sharedManager] currentForwardingPort],
+          [[PortForwarder sharedForwarder] isRunning],
+          [[PortForwarder sharedForwarder] listeningPort]);
     NSString *hostIP = room.hostIP.length ? room.hostIP : ([[MultiplayerManager sharedManager] currentLocalIP] ?: @"-");
     NSString *hostPort = room.hostPort.length ? room.hostPort : @"25565";
 

@@ -1172,7 +1172,11 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     // 修复方案：通过 room.isHostSide 区分房主/房客房间：
     //   - 房主房间（isHostSide=YES）：将本机 IP 同步到 room.hostIP，用于生成分享代码
     //   - 房客房间（isHostSide=NO）：保留分享代码中的房主 IP，确保 PortForwarder 正确转发
+    NSLog(@"[MultiplayerManager] [连接流程] 步骤 4.5：检查 isHostSide 并同步本机 IP（诊断日志：localIP=%@, currentRoom=%@）",
+          localIP, self.currentRoom);
     if (localIP && localIP.length > 0 && self.currentRoom) {
+        NSLog(@"[MultiplayerManager] [连接流程] 步骤 4.5 详情：isHostSide=%d, 当前 room.hostIP=%@, 本机 ZeroTier IP=%@",
+              self.currentRoom.isHostSide, self.currentRoom.hostIP, localIP);
         if (self.currentRoom.isHostSide) {
             // 房主模式：将本机 ZeroTier IP 同步到 room.hostIP，使 shareTextForRoom:
             // 能正确输出房主的服务器地址，分享代码中也包含正确的房主 IP。
@@ -1310,6 +1314,8 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     // 因为房客必须通过 PortForwarder 转发才能连接到房主（MC 的 Netty 不走 SOCKS5）。
     NSString *hostIP = room.hostIP;
     NSString *hostPortStr = room.hostPort;
+    NSLog(@"[MultiplayerManager] [连接流程] 步骤 6：准备启动端口转发器（诊断日志：room=%@, hostIP=%@, hostPort=%@）",
+          room, hostIP, hostPortStr);
     if (hostIP.length > 0 && hostPortStr.length > 0) {
         uint16_t hostPort = (uint16_t)[hostPortStr integerValue];
         if (hostPort > 0) {
@@ -1384,6 +1390,16 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     } else {
         NSLog(@"[MultiplayerManager] [连接流程] 房间无房主 IP/端口（可能是房主模式），跳过端口转发");
     }
+
+    // 关键诊断日志：记录连接流程完成时的状态，便于排查房客复制到错误地址的问题
+    [_stateLock lock];
+    uint16_t finalForwardingPort = self.currentForwardingPort;
+    BOOL finalPortForwarderRunning = [[PortForwarder sharedForwarder] isRunning];
+    uint16_t finalPortForwarderListeningPort = [[PortForwarder sharedForwarder] listeningPort];
+    [_stateLock unlock];
+    NSLog(@"[MultiplayerManager] [连接流程] 流程完成（诊断日志）：room.hostIP=%@, room.hostPort=%@, isHostSide=%d, currentForwardingPort=%u, PortForwarder.isRunning=%d, PortForwarder.listeningPort=%u",
+          room.hostIP, room.hostPort, room.isHostSide,
+          finalForwardingPort, finalPortForwarderRunning, finalPortForwarderListeningPort);
 
     if (completion) {
         completion(YES, nil);
@@ -2028,9 +2044,18 @@ static NSString * const kPresetNetworkIdPrefKey = @"multiplayer.preset_network_i
     room.ownerName = @"";
     room.status = MultiplayerRoomStatusDisconnected;
     room.createdAt = [NSDate date];
+    // 关键修复（房客加入后无法连接服务器）：显式设置 isHostSide = NO。
+    // 虽然通过 [[MultiplayerRoom alloc] init] 创建的对象 _isHostSide 默认为 NO
+    // （alloc 零初始化内存），但显式设置可以：
+    //   1. 提高代码可读性，明确表达"从分享代码解析出的房间是房客房间"的意图
+    //   2. 防御性编程：如果未来有人修改 MultiplayerRoom 的 init 方法导致默认值变化，
+    //      此处仍能保证 isHostSide = NO
+    // 这确保后续 connectToRoomFlow: 和 zeroTierNetworkReady: 不会将本机 ZeroTier IP
+    // 覆盖到 room.hostIP，从而保留分享代码中的房主 IP 供 PortForwarder 使用。
+    room.isHostSide = NO;
 
-    NSLog(@"[MultiplayerManager] 已解析分享代码：roomName=%@ networkId=%@ hostIP=%@ hostPort=%@",
-          room.name, room.networkId, room.hostIP, room.hostPort);
+    NSLog(@"[MultiplayerManager] 已解析分享代码：roomName=%@ networkId=%@ hostIP=%@ hostPort=%@ isHostSide=%d（房客模式，hostIP 应为房主 IP）",
+          room.name, room.networkId, room.hostIP, room.hostPort, room.isHostSide);
 
     return room;
 }
