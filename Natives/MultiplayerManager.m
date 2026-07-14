@@ -895,8 +895,26 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         [self connectToRoomFlow:room completion:^(BOOL success, NSError * _Nullable error) {
             if (success) {
-                NSLog(@"[MultiplayerManager] 房间连接成功：%@", room.name);
-                room.status = MultiplayerRoomStatusConnected;
+                // 关键修复：成功分支也需校验 currentRoom。
+                // 如果连接流程在 completion 回调前被取消（disconnectCurrentRoom
+                // 已清空 currentRoom），但流程仍以 success=YES 回调（如步骤 6
+                // 检查点 D 之前完成），会将已取消的房间标记为 Connected 并
+                // 误导 UI 显示"已加入联机"。
+                [self->_stateLock lock];
+                BOOL stillCurrent = (self.currentRoom != nil &&
+                                     [self.currentRoom.roomId isEqualToString:room.roomId]);
+                if (stillCurrent) {
+                    NSLog(@"[MultiplayerManager] 房间连接成功：%@", room.name);
+                    room.status = MultiplayerRoomStatusConnected;
+                } else {
+                    // currentRoom 已变更（用户取消或切换房间），不标记为 Connected
+                    NSLog(@"[MultiplayerManager] 连接流程返回成功但 currentRoom 已变更，丢弃此次结果");
+                    success = NO;
+                    error = [NSError errorWithDomain:kMultiplayerErrorDomain
+                                                code:MultiplayerErrorCodeRoomNotFound
+                                            userInfo:@{NSLocalizedDescriptionKey: @"连接已取消"}];
+                }
+                [self->_stateLock unlock];
             } else {
                 NSLog(@"[MultiplayerManager] 房间连接失败：%@ - %@", room.name, error.localizedDescription);
                 room.status = MultiplayerRoomStatusError;
@@ -1298,6 +1316,46 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     //   仅当房间有 hostIP 和 hostPort 时才启动（即房客连接到房主房间时）。
     //   房主不需要端口转发器（房主自己开 LAN，其他玩家通过 ZeroTier 连过来）。
     [self notifyConnectionProgress:@"步骤 6/6：正在设置代理和端口转发..."];
+
+    // 关键修复（检查点 D）：步骤 6 setenv/PortForwarder 启动前校验 currentRoom。
+    // 之前步骤 6 段无 currentRoom 检查点，用户在 SOCKS5 启动后、setenv 之前点取消，
+    // disconnectCurrentRoom 已执行 stop SOCKS5/unsetenv/leaveNetwork/清空 currentRoom，
+    // 但流程继续：setenv 重新设置刚被清除的环境变量、PortForwarder 在 currentRoom=nil
+    // 的状态下启动，且 completion(YES) 误导用户已加入联机。后续再次 disconnect 因
+    // currentRoom==nil 直接返回（line 1440-1443），导致 PortForwarder/环境变量/网络
+    // 资源泄漏直至 App 重启。此检查点参照检查点 B/C 的模式，失败时清理已启动的资源。
+    [_stateLock lock];
+    BOOL stillCurrentBeforeForwarder = (self.currentRoom != nil &&
+                                        [self.currentRoom.roomId isEqualToString:room.roomId]);
+    [_stateLock unlock];
+    if (!stillCurrentBeforeForwarder) {
+        NSLog(@"[MultiplayerManager] [连接流程] 步骤 6 前检测到 currentRoom 已变更，中止流程并清理 SOCKS5/网络");
+        // 清理步骤 5 已启动的 SOCKS5 代理和已加入的网络
+        [[SOCKS5Proxy sharedProxy] stop];
+        unsetenv([kAMETHYSTSOCKS5ProxyEnvVar UTF8String]);
+        [[ZeroTierBridge sharedInstance] leaveNetwork:netID];
+
+        [_stateLock lock];
+        if (self.currentRoom && [self.currentRoom.roomId isEqualToString:room.roomId]) {
+            self.currentRoom = nil;
+            self.currentNetworkID = 0;
+            self.currentLocalIP = nil;
+            self.currentSOCKS5Port = 0;
+            self.currentForwardingPort = 0;
+        }
+        [_stateLock unlock];
+
+        room.status = MultiplayerRoomStatusError;
+        [self updateRoom:room];
+
+        if (completion) {
+            completion(NO, [NSError errorWithDomain:kMultiplayerErrorDomain
+                                                code:MultiplayerErrorCodeRoomNotFound
+                                            userInfo:@{NSLocalizedDescriptionKey: @"连接已取消"}]);
+        }
+        return;
+    }
+
     NSString *proxyValue = [NSString stringWithFormat:@"127.0.0.1:%u", actualPort];
     setenv([kAMETHYSTSOCKS5ProxyEnvVar UTF8String], [proxyValue UTF8String], 1);
     NSLog(@"[MultiplayerManager] [连接流程] 已设置环境变量 %@=%@", kAMETHYSTSOCKS5ProxyEnvVar, proxyValue);
@@ -2140,7 +2198,21 @@ static NSString * const kPresetNetworkIdPrefKey = @"multiplayer.preset_network_i
     room.roomId = [self generateRoomId];
     room.networkId = networkId;
     room.hostIP = hostIP ?: @"";
-    room.hostPort = hostPort ?: kDefaultMCPort;
+    // 关键修复：校验 hostPort 范围（1024-65535）。
+    // 之前直接用 hostPort ?: kDefaultMCPort，未校验格式和范围。
+    // 非法值（如 "99999" 会被 uint16_t 截断为 34463，"-1" 会变成 65535，
+    // "abc" 会变成 0 但因 hostPort.length > 0 通过下游检查导致 PortForwarder
+    // 启动后所有连接失败）。此处校验非法时回退到默认端口。
+    NSString *validatedHostPort = kDefaultMCPort;
+    if (hostPort.length > 0) {
+        NSInteger portNum = [hostPort integerValue];
+        if (portNum >= 1024 && portNum <= 65535) {
+            validatedHostPort = hostPort;
+        } else {
+            NSLog(@"[MultiplayerManager] 分享代码中 hostPort 非法（%@），回退到默认端口 %@", hostPort, kDefaultMCPort);
+        }
+    }
+    room.hostPort = validatedHostPort;
     room.name = roomName ?: [NSString stringWithFormat:@"%@...", [networkId substringToIndex:8]];
     room.roomDescription = @"";
     room.ownerName = @"";

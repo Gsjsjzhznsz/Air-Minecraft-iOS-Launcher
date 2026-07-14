@@ -1123,14 +1123,13 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         return;
     }
     NSLog(@"[MultiplayerVC] 用户手动输入 LAN 端口：%@", trimmed);
+    // 关键修复：不在此处直接调用 generateShareCodeWithPort:。
+    // setManualPort 内部会通过 setPort:source: 发送 LanPortDetectorDidDetectPortNotification，
+    // lanPortDidDetect: 会调用 generateShareCodeWithPort:。
+    // 由于 source=LanPortSourceManual 与自动检测的 Auto 不同，setPort:source: 的去重条件
+    // (port && source 都相同) 不会跳过，通知一定会触发，避免双重执行导致
+    // ReversePortForwarder 重启和 Alert present 失败。
     [[LanPortDetector sharedDetector] setManualPort:trimmed];
-    // setManualPort 内部会发送 LanPortDetectorDidDetectPortNotification，
-    // lanPortDidDetect: 会自动调用 generateShareCodeWithPort:。
-    // 但如果之前已检测到相同端口（去重），通知不会再次触发，
-    // 因此这里主动调用一次确保分享代码生成。
-    if (self.isHostFlowActive && self.hostRoom) {
-        [self generateShareCodeWithPort:trimmed];
-    }
 }
 
 #pragma mark - 游戏内模式：LAN 端口检测回调
@@ -1457,6 +1456,14 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 ///   2. 自动复制服务器地址到剪贴板（方便房客在 MC 中"添加服务器"时粘贴）
 ///   3. 显示清晰的操作引导
 - (void)showGuestConnectedAlert {
+    // 关键修复：检查 isGuestFlowActive 防止取消后竞态 completion(YES) 仍弹出"已加入联机"提示。
+    // 之前在 connectToRoomFlow 步骤 6 前用户点取消，disconnectCurrentRoom 已清空状态，
+    // 但流程仍可能以 success=YES 回调（在检查点 D 之前完成），触发本方法。
+    // 此时弹出 Alert 并写入 profile serverIp + 复制剪贴板会误导用户。
+    if (!self.isGuestFlowActive) {
+        NSLog(@"[MultiplayerVC] showGuestConnectedAlert 跳过：isGuestFlowActive=NO（可能已取消）");
+        return;
+    }
     MultiplayerRoom *room = self.guestRoom;
     // 关键诊断日志：记录 guestRoom 的完整状态，便于排查房客复制到错误地址的问题
     NSLog(@"[MultiplayerVC] showGuestConnectedAlert 诊断：guestRoom=%@, currentLocalIP=%@, currentForwardingPort=%u, PortForwarder.isRunning=%d, PortForwarder.listeningPort=%u",
