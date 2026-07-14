@@ -1085,7 +1085,7 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 /// 也可通过部分 Mod/服务端插件提供的命令查询。
 - (void)showManualPortInputAlert {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:MPLocalized(@"mp.host.manual_port_title", @"手动输入 LAN 端口")
-                                                                   message:MPLocalized(@"mp.host.manual_port_msg", @"请在 MC 聊天中查看"Local game hosted on port XXXXX"，输入 XXXXX 部分（1024-65535）")
+                                                                   message:MPLocalized(@"mp.host.manual_port_msg", @"请在 MC 聊天中查看 \"Local game hosted on port XXXXX\"，输入 XXXXX 部分（1024-65535）")
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
         textField.placeholder = @"例如：54321";
