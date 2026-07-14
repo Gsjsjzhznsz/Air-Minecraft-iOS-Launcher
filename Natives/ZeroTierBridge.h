@@ -293,6 +293,42 @@ typedef NS_ENUM(NSInteger, ZeroTierNetworkStatus) {
              buffer:(void *)buf
               length:(size_t)len;
 
+#pragma mark - Socket 服务端操作（供 ReversePortForwarder 使用）
+
+/// 将 libzt socket 绑定到本地 ZeroTier 网络接口
+///
+/// 用于房主侧反向端口转发：在 libzt socket 上监听房主的 ZeroTier IP:port，
+/// 让其他 ZeroTier 节点的 connect() 可以到达。
+///
+/// 支持 IPv4 和 IPv6。地址族由 fd 创建时决定（createTCPSocketForFamily:）。
+///
+/// @param fd socket 文件描述符（由 createTCPSocket/createTCPSocketForFamily: 创建）
+/// @param host 本地绑定的 IP 地址字符串（如 "10.147.17.1"，可传 nil/"0.0.0.0" 绑定所有接口）
+/// @param port 本地绑定端口
+/// @return 0 表示成功，< 0 表示失败
+- (int)bindSocket:(int)fd
+        toLocalIP:(nullable NSString *)host
+              port:(uint16_t)port;
+
+/// 在已 bind 的 libzt socket 上开始监听
+///
+/// 封装 zts_bsd_listen，将 socket 转为被动监听模式，等待其他节点的 connect。
+///
+/// @param fd socket 文件描述符
+/// @param backlog 等待连接队列最大长度
+/// @return 0 表示成功，< 0 表示失败
+- (int)listenOnSocket:(int)fd
+              backlog:(int)backlog;
+
+/// 在已 listen 的 libzt socket 上接受新连接
+///
+/// 封装 zts_bsd_accept，阻塞等待直到有新连接到达。
+/// 调用方应在独立线程中调用此方法，避免阻塞主线程。
+///
+/// @param fd 已 listen 的 socket 文件描述符
+/// @return 新连接的 socket fd（≥ 0 表示成功），< 0 表示失败
+- (int)acceptOnSocket:(int)fd;
+
 #pragma mark - 工具方法
 
 /// 从十六进制字符串解析网络 ID

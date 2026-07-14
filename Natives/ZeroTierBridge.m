@@ -1471,6 +1471,134 @@ static void zeroTierEventCallback(void *msgPtr) {
     return received;
 }
 
+#pragma mark - Socket 服务端操作（供 ReversePortForwarder 使用）
+
+/// 将 libzt socket 绑定到本地 ZeroTier 网络接口
+///
+/// 用于房主侧反向端口转发：
+///   1. 房主调用 createTCPSocketForFamily: 创建 libzt socket
+///   2. 调用本方法 bind 到房主的 ZeroTier IP:LAN_PORT
+///   3. 调用 listenOnSocket: 进入监听状态
+///   4. 调用 acceptOnSocket: 等待房客的 libzt socket 连接
+///
+/// 关键说明：libzt 是用户态 socket 实现，bind 到的 IP 必须是本机已被 ZeroTier
+/// 网络分配的 IP（由 zeroTierAddressAssigned 回调或 ipv4AddressForNetwork: 获取）。
+/// 不能用 0.0.0.0 让 libzt 监听所有接口——libzt 只识别自己网络中的 IP。
+///
+/// IPv6 支持：Ad-hoc 网络下只有 IPv6 地址，host 应为 IPv6 字符串（如 "fd00::1"）。
+- (int)bindSocket:(int)fd
+        toLocalIP:(NSString *)host
+              port:(uint16_t)port {
+    if (fd < 0) {
+        NSLog(@"[ZeroTierBridge] bindSocket 错误：fd 无效 (fd=%d)", fd);
+        return ZTS_ERR_ARG;
+    }
+
+    // 设置 SO_REUSEADDR，避免 PortForwarder stop 后立即 restart 时端口 TIME_WAIT
+    int reuseAddr = 1;
+    zts_bsd_setsockopt(fd, ZTS_SOL_SOCKET, ZTS_SO_REUSEADDR, &reuseAddr, sizeof(reuseAddr));
+
+    // 检测地址类型（IPv4/IPv6）
+    // host 为 nil 时按 IPv4 0.0.0.0 处理（监听所有 IPv4 接口）
+    BOOL isIPv6 = NO;
+    const char *hostCStr = "0.0.0.0";
+    if (host && host.length > 0) {
+        hostCStr = [host UTF8String];
+        isIPv6 = (zts_inet_pton(ZTS_AF_INET6, hostCStr, NULL) == 1);
+    }
+
+    NSLog(@"[ZeroTierBridge] bind socket：fd=%d, host=%@, port=%u, isIPv6=%d",
+          fd, host ?: @"(nil)", port, isIPv6);
+
+    // 准备 sockaddr
+    struct zts_sockaddr_storage addrStorage;
+    memset(&addrStorage, 0, sizeof(addrStorage));
+    socklen_t addrLen = 0;
+
+    if (isIPv6) {
+        struct zts_sockaddr_in6 *addr6 = (struct zts_sockaddr_in6 *)&addrStorage;
+        addr6->sin6_len = sizeof(struct zts_sockaddr_in6);
+        addr6->sin6_family = ZTS_AF_INET6;
+        addr6->sin6_port = htons(port);
+
+        int ptonResult = zts_inet_pton(ZTS_AF_INET6, hostCStr, &addr6->sin6_addr);
+        if (ptonResult != 1) {
+            NSLog(@"[ZeroTierBridge] zts_inet_pton(IPv6) 失败：result=%d, host=%@", ptonResult, host);
+            return ZTS_ERR_ARG;
+        }
+        addrLen = sizeof(struct zts_sockaddr_in6);
+    } else {
+        struct zts_sockaddr_in *addr = (struct zts_sockaddr_in *)&addrStorage;
+        addr->sin_len = sizeof(struct zts_sockaddr_in);
+        addr->sin_family = ZTS_AF_INET;
+        addr->sin_port = htons(port);
+
+        if (host && host.length > 0) {
+            int ptonResult = zts_inet_pton(ZTS_AF_INET, hostCStr, &addr->sin_addr);
+            if (ptonResult != 1) {
+                NSLog(@"[ZeroTierBridge] zts_inet_pton(IPv4) 失败：result=%d, host=%@", ptonResult, host);
+                return ZTS_ERR_ARG;
+            }
+        } else {
+            // host 为 nil，绑定所有接口（0.0.0.0）
+            addr->sin_addr.s_addr = htonl(INADDR_ANY);
+        }
+        addrLen = sizeof(struct zts_sockaddr_in);
+    }
+
+    int bindResult = zts_bsd_bind(fd, (const struct zts_sockaddr *)&addrStorage, addrLen);
+    if (bindResult != ZTS_ERR_OK) {
+        NSLog(@"[ZeroTierBridge] zts_bsd_bind 失败：result=%d, zts_errno=%d, host=%@, port=%u",
+              bindResult, zts_errno, host ?: @"(nil)", port);
+    } else {
+        NSLog(@"[ZeroTierBridge] bind 成功：fd=%d, port=%u", fd, port);
+    }
+    return bindResult;
+}
+
+/// 在已 bind 的 libzt socket 上开始监听
+- (int)listenOnSocket:(int)fd
+              backlog:(int)backlog {
+    if (fd < 0) {
+        NSLog(@"[ZeroTierBridge] listenOnSocket 错误：fd 无效 (fd=%d)", fd);
+        return ZTS_ERR_ARG;
+    }
+
+    int listenResult = zts_bsd_listen(fd, backlog);
+    if (listenResult != ZTS_ERR_OK) {
+        NSLog(@"[ZeroTierBridge] zts_bsd_listen 失败：result=%d, zts_errno=%d, fd=%d",
+              listenResult, zts_errno, fd);
+    } else {
+        NSLog(@"[ZeroTierBridge] listen 成功：fd=%d, backlog=%d", fd, backlog);
+    }
+    return listenResult;
+}
+
+/// 在已 listen 的 libzt socket 上接受新连接
+///
+/// 阻塞调用：调用方必须在工作线程中调用此方法。
+/// 返回的新 fd 是 libzt socket，可通过 sendData/recvData/closeSocket 操作。
+- (int)acceptOnSocket:(int)fd {
+    if (fd < 0) {
+        NSLog(@"[ZeroTierBridge] acceptOnSocket 错误：fd 无效 (fd=%d)", fd);
+        return ZTS_ERR_ARG;
+    }
+
+    struct zts_sockaddr_storage clientAddr;
+    memset(&clientAddr, 0, sizeof(clientAddr));
+    zts_socklen_t addrLen = sizeof(clientAddr);
+
+    int clientFD = zts_bsd_accept(fd, (struct zts_sockaddr *)&clientAddr, &addrLen);
+    if (clientFD < 0) {
+        // accept 失败可能是正常的（如被信号中断、被 close 唤醒）
+        NSLog(@"[ZeroTierBridge] zts_bsd_accept 失败：clientFD=%d, zts_errno=%d, fd=%d",
+              clientFD, zts_errno, fd);
+    } else {
+        NSLog(@"[ZeroTierBridge] accept 成功：listenFD=%d, clientFD=%d", fd, clientFD);
+    }
+    return clientFD;
+}
+
 #pragma mark - 工具方法
 
 /// 从十六进制字符串解析网络 ID

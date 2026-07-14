@@ -55,6 +55,7 @@
 #import "ZeroTierBridge.h"
 #import "SOCKS5Proxy.h"
 #import "PortForwarder.h"
+#import "ReversePortForwarder.h"
 #import "LauncherPreferences.h"
 
 #pragma mark - 常量定义
@@ -112,6 +113,7 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     MultiplayerErrorCodeJoinNetworkFailed    = 1009, // 加入网络失败
     MultiplayerErrorCodeNetworkReadyTimeout  = 1010, // 等待网络就绪超时
     MultiplayerErrorCodeSOCKS5ProxyStartFailed = 1011, // SOCKS5 代理启动失败
+    MultiplayerErrorCodeInvalidState          = 1012, // 状态无效（如本机 IP 为空或非房主侧调用房主接口）
 };
 
 #pragma mark - MultiplayerRoom 实现
@@ -349,6 +351,10 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
 
 - (BOOL)isPortForwarderRunning {
     return [[PortForwarder sharedForwarder] isRunning];
+}
+
+- (BOOL)isReversePortForwarderRunning {
+    return [[ReversePortForwarder sharedForwarder] isRunning];
 }
 
 - (BOOL)isNodeOnline {
@@ -1298,6 +1304,21 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
 
     // 如果房间有房主 IP 和端口（房客模式），启动端口转发器
     //
+    // 关键修复（P1）：房主侧（isHostSide=YES）跳过 PortForwarder 启动。
+    //
+    // 问题：步骤 6 原本只检查 hostIP/hostPort 非空，但房主在步骤 4.5 中已把
+    // hostIP 同步为本机 ZeroTier IP，hostPort 在 LanPortDetector 检测到端口后
+    // 也会非空。这导致房主本机也启动 PortForwarder（127.0.0.1:25565 → 自己:LAN_PORT），
+    // 是一个无用的回环转发：房主自己的 MC 不需要走 PortForwarder。
+    // 更严重的是，hostPort 在 LAN 端口尚未检测时仍为空字符串跳过启动——但若旧版本
+    // 预设 25565 或被某次保存的房间对象污染，PortForwarder 会监听 25565，
+    // 占用房主本机 25565 端口，可能与房主 MC 的某些操作冲突。
+    //
+    // 修复方案：增加 !room.isHostSide 检查，确保仅房客启动 PortForwarder。
+    // 房主的接入由新增的 ReversePortForwarder 负责（在 libzt socket 上监听
+    // 房主 ZeroTier IP:LAN_PORT，accept 后用系统 socket 连接到 127.0.0.1:LAN_PORT
+    // 即房主 MC 的本地监听地址）。
+    //
     // 关键修复（房客复制到 10. 开头地址而非 127.0.0.1）：
     // 之前的 bug：如果 PortForwarder 已在运行（例如上一次连接未完全清理就重连，
     // 或者 disconnectCurrentRoom 中 stop 是异步的还没执行完就重新连接），
@@ -1314,9 +1335,13 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     // 因为房客必须通过 PortForwarder 转发才能连接到房主（MC 的 Netty 不走 SOCKS5）。
     NSString *hostIP = room.hostIP;
     NSString *hostPortStr = room.hostPort;
-    NSLog(@"[MultiplayerManager] [连接流程] 步骤 6：准备启动端口转发器（诊断日志：room=%@, hostIP=%@, hostPort=%@）",
-          room, hostIP, hostPortStr);
-    if (hostIP.length > 0 && hostPortStr.length > 0) {
+    NSLog(@"[MultiplayerManager] [连接流程] 步骤 6：准备启动端口转发器（诊断日志：room=%@, hostIP=%@, hostPort=%@, isHostSide=%d）",
+          room, hostIP, hostPortStr, room.isHostSide);
+    if (room.isHostSide) {
+        // 房主侧不启动正向 PortForwarder（房主本机不需要把 127.0.0.1:25565 转发给自己）。
+        // 房主的接入由 ReversePortForwarder 在 generateShareCodeWithPort: 中启动。
+        NSLog(@"[MultiplayerManager] [连接流程] 步骤 6：房主侧房间，跳过正向 PortForwarder 启动（由 ReversePortForwarder 接管）");
+    } else if (hostIP.length > 0 && hostPortStr.length > 0) {
         uint16_t hostPort = (uint16_t)[hostPortStr integerValue];
         if (hostPort > 0) {
             // 如果 PortForwarder 已在运行，先停止（可能是上一次连接残留）
@@ -1431,6 +1456,14 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
         [[PortForwarder sharedForwarder] stop];
     }
 
+    // 1.6 停止反向端口转发器（房主模式）
+    // 关键架构修复（P0）：房主侧 ReversePortForwarder 必须在断开时停止，
+    // 释放 libzt 监听 socket，避免端口占用和残留转发线程。
+    if ([[ReversePortForwarder sharedForwarder] isRunning]) {
+        NSLog(@"[MultiplayerManager] 停止反向端口转发器");
+        [[ReversePortForwarder sharedForwarder] stop];
+    }
+
     [_stateLock lock];
     self.currentSOCKS5Port = 0;
     self.currentForwardingPort = 0;
@@ -1470,6 +1503,54 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     NSLog(@"[MultiplayerManager] 已断开房间连接");
 }
 
+#pragma mark - 房主侧反向端口转发
+
+- (BOOL)startHostReverseForwarderWithListenPort:(uint16_t)listenPort
+                                     forwardPort:(uint16_t)forwardPort
+                                          error:(NSError **)error {
+    // 获取房主的 ZeroTier IP 作为 libzt 监听 IP
+    [_stateLock lock];
+    NSString *localIP = [self.currentLocalIP copy];
+    MultiplayerRoom *currentRoom = self.currentRoom;
+    [_stateLock unlock];
+
+    if (!localIP || localIP.length == 0) {
+        NSLog(@"[MultiplayerManager] 启动反向 PortForwarder 失败：当前 ZeroTier 本地 IP 为空");
+        if (error) {
+            *error = [NSError errorWithDomain:kMultiplayerErrorDomain
+                                          code:MultiplayerErrorCodeInvalidState
+                                      userInfo:@{NSLocalizedDescriptionKey: @"当前 ZeroTier 本地 IP 为空，无法启动反向端口转发"}];
+        }
+        return NO;
+    }
+
+    if (!currentRoom || !currentRoom.isHostSide) {
+        NSLog(@"[MultiplayerManager] 启动反向 PortForwarder 失败：当前不是房主侧房间");
+        if (error) {
+            *error = [NSError errorWithDomain:kMultiplayerErrorDomain
+                                          code:MultiplayerErrorCodeInvalidState
+                                      userInfo:@{NSLocalizedDescriptionKey: @"当前不是房主侧房间，无法启动反向端口转发"}];
+        }
+        return NO;
+    }
+
+    NSLog(@"[MultiplayerManager] 启动房主侧反向端口转发：libzt %@:%u → 系统 127.0.0.1:%u",
+          localIP, listenPort, forwardPort);
+
+    return [[ReversePortForwarder sharedForwarder] startWithListenIP:localIP
+                                                            listenPort:listenPort
+                                                           forwardHost:@"127.0.0.1"
+                                                           forwardPort:forwardPort
+                                                                error:error];
+}
+
+- (void)stopHostReverseForwarder {
+    if ([[ReversePortForwarder sharedForwarder] isRunning]) {
+        NSLog(@"[MultiplayerManager] 停止房主侧反向端口转发");
+        [[ReversePortForwarder sharedForwarder] stop];
+    }
+}
+
 #pragma mark - ZeroTierBridgeDelegate
 
 - (void)zeroTierNodeOnlineWithID:(uint64_t)nodeID {
@@ -1490,6 +1571,10 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     if ([[PortForwarder sharedForwarder] isRunning]) {
         NSLog(@"[MultiplayerManager] 节点离线，停止端口转发器");
         [[PortForwarder sharedForwarder] stop];
+    }
+    if ([[ReversePortForwarder sharedForwarder] isRunning]) {
+        NSLog(@"[MultiplayerManager] 节点离线，停止反向端口转发器");
+        [[ReversePortForwarder sharedForwarder] stop];
     }
     if ([[SOCKS5Proxy sharedProxy] isRunning]) {
         NSLog(@"[MultiplayerManager] 节点离线，停止 SOCKS5 代理");

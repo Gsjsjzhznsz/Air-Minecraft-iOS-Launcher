@@ -154,6 +154,14 @@ typedef NS_ENUM(NSInteger, MultiplayerRoomStatus) {
 /// 当前端口转发器是否正在运行
 @property (nonatomic, assign, readonly) BOOL isPortForwarderRunning;
 
+/// 当前房主侧反向端口转发器是否正在运行
+///
+/// 关键说明：房主侧使用 ReversePortForwarder 在 libzt socket 上监听房主的
+/// ZeroTier IP:LAN_PORT，accept 房客的 libzt 连接后用系统 socket 转发到
+/// 127.0.0.1:LAN_PORT（房主 MC 本地监听）。这是为了桥接 libzt socket 与
+/// 系统 socket 命名空间，使房客能通过 ZeroTier 虚拟网络到达房主 MC 的 LAN 服务器。
+@property (nonatomic, assign, readonly) BOOL isReversePortForwarderRunning;
+
 /// ZeroTier 节点是否已上线
 @property (nonatomic, assign, readonly) BOOL isNodeOnline;
 
@@ -292,11 +300,39 @@ typedef NS_ENUM(NSInteger, MultiplayerRoomStatus) {
 ///
 /// 流程：
 ///   1. 停止本地 SOCKS5 代理
-///   2. 清除 AMETHYST_SOCKS5_PROXY 环境变量
-///   3. 离开 ZeroTier 网络
-///   4. 更新房间状态为 Disconnected
-///   5. 清空 currentRoom
+///   2. 停止正向端口转发器（房客模式）
+///   3. 停止反向端口转发器（房主模式）
+///   4. 清除 AMETHYST_SOCKS5_PROXY 环境变量
+///   5. 离开 ZeroTier 网络
+///   6. 更新房间状态为 Disconnected
+///   7. 清空 currentRoom
 - (void)disconnectCurrentRoom;
+
+#pragma mark - 房主侧反向端口转发
+
+/// 启动房主侧反向端口转发
+///
+/// 关键架构修复（P0）：libzt 是用户态 socket 实现，与系统 socket 是两套独立的
+/// 命名空间。房主 MC 通过 java.net.ServerSocket 在 127.0.0.1:LAN_PORT（系统
+/// socket 命名空间）监听，房客通过 libzt socket connect 房主的 ZeroTier IP:LAN_PORT
+/// 时，连接到达房主的 libzt 实例后无法直接交付给房主 MC 的系统 socket。
+///
+/// 本方法在 libzt socket 上监听房主的 ZeroTier IP:listenPort，accept 房客的
+/// libzt 连接后用系统 socket 转发到 127.0.0.1:forwardPort（房主 MC 的本地监听地址）。
+///
+/// 调用时机：房主在 LanPortDetector 检测到 LAN 端口、生成分享代码后调用。
+/// listenPort 与 forwardPort 通常相同（都是房主 MC 的 LAN 端口）。
+///
+/// @param listenPort 在 libzt 上监听的端口（房主 MC LAN 端口）
+/// @param forwardPort 系统 socket 转发的目标端口（房主 MC LAN 端口，通常 = listenPort）
+/// @param error 错误输出
+/// @return YES 表示成功
+- (BOOL)startHostReverseForwarderWithListenPort:(uint16_t)listenPort
+                                     forwardPort:(uint16_t)forwardPort
+                                          error:(NSError **)error;
+
+/// 停止房主侧反向端口转发
+- (void)stopHostReverseForwarder;
 
 #pragma mark - 分享与导入
 

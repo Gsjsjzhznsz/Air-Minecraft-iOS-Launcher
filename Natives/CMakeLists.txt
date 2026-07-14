@@ -214,6 +214,7 @@ add_executable(AngelAuraAmethyst
   ZeroTierBridge.m
   SOCKS5Proxy.m
   PortForwarder.m
+  ReversePortForwarder.m
   LauncherMenuViewController.m
   LauncherNavigationController.m
   LauncherNewsViewController.m

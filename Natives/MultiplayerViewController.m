@@ -939,7 +939,18 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         room.name = MPLocalized(@"mp.host.default_room_name", @"我的联机房间");
         room.networkId = presetNetId;
         room.hostIP = @"";
-        room.hostPort = @"25565";
+        // 关键修复（P2）：房主创建房间时不再预设 hostPort=25565。
+        // 房主"对局域网开放"后，MC 的 LAN 端口是随机的（49152-65535），
+        // 由 LanPortDetector 实时检测后才确定。
+        // 之前预设为 25565 会导致：
+        //   - 房主在步骤 4.5 hostIP 同步后即触发 connectToRoomFlow 步骤 6
+        //     （虽然本提交同步修复了 P1 让房主跳过步骤 6，但 hostPort=25565 仍是
+        //      错误的初始值，会导致分享代码生成前 room.hostPort 错误）
+        //   - 分享代码生成时若 LanPortDetector 未检测到端口，hostPort 仍为 25565
+        //     导致房客 PortForwarder 转发到房主:25565（房主 MC 未监听此端口）
+        // 正确做法：初始化为空字符串，由 generateShareCodeWithPort: 在检测到
+        // LAN 端口后填入实际端口。
+        room.hostPort = @"";
         room.roomDescription = @"";
         room.ownerName = @"";
         room.status = MultiplayerRoomStatusDisconnected;
@@ -1096,6 +1107,50 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         room.hostIP = localIP;
     }
     [[MultiplayerManager sharedManager] updateRoom:room];
+
+    // 关键架构修复（P0）：启动房主侧反向 PortForwarder
+    //
+    // libzt 是用户态 socket，与系统 socket 是两套独立的命名空间。
+    // 房主 MC 通过 java.net.ServerSocket 在 127.0.0.1:port（系统 socket）监听，
+    // 房客的 PortForwarder 通过 libzt socket connect 到房主 ZeroTier IP:port 时，
+    // 连接到达房主的 libzt 实例后无法直接交付给房主 MC 的系统 socket。
+    //
+    // 解决方案：房主在 libzt socket 上监听 ZeroTier IP:port，accept 房客连接后
+    // 用系统 socket 转发到 127.0.0.1:port（房主 MC 本地监听）。
+    //
+    // 启动时机：LanPortDetector 检测到 LAN 端口后立即启动，确保房客连接时
+    // 房主侧已就绪。如果反向 PortForwarder 已在运行（如重复检测到端口），
+    // 先停止再启动，确保监听最新的 IP 和端口。
+    if (port.length > 0) {
+        uint16_t portValue = (uint16_t)[port integerValue];
+        if (portValue > 0) {
+            // 如果反向 PortForwarder 已在运行，先停止（端口或 IP 可能已变化）
+            if ([[MultiplayerManager sharedManager] isReversePortForwarderRunning]) {
+                NSLog(@"[MultiplayerVC] 反向 PortForwarder 已在运行，先停止再重启");
+                [[MultiplayerManager sharedManager] stopHostReverseForwarder];
+            }
+
+            NSError *reverseError = nil;
+            BOOL reverseStarted = [[MultiplayerManager sharedManager]
+                startHostReverseForwarderWithListenPort:portValue
+                                              forwardPort:portValue
+                                                   error:&reverseError];
+            if (reverseStarted) {
+                NSLog(@"[MultiplayerVC] 房主侧反向 PortForwarder 已启动：libzt %@:%u → 127.0.0.1:%u",
+                      localIP ?: @"(nil)", portValue, portValue);
+            } else {
+                NSLog(@"[MultiplayerVC] 房主侧反向 PortForwarder 启动失败：%@",
+                      reverseError.localizedDescription ?: @"(未知错误)");
+                // 反向 PortForwarder 失败不阻断分享代码生成，
+                // 但房客连接会失败（connection refused），通过日志告知用户。
+                [self showSimpleAlertWithTitle:MPLocalized(@"mp.host.reverse_pf_failed_title", @"反向端口转发启动失败")
+                                          message:[NSString stringWithFormat:@"%@\n\n%@",
+                                                    MPLocalized(@"mp.host.reverse_pf_failed_msg",
+                                                                @"房客将无法连接到你的游戏，请检查 ZeroTier 网络状态后重试。"),
+                                                    reverseError.localizedDescription ?: @"(未知错误)"]];
+            }
+        }
+    }
 
     // 生成分享代码
     self.lastShareCode = [[MultiplayerManager sharedManager] generateShareCodeForRoom:room];
