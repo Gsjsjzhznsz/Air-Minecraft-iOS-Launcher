@@ -1362,10 +1362,19 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
                 room.status = MultiplayerRoomStatusError;
                 [self updateRoom:room];
 
+                // 关键修复：修正编译错误。
+                // 原代码 userInfo 字典末尾有多余的 ]，导致括号不匹配，
+                // Clang 报错 "expected ')'" 和 "expected expression"。
+                // 同时使用临时变量替代 ?:（GNU nil-coalescing）运算符，
+                // 提高代码可读性。
+                NSString *forwardErrorDesc = forwardError.localizedDescription;
+                if (!forwardErrorDesc || forwardErrorDesc.length == 0) {
+                    forwardErrorDesc = @"未知错误";
+                }
                 if (completion) {
                     completion(NO, [NSError errorWithDomain:kMultiplayerErrorDomain
                                                         code:MultiplayerErrorCodeSOCKS5ProxyStartFailed
-                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"端口转发器启动失败，无法连接到房主：%@", forwardError.localizedDescription ?: @"未知错误"]}]]);
+                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"端口转发器启动失败，无法连接到房主：%@", forwardErrorDesc]}]);
                 }
                 return;
             }
