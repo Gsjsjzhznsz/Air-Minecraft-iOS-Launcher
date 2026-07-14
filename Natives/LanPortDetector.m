@@ -216,6 +216,23 @@ static BOOL LanPortDetectorIsLauncherLogLine(NSString *line) {
     if (port) {
         NSLog(@"[LanPortDetector] 从日志检测到 LAN 端口：%@（来源：行 '%@'）", port, line);
         [self setPort:port source:LanPortSourceAuto];
+    } else {
+        // 调试日志：识别疑似 LAN 相关但未匹配的行，帮助诊断新 MC 版本的日志格式
+        // 只记录长度 > 5 的行，避免空行噪声
+        // 注意：使用 [MultiplayerVC] 标记前缀让 LanPortDetectorIsLauncherLogLine 过滤此日志
+        // 防止与 LanPortDetector 自身的日志混在一起触发递归
+        static NSUInteger skippedCount = 0;
+        NSString *lowerLine = line.lowercaseString;
+        if (line.length > 5 && ([lowerLine containsString:@"local game"]
+                                 || [lowerLine containsString:@"open to lan"]
+                                 || [lowerLine containsString:@"open.*lan"]
+                                 || [lowerLine containsString:@"对局域网开放"])) {
+            skippedCount++;
+            // 只打印前 5 条疑似日志，避免日志爆炸
+            if (skippedCount <= 5) {
+                NSLog(@"[MultiplayerVC] 疑似 LAN 端口日志未匹配任何正则（行：'%@'），可能需要扩展 LanPortDetector 正则", line);
+            }
+        }
     }
 }
 

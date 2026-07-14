@@ -165,6 +165,12 @@ void init_redirectStdio() {
         static BOOL filteredSessionID;
         ssize_t rsize;
         char buf[2048];
+        // 行缓冲区修复：read() 不保证按行返回，当 MC 输出日志频繁时
+        // pipe 缓冲区会积累多个不完整行。之前直接对 read 返回的块按行分割，
+        // 不完整的行片段（如 "Local game hoste" + "d on port 54321"）被当作
+        // 独立行发送给 LanPortDetector，导致正则无法匹配，"对局域网开放"
+        // 端口检测失败。现在维护行缓冲区，遇到 \n 才提取完整行。
+        NSMutableData *lineBuffer = [NSMutableData data];
         while((rsize = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
             if (rsize < 2048) {
                 buf[rsize] = '\0';
@@ -180,32 +186,57 @@ void init_redirectStdio() {
                     filteredSessionID = true;
                 }
             }
-            if (canAppendToLog) {
-                // canAppendToLog=YES 时，通过 appendToLog: 同时更新 UI 表格和发送通知
-                [PLLogOutputView appendToLog:@(buf)];
-            } else {
-                // canAppendToLog=NO 时（默认状态，用户未打开日志面板），
-                // PLLogOutputView 不会更新 UI，但 LanPortDetector 仍需要实时检测
-                // MC "对局域网开放"端口。直接在后台线程发送通知，
-                // LanPortDetector 的处理是线程安全的（processLogLine: 是无状态的，
-                // setPort:source: 内部 dispatch_async 到主线程）。
-                //
-                // 关键修复：之前 canAppendToLog=NO 时完全不发送通知，
-                // 导致 LanPortDetector 无法实时检测端口，用户先"对局域网开放"
-                // 再点"当房主"时无法生成分享代码。
-                NSString *logString = @(buf);
-                NSArray *lines = [logString componentsSeparatedByCharactersInSet:
-                    [NSCharacterSet newlineCharacterSet]];
-                for (NSString *line in lines) {
-                    if (line.length > 0) {
-                        [[NSNotificationCenter defaultCenter] postNotificationName:@"PLLogOutputLineNotification"
-                                                                            object:nil
-                                                                          userInfo:@{@"line": line}];
-                    }
-                }
-            }
+            // 写入 latestlog.txt（保持原始字节流，不依赖行切片）
             [file writeData:[NSData dataWithBytes:buf length:rsize]];
             [file synchronizeFile];
+
+            // 累积到行缓冲区，按 \n 提取完整行
+            [lineBuffer appendBytes:buf length:rsize];
+            const char *rawBytes = lineBuffer.bytes;
+            NSUInteger rawLength = lineBuffer.length;
+            NSUInteger lineStart = 0;
+            for (NSUInteger i = 0; i < rawLength; i++) {
+                if (rawBytes[i] == '\n') {
+                    NSUInteger lineLen = i - lineStart;
+                    if (lineLen > 0) {
+                        NSString *line = [[NSString alloc] initWithBytes:rawBytes + lineStart
+                                                                   length:lineLen
+                                                                 encoding:NSUTF8StringEncoding];
+                        if (line) {
+                            if (canAppendToLog) {
+                                // canAppendToLog=YES：通过 appendToLog: 同时更新 UI 和发送通知
+                                // PLLogOutputView._appendToLog 内部会发送 PLLogOutputLineNotification
+                                [PLLogOutputView appendToLog:line];
+                            } else {
+                                // canAppendToLog=NO：直接在后台线程发送通知给 LanPortDetector
+                                // LanPortDetector.processLogLine: 是无状态的，setPort:source:
+                                // 内部 dispatch_async 到主线程，线程安全
+                                [[NSNotificationCenter defaultCenter] postNotificationName:@"PLLogOutputLineNotification"
+                                                                                    object:nil
+                                                                                  userInfo:@{@"line": line}];
+                            }
+                        }
+                    }
+                    lineStart = i + 1;
+                }
+            }
+            // 移除已处理的字节，保留未结尾 \n 的残留部分（下次 read 继续累积）
+            if (lineStart > 0) {
+                [lineBuffer replaceBytesInRange:NSMakeRange(0, lineStart) withBytes:NULL length:0];
+            }
+        }
+        // 处理残留的最后一行（没有 \n 结尾）
+        if (lineBuffer.length > 0) {
+            NSString *line = [[NSString alloc] initWithData:lineBuffer encoding:NSUTF8StringEncoding];
+            if (line.length > 0) {
+                if (canAppendToLog) {
+                    [PLLogOutputView appendToLog:line];
+                } else {
+                    [[NSNotificationCenter defaultCenter] postNotificationName:@"PLLogOutputLineNotification"
+                                                                        object:nil
+                                                                      userInfo:@{@"line": line}];
+                }
+            }
         }
         [file closeFile];
     });
