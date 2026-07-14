@@ -943,7 +943,17 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         room.ownerName = @"";
         room.status = MultiplayerRoomStatusDisconnected;
         room.createdAt = [NSDate date];
+        // 关键修复（房客加入后无法连接服务器）：标记为房主侧房间。
+        // MultiplayerManager 在 connectToRoomFlow: 和 zeroTierNetworkReady: 回调中
+        // 只允许 isHostSide=YES 的房间将 room.hostIP 同步为本机 ZeroTier IP，
+        // 用于生成分享代码；房客房间（isHostSide=NO）保留分享代码中的房主 IP，
+        // 确保 PortForwarder 正确转发到房主而非本机自身。
+        room.isHostSide = YES;
         self.hostRoom = room;
+    } else {
+        // 已存在房主房间对象（可能是复用的旧对象），确保 isHostSide=YES。
+        // 防止旧持久化数据中 isHostSide 为 NO 导致后续逻辑误判为房客房间。
+        room.isHostSide = YES;
     }
 
     // 如果当前已连接到其他房间，先断开

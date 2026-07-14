@@ -25,6 +25,27 @@ typedef NS_ENUM(NSInteger, MultiplayerRoomStatus) {
 @property (atomic, copy) NSString *hostIP;          // 房主在 ZeroTier 网络中的 IP（如 10.147.17.1）
 @property (nonatomic, copy) NSString *hostPort;        // MC 服务器端口（默认 25565）
 @property (nonatomic, copy) NSString *roomDescription; // 房间描述
+/// 标记当前房间是否为房主侧房间。
+///
+/// 关键修复（房客加入后无法连接服务器）：
+/// 之前 connectToRoomFlow: 和 zeroTierNetworkReady: 在获取到本机 ZeroTier IP 后
+/// 会无条件执行 `room.hostIP = localIP`。这对于房主是正确的（房主需要将自己的 IP
+/// 同步到 room.hostIP 用于生成分享代码），但对于房客是错误的：
+///   - 房客的 room.hostIP 来自分享代码（房主的 IP，如 10.147.17.1）
+///   - 房客连接后获取的 localIP 是房客自己的 ZeroTier IP（如 10.147.17.5）
+///   - 无条件覆盖后 room.hostIP 变成房客自己的 IP
+///   - PortForwarder 用错误的 room.hostIP 启动端口转发：127.0.0.1:25565 → 房客自己的IP:25565
+///   - 房客在 MC 直接连接输入 127.0.0.1:25565，PortForwarder 转发到房客自己设备的 25565 端口
+///   - 房客自己设备上没有 MC 服务器，连接失败，显示"无法加入服务器"
+///
+/// 修复方案：添加 isHostSide 属性区分房主/房客房间。只有 isHostSide=YES 的房间
+/// 才会在 connectToRoomFlow: 和 zeroTierNetworkReady: 中更新 room.hostIP 为本机 IP。
+/// 房客房间（isHostSide=NO）保持 room.hostIP 为分享代码中的房主 IP，确保 PortForwarder
+/// 正确转发到房主的 ZeroTier IP。
+///
+/// 默认值 NO（房客模式，更安全：若未设置则不覆盖 hostIP，避免破坏房客的 hostIP）。
+/// 房主创建房间时由 MultiplayerViewController.hostButtonTapped 显式设为 YES。
+@property (nonatomic, assign) BOOL isHostSide;      // 是否为房主侧房间（YES=房主，NO=房客）
 /// 连接状态。
 ///
 /// 关键修复（H12）：status 改为 atomic，保证多线程读写的内存一致性。

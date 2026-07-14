@@ -141,6 +141,11 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
         _ownerName = @"";
         _createdAt = [NSDate date];
         _lastConnectedAt = nil;
+        // 关键修复（房客加入后无法连接服务器）：默认 isHostSide=NO（房客模式）。
+        // 调用方可按需在创建后通过 room.isHostSide = YES 设置为房主模式。
+        // 默认 NO 更安全：若未设置则 connectToRoomFlow: 不会覆盖 hostIP，
+        // 避免破坏房客从分享代码解析得到的房主 IP。
+        _isHostSide = NO;
     }
     return self;
 }
@@ -167,6 +172,15 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
             statusValue = MultiplayerRoomStatusDisconnected;
         }
         _status = (MultiplayerRoomStatus)statusValue;
+
+        // 关键修复（房客加入后无法连接服务器）：解码 isHostSide。
+        // 旧版本的数据中没有此字段，containsValueForKey: 检测后使用默认值 NO（房客模式）。
+        // 默认 NO 更安全：旧数据反序列化后不会覆盖 hostIP，避免破坏已存在的房主 IP。
+        if ([coder containsValueForKey:@"isHostSide"]) {
+            _isHostSide = [coder decodeBoolForKey:@"isHostSide"];
+        } else {
+            _isHostSide = NO;
+        }
     }
     return self;
 }
@@ -182,19 +196,22 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     [coder encodeObject:self.createdAt forKey:@"createdAt"];
     [coder encodeObject:self.lastConnectedAt forKey:@"lastConnectedAt"];
     [coder encodeInteger:(NSInteger)self.status forKey:@"status"];
+    // 关键修复（房客加入后无法连接服务器）：编码 isHostSide
+    [coder encodeBool:self.isHostSide forKey:@"isHostSide"];
 }
 
 #pragma mark - 描述方法（便于调试）
 
 - (NSString *)description {
-    return [NSString stringWithFormat:@"<MultiplayerRoom: %p roomId=%@ name=%@ networkId=%@ host=%@:%@ status=%ld>",
+    return [NSString stringWithFormat:@"<MultiplayerRoom: %p roomId=%@ name=%@ networkId=%@ host=%@:%@ status=%ld isHostSide=%d>",
             self,
             self.roomId,
             self.name,
             self.networkId,
             self.hostIP,
             self.hostPort,
-            (long)self.status];
+            (long)self.status,
+            self.isHostSide];
 }
 
 #pragma mark - 复制与相等性（便于去重和比较）
@@ -211,6 +228,8 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     copy.ownerName = [self.ownerName copy];
     copy.createdAt = [self.createdAt copy];
     copy.lastConnectedAt = [self.lastConnectedAt copy];
+    // 关键修复（房客加入后无法连接服务器）：复制 isHostSide 标志
+    copy.isHostSide = self.isHostSide;
     return copy;
 }
 
@@ -1136,14 +1155,44 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
 
     [_stateLock lock];
     self.currentLocalIP = localIP;
-    // 关键修复（对标 FCL/HMCL）：将本机 ZeroTier IP 同步到 room.hostIP，
-    // 使 shareTextForRoom: 能正确输出房主的服务器地址，而不显示「未知」。
-    // 之前缺失此同步导致分享文本中服务器地址为空，加入者无法直接获取连接地址。
+    // 关键修复（房客加入后无法连接服务器）：只有房主侧房间（isHostSide=YES）才将本机
+    // ZeroTier IP 同步到 room.hostIP。
+    //
+    // 之前的 bug：connectToRoomFlow: 在获取到本机 ZeroTier IP 后无条件执行
+    // `self.currentRoom.hostIP = localIP`。这对于房主是正确的（房主需要将自己的 IP
+    // 同步到 room.hostIP 用于生成分享代码），但对于房客是致命错误：
+    //   - 房客的 room.hostIP 来自分享代码（房主的 IP，如 10.147.17.1）
+    //   - 房客连接后获取的 localIP 是房客自己的 ZeroTier IP（如 10.147.17.5）
+    //   - 无条件覆盖后 room.hostIP 变成房客自己的 IP（10.147.17.5）
+    //   - 步骤 6 中 PortForwarder 用错误的 room.hostIP 启动端口转发：
+    //     127.0.0.1:25565 → 10.147.17.5:25565（房客自己的设备）
+    //   - 房客在 MC 直接连接输入 127.0.0.1:25565，PortForwarder 转发到房客自己设备的 25565 端口
+    //   - 房客自己设备上没有 MC 服务器，连接失败，显示"无法加入服务器"
+    //
+    // 修复方案：通过 room.isHostSide 区分房主/房客房间：
+    //   - 房主房间（isHostSide=YES）：将本机 IP 同步到 room.hostIP，用于生成分享代码
+    //   - 房客房间（isHostSide=NO）：保留分享代码中的房主 IP，确保 PortForwarder 正确转发
     if (localIP && localIP.length > 0 && self.currentRoom) {
-        self.currentRoom.hostIP = localIP;
-        NSLog(@"[MultiplayerManager] [连接流程] 已同步房主 ZeroTier IP 到房间 %@：%@", self.currentRoom.name, localIP);
+        if (self.currentRoom.isHostSide) {
+            // 房主模式：将本机 ZeroTier IP 同步到 room.hostIP，使 shareTextForRoom:
+            // 能正确输出房主的服务器地址，分享代码中也包含正确的房主 IP。
+            self.currentRoom.hostIP = localIP;
+            NSLog(@"[MultiplayerManager] [连接流程] 房主模式，已同步本机 ZeroTier IP 到房间 %@：%@", self.currentRoom.name, localIP);
+        } else {
+            // 房客模式：保留分享代码中的房主 IP，不覆盖。
+            // 房客的 localIP 仅用于 currentLocalIP（显示给用户参考），不写入 room.hostIP。
+            NSLog(@"[MultiplayerManager] [连接流程] 房客模式，保留房主 IP（%@），本机 ZeroTier IP 为 %@（不覆盖 room.hostIP）",
+                  self.currentRoom.hostIP, localIP);
+        }
     }
     MultiplayerRoom *roomForIPUpdate = self.currentRoom;
+    // 关键修复（房客加入后无法连接服务器）：房客模式下不需要将 room 写回房间列表，
+    // 因为 hostIP 没有变化（仍为分享代码中的房主 IP），避免无意义的持久化操作。
+    // 仅当 hostIP 实际发生变化（房主模式）时才需要写回。
+    if (roomForIPUpdate && !roomForIPUpdate.isHostSide) {
+        // 房客模式：room.hostIP 未被修改，跳过写回操作
+        roomForIPUpdate = nil;
+    }
     [_stateLock unlock];
 
     // 持久化房主 IP 到房间列表（后台异步写入，避免阻塞连接流程）
@@ -1415,17 +1464,30 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
         // 关键修复（对标 FCL/HMCL）：ZeroTier 网络就绪回调可能晚于 connectToRoomFlow 完成，
         // 此处也需将 IP 同步到 room.hostIP，确保分享文本能输出正确的服务器地址。
         // Ad-hoc 模式下使用 IPv6，标准模式下使用 IPv4。
+        //
+        // 关键修复（房客加入后无法连接服务器）：只有房主侧房间（isHostSide=YES）才同步
+        // room.hostIP 到本机 IP。房客侧房间（isHostSide=NO）必须保留分享代码中的房主 IP，
+        // 否则 PortForwarder 会用错误的 hostIP 启动端口转发，导致房客在 MC 直接连接
+        // 127.0.0.1:25565 时被转发到房客自己设备，连接失败显示"无法加入服务器"。
     }
     MultiplayerRoom *room = currentRoom;
     BOOL needsUpdate = NO;
     if (room && effectiveIP && effectiveIP.length > 0) {
-        // 仅当 IP 变化时才更新，避免重复写入
-        if (![room.hostIP isEqualToString:effectiveIP]) {
-            room.hostIP = effectiveIP;
-            needsUpdate = YES;
+        // 关键修复（房客加入后无法连接服务器）：通过 room.isHostSide 区分房主/房客房间
+        if (room.isHostSide) {
+            // 房主模式：仅当 IP 变化时才更新，避免重复写入
+            if (![room.hostIP isEqualToString:effectiveIP]) {
+                room.hostIP = effectiveIP;
+                needsUpdate = YES;
+            }
+            NSLog(@"[MultiplayerManager] 房主模式，已更新房间 %@ 的本地 IP（%@）：%@",
+                  room.name, isAdhoc ? @"IPv6" : @"IPv4", effectiveIP);
+        } else {
+            // 房客模式：保留房主 IP（来自分享代码），不覆盖 room.hostIP。
+            // 房客的 effectiveIP 仅用于 currentLocalIP（显示给用户参考）。
+            NSLog(@"[MultiplayerManager] 房客模式，保留房主 IP（%@），本机 ZeroTier IP 为 %@（不覆盖 room.hostIP）",
+                  room.hostIP, effectiveIP);
         }
-        NSLog(@"[MultiplayerManager] 已更新房间 %@ 的本地 IP（%@）：%@",
-              room.name, isAdhoc ? @"IPv6" : @"IPv4", effectiveIP);
     }
     [_stateLock unlock];
 
