@@ -1100,9 +1100,27 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         return;
     }
 
+    // 关键修复（P4）：检查 ZeroTier 本地 IP 是否有效，避免房主断开后生成无效分享代码。
+    //
+    // 问题：generateShareCodeWithPort: 由 LanPortDetector 通知触发。当房主断开连接
+    // 后 isHostFlowActive 可能仍为 YES（disconnectCurrentRoom 不会清空 ViewController
+    // 的 isHostFlowActive），LanPortDetector 通知仍能触发本方法。此时 currentLocalIP
+    // 已被清空，room.hostIP 不会更新（保持空字符串或旧值），生成的分享代码无效。
+    // 同时 ReversePortForwarder 启动会因 currentLocalIP 为空而失败。
+    //
+    // 修复方案：本方法入口处检查 currentLocalIP，若为空则提示用户并直接返回，
+    // 不生成分享代码、不启动 ReversePortForwarder。
+    NSString *localIP = [[MultiplayerManager sharedManager] currentLocalIP];
+    if (!localIP || localIP.length == 0) {
+        NSLog(@"[MultiplayerVC] generateShareCodeWithPort: ZeroTier 本地 IP 为空，跳过生成分享代码（可能已断开连接）");
+        [self showSimpleAlertWithTitle:MPLocalized(@"mp.host.not_connected_title", @"未连接到联机网络")
+                                      message:MPLocalized(@"mp.host.not_connected_msg",
+                                                          @"请先点「当房主」按钮连接到 ZeroTier 网络，再在 MC 中开放局域网。")];
+        return;
+    }
+
     // 更新房间的端口和本机 IP
     room.hostPort = port;
-    NSString *localIP = [[MultiplayerManager sharedManager] currentLocalIP];
     if (localIP.length) {
         room.hostIP = localIP;
     }

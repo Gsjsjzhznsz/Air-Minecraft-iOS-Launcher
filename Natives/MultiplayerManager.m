@@ -1881,6 +1881,23 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
         }
     }
 
+    // ========== 1.5 关键修复（P3）：剥离 IPv6 地址的方括号 ==========
+    //
+    // 问题：shareTextForRoom: 生成分享文本时，IPv6 地址会被方括号包裹
+    // （如 "[fd00::1]:25565"，符合 RFC 3986 URI 语法）。但 parseRoomFromShareText:
+    // 的正则捕获组 1 包含方括号，导致 hostIP = "[fd00::1]"。
+    // 后续 PortForwarder 调用 zts_inet_pton(ZTS_AF_INET6, "[fd00::1]", NULL)
+    // 会返回 0（inet_pton 不接受方括号），误判为 IPv4，最终连接失败。
+    //
+    // 修复方案：解析后剥离首尾的方括号。这与 parseShareCode: 的行为保持一致
+    // （分享代码路径中 hostIP 是原始 IPv6 字符串，无方括号）。
+    if (hostIP.length >= 2) {
+        if ([hostIP hasPrefix:@"["] && [hostIP hasSuffix:@"]"]) {
+            hostIP = [hostIP substringWithRange:NSMakeRange(1, hostIP.length - 2)];
+            NSLog(@"[MultiplayerManager] parseRoomFromShareText: 剥离 IPv6 方括号后 hostIP=%@", hostIP);
+        }
+    }
+
     // ========== 2. 兜底：未匹配到 Network ID 时，在整个文本中搜索 ==========
 
     if (!networkId) {
