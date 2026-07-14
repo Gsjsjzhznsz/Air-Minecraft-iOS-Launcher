@@ -1056,8 +1056,81 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
                          MPLocalized(@"mp.host.tip.auto_detect", @"系统会自动检测 LAN 端口并生成分享代码"),
                          MPLocalized(@"mp.host.local_ip", @"本机 IP"),
                          localIP];
-    [self showSimpleAlertWithTitle:MPLocalized(@"mp.host.connected_title", @"联机已开启")
-                           message:message];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.connectionProgressAlert = nil;
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:MPLocalized(@"mp.host.connected_title", @"联机已开启")
+                                                                       message:message preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:MPLocalized(@"mp.host.manual_port", @"手动输入端口")
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction * _Nonnull action) {
+            [self showManualPortInputAlert];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:MPLocalized(@"common.ok", @"好")
+                                                  style:UIAlertActionStyleCancel handler:nil]];
+        if (self.presentedViewController) {
+            [self.presentedViewController dismissViewControllerAnimated:NO completion:^{
+                [self presentViewController:alert animated:YES completion:nil];
+            }];
+        } else {
+            [self presentViewController:alert animated:YES completion:nil];
+        }
+    });
+}
+
+/// 手动输入 LAN 端口的兜底入口
+///
+/// 当自动检测失败时（如 MC 日志格式变化、日志被截断、Mod 干扰等），
+/// 允许用户在游戏内"对局域网开放"后看到的提示中手动输入端口号。
+/// 端口号可在 MC 聊天框中看到（"Local game hosted on port XXXXX"），
+/// 也可通过部分 Mod/服务端插件提供的命令查询。
+- (void)showManualPortInputAlert {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:MPLocalized(@"mp.host.manual_port_title", @"手动输入 LAN 端口")
+                                                                   message:MPLocalized(@"mp.host.manual_port_msg", @"请在 MC 聊天中查看"Local game hosted on port XXXXX"，输入 XXXXX 部分（1024-65535）")
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.placeholder = @"例如：54321";
+        textField.keyboardType = UIKeyboardTypeNumberPad;
+    }];
+    [alert addAction:[UIAlertAction actionWithTitle:MPLocalized(@"common.cancel", @"取消") style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:MPLocalized(@"common.confirm", @"确定")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        NSString *input = alert.textFields.firstObject.text;
+        [weakSelf applyManualPort:input];
+    }]];
+    if (self.presentedViewController) {
+        [self.presentedViewController dismissViewControllerAnimated:NO completion:^{
+            [self presentViewController:alert animated:YES completion:nil];
+        }];
+    } else {
+        [self presentViewController:alert animated:YES completion:nil];
+    }
+}
+
+/// 应用用户手动输入的 LAN 端口
+- (void)applyManualPort:(NSString *)input {
+    NSString *trimmed = [input stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    if (trimmed.length == 0) {
+        [self showSimpleAlertWithTitle:MPLocalized(@"mp.guest.error_title", @"输入为空")
+                               message:MPLocalized(@"mp.host.manual_port_empty", @"请输入端口号")];
+        return;
+    }
+    NSInteger portNum = [trimmed integerValue];
+    if (portNum < 1024 || portNum > 65535) {
+        [self showSimpleAlertWithTitle:MPLocalized(@"mp.guest.error_title", @"输入无效")
+                               message:MPLocalized(@"mp.host.manual_port_invalid", @"端口号范围必须在 1024-65535 之间")];
+        return;
+    }
+    NSLog(@"[MultiplayerVC] 用户手动输入 LAN 端口：%@", trimmed);
+    [[LanPortDetector sharedDetector] setManualPort:trimmed];
+    // setManualPort 内部会发送 LanPortDetectorDidDetectPortNotification，
+    // lanPortDidDetect: 会自动调用 generateShareCodeWithPort:。
+    // 但如果之前已检测到相同端口（去重），通知不会再次触发，
+    // 因此这里主动调用一次确保分享代码生成。
+    if (self.isHostFlowActive && self.hostRoom) {
+        [self generateShareCodeWithPort:trimmed];
+    }
 }
 
 #pragma mark - 游戏内模式：LAN 端口检测回调
