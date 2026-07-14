@@ -1293,11 +1293,33 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
     NSLog(@"[MultiplayerManager] [连接流程] 已设置环境变量 %@=%@", kAMETHYSTSOCKS5ProxyEnvVar, proxyValue);
 
     // 如果房间有房主 IP 和端口（房客模式），启动端口转发器
+    //
+    // 关键修复（房客复制到 10. 开头地址而非 127.0.0.1）：
+    // 之前的 bug：如果 PortForwarder 已在运行（例如上一次连接未完全清理就重连，
+    // 或者 disconnectCurrentRoom 中 stop 是异步的还没执行完就重新连接），
+    // startWithLocalPort: 会返回 PortForwarderErrorCodeAlreadyRunning（forwardPort=0），
+    // 导致 currentForwardingPort 不被设置（保持 0）。
+    // 随后 showGuestConnectedAlert 读到 currentForwardingPort == 0，
+    // 走 else 回退分支，复制 hostIP:hostPort（10. 开头的房主 ZeroTier IP）而非
+    // 127.0.0.1:forwardPort。房客在 MC 中输入 10.x.x.x:25565 时系统无法路由，
+    // 显示"无法加入服务器"。
+    //
+    // 修复方案：启动前先检查 PortForwarder 是否已在运行，如果是则先 stop 再 start，
+    // 确保能正确返回 forwardPort 并设置 currentForwardingPort。
+    // 同时，房客模式下 PortForwarder 启动失败必须中断连接流程并报错，
+    // 因为房客必须通过 PortForwarder 转发才能连接到房主（MC 的 Netty 不走 SOCKS5）。
     NSString *hostIP = room.hostIP;
     NSString *hostPortStr = room.hostPort;
     if (hostIP.length > 0 && hostPortStr.length > 0) {
         uint16_t hostPort = (uint16_t)[hostPortStr integerValue];
         if (hostPort > 0) {
+            // 如果 PortForwarder 已在运行，先停止（可能是上一次连接残留）
+            if ([[PortForwarder sharedForwarder] isRunning]) {
+                NSLog(@"[MultiplayerManager] [连接流程] PortForwarder 已在运行（端口 %u），先停止再重新启动",
+                      [[PortForwarder sharedForwarder] listeningPort]);
+                [[PortForwarder sharedForwarder] stop];
+            }
+
             NSLog(@"[MultiplayerManager] [连接流程] 启动端口转发器：127.0.0.1:%u → %@:%u",
                   PortForwarderDefaultLocalPort, hostIP, hostPort);
 
@@ -1314,10 +1336,38 @@ typedef NS_ENUM(NSInteger, MultiplayerErrorCode) {
                 self.currentForwardingPort = forwardPort;
                 [_stateLock unlock];
             } else {
-                NSLog(@"[MultiplayerManager] [连接流程] 端口转发器启动失败：%@（不影响 SOCKS5 代理）",
+                NSLog(@"[MultiplayerManager] [连接流程] 端口转发器启动失败：%@",
                       forwardError.localizedDescription);
-                // 端口转发器失败不中断整个连接流程（SOCKS5 代理仍然有效）
-                // 但需要在 completion 中告知调用方，让它可以提示用户
+
+                // 关键修复：房客模式下 PortForwarder 是必须的（MC 的 Netty 不走 SOCKS5）。
+                // 如果启动失败，连接虽然"成功"（ZeroTier 网络已就绪），但房客无法在 MC 中
+                // 连接到房主。此时必须中断流程并报错，避免 showGuestConnectedAlert
+                // 回退到错误的 hostIP:hostPort（10. 开头，系统无法路由）。
+                //
+                // 清理已启动的 SOCKS5 代理和已加入的网络
+                [[SOCKS5Proxy sharedProxy] stop];
+                unsetenv([kAMETHYSTSOCKS5ProxyEnvVar UTF8String]);
+                [[ZeroTierBridge sharedInstance] leaveNetwork:netID];
+
+                [_stateLock lock];
+                if (self.currentRoom && [self.currentRoom.roomId isEqualToString:room.roomId]) {
+                    self.currentRoom = nil;
+                    self.currentNetworkID = 0;
+                    self.currentLocalIP = nil;
+                    self.currentSOCKS5Port = 0;
+                    self.currentForwardingPort = 0;
+                }
+                [_stateLock unlock];
+
+                room.status = MultiplayerRoomStatusError;
+                [self updateRoom:room];
+
+                if (completion) {
+                    completion(NO, [NSError errorWithDomain:kMultiplayerErrorDomain
+                                                        code:MultiplayerErrorCodeSOCKS5ProxyStartFailed
+                                                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"端口转发器启动失败，无法连接到房主：%@", forwardError.localizedDescription ?: @"未知错误"]}]]);
+                }
+                return;
             }
         } else {
             NSLog(@"[MultiplayerManager] [连接流程] 房主端口无效：%@，跳过端口转发", hostPortStr);

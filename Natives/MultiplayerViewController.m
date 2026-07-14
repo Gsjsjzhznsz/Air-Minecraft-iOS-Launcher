@@ -38,6 +38,7 @@
 #import "PLProfiles.h"
 #import "LanPortDetector.h"
 #import "ZeroTierBridge.h"
+#import "PortForwarder.h"
 #import "utils.h"
 
 /// 本地化辅助函数
@@ -1308,7 +1309,22 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
     // 房客不能直接输入房主的 ZeroTier IP（系统无法路由），必须通过本地端口转发器。
     // PortForwarder 在 127.0.0.1:25565（或下一个可用端口）监听，转发到房主的 ZeroTier IP:端口。
     // 房客在 MC 中输入 127.0.0.1:转发端口 即可连接。
+    //
+    // 关键修复（房客复制到 10. 开头地址而非 127.0.0.1）：
+    // 之前的 bug：如果 currentForwardingPort == 0（例如 PortForwarder 启动失败，
+    // 或者 disconnectCurrentRoom 清除了 currentForwardingPort 但 PortForwarder 仍在运行），
+    // showGuestConnectedAlert 会回退到 hostIP:hostPort（10. 开头的房主 ZeroTier IP）。
+    // 房客在 MC 中输入 10.x.x.x:25565 时系统无法路由，显示"无法加入服务器"。
+    //
+    // 修复方案：如果 currentForwardingPort == 0，检查 PortForwarder 单例是否在运行，
+    // 如果在运行则使用其 listeningPort 作为转发端口。这样即使 currentForwardingPort
+    // 因时序问题未被设置，也能从 PortForwarder 实例获取正确的端口。
     uint16_t forwardPort = [[MultiplayerManager sharedManager] currentForwardingPort];
+    if (forwardPort == 0 && [[PortForwarder sharedForwarder] isRunning]) {
+        // fallback：currentForwardingPort 未设置，但 PortForwarder 实例在运行
+        forwardPort = [[PortForwarder sharedForwarder] listeningPort];
+        NSLog(@"[MultiplayerVC] currentForwardingPort 为 0，从 PortForwarder 实例获取 listeningPort: %u", forwardPort);
+    }
     NSString *serverAddress;
     if (forwardPort > 0) {
         // 端口转发器已启动，使用本地地址
