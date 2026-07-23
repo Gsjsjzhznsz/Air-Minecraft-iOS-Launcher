@@ -34,6 +34,7 @@ include_directories(
   "external/Apple"
   "external/ballpa1n"
   "external/ballpa1n/wrapped"
+  "external/mach"
   "external/ZeroTierFramework/ios-example-app/zt.framework/Headers"
 )
 
@@ -298,6 +299,7 @@ add_executable(AngelAuraAmethyst
   main_hook.m
   JavaLauncher.m
   external/fishhook/fishhook.c
+  external/mach/mach_excServer.c
   UIKit+hook.m
   ScreenUtils.m
 

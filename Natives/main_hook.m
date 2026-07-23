@@ -3,9 +3,18 @@
 #import "SurfaceViewController.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
+#import "mach_excServer.h"
 
-#include "external/fishhook/fishhook.h"
 #include <dlfcn.h>
+#include <libgen.h>
+#include <pthread.h>
+#include "external/fishhook/fishhook.h"
+
+// === iOS 26+ PPL bypass（从原版项目移植）===
+// excPort：硬件断点异常接收端口，hooked_dlopen_26_ppl 首次调用时分配
+mach_port_t excPort;
+// 前向声明：hooked_dlopen 在 PPL bypass 分支中通过 musttail 调用此函数
+void *hooked_dlopen_26_ppl(const char *path, int mode);
 
 void (*orig_abort)();
 void (*orig_exit)(int code);
@@ -209,6 +218,26 @@ void hooked_exit(int code) {
 }
 
 void* hooked_dlopen(const char* path, int mode) {
+    // === iOS 26+ PPL bypass 分支（从原版项目移植）===
+    // 当设备处于 FORCE_MIRRORED 且无 TXM 时，使用硬件断点 + Mach 异常的
+    // PPL bypass 方式加载 home/tmp 目录下的 dylib（绕过 iOS 26+ 的 PPL 签名
+    // 校验）。此分支必须使用 musttail 尾调用 hooked_dlopen_26_ppl，因为后者
+    // 需要读取本函数的返回地址来解析 @loader_path。
+    BOOL shouldUseDyldBypass26PPL = NO;
+    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED)) {
+        shouldUseDyldBypass26PPL = hwRedirectOrig[0] && !DeviceHasJITFlags(JIT_FLAG_HAS_TXM);
+    }
+    if (shouldUseDyldBypass26PPL) {
+        const char *home = getenv("HOME");
+        const char *tmpdir = getenv("TMPDIR");
+        char fullpath[PATH_MAX];
+        if (path && realpath(path, fullpath) &&
+            (strstr(fullpath, home) || (tmpdir && strstr(fullpath, tmpdir)))) {
+            __attribute__((musttail)) return hooked_dlopen_26_ppl(path, mode);
+        }
+    }
+
+    // === 现有 SDL3/libOSMesa 检测 + Vulkan stride fix 逻辑（保留不变）===
     const char *home = getenv("HOME");
     // Only proceed to check if dylib is in the home dir
     char fullpath[PATH_MAX];
@@ -1264,4 +1293,94 @@ void amethyst_preloadSDL3ForHook(void) {
         NSLog(@"[SDL3 Hook] libSDL3.dylib already loaded in amethyst_preloadSDL3ForHook, rebinding all images");
         init_hookFunctions();
     }
+}
+
+// ============================================================================
+// iOS 26+ PPL bypass（从原版项目移植）
+// ============================================================================
+// 背景：
+//   iOS 26+ 引入 PPL（Page Protection Layer）对 dyld 加载的 Mach-O __TEXT
+//   段做签名校验，传统的 dyld bypass（PLPatchMachOPlatformForFile）不再有效。
+//   对于无 TXM（JIT 模块）且处于 FORCE_MIRRORED 模式的设备，需要使用硬件
+//   断点 + Mach 异常的方式绕过 PPL：
+//     1. 设置 ARM64 硬件断点（BVR/BCR）监控 hwRedirectOrig 指定的地址
+//     2. 当 PC 命中断点时，Mach 内核发送 EXC_BREAKPOINT 异常到 excPort
+//     3. exception_handler 线程通过 mach_msg_server 接收异常
+//     4. catch_mach_exception_raise_state 将 PC 重定向到 hwRedirectTarget
+//
+//   hooked_dlopen 在检测到 home/tmp 目录下的 dylib 且设备需要 PPL bypass 时，
+//   通过 musttail 尾调用 hooked_dlopen_26_ppl 执行上述流程。
+
+// hack dlopen for non-TXM 26.x
+void *exception_handler(void *unused) {
+    mach_msg_server(mach_exc_server, sizeof(union __RequestUnion__catch_mach_exc_subsystem), excPort, MACH_MSG_OPTION_NONE);
+    abort();
+}
+void *hooked_dlopen_26_ppl(const char *path, int mode) {
+    if (!excPort) {
+        mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &excPort);
+        mach_port_insert_right(mach_task_self(), excPort, excPort, MACH_MSG_TYPE_MAKE_SEND);
+        pthread_t thread;
+        pthread_create(&thread, NULL, exception_handler, NULL);
+    }
+
+    // save old thread states
+    exception_mask_t mask = EXC_MASK_BREAKPOINT;
+    mach_msg_type_number_t masksCnt = 1;
+    exception_handler_t handler = excPort;
+    exception_behavior_t behavior = EXCEPTION_STATE | MACH_EXCEPTION_CODES;
+    thread_state_flavor_t flavor = ARM_THREAD_STATE64;
+    arm_debug_state64_t origDebugState;
+    mach_port_t thread = mach_thread_self();
+    thread_get_state(thread, ARM_DEBUG_STATE64, (thread_state_t)&origDebugState, &(mach_msg_type_number_t){ARM_DEBUG_STATE64_COUNT});
+    thread_swap_exception_ports(thread, mask, handler, behavior, flavor, &mask, &masksCnt, &handler, &behavior, &flavor);
+    assert(masksCnt == 1);
+
+    // hook stuff. this will overwrite LiveContainer private container multitask's hook, we will load __TEXT using JIT inside
+    arm_debug_state64_t hookDebugState = {0};
+    for(int i = 0; i < 6 && hwRedirectOrig[i]; i++) {
+        hookDebugState.__bvr[i] = (uint64_t)hwRedirectOrig[i];
+        hookDebugState.__bcr[i] = 0x1e5;
+    }
+    thread_set_state(thread, ARM_DEBUG_STATE64, (thread_state_t)&hookDebugState, ARM_DEBUG_STATE64_COUNT);
+
+    // fixup @loader_path since we cannot use musttail here
+    void *result;
+    void *callerAddr = __builtin_return_address(0);
+    struct dl_info info;
+    if (path && !strncmp(path, "@loader_path/", 13) && dladdr(callerAddr, &info)) {
+        char resolvedPath[PATH_MAX];
+        snprintf(resolvedPath, sizeof(resolvedPath), "%s/%s", dirname((char *)info.dli_fname), path + 13);
+        result = orig_dlopen(resolvedPath, mode);
+    } else {
+        result = orig_dlopen(path, mode);
+    }
+
+    // restore old thread states
+    thread_set_state(thread, ARM_DEBUG_STATE64, (thread_state_t)&origDebugState, ARM_DEBUG_STATE64_COUNT);
+    thread_swap_exception_ports(thread, mask, handler, behavior, flavor, &mask, &masksCnt, &handler, &behavior, &flavor);
+
+    return result;
+}
+kern_return_t catch_mach_exception_raise_state( mach_port_t exception_port, exception_type_t exception, const mach_exception_data_t code, mach_msg_type_number_t codeCnt, int *flavor, const thread_state_t old_state, mach_msg_type_number_t old_stateCnt, thread_state_t new_state, mach_msg_type_number_t *new_stateCnt) {
+    arm_thread_state64_t *old = (arm_thread_state64_t *)old_state;
+    arm_thread_state64_t *new = (arm_thread_state64_t *)new_state;
+    uint64_t pc = arm_thread_state64_get_pc(*old);
+
+    for(int i = 0; i < 6 && hwRedirectOrig[i]; i++) {
+        if(pc == (uint64_t)hwRedirectOrig[i]) {
+            *new = *old;
+            *new_stateCnt = old_stateCnt;
+            arm_thread_state64_set_pc_fptr(*new, hwRedirectTarget[i]);
+            return KERN_SUCCESS;
+        }
+    }
+    NSLog(@"[DyldLVBypass] Unknown breakpoint at pc: %p", (void*)pc);
+    return KERN_FAILURE;
+}
+kern_return_t catch_mach_exception_raise(mach_port_t exception_port, mach_port_t thread, mach_port_t task, exception_type_t exception, mach_exception_data_t code, mach_msg_type_number_t codeCnt) {
+    abort();
+}
+kern_return_t catch_mach_exception_raise_state_identity(mach_port_t exception_port, mach_port_t thread, mach_port_t task, exception_type_t exception, mach_exception_data_t code, mach_msg_type_number_t codeCnt, int *flavor, thread_state_t old_state, mach_msg_type_number_t old_stateCnt, thread_state_t new_state, mach_msg_type_number_t *new_stateCnt) {
+    abort();
 }
