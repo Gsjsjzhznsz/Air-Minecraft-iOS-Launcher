@@ -510,6 +510,13 @@ add_executable(AngelAuraAmethyst
   MinecraftNewsItem.m
   MinecraftNewsService.m
   MinecraftNewsViewController.m
+
+  # 公告系统（从官网拉取 JSON，支持 Markdown 渲染）
+  AnnouncementItem.m
+  AnnouncementService.m
+  MarkdownParser.m
+  AnnouncementListViewController.m
+  AnnouncementDetailViewController.m
 )
 
 # Add ModLoaderIcons PNG files into the app bundle Resources/ModLoaderIcons so they are available at runtime.

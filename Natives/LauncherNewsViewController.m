@@ -13,6 +13,9 @@
 #import "MinecraftNewsService.h"
 #import "MinecraftNewsItem.h"
 #import "MinecraftNewsViewController.h"
+#import "AnnouncementService.h"
+#import "AnnouncementItem.h"
+#import "AnnouncementListViewController.h"
 #import "IconLoader.h"
 #import <SafariServices/SafariServices.h>
 #import <QuartzCore/QuartzCore.h>
@@ -716,6 +719,8 @@ static NSString *festivalGreeting(void) {
 @property (nonatomic, strong) NSString *announcementText;
 @property (nonatomic, assign) BOOL hasUpdate;
 @property (nonatomic, strong) NSString *latestVersion;
+// 公告系统（从官网拉取 JSON 的最新一条公告）
+@property (nonatomic, strong, nullable) AnnouncementItem *latestAnnouncement;
 
 // MC 新闻（首页 News tile 预览用，展示最新一条）
 @property (nonatomic, strong, nullable) MinecraftNewsItem *latestNewsItem;
@@ -758,6 +763,7 @@ static NSString *festivalGreeting(void) {
     [self checkMinecraftVersions];
     [self checkForUpdate];
     [self loadLatestNewsForTile];
+    [self loadAnnouncementsForTile];
 
     // 适配自定义启动器背景：将当前视图控制器透明化，让全局背景（图片/视频）能够透出显示。
     // 本控制器为 UIViewController 子类，其 collectionView 为手动创建，
@@ -1008,17 +1014,47 @@ static NSString *festivalGreeting(void) {
         case HomeTileTypeAnnouncement: {
             HomeAnnouncementTileCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"AnnouncementCell" forIndexPath:indexPath];
             [cell setAccentColor:[config accentColor]];
-            cell.messageLabel.text = self.announcementText;
-            
-            if (self.hasUpdate) {
-                cell.actionButton.hidden = NO;
-                [cell.actionButton setTitle:@"前往下载" forState:UIControlStateNormal];
-                cell.actionButton.backgroundColor = colorFromHex(@"#3B82F6");
-                [cell.actionButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-                [cell.actionButton removeTarget:nil action:nil forControlEvents:UIControlEventAllEvents];
-                [cell.actionButton addTarget:self action:@selector(downloadLatestVersion) forControlEvents:UIControlEventTouchUpInside];
+
+            if (self.latestAnnouncement) {
+                AnnouncementItem *ann = self.latestAnnouncement;
+                NSString *previewLevel = getPrefObject(@"general.announcement_preview_level") ?: @"summary";
+
+                if ([previewLevel isEqualToString:@"title_only"]) {
+                    // 仅标题
+                    cell.messageLabel.text = ann.title;
+                } else if ([previewLevel isEqualToString:@"full"]) {
+                    // 完整：标题 + 日期 + 摘要
+                    cell.messageLabel.text = [NSString stringWithFormat:@"%@\n%@\n%@", ann.title, ann.formattedDateString, ann.summary];
+                } else {
+                    // summary（默认）：标题 + 摘要
+                    cell.messageLabel.text = [NSString stringWithFormat:@"%@\n%@", ann.title, ann.summary];
+                }
+
+                // 如果有 actionURL，显示按钮
+                if (ann.actionURL.length > 0 && ann.actionTitle.length > 0) {
+                    cell.actionButton.hidden = NO;
+                    [cell.actionButton setTitle:ann.actionTitle forState:UIControlStateNormal];
+                    cell.actionButton.backgroundColor = colorFromHex(@"#3B82F6");
+                    [cell.actionButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                    [cell.actionButton removeTarget:nil action:nil forControlEvents:UIControlEventAllEvents];
+                    [cell.actionButton addTarget:self action:@selector(openAnnouncementActionURL) forControlEvents:UIControlEventTouchUpInside];
+                } else {
+                    cell.actionButton.hidden = YES;
+                }
             } else {
-                cell.actionButton.hidden = YES;
+                // 无公告数据时显示更新检测结果
+                cell.messageLabel.text = self.announcementText;
+
+                if (self.hasUpdate) {
+                    cell.actionButton.hidden = NO;
+                    [cell.actionButton setTitle:@"前往下载" forState:UIControlStateNormal];
+                    cell.actionButton.backgroundColor = colorFromHex(@"#3B82F6");
+                    [cell.actionButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                    [cell.actionButton removeTarget:nil action:nil forControlEvents:UIControlEventAllEvents];
+                    [cell.actionButton addTarget:self action:@selector(downloadLatestVersion) forControlEvents:UIControlEventTouchUpInside];
+                } else {
+                    cell.actionButton.hidden = YES;
+                }
             }
             return cell;
         }
@@ -1089,6 +1125,12 @@ static NSString *festivalGreeting(void) {
         UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:newsVC];
         nav.modalPresentationStyle = UIModalPresentationPageSheet;
         // 适配自定义启动器背景：透明化导航栏，让全局背景透出
+        [self presentViewController:nav animated:YES completion:nil];
+    } else if (config.tileType == HomeTileTypeAnnouncement) {
+        // 跳转到公告列表页
+        AnnouncementListViewController *listVC = [[AnnouncementListViewController alloc] init];
+        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:listVC];
+        nav.modalPresentationStyle = UIModalPresentationPageSheet;
         [self presentViewController:nav animated:YES completion:nil];
     }
 }
@@ -1379,6 +1421,33 @@ static NSString *festivalGreeting(void) {
                 [self.collectionView reloadSections:[NSIndexSet indexSetWithIndex:s]];
                 return;
             }
+        }
+    }
+}
+
+// MARK: - Announcements (官网 JSON 公告)
+
+/// 为首页公告磁贴拉取最新公告（取首条），失败时回退到更新检测文案
+- (void)loadAnnouncementsForTile {
+    __weak typeof(self) weakSelf = self;
+    [[AnnouncementService sharedService] fetchAnnouncementsWithCompletion:^(NSArray<AnnouncementItem *> *items, NSError *error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (items.count > 0) {
+            strongSelf.latestAnnouncement = items.firstObject;
+        }
+        [strongSelf reloadAnnouncementSection];
+    }];
+}
+
+/// 打开公告磁贴上 actionURL 指向的链接（SFSafariViewController 内嵌打开）
+- (void)openAnnouncementActionURL {
+    if (self.latestAnnouncement.actionURL.length > 0) {
+        NSURL *url = [NSURL URLWithString:self.latestAnnouncement.actionURL];
+        if (url) {
+            SFSafariViewController *safari = [[SFSafariViewController alloc] initWithURL:url];
+            safari.modalPresentationStyle = UIModalPresentationPageSheet;
+            [self presentViewController:safari animated:YES completion:nil];
         }
     }
 }

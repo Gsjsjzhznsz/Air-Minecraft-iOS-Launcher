@@ -27,7 +27,7 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"check_sha": @YES,
             @"cosmetica": @YES,
             @"debug_logging": @(!CONFIG_RELEASE),
-            @"news_url": @"https://amethyst.ct.ws/welcome",
+            @"news_url": @"https://amethyst.ct.ws/api/announcements.json",
             @"download_source": @"bmclapi",
             // 各资源类型独立下载源（未显式设置时回退到 modrinth）
             @"download_source_mod": @"modrinth",
@@ -45,6 +45,8 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"mod_mirror": @"official",
             // profile 写入的强制内存分配，0=使用 java.allocated_memory/auto_ram 逻辑
             @"ram_allocation": @(0),
+            // 首页公告磁贴预览级别：full（标题+日期+摘要）/ summary（标题+摘要）/ title_only（仅标题）
+            @"announcement_preview_level": @"summary",
         }.mutableCopy,
         @"video": @{ // Video & Audio
             @"renderer": @"auto",
