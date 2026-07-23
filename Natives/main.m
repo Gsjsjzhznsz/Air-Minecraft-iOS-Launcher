@@ -14,6 +14,10 @@
 #import "UIKit+hook.h"
 #import "config.h"
 
+// 前向声明：main_hook.m 中定义的致命退出处理函数
+// 用于 uncaughtExceptionHandler 将未捕获异常转发给统一的崩溃处理链路
+extern void handle_fatal_exit(int code);
+
 #include <libgen.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -105,7 +109,7 @@ void init_logDeviceAndVer(char *argument) {
     NSLog(@"[Pre-Init] Amethyst iOS Remastered INIT!");
     NSLog(@"[Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered");
     NSLog(@"[Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.");
-    NSLog(@"[Pre-Init] Version: %@", NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"], CONFIG_TYPE);
+    NSLog(@"[Pre-Init] Version: %@-%s", NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"], CONFIG_TYPE);
     NSLog(@"[Pre-Init] Commit: %s (%s)", CONFIG_COMMIT, CONFIG_BRANCH);
     
     NSString *tsPath = [NSString stringWithFormat:@"%@/../_TrollStore", NSBundle.mainBundle.bundlePath];

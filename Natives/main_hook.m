@@ -161,7 +161,12 @@ void handle_fatal_exit(int code) {
         return;
     }
 
-    [PLLogOutputView handleExitCode:code];
+    // 检查 handleExitCode 返回值（对齐原版 main_hook.m L26-28）
+    // 返回 NO 表示没有 current 日志视图（JVM 未启动或已退出），
+    // 此时不应进入 sleep/dispatch_group_wait，直接 return 让进程正常退出。
+    if (![PLLogOutputView handleExitCode:code]) {
+        return;
+    }
 
     if (fatalExitGroup != nil) {
         // Likely other threads are crashing, put them to sleep

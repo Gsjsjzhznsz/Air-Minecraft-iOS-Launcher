@@ -185,17 +185,17 @@ static PLLogOutputView* current;
     });
 }
 
-+ (void)handleExitCode:(int)code {
-    if (!current) return;
-    
++ (BOOL)handleExitCode:(int)code {
+    if (!current) return NO;
+
     // 如果有错误，显示新的崩溃界面
     if (code != 0) {
         fatalErrorOccurred = YES;
         canAppendToLog = NO;
         [PLCrashView showWithExitCode:code];
-        return;
+        return YES;
     }
-    
+
     // 退出代码为0时的降级处理（正常退出）
     dispatch_async(dispatch_get_main_queue(), ^(void){
         if (current.hidden) {
@@ -232,6 +232,7 @@ static PLLogOutputView* current;
 
         fatalErrorOccurred = YES;
     });
+    return YES;
 }
 
 @end

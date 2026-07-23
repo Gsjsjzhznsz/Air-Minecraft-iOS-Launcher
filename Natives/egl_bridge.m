@@ -260,12 +260,16 @@ void pojavMakeCurrent(basic_render_window_t* window) {
 }
 
 void* pojavCreateContext(basic_render_window_t* contextSrc) {
-    static BOOL inited = NO;
-    if (!inited) {
-        inited = YES;
-        pojavInitOpenGL();
-    }
-
+    // 对齐原版 egl_bridge.m L104-117：先判断 clientAPI，再决定是否调用 pojavInitOpenGL
+    //
+    // 修复 Bug 3/5（启动时黑屏不动）：
+    //   旧代码先无条件执行 `inited=YES; pojavInitOpenGL();`，再判断 clientAPI。
+    //   这导致 Vulkan 路径（clientAPI == GLFW_NO_API）也执行了 pojavInitOpenGL，
+    //   而 pojavInitOpenGL 内部会 dlopen 渲染器库 + 设置 GL bridge，
+    //   可能与 Vulkan 路径的 libMoltenVK 产生冲突，导致黑屏。
+    //
+    //   原版逻辑：Vulkan 路径直接 return CAMetalLayer，不初始化 GL bridge；
+    //   GL 路径才用 static inited 控制 pojavInitOpenGL 只执行一次。
     const char *renderer = getenv("AMETHYST_RENDERER");
     const char *graphicsApi = getenv("AMETHYST_GRAPHICS_API");
     NSLog(@"[egl_bridge] pojavCreateContext: clientAPI=%d (GLFW_NO_API=%d), renderer=%s, graphicsApi=%s",
@@ -275,12 +279,19 @@ void* pojavCreateContext(basic_render_window_t* contextSrc) {
         // Game has selected Vulkan API to render
         // MC 26.2+ graphicsApi=prefer_vulkan 或 default（Vulkan 路径）会走这里
         // 返回 CAMetalLayer 作为 Vulkan surface，MC/LWJGL 通过 libMoltenVK.dylib 自管 Vulkan
+        // 注意：Vulkan 路径不设置 inited=YES，不调用 pojavInitOpenGL（对齐原版）
         NSLog(@"[egl_bridge] Vulkan path: returning CAMetalLayer as Vulkan surface");
         return (__bridge void *)SurfaceViewController.surface.layer;
     }
 
     // GL 路径（clientAPI == GLFW_OPENGL_API 或 GLFW_OPENGL_ES_API）
     // MC 26.2+ graphicsApi=prefer_opengl 或 default（OpenGL 路径）会走这里
+    static BOOL inited = NO;
+    if (!inited) {
+        inited = YES;
+        pojavInitOpenGL();
+    }
+
     // 调用 br_init_context 创建真实 EGL/GL 上下文
     // 即使 renderer=libMoltenVK.dylib，pojavInitOpenGL 已设置 GL bridge（set_gl_bridge_tbl），
     // 所以这里会调用 gl_init_context 创建 ANGLE Metal EGL 上下文

@@ -574,13 +574,15 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             isExecuteJar ? [launchTarget lastPathComponent] : PLProfiles.current.selectedProfile[@"lastVersionId"], minVersion]);
         return 1;
     } else if ([javaHome hasPrefix:@(getenv("POJAV_HOME"))]) {
-        // Symlink libawt_xawt.dylib
+        // Copy libawt_xawt.dylib（对齐原版：硬拷贝而非符号链接）
+        // 符号链接在某些 iOS 版本上会导致 AWT 加载失败（dyld 解析符号链接时机问题）
         NSString *dest = [NSString stringWithFormat:@"%@/lib/libawt_xawt.dylib", javaHome];
         NSString *source = [NSString stringWithFormat:@"%@/Frameworks/libawt_xawt.dylib", NSBundle.mainBundle.bundlePath];
         NSError *error;
-        [fm createSymbolicLinkAtPath:dest withDestinationPath:source error:&error];
+        [fm removeItemAtPath:dest error:nil];
+        [fm copyItemAtPath:source toPath:dest error:&error];
         if (error) {
-            NSLog(@"[JavaLauncher] Symlink libawt_xawt.dylib failed: %@", error.localizedDescription);
+            NSLog(@"[JavaLauncher] Copy libawt_xawt.dylib failed: %@", error.localizedDescription);
         }
     }
 
@@ -600,6 +602,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         showDialog(localize(@"Error", nil), @"Insufficient contiguous virtual memory space. Lower memory allocation and try again.");
         return 1;
     }
+
+    // Setup options.txt（对齐原版 L229）
+    // 在 JVM 启动前写入 options.txt，设置 fullscreen=false、overrideWidth/Height、
+    // 默认 mipmapLevels/particles/renderDistance/simulationDistance 等性能选项，
+    // 并计算合适的 guiScale。缺少此调用会导致 MC 启动时使用默认 guiScale，
+    // 在高分屏上界面元素过小，且 overrideWidth/overrideHeight 不生效。
+    [MinecraftOptionUtils setupOptionsAtGameDir:gameDir];
 
     int margc = -1;
     const char *margv[1000];
@@ -1028,6 +1037,18 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     NSString *libjlipath11 = [NSString stringWithFormat:@"%@/lib/libjli.dylib", javaHome]; // java 11+
     BOOL isJava8 = [fm fileExistsAtPath:libjlipath8];
 
+    // 检测 Java 25：通过读取 JRE 目录下的 release 文件确定实际版本
+    // 用于条件化 Java 25 不兼容的 JVM 参数（如 sun.security.action 导出、UseCompressedClassPointers）
+    // release 文件格式：JAVA_VERSION="25"
+    BOOL isJava25 = NO;
+    NSString *releasePath = [javaHome stringByAppendingPathComponent:@"release"];
+    NSString *releaseContent = [NSString stringWithContentsOfFile:releasePath encoding:NSUTF8StringEncoding error:nil];
+    if (releaseContent) {
+        NSRange range = [releaseContent rangeOfString:@"JAVA_VERSION=\"25"];
+        isJava25 = range.location != NSNotFound;
+    }
+    NSLog(@"[JavaLauncher] Java version detection: isJava8=%d isJava25=%d javaHome=%@", isJava8, isJava25, javaHome.lastPathComponent);
+
     // ============================================================================
     // JVM 性能优化（保守参数，不影响启动稳定性）
     // ============================================================================
@@ -1103,7 +1124,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         PUSH_MARGV_LITERAL("--add-exports=java.desktop/sun.awt.event=ALL-UNNAMED");
         PUSH_MARGV_LITERAL("--add-exports=java.desktop/sun.awt.datatransfer=ALL-UNNAMED");
         PUSH_MARGV_LITERAL("--add-exports=java.desktop/sun.font=ALL-UNNAMED");
-        PUSH_MARGV_LITERAL("--add-exports=java.base/sun.security.action=ALL-UNNAMED");
+        // sun.security.action 导出：仅 Java < 25 添加
+        // Java 25 已移除 sun.security.action 包（GetPropertyAction 等类被删除），
+        // 在 Java 25 上添加此导出会导致 JVM 警告："module java.base does not export sun.security.action"
+        // Java 17/21 的 caciocavallo 可能引用 sun.security.action.GetPropertyAction，需要此导出。
+        if (!isJava25) {
+            PUSH_MARGV_LITERAL("--add-exports=java.base/sun.security.action=ALL-UNNAMED");
+        }
         PUSH_MARGV_LITERAL("--add-opens=java.base/java.util=ALL-UNNAMED");
         PUSH_MARGV_LITERAL("--add-opens=java.desktop/java.awt=ALL-UNNAMED");
         PUSH_MARGV_LITERAL("--add-opens=java.desktop/sun.font=ALL-UNNAMED");
@@ -1164,10 +1191,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     // stub-surface-manager.jar 已删除（见上方注释）。不再使用 --patch-module。
     // CTCPreloadClassLoader.<clinit> 抛出的 ClassNotFoundException 被吞掉，不影响启动。
 
-    if (!getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing")) {
+    if (!getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing") && !isJava25) {
         // In jailed environment, where extended virtual addressing entitlement isn't
         // present (for free dev account), allocating compressed space fails.
         // FIXME: does extended VA allow allocating compressed class space?
+        // Java 25 已弃用 UseCompressedClassPointers 参数（JEP 471），
+        // 在 Java 25 上添加会导致 "Ignoring option UseCompressedClassPointers" 警告。
+        // Java 25 默认使用 64-bit pointer，不再需要此参数。
         PUSH_MARGV_LITERAL("-XX:-UseCompressedClassPointers");
     }
 

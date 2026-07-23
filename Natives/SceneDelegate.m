@@ -11,6 +11,12 @@
 extern UIWindow *mainWindow;
 
 @interface SceneDelegate ()
+// 记录 requestGeometryUpdateWithPreferences 是否失败
+// iOS 16+ 在 willConnectToSession 阶段调用 requestGeometryUpdateWithPreferences
+// 可能因窗口场景尚未完全 attach 而失败（error code=101）。
+// 失败后在 sceneDidBecomeActive 中重试，确保横屏几何生效。
+@property (nonatomic, assign) BOOL geometryUpdateFailed;
+@property (nonatomic, assign) BOOL geometryUpdateRetried;
 @end
 
 @implementation SceneDelegate
@@ -110,6 +116,27 @@ extern UIWindow *mainWindow;
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    // 横屏几何更新失败兜底（修复 Bug 1：启动1.17及以上时崩溃）
+    //
+    // iOS 16+ 在 willConnectToSession 阶段调用 requestGeometryUpdateWithPreferences
+    // 可能失败（error code=101，窗口场景尚未完全 attach）。
+    // 如果首次失败，在 sceneDidBecomeActive（窗口场景已激活）时重试一次。
+    // 重试只执行一次，避免无限循环。
+    if (@available(iOS 16.0, *)) {
+        if (self.geometryUpdateFailed && !self.geometryUpdateRetried) {
+            self.geometryUpdateRetried = YES;
+            UIWindowScene *windowScene = (UIWindowScene *)scene;
+            UIWindowSceneGeometryPreferencesIOS *geometryPreferences = [[UIWindowSceneGeometryPreferencesIOS alloc] init];
+            geometryPreferences.interfaceOrientations = UIInterfaceOrientationMaskLandscape;
+            __weak typeof(self) weakSelf = self;
+            [windowScene requestGeometryUpdateWithPreferences:geometryPreferences errorHandler:^(NSError *error) {
+                NSLog(@"[SceneDelegate] Geometry retry also failed: %@", error);
+                // 重试仍失败，通知系统刷新支持的方向作为最终兜底
+                [windowScene setNeedsUpdateOfSupportedInterfaceOrientations];
+            }];
+            NSLog(@"[SceneDelegate] Retried geometry update after initial failure");
+        }
+    }
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene {

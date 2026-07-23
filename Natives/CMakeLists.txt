@@ -403,6 +403,7 @@ add_executable(AngelAuraAmethyst
   input_bridge_v3.m
   ios_uikit_bridge.m
   utils.m
+  MinecraftOptionUtils.m
 
   # Version card cell (shared between DownloadViewController and LauncherProfilesViewController)
   VersionCardCell.m
