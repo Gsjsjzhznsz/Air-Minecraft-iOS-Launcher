@@ -166,7 +166,6 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
 
         defaults[@"java"][@"manage_runtime"] = @""; // stub
         defaults[@"debug"] = @{
-            @"debug_universal_script_jit": @NO,
             @"debug_always_attached_jit": @NO,
             @"debug_skip_wait_jit": @NO,
             @"debug_hide_home_indicator": @NO,
