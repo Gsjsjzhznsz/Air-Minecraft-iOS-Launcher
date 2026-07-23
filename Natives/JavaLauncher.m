@@ -21,6 +21,7 @@
 #import "JavaLauncher.h"
 #import "LauncherPreferences.h"
 #import "MinecraftOptionUtils.h"
+#import "PLLogOutputView.h"
 #import "PLProfiles.h"
 
 #define fm NSFileManager.defaultManager
