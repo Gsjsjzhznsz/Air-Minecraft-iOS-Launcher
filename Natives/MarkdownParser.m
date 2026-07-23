@@ -178,7 +178,7 @@
                                                  textColor:secondaryColor
                                                  linkColor:linkColor
                                                 codeBgColor:codeBgColor];
-            NSMutableAttributedString *mutableQuote = [inline mutableCopy];
+            NSMutableAttributedString *mutableQuote = [inlineText mutableCopy];
             [mutableQuote addAttribute:NSParagraphStyleAttributeName value:para range:NSMakeRange(0, mutableQuote.length)];
             // 左侧条：用首字符背景色模拟（仅作视觉提示）
             if (mutableQuote.length > 0) {
