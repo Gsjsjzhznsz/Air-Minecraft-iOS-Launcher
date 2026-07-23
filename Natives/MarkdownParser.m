@@ -49,9 +49,60 @@
     NSMutableAttributedString *result = [[NSMutableAttributedString alloc] init];
     NSArray *lines = [markdown componentsSeparatedByString:@"\n"];
 
-    for (NSUInteger i = 0; i < lines.count; i++) {
+    NSUInteger i = 0;
+    while (i < lines.count) {
         NSString *line = lines[i];
         NSString *trimmed = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+
+        // 围栏代码块 ``` 或 ~~~
+        if ([trimmed hasPrefix:@"```"] || [trimmed hasPrefix:@"~~~"]) {
+            NSString *fence = [trimmed substringToIndex:3]; // ``` 或 ~~~
+            NSUInteger codeStart = i + 1;
+            NSUInteger codeEnd = codeStart;
+            BOOL foundClosing = NO;
+            // 找到闭合围栏
+            for (NSUInteger j = codeStart; j < lines.count; j++) {
+                NSString *codeTrimmed = [lines[j] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+                if ([codeTrimmed hasPrefix:fence]) {
+                    codeEnd = j;
+                    foundClosing = YES;
+                    break;
+                }
+            }
+            if (!foundClosing) {
+                codeEnd = lines.count; // 未闭合则到末尾
+            }
+            // 拼接代码块内容
+            NSMutableArray *codeLines = [NSMutableArray array];
+            for (NSUInteger j = codeStart; j < codeEnd; j++) {
+                [codeLines addObject:lines[j]];
+            }
+            NSString *codeContent = [codeLines componentsJoinedByString:@"\n"];
+            UIFont *codeFont = [UIFont fontWithName:@"Menlo" size:baseFont.pointSize - 1];
+            if (!codeFont) {
+                codeFont = [UIFont monospacedSystemFontOfSize:baseFont.pointSize - 1 weight:UIFontWeightRegular];
+            }
+            NSMutableParagraphStyle *codePara = [[NSMutableParagraphStyle alloc] init];
+            codePara.headIndent = 8;
+            codePara.firstLineHeadIndent = 8;
+            codePara.tailIndent = -8;
+            codePara.paragraphSpacingBefore = 4;
+            codePara.paragraphSpacing = 4;
+            NSAttributedString *codeBlock = [[NSAttributedString alloc] initWithString:codeContent
+                                                                              attributes:@{
+                                                                                  NSFontAttributeName: codeFont,
+                                                                                  NSForegroundColorAttributeName: textColor,
+                                                                                  NSBackgroundColorAttributeName: codeBgColor,
+                                                                                  NSParagraphStyleAttributeName: codePara
+                                                                              }];
+            [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
+                                                                            attributes:@{NSFontAttributeName: baseFont}]];
+            [result appendAttributedString:codeBlock];
+            [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
+                                                                            attributes:@{NSFontAttributeName: baseFont}]];
+            i = foundClosing ? codeEnd + 1 : codeEnd;
+            continue;
+        }
 
         // 空行 → 段落间距（跳过，避免堆积过多换行）
         if (trimmed.length == 0) {
@@ -59,6 +110,7 @@
                 [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                                 attributes:@{NSFontAttributeName: baseFont}]];
             }
+            i++;
             continue;
         }
 
@@ -74,6 +126,7 @@
             [result appendAttributedString:hr];
             [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                             attributes:@{NSFontAttributeName: baseFont}]];
+            i++;
             continue;
         }
 
@@ -86,6 +139,7 @@
                              textColor:textColor
                              linkColor:linkColor
                             codeBgColor:codeBgColor];
+            i++;
             continue;
         }
         if ([trimmed hasPrefix:@"## "]) {
@@ -96,6 +150,7 @@
                              textColor:textColor
                              linkColor:linkColor
                             codeBgColor:codeBgColor];
+            i++;
             continue;
         }
         if ([trimmed hasPrefix:@"# "]) {
@@ -106,6 +161,7 @@
                              textColor:textColor
                              linkColor:linkColor
                             codeBgColor:codeBgColor];
+            i++;
             continue;
         }
 
@@ -131,6 +187,7 @@
             [result appendAttributedString:mutableQuote];
             [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                             attributes:@{NSFontAttributeName: baseFont}]];
+            i++;
             continue;
         }
 
@@ -158,6 +215,7 @@
             [result appendAttributedString:listItem];
             [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                             attributes:@{NSFontAttributeName: baseFont}]];
+            i++;
             continue;
         }
 
@@ -187,7 +245,34 @@
             [result appendAttributedString:listItem];
             [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                             attributes:@{NSFontAttributeName: baseFont}]];
+            i++;
             continue;
+        }
+
+        // 图片 ![alt](url) — 在行内解析中处理为带链接的占位文本
+        if ([trimmed hasPrefix:@"!["]) {
+            NSRange closeBracket = [trimmed rangeOfString:@"]("];
+            if (closeBracket.location != NSNotFound) {
+                NSRange endParen = [trimmed rangeOfString:@")" options:NSBackwardsSearch];
+                if (endParen.location != NSNotFound && endParen.location > closeBracket.location) {
+                    NSString *altText = [trimmed substringWithRange:NSMakeRange(2, closeBracket.location - 2)];
+                    NSString *imgURL = [trimmed substringWithRange:NSMakeRange(NSMaxRange(closeBracket), endParen.location - NSMaxRange(closeBracket))];
+                    // 显示 [图片: altText] 作为占位（iOS UITextView 远程图片加载需额外处理）
+                    NSString *placeholder = altText.length > 0 ? [NSString stringWithFormat:@"[图片: %@]", altText] : @"[图片]";
+                    NSURL *url = [NSURL URLWithString:imgURL];
+                    NSMutableDictionary *attrs = [@{
+                        NSFontAttributeName: [UIFont italicSystemFontOfSize:baseFont.pointSize],
+                        NSForegroundColorAttributeName: secondaryColor
+                    } mutableCopy];
+                    if (url) attrs[NSLinkAttributeName] = url;
+                    [result appendAttributedString:[[NSAttributedString alloc] initWithString:placeholder
+                                                                                   attributes:attrs]];
+                    [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
+                                                                                   attributes:@{NSFontAttributeName: baseFont}]];
+                    i++;
+                    continue;
+                }
+            }
         }
 
         // 普通段落
@@ -199,6 +284,7 @@
         [result appendAttributedString:para];
         [result appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"
                                                                         attributes:@{NSFontAttributeName: baseFont}]];
+        i++;
     }
 
     return [result copy];
