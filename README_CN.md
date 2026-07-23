@@ -1,115 +1,154 @@
-# Amethyst (iOS) 重制版 
-###### 注：以后可能会改名
+# Air &middot; Amethyst iOS 重制版
 
-[![开发构建状态](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main)](.github/workflows/development.yml)
-[![总下载量](https://img.shields.io/github/downloads/herbrine8403/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat)](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases)
-<a href="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases/"><img src="https://img.shields.io/github/v/release/herbrine8403/Amethyst-iOS-MyRemastered?style=flat"></a>
-<a href="https://raw.githubusercontent.com/herbrine8403/Amethyst-iOS-MyRemastered/main/LICENSE"><img src="https://img.shields.io/github/license/herbrine8403/Amethyst-iOS-MyRemastered?style=flat"></a>
-![最后提交](https://img.shields.io/github/last-commit/herbrine8403/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat)
+<div align="center">
+  <img alt="构建状态" src="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="下载量" src="https://img.shields.io/github/downloads/herbrine8403/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
+  <img alt="版本" src="https://img.shields.io/github/v/release/herbrine8403/Amethyst-iOS-MyRemastered?style=flat">
+  <img alt="许可证" src="https://img.shields.io/github/license/herbrine8403/Amethyst-iOS-MyRemastered?style=flat">
+  <img alt="最后提交" src="https://img.shields.io/github/last-commit/herbrine8403/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat">
+</div>
 
-[English](README.md) | **中文** 
+<p align="center">
+  <a href="./README.md">English</a> | <a href="./README_CN.md">Chinese</a>
+</p>
 
-## 🌟 重制版核心亮点
-基于官方 Amethyst 优化适配，聚焦 iOS/iPadOS 体验升级，核心特性包括：
-- **Mod管理**：复刻其他启动器的Mod管理功能，支持查看Mod基本信息，一键禁用/删除Mod
-- **导入整合包**：支持导入 ZIP 格式的整合包
-- **更改鼠标指针**：支持在设置界面自定义虚拟鼠标指针的皮肤
-- **多下载源支持**：可在设置中手动更改下载源，支持 Mojang 官方源与 BMCLAPI 镜像源，下载更快速
-- **完整中文本地化**：界面完整汉化，更适合中国宝宝体质 awa
-- **账户限制解除**：支持本地账户、演示账户（Demo Mode）和第三方账户直接下载游戏，无需登录 Microsoft 账号或 Test 账号
-- **多账户登录**：兼容 Microsoft 账号、本地账号及第三方认证账户
-- **更改新闻页面网址**：可自由更改新闻页面的网址
-- **自动选择渲染器**：渲染器切换为 Auto 后将自动选择合适的渲染器，包括 MobileGlues
-- **自动选择JVM**：将根据游戏版本自动选择 JVM 版本，包括 Java21
-- **支持TouchController**：通过 UDP 本地代理实现与 TouchController Mod 的通信，为 iOS 用户提供触屏控制支持
-- **自定义图标**：（开发中，即将上线）
+---
 
-> ⚠️ 说明：暂不计划重置 Android 版本（Android 端的优秀启动器太多了,例如Zalith Launcher、Fold Craft Launcher、还未完工的ShardLauncher），如需官方 Android 版，可前往 [Amethyst-Android](https://github.com/AngelAuraMC/Amethyst-Android)。
+**Air** 是一款面向 iOS 和 iPadOS 平台的 Minecraft: Java Edition 高端启动器，基于官方 Amethyst 项目深度重构。它提供了精致的移动端体验，集成了全面的 Mod 管理、智能渲染器选择以及深度的平台适配能力。
 
+---
 
-## 🚀 快速上手指南
-完整安装及设置文档可参考 [Amethyst 官方维基](https://wiki.angelauramc.dev/wiki/getting_started/INSTALL.html#ios)，或查看我的 [B站教程视频(很古早)](https://b23.tv/KyxZr12)。以下为精简步骤：
+## 目录
 
+- [核心特性](#核心特性)
+- [快速上手](#快速上手)
+  - [设备要求](#设备要求)
+  - [侧载准备](#侧载准备)
+  - [安装步骤](#安装步骤)
+  - [启用 JIT](#启用-jit)
+- [贡献者](#贡献者)
+- [第三方组件](#第三方组件)
+- [捐赠](#捐赠)
 
-### 📱 设备要求
-| 类型       | 系统版本要求                | 支持机型列表                                                                 |
-|------------|-----------------------------|------------------------------------------------------------------------------|
-| **最低配置** | iOS 14.0 及以上             | iPhone 6s+/iPad 5代+/iPad Air 2+/iPad mini 4+/所有 iPad Pro/iPod touch 7代 |
-| **推荐配置** | iOS 14.5 及以上（体验更优） | iPhone XS+（不含 XR/SE 2代）、iPad 10代+/Air 4代+/mini 6代+/iPad Pro（不含9.7英寸） |
+## 核心特性
 
-> ⚠️ 关键提醒：iOS 14.0~14.4.2 存在严重兼容性问题，**强烈建议升级至 iOS 14.5+**；支持 iOS 17.x/iOS 18.x，但需电脑辅助配置，详情见 [官方JIT指南](https://wiki.angelauramc.dev/wiki/faq/ios/JIT.html#what-are-the-methods-to-enable-jit);支持 iOS 26.x(源码里称其为iOS 19.x)，但是并没有对其进行特殊适配,可能会出现不可预测的问题。
+- **Mod 管理** -- 浏览、启用、禁用和删除 Mod，支持完整元数据查看，专为 iOS 从头构建。
+- **光影管理** -- 浏览、启用、禁用和删除光影包，集成 Modrinth 下载支持。
+- **整合包导入** -- 直接在启动器内导入 ZIP 格式的整合包。
+- **智能下载源切换** -- 在 Mojang 官方源、BMCLAPI 镜像源等之间实时切换，获得最佳下载速度。
+- **完整中文本地化** -- 界面完整汉化，提供原生级中文语言体验。
+- **账户限制解除** -- 支持本地账户、演示模式和第三方认证，无需 Microsoft 账户即可下载和游玩。
+- **多账户支持** -- 在 Microsoft 账户、本地账户和第三方认证账户之间无缝切换。
+- **自动渲染器选择** -- 设为 Auto 时自动选择最优渲染后端（含 MobileGlues）。
+- **自动 JVM 选择** -- 根据游戏版本自动选择正确的 JVM 版本（Java 8 / 17 / 21 / 25）。
+- **自定义鼠标指针** -- 在设置中自定义虚拟鼠标指针皮肤。
+- **自定义新闻 URL** -- 为启动器主页配置自定义新闻源地址。
+- **TouchController 支持** -- 通过 UDP 本地代理与 TouchController Mod 通信，为 iOS 提供完整的触屏控制。
+- **自定义应用图标** -- （开发中）
 
+> [!NOTE]
+> 暂无计划将重制版移植至 Android 平台。Android 生态已有诸多优秀启动器，如 [Zalith Launcher](https://github.com/ZalithLauncher/ZalithLauncher)、[Fold Craft Launcher](https://github.com/FCL-Team/FoldCraftLauncher) 以及 ShardLauncher。如需官方 Android 版本，请前往 [Amethyst-Android](https://github.com/AngelAuraMC/Amethyst-Android)。
 
-### 🔧 侧载（Sideload）准备
-优先选择支持「永久签名+自动JIT」的工具，按优先级推荐：
-1. **TrollStore**（首选）：支持永久签名、自动启用 JIT、提升内存限制，适配部分 iOS 版本，下载见 [官方仓库](https://github.com/opa334/TrollStore)
-2. **AltStore/SideStore**（替代）：需定期重签名，首次设置需电脑/Wi-Fi；不支持「分发证书签名服务」，仅兼容「开发证书」（需包含 `com.apple.security.get-task-allow` 权限以启用JIT）
+## 快速上手
 
-> ⚠️ 安全提示：仅从官方/可信来源下载侧载工具及 IPA；非官方软件导致的设备问题，本人不承担责任；越狱设备虽支持永久签名，但不建议越狱日常设备。
+完整文档请参阅 [Amethyst 官方 Wiki](https://wiki.angelauramc.dev/wiki/getting_started/INSTALL.html#ios) 或 [B站教程视频](https://b23.tv/KyxZr12)。以下为精简指南。
 
+### 设备要求
 
-### 📥 安装步骤
-#### 1. 正式版（TrollStore 渠道）
-1. 前往 [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases) 下载 TIPA 安装包
-2. 通过系统「分享菜单」，选择用 TrollStore 打开，自动完成安装
+| 级别 | iOS 版本 | 支持机型 |
+|------|----------|----------|
+| **最低配置** | iOS 14.0+ | iPhone 6s+、iPad 5 代+、iPad Air 2+、iPad mini 4+、全部 iPad Pro、iPod touch 7 代 |
+| **推荐配置** | iOS 14.5+ | iPhone XS+（不含 XR/SE 2 代）、iPad 10 代+、iPad Air 4 代+、iPad mini 6 代+、iPad Pro（不含 9.7 英寸） |
 
-#### 2. 正式版（AltStore/SideStore 渠道）
-1. 前往 [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases) 下载 IPA 安装包
-2. (正常的安装步骤)
+> [!CAUTION]
+> iOS 14.0--14.4.2 存在已知的严重兼容性问题，**强烈建议升级至 iOS 14.5 或更高版本。** iOS 17.x 和 18.x 受支持，但首次配置 JIT 需要电脑辅助（参见[官方 JIT 指南](https://wiki.angelauramc.dev/wiki/faq/ios/JIT.html#what-are-the-methods-to-enable-jit)）。iOS 26.x 可安装使用，但未经过专项适配，可能出现不可预测的问题。
 
-#### 3. Nightly 测试版（每日构建）
-> 🔴 风险提示：测试版可能包含崩溃、无法启动等严重漏洞，仅用于开发测试！
-1. 前往 [GitHub Actions 标签页](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions) 下载最新 IPA 测试包
-2. 在侧载工具（AltStore/SideStore 等）中导入 IPA 完成安装
+### 侧载准备
 
+优先选择支持「永久签名 + 自动 JIT」的工具：
 
-### ⚡ 启用 JIT（必做！）
-JIT（Just-In-Time）是流畅运行游戏的核心，iOS 需通过以下工具启用，按自身环境选择：
+1. **TrollStore** *(推荐)* -- 永久签名、自动启用 JIT、提升内存上限。兼容部分 iOS 版本。[从官方仓库下载](https://github.com/opa334/TrollStore)
+2. **AltStore / SideStore** *(替代方案)* -- 需定期重签；首次设置需要电脑和 Wi-Fi。仅兼容**开发证书**（必须含 `com.apple.security.get-task-allow` 权限才能启用 JIT）。不支持分发证书签名服务。
 
-| 工具         | 需外部设备 | 需 Wi-Fi | 自动启用 | 备注                     |
-|--------------|------------|----------|----------|--------------------------|
-| TrollStore   | ❌         | ❌       | ✅       | 首选，无需额外操作       |
-| AltStore     | ✅         | ✅       | ✅       | 需本地网络运行 AltServer |
-| SideStore    | ✅（首次） | ✅（首次）| ❌       | 后续使用无需设备/网络    |
-| StikDebug    | ✅（首次） | ✅（首次）| ✅       | 后续使用无需设备/网络    |
-| Jitterbug    | ✅（VPN不可用时） | ✅ | ❌ | 需手动触发               |
-| 已越狱设备   | ❌         | ❌       | ✅       | 系统级自动支持           |
+> [!WARNING]
+> 仅从官方或可信来源下载侧载工具和 IPA 文件。因使用非官方软件导致的设备问题，作者不承担责任。越狱设备支持永久签名，但不建议在日常设备上越狱。
 
+### 安装步骤
 
-## 🙏 贡献者
-- @yitenchen123 - 深度重构前端 UI 界面，添加全新的现代化 UI
-- @LanRhyme - ShardLauncher作者，允许iOS 26用户使用启动器、更改日志内容
-- @WeiErLiTeo - 为启动器添加Mod下载功能、优化了TouchController支持、添加双指长按打开键盘功能
-- @Li2548 - 同步上游库
+<details>
+<summary><b>正式版（TrollStore 渠道）</b></summary>
 
+1. 前往 [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases) 下载 `.tipa` 安装包。
+2. 通过系统分享菜单，选择用 TrollStore 打开，即可自动完成安装。
+</details>
 
-## 📦 第三方组件及许可证
-| 组件名称               | 用途                     | 许可证类型               | 项目链接                                                                 |
-|------------------------|--------------------------|--------------------------|--------------------------------------------------------------------------|
-| Caciocavallo           | 基础运行框架             | GNU GPLv2                | [GitHub](https://github.com/PojavLauncherTeam/caciocavallo)              |
-| jsr305                 | 代码注解支持             | BSD 3-Clause             | [Google Code](https://code.google.com/p/jsr-305)                         |
-| Boardwalk              | 核心功能适配             | Apache 2.0               | [GitHub](https://github.com/zhuowei/Boardwalk)                            |
-| GL4ES                  | 图形渲染适配             | MIT                      | [GitHub](https://github.com/ptitSeb/gl4es)                                |
-| Mesa 3D 图形库         | 3D图形渲染核心            | MIT                      | [GitLab](https://gitlab.freedesktop.org/mesa/mesa)                        |
-| MetalANGLE             | Metal 图形接口适配        | BSD 2.0                  | [GitHub](https://github.com/khanhduytran0/metalangle)                     |
-| MoltenVK               | Vulkan 接口转译          | Apache 2.0               | [GitHub](https://github.com/KhronosGroup/MoltenVK)                        |
-| openal-soft            | 音频处理                 | LGPLv2                   | [GitHub](https://github.com/kcat/openal-soft)                            |
-| Azul Zulu JDK          | Java 运行环境            | GNU GPLv2                | [官网](https://www.azul.com/downloads/?package=jdk)                       |
-| LWJGL3                 | Java 游戏接口            | BSD-3                    | [GitHub](https://github.com/PojavLauncherTeam/lwjgl3)                     |
-| LWJGLX                 | LWJGL2 兼容层            | 许可证未知               | [GitHub](https://github.com/PojavLauncherTeam/lwjglx)                     |
-| DBNumberedSlider       | 界面滑动控件             | Apache 2.0               | [GitHub](https://github.com/khanhduytran0/DBNumberedSlider)               |
-| fishhook               | 动态链接库适配           | BSD-3                    | [GitHub](https://github.com/khanhduytran0/fishhook)                       |
-| shaderc                | Vulkan 着色器编译        | Apache 2.0               | [GitHub](https://github.com/khanhduytran0/shaderc)                        |
-| NRFileManager          | 文件管理工具类           | MPL-2.0                  | [GitHub](https://github.com/mozilla-mobile/firefox-ios)                   |
-| AltKit                 | AltStore 适配支持        | -                        | [GitHub](https://github.com/rileytestut/AltKit)                           |
-| UnzipKit               | 解压工具                 | BSD-2                    | [GitHub](https://github.com/abbeycode/UnzipKit)                           |
-| DyldDeNeuralyzer       | 库验证绕过工具           | -                        | [GitHub](https://github.com/xpn/DyldDeNeuralyzer)                         |
-| MobileGlues            | 第三方渲染器             | LGPL-2.1                 | [GitHub](https://github.com/MobileGL-Dev/MobileGlues)                     |
-| authlib-injector       | 第三方认证登录支持       | AGPL-3.0                 | [GitHub](https://github.com/yushijinhun/authlib-injector)                 |
-> 额外感谢：<br> [MCHeads](https://mc-heads.net) 提供 Minecraft 头像服务; <br> [Modrinth](https://modrinth.com) 提供 Mod 下载服务；<br> [BMCLAPI](https://bmclapidoc.bangbang93.com) 提供 Minecraft 下载服务。
+<details>
+<summary><b>正式版（AltStore / SideStore 渠道）</b></summary>
 
+1. 前往 [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases) 下载 `.ipa` 安装包。
+2. 按照侧载工具的标准流程导入 IPA 完成安装。
+</details>
+
+<details>
+<summary><b>Nightly 测试版（每日构建）</b></summary>
+
+> [!CAUTION]
+> 测试版可能包含崩溃、无法启动等严重缺陷，仅限开发测试使用。
+
+1. 前往 [GitHub Actions](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions) 页面下载最新 IPA 构建产物。
+2. 在侧载工具（AltStore、SideStore 等）中导入 IPA 完成安装。
+</details>
+
+### 启用 JIT
+
+JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选择合适的方案：
+
+| 工具 | 需外部设备 | 需 Wi-Fi | 自动启用 | 备注 |
+|------|:---:|:---:|:---:|-------|
+| TrollStore | 否 | 否 | 是 | 首选方案，无需额外操作 |
+| AltStore | 是 | 是 | 是 | 需本地网络运行 AltServer |
+| SideStore | 仅首次 | 仅首次 | 否 | 初始设置后无需设备/网络 |
+| StikDebug | 仅首次 | 仅首次 | 是 | 初始设置后无需设备/网络 |
+| Jitterbug | 是（无 VPN 时） | 是 | 否 | 需手动触发 |
+| 已越狱设备 | 否 | 否 | 是 | 系统级自动支持 |
+
+## 贡献者
+
+- [@yitenchen123](https://github.com/yitenchen123) -- 深度重构前端 UI，打造现代化视觉设计系统
+- [@LanRhyme](https://github.com/LanRhyme) -- ShardLauncher 作者；iOS 26 兼容性适配及日志改进
+- [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod 下载功能集成、TouchController 优化、双指长按唤出键盘
+- [@Li2548](https://github.com/Li2548) -- 上游同步维护
+
+## 第三方组件
+
+| 组件 | 用途 | 许可证 | 来源 |
+|------|------|--------|------|
+| Caciocavallo | AWT 运行时框架 | GPL-2.0 | [GitHub](https://github.com/PojavLauncherTeam/caciocavallo) |
+| jsr305 | 代码注解支持 | BSD-3 | [Google Code](https://code.google.com/p/jsr-305) |
+| Boardwalk | 核心功能适配 | Apache-2.0 | [GitHub](https://github.com/zhuowei/Boardwalk) |
+| GL4ES | OpenGL 到 GLES 转译 | MIT | [GitHub](https://github.com/ptitSeb/gl4es) |
+| Mesa 3D | 3D 图形库 | MIT | [GitLab](https://gitlab.freedesktop.org/mesa/mesa) |
+| MetalANGLE | Metal 到 OpenGL ES 转译 | BSD-2 | [GitHub](https://github.com/khanhduytran0/metalangle) |
+| MoltenVK | Vulkan 到 Metal 转译 | Apache-2.0 | [GitHub](https://github.com/KhronosGroup/MoltenVK) |
+| openal-soft | 跨平台 3D 音频 | LGPL-2.0 | [GitHub](https://github.com/kcat/openal-soft) |
+| Azul Zulu JDK | Java 运行时（8/17/21/25） | GPL-2.0 | [官网](https://www.azul.com/downloads/?package=jdk) |
+| LWJGL3 | Java 游戏开发库 | BSD-3 | [GitHub](https://github.com/PojavLauncherTeam/lwjgl3) |
+| LWJGLX | LWJGL2 兼容层 | -- | [GitHub](https://github.com/PojavLauncherTeam/lwjglx) |
+| DBNumberedSlider | UI 滑块控件 | Apache-2.0 | [GitHub](https://github.com/khanhduytran0/DBNumberedSlider) |
+| fishhook | 动态库重绑定 | BSD-3 | [GitHub](https://github.com/khanhduytran0/fishhook) |
+| shaderc | Vulkan 着色器编译 | Apache-2.0 | [GitHub](https://github.com/khanhduytran0/shaderc) |
+| NRFileManager | 文件管理工具 | MPL-2.0 | [GitHub](https://github.com/mozilla-mobile/firefox-ios) |
+| AltKit | AltStore 集成 | -- | [GitHub](https://github.com/rileytestut/AltKit) |
+| UnzipKit | ZIP 解压处理 | BSD-2 | [GitHub](https://github.com/abbeycode/UnzipKit) |
+| DyldDeNeuralyzer | 库验证绕过 | -- | [GitHub](https://github.com/xpn/DyldDeNeuralyzer) |
+| MobileGlues | 第三方渲染器 | LGPL-2.1 | [GitHub](https://github.com/MobileGL-Dev/MobileGlues) |
+| LTW | OpenGL Core 到 ES 封装 | LGPL-3.0 | [GitHub](https://github.com/MojoLauncher/LTW) |
+| authlib-injector | 第三方认证支持 | AGPL-3.0 | [GitHub](https://github.com/yushijinhun/authlib-injector) |
+
+额外感谢 [MCHeads](https://mc-heads.net) 提供 Minecraft 头像服务、[Modrinth](https://modrinth.com) 提供 Mod 分发服务，以及 [BMCLAPI](https://bmclapidoc.bangbang93.com) 提供 Minecraft 下载镜像服务。
 
 ## 捐赠
 
-如果您觉得这个项目对您有帮助，欢迎通过 [Ko-Fi](https://ko-fi.com/herbrine8403)、[爱发电](https://afdian.com/a/herbrine8403)或 [微信赞赏码](donate.png) 进行捐赠支持，为我回回血！
+如果您觉得这个项目对您有价值，欢迎通过 [Ko-Fi](https://ko-fi.com/herbrine8403)、[爱发电](https://afdian.com/a/herbrine8403) 或[微信赞赏码](donate.png) 进行捐赠支持。
 
+![Stone Badge](https://stone.professorlee.work/api/stone/herbrine8403/Amethyst-iOS-MyRemastered)
