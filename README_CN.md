@@ -1,4 +1,5 @@
-# Air &middot; Amethyst iOS 重制版
+<h1 align="center">Air</h1>
+<p align="center"><sub>Amethyst iOS 重制版</sub></p>
 
 <div align="center">
   <img alt="构建状态" src="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
@@ -14,7 +15,7 @@
 
 ---
 
-**Air** 是一款面向 iOS 和 iPadOS 平台的 Minecraft: Java Edition 高端启动器，基于官方 Amethyst 项目深度重构。它提供了精致的移动端体验，集成了全面的 Mod 管理、智能渲染器选择以及深度的平台适配能力。
+一款面向 iOS 和 iPadOS 平台的 Minecraft: Java Edition 高端启动器，基于官方 Amethyst 项目深度重构。提供了精致的移动端体验，集成了全面的 Mod 管理、智能渲染器选择以及深度的平台适配能力。
 
 ---
 

@@ -1,4 +1,5 @@
-# Air &middot; Amethyst iOS Remastered
+<h1 align="center">Air</h1>
+<p align="center"><sub>Amethyst iOS Remastered</sub></p>
 
 <div align="center">
   <img alt="Build Status" src="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
@@ -14,7 +15,7 @@
 
 ---
 
-**Air** is a premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the ground up on the official Amethyst project. It delivers a refined mobile experience with comprehensive mod management, intelligent renderer selection, and deep platform integration.
+A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the ground up on the official Amethyst project. It delivers a refined mobile experience with comprehensive mod management, intelligent renderer selection, and deep platform integration.
 
 ---
 
