@@ -131,8 +131,6 @@ extern UIWindow *mainWindow;
             __weak typeof(self) weakSelf = self;
             [windowScene requestGeometryUpdateWithPreferences:geometryPreferences errorHandler:^(NSError *error) {
                 NSLog(@"[SceneDelegate] Geometry retry also failed: %@", error);
-                // 重试仍失败，通知系统刷新支持的方向作为最终兜底
-                [windowScene setNeedsUpdateOfSupportedInterfaceOrientations];
             }];
             NSLog(@"[SceneDelegate] Retried geometry update after initial failure");
         }
