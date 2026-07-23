@@ -20,6 +20,7 @@
 #import "ios_uikit_bridge.h"
 #import "JavaLauncher.h"
 #import "LauncherPreferences.h"
+#import "MinecraftOptionUtils.h"
 #import "PLProfiles.h"
 
 #define fm NSFileManager.defaultManager
