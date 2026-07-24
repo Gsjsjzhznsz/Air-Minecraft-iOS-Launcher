@@ -240,34 +240,42 @@ BOOL DeviceCanCreateRXMap(void) {
 }
 
 BOOL DeviceHasTXMReal(void) {
-    DIR *d = opendir("/private/preboot");
-    if(!d) {
-        // /private/preboot is not accessible in 27.0 and 26.6?, fallback to speculation
-        NSUInteger (*MGGetSInt64Answer)(NSString *) = dlsym(RTLD_DEFAULT, "MGGetSInt64Answer");
-        NSUInteger chipID = MGGetSInt64Answer(@"ChipID");
-        switch(chipID) {
-            case 0x8020: // A12
-            case 0x8027: // A12X/Z
-                return NO;
-            case 0x8030: // A13
-            case 0x8101: // A14
-            case 0x8103: // M1
-                if (@available(iOS 27.0, *)) return YES; return NO;
-            default:
-                if (@available(iOS 19.0, *)) return YES; return NO;
+    // TXM（Trusted Execution Monitor）仅在 iOS 16+ 设备上存在。
+    // 旧版 DeviceRequiresTXMWorkaround 有 @available(iOS 16.0, *) 保护，
+    // 移植到 DeviceHasTXMReal 时遗漏了此保护。低版本（如 iOS 15）上调用
+    // MGGetSInt64Answer 私有 API不安全，且 /private/preboot 目录不存在，
+    // 故低版本直接返回 NO。
+    if (@available(iOS 16.0, *)) {
+        DIR *d = opendir("/private/preboot");
+        if(!d) {
+            // /private/preboot is not accessible in 27.0 and 26.6?, fallback to speculation
+            NSUInteger (*MGGetSInt64Answer)(NSString *) = dlsym(RTLD_DEFAULT, "MGGetSInt64Answer");
+            NSUInteger chipID = MGGetSInt64Answer(@"ChipID");
+            switch(chipID) {
+                case 0x8020: // A12
+                case 0x8027: // A12X/Z
+                    return NO;
+                case 0x8030: // A13
+                case 0x8101: // A14
+                case 0x8103: // M1
+                    if (@available(iOS 27.0, *)) return YES; return NO;
+                default:
+                    if (@available(iOS 19.0, *)) return YES; return NO;
+            }
         }
-    }
-    // deterministically detect TXM for 17.0-26.5?
-    struct dirent *dir;
-    char txmPath[PATH_MAX];
-    while ((dir = readdir(d)) != NULL) {
-        if(strlen(dir->d_name) == 96) {
-            snprintf(txmPath, sizeof(txmPath), "/private/preboot/%s/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", dir->d_name);
-            break;
+        // deterministically detect TXM for 17.0-26.5?
+        struct dirent *dir;
+        char txmPath[PATH_MAX];
+        while ((dir = readdir(d)) != NULL) {
+            if(strlen(dir->d_name) == 96) {
+                snprintf(txmPath, sizeof(txmPath), "/private/preboot/%s/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4", dir->d_name);
+                break;
+            }
         }
+        closedir(d);
+        return access(txmPath, F_OK) == 0;
     }
-    closedir(d);
-    return access(txmPath, F_OK) == 0;
+    return NO;
 }
 
 // Thin wrapper of DeviceHasJITFlags to respect overriden flag

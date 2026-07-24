@@ -164,9 +164,14 @@ void* hooked_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off
     }
 
     // Handle some cases where it will still map but without executable permission
-    if (mprotect(map, len, prot) == -1) {
-        munmap(map, len);
-        map = MAP_FAILED;
+    // 仅在 iOS 26+ 上执行 mprotect 检查：低版本（如 iOS 15）上对已成功映射的 RX 页面
+    // 调用 mprotect 可能错误返回 -1，导致 munmap 释放成功映射并进入回退逻辑，最终
+    // 引发 JVM 加载 libjli.dylib 时的内存访问崩溃。
+    if (@available(iOS 26.0, *)) {
+        if (mprotect(map, len, prot) == -1) {
+            munmap(map, len);
+            map = MAP_FAILED;
+        }
     }
     if (map == MAP_FAILED) {
         //printf("[DyldLVBypass] mmap(prot=%d, flags=%d, fd=%d)\n", prot, flags, fd);
