@@ -173,7 +173,7 @@
             para.firstLineHeadIndent = 16;
             para.tailIndent = -8;
             UIFont *quoteFont = [UIFont italicSystemFontOfSize:baseFont.pointSize];
-            NSAttributedString *inline = [self parseInline:content
+            NSAttributedString *inlineText = [self parseInline:content
                                                   baseFont:quoteFont
                                                  textColor:secondaryColor
                                                  linkColor:linkColor
