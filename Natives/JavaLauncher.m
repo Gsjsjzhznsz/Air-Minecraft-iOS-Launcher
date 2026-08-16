@@ -150,36 +150,47 @@ void init_loadCustomEnv() {
     }
 }
 
-/// 加载 MobileGlues 配置并写入 config.json
+/// 加载 MobileGlues / DesktopGlues 配置并写入 config.json
 ///
-/// 将用户偏好设置写入 <POJAV_HOME>/MG/config.json，供 MobileGlues 渲染器读取。
+/// 将用户偏好设置写入 <POJAV_HOME>/MG/config.json，供 MobileGlues / DesktopGlues 渲染器读取。
+/// 两个渲染器共用同一个 config.json（同一时刻只有一个渲染器被加载）。
 ///
-/// 渲染器与 MobileGlues 的关系（重要）：
+/// 渲染器与 MobileGlues/DesktopGlues 的关系（重要）：
 /// - MobileGlues 渲染器（libmobileglues.dylib）：直接加载 MobileGlues，config.json 生效。
-/// - Auto 渲染器：在 launchJVM 中被解析为 ANGLE（libtinygl4angle.dylib），MobileGlues 不会被加载，
-///   config.json 虽然会写入但不会被读取。用户需显式选择 MobileGlues 渲染器才能让设置生效。
+/// - DesktopGlues 渲染器（libdesktopglues.dylib）：直接加载 DesktopGlues，config.json 生效。
+/// - Auto 渲染器：在 launchJVM 中被解析为 ANGLE（libtinygl4angle.dylib），MobileGlues/DesktopGlues 不会被加载，
+///   config.json 虽然会写入但不会被读取。用户需显式选择 MobileGlues/DesktopGlues 渲染器才能让设置生效。
 /// - Vulkan 渲染器：Vulkan 模式下 OpenGL 回退库使用 MobileGlues（对齐 Ynnyny 仓库），
 ///   config.json 会被 MobileGlues 读取并生效。
 void init_loadMobileGluesConfig() {
     NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
     NSLog(@"[JavaLauncher] init_loadMobileGluesConfig: renderer=%@", renderer);
 
+    BOOL isDesktopGlues = [renderer isEqualToString:@ RENDERER_NAME_DESKTOPGLUES];
     BOOL usesMobileGlues = [renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES] ||
+        isDesktopGlues ||
         [renderer isEqualToString:@"auto"] ||
         [renderer isEqualToString:@ RENDERER_NAME_VULKAN];
 
     if (!usesMobileGlues) {
-        NSLog(@"[JavaLauncher] MobileGlues config not written (renderer is not mobileglues/auto/vulkan)");
+        NSLog(@"[JavaLauncher] MobileGlues/DesktopGlues config not written (renderer is not mobileglues/desktopglues/auto/vulkan)");
         return;
     }
 
-    // 警告：auto 渲染器实际不会加载 MobileGlues，设置不会生效
+    // 设置项读取前缀：DesktopGlues 使用独立的 desktopglues.* 偏好键（与 mobileglues.* 分开），
+    // 因为两者的 config.json 键不完全一致（DesktopGlues 有 enableExtShaderAtomicCounters /
+    // hideMGEnvLevel / multidrawOrder，MobileGlues 有 multidrawMode / enableExtGL43）。
+    NSString *prefPrefix = isDesktopGlues ? @"desktopglues." : @"mobileglues.";
+
+    // 警告：auto 渲染器实际不会加载 MobileGlues/DesktopGlues，设置不会生效
     if ([renderer isEqualToString:@"auto"]) {
         NSLog(@"[JavaLauncher] WARNING: renderer is 'auto', will be resolved to ANGLE. "
-              @"MobileGlues settings will NOT take effect. "
-              @"Please explicitly select 'MobileGlues' renderer to use these settings.");
+              @"MobileGlues/DesktopGlues settings will NOT take effect. "
+              @"Please explicitly select 'MobileGlues' or 'DesktopGlues' renderer to use these settings.");
     } else if ([renderer isEqualToString:@ RENDERER_NAME_VULKAN]) {
         NSLog(@"[JavaLauncher] Vulkan renderer detected, MobileGlues used as GL fallback. Config will take effect.");
+    } else if (isDesktopGlues) {
+        NSLog(@"[JavaLauncher] DesktopGlues renderer detected, config will take effect.");
     } else {
         NSLog(@"[JavaLauncher] MobileGlues renderer detected, config will take effect.");
     }
@@ -195,12 +206,16 @@ void init_loadMobileGluesConfig() {
     // customGLVersion 约束（settings.cpp 第 71-79 行）：>46 截断为 46，<32 且非 0 截断为 32，
     // 33-39 截断为 33，0 使用默认值 40。
     // 因此必须写入十进制数（40, 41, 42, ..., 46），不能写入十六进制 0x040000。
-    config[@"enableExtGL43"] = @1;
     config[@"enableExtDirectStateAccess"] = @1;
     config[@"maxGlslCacheSize"] = @128;
     config[@"customGLVersion"] = @40;  // 十进制 40 = GL 4.0
 
-    id enableAngle = getPrefObject(@"mobileglues.enable_angle");
+    // DesktopGlues 特有：没有 enableExtGL43，有 enableExtShaderAtomicCounters
+    if (!isDesktopGlues) {
+        config[@"enableExtGL43"] = @1;
+    }
+
+    id enableAngle = getPrefObject([NSString stringWithFormat:@"%@enable_angle", prefPrefix]);
     if (enableAngle) {
         // MobileGlues AngleConfig 枚举（settings.h）：
         //   0 = DisableIfPossible
@@ -211,56 +226,65 @@ void init_loadMobileGluesConfig() {
         //   3 = ForceEnable       ← 强制启用，绕过 GPU 检测
         // 用户启用 enable_angle 时写入 3 (ForceEnable)，禁用时写入 0 (DisableIfPossible)
         config[@"enableANGLE"] = [enableAngle boolValue] ? @3 : @0;
-        NSLog(@"[JavaLauncher]   mobileglues.enable_angle = %@ -> enableANGLE = %@ (3=ForceEnable, 0=DisableIfPossible)",
-              enableAngle, config[@"enableANGLE"]);
+        NSLog(@"[JavaLauncher]   %@enable_angle = %@ -> enableANGLE = %@ (3=ForceEnable, 0=DisableIfPossible)",
+              prefPrefix, enableAngle, config[@"enableANGLE"]);
     }
 
-    id enableNoError = getPrefObject(@"mobileglues.enable_no_error");
+    id enableNoError = getPrefObject([NSString stringWithFormat:@"%@enable_no_error", prefPrefix]);
     if (enableNoError) {
         config[@"enableNoError"] = @([enableNoError intValue]);
-        NSLog(@"[JavaLauncher]   mobileglues.enable_no_error = %@ -> enableNoError = %@", enableNoError, config[@"enableNoError"]);
+        NSLog(@"[JavaLauncher]   %@enable_no_error = %@ -> enableNoError = %@", prefPrefix, enableNoError, config[@"enableNoError"]);
     }
 
-    id enableExtTimerQuery = getPrefObject(@"mobileglues.enable_ext_timer_query");
+    id enableExtTimerQuery = getPrefObject([NSString stringWithFormat:@"%@enable_ext_timer_query", prefPrefix]);
     if (enableExtTimerQuery) {
         config[@"enableExtTimerQuery"] = [enableExtTimerQuery boolValue] ? @1 : @0;
-        NSLog(@"[JavaLauncher]   mobileglues.enable_ext_timer_query = %@ -> enableExtTimerQuery = %@", enableExtTimerQuery, config[@"enableExtTimerQuery"]);
+        NSLog(@"[JavaLauncher]   %@enable_ext_timer_query = %@ -> enableExtTimerQuery = %@", prefPrefix, enableExtTimerQuery, config[@"enableExtTimerQuery"]);
     }
 
-    id enableExtComputeShader = getPrefObject(@"mobileglues.enable_ext_compute_shader");
+    id enableExtComputeShader = getPrefObject([NSString stringWithFormat:@"%@enable_ext_compute_shader", prefPrefix]);
     if (enableExtComputeShader) {
         config[@"enableExtComputeShader"] = [enableExtComputeShader boolValue] ? @1 : @0;
-        NSLog(@"[JavaLauncher]   mobileglues.enable_ext_compute_shader = %@ -> enableExtComputeShader = %@", enableExtComputeShader, config[@"enableExtComputeShader"]);
+        NSLog(@"[JavaLauncher]   %@enable_ext_compute_shader = %@ -> enableExtComputeShader = %@", prefPrefix, enableExtComputeShader, config[@"enableExtComputeShader"]);
     }
 
-    id enableExtDirectStateAccess = getPrefObject(@"mobileglues.enable_ext_direct_state_access");
+    id enableExtDirectStateAccess = getPrefObject([NSString stringWithFormat:@"%@enable_ext_direct_state_access", prefPrefix]);
     if (enableExtDirectStateAccess) {
         config[@"enableExtDirectStateAccess"] = [enableExtDirectStateAccess boolValue] ? @1 : @0;
-        NSLog(@"[JavaLauncher]   mobileglues.enable_ext_direct_state_access = %@ -> enableExtDirectStateAccess = %@", enableExtDirectStateAccess, config[@"enableExtDirectStateAccess"]);
+        NSLog(@"[JavaLauncher]   %@enable_ext_direct_state_access = %@ -> enableExtDirectStateAccess = %@", prefPrefix, enableExtDirectStateAccess, config[@"enableExtDirectStateAccess"]);
     }
 
-    id maxGlslCacheSize = getPrefObject(@"mobileglues.max_glsl_cache_size");
+    id maxGlslCacheSize = getPrefObject([NSString stringWithFormat:@"%@max_glsl_cache_size", prefPrefix]);
     if (maxGlslCacheSize) {
         config[@"maxGlslCacheSize"] = @([maxGlslCacheSize intValue]);
-        NSLog(@"[JavaLauncher]   mobileglues.max_glsl_cache_size = %@ -> maxGlslCacheSize = %@", maxGlslCacheSize, config[@"maxGlslCacheSize"]);
+        NSLog(@"[JavaLauncher]   %@max_glsl_cache_size = %@ -> maxGlslCacheSize = %@", prefPrefix, maxGlslCacheSize, config[@"maxGlslCacheSize"]);
     }
 
-    id multidrawMode = getPrefObject(@"mobileglues.multidraw_mode");
-    if (multidrawMode) {
-        config[@"multidrawMode"] = @([multidrawMode intValue]);
-        NSLog(@"[JavaLauncher]   mobileglues.multidraw_mode = %@ -> multidrawMode = %@", multidrawMode, config[@"multidrawMode"]);
+    // MobileGlues 使用 multidrawMode（int 0-2），DesktopGlues 使用 multidrawOrder（字符串逗号分隔）
+    if (isDesktopGlues) {
+        id multidrawOrder = getPrefObject([NSString stringWithFormat:@"%@multidraw_order", prefPrefix]);
+        if (multidrawOrder && [[multidrawOrder description] length] > 0) {
+            config[@"multidrawOrder"] = [multidrawOrder description];
+            NSLog(@"[JavaLauncher]   %@multidraw_order = %@ -> multidrawOrder = %@", prefPrefix, multidrawOrder, config[@"multidrawOrder"]);
+        }
+    } else {
+        id multidrawMode = getPrefObject([NSString stringWithFormat:@"%@multidraw_mode", prefPrefix]);
+        if (multidrawMode) {
+            config[@"multidrawMode"] = @([multidrawMode intValue]);
+            NSLog(@"[JavaLauncher]   %@multidraw_mode = %@ -> multidrawMode = %@", prefPrefix, multidrawMode, config[@"multidrawMode"]);
+        }
     }
 
-    id angleDepthClearFixMode = getPrefObject(@"mobileglues.angle_depth_clear_fix_mode");
+    id angleDepthClearFixMode = getPrefObject([NSString stringWithFormat:@"%@angle_depth_clear_fix_mode", prefPrefix]);
     if (angleDepthClearFixMode) {
         config[@"angleDepthClearFixMode"] = [angleDepthClearFixMode boolValue] ? @1 : @0;
-        NSLog(@"[JavaLauncher]   mobileglues.angle_depth_clear_fix_mode = %@ -> angleDepthClearFixMode = %@", angleDepthClearFixMode, config[@"angleDepthClearFixMode"]);
+        NSLog(@"[JavaLauncher]   %@angle_depth_clear_fix_mode = %@ -> angleDepthClearFixMode = %@", prefPrefix, angleDepthClearFixMode, config[@"angleDepthClearFixMode"]);
     }
 
-    id customGlVersion = getPrefObject(@"mobileglues.custom_gl_version");
+    id customGlVersion = getPrefObject([NSString stringWithFormat:@"%@custom_gl_version", prefPrefix]);
     if (customGlVersion) {
         NSString *verStr = [customGlVersion description];
-        NSLog(@"[JavaLauncher]   mobileglues.custom_gl_version = %@ (raw)", customGlVersion);
+        NSLog(@"[JavaLauncher]   %@custom_gl_version = %@ (raw)", prefPrefix, customGlVersion);
         // MobileGlues 期望十进制数：Version(int code) 把 code 转字符串后取前 3 位作为
         // Major.Minor.Patch。例如 40 → "40" → 4.0.0，46 → "46" → 4.6.0。
         // 不能用十六进制 0x040000（=262144），会被截断为 46（4.6.0）。
@@ -276,14 +300,31 @@ void init_loadMobileGluesConfig() {
         else if ([verStr isEqualToString:@"4.5"]) config[@"customGLVersion"] = @45;
         else if ([verStr isEqualToString:@"4.6"]) config[@"customGLVersion"] = @46;
         // verStr == @"0" 时不匹配任何条件，保留默认值 @40（即 GL 4.0）
-        NSLog(@"[JavaLauncher]   -> customGLVersion = %d (decimal, MobileGlues Version(int) format)",
+        NSLog(@"[JavaLauncher]   -> customGLVersion = %d (decimal, Version(int) format)",
               [config[@"customGLVersion"] intValue]);
     }
 
-    id fsr1Setting = getPrefObject(@"mobileglues.fsr1_setting");
+    id fsr1Setting = getPrefObject([NSString stringWithFormat:@"%@fsr1_setting", prefPrefix]);
     if (fsr1Setting) {
         config[@"fsr1Setting"] = @([fsr1Setting intValue]);
-        NSLog(@"[JavaLauncher]   mobileglues.fsr1_setting = %@ -> fsr1Setting = %@", fsr1Setting, config[@"fsr1Setting"]);
+        NSLog(@"[JavaLauncher]   %@fsr1_setting = %@ -> fsr1Setting = %@", prefPrefix, fsr1Setting, config[@"fsr1Setting"]);
+    }
+
+    // DesktopGlues 特有设置
+    if (isDesktopGlues) {
+        id enableExtShaderAtomicCounters = getPrefObject([NSString stringWithFormat:@"%@enable_ext_shader_atomic_counters", prefPrefix]);
+        if (enableExtShaderAtomicCounters) {
+            config[@"enableExtShaderAtomicCounters"] = [enableExtShaderAtomicCounters boolValue] ? @1 : @0;
+            NSLog(@"[JavaLauncher]   %@enable_ext_shader_atomic_counters = %@ -> enableExtShaderAtomicCounters = %@",
+                  prefPrefix, enableExtShaderAtomicCounters, config[@"enableExtShaderAtomicCounters"]);
+        }
+
+        id hideMGEnvLevel = getPrefObject([NSString stringWithFormat:@"%@hide_mg_env_level", prefPrefix]);
+        if (hideMGEnvLevel) {
+            config[@"hideMGEnvLevel"] = [hideMGEnvLevel boolValue] ? @1 : @0;
+            NSLog(@"[JavaLauncher]   %@hide_mg_env_level = %@ -> hideMGEnvLevel = %@",
+                  prefPrefix, hideMGEnvLevel, config[@"hideMGEnvLevel"]);
+        }
     }
 
     NSError *error = nil;

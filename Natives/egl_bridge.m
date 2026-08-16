@@ -118,6 +118,14 @@ int pojavInitOpenGL() {
         renderer = @ RENDERER_NAME_MOBILEGLUES;
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
         set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_DESKTOPGLUES]) {
+        // DesktopGlues (Uniaball)：与 MobileGlues 相同的 GL bridge 路径。
+        // DesktopGlues 通过 EGL/GLES 工作，其 load_libs() 在 iOS 上会显式
+        // dlopen libEGL.framework / libGLESv2.framework (RTLD_GLOBAL)，
+        // 因此这里只需设置 GL bridge 并预加载 libdesktopglues.dylib。
+        renderer = @ RENDERER_NAME_DESKTOPGLUES;
+        setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
+        set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE]) {
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_LTW]) {

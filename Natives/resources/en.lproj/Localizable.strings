@@ -168,6 +168,8 @@
 "preference.section.footer.video" = "Auto renderer allows Amethyst to choose the best option based on Minecraft version. Decreasing resolution reduces GPU workload for better performance.";
 "preference.section.mobileglues" = "MobileGlues Renderer";
 "preference.section.footer.mobileglues" = "These settings take effect when the renderer is set to MobileGlues or Vulkan. The Vulkan renderer's OpenGL fallback uses MobileGlues (aligned with the Ynnyny repo), so config.json is read. The Auto renderer resolves to ANGLE and does not load MobileGlues, so settings do not apply. The config is written to <POJAV_HOME>/MG/config.json at game launch.";
+"preference.section.desktopglues" = "DesktopGlues Renderer";
+"preference.section.footer.desktopglues" = "These settings take effect when the renderer is set to DesktopGlues. DesktopGlues and MobileGlues settings are independent (config.json keys differ), using separate desktopglues.* preference keys. The Auto renderer resolves to ANGLE and does not load DesktopGlues, so settings do not apply. The config is written to <POJAV_HOME>/MG/config.json at game launch.";
 "preference.section.control" = "Control customization";
 "preference.section.debug" = "UI Debugging settings";
 "preference.section.footer.debug" = "You may need to restart the launcher for changes to take effect.";
@@ -226,6 +228,7 @@
 "preference.title.renderer.debug.gl4es" = "holy gl4es - exports OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - exports OpenGL 3.2 (Core Profile, limited)";
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - exports OpenGL 4.0, EXPERIMENTAL";
+"preference.title.renderer.debug.dg" = "DesktopGlues (1.17+) - exports OpenGL 4.0, EXPERIMENTAL";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) - exports OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES wrapper (1.17+)";
 "preference.title.renderer.debug.vulkan" = "MoltenVK (26.2+) - exports vulkan 1.4";
@@ -289,6 +292,24 @@
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";
 "preference.title.mg_fsr1_setting-3" = "Performance";
+
+/* DesktopGlues settings (independent from MobileGlues) */
+"preference.title.dg_enable_no_error-0" = "Auto";
+"preference.title.dg_enable_no_error-1" = "Disable";
+"preference.title.dg_enable_no_error-2" = "Level 1";
+"preference.title.dg_enable_no_error-3" = "Level 2";
+"preference.title.enable_ext_shader_atomic_counters" = "EXT Shader Atomic Counters";
+"preference.detail.enable_ext_shader_atomic_counters" = "Enable GL_ARB_shader_atomic_counters extension. May break some shaders.";
+"preference.title.hide_mg_env_level" = "Hide Renderer Environment";
+"preference.detail.hide_mg_env_level" = "Hide MobileGlues/DesktopGlues extensions and randomize the OpenGL version and renderer string to evade detection by some mods.";
+"preference.title.multidraw_order" = "MultiDraw Scheme Order";
+"preference.detail.multidraw_order" = "Global MultiDraw backend order (comma-separated, earlier = higher priority). Available: native, multiindirect, multibasevertex, multiarrays, indirect, basevertex, unroll, compute. Leave empty for default order.";
+"preference.placeholder.multidraw_order" = "native, multiindirect, multibasevertex, multiarrays, indirect, basevertex, unroll, compute";
+"preference.title.dg_fsr1_setting-0" = "Off";
+"preference.title.dg_fsr1_setting-1" = "Ultra Quality";
+"preference.title.dg_fsr1_setting-2" = "Quality";
+"preference.title.dg_fsr1_setting-3" = "Balanced";
+"preference.title.dg_fsr1_setting-4" = "Performance";
 "preference.title.default_gamepad_ctrl" = "Controller configuration";
 "preference.title.hardware_hide" = "Hide controls when hardware is connected";
 "preference.detail.hardware_hide" = "Enable the behaviour of automatically disabling the on-screen control overlay when a mouse or game controller is connected.";

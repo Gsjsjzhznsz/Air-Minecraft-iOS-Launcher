@@ -38,6 +38,7 @@
 #define RENDERER_NAME_GL4ES "libgl4es_114.dylib"
 #define RENDERER_NAME_MTL_ANGLE "libtinygl4angle.dylib"
 #define RENDERER_NAME_MOBILEGLUES "libmobileglues.dylib"
+#define RENDERER_NAME_DESKTOPGLUES "libdesktopglues.dylib"
 #define RENDERER_NAME_VK_ZINK "libOSMesa.8.dylib"
 #define RENDERER_NAME_VULKAN "libMoltenVK.dylib"
 // LTW (Large Thin Wrapper) - OpenGL Core 3.3 → OpenGL ES 3 转译层

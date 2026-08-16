@@ -168,6 +168,8 @@
 "preference.section.footer.video" = "自动渲染器允许 Amethyst 选择基于 Minecraft 版本的最佳选项。减少分辨率降低 GPU 工作量以提高性能。";
 "preference.section.mobileglues" = "MobileGlues 渲染器";
 "preference.section.footer.mobileglues" = "这些设置在渲染器选择为 MobileGlues 或 Vulkan 时生效。Vulkan 渲染器的 OpenGL 回退使用 MobileGlues（对齐 Ynnyny 仓库），config.json 会被读取。Auto 渲染器会被解析为 ANGLE，不会加载 MobileGlues，设置不生效。配置将在游戏启动时写入 <POJAV_HOME>/MG/config.json。";
+"preference.section.desktopglues" = "DesktopGlues 渲染器";
+"preference.section.footer.desktopglues" = "这些设置在渲染器选择为 DesktopGlues 时生效。DesktopGlues 与 MobileGlues 的设置相互独立（config.json 键不完全一致），使用独立的 desktopglues.* 偏好键。Auto 渲染器会被解析为 ANGLE，不会加载 DesktopGlues，设置不生效。配置将在游戏启动时写入 <POJAV_HOME>/MG/config.json。";
 "preference.section.control" = "自定义控制键";
 "preference.section.debug" = "UI设置";
 "preference.section.footer.debug" = "除了调试外，这些设置可能对自定义控件有用。您可能需要重新启动启动器才能使更改生效。";
@@ -229,6 +231,7 @@
 "preference.title.renderer.debug.gl4es" = "holy gl4es 1.1.4 - OpenGL版本2.1";
 "preference.title.renderer.debug.angle" = "ANGLE（仅支持1.17+）- OpenGL 版本 3.2";
 "preference.title.renderer.debug.mg" = "MobileGlues（1.17+）- OpenGL 版本 4.0，实验性";
+"preference.title.renderer.debug.dg" = "DesktopGlues（1.17+）- OpenGL 版本 4.0，实验性";
 "preference.title.renderer.debug.zink" = "Zink（Mesa 25.0.7）- OpenGL 版本 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES 转译（1.17+）";
 "preference.title.renderer.debug.vulkan" = "MoltenVK（26.2+）- 导出 Vulkan 1.4";
@@ -292,6 +295,24 @@
 "preference.title.mg_fsr1_setting-1" = "超高品质";
 "preference.title.mg_fsr1_setting-2" = "高品质";
 "preference.title.mg_fsr1_setting-3" = "性能优先";
+
+/* DesktopGlues 设置（与 MobileGlues 独立） */
+"preference.title.dg_enable_no_error-0" = "自动";
+"preference.title.dg_enable_no_error-1" = "禁用";
+"preference.title.dg_enable_no_error-2" = "级别 1";
+"preference.title.dg_enable_no_error-3" = "级别 2";
+"preference.title.enable_ext_shader_atomic_counters" = "EXT 着色器原子计数器";
+"preference.detail.enable_ext_shader_atomic_counters" = "启用 GL_ARB_shader_atomic_counters 扩展。可能破坏部分着色器。";
+"preference.title.hide_mg_env_level" = "隐藏渲染器环境";
+"preference.detail.hide_mg_env_level" = "隐藏 MobileGlues/DesktopGlues 扩展并随机化 OpenGL 版本与渲染器字符串，用于规避部分 Mod 的检测。";
+"preference.title.multidraw_order" = "MultiDraw 方案排序";
+"preference.detail.multidraw_order" = "全局 MultiDraw 后端排序（逗号分隔，越靠前越优先）。可用：native, multiindirect, multibasevertex, multiarrays, indirect, basevertex, unroll, compute。留空使用默认顺序。";
+"preference.placeholder.multidraw_order" = "native, multiindirect, multibasevertex, multiarrays, indirect, basevertex, unroll, compute";
+"preference.title.dg_fsr1_setting-0" = "关闭";
+"preference.title.dg_fsr1_setting-1" = "超高品质";
+"preference.title.dg_fsr1_setting-2" = "高品质";
+"preference.title.dg_fsr1_setting-3" = "平衡";
+"preference.title.dg_fsr1_setting-4" = "性能优先";
 "preference.title.default_gamepad_ctrl" = "手柄配置";
 "preference.title.hardware_hide" = "硬件连接时隐藏控制键";
 "preference.detail.hardware_hide" = "启用连接鼠标或游戏控制器时自动禁用屏幕控制叠加的行为。";

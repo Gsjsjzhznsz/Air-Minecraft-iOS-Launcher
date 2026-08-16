@@ -255,7 +255,7 @@ check:
 		$(info $(shell printf "%-20s" "$(v)") = $(value $(v)))) \
 	)
 
-native: dep_mg
+native: dep_mg dep_dg
 	echo '[Amethyst v$(VERSION)] native - start'
 	mkdir -p $(WORKINGDIR)
 	cd $(WORKINGDIR) && cmake \
@@ -324,6 +324,24 @@ dep_mg:
 	cp $(WORKINGDIR)/mobileglues/libspirv-cross*.dylib $(WORKINGDIR)/ 2>/dev/null || true
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
 
+dep_dg:
+	echo '[Amethyst v$(VERSION)] dep_dg - start'
+	mkdir -p $(WORKINGDIR)/desktopglues
+	cd $(WORKINGDIR)/desktopglues && cmake \
+		-DMACOS="1" \
+		-DCMAKE_CROSSCOMPILING=true \
+		-DCMAKE_SYSTEM_NAME=Darwin \
+		-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+		-DCMAKE_OSX_SYSROOT="$(SDKPATH)" \
+		-DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+		-DCMAKE_C_FLAGS="-arch arm64" \
+		$(SOURCEDIR)/Natives/external/DesktopGlues/MobileGlues-cpp/
+
+	cmake --build $(WORKINGDIR)/desktopglues --config RelWithDebInfo -j$(JOBS) --target desktopglues
+	cp $(WORKINGDIR)/desktopglues/libdesktopglues*.dylib $(WORKINGDIR)/
+	echo '[Amethyst v$(VERSION)] dep_dg - end'
+
 dep_mobilegl:
 	# MobileGL（Vulkan/GLES 后端渲染器）集成已完全移除：
 	# - 构建链中的 perl 补丁（Range1D/BufferChange/is_aggregate_v）不再需要
@@ -347,7 +365,7 @@ assets:
 	fi
 	echo '[Amethyst v$(VERSION)] assets - end'
 
-payload: native dep_mg java jre assets
+payload: native dep_mg dep_dg java jre assets
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)
