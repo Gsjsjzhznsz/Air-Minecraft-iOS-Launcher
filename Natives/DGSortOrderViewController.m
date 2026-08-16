@@ -227,6 +227,9 @@ static NSString *backendDisplayName(NSString *name) {
     return map[name] ?: name;
 }
 
+@interface DGSortOrderViewController : UITableViewController
+@end
+
 @interface DGSortOrderViewController () {
     NSMutableArray<NSMutableArray<NSString *> *> *_orders; // 每个入口点的有效顺序
     BOOL _benchRunning;
