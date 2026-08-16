@@ -358,6 +358,7 @@ add_executable(AngelAuraAmethyst
   LauncherProfileEditorViewController.m
   LauncherProfilesViewController.m
   LauncherSplitViewController.m
+  DGSortOrderViewController.m
   MinecraftResourceDownloadTask.m
   MinecraftResourceUtils.m
   PickTextField.m

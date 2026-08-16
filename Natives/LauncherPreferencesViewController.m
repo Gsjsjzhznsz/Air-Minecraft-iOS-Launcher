@@ -882,8 +882,23 @@
             @{@"key": @"multidraw_order",
               @"hasDetail": @YES,
               @"icon": @"square.stack.3d.down.dottedline",
-              @"type": self.typeTextField,
-              @"enableCondition": whenNotInGame
+              @"type": self.typeChildPane,
+              @"enableCondition": whenNotInGame,
+              @"canDismissWithSwipe": @YES,
+              @"class": NSClassFromString(@"DGSortOrderViewController")
+            },
+            @{@"key": @"multidraw_bench",
+              @"hasDetail": @YES,
+              @"icon": @"gauge.with.dots.needle.50percent",
+              @"type": self.typeButton,
+              @"enableCondition": whenNotInGame,
+              @"action": ^{
+                  UIViewController *vc = [NSClassFromString(@"DGSortOrderViewController") new];
+                  UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
+                  nav.navigationBar.prefersLargeTitles = YES;
+                  nav.modalInPresentation = YES;
+                  [currentVC() presentViewController:nav animated:YES completion:nil];
+              }
             },
         ], @[
             // Control settings

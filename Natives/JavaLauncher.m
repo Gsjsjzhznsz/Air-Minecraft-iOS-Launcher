@@ -267,6 +267,30 @@ void init_loadMobileGluesConfig() {
             config[@"multidrawOrder"] = [multidrawOrder description];
             NSLog(@"[JavaLauncher]   %@multidraw_order = %@ -> multidrawOrder = %@", prefPrefix, multidrawOrder, config[@"multidrawOrder"]);
         }
+        // DesktopGlues 支持按入口点覆盖全局顺序：multidrawOrder<EntryPoint>。
+        // 对应偏好键 desktopglues.multidraw_order_<entry>（由 DGSortOrderViewController 写入）。
+        NSArray<NSString *> *entryKeys = @[
+            @"multidraw_order_arrays",
+            @"multidraw_order_elements",
+            @"multidraw_order_elementsbasevertex",
+            @"multidraw_order_arraysindirect",
+            @"multidraw_order_elementsindirect",
+        ];
+        NSArray<NSString *> *configKeys = @[
+            @"multidrawOrderArrays",
+            @"multidrawOrderElements",
+            @"multidrawOrderElementsBaseVertex",
+            @"multidrawOrderArraysIndirect",
+            @"multidrawOrderElementsIndirect",
+        ];
+        for (NSUInteger i = 0; i < entryKeys.count; i++) {
+            id entryOrder = getPrefObject([NSString stringWithFormat:@"%@%@", prefPrefix, entryKeys[i]]);
+            if (entryOrder && [[entryOrder description] length] > 0) {
+                config[configKeys[i]] = [entryOrder description];
+                NSLog(@"[JavaLauncher]   %@%@ = %@ -> %@ = %@", prefPrefix, entryKeys[i], entryOrder,
+                      configKeys[i], config[configKeys[i]]);
+            }
+        }
     } else {
         id multidrawMode = getPrefObject([NSString stringWithFormat:@"%@multidraw_mode", prefPrefix]);
         if (multidrawMode) {
