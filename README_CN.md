@@ -3,28 +3,42 @@
 </div>
 
 <h1 align="center">Air</h1>
-<p align="center"><sub>Amethyst iOS 重制版</sub></p>
+<p align="center"><sub>Amethyst iOS 重制版 (Fork)</sub></p>
 
 <div align="center">
-  <img alt="构建状态" src="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
-  <img alt="下载量" src="https://img.shields.io/github/downloads/herbrine8403/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
-  <img alt="版本" src="https://img.shields.io/github/v/release/herbrine8403/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="许可证" src="https://img.shields.io/github/license/herbrine8403/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="最后提交" src="https://img.shields.io/github/last-commit/herbrine8403/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat">
+  <img alt="构建状态" src="https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="下载量" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
+  <img alt="版本" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
+  <img alt="许可证" src="https://img.shields.io/github/license/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
+  <img alt="最后提交" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat">
 </div>
 
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README_CN.md">Chinese</a>
+  <a href="./README.md">English</a> | <a href="./README_CN.md">中文</a>
 </p>
 
 ---
 
 一款面向 iOS 和 iPadOS 平台的 Minecraft: Java Edition 高端启动器，基于官方 Amethyst 项目深度重构。提供了精致的移动端体验，集成了全面的 Mod 管理、智能渲染器选择以及深度的平台适配能力。
 
+> **本仓库是** [herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) **的 Fork**，在原版基础上增加了额外的修复和改进。
+
+---
+
+## 与上游的差异
+
+| 改动 | 说明 |
+|------|------|
+| **LWJGL 3.4.1 兼容** | 更新 LWJGL 至 3.4.1 兼容层，支持 Sodium 0.9+ 等要求 LWJGL >= 3.4.1 的模组。采用开发者 herbrine8403 的方案：3.3.x 基础模块 + lwjgl-callback-descriptor.jar (3.4.1) + 源码覆盖层同时兼容 3.3.x 和 3.4.1 两种 Callback API。 |
+| **iOS 26+ JIT 崩溃修复** | 修复提前开启 JIT 权限时启动游戏闪退的问题。启动器现在会正确等待 StikJit 完成 debug JIT mapping 脚本后再启动 JVM，而非立即调用游戏启动。 |
+| **增强中文本地化** | 完整中文界面翻译（1955 行），覆盖比上游更全面。 |
+| **Makefile 健壮性** | 修复 TAB 缩进被转为空格导致 CI 构建失败的问题。 |
+
 ---
 
 ## 目录
 
+- [与上游的差异](#与上游的差异)
 - [核心特性](#核心特性)
 - [快速上手](#快速上手)
   - [设备要求](#设备要求)
@@ -54,7 +68,6 @@
 
 > [!NOTE]
 > 暂无计划将重制版移植至 Android 平台。Android 生态已有诸多优秀启动器，如 [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2)、[Fold Craft Launcher](https://github.com/FCL-Team/FoldCraftLauncher)。如需官方 Android 版本，请前往 [Amethyst-Android](https://github.com/AngelAuraMC/Amethyst-Android)。
-> (朕的 ShardLauncher 怎么中道崩殂了...？)
 
 ## 快速上手
 
@@ -68,7 +81,7 @@
 | **推荐配置** | iOS 14.5+ | iPhone XS+（不含 XR/SE 2 代）、iPad 10 代+、iPad Air 4 代+、iPad mini 6 代+、iPad Pro（不含 9.7 英寸） |
 
 > [!CAUTION]
-> iOS 14.0--14.4.2 存在已知的严重兼容性问题，**强烈建议升级至 iOS 14.5 或更高版本。** iOS 17.x 和 18.x 受支持，但首次配置 JIT 需要电脑辅助（参见[官方 JIT 指南](https://wiki.angelauramc.dev/wiki/faq/ios/JIT.html#what-are-the-methods-to-enable-jit)）。iOS 26.x 可安装使用，但未经过专项适配，可能出现不可预测的问题。
+> iOS 14.0--14.4.2 存在已知的严重兼容性问题，**强烈建议升级至 iOS 14.5 或更高版本。** iOS 17.x 和 18.x 受支持，但首次配置 JIT 需要电脑辅助（参见[官方 JIT 指南](https://wiki.angelauramc.dev/wiki/faq/ios/JIT.html#what-are-the-methods-to-enable-jit)）。
 
 ### 侧载准备
 
@@ -85,14 +98,14 @@
 <details>
 <summary><b>正式版（TrollStore 渠道）</b></summary>
 
-1. 前往 [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases) 下载 `.tipa` 安装包。
+1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases) 下载 `.tipa` 安装包。
 2. 通过系统分享菜单，选择用 TrollStore 打开，即可自动完成安装。
 </details>
 
 <details>
 <summary><b>正式版（AltStore / SideStore 渠道）</b></summary>
 
-1. 前往 [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases) 下载 `.ipa` 安装包。
+1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases) 下载 `.ipa` 安装包。
 2. 按照侧载工具的标准流程导入 IPA 完成安装。
 </details>
 
@@ -102,7 +115,7 @@
 > [!CAUTION]
 > 测试版可能包含崩溃、无法启动等严重缺陷，仅限开发测试使用。
 
-1. 前往 [GitHub Actions](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions) 页面下载最新 IPA 构建产物。
+1. 前往 [GitHub Actions](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions) 页面下载最新 IPA 构建产物。
 2. 在侧载工具（AltStore、SideStore 等）中导入 IPA 完成安装。
 </details>
 
@@ -121,10 +134,11 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 ## 贡献者
 
+- [@herbrine8403](https://github.com/herbrine8403) -- 原项目作者
 - [@yitenchen123](https://github.com/yitenchen123) -- 项目维护者
-- [EternityQwQ](https://github.com/EternityQwQ) -- 添加 Metal Universal Mod 支持，允许启动器使用 Metal 渲染 Minecraft
+- [EternityQwQ](https://github.com/EternityQwQ) -- 添加 Metal Universal Mod 支持
 - [@LanRhyme](https://github.com/LanRhyme) -- iOS 26 兼容性适配及日志改进
-- [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod 下载功能集成、TouchController 优化、双指长按唤出键盘
+- [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod 下载功能集成、TouchController 优化
 - [@Li2548](https://github.com/Li2548) -- 上游同步维护
 
 ## 第三方组件
@@ -136,7 +150,7 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 | Boardwalk | 核心功能适配 | Apache-2.0 | [GitHub](https://github.com/zhuowei/Boardwalk) |
 | GL4ES | OpenGL 到 GLES 转译 | MIT | [GitHub](https://github.com/ptitSeb/gl4es) |
 | Mesa 3D | 3D 图形库 | MIT | [GitLab](https://gitlab.freedesktop.org/mesa/mesa) |
-| MetalANGLE | Metal 到 OpenGL ES 转译 | BSD-2 | [GitHub](https://github.com/khanhduytran0/metalangle) |
+| MetalANGLE | Metal 到 OpenGL ES 转译 | BSD-2 | [GitHub](https://github.com/khanhduytran0/MetalANGLE) |
 | MoltenVK | Vulkan 到 Metal 转译 | Apache-2.0 | [GitHub](https://github.com/KhronosGroup/MoltenVK) |
 | openal-soft | 跨平台 3D 音频 | LGPL-2.0 | [GitHub](https://github.com/kcat/openal-soft) |
 | Azul Zulu JDK | Java 运行时（8/17/21/25） | GPL-2.0 | [官网](https://www.azul.com/downloads/?package=jdk) |
@@ -161,10 +175,10 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 ## Star History
 
-<a href="https://star-history.com/#herbrine8403/Amethyst-iOS-MyRemastered&Date">
+<a href="https://star-history.com/#Gsjsjzhznsz/Amethyst-iOS-MyRemastered&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=herbrine8403/Amethyst-iOS-MyRemastered&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=herbrine8403/Amethyst-iOS-MyRemastered&type=Date" />
-   <img alt="Star history" src="https://api.star-history.com/svg?repos=herbrine8403/Amethyst-iOS-MyRemastered&type=Date" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Amethyst-iOS-MyRemastered&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Amethyst-iOS-MyRemastered&type=Date" />
+  <img alt="Star history" src="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Amethyst-iOS-MyRemastered&type=Date" />
  </picture>
 </a>

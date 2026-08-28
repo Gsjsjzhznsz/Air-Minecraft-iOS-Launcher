@@ -3,14 +3,14 @@
 </div>
 
 <h1 align="center">Air</h1>
-<p align="center"><sub>Amethyst iOS Remastered</sub></p>
+<p align="center"><sub>Amethyst iOS Remastered (Fork)</sub></p>
 
 <div align="center">
-  <img alt="Build Status" src="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
-  <img alt="Downloads" src="https://img.shields.io/github/downloads/herbrine8403/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
-  <img alt="Release" src="https://img.shields.io/github/v/release/herbrine8403/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="License" src="https://img.shields.io/github/license/herbrine8403/Amethyst-iOS-MyRemastered?style=flat">
-  <a title="Crowdin" target="_blank" href="https://crowdin.com/project/amethyst-ios-remastered"><img alt="Crowdin" src="https://badges.crowdin.net/amethyst-ios-remastered/localized.svg">
+  <img alt="Build Status" src="https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
+  <img alt="Release" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
+  <img alt="License" src="https://img.shields.io/github/license/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
+  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat">
 </div>
 
 <p align="center">
@@ -21,10 +21,24 @@
 
 A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the ground up on the official Amethyst project. It delivers a refined mobile experience with comprehensive mod management, intelligent renderer selection, and deep platform integration.
 
+> **This is a fork** of [herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) with additional fixes and improvements.
+
+---
+
+## What's Different from Upstream
+
+| Change | Description |
+|--------|-------------|
+| **LWJGL 3.4.1 Compatibility** | Updated LWJGL to a 3.4.1-compatible layer, enabling mods like Sodium 0.9+ that require LWJGL >= 3.4.1. Uses developer herbrine8403's approach: 3.3.x base modules + lwjgl-callback-descriptor.jar (3.4.1) + source overlay for dual-API compatibility. |
+| **iOS 26+ JIT Crash Fix** | Fixed crash when JIT is pre-enabled before launch on iOS 26+ TXM devices. The launcher now correctly waits for StikJit to complete the debug JIT mapping script before starting the JVM. |
+| **Enhanced Chinese Localization** | Complete Chinese UI translation (1955 lines), more comprehensive than upstream. |
+| **Makefile Robustness** | Fixed TAB-to-space indentation issues that caused CI build failures. |
+
 ---
 
 ## Table of Contents
 
+- [What's Different from Upstream](#whats-different-from-upstream)
 - [Core Features](#core-features)
 - [Quick Start](#quick-start)
   - [Device Requirements](#device-requirements)
@@ -70,7 +84,7 @@ For complete documentation, refer to the [Amethyst Official Wiki](https://wiki.a
 | **Recommended** | iOS 14.5+ | iPhone XS+ (excl. XR/SE 2nd gen), iPad 10th gen+, iPad Air 4th gen+, iPad mini 6th gen+, iPad Pro (excl. 9.7-inch) |
 
 > [!CAUTION]
-> iOS 14.0--14.4.2 has known critical compatibility issues. **Upgrading to iOS 14.5 or later is strongly recommended.** iOS 17.x and 18.x are supported but require a companion computer for initial JIT configuration (see the [Official JIT Guide](https://wiki.angelauramc.dev/wiki/faq/ios/JIT.html#what-are-the-methods-to-enable-jit)). iOS 26.x is installable but has not undergone dedicated adaptation; expect unpredictable behavior.
+> iOS 14.0--14.4.2 has known critical compatibility issues. **Upgrading to iOS 14.5 or later is strongly recommended.** iOS 17.x and 18.x are supported but require a companion computer for initial JIT configuration (see the [Official JIT Guide](https://wiki.angelauramc.dev/wiki/faq/ios/JIT.html#what-are-the-methods-to-enable-jit)).
 
 ### Sideload Preparation
 
@@ -87,14 +101,14 @@ Prioritize tools that support permanent signing and automatic JIT enablement:
 <details>
 <summary><b>Official Release (TrollStore)</b></summary>
 
-1. Download the `.tipa` package from [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases).
+1. Download the `.tipa` package from [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases).
 2. Open the file with TrollStore via the system share menu to complete installation.
 </details>
 
 <details>
 <summary><b>Official Release (AltStore / SideStore)</b></summary>
 
-1. Download the `.ipa` package from [Releases](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/releases).
+1. Download the `.ipa` package from [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases).
 2. Import the IPA into your sideloading tool following its standard installation procedure.
 </details>
 
@@ -104,7 +118,7 @@ Prioritize tools that support permanent signing and automatic JIT enablement:
 > [!CAUTION]
 > Nightly builds may contain critical bugs including crashes and startup failures. Use only for development and testing purposes.
 
-1. Navigate to the [GitHub Actions](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered/actions) page and download the latest IPA artifact.
+1. Navigate to the [GitHub Actions](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions) page and download the latest IPA artifact.
 2. Import the IPA into your sideloading tool (AltStore, SideStore, etc.) to install.
 </details>
 
@@ -123,10 +137,11 @@ JIT (Just-In-Time compilation) is essential for smooth gameplay. Choose the appr
 
 ## Contributors
 
+- [@herbrine8403](https://github.com/herbrine8403) -- Original project author
 - [@yitenchen123](https://github.com/yitenchen123) -- Project Maintainer
-- [@EternityQwQ](https://github.com/EternityQwQ) -- Add Metal Universal Mod support, allowing the launcher to use Metal for rendering Minecraft
-- [@LanRhyme](https://github.com/LanRhyme) -- ShardLauncher author; iOS 26 compatibility and logging improvements
-- [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod download integration, TouchController optimizations, and two-finger long-press keyboard trigger
+- [@EternityQwQ](https://github.com/EternityQwQ) -- Metal Universal Mod support
+- [@LanRhyme](https://github.com/LanRhyme) -- iOS 26 compatibility and logging improvements
+- [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod download integration, TouchController optimizations
 - [@Li2548](https://github.com/Li2548) -- Upstream synchronization
 
 ## About Translations
@@ -142,7 +157,7 @@ If you would like to contribute translations for this project, please go to [Cro
 | Boardwalk | Core functionality adaptation | Apache-2.0 | [GitHub](https://github.com/zhuowei/Boardwalk) |
 | GL4ES | OpenGL-to-GLES translation | MIT | [GitHub](https://github.com/ptitSeb/gl4es) |
 | Mesa 3D | 3D graphics library | MIT | [GitLab](https://gitlab.freedesktop.org/mesa/mesa) |
-| MetalANGLE | Metal-to-OpenGL ES translation | BSD-2 | [GitHub](https://github.com/khanhduytran0/metalangle) |
+| MetalANGLE | Metal-to-OpenGL ES translation | BSD-2 | [GitHub](https://github.com/khanhduytran0/MetalANGLE) |
 | MoltenVK | Vulkan-to-Metal translation | Apache-2.0 | [GitHub](https://github.com/KhronosGroup/MoltenVK) |
 | openal-soft | Cross-platform 3D audio | LGPL-2.0 | [GitHub](https://github.com/kcat/openal-soft) |
 | Azul Zulu JDK | Java runtime (8/17/21/25) | GPL-2.0 | [Website](https://www.azul.com/downloads/?package=jdk) |
@@ -163,14 +178,14 @@ Additional thanks to [MCHeads](https://mc-heads.net) for Minecraft avatar servic
 
 ## Sponsor
 
-If you find this project valuable, consider supporting development through [Ko-Fi](https://ko-fi.com/herbrine8403), [Afdian](https://afdian.com/a/herbrine8403), or [WeChat Reward Code](donate.png).
+If you find this project valuable, consider supporting the original author through [Ko-Fi](https://ko-fi.com/herbrine8403), [Afdian](https://afdian.com/a/herbrine8403), or [WeChat Reward Code](donate.png).
 
 ## Star History
 
-<a href="https://www.star-history.com/?type=date&repos=herbrine8403%2FAmethyst-iOS-MyRemastered">
+<a href="https://www.star-history.com/?type=date&repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=herbrine8403/Amethyst-iOS-MyRemastered&type=date&theme=dark&legend=top-left&sealed_token=q1uFKbS7fO8owrcjy_kYTkCnnl8PNgHAgBSrWop8Y3ULDdvwOwDfORslSVVXABSTwrsdu14OM3fshRaNbXouxMU5IenXF0T5r5L6rxKIN2n29T6Fv4UYyA" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=herbrine8403/Amethyst-iOS-MyRemastered&type=date&legend=top-left&sealed_token=q1uFKbS7fO8owrcjy_kYTkCnnl8PNgHAgBSrWop8Y3ULDdvwOwDfORslSVVXABSTwrsdu14OM3fshRaNbXouxMU5IenXF0T5r5L6rxKIN2n29T6Fv4UYyA" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=herbrine8403/Amethyst-iOS-MyRemastered&type=date&legend=top-left&sealed_token=q1uFKbS7fO8owrcjy_kYTkCnnl8PNgHAgBSrWop8Y3ULDdvwOwDfORslSVVXABSTwrsdu14OM3fshRaNbXouxMU5IenXF0T5r5L6rxKIN2n29T6Fv4UYyA" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered&type=date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered&type=date&legend=top-left" />
+  <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered&type=date&legend=top-left" />
  </picture>
 </a>
