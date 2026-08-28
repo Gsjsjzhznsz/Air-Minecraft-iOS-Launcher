@@ -661,6 +661,17 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
+        // iOS 26+ TXM 设备即使 JIT 已开启，也需要发送 JIT 脚本设置 mirrored code cache
+        if (DeviceNeedsDebugJITMapping()) {
+            NSLog(@"[JIT] JIT already enabled but device needs debug JIT mapping, sending script...");
+            NSString *scriptPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"];
+            NSString *script = [NSString stringWithContentsOfFile:scriptPath encoding:NSUTF8StringEncoding error:nil];
+            if (script) {
+                JIT26SendJITScript(script);
+            } else {
+                NSLog(@"[JIT] WARNING: UniversalJIT26.js not found, Java JIT may crash");
+            }
+        }
         handler();
         return;
     } else if (hasTrollStoreJIT) {
