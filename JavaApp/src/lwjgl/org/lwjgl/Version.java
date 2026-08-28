@@ -34,7 +34,11 @@ public final class Version {
         if (ver != null) {
             return ver;
         }
-        // Fallback: use specVersion as version string
         return specVersion;
+    }
+
+    public enum BuildType {
+        SNAPSHOT,
+        STABLE
     }
 }
