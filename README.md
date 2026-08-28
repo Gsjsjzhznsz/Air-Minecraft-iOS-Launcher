@@ -30,8 +30,10 @@ A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the 
 | Change | Description |
 |--------|-------------|
 | **LWJGL 3.4.1 Compatibility** | Updated LWJGL to a 3.4.1-compatible layer, enabling mods like Sodium 0.9+ that require LWJGL >= 3.4.1. Uses developer herbrine8403's approach: 3.3.x base modules + lwjgl-callback-descriptor.jar (3.4.1) + source overlay for dual-API compatibility. |
-| **iOS 26+ JIT Crash Fix** | Fixed crash when JIT is pre-enabled before launch on iOS 26+ TXM devices. The launcher now correctly waits for StikJit to complete the debug JIT mapping script before starting the JVM. |
-| **Enhanced Chinese Localization** | Complete Chinese UI translation (1955 lines), more comprehensive than upstream. |
+| **JIT Pre-enabled Direct Launch** | When JIT is already enabled (e.g. from a previous session), the game launches directly without re-requesting via stikjit:// URL, avoiding unnecessary background transitions and potential crashes on iOS 26+ devices. The JIT26 script is handled by JavaLauncher during game startup. |
+| **In-App Language Switching** | Added a language picker in Settings > General that allows switching between Follow System, Simplified Chinese, and English without restarting the app. The `localize()` function respects the user's choice while maintaining the full fallback chain. |
+| **Enhanced Chinese Localization** | Complete Chinese UI translation (1955+ lines), more comprehensive than upstream. |
+| **Bug Fixes from Upstream Issue Audit** | 8 bug fixes identified through systematic review of upstream and upstream's upstream GitHub issues, including nil crash in JIT script loading, UIKit thread safety, KVO observer cleanup, and more. |
 | **Makefile Robustness** | Fixed TAB-to-space indentation issues that caused CI build failures. |
 
 ---
@@ -55,7 +57,7 @@ A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the 
 - **Resource Management & Downloads** -- Browse, enable, disable, and delete mods, shader packs, resource packs, and other assets, with integrated Modrinth and CurseForge download support.
 - **Modpack Import** -- Import ZIP-format modpacks directly from the launcher interface.
 - **Smart Download Sources** -- Switch between Mojang Official, BMCLAPI mirror, and other sources on the fly for optimal download speeds.
-- **Complete Chinese Localization** -- Fully translated interface with native-quality Chinese language support.
+- **Complete Chinese Localization** -- Fully translated interface with native-quality Chinese language support. In-app language switching between Chinese and English available in Settings.
 - **Unrestricted Accounts** -- Local accounts, demo mode, and third-party authentication all supported; no Microsoft account required to download and play.
 - **Multi-Account** -- Seamlessly switch between Microsoft, local, and third-party authentication accounts.
 - **Auto Renderer Selection** -- Automatically chooses the optimal rendering backend (including MobileGlues, MoltenVK, and more) when set to Auto.
