@@ -1215,55 +1215,13 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
-        // iOS 26+ TXM 设备需要 debug JIT mapping 脚本，
-        // 如果 JIT 是外部提前开启的（调试器可能已断开），不能直接用 brk 发脚本，
-        // 必须通过 URL scheme 重新请求带脚本的 JIT。
-        if (DeviceNeedsDebugJITMapping() && !hasTrollStoreJIT) {
-            NSLog(@"[JIT] JIT already enabled but device needs debug JIT mapping, re-requesting via URL...");
-            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-            NSString *scriptDataString = scriptData ? [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]] : @"";
-            if (@available(iOS 17.4, *)) {
-                [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
-            }
-            // 关键修复：JIT 已启用但需要重新请求 debug JIT mapping 时，
-            // 不能直接继续走下方的等待循环（isJITEnabled 已经为 true 会立即返回）。
-            // 必须等待 StikJit 处理完毕（app 被切到后台再回到前台）再调用 handler。
-            self.progressLabel.text = localize(@"i18n_str_436", nil);
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                message:localize(@"i18n_str_439", nil)
-                preferredStyle:UIAlertControllerStyleAlert];
-            [self presentViewController:alert animated:YES completion:nil];
-            __block BOOL didResignActive = NO;
-            __block id observer1 = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
-                didResignActive = YES;
-            }];
-            __block id observer2 = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
-                if (didResignActive) {
-                    [[NSNotificationCenter defaultCenter] removeObserver:observer1];
-                    [[NSNotificationCenter defaultCenter] removeObserver:observer2];
-                    // StikJit 处理完毕，app 已回到前台
-                    // 额外等待 2 秒确保 JIT 脚本完全执行完毕
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        NSLog(@"[JIT] StikJit re-request completed, proceeding with handler");
-                        [alert dismissViewControllerAnimated:YES completion:handler];
-                    });
-                }
-            }];
-            // 超时保护：如果 30 秒内 app 没有回到前台（如 StikJit 未安装），
-            // 清理观察者并继续执行（让标准流程接管）
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                [[NSNotificationCenter defaultCenter] removeObserver:observer1];
-                [[NSNotificationCenter defaultCenter] removeObserver:observer2];
-                if (alert.presentingViewController) {
-                    NSLog(@"[JIT] Timeout waiting for StikJit re-request, proceeding anyway");
-                    [alert dismissViewControllerAnimated:YES completion:handler];
-                }
-            });
-            return; // 不继续走下方的标准等待流程
-        } else {
-            handler();
-            return;
-        }
+        // JIT 已启用：直接启动游戏，跳过 stikjit URL 脚本请求。
+        // 之前对 iOS 26+ TXM 设备通过 stikjit:// 重新请求 debug JIT mapping 脚本
+        // 会导致 app 切到后台再回来，可能闪退。现在改为直接启动，
+        // 由 JavaLauncher 在游戏启动时通过 brk 指令发送 JIT26 脚本（见 JavaLauncher.m）。
+        NSLog(@"[JIT] JIT already enabled, launching game directly");
+        handler();
+        return;
     } else if (hasTrollStoreJIT) {
         NSURL *jitURL = [NSURL URLWithString:[NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", NSBundle.mainBundle.bundleIdentifier]];
         [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:nil];
