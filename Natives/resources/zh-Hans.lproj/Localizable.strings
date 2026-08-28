@@ -1953,15 +1953,3 @@
 
 "preference.auto" = "自动";
 "preference.auto_select" = "自动选择";
-
-// iOS 26+ JIT 不可用警告
-"login.warn.title.ios19_jitdead" = "Amethyst 不支持 iOS 26 及更高版本";
-"login.warn.message.ios19_jitdead" = "由于 iOS 的更改阻止了启用 JIT 的能力，Amethyst 目前无法正常工作，需要深入研究以找到新的前进方向。\n\n点击确定将关闭应用。";
-
-// 调试偏好
-"preference.title.debug_always_attached_jit" = "保持附加到 StikDebug";
-"preference.detail.debug_always_attached_jit" = "如果你的 Mod 需要在运行时加载 .dylib，请启用此项。启用后，游戏过程中不应关闭 StikDebug 的画中画。需要先启用 Universal Script";
-"preference.title.debug_universal_script_jit" = "使用 Universal StikDebug 脚本";
-
-// 渲染器
-"preference.title.renderer.release.mg" = "MobileGlues";
