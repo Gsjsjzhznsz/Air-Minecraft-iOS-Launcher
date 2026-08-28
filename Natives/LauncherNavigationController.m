@@ -671,7 +671,40 @@ static void *ProgressObserverContext = &ProgressObserverContext;
             if (@available(iOS 17.4, *)) {
                 [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
             }
-            // 不 return，继续走下面的等待 JIT 流程
+            // 关键修复：JIT 已启用但需要重新请求 debug JIT mapping 时，
+            // 不能直接继续走下方的等待循环（isJITEnabled 已经为 true 会立即返回）。
+            // 必须等待 StikJit 处理完毕（app 被切到后台再回到前台）再调用 handler。
+            UIAlertController* alert = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
+                message:localize(@"launcher.wait_jit.message", nil)
+                preferredStyle:UIAlertControllerStyleAlert];
+            [self presentViewController:alert animated:YES completion:nil];
+            __block BOOL didResignActive = NO;
+            __block id observer1 = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidResignActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+                didResignActive = YES;
+            }];
+            __block id observer2 = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+                if (didResignActive) {
+                    [[NSNotificationCenter defaultCenter] removeObserver:observer1];
+                    [[NSNotificationCenter defaultCenter] removeObserver:observer2];
+                    // StikJit 处理完毕，app 已回到前台
+                    // 额外等待 2 秒确保 JIT 脚本完全执行完毕
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                        NSLog(@"[JIT] StikJit re-request completed, proceeding with handler");
+                        [alert dismissViewControllerAnimated:YES completion:handler];
+                    });
+                }
+            }];
+            // 超时保护：如果 30 秒内 app 没有回到前台（如 StikJit 未安装），
+            // 清理观察者并继续执行
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [[NSNotificationCenter defaultCenter] removeObserver:observer1];
+                [[NSNotificationCenter defaultCenter] removeObserver:observer2];
+                if (alert.presentingViewController) {
+                    NSLog(@"[JIT] Timeout waiting for StikJit re-request, proceeding anyway");
+                    [alert dismissViewControllerAnimated:YES completion:handler];
+                }
+            });
+            return; // 不继续走下方的标准等待流程
         } else {
             handler();
             return;
