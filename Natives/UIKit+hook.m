@@ -176,6 +176,12 @@ void init_hookUIKitConstructor(void) {
 }
 
 - (UIViewController *)visibleViewController {
+    // 修复上游 Issue #41：防御性检查 ——
+    // 如果 self 不是 UIWindow（例如 __weak 全局变量被错误指向了其他对象），
+    // 直接返回 nil 而不是访问 rootViewController 触发 unrecognized selector 崩溃。
+    if (![self isKindOfClass:[UIWindow class]]) {
+        return nil;
+    }
     UIViewController *current = self.rootViewController;
     while (current.presentedViewController) {
         if ([current.presentedViewController isKindOfClass:UIAlertController.class] || [current.presentedViewController isKindOfClass:NSClassFromString(@"UIInputWindowController")]) {
@@ -228,5 +234,7 @@ void init_hookUIKitConstructor(void) {
 @end
 
 UIViewController* currentVC() {
-    return UIWindow.mainWindow.visibleViewController;
+    UIWindow *window = UIWindow.mainWindow;
+    if (!window) return nil;
+    return window.visibleViewController;
 }

@@ -81,7 +81,13 @@ bool pojavIsActualVulkanPath() {
 
 void JNI_LWJGL_changeRenderer(const char* value_c) {
     JNIEnv *env;
-    (*runtimeJavaVMPtr)->GetEnv(runtimeJavaVMPtr, (void **)&env, JNI_VERSION_1_4);
+    int getEnvResult = (*runtimeJavaVMPtr)->GetEnv(runtimeJavaVMPtr, (void **)&env, JNI_VERSION_1_4);
+    // Bug fix: GetEnv 可能返回 JNI_EDETACHED（调用线程未附加到 JVM），
+    // 此时 env 未初始化，后续 JNI 调用会解引用野指针导致崩溃。
+    if (getEnvResult != JNI_OK || !env) {
+        NSLog(@"[egl_bridge] JNI_LWJGL_changeRenderer: GetEnv failed (result=%d)", getEnvResult);
+        return;
+    }
     jstring key = (*env)->NewStringUTF(env, "org.lwjgl.opengl.libname");
     jstring value = (*env)->NewStringUTF(env, value_c);
     jclass clazz = (*env)->FindClass(env, "java/lang/System");

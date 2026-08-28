@@ -9,7 +9,7 @@
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
 
-extern UIWindow *mainWindow;
+extern __weak UIWindow *mainWindow;
 
 @interface SceneDelegate ()
 @end

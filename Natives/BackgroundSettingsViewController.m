@@ -623,11 +623,24 @@
     NSURL *url = urls.firstObject;
     NSString *extension = url.pathExtension.lowercaseString;
     
+    // 修复上游 Issue #92：DocumentPicker 返回安全范围 URL，
+    // 必须先 startAccessingSecurityScopedResource，否则 fileExistsAtPath:
+    // 和 copyItemAtURL: 都会失败（报"文件不存在"）。
+    BOOL accessing = [url startAccessingSecurityScopedResource];
+    
     if ([@[@"jpg", @"jpeg", @"png", @"heic"] containsObject:extension]) {
         UIImage *image = [UIImage imageWithContentsOfFile:url.path];
-        if (image) [self processSelectedImage:image];
+        if (image) {
+            [self processSelectedImage:image];
+        }
+        if (accessing) [url stopAccessingSecurityScopedResource];
     } else if ([@[@"mp4", @"mov", @"m4v"] containsObject:extension]) {
-        [self processSelectedVideo:url];
+        // 视频复制是异步的（BackgroundManager 中 dispatch_async 到后台队列），
+        // 需要保持安全范围访问直到复制完成。
+        // 传递 needsStopAccessing 标记，由 processSelectedVideo 在 completion 中 stop。
+        [self processSelectedVideo:url needsStopAccessing:accessing];
+    } else {
+        if (accessing) [url stopAccessingSecurityScopedResource];
     }
 }
 
@@ -675,6 +688,10 @@
 }
 
 - (void)processSelectedVideo:(NSURL *)videoURL {
+    [self processSelectedVideo:videoURL needsStopAccessing:NO];
+}
+
+- (void)processSelectedVideo:(NSURL *)videoURL needsStopAccessing:(BOOL)needsStop {
     if (!videoURL) return;
     
     UIAlertController *processingAlert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_78", nil)
@@ -683,6 +700,9 @@
     [self presentViewController:processingAlert animated:YES completion:nil];
     
     [[BackgroundManager sharedManager] setVideoBackgroundWithURL:videoURL completion:^(BOOL success, NSError * _Nullable error) {
+        // 视频复制已完成（无论成功或失败），现在可以释放安全范围访问
+        if (needsStop) [videoURL stopAccessingSecurityScopedResource];
+        
         [processingAlert dismissViewControllerAnimated:YES completion:^{
             if (success) {
                 [self updatePreview];

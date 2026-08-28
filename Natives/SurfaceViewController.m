@@ -307,7 +307,10 @@ static GameSurfaceView* pojavWindow;
 - (void)startTouchControllerMessageLoop {
     __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        while (weakSelf.touchControllerTransportHandle >= 0 && ![weakSelf isViewDismissed]) {
+        // Bug fix: 当 VC 被 dealloc 后 weakSelf 变为 nil，
+        // nil 的属性访问返回 0（不是负数），导致 0 >= 0 为 true 循环永不终止。
+        // 必须先检查 weakSelf 本身是否为 nil。
+        while (weakSelf && weakSelf.touchControllerTransportHandle >= 0 && ![weakSelf isViewDismissed]) {
             @autoreleasepool {
                 NSMutableData *buffer = [NSMutableData dataWithLength:256];
                 int result = [TouchControllerBridge receiveFromTransport:weakSelf.touchControllerTransportHandle buffer:buffer];
@@ -518,6 +521,18 @@ static GameSurfaceView* pojavWindow;
 
     NSString *text = self.touchControllerTextField.text ?: @"";
     UITextRange *selectedRange = self.touchControllerTextField.selectedTextRange;
+    // Bug fix: 当 TextField 不是 firstResponder 时 selectedTextRange 可能为 nil，
+    // 此时 offsetFromPosition:toPosition:nil 会抛出 NSInternalInconsistencyException。
+    if (!selectedRange) {
+        NSData *messageData = [self encodeInputStatusMessageWithText:text
+                                                  compositionStart:0
+                                                  compositionLength:0
+                                                  selectionStart:0
+                                                  selectionLength:0
+                                                  selectionLeft:NO];
+        [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+        return;
+    }
     NSInteger selectionStart = [self.touchControllerTextField offsetFromPosition:self.touchControllerTextField.beginningOfDocument
                                                                   toPosition:selectedRange.start];
     NSInteger selectionLength = [self.touchControllerTextField offsetFromPosition:selectedRange.start
@@ -2030,7 +2045,13 @@ static GameSurfaceView* pojavWindow;
         sender.state == UIGestureRecognizerStateEnded) {
         CGPoint velocity = [sender velocityInView:self.rootView];
         if (velocity.x != 0.0f || velocity.y != 0.0f) {
-            CallbackBridge_nativeSendScroll(velocity.x/self.view.frame.size.width, velocity.y/self.view.frame.size.height);
+            // Bug fix: view.frame.size 在窗口最小化、转场动画中可能为零，
+            // 除零产生 NaN/Inf 传入 native 层导致滚动异常。
+            CGFloat w = self.view.frame.size.width;
+            CGFloat h = self.view.frame.size.height;
+            if (w > 0 && h > 0) {
+                CallbackBridge_nativeSendScroll(velocity.x / w, velocity.y / h);
+            }
         }
     }
 }

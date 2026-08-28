@@ -1107,15 +1107,28 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     static CGFloat lastMsTime;
     static NSUInteger lastSecTime, lastCompletedUnitCount;
     NSProgress *progress = self.task.textProgress;
+    // Bug fix: static 变量在多次下载之间保留旧值，导致新下载首秒吞吐量/ETA 计算错误。
+    // 当 progress 尚未开始（totalUnitCount == 0）时重置。
+    if (!progress || progress.totalUnitCount == 0) {
+        lastMsTime = 0;
+        lastSecTime = 0;
+        lastCompletedUnitCount = 0;
+    }
     struct timeval tv;
     gettimeofday(&tv, NULL);
     NSInteger completedUnitCount = self.task.progress.totalUnitCount * self.task.progress.fractionCompleted;
     progress.completedUnitCount = completedUnitCount;
     if (lastSecTime < tv.tv_sec) {
         CGFloat currentTime = tv.tv_sec + tv.tv_usec / 1000000.0;
-        NSInteger throughput = (completedUnitCount - lastCompletedUnitCount) / (currentTime - lastMsTime);
+        CGFloat timeDelta = currentTime - lastMsTime;
+        NSInteger throughput = timeDelta > 0 ? (completedUnitCount - lastCompletedUnitCount) / timeDelta : 0;
         progress.throughput = @(throughput);
-        progress.estimatedTimeRemaining = @((progress.totalUnitCount - completedUnitCount) / throughput);
+        // Bug fix: throughput 可能为 0（下载暂停/卡住），整数除零会触发 SIGFPE 崩溃
+        if (throughput > 0) {
+            progress.estimatedTimeRemaining = @((progress.totalUnitCount - completedUnitCount) / throughput);
+        } else {
+            progress.estimatedTimeRemaining = nil;
+        }
         lastCompletedUnitCount = completedUnitCount;
         lastSecTime = tv.tv_sec;
         lastMsTime = currentTime;

@@ -386,7 +386,7 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // 检测是否在使用 legacy JIT script（brk #0x69 由 UniversalJIT26.js 处理）
         static void *result;
         if(!result) result = JIT26CreateRegionLegacy(getpagesize());
-        if ((uint32_t)result != 0x690000E0) {
+        if (result != MAP_FAILED && (uint32_t)result != 0x690000E0) {
             munmap(result, getpagesize());
             // legacy script 只允许调用一次 breakpoint，必须切换到 UniversalJIT26
             NSString *inBundleScriptPath = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];
@@ -1189,10 +1189,9 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
     if (requiresDebugJITMapping) {
         static void *result;
         if (!result) result = JIT26CreateRegionLegacy(getpagesize());
-        if ((uint32_t)result != 0x690000E0) {
+        if (result != MAP_FAILED && (uint32_t)result != 0x690000E0) {
             munmap(result, getpagesize());
-            NSString *inBundleScriptPath = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];
-            NSString *lcAppInfoPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"LCAppInfo.plist"];
+            NSString *inBundleScriptPath = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];            NSString *lcAppInfoPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"LCAppInfo.plist"];
             NSMutableDictionary *lcAppInfo = [NSMutableDictionary dictionaryWithContentsOfFile:lcAppInfoPath];
             if (lcAppInfo) {
                 lcAppInfo[@"jitLaunchScriptJs"] = [[NSData dataWithContentsOfFile:inBundleScriptPath] base64EncodedStringWithOptions:0];
