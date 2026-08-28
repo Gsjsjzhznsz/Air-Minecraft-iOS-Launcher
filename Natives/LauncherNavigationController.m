@@ -661,19 +661,21 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
-        // iOS 26+ TXM 设备即使 JIT 已开启，也需要发送 JIT 脚本设置 mirrored code cache
-        if (DeviceNeedsDebugJITMapping()) {
-            NSLog(@"[JIT] JIT already enabled but device needs debug JIT mapping, sending script...");
-            NSString *scriptPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"];
-            NSString *script = [NSString stringWithContentsOfFile:scriptPath encoding:NSUTF8StringEncoding error:nil];
-            if (script) {
-                JIT26SendJITScript(script);
-            } else {
-                NSLog(@"[JIT] WARNING: UniversalJIT26.js not found, Java JIT may crash");
+        // iOS 26+ TXM 设备需要 debug JIT mapping 脚本，
+        // 如果 JIT 是外部提前开启的（调试器可能已断开），不能直接用 brk 发脚本，
+        // 必须通过 URL scheme 重新请求带脚本的 JIT。
+        if (DeviceNeedsDebugJITMapping() && !hasTrollStoreJIT) {
+            NSLog(@"[JIT] JIT already enabled but device needs debug JIT mapping, re-requesting via URL...");
+            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+            NSString *scriptDataString = scriptData ? [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]] : @"";
+            if (@available(iOS 17.4, *)) {
+                [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
             }
+            // 不 return，继续走下面的等待 JIT 流程
+        } else {
+            handler();
+            return;
         }
-        handler();
-        return;
     } else if (hasTrollStoreJIT) {
         NSURL *jitURL = [NSURL URLWithString:[NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", NSBundle.mainBundle.bundleIdentifier]];
         [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:nil];
