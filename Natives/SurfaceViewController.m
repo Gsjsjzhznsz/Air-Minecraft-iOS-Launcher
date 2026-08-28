@@ -326,7 +326,17 @@ static GameSurfaceView* pojavWindow;
 
 // æ£æ¥è§å¾æ¯å¦å·²å³é­
 - (BOOL)isViewDismissed {
-    return !self.view.window || self.isBeingDismissed;
+    // 修复：self.view.window 和 self.isBeingDismissed 是 UIKit 属性，
+    // 必须在主线程访问。从后台线程 TouchController 循环调用时需 dispatch 到主线程。
+    __block BOOL dismissed = NO;
+    if ([NSThread isMainThread]) {
+        dismissed = !self.view.window || self.isBeingDismissed;
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            dismissed = !self.view.window || self.isBeingDismissed;
+        });
+    }
+    return dismissed;
 }
 
 // ç¼ç  ProxyMessage: AddPointerMessage (type=1, index=int32, x=float, y=float)

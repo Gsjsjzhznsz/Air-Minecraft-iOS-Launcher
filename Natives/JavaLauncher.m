@@ -406,8 +406,18 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             [PLLogOutputView handleExitCode:1];
             return 1;
         }
-        JIT26SendJITScript([NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"]]);
-        JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
+        // 关键修复（N5）：stringWithContentsOfFile: 失败时返回 nil，
+        // JIT26SendJITScript(nil) 会在 BreakSendJITScript 中 strlen(NULL) 崩溃。
+        // 改用 stringWithContentsOfFile:encoding:error: 并检查 nil。
+        NSError *scriptError = nil;
+        NSString *extensionScript = [NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"] encoding:NSUTF8StringEncoding error:&scriptError];
+        if (extensionScript) {
+            JIT26SendJITScript(extensionScript);
+            JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
+        } else {
+            NSLog(@"[JavaLauncher] ERROR: Failed to load UniversalJIT26Extension.js: %@", scriptError.localizedDescription);
+            // 无扩展脚本时仍继续启动，但 mirrored code cache 可能不完整
+        }
         // make sure we don't get stuck in EXC_BAD_ACCESS
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
@@ -1195,8 +1205,15 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
             showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. To import it, long-press on Amethyst when enabling JIT in StikDebug and tap \"Assign Script\", then go to Amethyst's Documents directory and pick it. (on sideloaded StikDebug, the builtin script is named Amethyst-MeloNX.js)");
             return -1;
         }
-        JIT26SendJITScript([NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"]]);
-        JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
+        // 关键修复（N5）：同 launchJVM，防止 nil 脚本崩溃
+        NSError *headlessScriptError = nil;
+        NSString *extensionScript = [NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"] encoding:NSUTF8StringEncoding error:&headlessScriptError];
+        if (extensionScript) {
+            JIT26SendJITScript(extensionScript);
+            JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
+        } else {
+            NSLog(@"[JavaLauncher] ERROR: Failed to load UniversalJIT26Extension.js (headless): %@", headlessScriptError.localizedDescription);
+        }
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
