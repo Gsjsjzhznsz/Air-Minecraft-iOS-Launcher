@@ -793,7 +793,7 @@ public class GLFW
             mGLFWInitialTime = (double) System.nanoTime();
             long __functionAddress = Functions.Init;
             boolean isCalledFromLWJGLX = new Throwable().getStackTrace()[1].getClassName().equals("org.lwjgl.Sys");
-            isGLFWReady = invokeI(!isCalledFromLWJGLX, __functionAddress) != 0;
+            isGLFWReady = invokeZ(!isCalledFromLWJGLX, __functionAddress);
         }
         return isGLFWReady;
     }
