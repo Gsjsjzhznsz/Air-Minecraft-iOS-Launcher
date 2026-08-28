@@ -90,12 +90,24 @@ extern __weak UIWindow *mainWindow;
                                              selector:@selector(applyUITheme:)
                                                  name:@"UIThemeChanged"
                                                object:nil];
+    // 监听语言切换通知
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(applyLanguageChange:)
+                                                 name:@"AppLanguageChanged"
+                                               object:nil];
 }
 
 - (void)showTranslationNoticeIfNeeded {
-    // 仅当系统语言为英文时提示：部分内容为机翻，可能不够准确，欢迎提交翻译 PR。
-    // 用户选择"不再提醒"后通过偏好持久化，下次不再弹出。
-    if (![NSLocale.preferredLanguages.firstObject hasPrefix:@"en"]) {
+    // 仅当实际显示语言为英文时提示（包括系统英文和手动选择英文）。
+    // 用户选择“不再提醒”后通过偏好持久化，下次不再弹出。
+    NSString *lang = getPrefObject(@"general.app_language");
+    BOOL isEnglish;
+    if (lang && ![lang isEqualToString:@"system"]) {
+        isEnglish = [lang isEqualToString:@"en"];
+    } else {
+        isEnglish = [NSLocale.preferredLanguages.firstObject hasPrefix:@"en"];
+    }
+    if (!isEnglish) {
         return;
     }
     if (getPrefBool(@"general.translation_notice_dismissed")) {
@@ -141,8 +153,23 @@ extern __weak UIWindow *mainWindow;
     }
 }
 
+- (void)applyLanguageChange:(NSNotification *)notification {
+    // 语言切换后重建根视图控制器以应用新语言
+    NSString *layout = getPrefObject(@"general.ui_layout");
+    UIViewController *rootVC;
+    if ([layout isEqualToString:@"card"]) {
+        rootVC = [[LauncherCardLayoutViewController alloc] init];
+    } else {
+        rootVC = [[LauncherRootViewController alloc] init];
+    }
+    [UIView transitionWithView:self.window duration:0.3 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
+        self.window.rootViewController = rootVC;
+    } completion:nil];
+}
+
 - (void)sceneDidDisconnect:(UIScene *)scene {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"UIThemeChanged" object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AppLanguageChanged" object:nil];
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {

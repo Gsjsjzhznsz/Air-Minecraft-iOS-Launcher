@@ -108,7 +108,7 @@ static const NSInteger kNewsPageSize = 24;
         _readMoreLabel.translatesAutoresizingMaskIntoConstraints = NO;
         _readMoreLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
         _readMoreLabel.textColor = [UIColor systemBlueColor];
-        _readMoreLabel.text = NSLocalizedString(@"mc_news.read_more", @"查看详情");
+        _readMoreLabel.text = localize(@"mc_news.read_more", nil);
         _readMoreLabel.textAlignment = NSTextAlignmentRight;
         [self.contentView addSubview:_readMoreLabel];
 
@@ -196,7 +196,7 @@ static const NSInteger kNewsPageSize = 24;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = NSLocalizedString(@"mc_news.title", @"Minecraft 新闻");
+    self.title = localize(@"mc_news.title", nil);
     self.view.backgroundColor = [UIColor systemBackgroundColor];
 
     // 适配自定义启动器背景
@@ -262,7 +262,7 @@ static const NSInteger kNewsPageSize = 24;
 
     self.retryButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.retryButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.retryButton setTitle:NSLocalizedString(@"mc_news.retry", @"重试") forState:UIControlStateNormal];
+    [self.retryButton setTitle:localize(@"mc_news.retry", nil) forState:UIControlStateNormal];
     self.retryButton.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     [self.retryButton addTarget:self action:@selector(loadFirstPage) forControlEvents:UIControlEventTouchUpInside];
     self.retryButton.hidden = YES;
@@ -351,7 +351,7 @@ static const NSInteger kNewsPageSize = 24;
 
         if (error) {
             if (strongSelf.items.count == 0) {
-                strongSelf.errorLabel.text = [NSString stringWithFormat:@"%@\n%@", NSLocalizedString(@"mc_news.load_failed", @"加载失败"), error.localizedDescription ?: @""];
+                strongSelf.errorLabel.text = [NSString stringWithFormat:@"%@\n%@", localize(@"mc_news.load_failed", nil), error.localizedDescription ?: @""];
                 strongSelf.errorLabel.hidden = NO;
                 strongSelf.retryButton.hidden = NO;
             }

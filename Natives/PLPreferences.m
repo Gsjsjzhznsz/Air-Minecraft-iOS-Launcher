@@ -167,6 +167,8 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"appicon": @"AppIcon-Light",
             @"ui_layout": @"vs",
             @"ui_theme": @"dark",
+            // 应用语言："system"=跟随系统，"zh-Hans"=简体中文，"en"=English
+            @"app_language": @"system",
             @"multi_threaded": @NO,
             // 自定义外观颜色（hex 字符串，空串=使用默认深色毛玻璃/白色文字）
             @"text_color": @"",

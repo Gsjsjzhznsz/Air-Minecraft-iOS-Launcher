@@ -315,7 +315,7 @@ static const CGFloat kSectionInset = 16.0;
                 NSString *speedText = [self compactSpeedText:task.speed];
                 if (speedText.length > 0) {
                     self.speedLabel.text = [NSString
-                        stringWithFormat:NSLocalizedString(@"download.progress.file_count_short",
+                        stringWithFormat:localize(@"download.progress.file_count_short",
                                                            @"%1$ld/%2$ld · %3$@"),
                         (long)task.completedFileCount, (long)task.totalFileCount, speedText];
                 } else {
@@ -735,7 +735,7 @@ static const CGFloat kSectionInset = 16.0;
     self.historyButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.historyButton setImage:[UIImage systemImageNamed:@"clock.arrow.circlepath"] forState:UIControlStateNormal];
     self.historyButton.tintColor = [UIColor labelColor];
-    self.historyButton.accessibilityLabel = NSLocalizedString(@"download.history.entry", @"历史");
+    self.historyButton.accessibilityLabel = localize(@"download.history.entry", nil);
     [self.historyButton addTarget:self action:@selector(historyTapped:) forControlEvents:UIControlEventTouchUpInside];
     [self.headerView addSubview:self.historyButton];
 

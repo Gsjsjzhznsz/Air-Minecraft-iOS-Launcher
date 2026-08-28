@@ -405,6 +405,28 @@
                   [[NSNotificationCenter defaultCenter] postNotificationName:@"UIThemeChanged" object:value];
               }
             },
+            @{@"key": @"app_language",
+              @"title": localize(@"i18n_str_2068", nil),
+              @"hasDetail": @YES,
+              @"icon": @"globe",
+              @"type": self.typePickField,
+              @"enableCondition": whenNotInGame,
+              @"pickKeys": @[
+                  @"system",
+                  @"zh-Hans",
+                  @"en"
+              ],
+              @"pickList": @[
+                  localize(@"i18n_str_382", nil),
+                  @"简体中文",
+                  @"English"
+              ],
+              @"action": ^(NSString *value){
+                  // 语言切换后发送通知，让界面重新加载以应用新语言
+                  [[NSNotificationCenter defaultCenter] postNotificationName:@"AppLanguageChanged" object:value];
+                  [self.tableView reloadData];
+              }
+            },
             @{@"key": @"custom_accent_color",
               @"title": localize(@"i18n_str_383", nil),
               @"hasDetail": @YES,

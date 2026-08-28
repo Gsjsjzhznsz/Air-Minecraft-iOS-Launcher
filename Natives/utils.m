@@ -97,14 +97,41 @@ NSError* saveJSONToFile(NSDictionary *dict, NSString *path) {
 }
 
 NSString* localize(NSString* key, NSString* comment) {
-    NSString *value = NSLocalizedString(key, nil);
-    if (![NSLocale.preferredLanguages[0] isEqualToString:@"en"] && [value isEqualToString:key]) {
-        NSString* path = [NSBundle.mainBundle pathForResource:@"en" ofType:@"lproj"];
-        NSBundle* languageBundle = [NSBundle bundleWithPath:path];
-        value = [languageBundle localizedStringForKey:key value:nil table:nil];
+    // 检查用户是否在设置中手动选择了语言
+    NSString *langOverride = getPrefObject(@"general.app_language");
+    NSBundle *targetBundle = nil;
 
+    if (langOverride && ![langOverride isEqualToString:@"system"]) {
+        // 用户手动选择了特定语言，使用对应的 .lproj bundle
+        NSString *lprojPath = [NSBundle.mainBundle pathForResource:langOverride ofType:@"lproj"];
+        if (lprojPath) {
+            targetBundle = [NSBundle bundleWithPath:lprojPath];
+        }
+    }
+
+    NSString *value;
+    if (targetBundle) {
+        value = [targetBundle localizedStringForKey:key value:key table:nil];
+        // 如果用户选择的语言缺少该 key，回退到英文
         if ([value isEqualToString:key]) {
-            value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+            NSString *enPath = [NSBundle.mainBundle pathForResource:@"en" ofType:@"lproj"];
+            NSBundle *enBundle = [NSBundle bundleWithPath:enPath];
+            value = [enBundle localizedStringForKey:key value:nil table:nil];
+            if ([value isEqualToString:key]) {
+                // 英文也没有，尝试 UIKit 系统翻译
+                value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+            }
+        }
+    } else {
+        // 跟随系统语言（默认行为）
+        value = NSLocalizedString(key, nil);
+        if (![NSLocale.preferredLanguages[0] isEqualToString:@"en"] && [value isEqualToString:key]) {
+            NSString* path = [NSBundle.mainBundle pathForResource:@"en" ofType:@"lproj"];
+            NSBundle* languageBundle = [NSBundle bundleWithPath:path];
+            value = [languageBundle localizedStringForKey:key value:nil table:nil];
+            if ([value isEqualToString:key]) {
+                value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+            }
         }
     }
 

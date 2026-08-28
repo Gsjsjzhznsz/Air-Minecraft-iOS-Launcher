@@ -87,8 +87,8 @@ static NSString * const kHistoryCellReuseIdentifier = @"DownloadHistoryCell";
     // 结果（当前历史仅记录成功条目）
     NSString *resultRaw = [entry[@"result"] isKindOfClass:[NSString class]] ? entry[@"result"] : @"success";
     NSString *resultText = [resultRaw isEqualToString:@"success"]
-        ? NSLocalizedString(@"download.history.result.success", @"成功")
-        : NSLocalizedString(@"download.history.result.failed", @"失败");
+        ? localize(@"download.history.result.success", nil)
+        : localize(@"download.history.result.failed", nil);
 
     self.detailLabel.text = [NSString stringWithFormat:@"%@ · %@ · %@",
                              typeDisplayName ?: @"--", sizeText, resultText];
@@ -161,10 +161,10 @@ static NSString * const kHistoryCellReuseIdentifier = @"DownloadHistoryCell";
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
     self.view.backgroundColor = [UIColor systemBackgroundColor];
 
-    self.title = NSLocalizedString(@"download.history.title", @"下载历史");
+    self.title = localize(@"download.history.title", nil);
 
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-        initWithTitle:NSLocalizedString(@"download.history.clear", @"清空")
+        initWithTitle:localize(@"download.history.clear", nil)
         style:UIBarButtonItemStylePlain
         target:self
         action:@selector(clearTapped:)];
@@ -194,7 +194,7 @@ static NSString * const kHistoryCellReuseIdentifier = @"DownloadHistoryCell";
         self.emptyLabel.textAlignment = NSTextAlignmentCenter;
         self.emptyLabel.numberOfLines = 0;
     }
-    self.emptyLabel.text = NSLocalizedString(@"download.history.empty", @"暂无下载历史");
+    self.emptyLabel.text = localize(@"download.history.empty", nil);
 
     // 用 tableHeaderView 承载居中空态，避免遮挡导航栏
     UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 240)];
@@ -209,18 +209,18 @@ static NSString * const kHistoryCellReuseIdentifier = @"DownloadHistoryCell";
     if (self.entries.count == 0) return;
 
     UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:NSLocalizedString(@"download.history.title", @"下载历史")
-                         message:NSLocalizedString(@"download.history.clear_confirm", @"确定清空全部下载历史？此操作不可恢复。")
+        alertControllerWithTitle:localize(@"download.history.title", nil)
+                         message:localize(@"download.history.clear_confirm", nil)
                   preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction
-        actionWithTitle:NSLocalizedString(@"download.history.clear", @"清空")
+        actionWithTitle:localize(@"download.history.clear", nil)
                   style:UIAlertActionStyleDestructive
                 handler:^(UIAlertAction *action) {
         [[DownloadHistoryStore sharedStore] clearAll];
         [self reloadEntries];
     }]];
     [alert addAction:[UIAlertAction
-        actionWithTitle:NSLocalizedString(@"download.history.cancel", @"取消")
+        actionWithTitle:localize(@"download.history.cancel", nil)
                   style:UIAlertActionStyleCancel
                 handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];

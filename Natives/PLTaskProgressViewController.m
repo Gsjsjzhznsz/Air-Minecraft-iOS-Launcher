@@ -17,9 +17,9 @@ static const CGFloat kPLTaskProgressPadCardWidth = 560.0;
 static const CGFloat kPLTaskProgressPadCardHeight = 640.0;
 
 /// 本地化辅助：strings 暂无条目时回退代码内中文默认值
-/// （Phase 7 统一补全语言文件后 NSLocalizedString 命中，兜底自动失效）
+/// （Phase 7 统一补全语言文件后 localize 命中，兜底自动失效）
 static NSString *PLTaskProgressText(NSString *key, NSString *fallback) {
-    NSString *value = NSLocalizedString(key, @"");
+    NSString *value = localize(key, nil);
     return [value isEqualToString:key] ? fallback : value;
 }
 
