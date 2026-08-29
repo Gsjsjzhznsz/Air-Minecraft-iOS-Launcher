@@ -14,3 +14,15 @@
 [submodule "ThirdParty/ZalithLauncher2"]
 	url = https://github.com/ZalithLauncher/ZalithLauncher2.git
 	path = ThirdParty/ZalithLauncher2
+[submodule "Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang"]
+	path = Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang
+	url = https://github.com/KhronosGroup/glslang.git
+[submodule "Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross"]
+	path = Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash"]
+	path = Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash
+	url = https://github.com/stbrumme/xxhash.git
+[submodule "Natives/external/MobileGlues/MobileGlues-cpp/include/ska"]
+	path = Natives/external/MobileGlues/MobileGlues-cpp/include/ska
+	url = https://github.com/MobileGL-Dev/flat_hash_map.git
