@@ -1212,7 +1212,17 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 - (void)invokeAfterJITEnabled:(void(^)(void))handler {
     BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust");
-    
+
+    // Diagnostic: full JIT state at decision time (mirrors the other two
+    // invokeAfterJITEnabled implementations).
+    {
+        BOOL hasDynamicCS = getEntitlementValue(@"dynamic-codesigning");
+        int diagCsFlags = 0;
+        csops(getpid(), 0, &diagCsFlags, sizeof(diagCsFlags));
+        NSLog(@"[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d JIT_FLAGS=0x%X",
+              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), DeviceGetJITFlags(NO));
+    }
+
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 

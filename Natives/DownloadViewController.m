@@ -3717,12 +3717,25 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 
 - (void)invokeAfterJITEnabled:(void(^)(void))handler {
     BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust");
-    
+
+    // Diagnostic (mirrors LauncherNavigationController.m): every branch must
+    // log, otherwise a silent launch from this path is indistinguishable from
+    // the JIT detection being skipped entirely in latestlog.txt.
+    {
+        BOOL hasDynamicCS = getEntitlementValue(@"dynamic-codesigning");
+        int diagCsFlags = 0;
+        csops(getpid(), 0, &diagCsFlags, sizeof(diagCsFlags));
+        NSLog(@"[JIT] [DownloadVC] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d JIT_FLAGS=0x%X",
+              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), DeviceGetJITFlags(NO));
+    }
+
     if (isJITEnabled(false)) {
+        NSLog(@"[JIT] [DownloadVC] JIT already enabled, launching game directly");
         [ALTServerManager.sharedManager stopDiscovering];
         handler();
         return;
     } else if (hasTrollStoreJIT) {
+        NSLog(@"[JIT] [DownloadVC] TrollStore entitlement present but isJITEnabled=false, opening apple-magnifier://");
         NSURL *jitURL = [NSURL URLWithString:[NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", NSBundle.mainBundle.bundleIdentifier]];
         [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:nil];
     } else if (getPrefBool(@"debug.debug_skip_wait_jit")) {
@@ -3734,10 +3747,13 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
             NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
             scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+            NSLog(@"[JIT] [DownloadVC] Using stikjit:// with JIT26 script (TXM device)");
         }
+        NSLog(@"[JIT] [DownloadVC] Opening stikjit:// to obtain debugger/JIT");
         [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
     } else {
         // Assuming 16.7-17.3.1. SideStore still lacks this URL scheme at the time of writing, so it only jumps to SideStore.
+        NSLog(@"[JIT] [DownloadVC] Using sidestore:// for iOS < 17.4");
         [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]] options:@{} completionHandler:nil];
     }
     

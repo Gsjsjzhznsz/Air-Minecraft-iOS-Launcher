@@ -128,7 +128,13 @@ void init_logDeviceAndVer(char *argument) {
     printEntitlementAvailability(@"com.apple.developer.kernel.extended-virtual-addressing");
     printEntitlementAvailability(@"com.apple.developer.kernel.increased-memory-limit");
     printEntitlementAvailability(@"com.apple.private.security.no-sandbox");
-    //printEntitlementAvailability(@"dynamic-codesigning");
+    // JIT-relevant entitlements: TrollStore grants jb.pmap_cs.custom_trust
+    // (kernel-level JIT without a debugger), which isJITEnabled() fast-paths
+    // on. dynamic-codesigning is the per-app JIT entitlement (iOS 18+).
+    // Logging them here settles "did the launcher even see my JIT entitlement"
+    // questions from latestlog alone.
+    printEntitlementAvailability(@"jb.pmap_cs.custom_trust");
+    printEntitlementAvailability(@"dynamic-codesigning");
 }
 
 void init_redirectStdio() {

@@ -90,8 +90,21 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, c
         essl_src = GLSLtoGLSLES(glsl_src.c_str(), shaderType, hardware->es_version, glsl_version, return_code);
 
         if (essl_src.empty()) {
+            LOG_W_FORCE("Failed to convert shader %d (empty result).", shader)
             LOG_E("Failed to convert shader %d.", shader)
             return;
+        }
+        // Report the conversion verdict unconditionally. When return_code < 0
+        // GLSLtoGLSLES() silently hands back the RAW desktop GLSL, which the
+        // iOS host driver (ANGLE) then rejects with a misleading
+        // "ERROR: 1:1: '' : syntax error" — this line is what tells the two
+        // failure modes apart in latestlog.txt.
+        if (return_code < 0) {
+            LOG_W_FORCE("[MG] Shader %d conversion FAILED (code=%d, glslver=%d, esver=%u) — falling back to RAW desktop GLSL!",
+                        shader, return_code, glsl_version, hardware->es_version)
+            LOG_W_FORCE("[MG] Raw source head: %.160s", glsl_src.c_str())
+        } else {
+            LOG_W_FORCE("[MG] Shader %d converted OK (glslver=%d -> essl ver=%u)", shader, glsl_version, hardware->es_version)
         }
         LOG_D("\n[INFO] [Shader] Converted Shader source: \n%s", essl_src.c_str())
     }

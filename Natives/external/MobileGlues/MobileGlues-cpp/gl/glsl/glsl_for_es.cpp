@@ -724,16 +724,23 @@ std::vector<unsigned int> glsl_to_spirv(GLenum shader_type, int glsl_version, co
     TBuiltInResource TBuiltInResource_resources = InitResources();
 
     if (!shader.parse(&TBuiltInResource_resources, glsl_version, true, EShMsgDefault)) {
+        // Always report parse failures: on iOS this is the only way to see
+        // WHY the desktop-GLSL -> SPIR-V stage failed (it is currently broken
+        // there and silently falls back to raw desktop GLSL, which the host
+        // driver then rejects with a misleading "1:1: '' : syntax error").
+        LOG_W_FORCE("GLSL Compiling ERROR (parse, glslver=%d): \n%s", glsl_version, shader.getInfoLog())
         LOG_D("GLSL Compiling ERROR: \n%s", shader.getInfoLog())
         errc = -1;
         return {};
     }
+    LOG_W_FORCE("GLSL parse OK (glslver=%d)", glsl_version)
     LOG_D("GLSL Compiled.")
 
     glslang::TProgram program;
     program.addShader(&shader);
 
     if (!program.link(EShMsgDefault)) {
+        LOG_W_FORCE("Shader Linking ERROR (glslver=%d): %s", glsl_version, program.getInfoLog())
         LOG_D("Shader Linking ERROR: %s", program.getInfoLog())
         errc = -1;
         return {};
@@ -770,6 +777,7 @@ static bool spvc_ok(spvc_context context, spvc_result res, const char* what) {
     if (res == SPVC_SUCCESS) {
         return true;
     }
+    LOG_W_FORCE("Error: %s failed in spirv-cross: %s", what, spvc_context_get_last_error_string(context))
     LOG_E("Error: %s failed in spirv-cross: %s", what, spvc_context_get_last_error_string(context))
     return false;
 }
