@@ -346,6 +346,7 @@ void restore_home_attachments(framebuffer_t& fbo) {
 // defines, and moving them here quietly dropped three of the 500-odd aliases the
 // library exports. An application that resolves glDeleteFramebuffersARB, as
 // anything written against EXT_framebuffer_object does, got a null pointer.
+#ifndef __APPLE__
 extern "C" {
 GLAPI GLAPIENTRY void glDeleteFramebuffersARB(GLsizei n, const GLuint* names) __attribute__((alias("glDeleteFramebuffers")));
 GLAPI GLAPIENTRY void glFramebufferRenderbufferARB(GLenum target, GLenum attachment, GLenum renderbuffertarget,
@@ -353,6 +354,15 @@ GLAPI GLAPIENTRY void glFramebufferRenderbufferARB(GLenum target, GLenum attachm
 GLAPI GLAPIENTRY void glFramebufferTextureLayerARB(GLenum target, GLenum attachment, GLuint texture, GLint level,
                                                    GLint layer) __attribute__((alias("glFramebufferTextureLayer")));
 }
+#else
+extern "C" {
+GLAPI GLAPIENTRY void glDeleteFramebuffersARB(GLsizei n, const GLuint* names) { glDeleteFramebuffers(n, names); }
+GLAPI GLAPIENTRY void glFramebufferRenderbufferARB(GLenum target, GLenum attachment, GLenum renderbuffertarget,
+                                                   GLuint renderbuffer) { glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer); }
+GLAPI GLAPIENTRY void glFramebufferTextureLayerARB(GLenum target, GLenum attachment, GLuint texture, GLint level,
+                                                   GLint layer) { glFramebufferTextureLayer(target, attachment, texture, level, layer); }
+}
+#endif
 
 // Wrapped for the same reason glReadPixels is: the source is the read framebuffer,
 // and while FSR1 is on the application's framebuffer 0 is not where its frame is.
