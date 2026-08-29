@@ -106,13 +106,36 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, c
         } else {
             LOG_W_FORCE("[MG] Shader %d converted OK (glslver=%d -> essl ver=%u)", shader, glsl_version, hardware->es_version)
         }
+        // Post-conversion sanity gate (iOS "1:1: ''" incident, 2026-08).
+        //
+        // "converted OK" only means the std::string is non-empty. The driver
+        // receives `essl_src.c_str()` and measures it with strlen(), so a
+        // translated source that begins with a NUL byte (or contains one)
+        // reaches ANGLE as an EMPTY string and fails with exactly
+        //   ERROR: 1:1: '' : syntax error
+        // while this layer logs "converted OK" — the two together are
+        // impossible to explain without this gate. SPIRV-Cross always emits
+        // "#version" first, so anything else here is corrupt toolchain output
+        // (e.g. a 3rdparty/ tree not checked out at the pinned commits).
+        // Refuse to submit and say why; the empty-cache-entry variant is
+        // handled in GLSLtoGLSLES().
+        if (essl_src.find('\0') != std::string::npos || essl_src.compare(0, 8, "#version") != 0) {
+            LOG_W_FORCE("[MG] Shader %d: translated ESSL is CORRUPT (size=%zu, strlen=%zu, head='%.64s') — refusing to submit to driver.",
+                        shader, essl_src.size(), strlen(essl_src.c_str()), essl_src.c_str())
+            LOG_W_FORCE("[MG] This means the glslang/SPIRV-Cross build did not produce valid ESSL. Verify 3rdparty/ is checked out at the pinned submodule commits (see Makefile dep_mg).")
+            return;
+        }
         LOG_D("\n[INFO] [Shader] Converted Shader source: \n%s", essl_src.c_str())
     }
     if (!essl_src.empty()) {
         shaderInfo.id = shader;
         shaderInfo.converted = essl_src;
         const char* s[] = {essl_src.c_str()};
-        GLES.glShaderSource(shader, count, s, nullptr);
+        // Submit exactly ONE string: the application's source segments were
+        // already concatenated into `essl_src` above. Forwarding the caller's
+        // `count` with a 1-element array makes the driver read past the end of
+        // `s` whenever the app passes more than one source string.
+        GLES.glShaderSource(shader, 1, s, nullptr);
         if (hardware->emulate_texture_buffer)
             shader_map_is_sampler_buffer_emulated[shader] = is_sampler_buffer_emulated;
     } else
@@ -123,12 +146,18 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, c
 void glGetShaderiv(GLuint shader, GLenum pname, GLint* params) {
     LOG()
     GLES.glGetShaderiv(shader, pname, params);
-    if (global_settings.ignore_error >= IgnoreErrorLevel::Partial && pname == GL_COMPILE_STATUS && !*params) {
-        GLchar infoLog[512];
-        GLES.glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+    // Report every compile failure unconditionally (the cheat below stays
+    // gated by ignore_error): without this line a driver-side rejection is
+    // invisible in latestlog unless the game happens to log the info log
+    // itself, and the ANGLE message is exactly what pinpoints the failure.
+    if (pname == GL_COMPILE_STATUS && !*params) {
+        GLchar infoLog[1024];
+        GLES.glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
         LOG_W_FORCE("Shader %d compilation failed: \n%s", shader, infoLog)
-        LOG_W_FORCE("Now try to cheat.")
-        *params = GL_TRUE;
+        if (global_settings.ignore_error >= IgnoreErrorLevel::Partial) {
+            LOG_W_FORCE("Now try to cheat.")
+            *params = GL_TRUE;
+        }
     }
     CHECK_GL_ERROR
 }

@@ -306,6 +306,25 @@ jre: native
 
 dep_mg:
 	echo '[Amethyst v$(VERSION)] dep_mg - start'
+
+	# The shader conversion pipeline (desktop GLSL -> ESSL) is only validated
+	# against the submodule commits pinned in .gitmodules. A 3rdparty/ tree
+	# populated from arbitrary master snapshots produced ESSL that ANGLE-Metal
+	# rejects as empty ("ERROR: 1:1: '' : syntax error" on every shader, MC
+	# 26.x black screen). Force the pinned versions before configuring cmake,
+	# and fail loudly if they are still missing afterwards.
+	@if [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang/CMakeLists.txt" ] || \
+	    [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross/CMakeLists.txt" ] || \
+	    [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash.h" ]; then \
+		echo '3rdparty/ incomplete: checking out pinned glslang/SPIRV-Cross/xxhash submodules'; \
+		git -C $(SOURCEDIR) submodule update --init --force --recursive \
+			Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang \
+			Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross \
+			Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash || exit 1; \
+	fi
+	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang/CMakeLists.txt" || { echo "ERROR: glslang submodule still missing - cannot build MobileGlues"; exit 1; }
+	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross/CMakeLists.txt" || { echo "ERROR: SPIRV-Cross submodule still missing - cannot build MobileGlues"; exit 1; }
+	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash.h" || { echo "ERROR: xxhash submodule still missing - cannot build MobileGlues"; exit 1; }
 	mkdir -p $(WORKINGDIR)/mobileglues
 	cd $(WORKINGDIR)/mobileglues && cmake \
 		-DMACOS="1" \
@@ -321,7 +340,6 @@ dep_mg:
 	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues
 	cp $(WORKINGDIR)/mobileglues/libmobileglues*.dylib $(WORKINGDIR)/
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
-
 dep_mobilegl:
 	# MobileGL（Vulkan/GLES 后端渲染器）集成已完全移除：
 	# - 构建链中的 perl 补丁（Range1D/BufferChange/is_aggregate_v）不再需要

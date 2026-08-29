@@ -12,6 +12,7 @@
 #include <spirv_cross/spirv_cross_c.h>
 #include <iostream>
 #include <fstream>
+#include <cstring>
 #include "../log.h"
 #include "glslang/SPIRV/GlslangToSpv.h"
 #include <string>
@@ -352,10 +353,19 @@ std::string GLSLtoGLSLES(const char* glsl_code, GLenum glsl_type, uint essl_vers
     sha256_string += "\n//" + std::to_string(MAJOR) + "." + std::to_string(MINOR) + "." + std::to_string(REVISION) +
                      "|" + std::to_string(essl_version);
     const char* cachedESSL = Cache::get_instance().get(sha256_string.c_str());
-    if (cachedESSL) {
+    // SPIRV-Cross output always starts with "#version". A cached entry that
+    // does not is corrupt — e.g. written by a build whose glslang/SPIRV-Cross
+    // were not at the pinned commits, which on iOS surfaced as ANGLE failing
+    // every shader with "ERROR: 1:1: '' : syntax error". Fall through to a
+    // fresh conversion instead; the put() below then overwrites the bad
+    // entry, so the cache self-heals on the first miss.
+    if (cachedESSL && strncmp(cachedESSL, "#version", 8) == 0) {
         LOG_D("GLSL Hit Cache:\n%s\n-->\n%s", glsl_code, cachedESSL)
         return_code = 0;
         return (char*)cachedESSL;
+    }
+    if (cachedESSL) {
+        LOG_W_FORCE("[MG] Cached ESSL is corrupt (head='%.64s') — ignoring cache and re-translating.", cachedESSL)
     }
 
     return_code = -1;

@@ -15,7 +15,12 @@
 
 #define MAJOR 2
 #define MINOR 0
-#define REVISION 0
+// 0 -> 1: force-invalidate the on-disk GLSL conversion cache. The 2.0.0 builds
+// that shipped with a mis-populated 3rdparty/ tree cached ESSL that ANGLE-Metal
+// rejects with "ERROR: 1:1: '' : syntax error"; the cache key embeds
+// MAJOR.MINOR.REVISION, so this bump makes every device discard those entries
+// on first run instead of re-serving them.
+#define REVISION 1
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE
