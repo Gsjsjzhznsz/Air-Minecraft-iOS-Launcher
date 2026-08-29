@@ -83,3 +83,32 @@ void proc_init() {
 #endif
     g_initialized = 1;
 }
+
+#ifdef __APPLE__
+// On Apple/iOS, ANGLE (libtinygl4angle.dylib) is loaded by the host launcher
+// with RTLD_GLOBAL *after* this dylib's constructor runs.  GL ES function
+// pointers must therefore be resolved lazily, once ANGLE is available.
+//
+// The host calls this function from egl_bridge.m right after
+// dlopen(libtinygl4angle.dylib, RTLD_GLOBAL) succeeds.
+extern "C" __attribute__((visibility("default")))
+void mg_init_gles() {
+    static bool done = false;
+    if (done) return;
+    done = true;
+
+    LOG_V("mg_init_gles: loading GL ES function pointers (Apple platform)\n");
+
+    // Mark GL functions as loaded from the system/ANGLE rather than a
+    // dlopen'd library.  proc_address() on Apple uses RTLD_DEFAULT.
+    gles = nullptr;
+    egl = nullptr;
+
+    init_target_gles();
+    set_multidraw_setting();
+    init_settings_post();
+
+    g_initialized = 1;
+    LOG_V("mg_init_gles: done (%d GL ES functions resolved)\n", (int)sizeof(g_gles_func));
+}
+#endif

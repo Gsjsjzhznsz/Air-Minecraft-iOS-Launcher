@@ -150,6 +150,14 @@ void load_libs() {
 }
 
 void* proc_address(void* lib, const char* name) {
+#if defined(__APPLE__)
+    // On Apple/iOS, GL ES functions are provided by ANGLE (loaded with
+    // RTLD_GLOBAL by the host launcher) or system frameworks.
+    // RTLD_DEFAULT searches all loaded images, which finds ANGLE's GLES
+    // symbols after the host has dlopen'd libtinygl4angle.dylib.
+    void *sym = dlsym(RTLD_DEFAULT, name);
+    if (sym) return sym;
+#endif
     return dlsym(lib, name);
 }
 

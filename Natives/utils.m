@@ -25,6 +25,12 @@ BOOL getEntitlementValue(NSString *key) {
     return ![(__bridge id)value isKindOfClass:NSNumber.class] || [(__bridge id)value boolValue];
 }
 
+BOOL JIT26IsLikelyDebuggerKeepAttached(void) {
+    // getppid() returns launchd's PID (1) unless a debugger is actively
+    // attached to this process.  This is the same check Hynis-JE uses.
+    return getppid() != 1;
+}
+
 BOOL isJITEnabled(BOOL checkCSFlags) {
     if (!checkCSFlags && (getEntitlementValue(@"dynamic-codesigning") || isJailbroken)) {
         return YES;
@@ -32,7 +38,17 @@ BOOL isJITEnabled(BOOL checkCSFlags) {
 
     int flags;
     csops(getpid(), 0, &flags, sizeof(flags));
-    return (flags & CS_DEBUGGED) != 0;
+    if ((flags & CS_DEBUGGED) == 0) {
+        return NO;
+    }
+    // On iOS 26+ with FORCE_MIRRORED + HAS_TXM, CS_DEBUGGED alone is not
+    // sufficient — the brk #0x69 in JavaLauncher.m needs a debugger that is
+    // STILL attached.  CS_DEBUGGED can remain set after the debugger
+    // detaches, so we verify with getppid().
+    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
+        return JIT26IsLikelyDebuggerKeepAttached();
+    }
+    return YES;
 }
 
 void openLink(UIViewController* sender, NSURL* link) {

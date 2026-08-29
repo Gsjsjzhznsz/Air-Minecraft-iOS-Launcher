@@ -67,6 +67,11 @@ BOOL debugLogEnabled, isJailbroken;
 #define CS_DEBUGGED 0x10000000
 int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
 BOOL isJITEnabled(BOOL checkCSOps);
+// Check if a debugger is likely still attached (iOS 26+ TXM workaround).
+// When FORCE_MIRRORED + HAS_TXM, brk #0x69 in JavaLauncher requires a
+// debugger to be actively attached.  getppid() returns launchd's PID (1)
+// when no debugger is present, and the debugger's PID otherwise.
+BOOL JIT26IsLikelyDebuggerKeepAttached(void);
 // legacy method used to check if we're using universal script
 void* JIT26CreateRegionLegacy(size_t len);
 // used for large memory regions

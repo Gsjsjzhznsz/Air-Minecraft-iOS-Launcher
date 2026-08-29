@@ -34,6 +34,10 @@ static bool dlsym_EGL() {
         return false;
     }
 
+    // NOTE: mg_init_gles() is called from gl_make_current() after the
+    // EGL context is made current, because init_target_gles() queries
+    // GL version/extensions which requires an active context.
+
     // LTW 模式：eglCreateContext / eglDestroyContext / eglMakeCurrent 三个函数
     // 必须从 libltw.dylib 直接 dlsym 解析，而非 ANGLE。
     //
@@ -191,6 +195,23 @@ void gl_make_current(gl_render_window_t* bundle) {
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
         currentBundle = (basic_render_window_t *)bundle;
+
+        // MobileGlues 2.0: on Apple, init GL ES function pointers now that
+        // we have a current context.  mg_init_gles() uses RTLD_DEFAULT to
+        // resolve ANGLE's GLES symbols and queries GL version/extensions.
+        // Only runs once; subsequent calls are a no-op.
+        static BOOL mgInitialized = NO;
+        if (!mgInitialized) {
+            mgInitialized = YES;
+            typedef void (*mg_init_gles_t)(void);
+            mg_init_gles_t fn = (mg_init_gles_t)dlsym(RTLD_DEFAULT, "mg_init_gles");
+            if (fn) {
+                fn();
+                NSLog(@"[gl_bridge] mg_init_gles() called after eglMakeCurrent");
+            } else {
+                NSLog(@"[gl_bridge] mg_init_gles not found (old MobileGlues?)");
+            }
+        }
 
         // 帧率解锁关键点：在 EGL context 首次变为 current 后立即设置 swap interval=0。
         //
