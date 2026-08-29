@@ -33,7 +33,7 @@
 | 改动 | 说明 |
 |------|------|
 | **LWJGL 3.4.1 兼容** | 更新 LWJGL 至 3.4.1 兼容层，支持 Sodium 0.9+ 等要求 LWJGL >= 3.4.1 的模组。采用 herbrine8403 的方案：3.3.x 基础模块 + lwjgl-callback-descriptor.jar (3.4.1) + 源码覆盖层同时兼容两种 Callback API。 |
-| **JIT 已启用时直接启动** | 当 JIT 已开启时直接启动游戏，不再通过 stikjit:// URL 重新请求，避免 iOS 26+ 设备上因切换后台导致的闪退。JIT26 脚本由 JavaLauncher 在游戏启动时通过 brk 指令发送。 |
+| **JIT 优化重连** | 在非 iOS 26 设备上，JIT 已启用时直接启动游戏。在 iOS 26+ 需要调试 JIT 映射的设备上，静默加载 UniversalJIT26 脚本（不显示等待对话框），避免后台切换闪退的同时确保 brk 指令能被正确处理。 |
 | **应用内语言切换** | 在设置 > 通用中新增语言选择器，支持跟随系统、简体中文、English 三种选项，切换后立即生效无需重启。 |
 | **增强中文本地化** | 完整中文界面翻译（1955+ 行），覆盖比上游更全面。 |
 | **上游议题审计 Bug 修复** | 通过系统性审查上游及上上游 GitHub 议题，修复了 8+ 个 Bug，包括 JIT 脚本加载 nil 崩溃、UIKit 线程安全、KVO 观察者清理等。 |
@@ -41,38 +41,19 @@
 
 ---
 
-## Fork 网络
-
-本项目存在于一条 Fork 链中。了解每个 Fork 的定位有助于您选择最适合的版本。
+## Fork 谱系
 
 ```
 PojavLauncherTeam/PojavLauncher_iOS          (最初的上游 - 官方 PojavLauncher iOS 移植版)
         |
         v
 herbrine8403/Amethyst-iOS-MyRemastered       (主要重制版 Fork - UI 重构、Mod 管理、
-        |                                     BMCLAPI 支持、多账户、自动渲染器/JVM)
+                                            BMCLAPI 支持、多账户、自动渲染器/JVM)
         |
-        +----> yitenchen123/Amethyst-iOS-MyRemastered   (TouchController 触控集成、CI 加速、
-        |                                              公告栏 UI、中文本地化优化)
-        |
-        +----> Gsjsjzhznsz/Air-Minecraft-iOS-Launcher   (本仓库 - 中国用户体验、JIT 直接启动、
-                                                       应用内语言切换、Bug 修复、LWJGL 3.4.1)
+        v
+Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、JIT 优化、
+                                            应用内语言切换、Bug 修复、LWJGL 3.4.1)
 ```
-
-### 活跃 Fork 功能对比
-
-| 功能 | herbrine8403 (上游) | yitenchen123 | Air (本仓库) |
-|------|:---:|:---:|:---:|
-| **定位** | 全功能重制版 | 触控 + CI 加速 | 中国用户体验 + 稳定性 |
-| **TouchController Mod** | 否 | 是 (UDP + XCFramework) | 否 |
-| **JIT 直接启动** | 否 | 否 | 是 |
-| **应用内语言切换** | 否 | 否 | 是 (系统/中文/English) |
-| **中文本地化** | 部分 (通过 Crowdin) | 增强 | 完整 (1955+ 行) |
-| **BMCLAPI 镜像源** | 是 | 是 | 是 |
-| **LWJGL 3.4.1** | 部分 | 否 | 是 |
-| **CI 构建速度** | 标准 | 优化 (预构建 MobileGlues) | 标准 |
-| **上游 Bug 修复** | -- | 否 | 是 (8+ 项) |
-| **同步状态** | 源 | 落后 950+ | 活跃同步 |
 
 ---
 
@@ -80,7 +61,7 @@ herbrine8403/Amethyst-iOS-MyRemastered       (主要重制版 Fork - UI 重构�
 
 - [Air 是什么？](#air-是什么)
 - [与上游的差异](#与上游的差异)
-- [Fork 网络](#fork-网络)
+- [Fork 谱系](#fork-谱系)
 - [核心特性](#核心特性)
 - [快速上手](#快速上手)
   - [设备要求](#设备要求)
@@ -178,7 +159,6 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 ## 贡献者
 
 - [@herbrine8403](https://github.com/herbrine8403) -- Amethyst-iOS-MyRemastered 原项目作者
-- [@yitenchen123](https://github.com/yitenchen123) -- TouchController 触控集成、CI 优化、UI 美化
 - [EternityQwQ](https://github.com/EternityQwQ) -- 添加 Metal Universal Mod 支持
 - [@LanRhyme](https://github.com/LanRhyme) -- iOS 26 兼容性适配及日志改进
 - [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod 下载功能集成、TouchController 优化
@@ -190,7 +170,6 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 - **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- 最初的 iOS Minecraft 启动器，一切的起点。
 - **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- 主要重制版 Fork，添加了现代化 UI、Mod 管理、BMCLAPI 下载源、多账户、自动渲染器/JVM 选择等功能。这是 Air 的直接上游。
-- **[yitenchen123/Amethyst-iOS-MyRemastered](https://github.com/yitenchen123/Amethyst-iOS-MyRemastered)** -- 同级 Fork，专注于 TouchController 触屏控制集成（UDP + XCFramework 双通信模式）、CI 构建加速（预构建 MobileGlues）、公告栏 UI 以及中文本地化优化。虽然 Air 未直接引入 TouchController 代码，但该 Fork 在中国用户体验改进方面的思路为 Air 的多项设计决策提供了参考。
 
 ## 第三方组件
 

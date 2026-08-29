@@ -33,7 +33,7 @@
 | Change | Description |
 |--------|-------------|
 | **LWJGL 3.4.1 Compatibility** | Updated LWJGL to a 3.4.1-compatible layer, enabling mods like Sodium 0.9+ that require LWJGL >= 3.4.1. Uses developer herbrine8403's approach: 3.3.x base modules + lwjgl-callback-descriptor.jar (3.4.1) + source overlay for dual-API compatibility. |
-| **JIT Pre-enabled Direct Launch** | When JIT is already enabled (e.g. from a previous session), the game launches directly without re-requesting via stikjit:// URL, avoiding unnecessary background transitions and potential crashes on iOS 26+ devices. The JIT26 script is handled by JavaLauncher during game startup. |
+| **Optimized JIT Re-launch** | When JIT is already enabled on non-iOS-26 devices, the game launches directly without re-requesting via stikjit://. On iOS 26+ devices that require debug JIT mapping, the UniversalJIT26 script is loaded silently (without showing a waiting dialog) to avoid background transition crashes while still ensuring brk instructions are handled. |
 | **In-App Language Switching** | Added a language picker in Settings > General that allows switching between Follow System, Simplified Chinese, and English without restarting the app. The `localize()` function respects the user's choice while maintaining the full fallback chain. |
 | **Enhanced Chinese Localization** | Complete Chinese UI translation (1955+ lines), more comprehensive than upstream. |
 | **Bug Fixes from Upstream Issue Audit** | 8+ bug fixes identified through systematic review of upstream and upstream's upstream GitHub issues, including nil crash in JIT script loading, UIKit thread safety, KVO observer cleanup, and more. |
@@ -41,38 +41,19 @@
 
 ---
 
-## Fork Network
-
-This project exists within a fork chain. Understanding each fork's purpose helps you choose the right one for your needs.
+## Fork Lineage
 
 ```
 PojavLauncherTeam/PojavLauncher_iOS          (Original upstream - official PojavLauncher iOS port)
         |
         v
 herbrine8403/Amethyst-iOS-MyRemastered       (Major remastered fork - UI overhaul, mod management,
-        |                                     BMCLAPI support, multi-account, auto renderer/JVM)
+                                            BMCLAPI support, multi-account, auto renderer/JVM)
         |
-        +----> yitenchen123/Amethyst-iOS-MyRemastered   (TouchController integration, CI optimizations,
-        |                                              UI polish, UDP/XCFramework comm)
-        |
-        +----> Gsjsjzhznsz/Air-Minecraft-iOS-Launcher   (THIS REPO - Chinese UX, JIT direct launch,
-                                                       in-app language switch, bug fixes, LWJGL 3.4.1)
+        v
+Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (THIS REPO - Chinese UX, JIT optimization,
+                                            in-app language switch, bug fixes, LWJGL 3.4.1)
 ```
-
-### Active Forks Comparison
-
-| Feature | herbrine8403 (Upstream) | yitenchen123 | Air (This Repo) |
-|---------|:---:|:---:|:---:|
-| **Focus** | Full-featured remaster | TouchController + CI speed | Chinese UX + Stability |
-| **TouchController Mod** | No | Yes (UDP + XCFramework) | No |
-| **JIT Direct Launch** | No | No | Yes |
-| **In-App Language Switch** | No | No | Yes (System/ZH/EN) |
-| **Chinese Localization** | Partial (via Crowdin) | Enhanced | Full (1955+ lines) |
-| **BMCLAPI Mirror** | Yes | Yes | Yes |
-| **LWJGL 3.4.1** | Partial | No | Yes |
-| **CI Build Speed** | Standard | Optimized (prebuilt MobileGlues) | Standard |
-| **Upstream Bug Fixes** | -- | No | Yes (8+ fixes) |
-| **Sync Status** | Source | Behind by 950+ | Active sync |
 
 ---
 
@@ -80,7 +61,7 @@ herbrine8403/Amethyst-iOS-MyRemastered       (Major remastered fork - UI overhau
 
 - [What is Air?](#what-is-air)
 - [What's Different from Upstream](#whats-different-from-upstream)
-- [Fork Network](#fork-network)
+- [Fork Lineage](#fork-lineage)
 - [Core Features](#core-features)
 - [Quick Start](#quick-start)
   - [Device Requirements](#device-requirements)
@@ -181,7 +162,6 @@ JIT (Just-In-Time compilation) is essential for smooth gameplay. Choose the appr
 ## Contributors
 
 - [@herbrine8403](https://github.com/herbrine8403) -- Original Amethyst-iOS-MyRemastered author
-- [@yitenchen123](https://github.com/yitenchen123) -- TouchController integration, CI optimizations, UI polish
 - [@EternityQwQ](https://github.com/EternityQwQ) -- Metal Universal Mod support
 - [@LanRhyme](https://github.com/LanRhyme) -- iOS 26 compatibility and logging improvements
 - [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod download integration, TouchController optimizations
@@ -193,7 +173,6 @@ This project would not exist without the following fork chain:
 
 - **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- The original iOS Minecraft launcher that started it all.
 - **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- The major remastered fork that added the modern UI, mod management, BMCLAPI support, multi-account, and auto renderer/JVM selection. This is the direct upstream of Air.
-- **[yitenchen123/Amethyst-iOS-MyRemastered](https://github.com/yitenchen123/Amethyst-iOS-MyRemastered)** -- A sibling fork focusing on TouchController touchscreen control integration (UDP + XCFramework communication), CI build optimizations (prebuilt MobileGlues), announcement bar UI, and Chinese localization refinements. Although Air does not directly include TouchController code, this fork's approach to Chinese user experience improvements informed several design decisions.
 
 ## About Translations
 
