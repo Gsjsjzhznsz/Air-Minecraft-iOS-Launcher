@@ -659,6 +659,17 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     // buttonInstall 短暂不可用。版本列表的生命周期应由 reloadProfileList 统一管理。
     BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust");
 
+    // Diagnostic: dump the full JIT decision state so device-specific issues
+    // can be debugged from latestlog alone (TrollStore vs dynamic-codesigning
+    // vs CS_DEBUGGED vs debugger attachment).
+    {
+        BOOL hasDynamicCS = getEntitlementValue(@"dynamic-codesigning");
+        int diagCsFlags = 0;
+        csops(getpid(), 0, &diagCsFlags, sizeof(diagCsFlags));
+        NSLog(@"[JIT] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d JIT_FLAGS=0x%X",
+              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), DeviceGetJITFlags(NO));
+    }
+
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 

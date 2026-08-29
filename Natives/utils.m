@@ -32,7 +32,18 @@ BOOL JIT26IsLikelyDebuggerKeepAttached(void) {
 }
 
 BOOL isJITEnabled(BOOL checkCSFlags) {
-    if (!checkCSFlags && (getEntitlementValue(@"dynamic-codesigning") || isJailbroken)) {
+    // Fast path: these entitlements/policies mean JIT is available without
+    // needing CS_DEBUGGED:
+    // - dynamic-codesigning: per-app JIT entitlement
+    // - jb.pmap_cs.custom_trust: TrollStore pmap trust chain — grants
+    //   kernel-level JIT on unjailbroken devices with NO debugger attached,
+    //   so CS_DEBUGGED is NOT set and must not be required (this is what
+    //   made isJITEnabled() return NO on TrollStore installs and trigger
+    //   unnecessary stikjit:// / apple-magnifier:// redirects)
+    // - isJailbroken: jailbroken devices
+    if (!checkCSFlags && (getEntitlementValue(@"dynamic-codesigning") ||
+                          getEntitlementValue(@"jb.pmap_cs.custom_trust") ||
+                          isJailbroken)) {
         return YES;
     }
 

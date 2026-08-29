@@ -389,6 +389,18 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     DeviceGetJITFlags(YES);
     BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");
+    // On TXM devices the dyld Library Validation bypass itself needs the
+    // debugger: redirectFunctionMirrored() calls JIT26PrepareRegionForPatching()
+    // which executes `brk #0xf00d` — that breakpoint must be handled by the
+    // JIT26 debugger script.  Force jit26AlwaysAttached BEFORE
+    // JIT26SetDetachAfterFirstBr() so the debugger stays attached to service
+    // both brk #0x69 (HotSpot) and brk #0xf00d (dyld hooks).  Without this,
+    // the debugger detaches after the first brk #0x69 and the later
+    // brk #0xf00d kills the process (SIGSEGV after "Platform.isMac").
+    if (requiresTXMWorkaround && !jit26AlwaysAttached) {
+        NSLog(@"[DyldLVBypass] TXM debug JIT mapping active — keeping debugger attached for dyld bypass");
+        jit26AlwaysAttached = YES;
+    }
     if (requiresTXMWorkaround) {
         static void *result;
         if(!result) result = JIT26CreateRegionLegacy(getpagesize());
@@ -1180,6 +1192,13 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
     DeviceGetJITFlags(YES);
     BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");
+    // Same fix as launchJVM: force the debugger to stay attached on TXM
+    // devices so the dyld bypass's brk #0xf00d is serviced (must happen
+    // before JIT26SetDetachAfterFirstBr).
+    if (requiresTXMWorkaround && !jit26AlwaysAttached) {
+        NSLog(@"[DyldLVBypass] TXM debug JIT mapping active — keeping debugger attached for dyld bypass");
+        jit26AlwaysAttached = YES;
+    }
     if (requiresTXMWorkaround) {
         static void *result;
         if (!result) result = JIT26CreateRegionLegacy(getpagesize());
