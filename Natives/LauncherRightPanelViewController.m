@@ -134,6 +134,14 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                                              selector:@selector(reapplyBackgroundEffect)
                                                  name:@"BackgroundUIEffectChanged"
                                                object:nil];
+
+    // JIT 状态必须实时反映：StikJIT/SideJIT 常在启动器已打开后才完成附加（甚至
+    // 附加后自身退出，应用被 launchd 收养），若只在 viewWillAppear 刷新，标签会
+    // 一直停留在"未开启"。应用回到前台时同步刷新一次。
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updateJITStatus)
+                                                 name:UIApplicationDidBecomeActiveNotification
+                                               object:nil];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -1219,9 +1227,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         BOOL hasDynamicCS = getEntitlementValue(@"dynamic-codesigning");
         int diagCsFlags = 0;
         csops(getpid(), 0, &diagCsFlags, sizeof(diagCsFlags));
-        NSLog(@"[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d JIT_FLAGS=0x%X",
-              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), DeviceGetJITFlags(NO));
+        NSLog(@"[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d traced=%d JIT_FLAGS=0x%X",
+              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), JIT26DebuggerAttachedViaPtrace(), DeviceGetJITFlags(NO));
     }
+
+    // 决策前先刷新一次状态标签，保证显示与本次实际判定一致
+    [self updateJITStatus];
 
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];

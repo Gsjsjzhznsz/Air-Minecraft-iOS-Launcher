@@ -315,7 +315,7 @@ dep_mg:
 	# and fail loudly if they are still missing afterwards.
 	@if [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang/CMakeLists.txt" ] || \
 	    [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross/CMakeLists.txt" ] || \
-	    [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash.h" ]; then \
+	    [ ! -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash32.h" ]; then \
 		echo '3rdparty/ incomplete: checking out pinned glslang/SPIRV-Cross/xxhash submodules'; \
 		git -C $(SOURCEDIR) submodule update --init --force --recursive \
 			Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang \
@@ -324,7 +324,7 @@ dep_mg:
 	fi
 	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang/CMakeLists.txt" || { echo "ERROR: glslang submodule still missing - cannot build MobileGlues"; exit 1; }
 	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross/CMakeLists.txt" || { echo "ERROR: SPIRV-Cross submodule still missing - cannot build MobileGlues"; exit 1; }
-	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash.h" || { echo "ERROR: xxhash submodule still missing - cannot build MobileGlues"; exit 1; }
+	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash32.h" || { echo "ERROR: xxhash submodule still missing - cannot build MobileGlues"; exit 1; }
 	mkdir -p $(WORKINGDIR)/mobileglues
 	cd $(WORKINGDIR)/mobileglues && cmake \
 		-DMACOS="1" \

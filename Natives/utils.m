@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <string.h>
+#include <sys/sysctl.h>
 
 #include "utils.h"
 #import "LauncherPreferences.h"
@@ -25,10 +27,45 @@ BOOL getEntitlementValue(NSString *key) {
     return ![(__bridge id)value isKindOfClass:NSNumber.class] || [(__bridge id)value boolValue];
 }
 
+#ifndef P_TRACED
+#define P_TRACED 0x00000800 /* process is being traced by a debugger (ptrace) */
+#endif
+
+// Ask the kernel whether a ptrace relationship is currently alive for this
+// process.  P_TRACED is set in kinfo_proc for the entire lifetime of a
+// debugger attach and is cleared the moment the debugger detaches, so it is
+// the accurate "debugger still here" signal for debuggers that attach to an
+// already-running process.
+BOOL JIT26DebuggerAttachedViaPtrace(void) {
+    struct kinfo_proc info;
+    size_t size = sizeof(info);
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+    memset(&info, 0, sizeof(info));
+    if (sysctl(mib, 4, &info, &size, NULL, 0) != 0) {
+        return NO;
+    }
+    return (info.kp_proc.p_flag & P_TRACED) != 0;
+}
+
 BOOL JIT26IsLikelyDebuggerKeepAttached(void) {
-    // getppid() returns launchd's PID (1) unless a debugger is actively
-    // attached to this process.  This is the same check Hynis-JE uses.
-    return getppid() != 1;
+    // getppid() returns launchd's PID (1) unless a debugger SPAWNED this
+    // process (debugserver-style parent).  This is the check Hynis-JE uses.
+    if (getppid() != 1) {
+        return YES;
+    }
+    // StikJIT / SideJIT instead attach to an ALREADY-RUNNING app by pid
+    // (the launcher hands its own getpid() over via the stikjit:// URL),
+    // which leaves ppid == 1 for the whole session even though the debugger
+    // is actively attached and handling JIT26 breakpoints.  Worse, the
+    // enabler may exit after enabling, getting the app re-parented to
+    // launchd (ppid 1) while CS_DEBUGGED stays set -- so ppid alone
+    // misclassifies a fully working JIT session as "no debugger attached".
+    // That caused the permanent "JIT not enabled" status label and a
+    // redundant stikjit:// script round trip on every game launch.
+    // Fall back to the live ptrace flag: it is set exactly while a debugger
+    // is attached, so this neither misses the attach flow nor weakens the
+    // "debugger really detached" case (P_TRACED returns to 0 on detach).
+    return JIT26DebuggerAttachedViaPtrace();
 }
 
 BOOL isJITEnabled(BOOL checkCSFlags) {

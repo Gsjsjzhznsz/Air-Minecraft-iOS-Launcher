@@ -72,6 +72,11 @@ BOOL isJITEnabled(BOOL checkCSOps);
 // debugger to be actively attached.  getppid() returns launchd's PID (1)
 // when no debugger is present, and the debugger's PID otherwise.
 BOOL JIT26IsLikelyDebuggerKeepAttached(void);
+// Live "debugger attached right now" check via the kernel P_TRACED flag
+// (sysctl KERN_PROC_PID).  Covers debuggers that attach to an
+// already-running process by pid (StikJIT/SideJIT), where getppid()
+// stays 1 for the whole session.
+BOOL JIT26DebuggerAttachedViaPtrace(void);
 // legacy method used to check if we're using universal script
 void* JIT26CreateRegionLegacy(size_t len);
 // used for large memory regions
