@@ -21,17 +21,50 @@ static void parse_multidraw_orders();
 
 void init_settings() {
 #if defined(__APPLE__)
+    // iOS: ANGLE is not available, always disabled
     global_settings.angle = AngleMode::Disabled;
     global_settings.angle_config = AngleConfig::DisableIfPossible;
     global_settings.angle_supported = false;
-    global_settings.ignore_error = IgnoreErrorLevel::Partial;
-    global_settings.ext_compute_shader = false;
-    global_settings.max_glsl_cache_size = 30 * 1024 * 1024;
     global_settings.angle_depth_clear_fix_mode = AngleDepthClearFixMode::Disabled;
-    global_settings.ext_direct_state_access = true;
-    global_settings.custom_gl_version = {0, 0, 0}; // will go default
     global_settings.fsr1_setting = FSR1_Quality_Preset::Disabled;
     global_settings.hide_mg_env_level = HideMGEnvLevel::Disabled;
+
+    // Load config.json for iOS-relevant settings (customGLVersion, cache size, etc.)
+    int success = initialized;
+    if (!success) {
+        success = config_refresh();
+        if (!success) {
+            LOG_V("Failed to load config. Use default config.")
+        }
+    }
+
+    // Apply config values with Apple-specific fallbacks
+    int noErrorRaw = success ? config_get_int((char*)"enableNoError") : -1;
+    if (noErrorRaw >= 0 && noErrorRaw <= 3) {
+        global_settings.ignore_error = static_cast<IgnoreErrorLevel>(noErrorRaw);
+    } else {
+        global_settings.ignore_error = IgnoreErrorLevel::Partial;
+    }
+
+    global_settings.ext_compute_shader = success ? (config_get_int((char*)"enableExtComputeShader") > 0) : false;
+    global_settings.ext_timer_query = success ? (config_get_int((char*)"enableExtTimerQuery") > 0) : false;
+    global_settings.ext_direct_state_access = success ? (config_get_int((char*)"enableExtDirectStateAccess") > 0) : true;
+
+    int customGLVersionInt = success ? config_get_int((char*)"customGLVersion") : 0;
+    if (customGLVersionInt < 0) customGLVersionInt = 0;
+    if (customGLVersionInt > 46) customGLVersionInt = 46;
+    else if (customGLVersionInt < 32 && customGLVersionInt != 0) customGLVersionInt = 32;
+    else if (customGLVersionInt > 33 && customGLVersionInt < 40) customGLVersionInt = 33;
+    global_settings.custom_gl_version = (customGLVersionInt == 0) ? Version(0, 0, 0) : Version(customGLVersionInt);
+
+    size_t maxGlslCacheSize = 0;
+    if (success && config_get_int((char*)"maxGlslCacheSize") > 0) {
+        maxGlslCacheSize = config_get_int((char*)"maxGlslCacheSize") * 1024 * 1024;
+    }
+    global_settings.max_glsl_cache_size = maxGlslCacheSize > 0 ? maxGlslCacheSize : 30 * 1024 * 1024;
+
+    LOG_V("MG_DIR_PATH = %s", mg_directory_path ? mg_directory_path : "(null)")
+    LOG_V("config.json %s", success ? "loaded successfully" : "not loaded, using defaults")
 
 #else
 

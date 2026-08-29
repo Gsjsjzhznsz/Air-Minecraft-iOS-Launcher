@@ -64,12 +64,14 @@ void proc_init() {
 
     init_settings();
 
+#ifndef __APPLE__
     load_libs();
     init_target_egl();
     init_target_gles();
     set_multidraw_setting();
 
     init_settings_post();
+#endif
 
 #if PROFILING
     init_perfetto();
