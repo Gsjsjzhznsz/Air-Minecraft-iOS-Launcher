@@ -1216,32 +1216,37 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 
-        // iOS 26+ with TXM: even if JIT is already enabled (e.g. via StikDebug pre-grant),
-        // the brk #0x69 in JavaLauncher.m still requires a debugger to handle it.
-        // If no debugger is attached, brk causes SIGKILL.
-        // DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED) is true when mprotect(RW→RX) fails,
-        // which is always the case on TrollStore devices without extended-virtual-addressing.
+        // iOS 26+ with TXM: the brk #0x69 in JavaLauncher.m requires a debugger.
+        // Only open stikjit:// if no debugger is currently attached --
+        // re-opening stikjit:// when a debugger is already present can cause
+        // StikDebug to detach it, making the subsequent brk #0x69 crash.
         if (@available(iOS 17.4, *)) {
             if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
-                NSLog(@"[JIT] JIT already enabled but TXM workaround needed (FORCE_MIRRORED), must attach debugger for brk #0x69");
-                NSString *scriptDataString = @"";
-                NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
-                [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
-                self.progressLabel.text = localize(@"i18n_str_436", nil);
-                UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                                                                       message:localize(@"i18n_str_439", nil)
-                                                                preferredStyle:UIAlertControllerStyleAlert];
-                [self presentViewController:alert animated:YES completion:nil];
-                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                    while (!isJITEnabled(false)) {
-                        usleep(1000 * 200);
-                    }
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        [alert dismissViewControllerAnimated:YES completion:handler];
+                if (!isJITEnabled(true)) {
+                    // JIT enabled but no debugger actually attached right now.
+                    // Must go through stikjit:// to get a debugger for brk #0x69.
+                    NSLog(@"[JIT] JIT enabled but no debugger attached, need stikjit:// for brk #0x69");
+                    NSString *scriptDataString = @"";
+                    NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+                    scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+                    [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+                    self.progressLabel.text = localize(@"i18n_str_436", nil);
+                    UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
+                                                                           message:localize(@"i18n_str_439", nil)
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+                    [self presentViewController:alert animated:YES completion:nil];
+                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                        while (!isJITEnabled(true)) {
+                            usleep(1000 * 200);
+                        }
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            [alert dismissViewControllerAnimated:YES completion:handler];
+                        });
                     });
-                });
-                return;
+                    return;
+                } else {
+                    NSLog(@"[JIT] JIT + debugger already attached, launching directly (brk #0x69 will be handled)");
+                }
             }
         }
 
