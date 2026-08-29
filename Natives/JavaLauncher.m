@@ -197,8 +197,8 @@ void init_loadMobileGluesConfig() {
     // 因此必须写入十进制数（40, 41, 42, ..., 46），不能写入十六进制 0x040000。
     config[@"enableExtDirectStateAccess"] = @1;
     config[@"maxGlslCacheSize"] = @128;
-    // 默认 GL 4.0，但 ANGLE 启用时会降至 GL 3.2（见下方 enableAngle 处理）
-    config[@"enableExtGL43"] = @1;
+    // 默认 GL 4.0（MobileGlues 2.0.0 DEFAULT_GL_VERSION=40，
+    // 内置 glslang+SPIRV-Cross 从源码编译，GLSL→SPIRV→ESSL 转换链可靠工作）
     config[@"customGLVersion"] = @40;
 
     id enableAngle = getPrefObject(@"mobileglues.enable_angle");
@@ -216,14 +216,12 @@ void init_loadMobileGluesConfig() {
               enableAngle, config[@"enableANGLE"]);
 
         // ANGLE 在 iOS 上实际只支持 OpenGL ES 3.0/3.1。
-        // 如果同时启用 enableExtGL43 + customGLVersion=4.0，Sodium 会生成桌面端
-        // GLSL 着色器（#version 400 core），但 ANGLE 的 GLES 编译器只接受
-        // #version 300 es，导致 'core' : invalid version directive 错误，方块不渲染。
-        // 修复：ANGLE 启用时，将 GL 版本降至 3.2 并禁用 GL 4.3 扩展。
+        // customGLVersion=4.0 + ANGLE 时，Sodium 生成桌面端 GLSL 着色器（#version 400 core），
+        // 但 ANGLE 的 GLES 编译器只接受 #version 300 es，导致方块不渲染。
+        // 修复：ANGLE 启用时，将 GL 版本降至 3.2（ANGLE 在 iOS 上的实际上限）。
         if ([enableAngle boolValue]) {
-            config[@"enableExtGL43"] = @0;
-            config[@"customGLVersion"] = @32;  // GL 3.2 = ANGLE 在 iOS 上的实际上限
-            NSLog(@"[JavaLauncher]   ANGLE enabled: override enableExtGL43=0, customGLVersion=32 (ANGLE iOS max is GLES 3.0/3.1)");
+            config[@"customGLVersion"] = @32;
+            NSLog(@"[JavaLauncher]   ANGLE enabled: override customGLVersion=32 (ANGLE iOS max is GLES 3.0/3.1)");
         }
     }
 
