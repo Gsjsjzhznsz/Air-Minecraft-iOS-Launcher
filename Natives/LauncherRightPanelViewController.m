@@ -1216,21 +1216,6 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 
-        if (@available(iOS 17.4, *) && DeviceNeedsDebugJITMapping()) {
-            NSLog(@"[JIT] JIT enabled but debug JIT mapping needed, loading script via stikjit://");
-            NSData *scriptData = [NSData dataWithContentsOfFile:
-                [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-            NSString *scriptDataString = [@"&script-data=" stringByAppendingString:
-                [scriptData base64EncodedStringWithOptions:0]];
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
-                [NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@",
-                 NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]]
-                options:@{} completionHandler:nil];
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-                dispatch_get_main_queue(), handler);
-            return;
-        }
-
         NSLog(@"[JIT] JIT already enabled, launching game directly");
         handler();
         return;
@@ -1243,7 +1228,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         return;
     } else if (@available(iOS 17.4, *)) {
         NSString *scriptDataString = @"";
-        if (DeviceNeedsDebugJITMapping()) {
+        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
             NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
             scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
         }

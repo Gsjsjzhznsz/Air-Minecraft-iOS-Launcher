@@ -1137,9 +1137,7 @@
                 @"type": self.typeSwitch,
                 @"requestReload": @YES,
                 @"enableCondition": ^BOOL(){
-                    // 同步自 catsruledogs：用 DeviceNeedsDebugJITMapping() 替代旧的 TXM 标志组合
-                    // 基于 JIT_FLAG_IS_IOS_26 | JIT_FLAG_FORCE_MIRRORED，确保 iOS 26+ 无 TXM 设备也显示此开关
-                    return DeviceNeedsDebugJITMapping() && whenNotInGame();
+                    return DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) && whenNotInGame();
                 },
             },
             @{@"key": @"debug_always_attached_jit",

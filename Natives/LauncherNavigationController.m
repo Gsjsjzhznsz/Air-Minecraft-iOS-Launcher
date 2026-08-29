@@ -662,26 +662,6 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 
-        if (@available(iOS 17.4, *) && DeviceNeedsDebugJITMapping()) {
-            // iOS 26+ TXM: JIT 已启用，但 brk 指令仍需要 UniversalJIT26 脚本
-            // 被调试器加载。stikjit:// URL 同时负责启用 JIT 和传递脚本数据，
-            // 跳过它会导致 brk #0x69 无人处理而崩溃。因此仍需打开 stikjit://
-            // 加载脚本，但不显示等待对话框（避免后台切换时 UI 闪退）。
-            NSLog(@"[JIT] JIT enabled but debug JIT mapping needed, loading script via stikjit://");
-            NSData *scriptData = [NSData dataWithContentsOfFile:
-                [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-            NSString *scriptDataString = [@"&script-data=" stringByAppendingString:
-                [scriptData base64EncodedStringWithOptions:0]];
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
-                [NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@",
-                 NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]]
-                options:@{} completionHandler:nil];
-            // 不显示等待对话框，静默等待调试器附加脚本后启动
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-                dispatch_get_main_queue(), handler);
-            return;
-        }
-
         NSLog(@"[JIT] JIT already enabled, launching game directly");
         handler();
         return;
@@ -695,7 +675,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         return;
     } else if (@available(iOS 17.4, *)) {
         NSString *scriptDataString = @"";
-        if (DeviceNeedsDebugJITMapping()) {
+        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
             NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
             scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
         }

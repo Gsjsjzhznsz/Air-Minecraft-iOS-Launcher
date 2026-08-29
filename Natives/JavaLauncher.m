@@ -388,17 +388,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     init_loadDefaultEnv();
     init_loadCustomEnv();
 
-    // 同步自 catsruledogs：刷新 JIT flags，决定是否需要 Debug JIT Mapping
-    // 使用 DeviceNeedsDebugJITMapping() 基于 JIT_FLAG_IS_IOS_26 | JIT_FLAG_FORCE_MIRRORED
-    // 而非 TXM 固件检测，确保 iOS 26+ 无 TXM 设备也能正确设置 JIT 脚本
     DeviceGetJITFlags(YES);
-    BOOL requiresDebugJITMapping = DeviceNeedsDebugJITMapping();
+    BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");
-    if (requiresDebugJITMapping) {
-        // 检测是否在使用 legacy JIT script（brk #0x69 由 UniversalJIT26.js 处理）
+    if (requiresTXMWorkaround) {
         static void *result;
         if(!result) result = JIT26CreateRegionLegacy(getpagesize());
-        if (result != MAP_FAILED && (uint32_t)result != 0x690000E0) {
+        if ((uint32_t)result != 0x690000E0) {
             munmap(result, getpagesize());
             // legacy script 只允许调用一次 breakpoint，必须切换到 UniversalJIT26
             NSString *inBundleScriptPath = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];
@@ -418,27 +414,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             [PLLogOutputView handleExitCode:1];
             return 1;
         }
-        // 关键修复（N5）：stringWithContentsOfFile: 失败时返回 nil，
-        // JIT26SendJITScript(nil) 会在 BreakSendJITScript 中 strlen(NULL) 崩溃。
-        // 改用 stringWithContentsOfFile:encoding:error: 并检查 nil。
-        NSError *scriptError = nil;
-        NSString *extensionScript = [NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"] encoding:NSUTF8StringEncoding error:&scriptError];
-        if (extensionScript) {
-            JIT26SendJITScript(extensionScript);
-            JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
-        } else {
-            NSLog(@"[JavaLauncher] ERROR: Failed to load UniversalJIT26Extension.js: %@", scriptError.localizedDescription);
-            // 无扩展脚本时仍继续启动，但 mirrored code cache 可能不完整
-        }
+        JIT26SendJITScript([NSString stringWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"UniversalJIT26Extension" ofType:@"js"]]);
+        JIT26SetDetachAfterFirstBr(!jit26AlwaysAttached);
         // make sure we don't get stuck in EXC_BAD_ACCESS
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
-    // Dyld Library Validation bypass 对于加载 JNA 等未签名动态库至关重要。
-    // 即使需要 debug JIT mapping（iOS 26+ TXM），只要设备有 dynamic-codesigning
-    // 权限（TrollStore），就应该启用 dyld bypass，否则 JNA 会因 code signature
-    // invalid 而加载失败。
-    if (!requiresDebugJITMapping || jit26AlwaysAttached || getEntitlementValue(@"dynamic-codesigning")) {
+    if (!requiresTXMWorkaround || jit26AlwaysAttached) {
         if (jit26AlwaysAttached) {
             // Only allow StikDebug to catch our breakpoints to prevent any stutters
             task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
@@ -1198,14 +1180,13 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
     init_loadDefaultEnv();
     init_loadCustomEnv();
 
-    // 与 launchJVM 相同的 JIT26 处理（iOS 26+ 无 TXM 设备需要 Debug JIT Mapping）
     DeviceGetJITFlags(YES);
-    BOOL requiresDebugJITMapping = DeviceNeedsDebugJITMapping();
+    BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");
-    if (requiresDebugJITMapping) {
+    if (requiresTXMWorkaround) {
         static void *result;
         if (!result) result = JIT26CreateRegionLegacy(getpagesize());
-        if (result != MAP_FAILED && (uint32_t)result != 0x690000E0) {
+        if ((uint32_t)result != 0x690000E0) {
             munmap(result, getpagesize());
             NSString *inBundleScriptPath = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];            NSString *lcAppInfoPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"LCAppInfo.plist"];
             NSMutableDictionary *lcAppInfo = [NSMutableDictionary dictionaryWithContentsOfFile:lcAppInfoPath];
@@ -1232,7 +1213,7 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
-    if (!requiresDebugJITMapping || jit26AlwaysAttached) {
+    if (!requiresTXMWorkaround || jit26AlwaysAttached) {
         if (jit26AlwaysAttached) {
             task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
                 EXCEPTION_DEFAULT, THREAD_STATE_NONE);

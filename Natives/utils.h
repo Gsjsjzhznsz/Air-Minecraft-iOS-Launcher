@@ -77,8 +77,6 @@ void JIT26PrepareRegionForPatching(void *addr, size_t len);
 void JIT26SetDetachAfterFirstBr(BOOL value);
 void JIT26SendJITScript(NSString* script);
 
-// Device JIT flags（同步自上游 AngelAuraMC/Amethyst-iOS）
-// 支持 iOS 26.6+ / 27 的现代 Preboot 路径 + ChipID 硬件 fallback + capability 查询
 typedef enum {
     JIT_FLAG_IS_IOS_26 = 1 << 0,
     JIT_FLAG_FORCE_MIRRORED = 1 << 1,
@@ -86,7 +84,6 @@ typedef enum {
 } JITFlags;
 JITFlags DeviceGetJITFlags(BOOL refresh);
 BOOL DeviceHasJITFlags(JITFlags flags);
-BOOL DeviceNeedsDebugJITMapping(void);
 
 // Init functions
 void init_bypassDyldLibValidation();
