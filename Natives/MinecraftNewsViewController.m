@@ -8,6 +8,7 @@
 #import "MinecraftNewsItem.h"
 #import "BackgroundManager.h"
 #import "IconLoader.h"
+#import "utils.h"
 #import <SafariServices/SafariServices.h>
 
 /// 缩略图目标尺寸（用于 IconLoader 降采样）
