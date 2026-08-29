@@ -195,10 +195,11 @@ void init_loadMobileGluesConfig() {
     // customGLVersion 约束（settings.cpp 第 71-79 行）：>46 截断为 46，<32 且非 0 截断为 32，
     // 33-39 截断为 33，0 使用默认值 40。
     // 因此必须写入十进制数（40, 41, 42, ..., 46），不能写入十六进制 0x040000。
-    config[@"enableExtGL43"] = @1;
     config[@"enableExtDirectStateAccess"] = @1;
     config[@"maxGlslCacheSize"] = @128;
-    config[@"customGLVersion"] = @40;  // 十进制 40 = GL 4.0
+    // 默认 GL 4.0，但 ANGLE 启用时会降至 GL 3.2（见下方 enableAngle 处理）
+    config[@"enableExtGL43"] = @1;
+    config[@"customGLVersion"] = @40;
 
     id enableAngle = getPrefObject(@"mobileglues.enable_angle");
     if (enableAngle) {
@@ -213,6 +214,17 @@ void init_loadMobileGluesConfig() {
         config[@"enableANGLE"] = [enableAngle boolValue] ? @3 : @0;
         NSLog(@"[JavaLauncher]   mobileglues.enable_angle = %@ -> enableANGLE = %@ (3=ForceEnable, 0=DisableIfPossible)",
               enableAngle, config[@"enableANGLE"]);
+
+        // ANGLE 在 iOS 上实际只支持 OpenGL ES 3.0/3.1。
+        // 如果同时启用 enableExtGL43 + customGLVersion=4.0，Sodium 会生成桌面端
+        // GLSL 着色器（#version 400 core），但 ANGLE 的 GLES 编译器只接受
+        // #version 300 es，导致 'core' : invalid version directive 错误，方块不渲染。
+        // 修复：ANGLE 启用时，将 GL 版本降至 3.2 并禁用 GL 4.3 扩展。
+        if ([enableAngle boolValue]) {
+            config[@"enableExtGL43"] = @0;
+            config[@"customGLVersion"] = @32;  // GL 3.2 = ANGLE 在 iOS 上的实际上限
+            NSLog(@"[JavaLauncher]   ANGLE enabled: override enableExtGL43=0, customGLVersion=32 (ANGLE iOS max is GLES 3.0/3.1)");
+        }
     }
 
     id enableNoError = getPrefObject(@"mobileglues.enable_no_error");
@@ -422,7 +434,11 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
-    if (!requiresDebugJITMapping || jit26AlwaysAttached) {
+    // Dyld Library Validation bypass 对于加载 JNA 等未签名动态库至关重要。
+    // 即使需要 debug JIT mapping（iOS 26+ TXM），只要设备有 dynamic-codesigning
+    // 权限（TrollStore），就应该启用 dyld bypass，否则 JNA 会因 code signature
+    // invalid 而加载失败。
+    if (!requiresDebugJITMapping || jit26AlwaysAttached || getEntitlementValue(@"dynamic-codesigning")) {
         if (jit26AlwaysAttached) {
             // Only allow StikDebug to catch our breakpoints to prevent any stutters
             task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
