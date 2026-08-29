@@ -662,41 +662,17 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 
-        // iOS 26+ with TXM: the brk #0x69 in JavaLauncher.m requires a debugger.
-        // Only open stikjit:// if no debugger is currently attached --
-        // re-opening stikjit:// when a debugger is already present can cause
-        // StikDebug to detach it, making the subsequent brk #0x69 crash.
-        if (@available(iOS 17.4, *)) {
-            if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
-                if (!isJITEnabled(true)) {
-                    // JIT enabled (e.g. cached CS_DEBUGGED or dynamic-codesigning)
-                    // but no debugger actually attached right now.
-                    // Must go through stikjit:// to get a debugger for brk #0x69.
-                    NSLog(@"[JIT] JIT enabled but no debugger attached, need stikjit:// for brk #0x69");
-                    NSString *scriptDataString = @"";
-                    NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-                    scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
-                    [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
-                    UIAlertController* alert = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
-                        message:localize(@"launcher.wait_jit.message", nil)
-                        preferredStyle:UIAlertControllerStyleAlert];
-                    [self presentViewController:alert animated:YES completion:nil];
-                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                        while (!isJITEnabled(true)) {
-                            usleep(1000*200);
-                        }
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [alert dismissViewControllerAnimated:YES completion:handler];
-                        });
-                    });
-                    return;
-                } else {
-                    NSLog(@"[JIT] JIT + debugger already attached, launching directly (brk #0x69 will be handled)");
-                }
-            }
-        }
-
-        NSLog(@"[JIT] JIT already enabled, launching game directly");
+        // On iOS 26+ with TXM, the brk #0x69 in JavaLauncher.m needs an
+        // actively attached debugger to allocate RX memory.
+        // However, if JIT is already enabled (CS_DEBUGGED set), launching
+        // directly is correct — Hynis-JE confirms this works on the same
+        // device.  The TXM workaround in JavaLauncher.m will use JIT26
+        // breakpoint stubs; if no debugger is attached, those stubs
+        // gracefully fall back (JIT26CreateRegionLegacy returns a sentinel).
+        // Forcing stikjit:// here was causing unnecessary URL jumps and
+        // preventing DyldLVBypass from activating (unsigned dylibs fail).
+        NSLog(@"[JIT] JIT already enabled (flags=0x%X, ppid=%d), launching game directly",
+              DeviceGetJITFlags(NO), getppid());
         handler();
         return;
     } else if (hasTrollStoreJIT) {

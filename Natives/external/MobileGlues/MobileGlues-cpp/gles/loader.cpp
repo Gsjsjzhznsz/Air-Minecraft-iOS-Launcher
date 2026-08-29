@@ -151,10 +151,15 @@ void load_libs() {
 
 void* proc_address(void* lib, const char* name) {
 #if defined(__APPLE__)
-    // On Apple/iOS, GL ES functions are provided by ANGLE (loaded with
-    // RTLD_GLOBAL by the host launcher) or system frameworks.
-    // RTLD_DEFAULT searches all loaded images, which finds ANGLE's GLES
-    // symbols after the host has dlopen'd libtinygl4angle.dylib.
+    // On Apple, prefer the specific library handle (ANGLE) over RTLD_DEFAULT.
+    // MobileGlues exports its own extern "C" wrappers (glGetString, glGetError,
+    // glGetIntegerv, glGetStringi) with the same names as the real GL functions.
+    // RTLD_DEFAULT would find our wrappers first, causing infinite recursion.
+    // By querying the specific handle first, we get ANGLE’s real implementation.
+    if (lib) {
+        void *sym = dlsym(lib, name);
+        if (sym) return sym;
+    }
     void *sym = dlsym(RTLD_DEFAULT, name);
     if (sym) return sym;
 #endif

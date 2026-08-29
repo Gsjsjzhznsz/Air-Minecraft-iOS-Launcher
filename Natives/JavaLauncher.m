@@ -418,17 +418,16 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
-    if (!requiresTXMWorkaround || jit26AlwaysAttached) {
-        if (jit26AlwaysAttached) {
-            // Only allow StikDebug to catch our breakpoints to prevent any stutters
-            task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
-                EXCEPTION_DEFAULT, THREAD_STATE_NONE);
-        }
-        // Activate Library Validation bypass for external runtime and dylibs (JNA, etc)
-        init_bypassDyldLibValidation();
-    } else {
-        NSLog(@"[DyldLVBypass] Hook disabled! Loading unsigned dylib will cause code signature error.");
+    if (jit26AlwaysAttached) {
+        // Only allow StikDebug to catch our breakpoints to prevent any stutters
+        task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
+            EXCEPTION_DEFAULT, THREAD_STATE_NONE);
     }
+    // Always activate Library Validation bypass for external runtime and dylibs (JNA, etc).
+    // Previously this was skipped when requiresTXMWorkaround was true, which caused
+    // JNA and other unsigned dylibs to fail with code signature errors.
+    // The TXM hardware breakpoint mechanism (brk #0x69) does not conflict with dlopen hooks.
+    init_bypassDyldLibValidation();
 
     // 加载 MobileGlues 配置（仅当用户手动选择 MobileGlues 渲染器时生效）
     init_loadMobileGluesConfig();
@@ -1211,15 +1210,12 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
         task_set_exception_ports(mach_task_self(), EXC_MASK_BAD_ACCESS, 0, EXCEPTION_DEFAULT, MACHINE_THREAD_STATE);
     }
 
-    if (!requiresTXMWorkaround || jit26AlwaysAttached) {
-        if (jit26AlwaysAttached) {
-            task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
-                EXCEPTION_DEFAULT, THREAD_STATE_NONE);
-        }
-        init_bypassDyldLibValidation();
-    } else {
-        NSLog(@"[DyldLVBypass] Hook disabled! Loading unsigned dylib will cause code signature error.");
+    if (jit26AlwaysAttached) {
+        task_set_exception_ports(mach_task_self(), EXC_MASK_ALL & ~EXC_MASK_BREAKPOINT, 0,
+            EXCEPTION_DEFAULT, THREAD_STATE_NONE);
     }
+    // Always activate Library Validation bypass (see launchJVM for rationale).
+    init_bypassDyldLibValidation();
 
     // JRE 选择：按 minJavaVersion 推断 runtime tag（≥17 用 1_17_newer，否则 1_16_5_older），
     // 失败回退 execute_jar。getSelectedJavaHome 内部会在 tag 槽位不满足 minVersion 时

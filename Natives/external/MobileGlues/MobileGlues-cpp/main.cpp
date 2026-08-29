@@ -91,6 +91,14 @@ void proc_init() {
 //
 // The host calls this function from egl_bridge.m right after
 // dlopen(libtinygl4angle.dylib, RTLD_GLOBAL) succeeds.
+//
+// IMPORTANT: We must resolve GL symbols from ANGLE's handle specifically,
+// NOT via RTLD_DEFAULT.  MobileGlues exports its own extern "C" wrappers
+// for glGetString/glGetError/glGetIntegerv/glGetStringi that have the same
+// symbol names as ANGLE's real GL functions.  dlsym(RTLD_DEFAULT, ...) would
+// find our wrappers instead of ANGLE's, causing infinite recursion (e.g.
+// glGetError() wrapper calls GLES.glGetError() which IS the wrapper).
+
 extern "C" __attribute__((visibility("default")))
 void mg_init_gles() {
     static bool done = false;
@@ -99,10 +107,17 @@ void mg_init_gles() {
 
     LOG_V("mg_init_gles: loading GL ES function pointers (Apple platform)\n");
 
-    // Mark GL functions as loaded from the system/ANGLE rather than a
-    // dlopen'd library.  proc_address() on Apple uses RTLD_DEFAULT.
-    gles = nullptr;
-    egl = nullptr;
+    // Obtain ANGLE's library handle so that proc_address() can prefer
+    // ANGLE symbols over MobileGlues' own extern "C" wrappers.
+    // Since the host already dlopen'd ANGLE with RTLD_GLOBAL, this just
+    // increments the reference count and returns the existing handle.
+    void *angle = dlopen("@rpath/libtinygl4angle.dylib", RTLD_NOW | RTLD_GLOBAL);
+    if (!angle) {
+        LOG_E("mg_init_gles: failed to dlopen ANGLE: %s", dlerror());
+        return;
+    }
+    gles = angle;
+    egl = angle;
 
     init_target_gles();
     set_multidraw_setting();
