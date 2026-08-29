@@ -1215,10 +1215,22 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
-        // JIT 已启用：直接启动游戏，跳过 stikjit URL 脚本请求。
-        // 之前对 iOS 26+ TXM 设备通过 stikjit:// 重新请求 debug JIT mapping 脚本
-        // 会导致 app 切到后台再回来，可能闪退。现在改为直接启动，
-        // 由 JavaLauncher 在游戏启动时通过 brk 指令发送 JIT26 脚本（见 JavaLauncher.m）。
+
+        if (@available(iOS 17.4, *) && DeviceNeedsDebugJITMapping()) {
+            NSLog(@"[JIT] JIT enabled but debug JIT mapping needed, loading script via stikjit://");
+            NSData *scriptData = [NSData dataWithContentsOfFile:
+                [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+            NSString *scriptDataString = [@"&script-data=" stringByAppendingString:
+                [scriptData base64EncodedStringWithOptions:0]];
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+                [NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@",
+                 NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]]
+                options:@{} completionHandler:nil];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                dispatch_get_main_queue(), handler);
+            return;
+        }
+
         NSLog(@"[JIT] JIT already enabled, launching game directly");
         handler();
         return;
