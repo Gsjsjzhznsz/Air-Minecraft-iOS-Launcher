@@ -662,6 +662,34 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
 
+        // iOS 26+ with TXM: even if JIT is already enabled (e.g. via StikDebug pre-grant),
+        // the brk #0x69 in JavaLauncher.m still requires a debugger to handle it.
+        // If no debugger is attached, brk causes SIGKILL.
+        // DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED) is true when mprotect(RW→RX) fails,
+        // which is always the case on TrollStore devices without extended-virtual-addressing.
+        if (@available(iOS 17.4, *)) {
+            if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
+                NSLog(@"[JIT] JIT already enabled but TXM workaround needed (FORCE_MIRRORED), must attach debugger for brk #0x69");
+                NSString *scriptDataString = @"";
+                NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+                [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+                UIAlertController* alert = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
+                    message:localize(@"launcher.wait_jit.message", nil)
+                    preferredStyle:UIAlertControllerStyleAlert];
+                [self presentViewController:alert animated:YES completion:nil];
+                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                    while (!isJITEnabled(false)) {
+                        usleep(1000*200);
+                    }
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [alert dismissViewControllerAnimated:YES completion:handler];
+                    });
+                });
+                return;
+            }
+        }
+
         NSLog(@"[JIT] JIT already enabled, launching game directly");
         handler();
         return;
