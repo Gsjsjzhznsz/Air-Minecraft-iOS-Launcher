@@ -3,14 +3,15 @@
 </div>
 
 <h1 align="center">Air</h1>
-<p align="center"><sub>Amethyst iOS Remastered (Fork)</sub></p>
+<p align="center"><b>A polished Minecraft: Java Edition launcher for iOS, optimized for Chinese users.</b></p>
+<p align="center"><sub>Forked from <a href="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered">Amethyst-iOS-MyRemastered</a></sub></p>
 
 <div align="center">
-  <img alt="Build Status" src="https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
-  <img alt="Downloads" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
-  <img alt="Release" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="License" src="https://img.shields.io/github/license/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat">
+  <img alt="Build Status" src="https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/total?label=Downloads&style=flat">
+  <img alt="Release" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
+  <img alt="License" src="https://img.shields.io/github/license/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
+  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?color=c78aff&label=last%20commit&style=flat">
 </div>
 
 <p align="center">
@@ -19,9 +20,11 @@
 
 ---
 
-A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the ground up on the official Amethyst project. It delivers a refined mobile experience with comprehensive mod management, intelligent renderer selection, and deep platform integration.
+## What is Air?
 
-> **This is a fork** of [herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) with additional fixes and improvements.
+**Air** is a customized fork of [Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered), a premium Minecraft: Java Edition launcher for iOS and iPadOS. This fork focuses on the **Chinese user experience** -- delivering robust Chinese localization, in-app language switching, streamlined JIT handling for iOS 26+, and bug fixes sourced from upstream issue audits.
+
+> **Not sure which fork to use?** See the [Fork Network](#fork-network) section below for a comparison of active forks and their unique features.
 
 ---
 
@@ -33,14 +36,51 @@ A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the 
 | **JIT Pre-enabled Direct Launch** | When JIT is already enabled (e.g. from a previous session), the game launches directly without re-requesting via stikjit:// URL, avoiding unnecessary background transitions and potential crashes on iOS 26+ devices. The JIT26 script is handled by JavaLauncher during game startup. |
 | **In-App Language Switching** | Added a language picker in Settings > General that allows switching between Follow System, Simplified Chinese, and English without restarting the app. The `localize()` function respects the user's choice while maintaining the full fallback chain. |
 | **Enhanced Chinese Localization** | Complete Chinese UI translation (1955+ lines), more comprehensive than upstream. |
-| **Bug Fixes from Upstream Issue Audit** | 8 bug fixes identified through systematic review of upstream and upstream's upstream GitHub issues, including nil crash in JIT script loading, UIKit thread safety, KVO observer cleanup, and more. |
+| **Bug Fixes from Upstream Issue Audit** | 8+ bug fixes identified through systematic review of upstream and upstream's upstream GitHub issues, including nil crash in JIT script loading, UIKit thread safety, KVO observer cleanup, and more. |
 | **Makefile Robustness** | Fixed TAB-to-space indentation issues that caused CI build failures. |
+
+---
+
+## Fork Network
+
+This project exists within a fork chain. Understanding each fork's purpose helps you choose the right one for your needs.
+
+```
+PojavLauncherTeam/PojavLauncher_iOS          (Original upstream - official PojavLauncher iOS port)
+        |
+        v
+herbrine8403/Amethyst-iOS-MyRemastered       (Major remastered fork - UI overhaul, mod management,
+        |                                     BMCLAPI support, multi-account, auto renderer/JVM)
+        |
+        +----> yitenchen123/Amethyst-iOS-MyRemastered   (TouchController integration, CI optimizations,
+        |                                              UI polish, UDP/XCFramework comm)
+        |
+        +----> Gsjsjzhznsz/Air-Minecraft-iOS-Launcher   (THIS REPO - Chinese UX, JIT direct launch,
+                                                       in-app language switch, bug fixes, LWJGL 3.4.1)
+```
+
+### Active Forks Comparison
+
+| Feature | herbrine8403 (Upstream) | yitenchen123 | Air (This Repo) |
+|---------|:---:|:---:|:---:|
+| **Focus** | Full-featured remaster | TouchController + CI speed | Chinese UX + Stability |
+| **TouchController Mod** | No | Yes (UDP + XCFramework) | No |
+| **JIT Direct Launch** | No | No | Yes |
+| **In-App Language Switch** | No | No | Yes (System/ZH/EN) |
+| **Chinese Localization** | Partial (via Crowdin) | Enhanced | Full (1955+ lines) |
+| **BMCLAPI Mirror** | Yes | Yes | Yes |
+| **LWJGL 3.4.1** | Partial | No | Yes |
+| **CI Build Speed** | Standard | Optimized (prebuilt MobileGlues) | Standard |
+| **Upstream Bug Fixes** | -- | No | Yes (8+ fixes) |
+| **Sync Status** | Source | Behind by 950+ | Active sync |
 
 ---
 
 ## Table of Contents
 
+- [What is Air?](#what-is-air)
 - [What's Different from Upstream](#whats-different-from-upstream)
+- [Fork Network](#fork-network)
 - [Core Features](#core-features)
 - [Quick Start](#quick-start)
   - [Device Requirements](#device-requirements)
@@ -48,6 +88,7 @@ A premium Minecraft: Java Edition launcher for iOS and iPadOS, rebuilt from the 
   - [Installation](#installation)
   - [Enabling JIT](#enabling-jit)
 - [Contributors](#contributors)
+- [Fork Acknowledgments](#fork-acknowledgments)
 - [Third-Party Components](#third-party-components)
 - [Sponsor](#sponsor)
 
@@ -103,14 +144,14 @@ Prioritize tools that support permanent signing and automatic JIT enablement:
 <details>
 <summary><b>Official Release (TrollStore)</b></summary>
 
-1. Download the `.tipa` package from [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases).
+1. Download the `.tipa` package from [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases).
 2. Open the file with TrollStore via the system share menu to complete installation.
 </details>
 
 <details>
 <summary><b>Official Release (AltStore / SideStore)</b></summary>
 
-1. Download the `.ipa` package from [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases).
+1. Download the `.ipa` package from [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases).
 2. Import the IPA into your sideloading tool following its standard installation procedure.
 </details>
 
@@ -120,7 +161,7 @@ Prioritize tools that support permanent signing and automatic JIT enablement:
 > [!CAUTION]
 > Nightly builds may contain critical bugs including crashes and startup failures. Use only for development and testing purposes.
 
-1. Navigate to the [GitHub Actions](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions) page and download the latest IPA artifact.
+1. Navigate to the [GitHub Actions](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions) page and download the latest IPA artifact.
 2. Import the IPA into your sideloading tool (AltStore, SideStore, etc.) to install.
 </details>
 
@@ -139,12 +180,20 @@ JIT (Just-In-Time compilation) is essential for smooth gameplay. Choose the appr
 
 ## Contributors
 
-- [@herbrine8403](https://github.com/herbrine8403) -- Original project author
-- [@yitenchen123](https://github.com/yitenchen123) -- Project Maintainer
+- [@herbrine8403](https://github.com/herbrine8403) -- Original Amethyst-iOS-MyRemastered author
+- [@yitenchen123](https://github.com/yitenchen123) -- TouchController integration, CI optimizations, UI polish
 - [@EternityQwQ](https://github.com/EternityQwQ) -- Metal Universal Mod support
 - [@LanRhyme](https://github.com/LanRhyme) -- iOS 26 compatibility and logging improvements
 - [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod download integration, TouchController optimizations
 - [@Li2548](https://github.com/Li2548) -- Upstream synchronization
+
+## Fork Acknowledgments
+
+This project would not exist without the following fork chain:
+
+- **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- The original iOS Minecraft launcher that started it all.
+- **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- The major remastered fork that added the modern UI, mod management, BMCLAPI support, multi-account, and auto renderer/JVM selection. This is the direct upstream of Air.
+- **[yitenchen123/Amethyst-iOS-MyRemastered](https://github.com/yitenchen123/Amethyst-iOS-MyRemastered)** -- A sibling fork focusing on TouchController touchscreen control integration (UDP + XCFramework communication), CI build optimizations (prebuilt MobileGlues), announcement bar UI, and Chinese localization refinements. Although Air does not directly include TouchController code, this fork's approach to Chinese user experience improvements informed several design decisions.
 
 ## About Translations
 
@@ -184,10 +233,10 @@ If you find this project valuable, consider supporting the original author throu
 
 ## Star History
 
-<a href="https://www.star-history.com/?type=date&repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered">
+<a href="https://www.star-history.com/?type=date&repos=Gsjsjzhznsz%2FAir-Minecraft-iOS-Launcher">
  <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered&type=date&theme=dark" />
-  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered&type=date&legend=top-left" />
-  <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAmethyst-iOS-MyRemastered&type=date&legend=top-left" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAir-Minecraft-iOS-Launcher&type=date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAir-Minecraft-iOS-Launcher&type=date&legend=top-left" />
+  <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Gsjsjzhznsz%2FAir-Minecraft-iOS-Launcher&type=date&legend=top-left" />
  </picture>
 </a>

@@ -3,25 +3,28 @@
 </div>
 
 <h1 align="center">Air</h1>
-<p align="center"><sub>Amethyst iOS 重制版 (Fork)</sub></p>
+<p align="center"><b>一款面向中国用户深度优化的 iOS Minecraft: Java Edition 启动器</b></p>
+<p align="center"><sub>派生自 <a href="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered">Amethyst-iOS-MyRemastered</a></sub></p>
 
 <div align="center">
-  <img alt="构建状态" src="https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions/workflows/development.yml/badge.svg?branch=main">
-  <img alt="下载量" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/total?label=Downloads&style=flat">
-  <img alt="版本" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="许可证" src="https://img.shields.io/github/license/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?style=flat">
-  <img alt="最后提交" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Amethyst-iOS-MyRemastered?color=c78aff&label=last%20commit&style=flat">
+  <img alt="构建状态" src="https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="下载量" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/total?label=Downloads&style=flat">
+  <img alt="版本" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
+  <img alt="许可证" src="https://img.shields.io/github/license/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
+  <img alt="最后提交" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?color=c78aff&label=last%20commit&style=flat">
 </div>
 
 <p align="center">
-  <a href="./README.md">English</a> | <a href="./README_CN.md">中文</a>
+  <a href="./README.md">English</a> | <a href="README_CN.md">中文</a>
 </p>
 
 ---
 
-一款面向 iOS 和 iPadOS 平台的 Minecraft: Java Edition 高端启动器，基于官方 Amethyst 项目深度重构。提供了精致的移动端体验，集成了全面的 Mod 管理、智能渲染器选择以及深度的平台适配能力。
+## Air 是什么？
 
-> **本仓库是** [herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) **的 Fork**，在原版基础上增加了额外的修复和改进。
+**Air** 是 [Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) 的定制 Fork，一款面向 iOS 和 iPadOS 的 Minecraft: Java Edition 高端启动器。本 Fork 聚焦**中国用户体验** -- 提供完整的中文本地化、应用内中英文切换、iOS 26+ JIT 直接启动优化，以及来自上游议题审计的 Bug 修复。
+
+> **不知道该用哪个 Fork？** 请查看下方的 [Fork 网络](#fork-网络) 章节，了解各活跃 Fork 的功能对比。
 
 ---
 
@@ -29,18 +32,55 @@
 
 | 改动 | 说明 |
 |------|------|
-| **LWJGL 3.4.1 兼容** | 更新 LWJGL 至 3.4.1 兼容层，支持 Sodium 0.9+ 等要求 LWJGL >= 3.4.1 的模组。采用开发者 herbrine8403 的方案：3.3.x 基础模块 + lwjgl-callback-descriptor.jar (3.4.1) + 源码覆盖层同时兼容 3.3.x 和 3.4.1 两种 Callback API。 |
-| **JIT 已启用时直接启动** | 当 JIT 已经开启时（如上次会话已启用），直接启动游戏，不再通过 stikjit:// URL 重新请求，避免 iOS 26+ 设备上因切换后台导致的闪退。JIT26 脚本由 JavaLauncher 在游戏启动时通过 brk 指令发送。 |
-| **应用内语言切换** | 在设置 > 通用中新增语言选择器，支持跟随系统、简体中文、English 三种选项，切换后立即生效无需重启。`localize()` 函数会尊重用户选择并保持完整的回退链。 |
+| **LWJGL 3.4.1 兼容** | 更新 LWJGL 至 3.4.1 兼容层，支持 Sodium 0.9+ 等要求 LWJGL >= 3.4.1 的模组。采用 herbrine8403 的方案：3.3.x 基础模块 + lwjgl-callback-descriptor.jar (3.4.1) + 源码覆盖层同时兼容两种 Callback API。 |
+| **JIT 已启用时直接启动** | 当 JIT 已开启时直接启动游戏，不再通过 stikjit:// URL 重新请求，避免 iOS 26+ 设备上因切换后台导致的闪退。JIT26 脚本由 JavaLauncher 在游戏启动时通过 brk 指令发送。 |
+| **应用内语言切换** | 在设置 > 通用中新增语言选择器，支持跟随系统、简体中文、English 三种选项，切换后立即生效无需重启。 |
 | **增强中文本地化** | 完整中文界面翻译（1955+ 行），覆盖比上游更全面。 |
-| **上游议题审计 Bug 修复** | 通过系统性审查上游及上上游 GitHub 议题，修复了 8 个 Bug，包括 JIT 脚本加载 nil 崩溃、UIKit 线程安全、KVO 观察者清理等。 |
+| **上游议题审计 Bug 修复** | 通过系统性审查上游及上上游 GitHub 议题，修复了 8+ 个 Bug，包括 JIT 脚本加载 nil 崩溃、UIKit 线程安全、KVO 观察者清理等。 |
 | **Makefile 健壮性** | 修复 TAB 缩进被转为空格导致 CI 构建失败的问题。 |
+
+---
+
+## Fork 网络
+
+本项目存在于一条 Fork 链中。了解每个 Fork 的定位有助于您选择最适合的版本。
+
+```
+PojavLauncherTeam/PojavLauncher_iOS          (最初的上游 - 官方 PojavLauncher iOS 移植版)
+        |
+        v
+herbrine8403/Amethyst-iOS-MyRemastered       (主要重制版 Fork - UI 重构、Mod 管理、
+        |                                     BMCLAPI 支持、多账户、自动渲染器/JVM)
+        |
+        +----> yitenchen123/Amethyst-iOS-MyRemastered   (TouchController 触控集成、CI 加速、
+        |                                              公告栏 UI、中文本地化优化)
+        |
+        +----> Gsjsjzhznsz/Air-Minecraft-iOS-Launcher   (本仓库 - 中国用户体验、JIT 直接启动、
+                                                       应用内语言切换、Bug 修复、LWJGL 3.4.1)
+```
+
+### 活跃 Fork 功能对比
+
+| 功能 | herbrine8403 (上游) | yitenchen123 | Air (本仓库) |
+|------|:---:|:---:|:---:|
+| **定位** | 全功能重制版 | 触控 + CI 加速 | 中国用户体验 + 稳定性 |
+| **TouchController Mod** | 否 | 是 (UDP + XCFramework) | 否 |
+| **JIT 直接启动** | 否 | 否 | 是 |
+| **应用内语言切换** | 否 | 否 | 是 (系统/中文/English) |
+| **中文本地化** | 部分 (通过 Crowdin) | 增强 | 完整 (1955+ 行) |
+| **BMCLAPI 镜像源** | 是 | 是 | 是 |
+| **LWJGL 3.4.1** | 部分 | 否 | 是 |
+| **CI 构建速度** | 标准 | 优化 (预构建 MobileGlues) | 标准 |
+| **上游 Bug 修复** | -- | 否 | 是 (8+ 项) |
+| **同步状态** | 源 | 落后 950+ | 活跃同步 |
 
 ---
 
 ## 目录
 
+- [Air 是什么？](#air-是什么)
 - [与上游的差异](#与上游的差异)
+- [Fork 网络](#fork-网络)
 - [核心特性](#核心特性)
 - [快速上手](#快速上手)
   - [设备要求](#设备要求)
@@ -48,6 +88,7 @@
   - [安装步骤](#安装步骤)
   - [启用 JIT](#启用-jit)
 - [贡献者](#贡献者)
+- [Fork 致谢](#fork-致谢)
 - [第三方组件](#第三方组件)
 - [捐赠](#捐赠)
 
@@ -100,14 +141,14 @@
 <details>
 <summary><b>正式版（TrollStore 渠道）</b></summary>
 
-1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases) 下载 `.tipa` 安装包。
+1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases) 下载 `.tipa` 安装包。
 2. 通过系统分享菜单，选择用 TrollStore 打开，即可自动完成安装。
 </details>
 
 <details>
 <summary><b>正式版（AltStore / SideStore 渠道）</b></summary>
 
-1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/releases) 下载 `.ipa` 安装包。
+1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases) 下载 `.ipa` 安装包。
 2. 按照侧载工具的标准流程导入 IPA 完成安装。
 </details>
 
@@ -117,7 +158,7 @@
 > [!CAUTION]
 > 测试版可能包含崩溃、无法启动等严重缺陷，仅限开发测试使用。
 
-1. 前往 [GitHub Actions](https://github.com/Gsjsjzhznsz/Amethyst-iOS-MyRemastered/actions) 页面下载最新 IPA 构建产物。
+1. 前往 [GitHub Actions](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions) 页面下载最新 IPA 构建产物。
 2. 在侧载工具（AltStore、SideStore 等）中导入 IPA 完成安装。
 </details>
 
@@ -136,12 +177,20 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 ## 贡献者
 
-- [@herbrine8403](https://github.com/herbrine8403) -- 原项目作者
-- [@yitenchen123](https://github.com/yitenchen123) -- 项目维护者
+- [@herbrine8403](https://github.com/herbrine8403) -- Amethyst-iOS-MyRemastered 原项目作者
+- [@yitenchen123](https://github.com/yitenchen123) -- TouchController 触控集成、CI 优化、UI 美化
 - [EternityQwQ](https://github.com/EternityQwQ) -- 添加 Metal Universal Mod 支持
 - [@LanRhyme](https://github.com/LanRhyme) -- iOS 26 兼容性适配及日志改进
 - [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod 下载功能集成、TouchController 优化
 - [@Li2548](https://github.com/Li2548) -- 上游同步维护
+
+## Fork 致谢
+
+本项目基于以下 Fork 链构建，特此致谢：
+
+- **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- 最初的 iOS Minecraft 启动器，一切的起点。
+- **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- 主要重制版 Fork，添加了现代化 UI、Mod 管理、BMCLAPI 下载源、多账户、自动渲染器/JVM 选择等功能。这是 Air 的直接上游。
+- **[yitenchen123/Amethyst-iOS-MyRemastered](https://github.com/yitenchen123/Amethyst-iOS-MyRemastered)** -- 同级 Fork，专注于 TouchController 触屏控制集成（UDP + XCFramework 双通信模式）、CI 构建加速（预构建 MobileGlues）、公告栏 UI 以及中文本地化优化。虽然 Air 未直接引入 TouchController 代码，但该 Fork 在中国用户体验改进方面的思路为 Air 的多项设计决策提供了参考。
 
 ## 第三方组件
 
@@ -177,10 +226,10 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 ## Star History
 
-<a href="https://star-history.com/#Gsjsjzhznsz/Amethyst-iOS-MyRemastered&Date">
+<a href="https://star-history.com/#Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&Date">
  <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Amethyst-iOS-MyRemastered&type=Date&theme=dark" />
-  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Amethyst-iOS-MyRemastered&type=Date" />
-  <img alt="Star history" src="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Amethyst-iOS-MyRemastered&type=Date" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&type=Date" />
+  <img alt="Star history" src="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&type=Date" />
  </picture>
 </a>
