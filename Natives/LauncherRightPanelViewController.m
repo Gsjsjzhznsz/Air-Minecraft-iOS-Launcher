@@ -1253,42 +1253,15 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
-
-        // iOS 26+ with TXM: the brk #0x69 in JavaLauncher.m requires a debugger.
-        // Only open stikjit:// if no debugger is currently attached --
-        // re-opening stikjit:// when a debugger is already present can cause
-        // StikDebug to detach it, making the subsequent brk #0x69 crash.
-        if (@available(iOS 17.4, *)) {
-            if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
-                if (!isJITEnabled(true)) {
-                    // JIT enabled but no debugger actually attached right now.
-                    // Must go through stikjit:// to get a debugger for brk #0x69.
-                    NSLog(@"[JIT] JIT enabled but no debugger attached, need stikjit:// for brk #0x69");
-                    NSString *scriptDataString = @"";
-                    NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-                    scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
-                    [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
-                    self.progressLabel.text = localize(@"i18n_str_436", nil);
-                    UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                                                                           message:localize(@"i18n_str_439", nil)
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-                    [self presentViewController:alert animated:YES completion:nil];
-                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                        while (!isJITEnabled(true)) {
-                            usleep(1000 * 200);
-                        }
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            [alert dismissViewControllerAnimated:YES completion:handler];
-                        });
-                    });
-                    return;
-                } else {
-                    NSLog(@"[JIT] JIT + debugger already attached, launching directly (brk #0x69 will be handled)");
-                }
-            }
-        }
-
-        NSLog(@"[JIT] JIT already enabled, launching game directly");
+        // Direct launch, matching upstream exactly.  A nested TXM
+        // "re-open stikjit:// when isJITEnabled(true)==NO" block lived here
+        // (added by the 1e11f44f/cf3033eb/9c6cdb53 series); it forced a
+        // redundant stikjit:// round trip on externally-JIT-enabled devices
+        // (external attachers leave ppid==1 / P_TRACED==0 / no task
+        // exception ports, so the old keep-attached gate misread them as
+        // debugger-less) and its while(!isJITEnabled(true)) wait could spin
+        // forever.  Upstream never re-opens stikjit:// once JIT is enabled.
+        NSLog(@"[JIT] [RightPanel] JIT already enabled, launching game directly");
         handler();
         return;
     } else if (hasTrollStoreJIT) {

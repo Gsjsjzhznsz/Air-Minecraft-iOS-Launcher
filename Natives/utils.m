@@ -129,19 +129,22 @@ BOOL isJITEnabled(BOOL checkCSFlags) {
         return YES;
     }
 
+    // NOTE: the tail below deliberately matches upstream semantics exactly
+    // (cf. 31d83637 which first simplified it this way): CS_DEBUGGED alone
+    // decides.  A TXM "debugger keep-attached" gate reintroduced by 9c6cdb53
+    // broke status display AND the launch path on StikJIT/SideJIT/NB-style
+    // tools: they attach externally (ppid stays 1, P_TRACED unset by the
+    // time we look, no task-level exception ports), yet the JIT26 mapping
+    // service keeps working -- measured on-device as CS_DEBUGGED=1 ppid=1
+    // traced=0 exn=0 with "[JIT26] Got JIT mapping from debugger" succeeding
+    // right after.  Gating on debugger-attach state misreported such fully
+    // working sessions as "JIT not enabled" and forced a redundant
+    // stikjit:// round trip on every launch.  The helpers
+    // JIT26IsLikelyDebuggerKeepAttached() / JIT26DebuggerAttachedViaPtrace()
+    // / JIT26DebuggerViaExceptionPorts() are still exported for diagnostics.
     int flags;
     csops(getpid(), 0, &flags, sizeof(flags));
-    if ((flags & CS_DEBUGGED) == 0) {
-        return NO;
-    }
-    // On iOS 26+ with FORCE_MIRRORED + HAS_TXM, CS_DEBUGGED alone is not
-    // sufficient — the brk #0x69 in JavaLauncher.m needs a debugger that is
-    // STILL attached.  CS_DEBUGGED can remain set after the debugger
-    // detaches, so we verify with getppid().
-    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
-        return JIT26IsLikelyDebuggerKeepAttached();
-    }
-    return YES;
+    return (flags & CS_DEBUGGED) != 0;
 }
 
 void openLink(UIViewController* sender, NSURL* link) {
