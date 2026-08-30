@@ -31,7 +31,7 @@
 // zero-byte driver readback). Shader conversions now ALWAYS run on the
 // dedicated 32 MB-stack thread (the >= 8 MB inline fast path depended on the
 // caller's stack-size report and could still overflow inside glslang).
-#define REVISION 3
+#define REVISION 4
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

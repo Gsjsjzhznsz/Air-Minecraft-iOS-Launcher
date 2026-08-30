@@ -25,6 +25,9 @@
 
 #if defined(__APPLE__)
 #include <pthread.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <mutex>
 #endif
 
 #define DEBUG 0
@@ -878,6 +881,61 @@ struct BigStackJob {
     void* arg;
 };
 
+// ---------------------------------------------------------------------------
+// SIGSEGV safety net for the conversion thread.
+//
+// History: three device builds in a row (2.0.1 .. 2.0.3) died with SIGSEGV at
+// glslang::TParseContext::lValueErrorCheck+0x264 while parsing Minecraft
+// 26.x's position_color vertex shader on iOS/arm64 -- an input that parses
+// fine under x86_64 with the same pinned glslang and is clean under ASan.
+// The fatal fault turned a per-shader GLSL problem into a whole-process kill
+// during startup.
+//
+// The guard below confines that blast radius: while a conversion runs on the
+// dedicated big-stack thread, a SIGSEGV in it unwinds back to the conversion
+// entry via siglongjmp, the failure is logged, and the shader simply fails to
+// convert (a per-shader GLSL error -- Minecraft 26.x can cope with that).
+// Faults on any other thread (or outside a conversion) are forwarded to
+// whatever handler was installed before us (HotSpot, PLCrashReporter, ...).
+// ---------------------------------------------------------------------------
+static thread_local sigjmp_buf t_conv_jmp;
+static thread_local bool t_in_conversion = false;
+static sigjmp_buf dummy_jmp;
+static struct sigaction g_prev_sigsegv{};
+static bool g_prev_sigsegv_valid = false;
+
+static void conversion_sigsegv_handler(int sig, siginfo_t* info, void* uctx) {
+    if (t_in_conversion) {
+        t_in_conversion = false;
+        siglongjmp(t_conv_jmp, 1);
+    }
+    // Not ours: forward to the previous handler chain (JVM, PLCrash, ...).
+    if (g_prev_sigsegv_valid && (g_prev_sigsegv.sa_flags & SA_SIGINFO) && g_prev_sigsegv.sa_sigaction) {
+        g_prev_sigsegv.sa_sigaction(sig, info, uctx);
+        return;
+    }
+    if (g_prev_sigsegv_valid && g_prev_sigsegv.sa_handler &&
+        g_prev_sigsegv.sa_handler != SIG_DFL && g_prev_sigsegv.sa_handler != SIG_IGN) {
+        g_prev_sigsegv.sa_handler(sig);
+        return;
+    }
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+// Called once per process, at the first conversion. By that time the JVM and
+// PLCrashReporter have already installed their handlers, which we chain to.
+static void install_conversion_sigsegv_guard() {
+    static std::once_flag once;
+    std::call_once(once, [] {
+        struct sigaction sa{};
+        sa.sa_sigaction = conversion_sigsegv_handler;
+        sa.sa_flags = SA_SIGINFO;
+        sigemptyset(&sa.sa_mask);
+        g_prev_sigsegv_valid = (sigaction(SIGSEGV, &sa, &g_prev_sigsegv) == 0);
+    });
+}
+
 static void* big_stack_trampoline(void* p) {
     BigStackJob* job = (BigStackJob*)p;
     job->fn(job->arg);
@@ -923,7 +981,23 @@ static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint es
 
 static void GLSLtoGLSLES_2_entry(void* p) {
     GLSLtoGLSLES_2_Args* a = (GLSLtoGLSLES_2_Args*)p;
+#if defined(__APPLE__)
+    if (sigsetjmp(t_conv_jmp, 1) != 0) {
+        // SIGSEGV inside glslang on this dedicated thread (see the guard
+        // notes above). Report a clean per-shader failure instead of dying:
+        // -999 marks "conversion crashed" for the caller's log.
+        LOG_W_FORCE("[MG] shader conversion CRASHED (SIGSEGV recovered on 32MB-stack thread, len=%zu, head='%.96s') -- reporting conversion failure",
+                    strlen(a->glsl_code), a->glsl_code)
+        *a->return_code = -999;
+        a->out->clear();
+        return;
+    }
+    t_in_conversion = true;
     GLSLtoGLSLES_2_impl(a->glsl_code, a->glsl_type, a->essl_version, *a->return_code, *a->out);
+    t_in_conversion = false;
+#else
+    GLSLtoGLSLES_2_impl(a->glsl_code, a->glsl_type, a->essl_version, *a->return_code, *a->out);
+#endif
 }
 
 std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_version, int& return_code) {
@@ -934,7 +1008,11 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
     // Log BEFORE the conversion so a crash inside glslang is attributable:
     // if the next log shows this line but no completion, the SEGV happened on
     // the dedicated 32 MB stack (=> a real glslang bug, not a stack overflow).
-    LOG_V("[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=%zu)", strlen(glsl_code))
+#if defined(__APPLE__)
+    install_conversion_sigsegv_guard();
+#endif
+    LOG_V("[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=%zu, head='%.96s')",
+          strlen(glsl_code), glsl_code)
     if (run_on_big_stack_if_needed(&GLSLtoGLSLES_2_entry, &args)) {
         return_code = rc;
         return out;

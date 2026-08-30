@@ -325,6 +325,17 @@ dep_mg:
 	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang/CMakeLists.txt" || { echo "ERROR: glslang submodule still missing - cannot build MobileGlues"; exit 1; }
 	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/SPIRV-Cross/CMakeLists.txt" || { echo "ERROR: SPIRV-Cross submodule still missing - cannot build MobileGlues"; exit 1; }
 	@test -f "$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/xxhash/xxhash32.h" || { echo "ERROR: xxhash submodule still missing - cannot build MobileGlues"; exit 1; }
+	# The pinned glslang (f5f664d) dereferences the swizzle selector aggregate in
+	# TParseContext::lValueErrorCheck without a null check. On iOS/arm64 that
+	# exact chain SIGSEGV'd the process while parsing Minecraft 26.x's
+	# position_color vertex shader (666 bytes post moj_import), killing the game
+	# during startup. Apply the defensive null-guard patch on top of the pinned
+	# submodule; idempotent across cached and fresh CI workspaces.
+	@if git -C $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang apply --check $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang-lvalue-nullguard.patch >/dev/null 2>&1; then \
+		git -C $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang apply $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang-lvalue-nullguard.patch && echo 'glslang-lvalue-nullguard.patch applied'; \
+	else \
+		echo 'glslang-lvalue-nullguard.patch already applied or submodule absent - continuing'; \
+	fi
 	mkdir -p $(WORKINGDIR)/mobileglues
 	cd $(WORKINGDIR)/mobileglues && cmake \
 		-DMACOS="1" \

@@ -112,7 +112,11 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, c
         essl_src = GLSLtoGLSLES(glsl_src.c_str(), shaderType, hardware->es_version, glsl_version, return_code);
 
         if (essl_src.empty()) {
-            LOG_W_FORCE("Failed to convert shader %d (empty result).", shader)
+            if (return_code == -999) {
+                LOG_W_FORCE("[MG] Shader %d conversion was aborted by the conversion-thread SIGSEGV guard (see conversion CRASHED log above). Reporting a per-shader failure instead of killing the process.", shader)
+            } else {
+                LOG_W_FORCE("Failed to convert shader %d (empty result).", shader)
+            }
             LOG_E("Failed to convert shader %d.", shader)
             return;
         }
