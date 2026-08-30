@@ -1262,6 +1262,7 @@
 "i18n_str_420" = "Failed to save avatar";
 "i18n_str_421" = "JIT: Enabled";
 "i18n_str_422" = "JIT: Not Enabled";
+"i18n_str_jit26_pending" = "JIT: Enabled (debugger will attach on launch)";
 "i18n_str_423" = "No installed versions";
 "i18n_str_424" = "Please install a version in the Downloads page first";
 "i18n_str_426" = "Manage Versions";

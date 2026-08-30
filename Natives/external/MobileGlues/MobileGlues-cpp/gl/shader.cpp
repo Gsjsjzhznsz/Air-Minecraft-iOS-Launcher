@@ -6,7 +6,13 @@
 // End of Source File Header
 
 #include <cctype>
+#include <cstdio>
+#include <cstring>
 #include "shader.h"
+
+#ifndef GL_SHADER_SOURCE_LENGTH
+#define GL_SHADER_SOURCE_LENGTH 0x8B88
+#endif
 
 #include <GL/gl.h>
 #include "log.h"
@@ -22,6 +28,22 @@
 struct shader_t shaderInfo;
 
 UnorderedMap<GLuint, bool> shader_map_is_sampler_buffer_emulated;
+
+// Failure-correlated record of what THIS wrapper last submitted to the driver
+// for each shader id, plus what the driver reports back via glGetShaderSource.
+// When a compile later fails, glGetShaderiv() dumps the matching record; that
+// single log line distinguishes "conversion produced a hollow/corrupt source"
+// from "the source never reached the driver" (delivery/interposition bug).
+static UnorderedMap<GLuint, std::string> shader_map_submit_record;
+
+static std::string sanitize_head(const char* s, size_t bytes) {
+    std::string out;
+    for (size_t i = 0; i < bytes && s[i]; ++i) {
+        unsigned char c = (unsigned char)s[i];
+        out += (c >= 0x20 && c < 0x7f) ? (char)c : '.';
+    }
+    return out;
+}
 
 bool can_run_essl3(unsigned int esversion, const char* glsl) {
     if (strncmp(glsl, "#version 100", 12) == 0) {
@@ -136,6 +158,27 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, c
         // `count` with a 1-element array makes the driver read past the end of
         // `s` whenever the app passes more than one source string.
         GLES.glShaderSource(shader, 1, s, nullptr);
+        // Read back what the driver actually stored. If the length comes back
+        // 0 (or the head differs) the submission was swallowed or mangled
+        // between this wrapper and the driver -- that is a delivery bug, not
+        // a conversion bug, and the next compile failure will say so.
+        {
+            GLint src_len = 0;
+            GLES.glGetShaderiv(shader, GL_SHADER_SOURCE_LENGTH, &src_len);
+            char rb[97] = {0};
+            GLsizei rb_len = 0;
+            if (src_len > 0)
+                GLES.glGetShaderSource(shader, sizeof(rb) - 1, &rb_len, rb);
+            size_t submitted_len = strlen(essl_src.c_str());
+            char rec[512];
+            snprintf(rec, sizeof(rec),
+                     "size=%zu strlen=%zu | driver SHADER_SOURCE_LENGTH=%ld readback=%d head(submit)='%.96s' head(readback)='%.96s'%s",
+                     essl_src.size(), submitted_len, (long)src_len, (int)rb_len,
+                     sanitize_head(essl_src.c_str(), 96).c_str(),
+                     sanitize_head(rb, 96).c_str(),
+                     (src_len > 0 && strncmp(rb, essl_src.c_str(), 32) != 0) ? " <-- MISMATCH" : "");
+            shader_map_submit_record[shader] = rec;
+        }
         if (hardware->emulate_texture_buffer)
             shader_map_is_sampler_buffer_emulated[shader] = is_sampler_buffer_emulated;
     } else
@@ -154,6 +197,12 @@ void glGetShaderiv(GLuint shader, GLenum pname, GLint* params) {
         GLchar infoLog[1024];
         GLES.glGetShaderInfoLog(shader, 1024, nullptr, infoLog);
         LOG_W_FORCE("Shader %d compilation failed: \n%s", shader, infoLog)
+        auto it = shader_map_submit_record.find(shader);
+        if (it != shader_map_submit_record.end()) {
+            LOG_W_FORCE("[MG] Shader %d submit record: %s", shader, it->second.c_str())
+        } else {
+            LOG_W_FORCE("[MG] Shader %d submit record: <none -- source was submitted outside this wrapper>", shader)
+        }
         if (global_settings.ignore_error >= IgnoreErrorLevel::Partial) {
             LOG_W_FORCE("Now try to cheat.")
             *params = GL_TRUE;

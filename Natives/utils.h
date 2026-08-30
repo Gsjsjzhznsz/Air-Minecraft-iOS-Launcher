@@ -77,6 +77,12 @@ BOOL JIT26IsLikelyDebuggerKeepAttached(void);
 // already-running process by pid (StikJIT/SideJIT), where getppid()
 // stays 1 for the whole session.
 BOOL JIT26DebuggerAttachedViaPtrace(void);
+// Live "debugger holds our task" check via Mach exception ports
+// (task_get_exception_ports on EXC_BREAKPOINT|EXC_SOFTWARE).  lldb/debugserver
+// keep serving breakpoints through task-level exception ports after
+// PT_DETACH, with P_TRACED back at 0 -- this is what actually services the
+// JIT26 brk #0x69 / brk #0xf00d traps in that state.
+BOOL JIT26DebuggerViaExceptionPorts(void);
 // legacy method used to check if we're using universal script
 void* JIT26CreateRegionLegacy(size_t len);
 // used for large memory regions

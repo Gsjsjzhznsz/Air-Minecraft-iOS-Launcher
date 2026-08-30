@@ -144,10 +144,76 @@ void load_libs() {
         LOG_E("ANGLE was requested but was not loaded; running on the system driver\n")
     }
 #else
-    gles = (void*)(~(uintptr_t)0);
-    egl = (void*)(~(uintptr_t)0);
+    // On iOS the host GLES driver is the app-bundled ANGLE
+    // (libGLESv2.framework / libEGL.framework next to the executable).  Bind
+    // those images EXPLICITLY instead of leaving `gles` at the invalid -1
+    // sentinel: proc_address() then queries the ANGLE handle directly and only
+    // falls back to RTLD_DEFAULT if the handle misses.  With the sentinel,
+    // EVERY lookup went through RTLD_DEFAULT -- the process-wide flat
+    // namespace -- so any other gl* definition in the process (render bridging
+    // shims, interposers, LWJGL helpers) could silently win over ANGLE and
+    // intercept the shader pipeline.  dlopen() on an already-loaded image just
+    // bumps its refcount and returns the same handle, so this cannot cause a
+    // second copy of ANGLE to appear.
+    {
+        const char* gles_paths[] = {
+            "@executable_path/Frameworks/libGLESv2.framework/libGLESv2",
+            "@rpath/libGLESv2.framework/libGLESv2",
+            "/System/Library/Frameworks/libGLESv2.framework/libGLESv2",
+        };
+        const char* egl_paths[] = {
+            "@executable_path/Frameworks/libEGL.framework/libEGL",
+            "@rpath/libEGL.framework/libEGL",
+            "/System/Library/Frameworks/libEGL.framework/libEGL",
+        };
+        gles = nullptr;
+        for (const char* p : gles_paths) {
+            if ((gles = dlopen(p, RTLD_LOCAL | RTLD_NOW)) != nullptr) break;
+        }
+        egl = nullptr;
+        for (const char* p : egl_paths) {
+            if ((egl = dlopen(p, RTLD_LOCAL | RTLD_NOW)) != nullptr) break;
+        }
+        g_angle_in_use = (gles != nullptr);
+        LOG_W_FORCE("[MG] iOS host driver binding: libGLESv2=%s libEGL=%s (angle_in_use=%d)\n",
+                    gles ? "loaded" : "NOT FOUND", egl ? "loaded" : "NOT FOUND",
+                    (int)g_angle_in_use)
+        if (!gles) {
+            // Nothing we could pin -- keep the legacy sentinel so
+            // proc_address() falls through to RTLD_DEFAULT exactly as before.
+            gles = (void*)(~(uintptr_t)0);
+            egl = (void*)(~(uintptr_t)0);
+            g_angle_in_use = false;
+        }
+    }
 #endif
 }
+
+#if defined(__APPLE__)
+// One-shot diagnostic: name the image each critical GLES entry point actually
+// came from.  When the shader pipeline misbehaves this is the difference
+// between "ANGLE saw garbage" and "someone else answered the lookup".
+static void log_gles_symbol_ownership() {
+    struct { const char* name; void* addr; } probe[] = {
+        {(const char*)"glShaderSource", (void*)GLES.glShaderSource},
+        {(const char*)"glCompileShader", (void*)GLES.glCompileShader},
+        {(const char*)"glGetString", (void*)GLES.glGetString},
+        {(const char*)"glCreateShader", (void*)GLES.glCreateShader},
+    };
+    for (auto& p : probe) {
+        if (!p.addr) {
+            LOG_W_FORCE("[MG] GLES ptr %s = NULL", p.name)
+            continue;
+        }
+        Dl_info info{};
+        if (dladdr(p.addr, &info) && info.dli_fname) {
+            LOG_W_FORCE("[MG] GLES ptr %s <- %s", p.name, info.dli_fname)
+        } else {
+            LOG_W_FORCE("[MG] GLES ptr %s <- <dladdr failed>", p.name)
+        }
+    }
+}
+#endif
 
 void* proc_address(void* lib, const char* name) {
 #if defined(__APPLE__)
@@ -709,4 +775,8 @@ void init_target_gles() {
             g_gles_func.glDrawElementsBaseVertex = nullptr;
         }
     }
+
+#if defined(__APPLE__)
+    log_gles_symbol_ownership();
+#endif
 }

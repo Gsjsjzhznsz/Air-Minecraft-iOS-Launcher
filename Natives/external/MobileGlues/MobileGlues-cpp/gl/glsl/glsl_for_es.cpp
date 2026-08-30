@@ -23,6 +23,10 @@
 #include "cache.h"
 #include "../../version.h"
 
+#if defined(__APPLE__)
+#include <pthread.h>
+#endif
+
 #define DEBUG 0
 
 static TBuiltInResource InitResources() {
@@ -857,7 +861,82 @@ std::string spirv_to_essl(std::vector<unsigned int> spirv, uint essl_version, in
 }
 
 static bool glslang_inited = false;
+
+#if defined(__APPLE__)
+namespace {
+// glslang's recursive-descent parser and its semantic analysis recurse through
+// the whole expression/declaration tree. iOS threads created by pthread_create
+// default to a 512 KB stack and JVM threads get 1-2 MB, while the harness runs
+// with the 8 MB main-thread stack -- which is why complex shaders (Sodium etc.)
+// SIGSEGV'd inside glslang::TParseContext::lValueErrorCheck on-device but never
+// locally. When the calling thread's stack is smaller than 8 MB, run the whole
+// conversion on a dedicated 32 MB-stack thread; results are copied back
+// synchronously. One pthread_create per compiled shader is negligible next to
+// the conversion itself.
+struct BigStackJob {
+    void (*fn)(void*);
+    void* arg;
+};
+
+static void* big_stack_trampoline(void* p) {
+    BigStackJob* job = (BigStackJob*)p;
+    job->fn(job->arg);
+    return nullptr;
+}
+
+static bool run_on_big_stack_if_needed(void (*fn)(void*), void* arg) {
+    size_t ss = pthread_get_stacksize_np(pthread_self());
+    if (ss >= (8u << 20)) return false; // plenty of headroom; run inline
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr) != 0) return false;
+    if (pthread_attr_setstacksize(&attr, 32u << 20) != 0) {
+        pthread_attr_destroy(&attr);
+        return false;
+    }
+    BigStackJob job{fn, arg};
+    pthread_t tid;
+    int rc = pthread_create(&tid, &attr, big_stack_trampoline, &job);
+    pthread_attr_destroy(&attr);
+    if (rc != 0) return false;
+    pthread_join(tid, nullptr);
+    return true;
+}
+} // namespace
+#endif
+
+struct GLSLtoGLSLES_2_Args {
+    const char* glsl_code;
+    GLenum glsl_type;
+    uint essl_version;
+    int* return_code;
+    std::string* out;
+};
+
+static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint essl_version,
+                                int& return_code, std::string& out);
+
+static void GLSLtoGLSLES_2_entry(void* p) {
+    GLSLtoGLSLES_2_Args* a = (GLSLtoGLSLES_2_Args*)p;
+    GLSLtoGLSLES_2_impl(a->glsl_code, a->glsl_type, a->essl_version, *a->return_code, *a->out);
+}
+
 std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_version, int& return_code) {
+#if defined(__APPLE__)
+    std::string out;
+    int rc = 0;
+    GLSLtoGLSLES_2_Args args{glsl_code, glsl_type, essl_version, &rc, &out};
+    if (run_on_big_stack_if_needed(&GLSLtoGLSLES_2_entry, &args)) {
+        return_code = rc;
+        return out;
+    }
+#endif
+    std::string out2;
+    GLSLtoGLSLES_2_impl(glsl_code, glsl_type, essl_version, return_code, out2);
+    return out2;
+}
+
+static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint essl_version,
+                                int& return_code, std::string& out) {
     std::string correct_glsl_str = preprocess_glsl(glsl_code, glsl_type);
     LOG_D("Firstly converted GLSL:\n%s", correct_glsl_str.c_str())
     int glsl_version = get_or_add_glsl_version(correct_glsl_str);
@@ -871,13 +950,15 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
     std::vector<unsigned int> spirv_code = glsl_to_spirv(glsl_type, glsl_version, s, errc);
     if (errc != 0) {
         return_code = -1;
-        return "";
+        out.clear();
+        return;
     }
     errc = 0;
     std::string essl = spirv_to_essl(spirv_code, essl_version, errc);
     if (errc != 0) {
         return_code = -2;
-        return "";
+        out.clear();
+        return;
     }
 
     // Post-processing ESSL
@@ -890,7 +971,7 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
 
     LOG_D("Originally GLSL to GLSL ES Complete: \n%s", essl.c_str())
     return_code = errc;
-    return essl;
+    out = std::move(essl);
 }
 
 std::string GLSLtoGLSLES_1(const char* glsl_code, GLenum glsl_type, uint esversion, int& return_code) { // useless now

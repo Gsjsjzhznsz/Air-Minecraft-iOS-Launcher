@@ -20,7 +20,12 @@
 // rejects with "ERROR: 1:1: '' : syntax error"; the cache key embeds
 // MAJOR.MINOR.REVISION, so this bump makes every device discard those entries
 // on first run instead of re-serving them.
-#define REVISION 1
+// 1 -> 2: iOS host-driver binding rework (explicit ANGLE dlopen instead of the
+// RTLD_DEFAULT free-for-all) + per-shader submit/readback records. The bump
+// invalidates cached conversion results once more and, more importantly, makes
+// "MobileGlues 2.0.2" visible in the runtime log so a stale dylib in the IPA
+// is instantly obvious.
+#define REVISION 2
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

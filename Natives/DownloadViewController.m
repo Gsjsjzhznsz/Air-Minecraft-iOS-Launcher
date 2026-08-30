@@ -3725,8 +3725,8 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         BOOL hasDynamicCS = getEntitlementValue(@"dynamic-codesigning");
         int diagCsFlags = 0;
         csops(getpid(), 0, &diagCsFlags, sizeof(diagCsFlags));
-        NSLog(@"[JIT] [DownloadVC] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d traced=%d JIT_FLAGS=0x%X",
-              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), JIT26DebuggerAttachedViaPtrace(), DeviceGetJITFlags(NO));
+        NSLog(@"[JIT] [DownloadVC] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d traced=%d exn=%d JIT_FLAGS=0x%X",
+              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts(), DeviceGetJITFlags(NO));
     }
 
     if (isJITEnabled(false)) {

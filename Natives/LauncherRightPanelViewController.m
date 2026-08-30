@@ -700,9 +700,26 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         self.jitStatusLabel.textColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0];
         self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
     } else {
-        self.jitStatusLabel.text = localize(@"i18n_str_422", nil);
-        self.jitStatusLabel.textColor = [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
-        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
+        // Three-state display on TXM devices (iPadOS 26 + M-series): plain
+        // isJITEnabled(NO) means "JIT26 debugger live", which reads as red
+        // "Not Enabled" while the user DID enable JIT externally -- the
+        // enablement (CS_DEBUGGED) persists, only the JIT26 debugger session
+        // is gone.  Tell the two apart instead of lying with the red label:
+        // the launch flow auto-attaches the debugger via stikjit:// when
+        // needed, so this state is expected and recoverable.
+        BOOL txm = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
+        int csFlags = 0;
+        csops(getpid(), 0, &csFlags, sizeof(csFlags));
+        BOOL debugged = (csFlags & CS_DEBUGGED) != 0;
+        if (txm && debugged) {
+            self.jitStatusLabel.text = localize(@"i18n_str_jit26_pending", nil);
+            self.jitStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0];
+            self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0] colorWithAlphaComponent:0.15];
+        } else {
+            self.jitStatusLabel.text = localize(@"i18n_str_422", nil);
+            self.jitStatusLabel.textColor = [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
+            self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
+        }
     }
 }
 
@@ -1227,8 +1244,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         BOOL hasDynamicCS = getEntitlementValue(@"dynamic-codesigning");
         int diagCsFlags = 0;
         csops(getpid(), 0, &diagCsFlags, sizeof(diagCsFlags));
-        NSLog(@"[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d traced=%d JIT_FLAGS=0x%X",
-              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), JIT26DebuggerAttachedViaPtrace(), DeviceGetJITFlags(NO));
+        NSLog(@"[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=%d trollStore=%d CS_DEBUGGED=%d ppid=%d traced=%d exn=%d JIT_FLAGS=0x%X",
+              hasDynamicCS, hasTrollStoreJIT, (diagCsFlags & CS_DEBUGGED) != 0, getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts(), DeviceGetJITFlags(NO));
     }
 
     // 决策前先刷新一次状态标签，保证显示与本次实际判定一致

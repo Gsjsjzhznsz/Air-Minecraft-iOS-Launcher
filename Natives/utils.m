@@ -2,6 +2,7 @@
 
 #include "jni.h"
 #include <dlfcn.h>
+#include <mach/mach.h>
 #include <os/lock.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,39 @@ BOOL JIT26DebuggerAttachedViaPtrace(void) {
     return (info.kp_proc.p_flag & P_TRACED) != 0;
 }
 
+// Detect a debugger that holds this task via Mach exception ports instead of
+// (or in addition to) ptrace.  lldb/debugserver on iOS attach with
+// ptrace(PT_ATTACH) to obtain the task port and then PT_DETACH while KEEPING
+// the port -- after that P_TRACED reads 0 even though the debugger is fully
+// alive and still receiving EXC_BREAKPOINT (which is exactly how the JIT26
+// brk #0x69 / brk #0xf00d breakpoints get serviced).  A live task-level
+// handler for BREAKPOINT/SOFTWARE is therefore the reliable "JIT26 debugger
+// in place" signal once CS_DEBUGGED is set.
+// NOTE: this only reports TASK-level ports.  The in-process hardware-breakpoint
+// dlopen redirect (main_hook.m, non-TXM path) registers THREAD-level ports,
+// which do not show up here -- so this cannot mistake our own handler for an
+// external debugger.  And JIT26IsLikelyDebuggerKeepAttached() is only ever
+// consulted on TXM devices, where main_hook's path is not used at all.
+BOOL JIT26DebuggerViaExceptionPorts(void) {
+    exception_mask_t masks[EXC_TYPES_COUNT];
+    exception_handler_t handlers[EXC_TYPES_COUNT];
+    exception_behavior_t behaviors[EXC_TYPES_COUNT];
+    thread_state_flavor_t flavors[EXC_TYPES_COUNT];
+    mach_msg_type_number_t count = EXC_TYPES_COUNT;
+    kern_return_t kr = task_get_exception_ports(mach_task_self(),
+                                                EXC_MASK_BREAKPOINT | EXC_MASK_SOFTWARE,
+                                                masks, &count, handlers, behaviors, flavors);
+    if (kr != KERN_SUCCESS) {
+        return NO;
+    }
+    for (mach_msg_type_number_t i = 0; i < count; i++) {
+        if (handlers[i] != MACH_PORT_NULL) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 BOOL JIT26IsLikelyDebuggerKeepAttached(void) {
     // getppid() returns launchd's PID (1) unless a debugger SPAWNED this
     // process (debugserver-style parent).  This is the check Hynis-JE uses.
@@ -65,7 +99,18 @@ BOOL JIT26IsLikelyDebuggerKeepAttached(void) {
     // Fall back to the live ptrace flag: it is set exactly while a debugger
     // is attached, so this neither misses the attach flow nor weakens the
     // "debugger really detached" case (P_TRACED returns to 0 on detach).
-    return JIT26DebuggerAttachedViaPtrace();
+    if (JIT26DebuggerAttachedViaPtrace()) {
+        return YES;
+    }
+    // lldb/debugserver detach (PT_DETACH) as soon as it holds the task port
+    // and then keep serving EXC_BREAKPOINT through Mach exception ports with
+    // P_TRACED == 0 -- measured on-device as CS_DEBUGGED=1 ppid=1 traced=0
+    // with the JIT26 mapping request succeeding moments later.  Treat a live
+    // task-level BREAKPOINT/SOFTWARE handler as "debugger attached": it is
+    // the entity that must service the brk #0x69 traps, which is the whole
+    // point of this check.  See JIT26DebuggerViaExceptionPorts() for why the
+    // app's own handlers cannot false-positive here.
+    return JIT26DebuggerViaExceptionPorts();
 }
 
 BOOL isJITEnabled(BOOL checkCSFlags) {
