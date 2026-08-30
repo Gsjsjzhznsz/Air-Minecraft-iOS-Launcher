@@ -41,7 +41,20 @@
 // driver-lenient uint indices cannot re-mix sign with u_BufferTexWidth.
 // REVISION 6: stage-tagged SIGSEGV crash-site report + optimizer-disabled
 // retry on the conversion thread.
-#define REVISION 6
+// REVISION 7: buffer-texture emulation runtime repair. (1) Draw-time sampler
+// rewiring now repoints ONLY the samplers converted from samplerBuffer at the
+// emulation unit; it used to repoint every sampler2D in the program, which on
+// Sodium 0.9's chunk program hijacked the block atlas (u_BlockTex) and light
+// map (u_LightTex) onto the section-info texture -- every chunk fragment then
+// discarded itself below ALPHA_CUTOUT and the whole terrain vanished
+// (MobileGlues-release issue #432). (2) The snapshot is refreshed whenever the
+// backing buffer is mutated (glBufferData/glBufferSubData/glUnmapBuffer/
+// glBufferStorage); it used to be taken exactly once at glTexBuffer. (3) The
+// GL_TEXTURE_BUFFER binding point no longer reaches an ES 3.0/3.1 driver (it
+// answered GL_INVALID_ENUM there, silently swallowing every mutation MC issued
+// through that target); it is tracked here and the mutations borrow
+// GL_COPY_WRITE_BUFFER instead.
+#define REVISION 7
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

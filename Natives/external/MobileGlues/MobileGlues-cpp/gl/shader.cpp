@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 #include "shader.h"
 
 #ifndef GL_SHADER_SOURCE_LENGTH
@@ -28,6 +29,77 @@
 struct shader_t shaderInfo;
 
 UnorderedMap<GLuint, bool> shader_map_is_sampler_buffer_emulated;
+
+// The variable names of every samplerBuffer declared in the shader's ORIGINAL
+// desktop-GLSL source, recorded when this wrapper converts the source. The
+// draw-path sampler rewiring (gl/drawing.cpp setupBufferTextureUniforms) must
+// repoint ONLY these samplers at the emulation unit: a Sodium 0.9 chunk program
+// carries the section-info isamplerBuffer AND the ordinary sampler2D uniforms
+// u_LightTex / u_BlockTex in one program, and repointing those two as well made
+// every chunk fragment sample the section-info texture for its atlas and light
+// map -- color.a read back as garbage below ALPHA_CUTOUT and the whole chunk
+// geometry discarded itself out of existence (MobileGlues-release issue #432,
+// "blocks become completely invisible / transparent", MC 26.2 + Sodium 0.9).
+UnorderedMap<GLuint, std::vector<std::string>> shader_map_sampler_buffer_names;
+
+// Scan the ORIGINAL source for samplerBuffer/isamplerBuffer/usamplerBuffer
+// declarations and return their variable names. Deliberately regex-free: this
+// runs once per converted shader on the conversion thread, where std::regex
+// construction costs dwarf the scan itself.
+//
+// The anchor token is "samplerBuffer", which also ends "isamplerBuffer" and
+// "usamplerBuffer"; the character before the anchor decides whether this is one
+// of those type tokens or the tail of some unrelated identifier. Commented-out
+// declarations may slip through and are harmless: their names resolve to
+// location -1 and are skipped at draw time.
+static std::vector<std::string> extract_sampler_buffer_names(const std::string& src) {
+    std::vector<std::string> names;
+    static const char* kToken = "samplerBuffer";
+    const size_t kTokenLen = strlen(kToken);
+    size_t pos = 0;
+    while ((pos = src.find(kToken, pos)) != std::string::npos) {
+        // The anchor must start a type token: either at string start, after a
+        // non-identifier byte, or directly after the 'i'/'u' precision prefixes.
+        bool starts_token = false;
+        if (pos == 0) {
+            starts_token = true;
+        } else {
+            const char prev = src[pos - 1];
+            if (prev == 'i' || prev == 'u') {
+                starts_token = pos < 2 ||
+                    !(isalnum(static_cast<unsigned char>(src[pos - 2])) || src[pos - 2] == '_');
+            } else {
+                starts_token = !(isalnum(static_cast<unsigned char>(prev)) || prev == '_');
+            }
+        }
+
+        size_t name_end = pos + kTokenLen;
+        size_t name_begin = name_end;
+        while (name_end < src.size() &&
+               (src[name_end] == ' ' || src[name_end] == '\t' || src[name_end] == '\n' ||
+                src[name_end] == '\r'))
+            ++name_end;
+        name_begin = name_end;
+        while (name_end < src.size() &&
+               (isalnum(static_cast<unsigned char>(src[name_end])) || src[name_end] == '_'))
+            ++name_end;
+
+        if (starts_token && name_end > name_begin) {
+            // Reject the degenerate case of the anchor itself being consumed as
+            // an identifier (e.g. a variable literally named samplerBufferFoo
+            // cannot follow a type token, but "samplerBuffer" captured above
+            // could be a false start for one).
+            std::string name = src.substr(name_begin, name_end - name_begin);
+            bool duplicate = false;
+            for (const auto& existing : names) {
+                if (existing == name) { duplicate = true; break; }
+            }
+            if (!duplicate) names.push_back(std::move(name));
+        }
+        pos = name_end > pos + kTokenLen ? name_end : pos + kTokenLen;
+    }
+    return names;
+}
 
 // Failure-correlated record of what THIS wrapper last submitted to the driver
 // for each shader id, plus what the driver reports back via glGetShaderSource.
@@ -183,8 +255,18 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar* const* string, c
                      (src_len > 0 && strncmp(rb, essl_src.c_str(), 32) != 0) ? " <-- MISMATCH" : "");
             shader_map_submit_record[shader] = rec;
         }
-        if (hardware->emulate_texture_buffer)
+        if (hardware->emulate_texture_buffer) {
             shader_map_is_sampler_buffer_emulated[shader] = is_sampler_buffer_emulated;
+            // Names come from the ORIGINAL source: conversion rewrites type
+            // tokens and texelFetch shapes but leaves identifiers untouched, so
+            // the names are also what glGetUniformLocation must be asked for at
+            // draw time. Erase rather than overwrite when the re-sourced shader
+            // no longer uses a buffer texture -- shader names are recycled.
+            if (is_sampler_buffer_emulated)
+                shader_map_sampler_buffer_names[shader] = extract_sampler_buffer_names(glsl_src);
+            else
+                shader_map_sampler_buffer_names.erase(shader);
+        }
     } else
         LOG_E("Failed to convert glsl.")
     CHECK_GL_ERROR

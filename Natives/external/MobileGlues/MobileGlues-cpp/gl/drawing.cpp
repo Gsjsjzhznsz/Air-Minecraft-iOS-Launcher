@@ -20,6 +20,7 @@ GLuint bufSampelerLoc;
 std::string bufSampelerName;
 
 extern UnorderedMap<GLuint, bool> program_map_is_sampler_buffer_emulated;
+extern UnorderedMap<GLuint, std::vector<std::string>> program_map_sampler_buffer_names;
 
 UnorderedMap<GLuint, SamplerInfo> g_samplerCacheForSamplerBuffer;
 
@@ -102,20 +103,34 @@ const resolved_program_t& resolve_program(GLuint program) {
         if (built.locWidth == -1) {
             LOG_W("u_BufferTexWidth uniform not found in program %d", program);
         } else {
-            GLint numUniforms = 0;
-            GLES.glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
-            LOG_D("Program %d has %d active uniforms", program, numUniforms);
-
-            for (GLint i = 0; i < numUniforms; ++i) {
-                const GLsizei bufSize = 256;
-                GLchar name[bufSize];
-                GLsizei length = 0;
-                GLint size = 0;
-                GLenum type = 0;
-                GLES.glGetActiveUniform(program, i, bufSize, &length, &size, &type, name);
-
-                if (type == GL_SAMPLER_2D || type == GL_INT_SAMPLER_2D) {
-                    built.samplers.push_back(GLES.glGetUniformLocation(program, name));
+            // Resolve locations by NAME, from the list of samplers this program's
+            // shaders really converted from samplerBuffer. The old scan collected
+            // every active GL_SAMPLER_2D in the program and repointed them ALL at
+            // the emulation unit -- which, for a program mixing a buffer texture
+            // with ordinary 2D samplers (Sodium 0.9's chunk program: u_LightTex
+            // and u_BlockTex alongside u_SectionTimeInfo), hijacked the atlas and
+            // light map onto the section-info texture and discarded every chunk
+            // fragment out of existence. Ordinary samplers must keep whatever
+            // unit the application assigned them.
+            const auto names = program_map_sampler_buffer_names.find(program);
+            if (names != program_map_sampler_buffer_names.end() && !names->second.empty()) {
+                for (const auto& name : names->second) {
+                    GLint loc = GLES.glGetUniformLocation(program, name.c_str());
+                    if (loc >= 0) built.samplers.push_back(loc);
+                    // Arrays: uniform isamplerBuffer foo[N] surfaces as location
+                    // of foo or foo[0]; every element reads the emulation unit,
+                    // so repoint each. Bounded: GLES guarantees at least 16
+                    // fragments of nothing -- 8 elements is far past anything a
+                    // buffer-texture shader declares, and the loop stops at the
+                    // first missing element.
+                    for (int element = 0; element < 8; ++element) {
+                        char elem[192];
+                        snprintf(elem, sizeof(elem), "%s[%d]", name.c_str(), element);
+                        GLint eloc = GLES.glGetUniformLocation(program, elem);
+                        if (eloc < 0) break;
+                        if (element == 0 && loc >= 0) continue; // already pushed via base name
+                        built.samplers.push_back(eloc);
+                    }
                 }
             }
         }

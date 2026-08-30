@@ -20,7 +20,13 @@
 #define DEBUG 0
 
 extern UnorderedMap<GLuint, bool> shader_map_is_sampler_buffer_emulated;
+extern UnorderedMap<GLuint, std::vector<std::string>> shader_map_sampler_buffer_names;
 UnorderedMap<GLuint, bool> program_map_is_sampler_buffer_emulated;
+// Per-program aggregation of shader_map_sampler_buffer_names, rebuilt at
+// glAttachShader time. gl/drawing.cpp resolves uniform locations from these
+// names instead of scanning every active sampler2D, so only the samplers that
+// were really converted FROM samplerBuffer get repointed at the emulation unit.
+UnorderedMap<GLuint, std::vector<std::string>> program_map_sampler_buffer_names;
 
 enum class ShouldGenerateFSState : int {
     Never = 0,
@@ -183,8 +189,20 @@ void glUseProgram(GLuint program) {
 void glAttachShader(GLuint program, GLuint shader) {
     LOG()
     LOG_D("glAttachShader(%u, %u)", program, shader)
-    if (hardware->emulate_texture_buffer && shader_map_is_sampler_buffer_emulated[shader])
+    if (hardware->emulate_texture_buffer && shader_map_is_sampler_buffer_emulated[shader]) {
         program_map_is_sampler_buffer_emulated[program] = true;
+        auto& dst = program_map_sampler_buffer_names[program];
+        const auto src = shader_map_sampler_buffer_names.find(shader);
+        if (src != shader_map_sampler_buffer_names.end()) {
+            for (const auto& name : src->second) {
+                bool duplicate = false;
+                for (const auto& existing : dst) {
+                    if (existing == name) { duplicate = true; break; }
+                }
+                if (!duplicate) dst.push_back(name);
+            }
+        }
+    }
 
     GLint type = 0;
     GLES.glGetShaderiv(shader, GL_SHADER_TYPE, &type);
@@ -210,6 +228,9 @@ GLuint glCreateProgram() {
     GLuint program = GLES.glCreateProgram();
     if (hardware->emulate_texture_buffer) {
         program_map_is_sampler_buffer_emulated[program] = false;
+        // GL hands deleted program names straight back out; a recycled name must
+        // not inherit the previous program's emulated-sampler list.
+        program_map_sampler_buffer_names[program].clear();
         if (g_samplerCacheForSamplerBuffer.find(program) != g_samplerCacheForSamplerBuffer.end()) {
             g_samplerCacheForSamplerBuffer.erase(program);
         }

@@ -15,6 +15,26 @@
 
 #define DEBUG 0
 
+// --- Emulated buffer-texture registry ---------------------------------------
+//
+// The emulated TBO is a snapshot: glTexBuffer copies the backing buffer's bytes
+// into a plain 2D texture once, and nothing watched the buffer afterwards. Any
+// glBufferData / glBufferSubData / glUnmapBuffer on the backing buffer then
+// silently diverged from what the shader's texelFetch read -- MC 26.2's cloud
+// faces and Sodium 0.9's section-time info both update their buffer textures
+// that way, so the emulation served the byte image of the glTexBuffer moment
+// forever. The registry maps an application buffer name to the 2D texture
+// holding its snapshot so the buffer-mutation entry points below can re-upload.
+//
+// Known gap: coherent persistent mappings (glBufferStorage MAP_COHERENT) write
+// without an unmap, and glCopyBufferSubData has no wrapper here to hook; both
+// keep serving the stale snapshot until the next hooked mutation.
+struct mg_tbo_backing_t {
+    GLuint tex = 0;            // the snapshot texture (parked on unit 15)
+    GLenum internalformat = 0; // the glTexBuffer internalformat
+};
+static ska::flat_hash_map<GLuint, mg_tbo_backing_t> g_tbo_backing;
+
 GLuint bound_array;
 static GLint maxBufferId = 0;
 static GLint maxArrayId = 0;
@@ -487,6 +507,10 @@ void glDeleteBuffers(GLsizei n, const GLuint* buffers) {
         if (buffers[i] != 0 && find_bound_buffer(GL_PARAMETER_BUFFER_BINDING) == buffers[i]) {
             set_bound_buffer_by_target(GL_PARAMETER_BUFFER, 0);
         }
+        // A deleted buffer must stop refreshing whatever snapshot it backed:
+        // recycled names would otherwise push fresh garbage into a live
+        // buffer texture.
+        g_tbo_backing.erase(buffers[i]);
         if (find_real_buffer(buffers[i])) {
             GLuint real_buff = find_real_buffer(buffers[i]);
             GLES.glDeleteBuffers(1, &real_buff);
@@ -512,6 +536,24 @@ void glBindBuffer(GLenum target, GLuint buffer) {
         // back by gl/multidraw.cpp for glMultiDraw*IndirectCount; forwarding the
         // target to the driver would only raise GL_INVALID_ENUM. The backing
         // object still has to exist, because nothing else will create it.
+        if (buffer != 0 && has_buffer(buffer) && !find_real_buffer(buffer)) {
+            GLuint real_buffer = 0;
+            GLES.glGenBuffers(1, &real_buffer);
+            modify_buffer(buffer, real_buffer);
+            CHECK_GL_ERROR
+        }
+        return;
+    }
+
+    // GLES 3.0/3.1 has no GL_TEXTURE_BUFFER binding point either. While the
+    // buffer-texture emulation is active the binding stays tracked (the
+    // set_bound_buffer_by_target above already sees every target) and the
+    // backing object is created here, but the target itself never reaches the
+    // driver: forwarding it only raised GL_INVALID_ENUM, and the driver-side
+    // binding never mattered -- the emulation reads the store through the
+    // pixel-unpack path. Mutations through this target borrow
+    // GL_COPY_WRITE_BUFFER (see borrowed_target_t) and refresh the snapshot.
+    if (target == GL_TEXTURE_BUFFER && hardware->emulate_texture_buffer) {
         if (buffer != 0 && has_buffer(buffer) && !find_real_buffer(buffer)) {
             GLuint real_buffer = 0;
             GLES.glGenBuffers(1, &real_buffer);
@@ -790,6 +832,155 @@ extern std::string bufSampelerName;
     } while (0)
 
 // Todo: any glGet* related to this function?
+
+// Copy the CURRENT contents of app_buffer's data store into tex_name, sized for
+// internalformat. Saves and restores everything it borrows: the active unit,
+// unit 15's GL_TEXTURE_2D binding (several emulated buffer textures can be
+// alive at once and a different one may be parked there) and the pixel-unpack
+// binding. hard=true is the initial glTexBuffer path and raises
+// GL_INVALID_ENUM / GL_INVALID_VALUE exactly as it always did; hard=false is
+// the re-upload path, which skips unrepresentable buffers quietly -- the
+// previous snapshot is the best available content in that case anyway.
+static bool mg_tbo_emulated_upload(GLuint app_buffer, GLuint tex_name, GLenum internalformat, bool hard) {
+    GLuint real_buffer = find_real_buffer(app_buffer);
+    if (!real_buffer) return false;
+
+    // internalformat arrives unvalidated -- a format outside GL 4.6 table 8.16
+    // is GL_INVALID_ENUM in real GL and this layer raises nothing -- so
+    // get_internal_format_size answers 0 for it, as its own default case says.
+    // That 0 used to reach "bufferSize / pixelSize" below: undefined, and on
+    // arm64 it divides to zero, giving a 0 x 1 texture that the emulated
+    // texelFetch then indexes modulo zero. Size the texel first and drop the
+    // call if we cannot, before any binding is disturbed.
+    GLuint pixelSize = get_internal_format_size(internalformat);
+    if (pixelSize == 0) {
+        BU_WARN_ONCE("glTexBuffer: no texel size known for internalformat %s, texture buffer left untouched",
+                     glEnumToString(internalformat));
+        if (hard) mg_set_gl_error(GL_INVALID_ENUM);
+        return false;
+    }
+
+    // The transfer pair this internalformat actually accepts. Hardcoding one
+    // pair here is what made every format but GL_R8I fail to allocate.
+    GLenum tb_format = GL_RED_INTEGER, tb_type = GL_BYTE;
+    if (!get_internal_format_transfer(internalformat, &tb_format, &tb_type)) {
+        BU_WARN_ONCE("glTexBuffer: no GLES transfer pair for internalformat %s, texture buffer left untouched",
+                     glEnumToString(internalformat));
+        if (hard) mg_set_gl_error(GL_INVALID_ENUM);
+        return false;
+    }
+
+    GLES.glActiveTexture(GL_TEXTURE0 + 15);
+    GLint prev_parked = 0;
+    GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_parked);
+    GLint prev_pixel_buffer_binding = 0;
+    GLES.glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &prev_pixel_buffer_binding);
+
+    GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, real_buffer);
+    GLint bufferSize = 0;
+    GLES.glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_SIZE, &bufferSize);
+    GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+    GLES.glBindTexture(GL_TEXTURE_2D, tex_name);
+
+    const GLuint MAX_WIDTH = 8192;
+    GLuint numElements = bufferSize / pixelSize;
+    if (numElements == 0) {
+        // A buffer too small to hold one texel. The pixelSize == 0 guard above
+        // exists because a zero-sized texture makes the emulated texelFetch
+        // index modulo zero; this reaches the same place by the other road,
+        // through a 0 x 1 glTexImage2D and a u_BufferTexWidth of 0.
+        BU_WARN_ONCE("glTexBuffer: buffer of %d bytes holds no %u-byte texel, texture buffer left untouched",
+                     bufferSize, pixelSize);
+        if (hard) mg_set_gl_error(GL_INVALID_VALUE);
+        GLES.glBindTexture(GL_TEXTURE_2D, prev_parked);
+        GLES.glActiveTexture(GL_TEXTURE0 + gl_state->current_tex_unit);
+        return false;
+    }
+
+    GLuint width = numElements;
+    GLuint height = 1;
+
+    if (width > MAX_WIDTH) {
+        width = MAX_WIDTH;
+        height = (numElements + MAX_WIDTH - 1) / MAX_WIDTH;
+    }
+
+    GLint prev_alignment, prev_row_length, prev_skip_pixels, prev_skip_rows;
+    GLES.glGetIntegerv(GL_UNPACK_ALIGNMENT, &prev_alignment);
+    GLES.glGetIntegerv(GL_UNPACK_ROW_LENGTH, &prev_row_length);
+    GLES.glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &prev_skip_pixels);
+    GLES.glGetIntegerv(GL_UNPACK_SKIP_ROWS, &prev_skip_rows);
+
+    // why do these 2 params not work
+    // GLES.glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    // GLES.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
+    GLES.glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+    GLES.glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+
+    GLES.glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, tb_format, tb_type, nullptr);
+
+    GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, real_buffer);
+
+    for (GLuint row = 0; row < height; ++row) {
+        // The last row is short whenever the element count is not a multiple
+        // of the row width. Asking for a full row anyway made the driver read
+        // past the end of the unpack buffer, which GLES answers with
+        // GL_INVALID_OPERATION and a no-op -- so the tail of the buffer was
+        // never uploaded and texelFetch read it back as whatever the
+        // allocation left there.
+        const GLuint row_texels = (row + 1 == height) ? (numElements - row * width) : width;
+        if (row_texels == 0) break;
+        void* offset = (void*)(static_cast<size_t>(row) * width * pixelSize);
+        GLES.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, row, row_texels, 1, tb_format, tb_type, offset);
+    }
+
+    GLES.glPixelStorei(GL_UNPACK_ALIGNMENT, prev_alignment);
+    GLES.glPixelStorei(GL_UNPACK_ROW_LENGTH, prev_row_length);
+    GLES.glPixelStorei(GL_UNPACK_SKIP_PIXELS, prev_skip_pixels);
+    GLES.glPixelStorei(GL_UNPACK_SKIP_ROWS, prev_skip_rows);
+
+    if (TextureObject* tex = mgGetTexObjectByID(tex_name)) {
+        tex->target = ConvertGLEnumToTextureTarget(GL_TEXTURE_BUFFER);
+        tex->internal_format = internalformat;
+        tex->width = width;
+        tex->height = height;
+        tex->depth = 1;
+        tex->swizzle_param[0] = GL_RED;
+        tex->swizzle_param[1] = GL_GREEN;
+        tex->swizzle_param[2] = GL_BLUE;
+        tex->swizzle_param[3] = GL_ALPHA;
+    }
+
+    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+
+    GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, prev_pixel_buffer_binding);
+
+    // Put back whatever was parked on the emulation unit: re-uploading one
+    // buffer texture must not park a different one.
+    GLES.glBindTexture(GL_TEXTURE_2D, prev_parked);
+    GLES.glActiveTexture(GL_TEXTURE0 + gl_state->current_tex_unit);
+
+    CHECK_GL_ERROR;
+    return true;
+}
+
+// Re-upload hook for the buffer-mutation entry points: refresh the snapshot
+// when the mutated buffer backs an emulated buffer texture. One hash lookup on
+// the common (non-TBO) path.
+static void mg_tbo_refresh_if_backing(GLuint app_buffer) {
+    if (app_buffer == 0) return;
+    const auto backing = g_tbo_backing.find(app_buffer);
+    if (backing == g_tbo_backing.end()) return;
+    LOG_D("Re-uploading emulated buffer texture for buffer %u", app_buffer)
+    mg_tbo_emulated_upload(app_buffer, backing->second.tex, backing->second.internalformat, false);
+}
+
 void glTexBuffer(GLenum target, GLenum internalformat, GLuint buffer) {
     LOG()
     LOG_D("glTexBuffer, target = %s, internalformat = %s, buffer = %d", glEnumToString(target),
@@ -811,147 +1002,26 @@ void glTexBuffer(GLenum target, GLenum internalformat, GLuint buffer) {
     if (hardware->emulate_texture_buffer) {
         LOG_D("Emulating glTexBuffer");
 
-        // internalformat arrives unvalidated -- a format outside GL 4.6 table 8.16
-        // is GL_INVALID_ENUM in real GL and this layer raises nothing -- so
-        // get_internal_format_size answers 0 for it, as its own default case says.
-        // That 0 used to reach "bufferSize / pixelSize" below: undefined, and on
-        // arm64 it divides to zero, giving a 0 x 1 texture that the emulated
-        // texelFetch then indexes modulo zero. Size the texel first and drop the
-        // call if we cannot, before any binding is disturbed.
-        GLuint pixelSize = get_internal_format_size(internalformat);
-        if (pixelSize == 0) {
-            BU_WARN_ONCE("glTexBuffer: no texel size known for internalformat %s, texture buffer left untouched",
-                         glEnumToString(internalformat));
-            mg_set_gl_error(GL_INVALID_ENUM);
-            return;
-        }
-
-        // The transfer pair this internalformat actually accepts. Hardcoding one
-        // pair here is what made every format but GL_R8I fail to allocate.
-        GLenum tb_format = GL_RED_INTEGER, tb_type = GL_BYTE;
-        if (!get_internal_format_transfer(internalformat, &tb_format, &tb_type)) {
-            BU_WARN_ONCE("glTexBuffer: no GLES transfer pair for internalformat %s, texture buffer left untouched",
-                         glEnumToString(internalformat));
-            mg_set_gl_error(GL_INVALID_ENUM);
-            return;
-        }
-
         GLint boundTexture = 0;
-        GLint prev_pixel_buffer_binding = 0;
-
         GLES.glActiveTexture(GL_TEXTURE0 + 15);
-
         GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTexture);
         LOG_D("Current GL_TEXTURE_BINDING_BUFFER = %d", boundTexture);
-        GLES.glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &prev_pixel_buffer_binding);
-        LOG_D("Previous GL_PIXEL_UNPACK_BUFFER_BINDING = %d", prev_pixel_buffer_binding);
+        // Hand the borrowed unit straight back before anything can observe it:
+        // unit 15 is only ever parked with the emulated buffer texture, and
+        // leaving it active sent the app's next glBindTexture to unit 15.
+        GLES.glActiveTexture(GL_TEXTURE0 + gl_state->current_tex_unit);
 
         if (!boundTexture) {
             LOG_D("No texture bound to GL_TEXTURE_BUFFER, skipping emulation.");
-            // Unit 15 is only ever borrowed for the emulated buffer texture; every
-            // other borrower hands it back. Returning from here without doing so
-            // left the app's next glBindTexture landing on unit 15.
-            GLES.glActiveTexture(GL_TEXTURE0 + gl_state->current_tex_unit);
             return;
         }
 
-        GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, real_buffer);
-        LOG_D("Bound GL_PIXEL_UNPACK_BUFFER to buffer %u", real_buffer);
+        // Upload the snapshot (guards, sizing, row-tail handling and the
+        // TextureObject record all live in the helper, which doubles as the
+        // re-upload path for the buffer-mutation hooks below).
+        if (!mg_tbo_emulated_upload(buffer, static_cast<GLuint>(boundTexture), internalformat, true)) return;
 
-        GLint bufferSize;
-        GLES.glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_SIZE, &bufferSize);
-        LOG_D("Buffer size = %d bytes", bufferSize);
-
-        GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-
-        GLES.glBindTexture(GL_TEXTURE_2D, boundTexture);
-        LOG_D("Binding texture %u to GL_TEXTURE_2D", boundTexture);
-
-        const GLuint MAX_WIDTH = 8192;
-        GLuint numElements = bufferSize / pixelSize;
-        if (numElements == 0) {
-            // A buffer too small to hold one texel. The pixelSize == 0 guard above
-            // exists because a zero-sized texture makes the emulated texelFetch
-            // index modulo zero; this reaches the same place by the other road,
-            // through a 0 x 1 glTexImage2D and a u_BufferTexWidth of 0.
-            BU_WARN_ONCE("glTexBuffer: buffer of %d bytes holds no %u-byte texel, texture buffer left untouched",
-                         bufferSize, pixelSize);
-            mg_set_gl_error(GL_INVALID_VALUE);
-            GLES.glActiveTexture(GL_TEXTURE0 + gl_state->current_tex_unit);
-            return;
-        }
-
-        GLuint width = numElements;
-        GLuint height = 1;
-
-        if (width > MAX_WIDTH) {
-            width = MAX_WIDTH;
-            height = (numElements + MAX_WIDTH - 1) / MAX_WIDTH;
-        }
-
-        GLint prev_alignment, prev_row_length, prev_skip_pixels, prev_skip_rows;
-        GLES.glGetIntegerv(GL_UNPACK_ALIGNMENT, &prev_alignment);
-        GLES.glGetIntegerv(GL_UNPACK_ROW_LENGTH, &prev_row_length);
-        GLES.glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &prev_skip_pixels);
-        GLES.glGetIntegerv(GL_UNPACK_SKIP_ROWS, &prev_skip_rows);
-
-        // why do these 2 params not work
-        // GLES.glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        // GLES.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0)
-        GLES.glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-        GLES.glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-
-        // TODO: Optimize the glTexImage2D call
-        GLES.glTexImage2D(GL_TEXTURE_2D, 0, internalformat, width, height, 0, tb_format, tb_type, nullptr);
-
-        GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, real_buffer);
-
-        for (GLuint row = 0; row < height; ++row) {
-            // The last row is short whenever the element count is not a multiple
-            // of the row width. Asking for a full row anyway made the driver read
-            // past the end of the unpack buffer, which GLES answers with
-            // GL_INVALID_OPERATION and a no-op -- so the tail of the buffer was
-            // never uploaded and texelFetch read it back as whatever the
-            // allocation left there.
-            const GLuint row_texels = (row + 1 == height) ? (numElements - row * width) : width;
-            if (row_texels == 0) break;
-            void* offset = (void*)(static_cast<size_t>(row) * width * pixelSize);
-            GLES.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, row, row_texels, 1, tb_format, tb_type, offset);
-        }
-
-        GLES.glPixelStorei(GL_UNPACK_ALIGNMENT, prev_alignment);
-        GLES.glPixelStorei(GL_UNPACK_ROW_LENGTH, prev_row_length);
-        GLES.glPixelStorei(GL_UNPACK_SKIP_PIXELS, prev_skip_pixels);
-        GLES.glPixelStorei(GL_UNPACK_SKIP_ROWS, prev_skip_rows);
-
-        auto tex = mgGetTexObjectByTarget(target);
-        tex->target = ConvertGLEnumToTextureTarget(target);
-        tex->internal_format = internalformat;
-        tex->width = width;
-        tex->height = height;
-        tex->depth = 1;
-        tex->swizzle_param[0] = GL_RED;
-        tex->swizzle_param[1] = GL_GREEN;
-        tex->swizzle_param[2] = GL_BLUE;
-        tex->swizzle_param[3] = GL_ALPHA;
-
-        LOG_D("Called glTexImage2D with internalformat = 0x%X", internalformat);
-
-        GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        LOG_D("Set texture parameters: MIN_FILTER=NEAREST, MAG_FILTER=NEAREST, WRAP_S/T=CLAMP_TO_EDGE");
-
-        GLES.glBindBuffer(GL_PIXEL_UNPACK_BUFFER, prev_pixel_buffer_binding);
-
-        GLES.glActiveTexture(GL_TEXTURE0 + gl_state->current_tex_unit);
-
-        LOG_D("Restored bindings: GL_PIXEL_UNPACK_BUFFER=%d", prev_pixel_buffer_binding);
-
-        CHECK_GL_ERROR;
+        g_tbo_backing[buffer] = {static_cast<GLuint>(boundTexture), internalformat};
         return;
     }
 
@@ -988,6 +1058,13 @@ void glTexBufferRange(GLenum target, GLenum internalformat, GLuint buffer, GLint
 // GL_COPY_WRITE_BUFFER is borrowed for the duration of one call and put back
 // afterwards. GLES defines it as a generic target with no meaning of its own, so
 // the swap is invisible: nothing observes it, and no draw depends on it.
+//
+// GL_TEXTURE_BUFFER joins it while the buffer-texture emulation is active: an
+// ES 3.0/3.1 driver has no such binding point either, and forwarding the target
+// answered GL_INVALID_ENUM -- which silently swallowed every mutation MC
+// issued against a buffer-texture backing store through that target. (With a
+// 3.2+ driver and native glTexBuffer the target still passes straight
+// through.)
 namespace {
 struct borrowed_target_t {
     GLenum target;
@@ -995,8 +1072,13 @@ struct borrowed_target_t {
     bool borrowed = false;
 
     explicit borrowed_target_t(GLenum requested) : target(requested) {
-        if (requested != GL_PARAMETER_BUFFER) return;
-        const GLuint real = find_real_buffer(find_bound_buffer(GL_PARAMETER_BUFFER_BINDING));
+        const bool borrow = requested == GL_PARAMETER_BUFFER ||
+                            (requested == GL_TEXTURE_BUFFER && hardware->emulate_texture_buffer);
+        if (!borrow) return;
+        const GLuint app_buffer = requested == GL_PARAMETER_BUFFER
+                                      ? find_bound_buffer(GL_PARAMETER_BUFFER_BINDING)
+                                      : find_bound_buffer_by_target(GL_TEXTURE_BUFFER);
+        const GLuint real = find_real_buffer(app_buffer);
         GLES.glGetIntegerv(GL_COPY_WRITE_BUFFER_BINDING, &saved);
         GLES.glBindBuffer(GL_COPY_WRITE_BUFFER, real);
         target = GL_COPY_WRITE_BUFFER;
@@ -1019,6 +1101,10 @@ void glBufferData(GLenum target, GLsizeiptr size, const void* data, GLenum usage
     GLES.glBufferData(t.target, size, data, usage);
     set_buffer_data_size(find_bound_buffer_by_target(target), size);
     CHECK_GL_ERROR
+    // Storage may have been (re)specified or resized: refresh the emulated
+    // buffer-texture snapshot if this buffer backs one.
+    if (hardware->emulate_texture_buffer)
+        mg_tbo_refresh_if_backing(find_bound_buffer_by_target(target));
 }
 
 // Both of these were plain pass-throughs in gl/gl_native.cpp. They live here now
@@ -1029,6 +1115,8 @@ void glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const void
     borrowed_target_t t(target);
     GLES.glBufferSubData(t.target, offset, size, data);
     CHECK_GL_ERROR
+    if (hardware->emulate_texture_buffer)
+        mg_tbo_refresh_if_backing(find_bound_buffer_by_target(target));
 }
 
 void glGetBufferParameteriv(GLenum target, GLenum pname, GLint* params) {
@@ -1103,6 +1191,9 @@ GLboolean glUnmapBuffer(GLenum target) {
 
     GLboolean result = GLES.glUnmapBuffer(t.target);
     CHECK_GL_ERROR
+    // Mapping writes commit at unmap time, so the snapshot is refreshed here.
+    if (result && hardware->emulate_texture_buffer)
+        mg_tbo_refresh_if_backing(find_bound_buffer_by_target(target));
     return result;
 }
 
@@ -1116,6 +1207,8 @@ void glBufferStorage(GLenum target, GLsizeiptr size, const void* data, GLbitfiel
         GLES.glBufferStorageEXT(t.target, size, data, flags);
         // Allocates storage just as glBufferData does, so it owes the same record.
         set_buffer_data_size(find_bound_buffer_by_target(target), size);
+        if (hardware->emulate_texture_buffer)
+            mg_tbo_refresh_if_backing(find_bound_buffer_by_target(target));
     }
     CHECK_GL_ERROR
 }
