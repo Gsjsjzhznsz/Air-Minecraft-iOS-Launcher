@@ -885,8 +885,14 @@ static void* big_stack_trampoline(void* p) {
 }
 
 static bool run_on_big_stack_if_needed(void (*fn)(void*), void* arg) {
-    size_t ss = pthread_get_stacksize_np(pthread_self());
-    if (ss >= (8u << 20)) return false; // plenty of headroom; run inline
+    // ALWAYS run on the dedicated 32 MB-stack thread.  pthread_get_stacksize_np()
+    // is authoritative for pthread-created threads, but the JVM may hand out
+    // large stacks (>= 8 MB) to some of its threads while the glslang recursive
+    // descent still overflows inside them on complex shaders -- and a
+    // mis-detected "plenty of headroom" case crashes the whole game.  The old
+    // ">= 8 MB -> inline" fast path made the behaviour depend on the caller's
+    // stack report; determinism beats the negligible cost of one pthread per
+    // shader compile.
     pthread_attr_t attr;
     if (pthread_attr_init(&attr) != 0) return false;
     if (pthread_attr_setstacksize(&attr, 32u << 20) != 0) {
@@ -925,10 +931,15 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
     std::string out;
     int rc = 0;
     GLSLtoGLSLES_2_Args args{glsl_code, glsl_type, essl_version, &rc, &out};
+    // Log BEFORE the conversion so a crash inside glslang is attributable:
+    // if the next log shows this line but no completion, the SEGV happened on
+    // the dedicated 32 MB stack (=> a real glslang bug, not a stack overflow).
+    LOG_V("[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=%zu)", strlen(glsl_code))
     if (run_on_big_stack_if_needed(&GLSLtoGLSLES_2_entry, &args)) {
         return_code = rc;
         return out;
     }
+    LOG_W_FORCE("[MG] shader conversion falling back to inline execution (big-stack thread unavailable)")
 #endif
     std::string out2;
     GLSLtoGLSLES_2_impl(glsl_code, glsl_type, essl_version, return_code, out2);

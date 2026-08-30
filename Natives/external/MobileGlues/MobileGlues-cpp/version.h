@@ -25,7 +25,13 @@
 // invalidates cached conversion results once more and, more importantly, makes
 // "MobileGlues 2.0.2" visible in the runtime log so a stale dylib in the IPA
 // is instantly obvious.
-#define REVISION 2
+// 2 -> 3: mg_init_gles() now pins the GL ES table to the REAL ANGLE libGLESv2
+// instead of libtinygl4angle, whose glShaderSource does not forward into
+// ANGLE's object namespace (every pipeline died with "ERROR: 1:1: ''" and a
+// zero-byte driver readback). Shader conversions now ALWAYS run on the
+// dedicated 32 MB-stack thread (the >= 8 MB inline fast path depended on the
+// caller's stack-size report and could still overflow inside glslang).
+#define REVISION 3
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE
