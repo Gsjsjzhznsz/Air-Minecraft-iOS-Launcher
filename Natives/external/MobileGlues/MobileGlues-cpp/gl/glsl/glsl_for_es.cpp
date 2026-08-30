@@ -28,7 +28,10 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <mutex>
-#include <ucontext.h>
+// NB: <sys/ucontext.h>, NOT <ucontext.h> -- the latter errors out on the
+// iOS SDK without _XOPEN_SOURCE. sys/ucontext.h defines ucontext_t with
+// uc_mcontext (mcontext_t, a pointer to _STRUCT_MCONTEXT64) and uc_mcsize.
+#include <sys/ucontext.h>
 #include <dlfcn.h>
 #endif
 
@@ -1078,19 +1081,19 @@ static void report_crash_site(siginfo_t* info, void* uctx) {
     uint64_t pc = 0, lr = 0, far_addr = 0;
 #if defined(__APPLE__) && defined(__aarch64__)
     ucontext_t* uc = (ucontext_t*)uctx;
-    if (uc && uc->uc_mcontext && uc->uc_mcsize >= sizeof(mcontext64)) {
-        arm_thread_state64_t* ss = &uc->uc_mcontext->__ss;
-        arm_exception_state64_t* es = &uc->uc_mcontext->__es;
-        pc = ss->__pc;
-        lr = (uint64_t)ss->__lr;
-        far_addr = es->__far;
+    mcontext_t mc = uc ? uc->uc_mcontext : nullptr;
+    if (uc && mc && uc->uc_mcsize >= sizeof(*mc)) {
+        pc = mc->__ss.__pc;
+        lr = mc->__ss.__lr;
+        far_addr = mc->__es.__far;
     }
 #elif defined(__APPLE__) && defined(__x86_64__)
     ucontext_t* uc = (ucontext_t*)uctx;
-    if (uc && uc->uc_mcontext && uc->uc_mcsize >= sizeof(mcontext64)) {
-        pc = uc->uc_mcontext->__ss.__rip;
-        lr = pc;
-        far_addr = uc->uc_mcontext->__es.__faultvaddr;
+    mcontext_t mc = uc ? uc->uc_mcontext : nullptr;
+    if (uc && mc && uc->uc_mcsize >= sizeof(*mc)) {
+        pc = mc->__ss.__rip;
+        lr = mc->__ss.__rip;
+        far_addr = mc->__es.__faultvaddr;
     }
 #else
     (void)uctx;
