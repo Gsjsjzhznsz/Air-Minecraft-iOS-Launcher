@@ -31,7 +31,15 @@
 // zero-byte driver readback). Shader conversions now ALWAYS run on the
 // dedicated 32 MB-stack thread (the >= 8 MB inline fast path depended on the
 // caller's stack-size report and could still overflow inside glslang).
-#define REVISION 4
+// 3 -> 4: process_sampler_buffer() rewrote texelFetch argument lists with a
+// [^)]+? regex that truncated at the first ')', shredding any coordinate with
+// nested calls. Sodium 0.9.x's
+//     texelFetch(u_SectionTimeInfo, int((u_RegionID * 256u) + uint(chunkId)))
+// became 'temp uint % uniform int' garbage -> glslang parse failure -> every
+// Sodium terrain pipeline invalid -> no blocks rendered. Rewritten with a
+// paren-depth scanner; coordinates now also pass through int(...) so
+// driver-lenient uint indices cannot re-mix sign with u_BufferTexWidth.
+#define REVISION 5
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

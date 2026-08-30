@@ -507,20 +507,176 @@ static size_t find_insertion_point(const std::string& glsl) {
     return insertion_point;
 }
 
-void process_sampler_buffer(std::string& source) { // a simplized version, should be rewritten in the future
-    if (source.find("isamplerBuffer") == std::string::npos) {
+// ----------------------------------------------------------------------------
+// Buffer-texture (samplerBuffer) emulation for ES 3.0 backends.
+//
+// The previous implementation rewrote texelFetch argument lists with
+//     std::regex(R"(texelFetch\s*\(\s*(\w+)\s*,\s*([^)]+?)\s*\))")
+// whose [^)]+? stops at the FIRST ')' -- so any coordinate expression with a
+// nested call was shredded mid-way. Sodium 0.9.x's
+//     texelFetch(u_SectionTimeInfo, int((u_RegionID * 256u) + uint(chunkId)))
+// came out as
+//     ivec2((int((u_RegionID * 256u) % u_BufferTexWidth, ...)
+// which (a) makes 'temp uint % uniform int' out of u_RegionID * 256u -- a
+// guaranteed glslang parse error at desktop 330 ("0:%d '%' : wrong operand
+// types", plus the bogus "missing #endif" cascade) and (b) unbalances the
+// parens for everything after it. Every Sodium terrain pipeline compiles that
+// one vertex shader, so the whole world went unrendered. The scanner below
+// tracks real paren depth instead; a text-level regex cannot do this job.
+// ----------------------------------------------------------------------------
+
+namespace {
+
+// ')' matching the '(' at 'open'; npos when unbalanced (callers leave the
+// source untouched instead of corrupting it).
+size_t find_matching_paren(const std::string& source, size_t open) {
+    if (open >= source.size() || source[open] != '(') return std::string::npos;
+    int depth = 0;
+    for (size_t i = open; i < source.size(); ++i) {
+        if (source[i] == '(') {
+            depth++;
+        } else if (source[i] == ')') {
+            if (--depth == 0) return i;
+        }
+    }
+    return std::string::npos;
+}
+
+size_t skip_ws(const std::string& s, size_t p) {
+    while (p < s.size() && std::isspace((unsigned char)s[p])) ++p;
+    return p;
+}
+
+std::string trim_ws(const std::string& s) {
+    size_t b = 0, e = s.size();
+    while (b < e && std::isspace((unsigned char)s[b])) ++b;
+    while (e > b && std::isspace((unsigned char)s[e - 1])) --e;
+    return s.substr(b, e - b);
+}
+
+// Split [begin, end) on top-level commas (paren depth 0 relative to begin).
+std::vector<std::string> split_top_level_args(const std::string& source, size_t begin, size_t end) {
+    std::vector<std::string> args;
+    int depth = 0;
+    size_t start = begin;
+    for (size_t i = begin; i < end; ++i) {
+        char c = source[i];
+        if (c == '(') {
+            depth++;
+        } else if (c == ')') {
+            depth--;
+        } else if (c == ',' && depth == 0) {
+            args.push_back(source.substr(start, i - start));
+            start = i + 1;
+        }
+    }
+    args.push_back(source.substr(start, end - start));
+    return args;
+}
+
+// "ivec2 ( EXPR )" with EXPR containing no top-level comma (i.e. a linear
+// index, not a 2D coordinate) -> true, EXPR in 'inner'.
+bool parse_single_component_ivec2(const std::string& arg, std::string& inner) {
+    const std::string head = "ivec2";
+    if (arg.compare(0, head.size(), head) != 0) return false;
+    size_t p = skip_ws(arg, head.size());
+    if (p >= arg.size() || arg[p] != '(') return false;
+    size_t close = find_matching_paren(arg, p);
+    if (close == std::string::npos) return false;
+    if (trim_ws(arg.substr(close + 1)).size() != 0) return false;
+    size_t begin = p + 1, end = close;
+    for (size_t i = begin; i < end; ++i) {
+        if (arg[i] == '(') {
+            // only track depth; commas inside nested parens are not top-level
+        } else if (arg[i] == ',') {
+            // any top-level comma means 2+ components -> a real 2D coordinate
+            return false;
+        }
+    }
+    inner = trim_ws(arg.substr(begin, end - begin));
+    return !inner.empty();
+}
+
+} // namespace
+
+void process_sampler_buffer(std::string& source) {
+    // The check matches isamplerBuffer/usamplerBuffer too (substring), and the
+    // swap below keeps those single-letter prefixes intact.
+    if (source.find("samplerBuffer") == std::string::npos) {
         return;
     }
 
+    // samplerBuffer / isamplerBuffer / usamplerBuffer -> (i/u)sampler2D
     size_t pos = 0;
-    while ((pos = source.find("isamplerBuffer", pos)) != std::string::npos) {
-        source.replace(pos, 14, "isampler2D");
-        pos += 11;
+    while ((pos = source.find("samplerBuffer", pos)) != std::string::npos) {
+        source.replace(pos, 13, "sampler2D");
+        pos += 9;
     }
 
-    std::regex pattern(R"(texelFetch\s*\(\s*(\w+)\s*,\s*([^)]+?)\s*\))");
-    source = std::regex_replace(source, pattern,
-                                "texelFetch($1, ivec2(($2) % u_BufferTexWidth, ($2) / u_BufferTexWidth), 0)");
+    // texelFetch rewriting with paren-aware argument parsing:
+    //   texelFetch(SAMP, COORD)                     (buffer-texture form)
+    //     -> texelFetch(SAMP, ivec2((int(COORD)) % u_BufferTexWidth,
+    //                               (int(COORD)) / u_BufferTexWidth), 0)
+    //   texelFetch(SAMP, ivec2(INDEX), 0)           (pre-flattened linear form)
+    //     -> texelFetch(SAMP, bufferCoords(int(INDEX)), 0)
+    // COORD/INDEX go through int(...): the coordinate of a buffer fetch is an
+    // int in valid GLSL, but drivers accept uint expressions there and the
+    // emulation's '% u_BufferTexWidth' would then mix uint with a uniform int
+    // -- illegal at desktop GLSL 330 and an instant parse error. int() is an
+    // identity for the already-int case, so this only ever repairs.
+    // Genuine 2D fetches -- texelFetch(SAMP, ivec2(X, Y), 0) -- are left alone;
+    // the old regex pass turned those into bufferCoords(X, Y), a call whose
+    // arity never matched the helper.
+    static const std::string kFetch = "texelFetch";
+    std::string out;
+    out.reserve(source.size() + 128);
+    size_t copy_from = 0;
+    size_t scan = 0;
+    bool rewrote_any = false;
+    while ((scan = source.find(kFetch, scan)) != std::string::npos) {
+        if (scan > 0 && (std::isalnum((unsigned char)source[scan - 1]) || source[scan - 1] == '_')) {
+            scan += kFetch.size();
+            continue;
+        }
+        size_t p = skip_ws(source, scan + kFetch.size());
+        if (p >= source.size() || source[p] != '(') {
+            scan += kFetch.size();
+            continue;
+        }
+        size_t close = find_matching_paren(source, p);
+        if (close == std::string::npos) break; // unbalanced overall: bail out untouched
+
+        std::vector<std::string> args = split_top_level_args(source, p + 1, close);
+        for (std::string& a : args) a = trim_ws(std::move(a));
+
+        std::string replacement;
+        if (args.size() == 2 && !args[0].empty() && !args[1].empty()) {
+            const std::string& coord = args[1];
+            replacement = "texelFetch(" + args[0] + ", ivec2((int(" + coord + ")) % u_BufferTexWidth, (int(" +
+                          coord + ")) / u_BufferTexWidth), 0)";
+        } else if (args.size() == 3 && args[2] == "0") {
+            std::string inner;
+            if (parse_single_component_ivec2(args[1], inner)) {
+                replacement = "texelFetch(" + args[0] + ", bufferCoords(int(" + inner + ")), 0)";
+            }
+        }
+
+        if (replacement.empty()) {
+            // Not a buffer-style fetch (or malformed): keep as-is and keep
+            // scanning inside it for further calls.
+            scan += kFetch.size();
+            continue;
+        }
+        out.append(source, copy_from, scan - copy_from);
+        out.append(replacement);
+        rewrote_any = true;
+        scan = close + 1;
+        copy_from = scan;
+    }
+    if (rewrote_any) {
+        out.append(source, copy_from, source.size() - copy_from);
+        source = std::move(out);
+    }
 
     const char* boundaryProtection = R"(
 ivec2 bufferCoords(int index) {
@@ -534,9 +690,6 @@ ivec2 bufferCoords(int index) {
     return ivec2(x, y);
 }
 )";
-
-    source = std::regex_replace(source, std::regex("texelFetch\\((\\w+)\\s*,\\s*ivec2\\(([^)]+)\\)\\s*,\\s*0\\)"),
-                                "texelFetch($1, bufferCoords($2), 0)");
 
     size_t insertion_point = find_insertion_point(source);
     if (insertion_point != std::string::npos) {
