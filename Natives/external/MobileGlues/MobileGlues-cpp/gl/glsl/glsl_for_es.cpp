@@ -28,6 +28,8 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <mutex>
+#include <ucontext.h>
+#include <dlfcn.h>
 #endif
 
 #define DEBUG 0
@@ -853,7 +855,7 @@ int get_or_add_glsl_version(std::string& glsl) {
 }
 
 std::vector<unsigned int> glsl_to_spirv(GLenum shader_type, int glsl_version, const char* const* shader_src,
-                                        int& errc) {
+                                        int& errc, bool safe_mode = false) {
     EShLanguage shader_language;
     switch (shader_type) {
     case GL_VERTEX_SHADER:
@@ -918,7 +920,10 @@ std::vector<unsigned int> glsl_to_spirv(GLenum shader_type, int glsl_version, co
     LOG_D("Shader Linked.")
     std::vector<unsigned int> spirv_code;
     glslang::SpvOptions spvOptions;
-    spvOptions.disableOptimizer = false;
+    // safe_mode (set by the SIGSEGV-retry path) skips the optional SPIR-V
+    // optimizer pass: if the arm64 fault lives inside it, the unoptimized
+    // SPIR-V still cross-compiles to a valid, working ESSL shader.
+    spvOptions.disableOptimizer = safe_mode;
     glslang::GlslangToSpv(*program.getIntermediate(shader_language), spirv_code, &spvOptions);
     errc = 0;
     return spirv_code;
@@ -1018,6 +1023,13 @@ std::string spirv_to_essl(std::vector<unsigned int> spirv, uint essl_version, in
 
 static bool glslang_inited = false;
 
+// Coarse pipeline-stage marker, updated before each conversion sub-step. A
+// recovered SIGSEGV reports it so one device log says WHICH stage died
+// (parse / link / SPIR-V codegen+optimizer / SPIRV-Cross / ESSL post).
+// Declared outside the Apple-only guard block because the conversion impl
+// (shared with the desktop harness) updates it unconditionally.
+static thread_local const char* t_conv_stage = "idle";
+
 #if defined(__APPLE__)
 namespace {
 // glslang's recursive-descent parser and its semantic analysis recurse through
@@ -1057,9 +1069,57 @@ static sigjmp_buf dummy_jmp;
 static struct sigaction g_prev_sigsegv{};
 static bool g_prev_sigsegv_valid = false;
 
+// Best-effort crash-site report from inside the signal handler. We are
+// already past the point of caring about strict async-signal-safety (the
+// longjmp below aborts a corrupted computation anyway); what matters is
+// that the offsets land in the log so the arm64 fault can be symbolicated
+// offline against the exact CI dylib, the way lValueErrorCheck+0x264 was.
+static void report_crash_site(siginfo_t* info, void* uctx) {
+    uint64_t pc = 0, lr = 0, far_addr = 0;
+#if defined(__APPLE__) && defined(__aarch64__)
+    ucontext_t* uc = (ucontext_t*)uctx;
+    if (uc && uc->uc_mcontext && uc->uc_mcsize >= sizeof(mcontext64)) {
+        arm_thread_state64_t* ss = &uc->uc_mcontext->__ss;
+        arm_exception_state64_t* es = &uc->uc_mcontext->__es;
+        pc = ss->__pc;
+        lr = (uint64_t)ss->__lr;
+        far_addr = es->__far;
+    }
+#elif defined(__APPLE__) && defined(__x86_64__)
+    ucontext_t* uc = (ucontext_t*)uctx;
+    if (uc && uc->uc_mcontext && uc->uc_mcsize >= sizeof(mcontext64)) {
+        pc = uc->uc_mcontext->__ss.__rip;
+        lr = pc;
+        far_addr = uc->uc_mcontext->__es.__faultvaddr;
+    }
+#else
+    (void)uctx;
+#endif
+    if (pc != 0) {
+        Dl_info dli{};
+        if (dladdr((void*)pc, &dli) && dli.dli_fbase) {
+            uint64_t base = (uint64_t)dli.dli_fbase;
+            const char* img = dli.dli_fname ? strrchr(dli.dli_fname, '/') : nullptr;
+            img = img ? img + 1 : dli.dli_fname;
+            LOG_W_FORCE("[MG] crash site: stage='%s' pc=0x%llx (pc-%s+0x%llx) lr=0x%llx far=0x%llx si_addr=0x%p",
+                        t_conv_stage, (unsigned long long)pc, img ? img : "?",
+                        (unsigned long long)(pc - base), (unsigned long long)lr,
+                        (unsigned long long)far_addr, info ? info->si_addr : nullptr)
+        } else {
+            LOG_W_FORCE("[MG] crash site: stage='%s' pc=0x%llx lr=0x%llx far=0x%llx si_addr=0x%p (module unknown)",
+                        t_conv_stage, (unsigned long long)pc, (unsigned long long)lr,
+                        (unsigned long long)far_addr, info ? info->si_addr : nullptr)
+        }
+    } else {
+        LOG_W_FORCE("[MG] crash site: stage='%s' si_addr=0x%p (pc unavailable)",
+                    t_conv_stage, info ? info->si_addr : nullptr)
+    }
+}
+
 static void conversion_sigsegv_handler(int sig, siginfo_t* info, void* uctx) {
     if (t_in_conversion) {
         t_in_conversion = false;
+        report_crash_site(info, uctx);
         siglongjmp(t_conv_jmp, 1);
     }
     // Not ours: forward to the previous handler chain (JVM, PLCrash, ...).
@@ -1127,26 +1187,31 @@ struct GLSLtoGLSLES_2_Args {
     uint essl_version;
     int* return_code;
     std::string* out;
+    // safe_mode: run the SPIR-V pipeline with the optimizer disabled. Used
+    // for the one-shot retry after a recovered SIGSEGV -- the optimizer is an
+    // optional transform, so if a crash lives in it, the retry converts the
+    // shader for real instead of falling back to unusable raw desktop GLSL.
+    bool safe_mode = false;
 };
 
 static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint essl_version,
-                                int& return_code, std::string& out);
+                                int& return_code, std::string& out, bool safe_mode = false);
 
 static void GLSLtoGLSLES_2_entry(void* p) {
     GLSLtoGLSLES_2_Args* a = (GLSLtoGLSLES_2_Args*)p;
 #if defined(__APPLE__)
     if (sigsetjmp(t_conv_jmp, 1) != 0) {
-        // SIGSEGV inside glslang on this dedicated thread (see the guard
-        // notes above). Report a clean per-shader failure instead of dying:
-        // -999 marks "conversion crashed" for the caller's log.
-        LOG_W_FORCE("[MG] shader conversion CRASHED (SIGSEGV recovered on 32MB-stack thread, len=%zu, head='%.96s') -- reporting conversion failure",
-                    strlen(a->glsl_code), a->glsl_code)
+        // SIGSEGV inside glslang/SPIRV-Cross on this dedicated thread (see
+        // the guard notes above). Report a clean per-shader failure instead
+        // of dying: -999 marks "conversion crashed" for the caller's log.
+        LOG_W_FORCE("[MG] shader conversion CRASHED (SIGSEGV recovered on 32MB-stack thread, stage='%s', len=%zu, head='%.96s') -- reporting conversion failure",
+                    t_conv_stage, strlen(a->glsl_code), a->glsl_code)
         *a->return_code = -999;
         a->out->clear();
         return;
     }
     t_in_conversion = true;
-    GLSLtoGLSLES_2_impl(a->glsl_code, a->glsl_type, a->essl_version, *a->return_code, *a->out);
+    GLSLtoGLSLES_2_impl(a->glsl_code, a->glsl_type, a->essl_version, *a->return_code, *a->out, a->safe_mode);
     t_in_conversion = false;
 #else
     GLSLtoGLSLES_2_impl(a->glsl_code, a->glsl_type, a->essl_version, *a->return_code, *a->out);
@@ -1167,6 +1232,25 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
     LOG_V("[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=%zu, head='%.96s')",
           strlen(glsl_code), glsl_code)
     if (run_on_big_stack_if_needed(&GLSLtoGLSLES_2_entry, &args)) {
+        if (rc == -999) {
+            // One recovery shot in safe mode: the SPIR-V optimizer is an
+            // optional pass, and if the arm64 fault lives inside it, running
+            // without it turns a dead pipeline back into a working shader.
+            // Each run_on_big_stack_if_needed() call spawns a fresh pthread,
+            // so the retry also starts from clean glslang state.
+            int rc2 = 0;
+            std::string out2;
+            GLSLtoGLSLES_2_Args args2{glsl_code, glsl_type, essl_version, &rc2, &out2, true};
+            LOG_W_FORCE("[MG] conversion crashed -- retrying once with SPIR-V optimizer disabled (len=%zu, head='%.96s')",
+                        strlen(glsl_code), glsl_code)
+            if (run_on_big_stack_if_needed(&GLSLtoGLSLES_2_entry, &args2) && rc2 == 0 && !out2.empty()) {
+                LOG_W_FORCE("[MG] conversion SUCCEEDED on optimizer-disabled retry (len=%zu) -- the SPIR-V optimizer path is the crasher",
+                            strlen(glsl_code))
+                return_code = rc2;
+                return out2;
+            }
+            LOG_W_FORCE("[MG] optimizer-disabled retry did not produce a usable shader (rc=%d) -- reporting conversion failure", rc2)
+        }
         return_code = rc;
         return out;
     }
@@ -1178,7 +1262,8 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
 }
 
 static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint essl_version,
-                                int& return_code, std::string& out) {
+                                int& return_code, std::string& out, bool safe_mode) {
+    t_conv_stage = "preprocess";
     std::string correct_glsl_str = preprocess_glsl(glsl_code, glsl_type);
     LOG_D("Firstly converted GLSL:\n%s", correct_glsl_str.c_str())
     int glsl_version = get_or_add_glsl_version(correct_glsl_str);
@@ -1189,13 +1274,15 @@ static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint es
     }
     const char* s[] = {correct_glsl_str.c_str()};
     int errc = 0;
-    std::vector<unsigned int> spirv_code = glsl_to_spirv(glsl_type, glsl_version, s, errc);
+    t_conv_stage = "glslang-parse+link+spv";
+    std::vector<unsigned int> spirv_code = glsl_to_spirv(glsl_type, glsl_version, s, errc, safe_mode);
     if (errc != 0) {
         return_code = -1;
         out.clear();
         return;
     }
     errc = 0;
+    t_conv_stage = "spirv-cross";
     std::string essl = spirv_to_essl(spirv_code, essl_version, errc);
     if (errc != 0) {
         return_code = -2;
@@ -1204,6 +1291,7 @@ static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint es
     }
 
     // Post-processing ESSL
+    t_conv_stage = "essl-postprocess";
 
     if (glsl_type != GL_COMPUTE_SHADER) {
         essl = removeLayoutBinding(essl);
@@ -1211,6 +1299,7 @@ static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint es
     essl = processOutColorLocations(essl);
     essl = forceSupporterOutput(essl);
 
+    t_conv_stage = "done";
     LOG_D("Originally GLSL to GLSL ES Complete: \n%s", essl.c_str())
     return_code = errc;
     out = std::move(essl);

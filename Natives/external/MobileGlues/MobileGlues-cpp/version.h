@@ -39,7 +39,9 @@
 // Sodium terrain pipeline invalid -> no blocks rendered. Rewritten with a
 // paren-depth scanner; coordinates now also pass through int(...) so
 // driver-lenient uint indices cannot re-mix sign with u_BufferTexWidth.
-#define REVISION 5
+// REVISION 6: stage-tagged SIGSEGV crash-site report + optimizer-disabled
+// retry on the conversion thread.
+#define REVISION 6
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE
