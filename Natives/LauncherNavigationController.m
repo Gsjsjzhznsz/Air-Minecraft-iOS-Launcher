@@ -672,17 +672,47 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
-
-        // On iOS 26+ with TXM, the brk #0x69 in JavaLauncher.m needs an
-        // actively attached debugger to allocate RX memory.
-        // However, if JIT is already enabled (CS_DEBUGGED set), launching
-        // directly is correct — Hynis-JE confirms this works on the same
-        // device.  The TXM workaround in JavaLauncher.m will use JIT26
-        // breakpoint stubs; if no debugger is attached, those stubs
-        // gracefully fall back (JIT26CreateRegionLegacy returns a sentinel).
-        // Forcing stikjit:// here was causing unnecessary URL jumps and
-        // preventing DyldLVBypass from activating (unsigned dylibs fail).
-        NSLog(@"[JIT] JIT already enabled (flags=0x%X, ppid=%d), launching game directly",
+        // iPadOS 26+ TXM devices: HotSpot's RX mappings are allocated by the
+        // JIT26 debugger script while it services brk #0x69.  CS_DEBUGGED
+        // being set only proves JIT was enabled once for this process -- the
+        // JIT26 debugger itself is normally long gone by launch time
+        // (ppid==1, P_TRACED==0, no task exception ports).  launchJVM() then
+        // runs JIT26CreateRegionLegacy() whose brk #0x69 is instantly fatal
+        // with no live debugger (measured 2026-08-30: crash right after
+        // custom-env init when this re-attach step was skipped -- the old
+        // "stubs gracefully fall back" assumption is disproven).  So when
+        // launchJVM would enter the JIT26 path and no debugger is live,
+        // re-attach the Universal script via stikjit:// first, then launch.
+        // NOTE: this intentionally does NOT reuse isJITEnabled() -- that
+        // reports the persistent CS_DEBUGGED state, not debugger liveness.
+        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+            !JIT26IsLikelyDebuggerKeepAttached()) {
+            NSLog(@"[JIT] [NavCtrl] CS_DEBUGGED set but no live JIT26 debugger (ppid=%d traced=%d exn=%d) — re-attaching script via stikjit://",
+                  getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
+            NSString *scriptDataString = @"";
+            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+            if (scriptData) {
+                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+            }
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+            UIAlertController* alert = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
+                message:localize(@"launcher.wait_jit.message", nil)
+                preferredStyle:UIAlertControllerStyleAlert];
+            [self presentViewController:alert animated:YES completion:nil];
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                // Wait for the JIT26 debugger to actually attach (P_TRACED /
+                // exception ports / spawned-by-debugger), not for CS_DEBUGGED
+                // -- that flag is already set and would race the first brk.
+                while (!JIT26IsLikelyDebuggerKeepAttached()) {
+                    usleep(1000 * 200);
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [alert dismissViewControllerAnimated:YES completion:handler];
+                });
+            });
+            return;
+        }
+        NSLog(@"[JIT] [NavCtrl] JIT enabled with live JIT26 debugger (flags=0x%X, ppid=%d), launching game directly",
               DeviceGetJITFlags(NO), getppid());
         handler();
         return;

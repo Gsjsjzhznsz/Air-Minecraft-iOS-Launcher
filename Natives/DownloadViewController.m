@@ -3730,8 +3730,48 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     }
 
     if (isJITEnabled(false)) {
-        NSLog(@"[JIT] [DownloadVC] JIT already enabled, launching game directly");
         [ALTServerManager.sharedManager stopDiscovering];
+        // iPadOS 26+ TXM devices: HotSpot's RX mappings are allocated by the
+        // JIT26 debugger script while it services brk #0x69.  CS_DEBUGGED
+        // being set only proves JIT was enabled once for this process -- the
+        // JIT26 debugger itself is normally long gone by launch time
+        // (ppid==1, P_TRACED==0, no task exception ports).  launchJVM() then
+        // runs JIT26CreateRegionLegacy() whose brk #0x69 is instantly fatal
+        // with no live debugger (measured 2026-08-30: crash right after
+        // custom-env init when this re-attach step was skipped).  So when
+        // launchJVM would enter the JIT26 path and no debugger is live,
+        // re-attach the Universal script via stikjit:// first, then launch.
+        // NOTE: this intentionally does NOT reuse isJITEnabled() -- that
+        // reports the persistent CS_DEBUGGED state, not debugger liveness.
+        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+            !JIT26IsLikelyDebuggerKeepAttached()) {
+            NSLog(@"[JIT] [DownloadVC] CS_DEBUGGED set but no live JIT26 debugger (ppid=%d traced=%d exn=%d) — re-attaching script via stikjit://",
+                  getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
+            NSString *scriptDataString = @"";
+            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+            if (scriptData) {
+                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+            }
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+            InlineMessageView *jitAlert = [InlineMessageView showInViewController:self
+                                                                            title:localize(@"launcher.wait_jit.title", nil)
+                                                                          message:localize(@"launcher.wait_jit.message", nil)
+                                                                             type:InlineMessageTypeLoading];
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                // Wait for the JIT26 debugger to actually attach (P_TRACED /
+                // exception ports / spawned-by-debugger), not for CS_DEBUGGED
+                // -- that flag is already set and would race the first brk.
+                while (!JIT26IsLikelyDebuggerKeepAttached()) {
+                    usleep(1000 * 200);
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [jitAlert dismiss];
+                    if (handler) handler();
+                });
+            });
+            return;
+        }
+        NSLog(@"[JIT] [DownloadVC] JIT enabled with live JIT26 debugger, launching game directly");
         handler();
         return;
     } else if (hasTrollStoreJIT) {

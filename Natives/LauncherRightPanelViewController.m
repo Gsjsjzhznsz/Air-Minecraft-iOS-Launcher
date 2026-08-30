@@ -695,31 +695,24 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 - (void)updateJITStatus {
     if (!self.jitStatusLabel) return;
     BOOL enabled = isJITEnabled(NO);
-    if (enabled) {
+    // Three-state display on TXM devices (iPadOS 26 + M-series): JIT can be
+    // "enabled" (CS_DEBUGGED set) while the JIT26 debugger that must service
+    // brk #0x69 at launch is gone.  That state is expected and recoverable --
+    // invokeAfterJITEnabled re-attaches the script via stikjit:// -- so tell
+    // it apart from plain red "Not Enabled" instead of lying either way.
+    if (enabled && DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+        !JIT26IsLikelyDebuggerKeepAttached()) {
+        self.jitStatusLabel.text = localize(@"i18n_str_jit26_pending", nil);
+        self.jitStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0];
+        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0] colorWithAlphaComponent:0.15];
+    } else if (enabled) {
         self.jitStatusLabel.text = localize(@"i18n_str_421", nil);
         self.jitStatusLabel.textColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0];
         self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
     } else {
-        // Three-state display on TXM devices (iPadOS 26 + M-series): plain
-        // isJITEnabled(NO) means "JIT26 debugger live", which reads as red
-        // "Not Enabled" while the user DID enable JIT externally -- the
-        // enablement (CS_DEBUGGED) persists, only the JIT26 debugger session
-        // is gone.  Tell the two apart instead of lying with the red label:
-        // the launch flow auto-attaches the debugger via stikjit:// when
-        // needed, so this state is expected and recoverable.
-        BOOL txm = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
-        int csFlags = 0;
-        csops(getpid(), 0, &csFlags, sizeof(csFlags));
-        BOOL debugged = (csFlags & CS_DEBUGGED) != 0;
-        if (txm && debugged) {
-            self.jitStatusLabel.text = localize(@"i18n_str_jit26_pending", nil);
-            self.jitStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0];
-            self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0] colorWithAlphaComponent:0.15];
-        } else {
-            self.jitStatusLabel.text = localize(@"i18n_str_422", nil);
-            self.jitStatusLabel.textColor = [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
-            self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
-        }
+        self.jitStatusLabel.text = localize(@"i18n_str_422", nil);
+        self.jitStatusLabel.textColor = [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
+        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
     }
 }
 
@@ -1253,15 +1246,47 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     if (isJITEnabled(false)) {
         [ALTServerManager.sharedManager stopDiscovering];
-        // Direct launch, matching upstream exactly.  A nested TXM
-        // "re-open stikjit:// when isJITEnabled(true)==NO" block lived here
-        // (added by the 1e11f44f/cf3033eb/9c6cdb53 series); it forced a
-        // redundant stikjit:// round trip on externally-JIT-enabled devices
-        // (external attachers leave ppid==1 / P_TRACED==0 / no task
-        // exception ports, so the old keep-attached gate misread them as
-        // debugger-less) and its while(!isJITEnabled(true)) wait could spin
-        // forever.  Upstream never re-opens stikjit:// once JIT is enabled.
-        NSLog(@"[JIT] [RightPanel] JIT already enabled, launching game directly");
+        // iPadOS 26+ TXM devices: HotSpot's RX mappings are allocated by the
+        // JIT26 debugger script while it services brk #0x69.  CS_DEBUGGED
+        // being set only proves JIT was enabled once for this process -- the
+        // JIT26 debugger itself is normally long gone by launch time
+        // (ppid==1, P_TRACED==0, no task exception ports).  launchJVM() then
+        // runs JIT26CreateRegionLegacy() whose brk #0x69 is instantly fatal
+        // with no live debugger (measured 2026-08-30: crash right after
+        // custom-env init when this re-attach step was skipped).  So when
+        // launchJVM would enter the JIT26 path and no debugger is live,
+        // re-attach the Universal script via stikjit:// first, then launch.
+        // NOTE: this intentionally does NOT reuse isJITEnabled() -- that
+        // reports the persistent CS_DEBUGGED state, not debugger liveness.
+        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+            !JIT26IsLikelyDebuggerKeepAttached()) {
+            NSLog(@"[JIT] [RightPanel] CS_DEBUGGED set but no live JIT26 debugger (ppid=%d traced=%d exn=%d) — re-attaching script via stikjit://",
+                  getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
+            NSString *scriptDataString = @"";
+            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+            if (scriptData) {
+                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+            }
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+            self.progressLabel.text = localize(@"i18n_str_436", nil);
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
+                                                                           message:localize(@"i18n_str_439", nil)
+                                                                    preferredStyle:UIAlertControllerStyleAlert];
+            [self presentViewController:alert animated:YES completion:nil];
+            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                // Wait for the JIT26 debugger to actually attach (P_TRACED /
+                // exception ports / spawned-by-debugger), not for CS_DEBUGGED
+                // -- that flag is already set and would race the first brk.
+                while (!JIT26IsLikelyDebuggerKeepAttached()) {
+                    usleep(1000 * 200);
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [alert dismissViewControllerAnimated:YES completion:handler];
+                });
+            });
+            return;
+        }
+        NSLog(@"[JIT] [RightPanel] JIT enabled with live JIT26 debugger, launching game directly");
         handler();
         return;
     } else if (hasTrollStoreJIT) {
