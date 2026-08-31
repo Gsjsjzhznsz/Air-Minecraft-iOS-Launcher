@@ -12,6 +12,8 @@
 #include "mg.h"
 #include "texture.h"
 #include "../egl/context.h"
+#include <cstring>
+#include "log.h"
 
 #define DEBUG 0
 
@@ -213,6 +215,86 @@ void prepareForDraw() {
     if (hardware->emulate_texture_buffer) {
         setupBufferTextureUniforms(gl_state->current_program);
     }
+    // MC 26.x's transparency composite (post/transparency) is a full-screen
+    // pass with TWELVE sampler2D uniforms -- six color + six depth layers --
+    // and its per-pixel depth sort silently produces clouds-through-terrain if
+    // any sampler points at the wrong unit or at an empty texture. Nothing in
+    // the GL stream flags that: wrong units are legal, empty depth textures
+    // sample as 0.0. Dump the program's sampler state on its first draw, once,
+    // so a device log can grade the composite's inputs directly.
+    static int mg_composite_dump_count = 0;
+    static GLuint mg_composite_dumped_program = 0;
+    GLuint program = gl_state->current_program;
+    if (program != 0 && program != mg_composite_dumped_program && mg_composite_dump_count < 2) {
+        GLint active_uniforms = 0;
+        GLES.glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &active_uniforms);
+        if (active_uniforms >= 6) {
+            int sampler_count = 0;
+            bool is_composite = false;
+            char name_buf[128];
+            for (GLint i = 0; i < active_uniforms; ++i) {
+                GLsizei len = 0;
+                GLenum type = 0;
+                GLint size = 0;
+                GLES.glGetActiveUniform(program, (GLuint)i, sizeof(name_buf), &len, &size, &type, name_buf);
+                if (type == GL_SAMPLER_2D) {
+                    sampler_count++;
+                    if (len >= 18 && strncmp(name_buf, "CloudsDepthSampler", 18) == 0) is_composite = true;
+                }
+            }
+            if (is_composite) {
+                mg_composite_dumped_program = program;
+                mg_composite_dump_count++;
+                LOG_W_FORCE("[MG] transparency composite program %u: %d sampler2D uniforms", program, sampler_count)
+                for (GLint i = 0; i < active_uniforms; ++i) {
+                    GLsizei len = 0;
+                    GLenum type = 0;
+                    GLint size = 0;
+                    GLES.glGetActiveUniform(program, (GLuint)i, sizeof(name_buf), &len, &size, &type, name_buf);
+                    if (type != GL_SAMPLER_2D) continue;
+                    GLint loc = GLES.glGetUniformLocation(program, name_buf);
+                    GLint unit = -1;
+                    GLES.glGetUniformiv(program, loc, &unit);
+                    GLuint tex_id = 0;
+                    if (unit >= 0 && unit < mg_max_texture_units()) {
+                        mg_driver_texture_binding_at_unit(unit, GL_TEXTURE_2D, &tex_id);
+                    }
+                    // Driver truth for the same unit, restored immediately. The
+                    // shadow and this must agree; if they do not, the desync is
+                    // the bug and this log is what catches it.
+                    GLuint drv_tex = 0;
+                    if (unit >= 0) {
+                        int prev_unit = mg_driver_active_texture_unit();
+                        GLES.glActiveTexture(GL_TEXTURE0 + unit);
+                        GLint q = 0;
+                        GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &q);
+                        GLES.glActiveTexture(GL_TEXTURE0 + prev_unit);
+                        drv_tex = (GLuint)q;
+                    }
+                    GLenum tex_fmt = 0;
+                    if (tex_id != 0) {
+                        const TextureObject* to = mgGetTexObjectByID(tex_id);
+                        if (to) tex_fmt = to->internal_format;
+                    }
+                    LOG_W_FORCE("[MG]   %-24s -> unit %2d, tex %u (driver %u), internalformat %s", name_buf, unit,
+                                tex_id, drv_tex, tex_fmt ? glEnumToString(tex_fmt) : "(none)")
+                }
+            }
+        }
+    }
+}
+
+// MC 26.x's transparency composite (post/transparency) draws its full-screen
+// triangle with glDrawArrays -- the one draw call that used to bypass
+// prepareForDraw entirely. Everything the draw-time hooks are for (the TBO
+// sampler rewiring under ES 3.0/3.1, the composite sampler dump) rides along
+// here now; the native passthrough this replaces did nothing else.
+void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
+    LOG()
+    LOG_D("glDrawArrays, mode: %d, first: %d, count: %d", mode, first, count)
+    prepareForDraw();
+    GLES.glDrawArrays(mode, first, count);
+    CHECK_GL_ERROR
 }
 
 void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei primcount) {

@@ -67,7 +67,31 @@
 // EOpVectorSwizzle, createInvertedSwizzle) fall back to the identity swizzle
 // of the result's component count. Byte-identical output vs pristine glslang
 // on all swizzle-heavy positive tests and every edge-case candidate.
-#define REVISION 8
+// REVISION 9: MC 26.x transparency-pipeline depth-path hardening + device
+// diagnostics. The game's clouds/weather/particles are composited by
+// post/transparency.fsh, which per-pixel-sorts six layers (main + five
+// dedicated FBOs, each with its own D32F depth texture) and blends far to
+// near. If any depth texture reads garbage the sort degenerates to insertion
+// order and the last layer -- clouds -- draws over everything, including from
+// underground. A locally built libmobileglues (Linux) replaying the exact
+// blaze3d call sequence against a conformant ES 3.0 driver (Mesa llvmpipe)
+// passes every hop end to end: D32F allocation, D32F sampling, reversed-Z
+// draw, copyDepthFrom's depth-only glBlitFramebuffer (byte-exact), composite
+// sort. So the on-device breakage is a per-driver divergence this layer must
+// flatten. Two changes: (1) glFramebufferTexture2D redirects depth-ONLY
+// textures attached at GL_DEPTH_STENCIL_ATTACHMENT to GL_DEPTH_ATTACHMENT and
+// detaches the stencil point. blaze3d's fallback DirectStateAccess attaches
+// every depth texture at the combined point; strict drivers (Mesa, measured)
+// answer FRAMEBUFFER_INCOMPLETE_ATTACHMENT for a depth-only image there, and
+// the lenient drivers that accept it are left with a stencil attachment
+// pointing at a stencil-less image. (2) One-shot W_FORCE diagnostics on the
+// first depth-texture allocation (driver-reported internalformat/depth/
+// stencil bits), the first combined-point depth+stencil attach (driver
+// completeness verdict), the first DEPTH blit (both FBOs' completeness +
+// error verdict), and the first draw of the composite program (all twelve
+// sampler uniforms with unit, texture name and internalformat). Together
+// these grade every hop the composite depends on directly from a device log.
+#define REVISION 9
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

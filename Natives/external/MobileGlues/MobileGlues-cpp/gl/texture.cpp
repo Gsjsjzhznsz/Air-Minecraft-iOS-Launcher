@@ -946,6 +946,31 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 
     GLES.glTexImage2D(target, level, internalFormat, width, height, border, format, type, fix.pixels);
 
+    // MC 26.x runs its whole transparency pipeline (clouds/weather/particles
+    // occlusion) on float depth textures. The depth path has more per-driver
+    // divergence than any other allocation -- unsized forms that quietly
+    // allocate RGBA, silent internalformat rewrites, float depth rejected on
+    // some tilers -- and the composite shader that samples these gives no
+    // error when the answer is garbage. Record the first depth allocation with
+    // what the driver says it actually made, once.
+    static bool mg_depth_alloc_logged = false;
+    if (!mg_depth_alloc_logged &&
+        (internalFormat == GL_DEPTH_COMPONENT16 || internalFormat == GL_DEPTH_COMPONENT24 ||
+         internalFormat == GL_DEPTH_COMPONENT32 || internalFormat == GL_DEPTH_COMPONENT32F ||
+         internalFormat == GL_DEPTH_COMPONENT || internalFormat == GL_DEPTH24_STENCIL8 ||
+         internalFormat == GL_DEPTH32F_STENCIL8 || internalFormat == GL_DEPTH_STENCIL)) {
+        mg_depth_alloc_logged = true;
+        GLint drv_fmt = 0, drv_depth_bits = 0, drv_stencil_bits = 0;
+        GLES.glGetTexLevelParameteriv(target, level, GL_TEXTURE_INTERNAL_FORMAT, &drv_fmt);
+        GLES.glGetTexLevelParameteriv(target, level, GL_TEXTURE_DEPTH_SIZE, &drv_depth_bits);
+        GLES.glGetTexLevelParameteriv(target, level, GL_TEXTURE_STENCIL_SIZE, &drv_stencil_bits);
+        LOG_W_FORCE("[MG] depth texture alloc: requested %s -> driver internalformat 0x%x, depth bits %d, stencil bits %d (%dx%d)",
+                    glEnumToString(internalFormat), drv_fmt, drv_depth_bits, drv_stencil_bits, width, height)
+        if (drv_stencil_bits == 0 && internalFormat != GL_DEPTH_COMPONENT32F) {
+            LOG_W_FORCE("[MG] note: depth allocation carries no stencil bits")
+        }
+    }
+
     CHECK_GL_ERROR
 }
 

@@ -6,6 +6,7 @@
 // End of Source File Header
 
 #include "framebuffer.h"
+#include "texture.h"
 #include "../egl/context.h"
 #include <mutex>
 #include <memory>
@@ -293,7 +294,60 @@ void reattach(GLenum target, GLenum attachment, const attachment_t& a) {
     }
 }
 
+// MC 26.x (and anything built on blaze3d's GlDevice) attaches EVERY depth
+// texture -- including depth-ONLY ones like the D32F main/layer targets -- at
+// GL_DEPTH_STENCIL_ATTACHMENT (0x8D00), because its fallback DirectStateAccess
+// writes attachment 36096 unconditionally. GL 4.4+ allows that spelling for a
+// depth-only image; strict GLES drivers (Mesa, measured) answer
+// GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT for it, and the lenient ones that accept
+// the attach are left with a STENCIL attachment pointing at a stencil-less
+// image, whose downstream effects (depth blit validation, effective format
+// matching) are exactly the kind of silent per-driver divergence the
+// transparency pipeline cannot survive. Redirecting depth-only attaches to
+// GL_DEPTH_ATTACHMENT and detaching the bogus stencil point is what the
+// lenient drivers were doing implicitly, and it is a no-op on drivers that
+// already handled the combined spelling.
+static bool mg_attachment_is_depth_only(GLenum internal_format) {
+    return internal_format == GL_DEPTH_COMPONENT16 || internal_format == GL_DEPTH_COMPONENT24 ||
+           internal_format == GL_DEPTH_COMPONENT32 || internal_format == GL_DEPTH_COMPONENT32F;
+}
+
 void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) {
+    if (attachment == GL_DEPTH_STENCIL_ATTACHMENT && textarget == GL_TEXTURE_2D) {
+        if (texture != 0) {
+            const TextureObject* tex = mgGetTexObjectByID(texture);
+            if (tex && mg_attachment_is_depth_only(tex->internal_format)) {
+                static bool mg_ds_depthonly_logged = false;
+                if (!mg_ds_depthonly_logged) {
+                    mg_ds_depthonly_logged = true;
+                    LOG_W_FORCE("[MG] depth-only texture %u (internalformat %s) attached at DEPTH_STENCIL_ATTACHMENT -- "
+                                "redirecting to GL_DEPTH_ATTACHMENT and detaching the stencil point",
+                                texture, glEnumToString(tex->internal_format))
+                }
+                GLES.glFramebufferTexture2D(target, GL_DEPTH_ATTACHMENT, textarget, texture, level);
+                GLES.glFramebufferTexture2D(target, GL_STENCIL_ATTACHMENT, textarget, 0, level);
+                update_attachment(target, GL_DEPTH_ATTACHMENT, {attach_kind_t::Texture2D, textarget, texture, level, 0});
+                return;
+            }
+            // A real depth+stencil image on the combined point. Log the driver's
+            // completeness verdict once -- the transparency pipeline lives or dies
+            // by this and the strictness varies per driver.
+            static bool mg_ds_combined_logged = false;
+            if (!mg_ds_combined_logged) {
+                mg_ds_combined_logged = true;
+                LOG_W_FORCE("[MG] fbo %u: depth+stencil texture %u attached at DEPTH_STENCIL_ATTACHMENT (target %s), status 0x%x",
+                            current_draw_fbo, texture, glEnumToString(target), GLES.glCheckFramebufferStatus(target))
+            }
+        } else {
+            // Detach of the combined point. With the redirect above, the depth
+            // image may live on GL_DEPTH_ATTACHMENT, so clear every depth-ish
+            // point: detaching an empty point is a no-op.
+            GLES.glFramebufferTexture2D(target, GL_DEPTH_ATTACHMENT, textarget, 0, level);
+            GLES.glFramebufferTexture2D(target, GL_STENCIL_ATTACHMENT, textarget, 0, level);
+            GLES.glFramebufferTexture2D(target, GL_DEPTH_STENCIL_ATTACHMENT, textarget, 0, level);
+            return;
+        }
+    }
     update_attachment(target, attachment, {attach_kind_t::Texture2D, textarget, texture, level, 0});
     GLES.glFramebufferTexture2D(target, attachment, textarget, texture, level);
 }
@@ -375,7 +429,39 @@ void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint
                        GLint dstY1, GLbitfield mask, GLenum filter) {
     LOG()
     mg_fsr_read_scope_t fsr_read;
+    // MC 26.x's copyDepthFrom is a DEPTH-only blit between two FBOs whose only
+    // attachment is a depth texture; the transparency composite's per-layer
+    // depth sort (cloud/weather/particle occlusion) is built entirely on these
+    // copies landing. A silent failure here shows up as translucent geometry
+    // sorting against nothing. Log the first one with both attachments and the
+    // driver's error verdict so a device log can grade this hop directly.
+    static bool mg_depth_blit_logged = false;
+    if (!mg_depth_blit_logged && (mask & GL_DEPTH_BUFFER_BIT)) {
+        mg_depth_blit_logged = true;
+        GLint read_fbo = 0, draw_fbo = 0;
+        GLES.glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fbo);
+        GLES.glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
+        GLenum read_status = GLES.glCheckFramebufferStatus(GL_READ_FRAMEBUFFER);
+        GLenum draw_status = GLES.glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+        LOG_W_FORCE("[MG] depth blit %dx%d -> %dx%d: read fbo %u (status 0x%x) -> draw fbo %u (status 0x%x)",
+                    srcX1 - srcX0, srcY1 - srcY0, dstX1 - dstX0, dstY1 - dstY0,
+                    (unsigned)read_fbo, read_status, (unsigned)draw_fbo, draw_status)
+    }
     GLES.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
+    if (mg_depth_blit_logged && (mask & GL_DEPTH_BUFFER_BIT)) {
+        // Only ever fires once more: the flag now guards the error report, not
+        // the attachment report above.
+        static bool mg_depth_blit_err_logged = false;
+        if (!mg_depth_blit_err_logged) {
+            mg_depth_blit_err_logged = true;
+            GLenum err = GLES.glGetError();
+            if (err != GL_NO_ERROR) {
+                LOG_W_FORCE("[MG] depth blit raised GL error 0x%x", err)
+            } else {
+                LOG_W_FORCE("[MG] depth blit completed with GL_NO_ERROR")
+            }
+        }
+    }
     CHECK_GL_ERROR
 }
 

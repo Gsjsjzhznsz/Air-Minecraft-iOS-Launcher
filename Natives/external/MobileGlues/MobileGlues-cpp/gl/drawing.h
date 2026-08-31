@@ -39,6 +39,7 @@ extern "C"
     GLAPI GLAPIENTRY void glMultiDrawElements(GLenum mode, const GLsizei* count, GLenum type,
                                               const void* const* indices, GLsizei primcount);
     GLAPI GLAPIENTRY void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
+    GLAPI GLAPIENTRY void glDrawArrays(GLenum mode, GLint first, GLsizei count);
 
     // The rest of the indexed family, so GL_PRIMITIVE_RESTART is applied to all
     // of it rather than only to the three above.
