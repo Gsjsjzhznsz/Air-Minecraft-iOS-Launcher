@@ -146,7 +146,44 @@
 // unfilterable depth texture reads black, which in reversed-z is "infinitely
 // far" and un-occludes everything), and the draw fbo's color0/depth
 // attachments are logged with it.
-#define REVISION 11
+// REVISION 12: 2.0.11 device log results + the root cause of the transparency
+// occlusion break (clouds visible through terrain, underground clouds, water/
+// particles/weather sorting against nothing). The log closed the case with the
+// depth-sampler dump: the composite program's twelve sampler2D uniforms all
+// have one SamplerCache sampler object bound over them whose MIN filter is
+// GL_LINEAR_MIPMAP_NEAREST (9986) -- with the dump's 9728/9729 labels fixed,
+// its MAG is GL_NEAREST, and the "LINEAR" the 2.0.11 log printed for MIN was
+// the value 9986, not a NEAREST/linear mistake on MC's part. 9986 is what
+// Mojang's GlSampler deliberately emits for minFilter=NEAREST (LINEAR goes to
+// 9987), kept pointed at level 0 by TEXTURE_MAX_LEVEL=0 on the texture and the
+// sampler's own MAX_LOD=0. The within-level part of 9986 is a LINEAR sample,
+// and GLES 3.0 does not filter depth images (desktop GL does, which is why the
+// same state renders fine on PC): on ANGLE Metal the composite's depth samples
+// are undefined and read 0.0, which in reversed-z is "infinitely far", so
+// every layer-vs-layer sort degenerates and the last-blended clouds layer
+// wins over everything. The dump's own filter table had GL_NEAREST/GL_LINEAR
+// swapped, which is why 2.0.11's log reads as MAG=LINEAR at first glance --
+// fixed here so the next log is readable. The fix, desktop semantics on ES:
+// (1) every depth-family allocation (TexImage2D/3D, TexStorage2D/3D) joins a
+// depth registry and gets MIN/MAG = NEAREST on the texture object itself;
+// (2) glTexParameteri/glTexParameterf aimed at a registered depth texture
+// cannot set anything but NEAREST for MIN/MAG; (3) the sampler objects are
+// now tracked (glGenSamplers/glDeleteSamplers/glBindSampler/glSamplerParameteri/
+// glSamplerParameterf moved from the native table into gl/texture.cpp, ARB
+// aliases kept), and prepareForDraw forces a bound sampler's driver-side
+// MIN/MAG to NEAREST exactly while any unit it is bound on holds a depth
+// image, restoring the application's parameters on the first draw where the
+// pairing no longer holds (two-pass per draw so one cache sampler shared by a
+// colour and a depth unit in the same composite draw converges on forced);
+// comparison-mode samplers are left alone so hardware PCF is untouched; the
+// enforcement is skipped while FSR1 makes the per-unit binding shadow
+// untrustworthy. Retired diagnostics that had answered their questions: the
+// 24-program draw census, the depth-family attach census, and the depth blit
+// content probe (ANGLE Metal refuses every depth glReadPixels with
+// GL_INVALID_OPERATION, so a probe can only report its own refusal). The
+// depth-sampler program dump stays, with the corrected filter names, and the
+// force/restore transitions log their first eight occurrences.
+#define REVISION 12
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

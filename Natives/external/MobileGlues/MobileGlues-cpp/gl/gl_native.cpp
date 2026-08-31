@@ -236,13 +236,14 @@ NATIVE_FUNCTION_HEAD(void, glWaitSync, GLsync sync, GLbitfield flags, GLuint64 t
 NATIVE_FUNCTION_HEAD(void, glGetSynciv, GLsync sync, GLenum pname, GLsizei bufSize, GLsizei *length, GLint *values) NATIVE_FUNCTION_END_NO_RETURN(void, glGetSynciv, sync,pname,bufSize,length,values)
 NATIVE_FUNCTION_HEAD(void, glGetInteger64i_v, GLenum target, GLuint index, GLint64 *data) NATIVE_FUNCTION_END_NO_RETURN(void, glGetInteger64i_v, target,index,data)
 NATIVE_FUNCTION_HEAD(void, glGetBufferParameteri64v, GLenum target, GLenum pname, GLint64 *params) NATIVE_FUNCTION_END_NO_RETURN(void, glGetBufferParameteri64v, target,pname,params)
-NATIVE_FUNCTION_HEAD(void, glGenSamplers, GLsizei count, GLuint *samplers) NATIVE_FUNCTION_END_NO_RETURN(void, glGenSamplers, count,samplers)
-NATIVE_FUNCTION_HEAD(void, glDeleteSamplers, GLsizei count, const GLuint *samplers) NATIVE_FUNCTION_END_NO_RETURN(void, glDeleteSamplers, count,samplers)
+// NATIVE_FUNCTION_HEAD(void, glGenSamplers, GLsizei count, GLuint *samplers) NATIVE_FUNCTION_END_NO_RETURN(void, glGenSamplers, count,samplers)   // moved to gl/texture.cpp: the depth-sampling filter enforcement tracks every sampler object's parameters (MG 2.0.12)
+// NATIVE_FUNCTION_HEAD(void, glDeleteSamplers, GLsizei count, const GLuint *samplers) NATIVE_FUNCTION_END_NO_RETURN(void, glDeleteSamplers, count,samplers)   // moved to gl/texture.cpp: forget the deleted sampler's record and per-unit shadow
 NATIVE_FUNCTION_HEAD(GLboolean, glIsSampler, GLuint sampler) NATIVE_FUNCTION_END(GLboolean, glIsSampler, sampler)
-NATIVE_FUNCTION_HEAD(void, glBindSampler, GLuint unit, GLuint sampler) NATIVE_FUNCTION_END_NO_RETURN(void, glBindSampler, unit,sampler)
-NATIVE_FUNCTION_HEAD(void, glSamplerParameteri, GLuint sampler, GLenum pname, GLint param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameteri, sampler,pname,param)
+// NATIVE_FUNCTION_HEAD(void, glBindSampler, GLuint unit, GLuint sampler) NATIVE_FUNCTION_END_NO_RETURN(void, glBindSampler, unit,sampler)   // moved to gl/texture.cpp: the depth-sampling filter enforcement needs the per-unit sampler binding shadow
+// NATIVE_FUNCTION_HEAD(void, glSamplerParameteri, GLuint sampler, GLenum pname, GLint param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameteri, sampler,pname,param)   // moved to gl/texture.cpp: parameter records + stale-force invalidation
+// NATIVE_FUNCTION_HEAD(void, glSamplerParameterf, GLuint sampler, GLenum pname, GLfloat param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameterf, sampler,pname,param)   // moved to gl/texture.cpp: parameter records + stale-force invalidation
 NATIVE_FUNCTION_HEAD(void, glSamplerParameteriv, GLuint sampler, GLenum pname, const GLint *param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameteriv, sampler,pname,param)
-NATIVE_FUNCTION_HEAD(void, glSamplerParameterf, GLuint sampler, GLenum pname, GLfloat param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameterf, sampler,pname,param)
+// NATIVE_FUNCTION_HEAD(void, glSamplerParameterf, GLuint sampler, GLenum pname, GLfloat param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameterf, sampler,pname,param)   // moved to gl/texture.cpp: parameter records + stale-force invalidation (MG 2.0.12)
 NATIVE_FUNCTION_HEAD(void, glSamplerParameterfv, GLuint sampler, GLenum pname, const GLfloat *param) NATIVE_FUNCTION_END_NO_RETURN(void, glSamplerParameterfv, sampler,pname,param)
 NATIVE_FUNCTION_HEAD(void, glGetSamplerParameteriv, GLuint sampler, GLenum pname, GLint *params) NATIVE_FUNCTION_END_NO_RETURN(void, glGetSamplerParameteriv, sampler,pname,params)
 NATIVE_FUNCTION_HEAD(void, glGetSamplerParameterfv, GLuint sampler, GLenum pname, GLfloat *params) NATIVE_FUNCTION_END_NO_RETURN(void, glGetSamplerParameterfv, sampler,pname,params)

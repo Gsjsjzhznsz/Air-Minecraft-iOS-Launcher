@@ -144,4 +144,26 @@ bool mg_driver_texture_binding_at_unit(int unit, GLenum target, GLuint* out);
 // for its own work; this is the one that is right inside them too.
 int mg_driver_active_texture_unit(void);
 
+// ---------------------------------------------------------------------------
+// Depth-sampling filter enforcement (MG 2.0.12).
+//
+// Desktop GL filterable DEPTH_COMPONENT32F; GLES 3.0 does not. MC 26.2 builds
+// every sampler from SamplerCache through GlSampler, which maps minFilter=NEAREST
+// to GL_LINEAR_MIPMAP_NEAREST (9986) and relies on TEXTURE_MAX_LEVEL=0 + the
+// sampler's MAX_LOD=0 to keep it pointed at level 0. The *within-level* part of
+// 9986 is a LINEAR sample, and a LINEAR sample of an unfilterable depth image is
+// undefined on strict ES drivers -- ANGLE Metal answers 0.0, which in reversed-z
+// reads as "infinitely far" and un-occludes the transparency composite: clouds
+// draw through terrain, water/particles/weather sort against nothing.
+//
+// The layer therefore records which driver texture names are depth-family and,
+// per draw, forces the effective filter to NEAREST wherever a sampler object
+// would linearly sample one, restoring the application's parameters when the
+// sampler no longer sits over a depth image. Comparison-mode samplers are left
+// alone: hardware PCF on a compare sampler is legal and wanted.
+void mg_register_depth_texture(GLuint texture);
+void mg_unregister_depth_texture(GLuint texture);
+void mg_enforce_depth_sampling_nearest(void);
+bool mg_unit_holds_depth_texture(int unit);
+
 #endif

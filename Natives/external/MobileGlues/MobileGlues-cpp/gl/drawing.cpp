@@ -219,52 +219,27 @@ void prepareForDraw(int api) {
     if (hardware->emulate_texture_buffer) {
         setupBufferTextureUniforms(gl_state->current_program);
     }
-    // Draw census + depth-sampler program dump.
+    // Depth-sampling program dump.
     //
-    // The 2.0.10 build graded three things and answered two: the depth blit is
-    // healthy on device and the depth textures allocate cleanly -- but neither
-    // diagnostic ever observed the transparency composite, because MC 26.2's
-    // GlCommandEncoder.drawFromBuffers has NO plain glDrawArrays branch at all
-    // (disassembled from the shipped client.jar): every non-indexed draw,
-    // instanceCount included, goes through glDrawArraysInstanced, and every
-    // indexed draw through glDrawElementsInstancedBaseVertex(_BaseInstance).
-    // glDrawArraysInstanced used to be a native passthrough here, so the one
-    // draw this layer most needed to see -- the composite that sorts water,
-    // clouds and particles against the terrain depth -- sailed through unseen,
-    // and the census labelled every program "other draw" because MC 26.2 never
-    // issues the plain draws at all.
-    //
-    // The instanced entry points now carry the same hooks (api 3/4 below), and
-    // the dump grades, for each depth-sampling program, once per program:
+    // The composite that per-pixel-sorts MC 26.2's transparency layers (water,
+    // clouds, particles, weather) reads six depth textures through sampler2D
+    // uniforms. The dump grades, for each of the first four depth-sampling
+    // programs, once per program:
     //   - every sampler2D's unit, the texture and sampler object bound there,
     //     their filtering, and the registry's internal format for the texture;
     //   - the current draw fbo and what is attached to it.
-    // Reading depth with a LINEAR filter is the classic silent killer on strict
-    // ES drivers: an unfilterable depth texture turns the sample black, which
-    // in reversed-z reads as "infinitely far" and un-occludes everything, and
-    // it is invisible to every check that only looks at textures and blits.
-    static int mg_draw_census = 0;
-    static ska::flat_hash_map<GLuint, bool>* mg_seen_programs = nullptr;
+    // Reading depth with a LINEAR (within-level) filter is the classic silent
+    // killer on strict ES drivers: an unfilterable depth texture turns the
+    // sample black, which in reversed-z reads as "infinitely far" and
+    // un-occludes everything, and it is invisible to every check that only
+    // looks at textures and blits. 2.0.11's device log caught it red-handed:
+    // the composite's samplers carry MIN = GL_LINEAR_MIPMAP_NEAREST (9986),
+    // which Mojang's GlSampler emits for minFilter=NEAREST, on D32F images --
+    // desktop GL filters depth images, GLES does not. The enforcement below
+    // rewrites exactly that combination to NEAREST for the draw.
     static ska::flat_hash_map<GLuint, bool>* mg_dumped_programs = nullptr;
     static int mg_dumped_programs_count = 0;
     GLuint program = gl_state->current_program;
-    if (program != 0) {
-        if (!mg_seen_programs) mg_seen_programs = new ska::flat_hash_map<GLuint, bool>();
-        auto it = mg_seen_programs->find(program);
-        if (it == mg_seen_programs->end()) {
-            (*mg_seen_programs)[program] = true;
-            if (mg_draw_census < 24) {
-                mg_draw_census++;
-                LOG_W_FORCE("[MG] new program %u first seen on %s (new #%d)", program,
-                            api == 1 ? "glDrawArrays"
-                                     : (api == 2 ? "glDrawElements"
-                                                 : (api == 3 ? "glDrawArraysInstanced"
-                                                             : (api == 4 ? "glDrawArraysInstancedBaseInstance"
-                                                                         : "other draw"))),
-                            mg_draw_census)
-            }
-        }
-    }
     if (program != 0 && mg_dumped_programs_count < 4 &&
         (!mg_dumped_programs || !(*mg_dumped_programs)[program])) {
         GLint active_uniforms = 0;
@@ -329,9 +304,15 @@ void prepareForDraw(int api) {
                     }
                     auto filter_name = [](GLint f) -> const char* {
                         switch (f) {
-                        case 9728: return "LINEAR";
-                        case 9729: return "NEAREST";
+                        // 2.0.11 printed these with GL_NEAREST/GL_LINEAR swapped,
+                        // which turned the 2.0.11 log's "LINEAR" rows into
+                        // NEAREST and hid the real mechanism for a round: the
+                        // sampler MIN was GL_LINEAR_MIPMAP_NEAREST all along
+                        // (Mojang's GlSampler maps minFilter=NEAREST to 9986).
+                        case 9728: return "NEAREST";
+                        case 9729: return "LINEAR";
                         case 9984: return "NEAREST_MIPMAP_NEAREST";
+                        case 9985: return "NEAREST_MIPMAP_LINEAR";
                         case 9986: return "LINEAR_MIPMAP_NEAREST";
                         case 9987: return "LINEAR_MIPMAP_LINEAR";
                         case -1: return "(n/a)";
@@ -361,6 +342,13 @@ void prepareForDraw(int api) {
             }
         }
     }
+
+    // The fix itself, every draw: wherever a sampler object would linearly
+    // sample a depth-family image, its driver-side MIN/MAG are rewritten to
+    // NEAREST for as long as that pairing lasts (see gl/texture.h). Runs after
+    // the dump so the first sight of a broken composite still logs the
+    // application's raw state, then the force it received.
+    mg_enforce_depth_sampling_nearest();
 }
 
 

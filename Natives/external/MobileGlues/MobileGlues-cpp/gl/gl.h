@@ -427,9 +427,9 @@ extern "C"
 #define GL_NONE 0
 #define GL_LEFT 0x0406
 #define GL_RIGHT 0x0407
-/*GL_FRONT					0x0404 */
-/*GL_BACK					0x0405 */
-/*GL_FRONT_AND_BACK				0x0408 */
+/*GL_FRONT                                      0x0404 */
+/*GL_BACK                                       0x0405 */
+/*GL_FRONT_AND_BACK                             0x0408 */
 #define GL_FRONT_LEFT 0x0400
 #define GL_FRONT_RIGHT 0x0401
 #define GL_BACK_LEFT 0x0402
@@ -627,8 +627,8 @@ extern "C"
 #define GL_TEXTURE_LUMINANCE_SIZE 0x8060
 #define GL_TEXTURE_INTENSITY_SIZE 0x8061
 #define GL_NEAREST_MIPMAP_NEAREST 0x2700
-#define GL_NEAREST_MIPMAP_LINEAR 0x2702
-#define GL_LINEAR_MIPMAP_NEAREST 0x2701
+#define GL_NEAREST_MIPMAP_LINEAR 0x2701
+#define GL_LINEAR_MIPMAP_NEAREST 0x2702
 #define GL_LINEAR_MIPMAP_LINEAR 0x2703
 #define GL_OBJECT_LINEAR 0x2401
 #define GL_OBJECT_PLANE 0x2501
