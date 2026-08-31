@@ -91,7 +91,30 @@
 // error verdict), and the first draw of the composite program (all twelve
 // sampler uniforms with unit, texture name and internalformat). Together
 // these grade every hop the composite depends on directly from a device log.
-#define REVISION 9
+// REVISION 10: 2.0.9 device log results -- the depth blit (copyDepthFrom) is
+// healthy on device (both FBOs complete, GL_NO_ERROR), but the combined-point
+// redirect never fired AND the composite sampler dump never fired. Two
+// corrections and one new probe. (1) Constant correction: 36096 is
+// GL_DEPTH_ATTACHMENT, not GL_DEPTH_STENCIL_ATTACHMENT -- MC attaches depth
+// directly at GL_DEPTH_ATTACHMENT and the 2.0.9 combined-point redirect is
+// dead code for this application (kept for spec hygiene). The attach
+// diagnostic now grades the FIRST EIGHT depth-family attaches at whichever
+// point they actually use, with the registry's view of each texture. (2) The
+// depth-allocation probe read GL_TEXTURE_INTERNAL_FORMAT, which is not an
+// ES 3.0 pname (ANGLE rejects it; Mesa tolerates it), so its zeros were
+// ambiguous. Rewritten to separate the three confounded things per
+// allocation: the shadow's texture, the DRIVER's texture on the active unit,
+// the upload's own error, and GL_TEXTURE_DEPTH_SIZE of what the driver
+// actually has. (3) The composite dump never fired because nothing verified
+// the composite draws reach this layer's glDrawArrays at all; a 24-draw
+// census plus a depth-sampler dump keyed on any program with a "Depth"-named
+// sampler2D now grades reachability and the composite's inputs together.
+// (4) One-shot symbol-theft check in glXGetProcAddress: the app-facing proc
+// addresses come from dlsym(RTLD_DEFAULT), whose flat namespace also holds
+// the host ANGLE libGLESv2; if dyld's image order ever lets ANGLE win a name
+// this layer exports, the application bypasses this layer for that function
+// entirely.
+#define REVISION 10
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

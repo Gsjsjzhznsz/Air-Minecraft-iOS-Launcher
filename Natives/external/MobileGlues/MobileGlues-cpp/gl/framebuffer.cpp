@@ -313,6 +313,27 @@ static bool mg_attachment_is_depth_only(GLenum internal_format) {
 }
 
 void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) {
+    // MC 26.x attaches every depth texture DIRECTLY at GL_DEPTH_ATTACHMENT
+    // (36096 -- blaze3d's fallback DirectStateAccess spells attachment 36096,
+    // which is GL_DEPTH_ATTACHMENT, not the combined point). Record the first
+    // few depth-family attaches with the registry's view of the texture: this
+    // is the only way a device log can say whether the attach reached this
+    // layer and whether the texture it names is the one this layer thinks it
+    // is. (The 2.0.9 build proved the depth blit healthy on device while this
+    // diagnostic never fired -- the combined-point redirect below is dead code
+    // for this application.)
+    static int mg_depth_attach_logged = 0;
+    if (mg_depth_attach_logged < 8 &&
+        (attachment == GL_DEPTH_ATTACHMENT || attachment == GL_DEPTH_STENCIL_ATTACHMENT ||
+         attachment == GL_STENCIL_ATTACHMENT)) {
+        mg_depth_attach_logged++;
+        const TextureObject* tex = texture ? mgGetTexObjectByID(texture) : nullptr;
+        GLenum status = GLES.glCheckFramebufferStatus(target);
+        LOG_W_FORCE("[MG] depth-family attach #%d: fbo %u, attachment %s, tex %u (%s, %dx%d), status 0x%x",
+                    mg_depth_attach_logged, current_draw_fbo, glEnumToString(attachment), texture,
+                    tex ? glEnumToString(tex->internal_format) : "UNTRACKED",
+                    tex ? tex->width : 0, tex ? tex->height : 0, status)
+    }
     if (attachment == GL_DEPTH_STENCIL_ATTACHMENT && textarget == GL_TEXTURE_2D) {
         if (texture != 0) {
             const TextureObject* tex = mgGetTexObjectByID(texture);

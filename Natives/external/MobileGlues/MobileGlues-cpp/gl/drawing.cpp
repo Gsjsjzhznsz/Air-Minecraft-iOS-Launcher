@@ -210,28 +210,45 @@ void setupBufferTextureUniforms(GLuint program) {
     GLES.glUniform1i(info.locHeight, texObject->height);
 }
 
-void prepareForDraw() {
+void prepareForDraw(int api);
+
+void prepareForDraw() { prepareForDraw(0); }
+
+void prepareForDraw(int api) {
     LOG_D("prepareForDraw...")
     if (hardware->emulate_texture_buffer) {
         setupBufferTextureUniforms(gl_state->current_program);
     }
-    // MC 26.x's transparency composite (post/transparency) is a full-screen
-    // pass with TWELVE sampler2D uniforms -- six color + six depth layers --
-    // and its per-pixel depth sort silently produces clouds-through-terrain if
-    // any sampler points at the wrong unit or at an empty texture. Nothing in
-    // the GL stream flags that: wrong units are legal, empty depth textures
-    // sample as 0.0. Dump the program's sampler state on its first draw, once,
-    // so a device log can grade the composite's inputs directly.
-    static int mg_composite_dump_count = 0;
-    static GLuint mg_composite_dumped_program = 0;
+    // Draw census + composite sampler dump. The 2.0.9 build proved the depth
+    // blit healthy on device but neither the depth-attach nor the composite
+    // diagnostic fired, so the composite's input state is still unobserved.
+    // This grades three things straight from the next device log:
+    //   (a) whether the composite pass's draws even reach this layer (census),
+    //   (b) what the composite program's sampler uniforms actually are (dump),
+    //   (c) whether the depth textures they point at carry real depth bits.
+    static int mg_draw_census = 0;
+    static int mg_depth_dump_count = 0;
+    static ska::flat_hash_map<GLuint, int>* mg_seen_programs = nullptr;
     GLuint program = gl_state->current_program;
-    if (program != 0 && program != mg_composite_dumped_program && mg_composite_dump_count < 2) {
+    if (program != 0) {
+        if (!mg_seen_programs) mg_seen_programs = new ska::flat_hash_map<GLuint, int>();
+        auto it = mg_seen_programs->find(program);
+        if (it == mg_seen_programs->end()) {
+            (*mg_seen_programs)[program] = api;
+            if (mg_draw_census < 24) {
+                mg_draw_census++;
+                LOG_W_FORCE("[MG] new program %u first seen on %s (new #%d)", program,
+                            api == 1 ? "glDrawArrays" : (api == 2 ? "glDrawElements" : "other draw"), mg_draw_census)
+            }
+        }
+    }
+    if (program != 0 && mg_depth_dump_count < 2) {
         GLint active_uniforms = 0;
         GLES.glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &active_uniforms);
-        if (active_uniforms >= 6) {
-            int sampler_count = 0;
-            bool is_composite = false;
+        if (active_uniforms > 0 && active_uniforms < 64) {
             char name_buf[128];
+            int sampler_count = 0;
+            bool has_depth_sampler = false;
             for (GLint i = 0; i < active_uniforms; ++i) {
                 GLsizei len = 0;
                 GLenum type = 0;
@@ -239,13 +256,13 @@ void prepareForDraw() {
                 GLES.glGetActiveUniform(program, (GLuint)i, sizeof(name_buf), &len, &size, &type, name_buf);
                 if (type == GL_SAMPLER_2D) {
                     sampler_count++;
-                    if (len >= 18 && strncmp(name_buf, "CloudsDepthSampler", 18) == 0) is_composite = true;
+                    if (len > 0 && strstr(name_buf, "Depth") != nullptr) has_depth_sampler = true;
                 }
             }
-            if (is_composite) {
-                mg_composite_dumped_program = program;
-                mg_composite_dump_count++;
-                LOG_W_FORCE("[MG] transparency composite program %u: %d sampler2D uniforms", program, sampler_count)
+            if (has_depth_sampler && sampler_count >= 2) {
+                mg_depth_dump_count++;
+                LOG_W_FORCE("[MG] depth-sampling program %u (draw call #%d): %d sampler2D uniforms", program,
+                            mg_draw_census, sampler_count)
                 for (GLint i = 0; i < active_uniforms; ++i) {
                     GLsizei len = 0;
                     GLenum type = 0;
@@ -255,34 +272,38 @@ void prepareForDraw() {
                     GLint loc = GLES.glGetUniformLocation(program, name_buf);
                     GLint unit = -1;
                     GLES.glGetUniformiv(program, loc, &unit);
-                    GLuint tex_id = 0;
-                    if (unit >= 0 && unit < mg_max_texture_units()) {
-                        mg_driver_texture_binding_at_unit(unit, GL_TEXTURE_2D, &tex_id);
-                    }
-                    // Driver truth for the same unit, restored immediately. The
-                    // shadow and this must agree; if they do not, the desync is
-                    // the bug and this log is what catches it.
-                    GLuint drv_tex = 0;
+                    GLuint shadow_tex = 0, drv_tex = 0;
+                    GLint depth_bits = -1;
                     if (unit >= 0) {
+                        if (unit < mg_max_texture_units()) {
+                            mg_driver_texture_binding_at_unit(unit, GL_TEXTURE_2D, &shadow_tex);
+                        }
                         int prev_unit = mg_driver_active_texture_unit();
                         GLES.glActiveTexture(GL_TEXTURE0 + unit);
                         GLint q = 0;
                         GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &q);
                         GLES.glActiveTexture(GL_TEXTURE0 + prev_unit);
                         drv_tex = (GLuint)q;
+                        if (drv_tex != 0) {
+                            GLES.glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_DEPTH_SIZE, &depth_bits);
+                            GLES.glGetError(); // clear the query error if the level is not allocated
+                        }
                     }
                     GLenum tex_fmt = 0;
-                    if (tex_id != 0) {
-                        const TextureObject* to = mgGetTexObjectByID(tex_id);
+                    GLuint tex_for_fmt = drv_tex ? drv_tex : shadow_tex;
+                    if (tex_for_fmt != 0) {
+                        const TextureObject* to = mgGetTexObjectByID(tex_for_fmt);
                         if (to) tex_fmt = to->internal_format;
                     }
-                    LOG_W_FORCE("[MG]   %-24s -> unit %2d, tex %u (driver %u), internalformat %s", name_buf, unit,
-                                tex_id, drv_tex, tex_fmt ? glEnumToString(tex_fmt) : "(none)")
+                    LOG_W_FORCE("[MG]   %-24s -> unit %2d, shadow tex %u, driver tex %u, depth bits %d, fmt %s",
+                                name_buf, unit, shadow_tex, drv_tex, depth_bits,
+                                tex_fmt ? glEnumToString(tex_fmt) : "(none)")
                 }
             }
         }
     }
 }
+
 
 // MC 26.x's transparency composite (post/transparency) draws its full-screen
 // triangle with glDrawArrays -- the one draw call that used to bypass
@@ -292,7 +313,7 @@ void prepareForDraw() {
 void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     LOG()
     LOG_D("glDrawArrays, mode: %d, first: %d, count: %d", mode, first, count)
-    prepareForDraw();
+    prepareForDraw(1);
     GLES.glDrawArrays(mode, first, count);
     CHECK_GL_ERROR
 }
@@ -313,7 +334,7 @@ void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void
 void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices) {
     LOG()
     LOG_D("glDrawElements, mode: %d, count: %d, type: %d, indices: %p", mode, count, type, indices)
-    prepareForDraw();
+    prepareForDraw(2);
     if (mg_restart_needs_rewrite(type) && mg_draw_elements_restart(mode, count, type, indices, 0, -1)) return;
     const bool restart_fixed = mg_restart_needs_driver_fixed(type);
     if (restart_fixed) GLES.glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);

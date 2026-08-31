@@ -11,6 +11,9 @@
 #include "../gl/envvars.h"
 #include "../gl/log.h"
 #include "../gl/mg.h"
+#include "../gl/framebuffer.h"
+#include "../gl/texture.h"
+#include "../gl/drawing.h"
 #include "../includes.h"
 #include <EGL/egl.h>
 #include <cstdio>
@@ -51,7 +54,36 @@ void* glXGetProcAddress(const char* name) {
     LOG()
     std::string real_func_name = handle_multidraw_func_name(std::string(name));
 #ifdef __APPLE__
-    return dlsym((void*)(~(uintptr_t)0), real_func_name.c_str());
+    void* resolved = dlsym((void*)(~(uintptr_t)0), real_func_name.c_str());
+    // RTLD_DEFAULT searches the process-wide flat namespace, which contains
+    // this layer AND the host's ANGLE libGLESv2. Whichever image dyld put
+    // earlier wins for every symbol both export. If ANGLE wins for a function
+    // this layer wraps, the application binds the backend DIRECTLY and this
+    // layer silently never sees the call -- the exact failure shape the 2.0.9
+    // diagnostics hinted at (the depth-attach and composite probes never
+    // fired while the same-file blit probe did). Grade the three functions the
+    // transparency pipeline rides on, once, against this layer's own exports.
+    static bool mg_theft_checked = false;
+    if (!mg_theft_checked) {
+        mg_theft_checked = true;
+        // Taking the address of this layer's own exports binds locally, so the
+        // comparison answers "did the flat namespace hand the application one
+        // of OUR entry points or someone else's".
+        struct { const char* name; void* mine; } probes[3] = {
+            {"glFramebufferTexture2D", (void*)&glFramebufferTexture2D},
+            {"glTexImage2D", (void*)&glTexImage2D},
+            {"glDrawArrays", (void*)&glDrawArrays},
+        };
+        for (int i = 0; i < 3; ++i) {
+            void* flat = dlsym((void*)(~(uintptr_t)0), probes[i].name);
+            if (flat != probes[i].mine) {
+                LOG_W_FORCE("[MG] SYMBOL THEFT: flat namespace resolves %s to %p, this layer's export is %p -- "
+                            "the application is calling someone else for this function",
+                            probes[i].name, flat, probes[i].mine)
+            }
+        }
+    }
+    return resolved;
 #else
 
     void* proc = nullptr;
