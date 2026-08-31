@@ -228,15 +228,16 @@ void prepareForDraw(int api) {
     //   - every sampler2D's unit, the texture and sampler object bound there,
     //     their filtering, and the registry's internal format for the texture;
     //   - the current draw fbo and what is attached to it.
-    // Reading depth with a LINEAR (within-level) filter is the classic silent
-    // killer on strict ES drivers: an unfilterable depth texture turns the
-    // sample black, which in reversed-z reads as "infinitely far" and
-    // un-occludes everything, and it is invisible to every check that only
-    // looks at textures and blits. 2.0.11's device log caught it red-handed:
-    // the composite's samplers carry MIN = GL_LINEAR_MIPMAP_NEAREST (9986),
-    // which Mojang's GlSampler emits for minFilter=NEAREST, on D32F images --
-    // desktop GL filters depth images, GLES does not. The enforcement below
-    // rewrites exactly that combination to NEAREST for the draw.
+    // Reading depth through a sampler that leaves the texture filter-
+    // incomplete is the classic silent killer on strict ES drivers: GLES 3.0
+    // only keeps depth textures complete for MIN_FILTER NEAREST or
+    // NEAREST_MIPMAP_NEAREST, an incomplete texture reads black, which in
+    // reversed-z is "infinitely far" and un-occludes everything, and it is
+    // invisible to every check that only looks at textures and blits.
+    // 2.0.11's device log caught it red-handed: the composite's samplers
+    // carry MIN = GL_NEAREST_MIPMAP_LINEAR (9986), which Mojang's GlSampler
+    // emits for minFilter=NEAREST. The enforcement below rewrites exactly
+    // that combination to NEAREST for the draw.
     static ska::flat_hash_map<GLuint, bool>* mg_dumped_programs = nullptr;
     static int mg_dumped_programs_count = 0;
     GLuint program = gl_state->current_program;
@@ -306,14 +307,18 @@ void prepareForDraw(int api) {
                         switch (f) {
                         // 2.0.11 printed these with GL_NEAREST/GL_LINEAR swapped,
                         // which turned the 2.0.11 log's "LINEAR" rows into
-                        // NEAREST and hid the real mechanism for a round: the
-                        // sampler MIN was GL_LINEAR_MIPMAP_NEAREST all along
-                        // (Mojang's GlSampler maps minFilter=NEAREST to 9986).
+                        // NEAREST and hid the real mechanism for a round. The
+                        // 2.0.12 table then carried the same swap 2.0.12's own
+                        // gl.h had picked up for 9985/9986 (registry order:
+                        // 0x2701 = LINEAR_MIPMAP_NEAREST, 0x2702 =
+                        // NEAREST_MIPMAP_LINEAR) -- fixed here against the
+                        // Khronos registry: Mojang's GlSampler maps
+                        // minFilter=NEAREST to 9986 = GL_NEAREST_MIPMAP_LINEAR.
                         case 9728: return "NEAREST";
                         case 9729: return "LINEAR";
                         case 9984: return "NEAREST_MIPMAP_NEAREST";
-                        case 9985: return "NEAREST_MIPMAP_LINEAR";
-                        case 9986: return "LINEAR_MIPMAP_NEAREST";
+                        case 9985: return "LINEAR_MIPMAP_NEAREST";
+                        case 9986: return "NEAREST_MIPMAP_LINEAR";
                         case 9987: return "LINEAR_MIPMAP_LINEAR";
                         case -1: return "(n/a)";
                         default: return "other";

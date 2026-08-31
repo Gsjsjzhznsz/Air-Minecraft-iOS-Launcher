@@ -496,14 +496,17 @@ TextureObject* mgGetTexObjectByID(unsigned texture) {
 }
 
 // ---------------------------------------------------------------------------
-// Depth-sampling filter enforcement (MG 2.0.12). See gl/texture.h for the full
-// rationale; the short version: MC 26.2's GlSampler maps minFilter=NEAREST to
-// GL_LINEAR_MIPMAP_NEAREST, whose within-level LINEAR sample of an unfilterable
-// D32F image is undefined on GLES -- ANGLE Metal answers 0.0, reversed-z reads
+// Depth-sampling filter enforcement (MG 2.0.12, labels corrected in 2.0.14).
+// See gl/texture.h for the full rationale; the short version: MC 26.2's
+// GlSampler maps minFilter=NEAREST to GL_NEAREST_MIPMAP_LINEAR (0x2702/9986).
+// GLES 3.0 only keeps depth-family textures filter-complete for MIN_FILTER
+// NEAREST or NEAREST_MIPMAP_NEAREST, so that sampler leaves every D32F image
+// it touches filter-incomplete -- ANGLE Metal answers 0.0, reversed-z reads
 // that as "infinitely far", and the transparency composite stops occluding
 // (clouds visible through terrain). The layer forces NEAREST on the effective
-// filter wherever a sampler object would linearly sample a depth image, and
-// restores the application's parameters once the sampler moves off depth.
+// filter wherever a sampler object would sample a depth image through a
+// non-completeness-safe MIN_FILTER, and restores the application's parameters
+// once the sampler moves off depth.
 
 namespace {
 
@@ -515,10 +518,13 @@ std::mutex g_depth_sampler_mutex;
 ska::flat_hash_map<GLuint, char> g_depth_textures;
 
 // What this layer has seen the application set on each sampler object. Created
-// samplers start from the GLES defaults: MIN = NEAREST_MIPMAP_LINEAR (9985),
-// MAG = NEAREST (9728), COMPARE_MODE = GL_NONE.
+// samplers start from the GLES defaults: MIN = NEAREST_MIPMAP_LINEAR (0x2702
+// = 9986), MAG = NEAREST (9728), COMPARE_MODE = GL_NONE. (2.0.12 seeded this
+// with 9985 -- GL_LINEAR_MIPMAP_NEAREST per the registry -- because its gl.h
+// had the two macros swapped; the value only ever surfaced in restore
+// write-backs for samplers the application never parameterised.)
 struct mg_sampler_record_t {
-    GLint min_filter = 9985;
+    GLint min_filter = 9986;
     GLint mag_filter = GL_NEAREST;
     GLint compare_mode = GL_NONE;
 };

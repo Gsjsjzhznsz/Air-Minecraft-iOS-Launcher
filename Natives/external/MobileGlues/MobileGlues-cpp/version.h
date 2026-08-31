@@ -208,7 +208,28 @@
 // its binding leak is silent, so neither a record nor a confirm can see it.
 // One line logs once when the untracked scan arms, so the next device log
 // can distinguish "armed and confirming" from "never ran".
-#define REVISION 13
+// REVISION 14: 2.0.13 verified on device (armed line + force/restore pairs +
+// occlusion restored in play), and a self-correction the verification pass
+// uncovered. The filter labels this layer printed since 2.0.12 -- and the
+// gl.h definitions behind them -- were themselves wrong: the Khronos
+// registry (and Mesa's and ANGLE's headers, all cross-checked) define
+// 0x2701 = GL_LINEAR_MIPMAP_NEAREST and 0x2702 = GL_NEAREST_MIPMAP_LINEAR,
+// so 2.0.12's "corrected" gl.h had in fact inverted a correct header, and
+// Mojang's GlSampler maps minFilter=NEAREST to 9986 = GL_NEAREST_MIPMAP_
+// LINEAR (nearest within a level, blended across levels, clipped to one
+// level by MAX_LOD=0) -- not GL_LINEAR_MIPMAP_NEAREST. The mechanism
+// narrative is relabelled accordingly and gets tighter: GLES 3.0 keeps a
+// depth-family texture filter-complete only while MIN_FILTER is NEAREST or
+// NEAREST_MIPMAP_NEAREST, so the MIPMAP_LINEAR family alone is enough to
+// make every D32F image under that sampler read incomplete (0.0 on ANGLE
+// Metal, "infinitely far" in reversed-z). No behavioural change to the
+// enforcement itself: the force still writes plain NEAREST, and the
+// decision paths only ever compared against GL_NEAREST. Fixed here: the
+// gl.h pair, the dump's filter_name table (9985/9986 labels), the sampler
+// record's GLES-default MIN (9986, not 9985 -- the restore write-back for a
+// never-parameterised sampler used to hand back LINEAR_MIPMAP_NEAREST
+// instead of the default), and the rationale comments in gl/texture.{h,cpp}.
+#define REVISION 14
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

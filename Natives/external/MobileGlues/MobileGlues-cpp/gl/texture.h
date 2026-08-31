@@ -145,16 +145,22 @@ bool mg_driver_texture_binding_at_unit(int unit, GLenum target, GLuint* out);
 int mg_driver_active_texture_unit(void);
 
 // ---------------------------------------------------------------------------
-// Depth-sampling filter enforcement (MG 2.0.12).
+// Depth-sampling filter enforcement (MG 2.0.12, labels corrected in 2.0.14).
 //
-// Desktop GL filterable DEPTH_COMPONENT32F; GLES 3.0 does not. MC 26.2 builds
-// every sampler from SamplerCache through GlSampler, which maps minFilter=NEAREST
-// to GL_LINEAR_MIPMAP_NEAREST (9986) and relies on TEXTURE_MAX_LEVEL=0 + the
-// sampler's MAX_LOD=0 to keep it pointed at level 0. The *within-level* part of
-// 9986 is a LINEAR sample, and a LINEAR sample of an unfilterable depth image is
-// undefined on strict ES drivers -- ANGLE Metal answers 0.0, which in reversed-z
-// reads as "infinitely far" and un-occludes the transparency composite: clouds
-// draw through terrain, water/particles/weather sort against nothing.
+// Desktop GL allows filtering DEPTH_COMPONENT32F; GLES 3.0 does not: its
+// texture-completeness rules keep a depth-family texture filter-complete only
+// while MAG_FILTER is NEAREST and MIN_FILTER is NEAREST or
+// NEAREST_MIPMAP_NEAREST. MC 26.2 builds every sampler from SamplerCache
+// through GlSampler, which maps minFilter=NEAREST to GL_NEAREST_MIPMAP_LINEAR
+// (0x2702 = 9986 -- nearest within a level, blended across levels, harmless
+// for colours and clipped to a single level by TEXTURE_MAX_LEVEL=0 + the
+// sampler's MAX_LOD=0) -- but the MIPMAP_LINEAR family fails the depth
+// completeness test, so every D32F image under that sampler reads as
+// incomplete on strict ES drivers: ANGLE Metal answers 0.0, which in
+// reversed-z reads as "infinitely far" and un-occludes the transparency
+// composite: clouds draw through terrain, water/particles/weather sort
+// against nothing. Desktop never saw this because its spec permits filtering
+// depth images.
 //
 // The layer therefore records which driver texture names are depth-family and,
 // per draw, forces the effective filter to NEAREST wherever a sampler object
