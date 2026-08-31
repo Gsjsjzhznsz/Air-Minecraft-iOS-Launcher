@@ -316,24 +316,43 @@ void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, 
     // MC 26.x attaches every depth texture DIRECTLY at GL_DEPTH_ATTACHMENT
     // (36096 -- blaze3d's fallback DirectStateAccess spells attachment 36096,
     // which is GL_DEPTH_ATTACHMENT, not the combined point). Record the first
-    // few depth-family attaches with the registry's view of the texture: this
-    // is the only way a device log can say whether the attach reached this
-    // layer and whether the texture it names is the one this layer thinks it
-    // is. (The 2.0.9 build proved the depth blit healthy on device while this
-    // diagnostic never fired -- the combined-point redirect below is dead code
-    // for this application.)
+    // few depth-family attaches with the registry's view of the texture.
+    //
+    // 2.0.10 logged the status BEFORE the driver call, which answered "was the
+    // fbo complete before this attach" -- that is where its odd 0x8cd7 rows
+    // came from (freshly created, still-empty temp fbos), not from the driver
+    // rejecting anything. The census now runs after the forward and also
+    // records the attach error, the post-attach completeness verdict, and what
+    // is attached at color0 and depth -- the full state a device log needs to
+    // say whether a depth image actually landed on the fbo it was meant for.
     static int mg_depth_attach_logged = 0;
-    if (mg_depth_attach_logged < 8 &&
+    const bool mg_log_attach =
+        mg_depth_attach_logged < 16 &&
         (attachment == GL_DEPTH_ATTACHMENT || attachment == GL_DEPTH_STENCIL_ATTACHMENT ||
-         attachment == GL_STENCIL_ATTACHMENT)) {
-        mg_depth_attach_logged++;
+         attachment == GL_STENCIL_ATTACHMENT);
+    if (mg_log_attach) mg_depth_attach_logged++;
+    auto mg_report_attach = [&]() {
+        if (!mg_log_attach) return;
         const TextureObject* tex = texture ? mgGetTexObjectByID(texture) : nullptr;
+        GLenum err = GLES.glGetError();
         GLenum status = GLES.glCheckFramebufferStatus(target);
-        LOG_W_FORCE("[MG] depth-family attach #%d: fbo %u, attachment %s, tex %u (%s, %dx%d), status 0x%x",
+        GLint color_type = 0, color_name = 0, depth_type = 0, depth_name = 0;
+        GLES.glGetFramebufferAttachmentParameteriv(target, GL_COLOR_ATTACHMENT0,
+                                                    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &color_type);
+        GLES.glGetFramebufferAttachmentParameteriv(target, GL_COLOR_ATTACHMENT0,
+                                                    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &color_name);
+        GLES.glGetFramebufferAttachmentParameteriv(target, GL_DEPTH_ATTACHMENT,
+                                                    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &depth_type);
+        GLES.glGetFramebufferAttachmentParameteriv(target, GL_DEPTH_ATTACHMENT,
+                                                    GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &depth_name);
+        GLES.glGetError(); // empty attachments refuse the NAME query; that is fine
+        LOG_W_FORCE("[MG] depth-family attach #%d: fbo %u, attachment %s, tex %u (%s, %dx%d), err 0x%x, status 0x%x, "
+                    "color0 {type 0x%x, obj %u}, depth {type 0x%x, obj %u}",
                     mg_depth_attach_logged, current_draw_fbo, glEnumToString(attachment), texture,
                     tex ? glEnumToString(tex->internal_format) : "UNTRACKED",
-                    tex ? tex->width : 0, tex ? tex->height : 0, status)
-    }
+                    tex ? tex->width : 0, tex ? tex->height : 0, err, status, color_type, (unsigned)color_name,
+                    depth_type, (unsigned)depth_name)
+    };
     if (attachment == GL_DEPTH_STENCIL_ATTACHMENT && textarget == GL_TEXTURE_2D) {
         if (texture != 0) {
             const TextureObject* tex = mgGetTexObjectByID(texture);
@@ -348,6 +367,7 @@ void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, 
                 GLES.glFramebufferTexture2D(target, GL_DEPTH_ATTACHMENT, textarget, texture, level);
                 GLES.glFramebufferTexture2D(target, GL_STENCIL_ATTACHMENT, textarget, 0, level);
                 update_attachment(target, GL_DEPTH_ATTACHMENT, {attach_kind_t::Texture2D, textarget, texture, level, 0});
+                mg_report_attach();
                 return;
             }
             // A real depth+stencil image on the combined point. Log the driver's
@@ -366,11 +386,13 @@ void glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, 
             GLES.glFramebufferTexture2D(target, GL_DEPTH_ATTACHMENT, textarget, 0, level);
             GLES.glFramebufferTexture2D(target, GL_STENCIL_ATTACHMENT, textarget, 0, level);
             GLES.glFramebufferTexture2D(target, GL_DEPTH_STENCIL_ATTACHMENT, textarget, 0, level);
+            mg_report_attach();
             return;
         }
     }
     update_attachment(target, attachment, {attach_kind_t::Texture2D, textarget, texture, level, 0});
     GLES.glFramebufferTexture2D(target, attachment, textarget, texture, level);
+    mg_report_attach();
 }
 void glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLint level) {
     // Kind rather than a made-up GL_TEXTURE_2D. This entry point attaches the
@@ -464,8 +486,8 @@ void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint
         GLES.glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
         GLenum read_status = GLES.glCheckFramebufferStatus(GL_READ_FRAMEBUFFER);
         GLenum draw_status = GLES.glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
-        LOG_W_FORCE("[MG] depth blit %dx%d -> %dx%d: read fbo %u (status 0x%x) -> draw fbo %u (status 0x%x)",
-                    srcX1 - srcX0, srcY1 - srcY0, dstX1 - dstX0, dstY1 - dstY0,
+        LOG_W_FORCE("[MG] depth blit %dx%d -> %dx%d, mask 0x%x: read fbo %u (status 0x%x) -> draw fbo %u (status 0x%x)",
+                    srcX1 - srcX0, srcY1 - srcY0, dstX1 - dstX0, dstY1 - dstY0, mask,
                     (unsigned)read_fbo, read_status, (unsigned)draw_fbo, draw_status)
     }
     GLES.glBlitFramebuffer(srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
@@ -482,6 +504,48 @@ void glBlitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint
                 LOG_W_FORCE("[MG] depth blit completed with GL_NO_ERROR")
             }
         }
+    }
+    // Content probe for the depth blit. NO_ERROR with both fbos complete says
+    // the driver ACCEPTED the copy, not that the depth data MOVED -- and the
+    // transparency composite's whole world is the moved data. For the first two
+    // depth blits, read a five-point grid back out of both sides and log the
+    // raw values. A depth readback needs the fbo bound as the read target, so
+    // save and restore that binding directly at the driver level: the tracked
+    // binding never changes, and the restore lands the driver where it was.
+    static int mg_depth_blit_probes = 0;
+    if (mg_depth_blit_probes < 2 && (mask & GL_DEPTH_BUFFER_BIT)) {
+        mg_depth_blit_probes++;
+        GLint read_fbo = 0, draw_fbo = 0;
+        GLES.glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fbo);
+        GLES.glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
+        auto mg_probe_depth = [&](GLuint fbo, GLenum bind_target, GLint x, GLint y, const char* side) {
+            if (fbo == 0) {
+                LOG_W_FORCE("[MG] depth blit probe #%d %s: fbo 0 (surface), skipped", mg_depth_blit_probes, side)
+                return;
+            }
+            GLint saved = 0;
+            GLES.glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &saved);
+            GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+            const GLfloat fx[5] = {0.25f, 0.75f, 0.5f, 0.25f, 0.75f};
+            const GLfloat fy[5] = {0.25f, 0.25f, 0.5f, 0.75f, 0.75f};
+            for (int p = 0; p < 5; ++p) {
+                GLint px = x + (GLint)(fx[p] * (srcX1 - srcX0));
+                GLint py = y + (GLint)(fy[p] * (srcY1 - srcY0));
+                if (bind_target == GL_DRAW_FRAMEBUFFER) {
+                    px = dstX0 + (GLint)(fx[p] * (dstX1 - dstX0));
+                    py = dstY0 + (GLint)(fy[p] * (dstY1 - dstY0));
+                }
+                GLfloat depth = -2.0f;
+                GLES.glReadPixels(px, py, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+                GLenum err = GLES.glGetError();
+                LOG_W_FORCE("[MG] depth blit probe #%d %s fbo %u @ (%d,%d) = %.5f (err 0x%x)", mg_depth_blit_probes,
+                            side, fbo, px, py, depth, err)
+            }
+            GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, saved);
+        };
+        mg_probe_depth((GLuint)read_fbo, GL_READ_FRAMEBUFFER, srcX0, srcY0, "read");
+        mg_probe_depth((GLuint)draw_fbo, GL_DRAW_FRAMEBUFFER, dstX0, dstY0, "draw");
+        (void)draw_fbo;
     }
     CHECK_GL_ERROR
 }

@@ -219,30 +219,54 @@ void prepareForDraw(int api) {
     if (hardware->emulate_texture_buffer) {
         setupBufferTextureUniforms(gl_state->current_program);
     }
-    // Draw census + composite sampler dump. The 2.0.9 build proved the depth
-    // blit healthy on device but neither the depth-attach nor the composite
-    // diagnostic fired, so the composite's input state is still unobserved.
-    // This grades three things straight from the next device log:
-    //   (a) whether the composite pass's draws even reach this layer (census),
-    //   (b) what the composite program's sampler uniforms actually are (dump),
-    //   (c) whether the depth textures they point at carry real depth bits.
+    // Draw census + depth-sampler program dump.
+    //
+    // The 2.0.10 build graded three things and answered two: the depth blit is
+    // healthy on device and the depth textures allocate cleanly -- but neither
+    // diagnostic ever observed the transparency composite, because MC 26.2's
+    // GlCommandEncoder.drawFromBuffers has NO plain glDrawArrays branch at all
+    // (disassembled from the shipped client.jar): every non-indexed draw,
+    // instanceCount included, goes through glDrawArraysInstanced, and every
+    // indexed draw through glDrawElementsInstancedBaseVertex(_BaseInstance).
+    // glDrawArraysInstanced used to be a native passthrough here, so the one
+    // draw this layer most needed to see -- the composite that sorts water,
+    // clouds and particles against the terrain depth -- sailed through unseen,
+    // and the census labelled every program "other draw" because MC 26.2 never
+    // issues the plain draws at all.
+    //
+    // The instanced entry points now carry the same hooks (api 3/4 below), and
+    // the dump grades, for each depth-sampling program, once per program:
+    //   - every sampler2D's unit, the texture and sampler object bound there,
+    //     their filtering, and the registry's internal format for the texture;
+    //   - the current draw fbo and what is attached to it.
+    // Reading depth with a LINEAR filter is the classic silent killer on strict
+    // ES drivers: an unfilterable depth texture turns the sample black, which
+    // in reversed-z reads as "infinitely far" and un-occludes everything, and
+    // it is invisible to every check that only looks at textures and blits.
     static int mg_draw_census = 0;
-    static int mg_depth_dump_count = 0;
-    static ska::flat_hash_map<GLuint, int>* mg_seen_programs = nullptr;
+    static ska::flat_hash_map<GLuint, bool>* mg_seen_programs = nullptr;
+    static ska::flat_hash_map<GLuint, bool>* mg_dumped_programs = nullptr;
+    static int mg_dumped_programs_count = 0;
     GLuint program = gl_state->current_program;
     if (program != 0) {
-        if (!mg_seen_programs) mg_seen_programs = new ska::flat_hash_map<GLuint, int>();
+        if (!mg_seen_programs) mg_seen_programs = new ska::flat_hash_map<GLuint, bool>();
         auto it = mg_seen_programs->find(program);
         if (it == mg_seen_programs->end()) {
-            (*mg_seen_programs)[program] = api;
+            (*mg_seen_programs)[program] = true;
             if (mg_draw_census < 24) {
                 mg_draw_census++;
                 LOG_W_FORCE("[MG] new program %u first seen on %s (new #%d)", program,
-                            api == 1 ? "glDrawArrays" : (api == 2 ? "glDrawElements" : "other draw"), mg_draw_census)
+                            api == 1 ? "glDrawArrays"
+                                     : (api == 2 ? "glDrawElements"
+                                                 : (api == 3 ? "glDrawArraysInstanced"
+                                                             : (api == 4 ? "glDrawArraysInstancedBaseInstance"
+                                                                         : "other draw"))),
+                            mg_draw_census)
             }
         }
     }
-    if (program != 0 && mg_depth_dump_count < 2) {
+    if (program != 0 && mg_dumped_programs_count < 4 &&
+        (!mg_dumped_programs || !(*mg_dumped_programs)[program])) {
         GLint active_uniforms = 0;
         GLES.glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &active_uniforms);
         if (active_uniforms > 0 && active_uniforms < 64) {
@@ -260,9 +284,13 @@ void prepareForDraw(int api) {
                 }
             }
             if (has_depth_sampler && sampler_count >= 2) {
-                mg_depth_dump_count++;
-                LOG_W_FORCE("[MG] depth-sampling program %u (draw call #%d): %d sampler2D uniforms", program,
-                            mg_draw_census, sampler_count)
+                if (!mg_dumped_programs) mg_dumped_programs = new ska::flat_hash_map<GLuint, bool>();
+                (*mg_dumped_programs)[program] = true;
+                mg_dumped_programs_count++;
+                GLint draw_fbo = 0;
+                GLES.glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo);
+                LOG_W_FORCE("[MG] depth-sampling program %u (dump #%d): %d sampler2D uniforms, draw fbo %d", program,
+                            mg_dumped_programs_count, sampler_count, draw_fbo)
                 for (GLint i = 0; i < active_uniforms; ++i) {
                     GLsizei len = 0;
                     GLenum type = 0;
@@ -272,32 +300,63 @@ void prepareForDraw(int api) {
                     GLint loc = GLES.glGetUniformLocation(program, name_buf);
                     GLint unit = -1;
                     GLES.glGetUniformiv(program, loc, &unit);
-                    GLuint shadow_tex = 0, drv_tex = 0;
-                    GLint depth_bits = -1;
-                    if (unit >= 0) {
-                        if (unit < mg_max_texture_units()) {
-                            mg_driver_texture_binding_at_unit(unit, GL_TEXTURE_2D, &shadow_tex);
-                        }
+                    GLuint shadow_tex = 0, drv_tex = 0, drv_sampler = 0;
+                    GLint tex_minf = -1, tex_magf = -1, samp_minf = -1, samp_magf = -1;
+                    GLenum tex_fmt = 0;
+                    if (unit >= 0 && unit < (GLint)mg_max_texture_units()) {
+                        mg_driver_texture_binding_at_unit((GLuint)unit, GL_TEXTURE_2D, &shadow_tex);
                         int prev_unit = mg_driver_active_texture_unit();
                         GLES.glActiveTexture(GL_TEXTURE0 + unit);
                         GLint q = 0;
                         GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &q);
-                        GLES.glActiveTexture(GL_TEXTURE0 + prev_unit);
                         drv_tex = (GLuint)q;
+                        q = 0;
+                        GLES.glGetIntegerv(GL_SAMPLER_BINDING, &q);
+                        drv_sampler = (GLuint)q;
                         if (drv_tex != 0) {
-                            GLES.glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_DEPTH_SIZE, &depth_bits);
-                            GLES.glGetError(); // clear the query error if the level is not allocated
+                            GLES.glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &tex_minf);
+                            GLES.glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, &tex_magf);
+                            const TextureObject* to = mgGetTexObjectByID(drv_tex);
+                            if (to) tex_fmt = to->internal_format;
+                            GLES.glGetError(); // clear a rejected-parameter error, if any
                         }
+                        if (drv_sampler != 0) {
+                            GLES.glGetSamplerParameteriv(drv_sampler, GL_TEXTURE_MIN_FILTER, &samp_minf);
+                            GLES.glGetSamplerParameteriv(drv_sampler, GL_TEXTURE_MAG_FILTER, &samp_magf);
+                            GLES.glGetError(); // same
+                        }
+                        GLES.glActiveTexture(GL_TEXTURE0 + prev_unit);
                     }
-                    GLenum tex_fmt = 0;
-                    GLuint tex_for_fmt = drv_tex ? drv_tex : shadow_tex;
-                    if (tex_for_fmt != 0) {
-                        const TextureObject* to = mgGetTexObjectByID(tex_for_fmt);
-                        if (to) tex_fmt = to->internal_format;
-                    }
-                    LOG_W_FORCE("[MG]   %-24s -> unit %2d, shadow tex %u, driver tex %u, depth bits %d, fmt %s",
-                                name_buf, unit, shadow_tex, drv_tex, depth_bits,
-                                tex_fmt ? glEnumToString(tex_fmt) : "(none)")
+                    auto filter_name = [](GLint f) -> const char* {
+                        switch (f) {
+                        case 9728: return "LINEAR";
+                        case 9729: return "NEAREST";
+                        case 9984: return "NEAREST_MIPMAP_NEAREST";
+                        case 9986: return "LINEAR_MIPMAP_NEAREST";
+                        case 9987: return "LINEAR_MIPMAP_LINEAR";
+                        case -1: return "(n/a)";
+                        default: return "other";
+                        }
+                    };
+                    LOG_W_FORCE("[MG]   %-24s -> unit %2d, tex %u/%u, fmt %s, tex filter %s/%s, sampler %u filter %s/%s",
+                                name_buf, unit, shadow_tex, drv_tex, tex_fmt ? glEnumToString(tex_fmt) : "(none)",
+                                filter_name(tex_minf), filter_name(tex_magf), drv_sampler,
+                                filter_name(samp_minf), filter_name(samp_magf))
+                }
+                // What the program is being rendered into. GL_FRAMEBUFFER_ATTACHMENT_
+                // OBJECT_TYPE/NAME are core ES 3.0 and cannot be refused.
+                GLint draw_fbo2 = 0;
+                GLES.glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fbo2);
+                for (int which = 0; which < 2; ++which) {
+                    GLenum attachment = which == 0 ? GL_COLOR_ATTACHMENT0 : GL_DEPTH_ATTACHMENT;
+                    GLint atype = 0, aname = 0;
+                    GLES.glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, attachment,
+                                                               GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &atype);
+                    GLES.glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER, attachment,
+                                                               GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, &aname);
+                    GLES.glGetError(); // an empty attachment refuses the NAME query; that is fine
+                    LOG_W_FORCE("[MG]   draw fbo %d %s: type 0x%x, object %u", draw_fbo2,
+                                which == 0 ? "color0" : "depth ", atype, (unsigned)aname)
                 }
             }
         }
@@ -305,11 +364,10 @@ void prepareForDraw(int api) {
 }
 
 
-// MC 26.x's transparency composite (post/transparency) draws its full-screen
-// triangle with glDrawArrays -- the one draw call that used to bypass
-// prepareForDraw entirely. Everything the draw-time hooks are for (the TBO
-// sampler rewiring under ES 3.0/3.1, the composite sampler dump) rides along
-// here now; the native passthrough this replaces did nothing else.
+// The plain-glDrawArrays wrapper from 2.0.9 stays: MC 26.2's drawFromBuffers no
+// longer issues plain glDrawArrays itself, but LWJGL's GL11.glDrawArrays is the
+// legacy path older mods and GlStateManager compat code can still take, and the
+// TBO sampler rewiring must cover it either way.
 void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     LOG()
     LOG_D("glDrawArrays, mode: %d, first: %d, count: %d", mode, first, count)
@@ -317,6 +375,37 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     GLES.glDrawArrays(mode, first, count);
     CHECK_GL_ERROR
 }
+
+// MC 26.2's GlCommandEncoder.drawFromBuffers (disassembled from the shipped
+// client.jar) routes every non-indexed draw -- the transparency composite's
+// full-screen triangle included -- through glDrawArraysInstanced, and its
+// ARBBaseInstance sibling when baseinstance != 0. This wrapper used to be a
+// native passthrough, which meant the one draw the depth-sort pipeline lives
+// by never reached prepareForDraw: no TBO sampler rewiring for any instanced
+// draw, and no way for a diagnostic to see the composite's inputs.
+void glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instancecount) {
+    LOG()
+    LOG_D("glDrawArraysInstanced, mode: %d, first: %d, count: %d, instancecount: %d", mode, first, count,
+          instancecount)
+    prepareForDraw(3);
+    GLES.glDrawArraysInstanced(mode, first, count, instancecount);
+    CHECK_GL_ERROR
+}
+
+// The NATIVE_FUNCTION_HEAD macro this replaces also emitted an `##ARB` alias;
+// keep the alias alive so anything resolving the ARB spelling still binds here.
+#ifndef __APPLE__
+extern "C" {
+GLAPI GLAPIENTRY void glDrawArraysInstancedARB(GLenum mode, GLint first, GLsizei count, GLsizei instancecount)
+    __attribute__((alias("glDrawArraysInstanced")));
+}
+#else
+extern "C" {
+GLAPI GLAPIENTRY void glDrawArraysInstancedARB(GLenum mode, GLint first, GLsizei count, GLsizei instancecount) {
+    glDrawArraysInstanced(mode, first, count, instancecount);
+}
+}
+#endif
 
 void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei primcount) {
     LOG()
@@ -642,7 +731,7 @@ void glDrawArraysInstancedBaseInstance(GLenum mode, GLint first, GLsizei count, 
         DR_WARN_ONCE("glDrawArraysInstancedBaseInstance: baseinstance %u ignored, GLES has no base instance",
                      baseinstance);
     }
-    prepareForDraw();
+    prepareForDraw(4);
     GLES.glDrawArraysInstanced(mode, first, count, instancecount);
     CHECK_GL_ERROR
 }

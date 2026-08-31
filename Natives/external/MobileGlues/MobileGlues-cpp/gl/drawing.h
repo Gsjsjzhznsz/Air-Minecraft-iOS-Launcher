@@ -40,6 +40,10 @@ extern "C"
                                               const void* const* indices, GLsizei primcount);
     GLAPI GLAPIENTRY void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices);
     GLAPI GLAPIENTRY void glDrawArrays(GLenum mode, GLint first, GLsizei count);
+    // MC 26.2 routes every non-indexed draw (the transparency composite
+    // included) through here; wrapping it keeps instanced draws on the same
+    // draw-time hooks (TBO sampler rewiring, diagnostics) as the rest.
+    GLAPI GLAPIENTRY void glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instancecount);
 
     // The rest of the indexed family, so GL_PRIMITIVE_RESTART is applied to all
     // of it rather than only to the three above.

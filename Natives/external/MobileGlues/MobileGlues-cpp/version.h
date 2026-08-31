@@ -114,7 +114,39 @@
 // the host ANGLE libGLESv2; if dyld's image order ever lets ANGLE win a name
 // this layer exports, the application bypasses this layer for that function
 // entirely.
-#define REVISION 10
+// REVISION 11: 2.0.10 device log results + the real reason the composite was
+// never observed. The log graded three things: depth allocations healthy
+// (shadow == driver binding, upload clean), depth blit healthy (both FBOs
+// complete, GL_NO_ERROR), no symbol theft -- and the draw census answered a
+// question nobody had asked: every one of the first 24 programs was first
+// seen on "other draw", meaning MC 26.2 never issues plain glDrawArrays or
+// glDrawElements at all. Disassembling the shipped client.jar's
+// GlCommandEncoder.drawFromBuffers confirms it: the non-indexed branch is
+// glDrawArraysInstanced / glDrawArraysInstancedBaseInstance, the indexed one
+// glDrawElementsInstancedBaseVertex(_BaseInstance) -- there is NO plain
+// glDrawArrays branch, so the transparency composite (a 3-vertex, 1-instance
+// non-indexed draw) sailed through the glDrawArraysInstanced native
+// passthrough without ever reaching prepareForDraw: no TBO sampler rewiring
+// for any instanced draw, and no diagnostic could ever see the composite's
+// inputs. (1) glDrawArraysInstanced moved from the native table into
+// gl/drawing.cpp behind prepareForDraw(3); glDrawArraysInstancedBaseInstance
+// now tags prepareForDraw(4); the ARB alias the NATIVE_FUNCTION_HEAD macro
+// used to emit is kept. (2) The depth-family attach census turned out to
+// query glCheckFramebufferStatus BEFORE the forward -- its odd 0x8cd7 rows
+// measured the pre-attach emptiness of fresh temp fbos, not driver verdicts;
+// it now runs after the forward and records the attach error plus the
+// color0/depth attachment object names. (3) The depth blit gets a content
+// probe: for the first two DEPTH blits, five depth texels are read back from
+// both sides and logged -- NO_ERROR says the driver accepted the copy, only
+// the values say the data moved. (4) The depth-sampler program dump (now
+// reachable through the instanced hooks) grades per sampler: unit, shadow and
+// driver texture, registry internal format, the texture's own MIN/MAG filter,
+// and any bound sampler object's MIN/MAG filter -- sampling depth with a
+// LINEAR filter is the classic silent killer on strict ES drivers (an
+// unfilterable depth texture reads black, which in reversed-z is "infinitely
+// far" and un-occludes everything), and the draw fbo's color0/depth
+// attachments are logged with it.
+#define REVISION 11
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE
