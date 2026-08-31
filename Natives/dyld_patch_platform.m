@@ -7,6 +7,17 @@
 
 extern int dyld_get_active_platform();
 
+// Rewrite an LC_(LOAD|WEAK)_DYLIB install name in place. The replacement must
+// fit in the original load command's string buffer.
+static void PLRewriteDylibName(struct dylib_command *dylib, const char *newName) {
+    char *dylibName = (void *)dylib + dylib->dylib.name.offset;
+    size_t bufLen = dylib->cmdsize - dylib->dylib.name.offset;
+    size_t nameLen = strlen(newName);
+    if (nameLen + 1 > bufLen) return;
+    memcpy(dylibName, newName, nameLen + 1);
+    memset(dylibName + nameLen + 1, 0, bufLen - nameLen - 1);
+}
+
 static BOOL PLPatchMachOPlatformForSlice(const char *path, struct mach_header_64 *header) {
     uint8_t *imageHeaderPtr = (uint8_t*)header + sizeof(struct mach_header_64);
 
@@ -17,7 +28,7 @@ static BOOL PLPatchMachOPlatformForSlice(const char *path, struct mach_header_64
             int activePlatform = dyld_get_active_platform();
             if (buildver->platform == activePlatform) return NO; // it is already set, stop
             buildver->platform = activePlatform; // set to current platform
-        } else if (command->cmd == LC_LOAD_DYLIB) {
+        } else if (command->cmd == LC_LOAD_DYLIB || command->cmd == LC_LOAD_WEAK_DYLIB) {
             struct dylib_command *dylib = (struct dylib_command *)command;
             char *dylibName = (void *)dylib + dylib->dylib.name.offset;
             char *verPtr = strstr(dylibName, "/Versions/");
@@ -26,6 +37,17 @@ static BOOL PLPatchMachOPlatformForSlice(const char *path, struct mach_header_64
                 int lastComponentLen = strlen(dylibName) - (verPtr - dylibName) - 11;
                 memmove(verPtr, verPtr + 11, lastComponentLen);
                 verPtr[lastComponentLen] = '\0';
+            }
+            // Redirect macOS-only umbrella frameworks to iOS equivalents.
+            // Cocoa/AppKit don't exist on iOS, which makes dlopen fail even
+            // after the platform retag above. libjcocoa (java-objc-bridge,
+            // pulled in by Minecraft's MacosUtil) links Cocoa but only uses
+            // Foundation symbols eagerly; everything AppKit is resolved at
+            // runtime via objc_getClass, whose nil results are harmless.
+            // UIKit exists on iOS and its path has the exact same length as
+            // the stripped Cocoa path, so it always fits in place.
+            if (strstr(dylibName, "Cocoa.framework") || strstr(dylibName, "AppKit.framework")) {
+                PLRewriteDylibName(dylib, "/System/Library/Frameworks/UIKit.framework/UIKit");
             }
         }
         command = (struct load_command *)((void *)command + command->cmdsize);

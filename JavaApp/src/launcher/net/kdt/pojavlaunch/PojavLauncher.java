@@ -141,8 +141,19 @@ public class PojavLauncher {
         MCOptionUtils.setDefault("particles", "1");
         MCOptionUtils.setDefault("renderDistance", "2");
         MCOptionUtils.setDefault("simulationDistance", "5");
+        // 关闭 OIT（Order-Independent Transparency）—— renderpearl 的
+        // oit_transmittance_flat_clouds Vulkan 管线在 MoltenVK / A11 GPU 上
+        // 编译失败导致崩溃。graphicsMode 0=Fast,1=Fancy,2=Fabulous(OIT)。
+        // 对齐 Ynnyny 仓库 be74cd4。
+        MCOptionUtils.setDefault("graphicsMode", "0");
+        MCOptionUtils.setDefault("transparency", "0");
         
         MCOptionUtils.save();
+
+        // 提示 renderpearl 跳过 OIT 管线编译
+        System.setProperty("com.mojang.renderpearl.disableOIT", "true");
+        System.setProperty("com.mojang.renderpearl.skipOIT", "true");
+        System.setProperty("com.mojang.renderpearl.forceNoOIT", "true");
 
         // Setup Forge splash.properties
         File forgeSplashFile = new File(Tools.DIR_GAME_NEW, "config/splash.properties");
@@ -157,12 +168,39 @@ public class PojavLauncher {
 
         // 仅在显式选择 Vulkan 渲染器时设置 LWJGL Vulkan native 库名称，
         // 避免覆盖 JavaLauncher.m 为 ANGLE/MobileGlues/GL4ES 设置的 OpenGL libname。
-        // 注意：LWJGL Library.loadNative 在 macOS 上会自动加 "lib" 前缀和 ".dylib" 后缀，
-        // 所以这里必须传裸名 "MoltenVK"，否则 "libMoltenVK.dylib" 会被二次包装成
-        // "liblibMoltenVK.dylib.dylib" 导致 UnsatisfiedLinkError。
+        //
+        // 传裸名 "MoltenVK"。LWJGL 的 Platform.mapLibraryName（macOS 分支）用正则
+        //     (?:^|/)lib\w+(?:[.]\d+)*[.]dylib$
+        // 判断 libname 是否已是 dylib 文件名：匹配则原样返回，否则交给
+        // System.mapLibraryName 补 "lib" 前缀与 ".dylib" 后缀。
+        // 裸名不以 lib 开头，必定走后者 -> "libMoltenVK.dylib"，与磁盘一致。
+        //
+        // 修正旧注释：它声称传 "libMoltenVK.dylib" 会被二次包装成
+        // "liblibMoltenVK.dylib.dylib"。实际上该名是匹配上述正则的（\w 覆盖
+        // "MoltenVK"），原样返回并不会被二次包装。真正会中招的是名字含连字符的库
+        // —— "\w" 不含 '-'，例如 "libMobileGL-gles.dylib" 会被误判并包装成
+        // "liblibMobileGL-gles.dylib.dylib"。统一传裸名可让规则对任何文件名都成立。
         String renderer = System.getenv("AMETHYST_RENDERER");
         if ("libMoltenVK.dylib".equals(renderer) || "vulkan".equals(renderer)) {
             System.setProperty("org.lwjgl.vulkan.libname", "MoltenVK");
+
+        // Sanity check: the LWJGL jar on the classpath must match the version the
+        // native launcher selected (AndroidLauncher sets -Dpojav.lwjgl.version and
+        // builds the classpath from libs/lwjgl-<version>/). Otherwise the wrong
+        // LWJGL set would be used, e.g. 3.3.3 when 3.4.1 (real SDL3 bindings) is
+        // required by MC 26.3+. org.lwjgl.Version comes from whichever lwjgl jar
+        // the classpath resolved first.
+        String activeLwjgl = System.getProperty("pojav.lwjgl.version");
+        if (activeLwjgl != null) {
+            try {
+                String versionStr = Class.forName("org.lwjgl.Version").getMethod("getVersion").invoke(null).toString();
+                System.out.println("[PojavLauncher] LWJGL selected by launcher: " + activeLwjgl
+                    + ", LWJGL on classpath: " + versionStr);
+            } catch (ReflectiveOperationException e) {
+                System.out.println("[PojavLauncher] LWJGL selected by launcher: " + activeLwjgl
+                    + ", failed to read org.lwjgl.Version: " + e);
+            }
+        }
         }
 
         // MC 26.2+ Graphics API 切换（OpenGL/Vulkan 游戏内图形后端选择）

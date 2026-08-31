@@ -208,40 +208,101 @@ NSString* getSelectedJavaHome(NSString* defaultJRETag, int minVersion) {
 }
 
 #pragma mark Renderer
-NSArray* getRendererKeys(BOOL containsDefault) {
-    NSMutableArray *array = @[
-        @"auto",
-        @ RENDERER_NAME_GL4ES,
-        @ RENDERER_NAME_MTL_ANGLE,
-        @ RENDERER_NAME_MOBILEGLUES,
-        @ RENDERER_NAME_VK_ZINK,
-        @ RENDERER_NAME_LTW,
-        @ RENDERER_NAME_VULKAN
-    ].mutableCopy;
 
+// 可选渲染器是否真的可用：对应的 dylib 必须已经打进 app 的 Frameworks 目录。
+//
+// 为什么需要这个判断：Mithril 的 libmithril.dylib 是预编译产物（需另外下载），
+// MobileGL 的 libMobileGL.dylib 默认不构建（源码体积大、编译慢，属可选依赖）。
+// 若把不存在的渲染器列进选择器，用户选中后 dlopen 失败，gl_bridge.m 的
+// dlsym_EGL() 直接返回 false，启动器弹不出有意义的错误，排查成本很高。
+// 因此按实际存在与否过滤：缺哪个 dylib 就不显示哪个选项。
+static BOOL rendererLibraryExists(NSString *fileName) {
+    if (fileName.length == 0) return NO;
+    NSString *path = [NSBundle.mainBundle.bundlePath
+        stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:fileName]];
+    return [[NSFileManager defaultManager] fileExistsAtPath:path];
+}
+
+// 候选渲染器表：key / 显示名 / 对应的 dylib 文件（为空表示始终可用）。
+// keys 与 names 由同一份表生成，避免两处手改导致下标错位。
+static NSArray<NSDictionary *> *rendererCandidates(void) {
+    return @[
+        @{@"key": @"auto",
+          @"name": localize(@"preference.title.renderer.debug.auto", nil),
+          @"file": @""},
+        @{@"key": @ RENDERER_NAME_GL4ES,
+          @"name": localize(@"preference.title.renderer.debug.gl4es", nil),
+          @"file": @ RENDERER_NAME_GL4ES},
+        @{@"key": @ RENDERER_NAME_MTL_ANGLE,
+          @"name": localize(@"preference.title.renderer.debug.angle", nil),
+          @"file": @ RENDERER_NAME_MTL_ANGLE},
+        @{@"key": @ RENDERER_NAME_MOBILEGLUES,
+          @"name": localize(@"preference.title.renderer.debug.mg", nil),
+          @"file": @ RENDERER_NAME_MOBILEGLUES},
+        @{@"key": @ RENDERER_NAME_VK_ZINK,
+          @"name": localize(@"preference.title.renderer.debug.zink", nil),
+          @"file": @ RENDERER_NAME_VK_ZINK},
+        @{@"key": @ RENDERER_NAME_LTW,
+          @"name": localize(@"preference.title.renderer.debug.ltw", nil),
+          @"file": @ RENDERER_NAME_LTW},
+        @{@"key": @ RENDERER_NAME_VULKAN,
+          @"name": localize(@"preference.title.renderer.debug.vulkan", nil),
+          @"file": @ RENDERER_NAME_VULKAN},
+        @{@"key": @ RENDERER_NAME_MITHRIL,
+          @"name": localize(@"preference.title.renderer.debug.mithril", nil),
+          @"file": @ RENDERER_NAME_MITHRIL},
+        @{@"key": @ RENDERER_NAME_MOBILEGL,
+          @"name": localize(@"preference.title.renderer.debug.mobilegl", nil),
+          @"file": @ RENDERER_NAME_MOBILEGL},
+        @{@"key": @ RENDERER_NAME_MOBILEGL_GLES,
+          @"name": localize(@"preference.title.renderer.debug.mobilegl_gles", nil),
+          @"file": @ RENDERER_NAME_MOBILEGL_GLES}
+    ];
+}
+
+// 当前选中的渲染器（可能已不在候选表里，见下方说明）
+static NSString *currentRendererKey(void) {
+    NSString *value = getPrefObject(@"video.renderer");
+    return [value isKindOfClass:NSString.class] ? value : nil;
+}
+
+// 过滤规则：
+//   1. dylib 不存在的候选不显示（Mithril 需另下载、MobileGL 默认不构建）
+//   2. 但当前已选中的值永远保留 —— 否则用户选了某个渲染器、之后该 dylib 被移除
+//      （例如换了个不含 MobileGL 的构建），设置页会失去这一项，pick 控件拿不到
+//      对应下标，显示为空白或错选中第一项，用户无从察觉当前到底是什么渲染器。
+static NSArray<NSDictionary *> *availableRendererCandidates(void) {
+    NSString *current = currentRendererKey();
+    NSMutableArray *result = [NSMutableArray array];
+    for (NSDictionary *entry in rendererCandidates()) {
+        NSString *file = entry[@"file"];
+        NSString *key = entry[@"key"];
+        if (file.length > 0 && !rendererLibraryExists(file) && ![key isEqualToString:current]) {
+            continue;
+        }
+        [result addObject:entry];
+    }
+    return result;
+}
+
+NSArray* getRendererKeys(BOOL containsDefault) {
+    NSMutableArray *array = [NSMutableArray array];
+    for (NSDictionary *entry in availableRendererCandidates()) {
+        [array addObject:entry[@"key"]];
+    }
     if (containsDefault) {
         [array insertObject:@"(default)" atIndex:0];
     }
-    
     return array;
 }
 
 NSArray* getRendererNames(BOOL containsDefault) {
-    NSMutableArray *array;
-
-    array = @[
-        localize(@"preference.title.renderer.debug.auto", nil),
-        localize(@"preference.title.renderer.debug.gl4es", nil),
-        localize(@"preference.title.renderer.debug.angle", nil),
-        localize(@"preference.title.renderer.debug.mg", nil),
-        localize(@"preference.title.renderer.debug.zink", nil),
-        localize(@"preference.title.renderer.debug.ltw", nil),
-        localize(@"preference.title.renderer.debug.vulkan", nil)
-    ].mutableCopy;
-
+    NSMutableArray *array = [NSMutableArray array];
+    for (NSDictionary *entry in availableRendererCandidates()) {
+        [array addObject:entry[@"name"]];
+    }
     if (containsDefault) {
         [array insertObject:@"(default)" atIndex:0];
     }
-
     return array;
 }

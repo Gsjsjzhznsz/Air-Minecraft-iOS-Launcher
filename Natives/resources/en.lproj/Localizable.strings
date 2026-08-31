@@ -244,6 +244,9 @@
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) - exports OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES wrapper (1.17+)";
 "preference.title.renderer.debug.vulkan" = "MoltenVK (26.2+) - exports vulkan 1.4";
+"preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
+"preference.title.renderer.debug.mobilegl" = "MobileGL Vulkan (1.17+) - OpenGL 3.3 Core, EXPERIMENTAL";
+"preference.title.renderer.debug.mobilegl_gles" = "MobileGL GLES (1.17+) - OpenGL 3.3 Core via OpenGL ES, EXPERIMENTAL";
 
 "preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";
 
@@ -457,6 +460,7 @@
 "preference.profile.title.version_type" = "Version type";
 "preference.profile.title.default_touch_control" = "Touch controls";
 "preference.profile.title.default_gamepad_control" = "Gamepad controls";
+"preference.profile.title.lwjgl_version" = "LWJGL version";
 
 "profile.error.name_exists" = "A profile with that name already exists. Please use another name.";
 "profile.section.instance" = "Game Instance settings";

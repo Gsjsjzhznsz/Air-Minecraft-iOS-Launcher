@@ -152,6 +152,13 @@
               @"pickKeys": javaList,
               @"pickList": javaList
             },
+            @{@"key": @"lwjglVersion",
+              @"icon": @"shippingbox",
+              @"title": @"preference.profile.title.lwjgl_version",
+              @"type": self.typePickField,
+              @"pickKeys": @[@"(default)", @"333", @"341"],
+              @"pickList": @[@"(default)", @"3.3.3", @"3.4.1"]
+            },
             @{@"key": @"javaArgs",
               @"icon": @"slider.vertical.3",
               @"title": @"preference.title.java_args",

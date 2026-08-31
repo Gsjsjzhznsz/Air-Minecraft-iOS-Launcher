@@ -80,19 +80,46 @@ bool pojavIsActualVulkanPath() {
 }
 
 void JNI_LWJGL_changeRenderer(const char* value_c) {
-    JNIEnv *env;
-    int getEnvResult = (*runtimeJavaVMPtr)->GetEnv(runtimeJavaVMPtr, (void **)&env, JNI_VERSION_1_4);
-    // Bug fix: GetEnv 可能返回 JNI_EDETACHED（调用线程未附加到 JVM），
-    // 此时 env 未初始化，后续 JNI 调用会解引用野指针导致崩溃。
-    if (getEnvResult != JNI_OK || !env) {
-        NSLog(@"[egl_bridge] JNI_LWJGL_changeRenderer: GetEnv failed (result=%d)", getEnvResult);
+    if (value_c == NULL) return;
+
+    // 原实现直接 (*runtimeJavaVMPtr)->GetEnv(...) 且不检查返回值。
+    // 在非 JVM 线程上（SDL 的视频/事件线程，SDL3 路径的 SDL_GL_LoadLibrary 就发生在
+    // 这类线程上）GetEnv 返回 JNI_EDETACHED 并且**不会写 env**，env 保持为未初始化的
+    // 栈垃圾，紧接着 (*env)->NewStringUTF(...) 立刻段错误（崩溃点就是本函数 +0x1c）。
+    // 这里补齐：VM 判空 -> GetEnv 结果判空 -> AttachCurrentThread 兜底 -> 用完 detach。
+    JavaVM *vm = runtimeJavaVMPtr;
+    if (vm == NULL) {
+        NSLog(@"[egl_bridge] JNI_LWJGL_changeRenderer('%s') skipped: runtimeJavaVMPtr is NULL", value_c);
         return;
     }
+
+    JNIEnv *env = NULL;
+    BOOL attached = NO;
+    if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_4) != JNI_OK || env == NULL) {
+        if ((*vm)->AttachCurrentThread(vm, (void **)&env, NULL) != JNI_OK || env == NULL) {
+            NSLog(@"[egl_bridge] JNI_LWJGL_changeRenderer('%s') skipped: cannot obtain JNIEnv", value_c);
+            return;
+        }
+        attached = YES;
+    }
+
     jstring key = (*env)->NewStringUTF(env, "org.lwjgl.opengl.libname");
     jstring value = (*env)->NewStringUTF(env, value_c);
-    jclass clazz = (*env)->FindClass(env, "java/lang/System");
-    jmethodID method = (*env)->GetStaticMethodID(env, clazz, "setProperty", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-    (*env)->CallStaticObjectMethod(env, clazz, method, key, value);
+    if (key != NULL && value != NULL) {
+        jclass clazz = (*env)->FindClass(env, "java/lang/System");
+        if (clazz != NULL) {
+            jmethodID method = (*env)->GetStaticMethodID(env, clazz, "setProperty",
+                "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+            if (method != NULL) {
+                (*env)->CallStaticObjectMethod(env, clazz, method, key, value);
+            }
+            (*env)->DeleteLocalRef(env, clazz);
+        }
+        (*env)->DeleteLocalRef(env, key);
+        (*env)->DeleteLocalRef(env, value);
+    }
+
+    if (attached) (*vm)->DetachCurrentThread(vm);
 }
 
 void pojavTerminate() {
@@ -112,7 +139,38 @@ int pojavInit(BOOL useStackQueue) {
     return JNI_TRUE;
 }
 
-int pojavInitOpenGL() {
+/// OpenGL 子系统是否已初始化成功（渲染器 bridge + br_init()）。
+///
+/// 必须是全局的而不是 pojavCreateContext 里的局部 static：SDL3 路径下
+/// SDL_GL_LoadLibrary 已经调过 pojavInitOpenGLForSDL3() 完成初始化，
+/// 若 pojavCreateContext 再凭自己的局部 static 判定"未初始化"，就会再调一次
+/// 完整的 pojavInitOpenGL()——那会在 SDL 的原生线程上执行 JNI 调用
+/// （JNI_LWJGL_changeRenderer），正是 fc0d838 上报的
+/// `C [AngelAuraAmethyst+0x220df8] JNI_LWJGL_changeRenderer+0x1c` 崩溃。
+static BOOL s_openGLInited = NO;
+
+BOOL pojavIsOpenGLInited(void) {
+    return s_openGLInited;
+}
+
+/// 统一收口初始化结果，成功后置位幂等标志。
+static int pojavFinishOpenGLInit(int result) {
+    if (result == 0) {
+        s_openGLInited = YES;
+    } else {
+        NSLog(@"[egl_bridge] pojavInitOpenGL failed (br_init() returned %d); "
+              @"not marking as initialised", result);
+    }
+    return result;
+}
+
+static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
+    if (s_openGLInited) {
+        // 幂等：重复初始化会二次 dlopen 渲染器、二次 br_init()（eglInitialize），
+        // 且在 SDL3 路径上会触发无意义的 JNI 调用。
+        NSDebugLog(@"[egl_bridge] pojavInitOpenGL skipped: already initialised");
+        return 0;
+    }
     NSString *renderer = NSProcessInfo.processInfo.environment[@"AMETHYST_RENDERER"];
     BOOL isAuto = [renderer isEqualToString:@"auto"];
     if (isAuto || [renderer isEqualToString:@ RENDERER_NAME_GL4ES]) {
@@ -140,6 +198,25 @@ int pojavInitOpenGL() {
         // 这三个 wrapper 函数，其余 EGL 函数仍从 ANGLE 解析。
         NSLog(@"[egl_bridge] LTW renderer: preloading ANGLE as host EGL before LTW init");
         dlopen("@rpath/" RENDERER_NAME_MTL_ANGLE, RTLD_GLOBAL);
+        set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+        // Mithril 渲染器：EGL 1.5 + GL 3.3 Core 全部由 libmithril.dylib 提供
+        // （Vulkan backend，经 MoltenVK 到 Metal）。
+        // gl_bridge.m 的 dlsym_EGL() 会从 libmithril.dylib 解析 EGL 符号，
+        // gl_init_context 用 EGL_OPENGL_BIT + EGL_OPENGL_API 创建 desktop GL 上下文。
+        // 下方的统一逻辑会把它设为 LWJGL 的 opengl.libname 并 RTLD_GLOBAL 预加载。
+        NSLog(@"[egl_bridge] Mithril renderer: EGL/GL provided by libmithril.dylib (Vulkan backend)");
+        set_gl_bridge_tbl();
+    } else if (isMobileGLRenderer(renderer.UTF8String)) {
+        // MobileGL 渲染器：EGL + GL 由 libMobileGL.dylib 提供。
+        // 两个变体共用同一个二进制，用 MOBILEGL_BACKEND_TYPE 选择后端：
+        //   libMobileGL.dylib      -> DirectVulkan (GL -> Vulkan -> MoltenVK -> Metal)
+        //   libMobileGL-gles.dylib -> DirectGLES   (GL -> OpenGL ES)
+        setenv("MOBILEGL_BACKEND_TYPE",
+            [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ? "DirectGLES" : "DirectVulkan",
+            1);
+        NSLog(@"[egl_bridge] MobileGL renderer: backend=%s",
+            getenv("MOBILEGL_BACKEND_TYPE") ?: "<unset>");
         set_gl_bridge_tbl();
     } else if ([renderer hasPrefix:@"libOSMesa"]) {
         setenv("GALLIUM_DRIVER","zink",1);
@@ -176,18 +253,37 @@ int pojavInitOpenGL() {
         // Vulkan 模式下 LWJGL OpenGL 库使用 MobileGlues（由 JavaLauncher.m 设置）
         // 不再调用 JNI_LWJGL_changeRenderer(RENDERER_NAME_MTL_ANGLE)，
         // 因为 JavaLauncher.m 已通过 -Dorg.lwjgl.opengl.libname=libmobileglues.dylib 设置
-        JNI_LWJGL_changeRenderer(RENDERER_NAME_MOBILEGLUES);
+        if (setLwjglProperty) JNI_LWJGL_changeRenderer(RENDERER_NAME_MOBILEGLUES);
         // 跳过下方的统一 JNI_LWJGL_changeRenderer 和 dlopen（已处理）
-        return !br_init();
+        return pojavFinishOpenGLInit(!br_init());
     }
-    if (strcmp(renderer.UTF8String, RENDERER_NAME_VULKAN) != 0) {
+    if (!isMobileGLRenderer(renderer.UTF8String)) {
+        // 切换渲染器后清掉 MobileGL 专用环境变量，避免残留影响下一次启动
+        unsetenv("MOBILEGL_BACKEND_TYPE");
+        unsetenv("MOBILEGL_LOG_FILE_PATH");
+    }
+    if (setLwjglProperty && strcmp(renderer.UTF8String, RENDERER_NAME_VULKAN) != 0) {
         JNI_LWJGL_changeRenderer(renderer.UTF8String);
     }
     // Preload renderer library
     dlopen([NSString stringWithFormat:@"@rpath/%@", renderer].UTF8String, RTLD_GLOBAL);
 
-    return !br_init();
+    return pojavFinishOpenGLInit(!br_init());
     //return 0;
+}
+
+int pojavInitOpenGL(void) {
+    return pojavInitOpenGLInternal(YES);
+}
+
+/// SDL3 路径专用入口：不写 org.lwjgl.opengl.libname。
+///
+/// 该属性由 JavaLauncher 在 JVM 启动时以 -D 传入，LWJGL 在 bootstrap 阶段就已读取
+/// 并 dlopen 了渲染器库（这正是 MC 26.3 报 "OpenGL library already loaded" 的来源）。
+/// 等到 SDL_GL_LoadLibrary 再设这个属性既无效果（LWJGL 的 System property 只在类
+/// 初始化时读一次），又要为此把非 JVM 线程 attach 到 VM，属于纯粹的收益为负的操作。
+int pojavInitOpenGLForSDL3(void) {
+    return pojavInitOpenGLInternal(NO);
 }
 
 void pojavSetWindowHint(int hint, int value) {
@@ -233,9 +329,10 @@ void pojavMakeCurrent(basic_render_window_t* window) {
 }
 
 void* pojavCreateContext(basic_render_window_t* contextSrc) {
-    static BOOL inited = NO;
-    if (!inited) {
-        inited = YES;
+    // 用全局幂等标志而非局部 static：SDL3 路径下 SDL_GL_LoadLibrary 已通过
+    // pojavInitOpenGLForSDL3() 完成初始化，此处若用局部 static 判定为"未初始化"，
+    // 会再调一次完整的 pojavInitOpenGL()，在 SDL 的原生线程上触发 JNI 调用。
+    if (!pojavIsOpenGLInited()) {
         pojavInitOpenGL();
     }
 

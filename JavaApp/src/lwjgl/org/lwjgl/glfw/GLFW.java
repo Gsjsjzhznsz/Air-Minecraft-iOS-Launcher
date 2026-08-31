@@ -1098,7 +1098,16 @@ public class GLFW
     public static void glfwSetWindowIcon(@NativeType("GLFWwindow *") long window, @Nullable @NativeType("GLFWimage const *") GLFWImage.Buffer images) {}
 
     public static void glfwPollEvents() {
-        for (Long ptr : mGLFWWindowMap.keySet()) callJV(ptr, Functions.PumpEvents);
+        if (mGLFWWindowMap.isEmpty()) {
+            // MC 26.x creates an SDL3 window, not a GLFW window, so
+            // mGLFWWindowMap is empty.  We must still pump the input
+            // queue or pojavPumpEvents() (which sets isInputReady and
+            // dispatches queued key / cursor / mouse events) is never
+            // called and all input is silently dropped.
+            callJV(0L, Functions.PumpEvents);
+        } else {
+            for (Long ptr : mGLFWWindowMap.keySet()) callJV(ptr, Functions.PumpEvents);
+        }
         callV(Functions.RewindEvents);
     }
 

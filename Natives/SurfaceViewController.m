@@ -299,6 +299,12 @@ static GameSurfaceView* pojavWindow;
 
 @end
 
+// Forward declaration: findSDL_uikitview is defined further down this file
+// (after the @implementation block, near touchesBegan). Declaring it here
+// avoids an implicit-declaration warning when pressesBegan/pressesEnded
+// forward physical keyboard events to the embedded SDL_uikitview.
+static UIView *findSDL_uikitview(UIView *root);
+
 @implementation SurfaceViewController
 
 #pragma mark - TouchController Static Library Support
@@ -1877,6 +1883,9 @@ static GameSurfaceView* pojavWindow;
             [KeyboardInput sendKeyEvent:press.key down:YES];
         }
     }
+    // Forward to SDL view for MC 26.3 (SDL3 input)
+    UIView *sdlView = findSDL_uikitview(self.view);
+    if (sdlView) [sdlView pressesBegan:presses withEvent:event];
     // Always call super so that inputTextField (UITextInput) can receive
     // key events for text input (e.g., Minecraft chat).
     [super pressesBegan:presses withEvent:event];
@@ -1888,6 +1897,9 @@ static GameSurfaceView* pojavWindow;
             [KeyboardInput sendKeyEvent:press.key down:NO];
         }
     }
+    // Forward to SDL view for MC 26.3 (SDL3 input)
+    UIView *sdlView = findSDL_uikitview(self.view);
+    if (sdlView) [sdlView pressesEnded:presses withEvent:event];
     // Always call super so that inputTextField (UITextInput) can receive
     // key-up events properly.
     [super pressesEnded:presses withEvent:event];
@@ -2227,6 +2239,20 @@ static NSMutableDictionary *s_touchToFingerIdMap = nil;
     }
 }
 
+// Find the embedded SDL_uikitview (MC 26.3 uses SDL3 for input).
+static UIView *findSDL_uikitview(UIView *root) {
+    static Class sdlCls = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ sdlCls = NSClassFromString(@"SDL_uikitview"); });
+    if (!sdlCls) return nil;
+    if ([root isKindOfClass:sdlCls]) return root;
+    for (UIView *sub in root.subviews) {
+        UIView *found = findSDL_uikitview(sub);
+        if (found) return found;
+    }
+    return nil;
+}
+
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event
 {
 
@@ -2275,6 +2301,10 @@ static NSMutableDictionary *s_touchToFingerIdMap = nil;
         }
         [self sendTouchEvent:touch withUIEvent:event withEvent:ACTION_DOWN];
     }
+    // NOTE: Touches are NOT forwarded to SDL_uikitview here.
+    // Our input_bridge_v3.m handles all mouse injection via SDL_PushEvent.
+    // Forwarding to SDL_uikitview would cause duplicate SDL_FINGER + mouse events
+    // (SDL internally converts touch→mouse), resulting in hitbox mismatch.
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event

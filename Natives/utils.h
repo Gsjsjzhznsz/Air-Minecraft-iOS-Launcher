@@ -49,6 +49,45 @@
 //   - Fragment shader 编译失败时忽略错误，让 BSL/Mellow 等光影包能运行
 #define RENDERER_NAME_LTW "libltw.dylib"
 
+// Mithril 渲染器 - OpenGL 3.3 Core → Vulkan/Metal 转译层（libmithril.dylib）。
+// 自带完整的 EGL 1.5 + GL 实现（Vulkan backend，经 MoltenVK 到 Metal），
+// 必须从自身 dylib 解析 EGL 符号：若复用 ANGLE 的 EGL，会创建 ANGLE 的 Metal
+// 上下文而非 Mithril 的 swapchain，且 eglChooseConfig 在 Mithril 的属性组合下
+// 可能返回 0 个配置，触发 gl_init_context 的 assert(bundle->config)。
+// 参考：Uniaball/Mithril-Wrapper 仓库 launcher-patch/ 下对 Air 的接入方式。
+#define RENDERER_NAME_MITHRIL "libmithril.dylib"
+
+// MobileGL - MobileGL-Dev 的桌面 OpenGL 实现（LGPL-3.0）。
+// 两个变体共用同一个 libMobileGL.dylib 二进制，由环境变量
+// MOBILEGL_BACKEND_TYPE 在运行时选择后端：
+//   libMobileGL.dylib       -> DirectVulkan（GL -> Vulkan -> MoltenVK -> Metal）
+//   libMobileGL-gles.dylib  -> DirectGLES（GL -> OpenGL ES）
+// 与 Mithril 一样自带 EGL 实现，必须从自身 dylib 解析 EGL 符号。
+// 参考：Swung0x48/Amethyst-iOS 提交 dc57bfd3d2 "feat: add MobileGL renderer support"。
+#define RENDERER_NAME_MOBILEGL "libMobileGL.dylib"
+#define RENDERER_NAME_MOBILEGL_GLES "libMobileGL-gles.dylib"
+
+static inline bool isMobileGLRenderer(const char *renderer) {
+    return renderer && (!strcmp(renderer, RENDERER_NAME_MOBILEGL) ||
+                        !strcmp(renderer, RENDERER_NAME_MOBILEGL_GLES));
+}
+
+static inline bool isMithrilRenderer(const char *renderer) {
+    return renderer && !strcmp(renderer, RENDERER_NAME_MITHRIL);
+}
+
+// 自带 EGL 实现的渲染器：EGL 符号要从渲染器自己的 dylib 解析，不能用 ANGLE。
+static inline bool isSelfEglRenderer(const char *renderer) {
+    return isMithrilRenderer(renderer) || isMobileGLRenderer(renderer);
+}
+
+// 导出 desktop OpenGL（而非 OpenGL ES）的渲染器：
+// 需要 EGL_OPENGL_BIT 配置 + eglBindAPI(EGL_OPENGL_API)。
+static inline bool isDesktopGLRenderer(const char *renderer) {
+    return isMobileGLRenderer(renderer) || isMithrilRenderer(renderer) ||
+           (renderer && !strcmp(renderer, RENDERER_NAME_MTL_ANGLE));
+}
+
 #define SPECIALBTN_KEYBOARD -1
 #define SPECIALBTN_TOGGLECTRL -2
 #define SPECIALBTN_MOUSEPRI -3

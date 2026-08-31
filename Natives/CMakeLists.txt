@@ -270,6 +270,10 @@ add_executable(AngelAuraAmethyst
   dyld_patch_platform.m
   main.m
   main_hook.m
+  # SDL3 兼容层（移植自 ZalithLauncher2 的 sdl_hook.c）：建窗前强制 ES profile、
+  # 主窗口复用、EGL 兼容重试、Vulkan 加载器句柄共享。iOS 无 bytehook，
+  # 由 main_hook.m 的 hooked_dlsym 驱动。
+  sdl3_hook.m
   JavaLauncher.m
   external/fishhook/fishhook.c
   UIKit+hook.m
