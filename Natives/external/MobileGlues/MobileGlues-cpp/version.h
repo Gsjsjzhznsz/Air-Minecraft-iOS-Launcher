@@ -183,7 +183,32 @@
 // GL_INVALID_OPERATION, so a probe can only report its own refusal). The
 // depth-sampler program dump stays, with the corrected filter names, and the
 // force/restore transitions log their first eight occurrences.
-#define REVISION 12
+// REVISION 13: 2.0.12 device log results + why the depth-filter enforcement
+// never armed where it was needed. The log shows deployment healthy, the
+// composite dump firing (program 197, twelve sampler2D inputs, one SamplerCache
+// sampler 26 bound across all of them, MIN 9986, six D32F depth textures whose
+// texture-object filters read NEAREST/NEAREST from fix (1)) -- and not one
+// "depth filter force" line. The enforcement's precondition,
+// driver_texture_shadow_trustworthy(), is false on the iOS/ANGLE host for a
+// reason nothing had exercised before: the app talks to ANGLE's libEGL
+// directly, so mg_texture_bind_context never fires and the texture layer sits
+// on the shared fallback record forever -- the same precondition the TBO
+// rewiring survives by falling back to a direct driver query, which the
+// enforcement lacked. (The dump's "tex 0/9" rows are this gate refusing to
+// answer, not an empty binding map.) Fix: two modes in
+// mg_enforce_depth_sampling_nearest. Tracked mode is 2.0.12 unchanged. The
+// untracked mode treats the fallback record as a HINT -- every hooked bind
+// still maintains it, and the decompiled GlCommandEncoder shows MC 26.2 binds
+// textures exclusively through _activeTexture/_bindTexture/glBindSampler, all
+// hooked -- and confirms every depth hint against the driver
+// (glActiveTexture + GL_TEXTURE_BINDING_2D, borrowed and restored via the
+// GLES entry points directly) before a filter may be forced. A stale hint
+// costs a rejected confirmation; acting on the record alone is what the
+// layer's invariant forbids. FSR1 keeps enforcement off entirely, as before:
+// its binding leak is silent, so neither a record nor a confirm can see it.
+// One line logs once when the untracked scan arms, so the next device log
+// can distinguish "armed and confirming" from "never ran".
+#define REVISION 13
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

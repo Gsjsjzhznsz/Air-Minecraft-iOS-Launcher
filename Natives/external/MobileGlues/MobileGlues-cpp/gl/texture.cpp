@@ -589,13 +589,62 @@ bool mg_unit_holds_depth_texture(int unit) {
 }
 
 void mg_enforce_depth_sampling_nearest(void) {
-    // Same precondition the TBO rewiring applies to its shadow reads: with FSR1
-    // enabled the per-unit driver binding shadow is declared untrustworthy, and
-    // forcing filters off an untrustworthy binding map could flip a colour
-    // sampler. The setting is off by default; enforcement resumes when it is.
-    if (!driver_texture_shadow_trustworthy()) return;
+    // Two modes, same two passes.
+    //
+    // Tracked mode: contexts this layer's EGL hooks reported -- per-unit
+    // bindings read from the context's own shadow, no driver traffic.
+    //
+    // Untracked mode: contexts mg_texture_bind_context never heard about. The
+    // iOS/ANGLE host is one -- the app talks to ANGLE's libEGL directly, so
+    // g_tc sits on the shared fallback record forever, and 2.0.12's early
+    // return made the whole enforcement silently dead there: the 2.0.12
+    // device log shows the composite dump (sampler 26, MIN 9986, over all six
+    // D32F units) with not one force/restore line. The fallback record is not
+    // abandoned, though -- every hooked entry point still maintains it
+    // (glBindTexture, glActiveTexture and glBindSampler all write it, and MC
+    // 26.2 uses exactly those three for texture state; verified against the
+    // decompiled GlCommandEncoder/GlStateManager: _activeTexture + _bindTexture
+    // + GL33C.glBindSampler, no multibind, no glBindTextureUnit). What the
+    // layer's own invariant forbids is ACTING on a record "whose values belong
+    // to no context in particular". So the record is a HINT here, and every
+    // depth hint is confirmed against the driver -- glActiveTexture onto the
+    // unit, GL_TEXTURE_BINDING_2D back -- before it may force a filter. The
+    // borrows use the GLES entry points directly and put the active unit back
+    // from the driver's own answer, the same pattern
+    // setupBufferTextureUniforms already uses for its unit-15 read, so the
+    // record never learns about them and the driver nets to zero. A stale
+    // hint costs nothing but a rejected confirmation; a missed hint would
+    // need a second untracked context on the render thread rebinding depth
+    // behind our back, which MC does not do -- and a missed force self-
+    // corrects on the next draw's re-scan anyway.
+    //
+    // FSR1 precondition unchanged: with FSR1 on, the per-unit binding shadow
+    // is declared untrustworthy wholesale (its GLStateGuard leak is exactly a
+    // binding no record knows about), hints could flip a colour sampler, and
+    // a driver-side confirm cannot help because the leak is silent per frame
+    // -- so enforcement stays off. The setting is off by default.
+    const bool tracked = driver_texture_shadow_trustworthy();
+    if (!tracked && global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled) return;
 
     std::lock_guard<std::mutex> lock(g_depth_sampler_mutex);
+
+    // Cheap out before any map traffic: nothing is bound on any unit and
+    // nothing is parked in the forced state, so there is nothing to want.
+    bool any_sampler = false;
+    for (int u = 0; u < MAX_TEXTURE_IMAGE_UNITS; ++u) {
+        if (DriverSamplers[u] != 0) {
+            any_sampler = true;
+            break;
+        }
+    }
+    if (!any_sampler && g_sampler_forced.empty()) return;
+
+    static bool mg_untracked_scan_logged = false;
+    if (!tracked && !mg_untracked_scan_logged && any_sampler) {
+        mg_untracked_scan_logged = true;
+        LOG_W_FORCE("[MG] depth filter scan: context untracked (EGL bypassed this layer), "
+                    "fallback-record hints + driver confirms armed")
+    }
 
     // Pass 1 -- desired state. A sampler must be in the forced state iff at
     // least one of the units it is bound on holds a depth-family image. The
@@ -605,14 +654,30 @@ void mg_enforce_depth_sampling_nearest(void) {
     // inputs): a single pass scanning units in order would force on unit 1 and
     // restore on unit 0 and leave the draw with whichever came last.
     ska::flat_hash_map<GLuint, bool> wants_force;
+    bool confirm_borrowed = false;
+    GLint saved_active = GL_TEXTURE0;
     for (int u = 0; u < MAX_TEXTURE_IMAGE_UNITS; ++u) {
         const GLuint sampler = DriverSamplers[u];
         if (sampler == 0) continue;
         bool& want = wants_force[sampler];
         if (want) continue;
         const GLuint tex = get_driver_texture_binding(u, TextureTarget::TEXTURE_2D);
-        if (tex != 0 && g_depth_textures.count(tex) != 0) want = true;
+        bool holds_depth = tex != 0 && g_depth_textures.count(tex) != 0;
+        if (holds_depth && !tracked) {
+            // Hint came from the shared fallback record -- the driver decides.
+            if (!confirm_borrowed) {
+                GLES.glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active);
+                confirm_borrowed = true;
+            }
+            GLES.glActiveTexture(GL_TEXTURE0 + u);
+            GLint confirmed = 0;
+            GLES.glGetIntegerv(GL_TEXTURE_BINDING_2D, &confirmed);
+            GLES.glGetError(); // keep the scan's own queries from leaving an error parked
+            holds_depth = confirmed != 0 && g_depth_textures.count((GLuint)confirmed) != 0;
+        }
+        if (holds_depth) want = true;
     }
+    if (confirm_borrowed) GLES.glActiveTexture(saved_active);
 
     // Pass 2 -- transitions.
     for (const auto& entry : g_sampler_forced) {
