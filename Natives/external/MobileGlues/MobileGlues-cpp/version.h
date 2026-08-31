@@ -54,7 +54,20 @@
 // answered GL_INVALID_ENUM there, silently swallowing every mutation MC issued
 // through that target); it is tracked here and the mutations borrow
 // GL_COPY_WRITE_BUFFER instead.
-#define REVISION 7
+// REVISION 8: glslang emission-side swizzle null guards. Device log 2.0.7:
+// 264 conversions SIGSEGV'd at ONE site -- (anon)::TGlslangToSpvTraverser::
+// convertSwizzle+0x1c via visitBinary+0x1318 (symbolicated from the crash-site
+// report, pc-libmobileglues+0x24a838) -- the selector aggregate read as
+// missing/malformed on iOS/arm64 for inputs that convert cleanly under
+// x86_64/qemu-arm64/ASan and converted fine in the 2.0.6 process. Same defect
+// family as the 2.0.1-2.0.3 lValueErrorCheck kill, one stage later. The
+// nullguard patch now covers SPIRV/GlslangToSpv.cpp: convertSwizzle returns
+// bool and rejects unusable selectors (null/non-constant element, out-of-range
+// index) instead of dereferencing them, and both call sites (visitBinary
+// EOpVectorSwizzle, createInvertedSwizzle) fall back to the identity swizzle
+// of the result's component count. Byte-identical output vs pristine glslang
+// on all swizzle-heavy positive tests and every edge-case candidate.
+#define REVISION 8
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE
