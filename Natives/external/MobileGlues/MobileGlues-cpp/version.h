@@ -229,7 +229,24 @@
 // record's GLES-default MIN (9986, not 9985 -- the restore write-back for a
 // never-parameterised sampler used to hand back LINEAR_MIPMAP_NEAREST
 // instead of the default), and the rationale comments in gl/texture.{h,cpp}.
-#define REVISION 14
+// REVISION 15: the MC 26.3 SDL3 host turned the 2.0.10 theft canary from a
+// hypothetical into the actual failure. 26.3's renderpearl GlBackend.loadLibrary
+// cross-checks its two GL entry points: the LWJGL function provider (built on
+// this layer's exported glXGetProcAddress) must return the SAME address for
+// "glGetError" as SDL_GL_GetProcAddress (hooked by the host to dlsym this
+// layer's handle). glXGetProcAddress resolved names through the process-wide
+// flat namespace (RTLD_DEFAULT), where this layer and the host's ANGLE
+// libGLESv2 both export every gl* name and dyld image order decides the
+// winner. In the 26.3 path ANGLE loads first, the LWJGL side bound ANGLE's
+// GLES exports, the SDL side bound this layer's exports, the pointer check
+// failed ("glGetError mismatch"), the OpenGL backend was rejected and the
+// game fell back to MoltenVK (which then died in shaderc's unpatched glslang).
+// Fixed by resolving from this layer's own image first (RTLD_SELF: the
+// calling image, then its dependents), so this layer's exports win regardless
+// of image order; RTLD_DEFAULT remains the fallback for names this layer does
+// not export. The flat-namespace canary stays as environment diagnostics --
+// resolution no longer depends on what it reports.
+#define REVISION 15
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

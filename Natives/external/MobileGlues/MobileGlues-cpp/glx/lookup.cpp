@@ -54,15 +54,37 @@ void* glXGetProcAddress(const char* name) {
     LOG()
     std::string real_func_name = handle_multidraw_func_name(std::string(name));
 #ifdef __APPLE__
-    void* resolved = dlsym((void*)(~(uintptr_t)0), real_func_name.c_str());
-    // RTLD_DEFAULT searches the process-wide flat namespace, which contains
-    // this layer AND the host's ANGLE libGLESv2. Whichever image dyld put
-    // earlier wins for every symbol both export. If ANGLE wins for a function
-    // this layer wraps, the application binds the backend DIRECTLY and this
-    // layer silently never sees the call -- the exact failure shape the 2.0.9
+#ifndef RTLD_SELF
+#define RTLD_SELF ((void *) -3)
+#endif
+    // 2.0.15: resolve from this layer's OWN image first. RTLD_SELF searches
+    // the calling image (this layer) and then its dependents, so this layer's
+    // exports win for every name it implements -- independent of dyld image
+    // order. RTLD_DEFAULT alone searches the process-wide flat namespace,
+    // where this layer and the host's ANGLE libGLESv2 export the same gl*
+    // names and whichever image dyld put earlier wins. That order flipped in
+    // the MC 26.3 SDL3 host (ANGLE loads first there): the host's LWJGL
+    // provider bound ANGLE's GLES exports through this very function, while
+    // the host's hooked SDL_GL_GetProcAddress returned this layer's exports.
+    // renderpearl's GlBackend.loadLibrary demands pointer equality between
+    // the two for "glGetError" ("glGetError mismatch"), so the OpenGL backend
+    // was rejected and the game fell back to MoltenVK. RTLD_DEFAULT stays as
+    // the fallback for names this layer does not export (the RTLD_SELF search
+    // already covers this layer's ANGLE dependents before it fails).
+    void* resolved = dlsym(RTLD_SELF, real_func_name.c_str());
+    if (resolved == nullptr) {
+        resolved = dlsym(RTLD_DEFAULT, real_func_name.c_str());
+    }
+    // Flat-namespace canary, added in 2.0.10 when the shared-symbol overlap
+    // with the host's ANGLE libGLESv2 was first mapped. Since 2.0.15 the
+    // resolution above no longer depends on the flat order, so a theft line
+    // is environment diagnostics (who else exports gl* in this process), not
+    // a functional failure by itself. It still matters: anything that binds
+    // these names WITHOUT going through this function -- direct flat-namespace
+    // linkage in the host binary, dlsym(RTLD_DEFAULT) in host code -- gets
+    // the winner of that race, which is the failure shape the 2.0.9
     // diagnostics hinted at (the depth-attach and composite probes never
-    // fired while the same-file blit probe did). Grade the three functions the
-    // transparency pipeline rides on, once, against this layer's own exports.
+    // fired while the same-file blit probe did).
     static bool mg_theft_checked = false;
     if (!mg_theft_checked) {
         mg_theft_checked = true;

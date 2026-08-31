@@ -544,12 +544,27 @@ static bool ame_SDL_GL_SwapWindow(void *window) {
 
 // GL 函数必须来自渲染器自身。若误返回系统 GLES / EAGL 的实现，
 // LWJGL 拿到的函数指针与 EGL 上下文不匹配，会直接崩。
+//
+// 26.3 renderpearl 的 GlBackend.loadLibrary 还要求指针一致：LWJGL 的
+// GL FunctionProvider（走渲染器导出的 glXGetProcAddress）与 SDL 的
+// SDL_GL_GetProcAddress（本钩子）对 "glGetError" 必须返回同一地址。
+// 前半段 dlsym(渲染器句柄) 与 MG 2.0.15 起 glXGetProcAddress 的
+// RTLD_SELF 自解析对已导出名返回同一地址；对渲染器未导出的名字，
+// 这里继续走渲染器自己的 glXGetProcAddress（而非 SDL 原生实现或
+// RTLD_DEFAULT），保证两条解析链的落点也一致，不会再出现
+// "glGetError mismatch" 式的后端拒绝。
 static void *ame_SDL_GL_GetProcAddress(const char *proc) {
     if (proc == NULL) return NULL;
     void *h = ame_rendererHandle();
     if (h != NULL) {
         void *p = dlsym(h, proc);
         if (p != NULL) return p;
+        void *sym = dlsym(h, "glXGetProcAddress");
+        if (sym != NULL) {
+            void *(*renderer_gpa)(const char *) = (void *(*)(const char *))sym;
+            p = renderer_gpa(proc);
+            if (p != NULL) return p;
+        }
     }
     void *r = ame_real_GL_GetProcAddress ? ame_real_GL_GetProcAddress(proc) : NULL;
     if (r == NULL) r = dlsym(RTLD_DEFAULT, proc);
