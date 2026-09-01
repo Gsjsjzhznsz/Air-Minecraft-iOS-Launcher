@@ -246,7 +246,22 @@
 // of image order; RTLD_DEFAULT remains the fallback for names this layer does
 // not export. The flat-namespace canary stays as environment diagnostics --
 // resolution no longer depends on what it reports.
-#define REVISION 15
+// REVISION 16: 2.0.15's RTLD_SELF did not survive contact with the device --
+// the 3c13d5e5 build still reported "glGetError mismatch" and fell back to
+// MoltenVK. Root cause of the trap: dyld derives the "caller image" of the
+// special handles (RTLD_SELF/RTLD_NEXT) from __builtin_return_address(0), and
+// the host launcher rebinding dlsym process-wide (fishhook) redirects every
+// dlsym issued from this layer through host code, so the "caller" dyld saw was
+// the host binary, not this layer -- RTLD_SELF searched the host's dependency
+// subtree and the outcome depended on where the dlopen'd renderers sit in it.
+// Fixed by dropping special handles entirely: glXGetProcAddress now resolves
+// through a handle to THIS image (dladdr on an own function + dlopen
+// RTLD_NOLOAD, which can never map a duplicate) and falls back to
+// RTLD_DEFAULT only for names this layer does not export. Handle-based dlsym
+// has no caller-image ambiguity, so this layer's exports win for every name
+// it implements, independent of image order and of who is calling. One-time
+// W_FORCE line reports the resolved own-image path for device-log verification.
+#define REVISION 16
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

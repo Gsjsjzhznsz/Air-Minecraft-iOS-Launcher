@@ -54,29 +54,61 @@ void* glXGetProcAddress(const char* name) {
     LOG()
     std::string real_func_name = handle_multidraw_func_name(std::string(name));
 #ifdef __APPLE__
-#ifndef RTLD_SELF
-#define RTLD_SELF ((void *) -3)
-#endif
-    // 2.0.15: resolve from this layer's OWN image first. RTLD_SELF searches
-    // the calling image (this layer) and then its dependents, so this layer's
-    // exports win for every name it implements -- independent of dyld image
-    // order. RTLD_DEFAULT alone searches the process-wide flat namespace,
-    // where this layer and the host's ANGLE libGLESv2 export the same gl*
-    // names and whichever image dyld put earlier wins. That order flipped in
-    // the MC 26.3 SDL3 host (ANGLE loads first there): the host's LWJGL
-    // provider bound ANGLE's GLES exports through this very function, while
-    // the host's hooked SDL_GL_GetProcAddress returned this layer's exports.
-    // renderpearl's GlBackend.loadLibrary demands pointer equality between
-    // the two for "glGetError" ("glGetError mismatch"), so the OpenGL backend
-    // was rejected and the game fell back to MoltenVK. RTLD_DEFAULT stays as
-    // the fallback for names this layer does not export (the RTLD_SELF search
-    // already covers this layer's ANGLE dependents before it fails).
-    void* resolved = dlsym(RTLD_SELF, real_func_name.c_str());
+    // 2.0.16: resolve from this layer's OWN image handle instead of any
+    // special dlsym handle. The special handles (RTLD_SELF / RTLD_NEXT /
+    // RTLD_DEFAULT) derive their "caller image" from
+    // __builtin_return_address(0) inside dyld -- but the host launcher
+    // rebinding dlsym process-wide (fishhook) makes that address land in the
+    // HOST BINARY for every dlsym issued from this layer, so RTLD_SELF searched
+    // the host's image and its dependency subtree instead of this layer, and
+    // the result depended on where the host's dlopen'd renderers (this layer,
+    // ANGLE) happen to sit in that subtree. 2.0.15 shipped exactly that trap:
+    // RTLD_SELF was expected to find this layer's exports first, yet the device
+    // still reported renderpearl's "glGetError mismatch" (LWJGL's provider and
+    // the hooked SDL_GL_GetProcAddress disagreeing about glGetError), and the
+    // OpenGL backend was rejected again in favour of MoltenVK.
+    //
+    // A handle-based dlsym has none of that ambiguity: the handle pins the
+    // search to THIS image (then its dependents), so this layer's exports win
+    // for every name it implements, independent of image order, of who is
+    // calling, and of any interposing layers. The handle is obtained via
+    // dladdr on one of this layer's own functions + dlopen(RTLD_NOLOAD), which
+    // can never map a second copy of the image. RTLD_DEFAULT stays as the
+    // fallback for names this layer does not export (extension entry points
+    // that live only in the backend).
+    static void* own_image = nullptr;
+    static bool own_image_tried = false;
+    if (!own_image_tried) {
+        own_image_tried = true;
+        Dl_info info{};
+        if (dladdr((void*)&glXGetProcAddress, &info) && info.dli_fname != nullptr) {
+            // RTLD_NOLOAD: succeed only if the image is already loaded -- it is,
+            // we are executing inside it -- and never map a duplicate.
+            own_image = dlopen(info.dli_fname, RTLD_LAZY | RTLD_NOLOAD);
+            if (own_image == nullptr) {
+                own_image = dlopen(info.dli_fname, RTLD_LAZY | RTLD_GLOBAL);
+            }
+            if (own_image != nullptr) {
+                LOG_W_FORCE("[MG] 2.0.16 own-image resolution: handle for %s", info.dli_fname)
+            } else {
+                // dlerror() clears the error state on read -- capture once.
+                const char* dlerr = dlerror();
+                LOG_W_FORCE("[MG] 2.0.16 own-image resolution: dlopen('%s') failed (%s), falling back to RTLD_DEFAULT",
+                            info.dli_fname, dlerr != nullptr ? dlerr : "unknown")
+            }
+        } else {
+            LOG_W_FORCE("[MG] 2.0.16 own-image resolution: dladdr could not identify this image, falling back to RTLD_DEFAULT")
+        }
+    }
+    void* resolved = nullptr;
+    if (own_image != nullptr) {
+        resolved = dlsym(own_image, real_func_name.c_str());
+    }
     if (resolved == nullptr) {
         resolved = dlsym(RTLD_DEFAULT, real_func_name.c_str());
     }
     // Flat-namespace canary, added in 2.0.10 when the shared-symbol overlap
-    // with the host's ANGLE libGLESv2 was first mapped. Since 2.0.15 the
+    // with the host's ANGLE libGLESv2 was first mapped. Since 2.0.16 the
     // resolution above no longer depends on the flat order, so a theft line
     // is environment diagnostics (who else exports gl* in this process), not
     // a functional failure by itself. It still matters: anything that binds

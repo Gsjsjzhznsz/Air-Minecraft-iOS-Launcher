@@ -484,15 +484,40 @@ extern void  pojavSwapInterval(int interval);
 static bool   g_glBridgeInited = false;
 static void  *g_glContext = NULL;      // 充当 SDL_GLContext
 static void  *g_rendererHandle = NULL; // 渲染器 dylib 句柄（缓存，避免重复 dlopen）
+// LWJGL OpenGL FunctionProvider 所用库的确切路径（SDL_GL_LoadLibrary 的入参
+// = GL.getFunctionProvider().getPath()）。26.3 renderpearl 的
+// GlBackend.loadLibrary 要求 LWJGL provider 与 SDL_GL_GetProcAddress 对同一
+// 名字返回同一指针，所以本钩子必须与 LWJGL 绑定到同一镜像：NOLOAD 按该
+// 路径取回“已加载”的句柄，绝不映射第二份。
+static char   g_lwjglGLLibPath[1024] = {0};
 
 static void *ame_rendererHandle(void) {
     if (g_rendererHandle != NULL) return g_rendererHandle;
+
+    // 首选：LWJGL provider 的确切路径（ame_SDL_GL_LoadLibrary 捕获）。
+    // LWJGL 打开渲染器用的正是这个字符串，NOLOAD 返回同一 Loader 的句柄 ——
+    // 本钩子的 dlsym 落点与 LWJGL 完全一致，也不会重复映射。
+    if (g_lwjglGLLibPath[0] != '\0') {
+        g_rendererHandle = dlopen(g_lwjglGLLibPath, RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
+        if (g_rendererHandle != NULL) {
+            NSDebugLog(@"[SDLHook] renderer handle <- LWJGL provider path (NOLOAD): %s",
+                       g_lwjglGLLibPath);
+            return g_rendererHandle;
+        }
+        NSDebugLog(@"[SDLHook] renderer NOLOAD dlopen('%s') failed: %s -- falling back",
+                   g_lwjglGLLibPath, dlerror() ?: "unknown");
+    }
+
     const char *renderer = getenv("AMETHYST_RENDERER");
     if (renderer == NULL || renderer[0] == '\0') return NULL;
     NSString *path = [NSString stringWithFormat:@"@rpath/%s", renderer];
-    // 渲染器已由 pojavInitOpenGL 以 RTLD_GLOBAL 预加载，此处返回同一句柄，
-    // 仅增加引用计数，不会重复映射。
-    g_rendererHandle = dlopen(path.UTF8String, RTLD_NOW | RTLD_GLOBAL);
+    // 渲染器已由 LWJGL（org.lwjgl.opengl.libname）加载。先 NOLOAD 取同一
+    // 句柄；万一失败（@rpath 展开差异等），退回普通 dlopen —— dyld 按文件
+    // 身份去重，不会真的映射第二份。
+    g_rendererHandle = dlopen(path.UTF8String, RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
+    if (g_rendererHandle == NULL) {
+        g_rendererHandle = dlopen(path.UTF8String, RTLD_NOW | RTLD_GLOBAL);
+    }
     if (g_rendererHandle == NULL) {
         NSDebugLog(@"[SDLHook] renderer dlopen('%@') failed: %s",
                    path, dlerror() ?: "unknown");
@@ -502,6 +527,12 @@ static void *ame_rendererHandle(void) {
 
 // 库已由启动器预加载，这里只负责初始化 bridge
 static bool ame_SDL_GL_LoadLibrary(const char *path) {
+    // 记录 LWJGL provider 的确切路径（= GL.getFunctionProvider().getPath()），
+    // ame_rendererHandle 据此取回同一镜像的句柄。在任何 GlBackend 调用
+    // SDL_GL_GetProcAddress 之前必然先经过这里（loadLibrary 的顺序）。
+    if (path != NULL && path[0] != '\0' && g_lwjglGLLibPath[0] == '\0') {
+        strlcpy(g_lwjglGLLibPath, path, sizeof(g_lwjglGLLibPath));
+    }
     if (!g_glBridgeInited) {
         g_glBridgeInited = true;
         int r = pojavInitOpenGLForSDL3();
@@ -546,25 +577,39 @@ static bool ame_SDL_GL_SwapWindow(void *window) {
 // LWJGL 拿到的函数指针与 EGL 上下文不匹配，会直接崩。
 //
 // 26.3 renderpearl 的 GlBackend.loadLibrary 还要求指针一致：LWJGL 的
-// GL FunctionProvider（走渲染器导出的 glXGetProcAddress）与 SDL 的
-// SDL_GL_GetProcAddress（本钩子）对 "glGetError" 必须返回同一地址。
-// 前半段 dlsym(渲染器句柄) 与 MG 2.0.15 起 glXGetProcAddress 的
-// RTLD_SELF 自解析对已导出名返回同一地址；对渲染器未导出的名字，
-// 这里继续走渲染器自己的 glXGetProcAddress（而非 SDL 原生实现或
-// RTLD_DEFAULT），保证两条解析链的落点也一致，不会再出现
-// "glGetError mismatch" 式的后端拒绝。
+// GL FunctionProvider（GL$1，macOS 分支）与 SDL 的 SDL_GL_GetProcAddress
+// （本钩子）对 "glGetError" 必须返回同一地址。2.0.15 在 MG 侧用 RTLD_SELF
+// 自解析对齐两条链，但设备实测 3c13d5e5 依旧 mismatch —— dyld 对特殊句柄
+// 的“caller image”判定被启动器的全局 dlsym 重绑定带偏，任何依赖
+// RTLD_SELF / 镜像顺序的方案都不可靠。
+//
+// 2.0.16 改为按构造对齐：ame_rendererHandle() 通过 LWJGL provider 的确切
+// 路径（NOLOAD）取回 LWJGL 正在使用的同一镜像句柄，然后逐条镜像 GL$1
+// 的 macOS 解析链 ——
+//   构造：GetProcAddress = dlsym(lib, "eglGetProcAddress")，
+//         否则 dlsym(lib, "OSMesaGetProcAddress")；
+//   查询：GetProcAddress(name) 非空则取其结果，否则 dlsym(lib, name)。
+// 两条腿由此执行同一条链、调用同一个函数对象，指针一致性按构造成立，
+// 不再依赖 dyld 的任何 caller-image 语义。
 static void *ame_SDL_GL_GetProcAddress(const char *proc) {
     if (proc == NULL) return NULL;
     void *h = ame_rendererHandle();
     if (h != NULL) {
-        void *p = dlsym(h, proc);
-        if (p != NULL) return p;
-        void *sym = dlsym(h, "glXGetProcAddress");
-        if (sym != NULL) {
-            void *(*renderer_gpa)(const char *) = (void *(*)(const char *))sym;
-            p = renderer_gpa(proc);
+        // 镜像 GL$1 的 FunctionProvider 解析（macOS 分支无 glXGetProcAddress 环节）
+        static void *g_lwjglMirrorGPA = NULL;
+        static bool  g_lwjglMirrorTried = false;
+        if (!g_lwjglMirrorTried) {
+            g_lwjglMirrorTried = true;
+            g_lwjglMirrorGPA = dlsym(h, "eglGetProcAddress");
+            if (g_lwjglMirrorGPA == NULL) g_lwjglMirrorGPA = dlsym(h, "OSMesaGetProcAddress");
+        }
+        if (g_lwjglMirrorGPA != NULL) {
+            void *p = ((void *(*)(const char *))g_lwjglMirrorGPA)(proc);
             if (p != NULL) return p;
         }
+        // 对齐 GL$1 的回退：dlsym(lib, name)
+        void *p = dlsym(h, proc);
+        if (p != NULL) return p;
     }
     void *r = ame_real_GL_GetProcAddress ? ame_real_GL_GetProcAddress(proc) : NULL;
     if (r == NULL) r = dlsym(RTLD_DEFAULT, proc);
