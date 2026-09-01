@@ -1038,6 +1038,24 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         NSLog(@"[JavaLauncher] Java 8 detected, skipping G1GC tuning (using default GC)");
     }
 
+    // ============================================================================
+    // Java 线程栈扩容 —— glslang / spirv-cross 深递归防护（MC 26.3）
+    // ============================================================================
+    // iOS OpenJDK 运行时会在我们的 argv 之后注入 -Xss1M（hs_err 的 flags 序列
+    // 实证："-XX:-UseCompressedClassPointers -Xss1M -XX:StackShadowPages=32"，
+    // 前两者由本文件推送，故 -Xss1M/StackShadowPages 来自 JRE 内部追加）。
+    // JVM 主线程（= MC 的 Render thread）因此只有 1MB 原生栈。MC 26.3 的
+    // RenderPearl 在游戏线程上直接调 shaderc（内含 glslang）编译 GLSL，深递归
+    // 实测打穿 1MB 栈：SIGSEGV @ glslang::TParseContext::lValueErrorCheck+0x204
+    // （构建 662d6e2 设备日志）。在此推大栈：
+    //   - 若覆盖了运行时注入的 1M → 全部 Java 线程 32MB 栈，shaderc/spvc 一并安全
+    //   - 若运行时注入仍在其后（1M 胜出）→ main_hook.m 的 shaderc 32MB 栈
+    //     重定向兜底（独立于参数顺序，保证生效）
+    // 32MB 取值对齐 MobileGlues 自身转换线程（设备日志原文 "dedicated 32MB-stack
+    // thread"——同一批着色器、同一库家族在该预算下验证安全）。属虚拟内存预留，
+    // 物理内存按实际触页计。
+    PUSH_MARGV_LITERAL("-Xss32M");
+
     setenv("INTERNAL_JLI_PATH", (isJava8 ? libjlipath8 : libjlipath11).UTF8String, 1);
     void* libjli = dlopen(getenv("INTERNAL_JLI_PATH"), RTLD_GLOBAL);
 
