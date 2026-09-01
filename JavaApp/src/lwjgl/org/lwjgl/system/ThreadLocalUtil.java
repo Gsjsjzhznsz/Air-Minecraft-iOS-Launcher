@@ -161,7 +161,8 @@ public final class ThreadLocalUtil {
             case JNI_VERSION_21:
                 jniCallCount = 232;
                 break;
-            case JNI_VERSION_24:
+            case 0x00180000: // JNI_VERSION_24 (Java 25); the constant is absent
+                             // from the lwjgl-341 JNINativeInterface class
                 jniCallCount = 233;
                 break;
             default:
