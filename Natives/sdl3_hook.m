@@ -160,8 +160,16 @@ static bool ame_sdlGlesCompatEnabled(void) {
     if (strstr(renderer, "libMoltenVK") != NULL) return false;    // 原生 Vulkan
     if (strncmp(renderer, "opengles", 8) == 0) return true;       // 内置 GL4ES
     if (strstr(renderer, "libMobileGL") != NULL) return true;     // MobileGL 双后端
+    // MobileGlues：iOS 的 dylib 名是全小写（RENDERER_NAME_MOBILEGLUES =
+    // "libmobileglues.dylib"），上面 "libMobileGL" 是大小写敏感的 strstr，
+    // 对它不命中。26.3 实测（构建 f6adca3）：此函数因此对 MG 返回 false，
+    // ES profile 强制与主窗口复用全部未启用 —— 第二个 SDL_CreateWindow 被
+    // SDL UIKit 后端以 "Only one window allowed per display." 拒绝（SDL3.4.0
+    // SDL_uikitwindow.m：iOS 每个显示器只允许一个窗口），MC 抛
+    // "Failed to create window" 崩溃。故必须显式识别小写名字。
+    if (strstr(renderer, "mobileglues") != NULL) return true;     // MobileGlues
     if (strstr(renderer, "libmithril") != NULL) return true;      // Mithril
-    return ame_isMobileGluesEgl();                                // MobileGlues
+    return ame_isMobileGluesEgl();                                // POJAVEXEC_EGL 兜底
 }
 
 #pragma mark - 1) 强制 ES profile
