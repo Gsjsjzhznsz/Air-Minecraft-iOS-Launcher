@@ -1324,12 +1324,31 @@ void rebindZinkStrideFixForNewImage(void) {
 // shaderc 的编译入口是线程安全 API，参数与返回值均为裸指针/标量，跨线程
 // 传递无副作用；GLSL emission 与结果访问器均作用在堆对象上，线程亲和性无关。
 //
+// 26.3-pre-1 真机第三击（hs_err_pid27240，快照修复 3d0b882a 之后）：首个编译
+// 任务日志 "source=0x278 size=0" —— 暴露快照读到了错位槽。旧 typedef 把 kind
+// 写在 source 之前（与 shaderc.h ABI 的 source_text/source_size/shader_kind
+// 顺序不符）：474b71d3 时代无快照、纯按位置转发，错位在机器层自相抵消
+// （pid27118 的源指针 <4GB，流经 int kind 槽截断后侥幸自洽，遂未察觉）；
+// 3d0b882a 的快照按"形参名"取值后，两个恶果同时显形：
+//   1) source 槽实际装的是 source_size(0x278)、source_size 槽装的是
+//      shader_kind(0=vertex) → 快照 memcpy(0x278, 0 字节) = 空转；
+//   2) 真实 64 位 source 指针流经 int kind 槽被截断成 32 位
+//      （0x14007c000 → 0x4007c000，恰落入 JVM 保留未提交区），job 线程
+//      首次读源码即 SEGV_ACCERR。
+// 修复：typedef 改为与 shaderc.h 公开 ABI 严格一致
+//   (compiler, source_text, source_size, shader_kind, input_file_name,
+//    entry_point_name, additional_options)
+// 类型与位置双重对齐后，快照取的是真源码、64 位指针不再流经 32 位槽。
+// 此前 snapshot-10 未触发是因为该版本不走 RenderPearl 的 shaderc 编译路径
+// —— dlsym 拦截日志只证明符号被解析，不代表函数被调用。
+//
 // 对 26.3 之前版本无影响：只有真正 dlsym 请求这些符号的代码（LWJGL 的
 // shaderc / spvc 绑定）才会被包装。与 JavaLauncher.m 的 -Xss32M 形成双保险
 // —— 即便运行时注入的 -Xss1M 覆盖了我们的参数，本重定向仍按构造生效。
 
-typedef void *(*ame_shaderc_compile_fn)(void *compiler, int kind, const char *source,
-                                        size_t source_size, const char *input_file,
+typedef void *(*ame_shaderc_compile_fn)(void *compiler, const char *source,
+                                        size_t source_size, int kind,
+                                        const char *input_file,
                                         const char *entry_point, void *options);
 
 typedef int (*ame_spvc_parse_fn)(void *context, const unsigned *spirv, size_t word_count,
@@ -1371,9 +1390,9 @@ static void ame_log_redirect_once(const char *tag) {
 typedef struct {
     ame_shaderc_compile_fn fn;
     void      *compiler;
-    int        kind;
     const char *source;
     size_t     source_size;
+    int        kind;
     const char *input_file;
     const char *entry_point;
     void       *options;
@@ -1382,7 +1401,7 @@ typedef struct {
 
 static void *ame_shaderc_job_main(void *arg) {
     ame_shaderc_job *job = (ame_shaderc_job *)arg;
-    job->result = job->fn(job->compiler, job->kind, job->source, job->source_size,
+    job->result = job->fn(job->compiler, job->source, job->source_size, job->kind,
                           job->input_file, job->entry_point, job->options);
     return NULL;
 }
@@ -1402,7 +1421,7 @@ static char *ame_copy_cstr(const char *src, size_t limit) {
 }
 
 static void *ame_shaderc_run_on_big_stack(ame_shaderc_compile_fn real, void *compiler,
-                                          int kind, const char *source, size_t source_size,
+                                          const char *source, size_t source_size, int kind,
                                           const char *input_file, const char *entry_point,
                                           void *options) {
     ame_log_redirect_once("shaderc");
@@ -1410,8 +1429,8 @@ static void *ame_shaderc_run_on_big_stack(ame_shaderc_compile_fn real, void *com
     if (!sLoggedSnapshot) {
         sLoggedSnapshot = true;
         NSLog(@"[shaderc] snapshotting source buffers on caller thread before 32MB-stack hop "
-              @"(source=%p size=%zu): MemoryStack pages can be decommitted while the job runs",
-              source, source_size);
+              @"(source=%p size=%zu kind=%d): MemoryStack pages can be decommitted while the job runs",
+              source, source_size, kind);
     }
 
     // 1) 调用方线程上快照输入：此刻源码页刚被 nUTF8 写入，必然可读。
@@ -1421,8 +1440,8 @@ static void *ame_shaderc_run_on_big_stack(ame_shaderc_compile_fn real, void *com
 
     // malloc 失败时回退用原指针（OOM 极端场景，行为同旧版）。
     ame_shaderc_job job = {
-        real, compiler, kind,
-        (source_copy != NULL) ? source_copy : source, source_size,
+        real, compiler,
+        (source_copy != NULL) ? source_copy : source, source_size, kind,
         (input_file_copy != NULL) ? input_file_copy : input_file,
         (entry_point_copy != NULL) ? entry_point_copy : entry_point,
         options, NULL};
@@ -1436,28 +1455,31 @@ static void *ame_shaderc_run_on_big_stack(ame_shaderc_compile_fn real, void *com
 
     if (ok) return job.result;
     NSLog(@"[shaderc] pthread_create failed, falling back to caller thread");
-    return real(compiler, kind, source, source_size, input_file, entry_point, options);
+    return real(compiler, source, source_size, kind, input_file, entry_point, options);
 }
 
-static void *amethyst_shaderc_into_spv(void *compiler, int kind, const char *source,
-                                       size_t source_size, const char *input_file,
+static void *amethyst_shaderc_into_spv(void *compiler, const char *source,
+                                       size_t source_size, int kind,
+                                       const char *input_file,
                                        const char *entry_point, void *options) {
-    return ame_shaderc_run_on_big_stack(g_real_shaderc_into_spv, compiler, kind, source,
-                                        source_size, input_file, entry_point, options);
+    return ame_shaderc_run_on_big_stack(g_real_shaderc_into_spv, compiler, source,
+                                        source_size, kind, input_file, entry_point, options);
 }
 
-static void *amethyst_shaderc_into_spv_assembly(void *compiler, int kind, const char *source,
-                                                size_t source_size, const char *input_file,
+static void *amethyst_shaderc_into_spv_assembly(void *compiler, const char *source,
+                                                size_t source_size, int kind,
+                                                const char *input_file,
                                                 const char *entry_point, void *options) {
-    return ame_shaderc_run_on_big_stack(g_real_shaderc_into_spv_assembly, compiler, kind, source,
-                                        source_size, input_file, entry_point, options);
+    return ame_shaderc_run_on_big_stack(g_real_shaderc_into_spv_assembly, compiler, source,
+                                        source_size, kind, input_file, entry_point, options);
 }
 
-static void *amethyst_shaderc_into_preprocessed_text(void *compiler, int kind, const char *source,
-                                                     size_t source_size, const char *input_file,
+static void *amethyst_shaderc_into_preprocessed_text(void *compiler, const char *source,
+                                                     size_t source_size, int kind,
+                                                     const char *input_file,
                                                      const char *entry_point, void *options) {
-    return ame_shaderc_run_on_big_stack(g_real_shaderc_into_preprocessed_text, compiler, kind, source,
-                                        source_size, input_file, entry_point, options);
+    return ame_shaderc_run_on_big_stack(g_real_shaderc_into_preprocessed_text, compiler, source,
+                                        source_size, kind, input_file, entry_point, options);
 }
 
 // ---- spvc（SPIR-V → 桌面 GLSL）----
