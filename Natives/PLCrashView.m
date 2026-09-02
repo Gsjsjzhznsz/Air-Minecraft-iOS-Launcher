@@ -939,7 +939,8 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
         NSInteger tStart = MAX(0, (NSInteger)traceLines.count - 40);
         NSMutableArray *traceTail = [NSMutableArray arrayWithObject:@"----- fatal_trace.txt (tail) -----"];
         for (NSInteger i = tStart; i < (NSInteger)traceLines.count; i++) {
-            if (traceLines[i].length > 0) [traceTail addObject:traceLines[i]];
+            NSString *tl = traceLines[i];
+            if (tl.length > 0) [traceTail addObject:tl];
         }
         _logTextView.text = [_logTextView.text stringByAppendingFormat:@"\n%@", [traceTail componentsJoinedByString:@"\n"]];
     }
