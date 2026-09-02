@@ -11,6 +11,8 @@
 #include <libgen.h>
 #include <pthread.h>
 #include <stdatomic.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include "external/fishhook/fishhook.h"
@@ -1303,12 +1305,24 @@ void rebindZinkStrideFixForNewImage(void) {
 // glslang::TParseContext::lValueErrorCheck+0x204（设备日志，构建 662d6e2，
 // JVM Flags 含 iOS OpenJDK 运行时注入的 -Xss1M）。
 //
+// 26.3-pre-1 真机第二击（hs_err_pid27118）：重定向生效后，glslang 首次读源码
+// 就 SEGV_ACCERR @ 0x143ed900 —— sources[0] 指针与长度 0x278 均自洽，但该页
+// 已无读权限。反汇编 stub 字节码证实：MC 把 GLSL 源文本经 MemoryStack.nUTF8
+// 编码进 LWJGL MemoryStack 的 direct ByteBuffer（HotSpot native 内存），指针
+// 由 getPointerAddress() 计算后传给我们。该缓冲页的生命周期归 JVM/Cleaner
+// 管：我们把编译 hop 到 32MB 栈线程后原线程阻塞等待，等待窗口内 JVM 侧的
+// GC（实测 3.3s 内 24 次 young GC）/Cleaner/运行时可能回收或去提交该页，
+// job 线程随后读取 → SEGV_ACCERR。
+//
+// 修复：在调用方线程上（此刻源码页刚被 nUTF8 写入、必然可读）先把 source /
+// input_file / entry_point 快照进 malloc 副本，job 线程全程只触碰副本；spvc
+// 两个入口同理 —— 输出槽（parsed_ir / glsl 输出指针位）原本也指向 JVM 侧
+// 内存，改用本地槽承载 job 线程写入，join 后由调用方线程回写。
+//
 // MobileGlues 自己的转换管线早已为同一批着色器配备了专用 32MB 栈线程（设备
 // 日志原文 "dedicated 32MB-stack thread"），证明该库家族需要这一栈预算。
-// 这里对三个编译入口做同样重定向：每次调用在 32MB 栈的临时 pthread 上执行
-// 真实编译，pthread_join 取回结果。shaderc 的编译入口是线程安全 API，参数
-// 与返回值均为裸指针/标量，跨线程传递无副作用；GLSL emission 与结果访问器
-// 均作用在堆对象上，线程亲和性无关。
+// shaderc 的编译入口是线程安全 API，参数与返回值均为裸指针/标量，跨线程
+// 传递无副作用；GLSL emission 与结果访问器均作用在堆对象上，线程亲和性无关。
 //
 // 对 26.3 之前版本无影响：只有真正 dlsym 请求这些符号的代码（LWJGL 的
 // shaderc / spvc 绑定）才会被包装。与 JavaLauncher.m 的 -Xss32M 形成双保险
@@ -1373,15 +1387,54 @@ static void *ame_shaderc_job_main(void *arg) {
     return NULL;
 }
 
+// 调用方线程上的参数快照工具：job 线程绝不直接触碰 JVM 侧内存。
+static char *ame_copy_bytes(const void *src, size_t n) {
+    char *copy = (char *)malloc(n != 0 ? n : 1);
+    if (copy == NULL) return NULL;
+    if (n != 0) memcpy(copy, src, n);
+    return copy;
+}
+
+// C 字符串副本（strnlen 限界，防失控扫描；含 NUL 结尾）。
+static char *ame_copy_cstr(const char *src, size_t limit) {
+    if (src == NULL) return NULL;
+    return ame_copy_bytes(src, strnlen(src, limit) + 1);
+}
+
 static void *ame_shaderc_run_on_big_stack(ame_shaderc_compile_fn real, void *compiler,
                                           int kind, const char *source, size_t source_size,
                                           const char *input_file, const char *entry_point,
                                           void *options) {
     ame_log_redirect_once("shaderc");
-    ame_shaderc_job job = {real, compiler, kind, source, source_size,
-                           input_file, entry_point, options, NULL};
-    if (ame_run_on_32mb_stack(ame_shaderc_job_main, &job)) return job.result;
+    static bool sLoggedSnapshot = false;
+    if (!sLoggedSnapshot) {
+        sLoggedSnapshot = true;
+        NSLog(@"[shaderc] snapshotting source buffers on caller thread before 32MB-stack hop "
+              @"(source=%p size=%zu): MemoryStack pages can be decommitted while the job runs",
+              source, source_size);
+    }
 
+    // 1) 调用方线程上快照输入：此刻源码页刚被 nUTF8 写入，必然可读。
+    char *source_copy = (source != NULL) ? ame_copy_bytes(source, source_size) : NULL;
+    char *input_file_copy = ame_copy_cstr(input_file, 8192);
+    char *entry_point_copy = ame_copy_cstr(entry_point, 256);
+
+    // malloc 失败时回退用原指针（OOM 极端场景，行为同旧版）。
+    ame_shaderc_job job = {
+        real, compiler, kind,
+        (source_copy != NULL) ? source_copy : source, source_size,
+        (input_file_copy != NULL) ? input_file_copy : input_file,
+        (entry_point_copy != NULL) ? entry_point_copy : entry_point,
+        options, NULL};
+
+    bool ok = ame_run_on_32mb_stack(ame_shaderc_job_main, &job);
+
+    // 2) job 已 join，副本生命周期结束。
+    free(source_copy);
+    free(input_file_copy);
+    free(entry_point_copy);
+
+    if (ok) return job.result;
     NSLog(@"[shaderc] pthread_create failed, falling back to caller thread");
     return real(compiler, kind, source, source_size, input_file, entry_point, options);
 }
@@ -1446,16 +1499,35 @@ static void *ame_spvc_compile_job_main(void *arg) {
 static int amethyst_spvc_parse_spirv(void *context, const unsigned *spirv, size_t word_count,
                                      void **parsed_ir) {
     ame_log_redirect_once("spvc");
-    ame_spvc_parse_job job = {g_real_spvc_parse_spirv, context, spirv, word_count, parsed_ir, 0};
-    if (ame_run_on_32mb_stack(ame_spvc_parse_job_main, &job)) return job.rc;
-    NSLog(@"[spvc] pthread_create failed, falling back to caller thread");
-    return g_real_spvc_parse_spirv(context, spirv, word_count, parsed_ir);
+    // 同 shaderc：输入 SPIR-V 可能也在 JVM 侧可回收内存里；输出槽（parsed_ir
+    // 指向的指针位）同样如此。job 线程全程用副本/本地槽，join 后在调用方线程回写。
+    unsigned *spirv_copy = (spirv != NULL && word_count != 0)
+        ? (unsigned *)ame_copy_bytes(spirv, word_count * sizeof(unsigned)) : NULL;
+    void *ir_slot = NULL;
+
+    ame_spvc_parse_job job = {g_real_spvc_parse_spirv, context,
+                              (spirv_copy != NULL) ? spirv_copy : spirv, word_count,
+                              &ir_slot, 0};
+    bool ok = ame_run_on_32mb_stack(ame_spvc_parse_job_main, &job);
+    free(spirv_copy);
+    if (!ok) {
+        NSLog(@"[spvc] pthread_create failed, falling back to caller thread");
+        return g_real_spvc_parse_spirv(context, spirv, word_count, parsed_ir);
+    }
+    if (parsed_ir != NULL) *parsed_ir = ir_slot;
+    return job.rc;
 }
 
 static int amethyst_spvc_compiler_compile(void *compiler, const char **source) {
     ame_log_redirect_once("spvc");
-    ame_spvc_compile_job job = {g_real_spvc_compiler_compile, compiler, source, 0};
-    if (ame_run_on_32mb_stack(ame_spvc_compile_job_main, &job)) return job.rc;
+    // 同上：spvc 把发射的 GLSL 指针写进 *source（JVM 侧内存），改用本地槽承载
+    // job 线程写入，join 后回写。
+    const char *out = NULL;
+    ame_spvc_compile_job job = {g_real_spvc_compiler_compile, compiler, &out, 0};
+    if (ame_run_on_32mb_stack(ame_spvc_compile_job_main, &job)) {
+        if (source != NULL) *source = out;
+        return job.rc;
+    }
     NSLog(@"[spvc] pthread_create failed, falling back to caller thread");
     return g_real_spvc_compiler_compile(compiler, source);
 }
