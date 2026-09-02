@@ -6,6 +6,10 @@ public class NarratorDummy implements Narrator {
     }
 
     @Override
+    public void say(final String msg, final boolean interrupt, final float volume) {
+    }
+
+    @Override
     public void clear() {
     }
 
