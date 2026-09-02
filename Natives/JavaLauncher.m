@@ -1056,6 +1056,16 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     // 物理内存按实际触页计。
     PUSH_MARGV_LITERAL("-Xss32M");
 
+    // ============================================================================
+    // JVM fatal error log 定向 —— hs_err_pid*.log 落到可取位置（Task 27）
+    // ============================================================================
+    // JVM 收到 SIGSEGV/SIGILL 等致命信号时会写 hs_err 文件，默认落在进程 CWD——
+    // iOS 上 CWD 不可控（可能只读或用户找不到），这是此前设备上"没有 hs_err
+    // 报告"的原因之一。显式定向到 POJAV_HOME（启动器主目录），%p 由 JVM
+    // 展开为 pid。与 main_hook.m 的 fatal_trace.txt（abort/exit 直写取证）
+    // 互补：SIGSEGV 类死亡走 hs_err，exit/abort 类死亡走 fatal_trace。
+    PUSH_MARGV_FORMAT(@"-XX:ErrorFile=%@/hs_err_pid%%p.log", @(getenv("POJAV_HOME")));
+
     setenv("INTERNAL_JLI_PATH", (isJava8 ? libjlipath8 : libjlipath11).UTF8String, 1);
     void* libjli = dlopen(getenv("INTERNAL_JLI_PATH"), RTLD_GLOBAL);
 

@@ -337,6 +337,11 @@ dep_mg:
 		echo 'glslang-lvalue-nullguard.patch already applied or submodule absent - continuing'; \
 	fi
 	mkdir -p $(WORKINGDIR)/mobileglues
+	# Task 27: 显式设 CMAKE_BUILD_TYPE=RelWithDebInfo。此前未设置（--config 对
+	# 单配置生成器无效），CMake 不追加 -O2/-DNDEBUG：整库 -O0 且 glslang/
+	# SPIRV-Cross/MG 的 assert() 全部激活——assert 触发即 __assert_rtn->abort()，
+	# 被 hooked_abort 拦截后表现为直接进启动器错误界面且无 .ips/hs_err。
+	# RelWithDebInfo = -O2 -g -DNDEBUG，对齐上游 Release 语义。
 	cd $(WORKINGDIR)/mobileglues && cmake \
 		-DMACOS="1" \
 		-DCMAKE_CROSSCOMPILING=true \
@@ -346,6 +351,7 @@ dep_mg:
 		-DCMAKE_OSX_ARCHITECTURES=arm64 \
 		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
 		-DCMAKE_C_FLAGS="-arch arm64" \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/
 
 	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues

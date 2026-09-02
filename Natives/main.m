@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
+#include <errno.h>
 #include "utils.h"
 #include "codesign.h"
 
@@ -37,6 +38,11 @@ void printEntitlementAvailability(NSString *key) {
 void uncaughtExceptionHandler(NSException *exception) {
     NSLog(@"Uncaught exception: %@", exception.description);
     NSLog(@"Call stack: %@", exception.callStackSymbols);
+    // Task 27：ObjC 未捕获异常也直写 fatal_trace（同 abort/exit 取证通道），
+    // 避免 latestlog 管道丢尾导致现场丢失
+    NSString *reasonStr = [NSString stringWithFormat:@"NSException: %@ — %@",
+        exception.name, exception.reason ?: @"(no reason)"];
+    ame_write_fatal_trace(reasonStr.UTF8String);
     usleep(10000);
     handle_fatal_exit(SIGABRT);
 }
@@ -173,19 +179,43 @@ void init_redirectStdio() {
         static BOOL filteredSessionID;
         ssize_t rsize;
         char buf[2048];
-        while((rsize = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
+        // Task 27 加固：
+        // ① read() EINTR 重试 —— 信号中断曾可能让读取线程意外退出，
+        //    此后全部日志丢失（latestlog 冻结在退出点）。
+        // ② 每次迭代包 @try —— 单次异常不再杀死整个读取循环。
+        // ③ Session ID 审查改为定界 splice（见内注释），不再丢 chunk 尾数据。
+        while (YES) {
+            do {
+                rsize = read(pfd[0], buf, sizeof(buf)-1);
+            } while (rsize < 0 && errno == EINTR);
+            if (rsize <= 0) break;
+            @try {
             if (rsize < 2048) {
                 buf[rsize] = '\0';
             }
             // Filter out Session ID here
-            int index;
+            // Task 27 修复：旧实现 strcpy(censor) 后 rsize=strlen(buf)，
+            // ① chunk 内审查点之后的既有数据全部丢掉（写文件长度被截短）；
+            // ② 匹配落在 chunk 末尾时会越界写入陈旧缓冲区。
+            // 改为定界 splice：仅当结束符 ')' 在本 chunk 内才替换，尾部数据
+            // 整体前移，rsize 只缩短实际长度差；ID 跨 chunk 则留待下一块。
             if (!filteredSessionID) {
+                static const char kCensor[] = "(Session ID is <censored>)";
                 char *sessionStr = strstr(buf, "(Session ID is ");
                 if (sessionStr) {
-                    char *censorStr = "(Session ID is <censored>)\n\0";
-                    strcpy(sessionStr, censorStr);
-                    rsize = strlen(buf);
-                    filteredSessionID = true;
+                    ptrdiff_t off = sessionStr - buf;
+                    const char *closeParen = memchr(sessionStr, ')', (size_t)(rsize - off));
+                    if (closeParen) {
+                        size_t idLen = (size_t)(closeParen - sessionStr) + 1;
+                        size_t censorLen = sizeof(kCensor) - 1;
+                        size_t tailLen = (size_t)rsize - (size_t)off - idLen;
+                        if (censorLen != idLen) {
+                            memmove(sessionStr + censorLen, closeParen + 1, tailLen);
+                        }
+                        memcpy(sessionStr, kCensor, censorLen);
+                        rsize = (ssize_t)((size_t)off + censorLen + tailLen);
+                        filteredSessionID = true;
+                    }
                 }
             }
             if (canAppendToLog) {
@@ -214,6 +244,10 @@ void init_redirectStdio() {
             }
             [file writeData:[NSData dataWithBytes:buf length:rsize]];
             [file synchronizeFile];
+            } @catch (NSException *e) {
+                // 读取线程绝不能因单次异常死亡：死亡 = 后续日志全部丢失（Task 26 教训）
+                NSLog(@"[Pre-init] latestlog reader exception: %@", e);
+            }
         }
         [file closeFile];
     });

@@ -6,8 +6,13 @@
 #import "mach_excServer.h"
 
 #include <dlfcn.h>
+#include <execinfo.h>
+#include <fcntl.h>
 #include <libgen.h>
 #include <pthread.h>
+#include <stdatomic.h>
+#include <time.h>
+#include <unistd.h>
 #include "external/fishhook/fishhook.h"
 
 // 硬件断点异常端口（同步自上游，用于非 TXM 的 iOS 26+ 设备 dlopen 重定向）
@@ -143,6 +148,79 @@ void *amethyst_orig_dlsym(void *handle, const char *name) {
 // 但 hooked_dlopen 在文件前部就需要引用它来检测 libOSMesa 加载）
 static BOOL g_zinkStrideFixActive = NO;
 
+// MARK: - fatal 通道取证（Task 27，26.3-pre-1 第四关）
+//
+// 背景：游戏死亡时 PLCrashView 弹出（= hooked_exit/hooked_abort 被某个非主线程
+// 触发），但设备上既无 .ips 也无 hs_err：
+//   - hooked_abort/hooked_exit 会 park 调用线程，orig_abort/orig_exit 永不执行，
+//     所以 iOS 崩溃报告器永远收不到真实信号 -> .ips 必然不会生成（这是拦截
+//     机制的固有属性，不是系统没记录）；
+//   - 若死亡源自 JVM 的 SIGSEGV fatal handler，hs_err 文本只写进 stdout/stderr
+//     管道，而 latestlog 尾部在多行突发 + 死亡竞争中会丢（Task 26：截断+NUL 空洞）。
+// 因此取证改为绕过管道：O_APPEND 直写 $POJAV_HOME/fatal_trace.txt（malloc-free，
+// 防 heap 损坏场景下的递归 abort），再 NSLog 到系统日志兜底（Console 可回捞）。
+// 下一轮测试的 fatal_trace.txt 就是“谁调用了 abort/exit”的定位铁证。
+void ame_write_fatal_trace(const char *reason) {
+    // 防重入：若 abort 源于 heap 损坏，本函数内的任何分配都可能再次 abort。
+    // 全程不用 malloc（静态缓冲 + snprintf），并用 CAS 拒绝并发/递归进入。
+    static atomic_int busy;
+    int expected = 0;
+    if (!atomic_compare_exchange_strong(&busy, &expected, 1)) {
+        return;
+    }
+
+    static char report[16384];
+    size_t len = 0;
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    struct tm tmv;
+    localtime_r(&ts.tv_sec, &tmv);
+    len += (size_t)snprintf(report + len, sizeof(report) - len,
+        "\n===== [Amethyst fatal trace] %04d-%02d-%02d %02d:%02d:%02d.%03d =====\n",
+        tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday,
+        tmv.tm_hour, tmv.tm_min, tmv.tm_sec, (int)(ts.tv_nsec / 1000000));
+
+    char tname[64] = {0};
+    pthread_getname_np(pthread_self(), tname, sizeof(tname));
+    len += (size_t)snprintf(report + len, sizeof(report) - len,
+        "reason: %s\nthread: %s\n",
+        reason ? reason : "(null)", tname[0] ? tname : "(unnamed)");
+
+    void *frames[64];
+    int n = backtrace(frames, 64);
+    for (int i = 0; i < n && len < sizeof(report) - 256; i++) {
+        Dl_info info;
+        memset(&info, 0, sizeof(info));
+        if (dladdr(frames[i], &info) && info.dli_fname) {
+            len += (size_t)snprintf(report + len, sizeof(report) - len,
+                "  #%02d %p  %s  %s + %llu\n", i, frames[i],
+                info.dli_fname,
+                info.dli_sname ? info.dli_sname : "?",
+                (unsigned long long)((uintptr_t)frames[i] - (uintptr_t)info.dli_fbase));
+        } else {
+            len += (size_t)snprintf(report + len, sizeof(report) - len,
+                "  #%02d %p\n", i, frames[i]);
+        }
+    }
+
+    // 先落盘（不经管道/stdio，O_APPEND 单次 write），后 NSLog（系统日志兑底）
+    const char *home = getenv("POJAV_HOME");
+    if (home) {
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/fatal_trace.txt", home);
+        int fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd >= 0) {
+            ssize_t wr = write(fd, report, len);
+            (void)wr;
+            close(fd);
+        }
+    }
+    if (len < sizeof(report)) report[len] = '\0';
+    NSLog(@"%s", report);
+
+    atomic_store(&busy, 0);
+}
+
 void handle_fatal_exit(int code) {
     if (NSThread.isMainThread) {
         return;
@@ -164,22 +242,35 @@ void handle_fatal_exit(int code) {
 
 void hooked_abort() {
     NSLog(@"abort() called");
+    ame_write_fatal_trace("abort() called");
     handle_fatal_exit(SIGABRT);
     orig_abort();
 }
 
 void hooked___assert_rtn(const char* func, const char* file, int line, const char* failedexpr)
 {
+    // 断言消息也直写 fatal_trace：stderr 管道尾部在死亡竞争中不可靠（Task 26）
+    char assertMsg[1024];
     if (func == NULL) {
         fprintf(stderr, "Assertion failed: (%s), file %s, line %d.\n", failedexpr, file, line);
+        snprintf(assertMsg, sizeof(assertMsg), "assertion failed: (%s), file %s, line %d",
+                 failedexpr ? failedexpr : "?", file ? file : "?", line);
     } else {
         fprintf(stderr, "Assertion failed: (%s), function %s, file %s, line %d.\n", failedexpr, func, file, line);
+        snprintf(assertMsg, sizeof(assertMsg), "assertion failed: (%s), function %s, file %s, line %d",
+                 failedexpr ? failedexpr : "?", func ? func : "?", file ? file : "?", line);
     }
+    ame_write_fatal_trace(assertMsg);
     hooked_abort();
 }
 
 void hooked_exit(int code) {
     NSLog(@"exit(%d) called", code);
+    if (code != 0) {
+        char exitMsg[64];
+        snprintf(exitMsg, sizeof(exitMsg), "exit(%d) called", code);
+        ame_write_fatal_trace(exitMsg);
+    }
     if (code == 0) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [UIApplication.sharedApplication performSelector:@selector(suspend)];

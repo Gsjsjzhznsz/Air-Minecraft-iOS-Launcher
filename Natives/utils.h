@@ -159,6 +159,9 @@ BOOL PLPatchMachOPlatformForFile(const char *path);
 UIViewController* currentVC();
 void openLink(UIViewController* sender, NSURL* link);
 void handle_fatal_exit(int code);
+// Task 27：fatal 通道取证 —— 把 abort/exit/断言的调用线程名+符号化回溯
+// O_APPEND 直写 $POJAV_HOME/fatal_trace.txt（绕过 latestlog 管道，防丢尾）
+void ame_write_fatal_trace(const char *reason);
 
 NSString* localize(NSString* key, NSString* comment);
 NSMutableDictionary* parseJSONFromFile(NSString *path);

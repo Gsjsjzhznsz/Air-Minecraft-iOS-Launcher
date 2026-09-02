@@ -929,6 +929,21 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     }
 
     _logTextView.text = [lastLines componentsJoinedByString:@"\n"];
+
+    // Task 27：日志尾部可能在死亡竞争中丢失（Task 26 教训），把 fatal_trace.txt
+    // 尾部追加显示（若存在）——这是错误界面上唯一直接可见的死亡现场
+    NSString *tracePath = [NSString stringWithFormat:@"%s/fatal_trace.txt", getenv("POJAV_HOME")];
+    NSString *trace = [NSString stringWithContentsOfFile:tracePath encoding:NSUTF8StringEncoding error:nil];
+    if (trace.length > 0) {
+        NSArray *traceLines = [trace componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]];
+        NSInteger tStart = MAX(0, (NSInteger)traceLines.count - 40);
+        NSMutableArray *traceTail = [NSMutableArray arrayWithObject:@"----- fatal_trace.txt (tail) -----"];
+        for (NSInteger i = tStart; i < (NSInteger)traceLines.count; i++) {
+            if (traceLines[i].length > 0) [traceTail addObject:traceLines[i]];
+        }
+        _logTextView.text = [_logTextView.text stringByAppendingFormat:@"\n%@", [traceTail componentsJoinedByString:@"\n"]];
+    }
+
     _logPlaceholderLabel.hidden = _logTextView.text.length > 0;
 
     // 滚动到底部
@@ -940,14 +955,55 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
 #pragma mark - Crash Analysis
 
 /// 读取 latestlog.txt 的内容（用于崩溃原因分析）
+/// Task 27：追加 fatal_trace.txt 与 hs_err（若有）——这两者是“无报告死亡”
+/// 场景下唯一的现场证据，且不经过 latestlog 管道，不存在丢尾问题
 - (NSString *)readLatestLogForAnalysis {
     static NSString *cachedLog = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSString *latestlogPath = [NSString stringWithFormat:@"%s/latestlog.txt", getenv("POJAV_HOME")];
         cachedLog = [NSString stringWithContentsOfFile:latestlogPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        NSString *extra = [PLCrashView fatalEvidenceText];
+        if (extra.length > 0) {
+            cachedLog = [cachedLog stringByAppendingFormat:@"\n%@", extra];
+        }
     });
     return cachedLog;
+}
+
+/// 汇总 fatal 证据文本：fatal_trace.txt 全部 + 最新 hs_err_pid*.log 头部 4KB
++ (NSString *)fatalEvidenceText {
+    NSMutableString *out = [NSMutableString string];
+    NSString *home = @(getenv("POJAV_HOME") ?: "");
+    if (home.length == 0) return out;
+
+    NSString *tracePath = [home stringByAppendingPathComponent:@"fatal_trace.txt"];
+    NSString *trace = [NSString stringWithContentsOfFile:tracePath encoding:NSUTF8StringEncoding error:nil];
+    if (trace.length > 0) {
+        [out appendFormat:@"\n----- fatal_trace.txt -----\n%@", trace];
+    }
+
+    // 最新 hs_err_pid*.log（JVM fatal log，-XX:ErrorFile 已定向到 POJAV_HOME）
+    NSError *dirErr = nil;
+    NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:home error:&dirErr];
+    NSString *best = nil; NSDate *bestDate = nil;
+    for (NSString *f in files) {
+        if (![f hasPrefix:@"hs_err_pid"] || ![f hasSuffix:@".log"]) continue;
+        NSString *p = [home stringByAppendingPathComponent:f];
+        NSDate *d = [[NSFileManager defaultManager] attributesOfItemAtPath:p error:nil][NSFileModificationDate];
+        if (!bestDate || [d compare:bestDate] == NSOrderedDescending) { best = p; bestDate = d; }
+    }
+    if (best) {
+        NSData *data = [NSData dataWithContentsOfFile:best];
+        if (data.length > 0) {
+            NSUInteger cap = MIN(data.length, (unsigned long)4096);
+            NSString *head = [[NSString alloc] initWithData:[data subdataWithRange:NSMakeRange(0, cap)] encoding:NSUTF8StringEncoding];
+            if (head.length > 0) {
+                [out appendFormat:@"\n----- %@ (head) -----\n%@", best.lastPathComponent, head];
+            }
+        }
+    }
+    return out;
 }
 
 /// 判断是否为 OOM（内存不足）崩溃
@@ -1038,7 +1094,29 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
 
 - (void)shareLog {
     NSString *latestlogPath = [NSString stringWithFormat:@"file://%s/latestlog.txt", getenv("POJAV_HOME")];
-    UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:@[@"latestlog.txt", [NSURL URLWithString:latestlogPath]] applicationActivities:nil];
+    NSMutableArray *items = [NSMutableArray arrayWithArray:@[@"latestlog.txt", [NSURL URLWithString:latestlogPath]]];
+
+    // Task 27：一并分享 fatal 证据文件（fatal_trace.txt / 最新 hs_err），
+    // 让“无报告死亡”场景的现场数据随一次分享全部带出
+    NSString *home = @(getenv("POJAV_HOME") ?: "");
+    if (home.length > 0) {
+        NSString *tracePath = [home stringByAppendingPathComponent:@"fatal_trace.txt"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:tracePath]) {
+            [items addObject:[NSURL fileURLWithPath:tracePath]];
+        }
+        NSError *dirErr = nil;
+        NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:home error:&dirErr];
+        NSString *best = nil; NSDate *bestDate = nil;
+        for (NSString *f in files) {
+            if (![f hasPrefix:@"hs_err_pid"] || ![f hasSuffix:@".log"]) continue;
+            NSString *p = [home stringByAppendingPathComponent:f];
+            NSDate *d = [[NSFileManager defaultManager] attributesOfItemAtPath:p error:nil][NSFileModificationDate];
+            if (!bestDate || [d compare:bestDate] == NSOrderedDescending) { best = p; bestDate = d; }
+        }
+        if (best) [items addObject:[NSURL fileURLWithPath:best]];
+    }
+
+    UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:items applicationActivities:nil];
 
     activityVC.popoverPresentationController.sourceView = self.view;
     activityVC.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
