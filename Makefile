@@ -380,7 +380,37 @@ assets:
 	fi
 	echo '[Amethyst v$(VERSION)] assets - end'
 
-payload: native dep_mg java jre assets
+# shaderc / spirv-cross serializing shims (hs_err_pid27329: concurrent compiles
+# from multiple contexts trampled glslang AST node memory). Real libs were
+# renamed *_impl.dylib (git mv). This target:
+#   1) copies the impls into WORKINGDIR and fixes their LC_ID with
+#      install_name_tool (re-export must point at the impl name, not back at
+#      the shim, or loading recurses forever);
+#   2) builds same-name shims with -reexport_library (pass through ALL impl
+#      symbols); the 3 shaderc compile entries and 2 heavy spvc entries are
+#      defined by the shims with a process-global recursive mutex, so every
+#      resolution path (hooked dlsym / RTLD_DEFAULT / any direct dlsym) lands
+#      on the locking forwarders. Deadlock avoidance details in
+#      Natives/shaderc_shim.c header comment.
+dep_shader_shims:
+	echo '[Amethyst v$(VERSION)] dep_shader_shims - start'
+	cp $(SOURCEDIR)/Natives/resources/Frameworks/libshaderc_impl.dylib $(WORKINGDIR)/ || exit 1
+	install_name_tool -id @rpath/libshaderc_impl.dylib $(WORKINGDIR)/libshaderc_impl.dylib || exit 1
+	cp $(SOURCEDIR)/Natives/resources/Frameworks/libspirv-cross-c-shared.0.impl.dylib $(WORKINGDIR)/ || exit 1
+	install_name_tool -id @rpath/libspirv-cross-c-shared.0.impl.dylib $(WORKINGDIR)/libspirv-cross-c-shared.0.impl.dylib || exit 1
+	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
+		-install_name @rpath/libshaderc.dylib \
+		-reexport_library $(WORKINGDIR)/libshaderc_impl.dylib \
+		-o $(WORKINGDIR)/libshaderc.dylib \
+		$(SOURCEDIR)/Natives/shaderc_shim.c || exit 1
+	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
+		-install_name @rpath/libspirv-cross-c-shared.0.dylib \
+		-reexport_library $(WORKINGDIR)/libspirv-cross-c-shared.0.impl.dylib \
+		-o $(WORKINGDIR)/libspirv-cross-c-shared.0.dylib \
+		$(SOURCEDIR)/Natives/spvc_shim.c || exit 1
+	echo '[Amethyst v$(VERSION)] dep_shader_shims - end'
+
+payload: native dep_mg java jre assets dep_shader_shims
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)
