@@ -261,7 +261,23 @@
 // has no caller-image ambiguity, so this layer's exports win for every name
 // it implements, independent of image order and of who is calling. One-time
 // W_FORCE line reports the resolved own-image path for device-log verification.
-#define REVISION 16
+// REVISION 17: Amethyst Task 32 -- two ESSL-output bugs that surfaced once the
+// Task 30/31 lifecycle locks stopped the SIGSEGV (build a09e020 ran all 390
+// shaderc compiles with zero native crashes, revealing what the crash used to
+// hide). (1) process_uniform_declarations() matched the "uniform" keyword as
+// a raw substring, so RenderPearl's _uniform_instance_00_XX block-instance
+// identifiers triggered a bogus has_initializer rewrite that destroyed the
+// enclosing statement -- every core pipeline fragment failed in ANGLE with
+// "'_uniform' : undeclared identifier" + "'_instance_00_XX' : syntax error".
+// Now token-guarded on both sides. (2) Minecraft 26.x OIT shaders index
+// fragment-output arrays (coeff[attachmentIndex][i]) with loop variables,
+// which ESSL 300 rejects outright; the converter now routes those accesses
+// through a scratch array and copies out with constant indices at the end of
+// main(). This bump also force-invalidates the on-disk conversion cache:
+// entries written by <= 2.0.16 embed the corrupted ESSL and would keep being
+// re-served for identical sources. "MobileGlues 2.0.17" in the runtime
+// Graphics Drivers line identifies the fixed build on device.
+#define REVISION 17
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

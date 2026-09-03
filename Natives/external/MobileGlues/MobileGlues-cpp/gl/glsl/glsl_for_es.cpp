@@ -20,6 +20,13 @@
 #include <strstream>
 #include <algorithm>
 #include <sstream>
+// Amethyst Task 32: explicit headers for fix_dynamic_output_indexing() and the
+// token-guarded process_uniform_declarations() (snprintf/atoi/isalnum/vector);
+// these used to arrive transitively via the toolchain headers above.
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <vector>
 #include "cache.h"
 #include "../../version.h"
 
@@ -262,7 +269,27 @@ std::string process_uniform_declarations(const std::string& glslCode) {
     result.reserve(glslCode.length());
 
     while (scan_pos < length) {
-        if (glslCode.compare(scan_pos, 7, "uniform") == 0) {
+        // Amethyst Task 32 (2026-09, latestlog of build a09e020): "uniform" must
+        // match as a standalone token. Minecraft 26.3's RenderPearl pipeline
+        // feeds this layer GLSL whose uniform-block instance variables are named
+        // _uniform_instance_00_XX; the raw substring match below fired at the
+        // "u" inside that identifier, mis-parsed the rest of the statement as a
+        // uniform declaration, and -- because the following member access
+        // contained a '=' (e.g. "if (_uniform_instance_00_00.UseRgss == 1)") --
+        // took the has_initializer rewrite path, which replaced the whole
+        // statement with "uniform _instance_00_00 ;" and skipped ahead to the
+        // next ';'. Every core pipeline's fragment shader then died in ANGLE
+        // with "'_uniform' : undeclared identifier" /
+        // "'_instance_00_XX' : syntax error". Guard both sides of the token.
+        const bool prev_is_token_char =
+            scan_pos > 0 && (std::isalnum(static_cast<unsigned char>(glslCode[scan_pos - 1])) ||
+                             glslCode[scan_pos - 1] == '_');
+        const bool next_is_token_char =
+            scan_pos + 7 < length &&
+            (std::isalnum(static_cast<unsigned char>(glslCode[scan_pos + 7])) ||
+             glslCode[scan_pos + 7] == '_');
+        if (!prev_is_token_char && !next_is_token_char &&
+            glslCode.compare(scan_pos, 7, "uniform") == 0) {
             if (scan_pos > chunk_start) {
                 result.append(glslCode, chunk_start, scan_pos - chunk_start);
             }
@@ -357,6 +384,97 @@ std::string processOutColorLocations(const std::string& glslCode) {
     const static std::regex pattern(R"(\n(out highp vec4 outColor)(\d+);)");
     const std::string replacement = "\nlayout(location=$2) $1$2;";
     return std::regex_replace(glslCode, pattern, replacement);
+}
+
+// Amethyst Task 32 (2026-09): ESSL 300 only allows CONSTANT integral
+// expressions when indexing fragment-output arrays ("array indexes for
+// fragment outputs must be constant integral expressions" -- the ANGLE
+// rejection that killed every minecraft:oit_transmittance_* pipeline).
+// Minecraft 26.x's OIT passes write
+//     layout(location = 0) out vec4 coeff[ATTACHMENTS];
+//     ... coeff[attachmentIndex][i] = ...   // loop variables -- dynamic
+// which desktop GLSL accepts and this converter used to pass through
+// verbatim. Rewrite every access through a global scratch array (dynamic
+// indexing of a plain global is legal ES 3.00) and copy out with constant
+// indices at the end of main(). Reads of the output array are redirected the
+// same way; outputs are write-only by convention so a read-before-write only
+// ever observes the zero-initialized scratch, never a previous frame.
+//
+// Runs AFTER removeLayoutBinding (declarations have no binding qualifier
+// left) and AFTER forceSupporterOutput (global precision is in place).
+std::string fix_dynamic_output_indexing(const std::string& essl) {
+    static std::regex out_arr(
+        R"((layout\s*\(\s*location\s*=\s*\d+\s*\)\s*)?out\s+(?:(highp|mediump|lowp)\s+)?(\w+)\s+(\w+)\s*\[\s*(\d+)\s*\]\s*;)");
+    struct ArrInfo {
+        std::string name, prec, type;
+        int n;
+    };
+    std::vector<ArrInfo> arrs;
+    std::vector<std::string> decls;  // protected declaration + scratch decl
+    std::string cur = essl;
+
+    // (a) Collect output-array declarations, replace each with a plain marker
+    // so the access rewrite in (b) cannot touch the declaration itself.
+    for (int idx = 0;; ++idx) {
+        std::smatch m;
+        if (!std::regex_search(cur, m, out_arr)) break;
+        ArrInfo a;
+        a.prec = m[2].str();
+        a.type = m[3].str();
+        a.name = m[4].str();
+        a.n = atoi(m[5].str().c_str());
+        if (a.n <= 0 || a.n > 64) break;  // defensive: absurd size, bail out
+        arrs.push_back(a);
+        char marker[48];
+        snprintf(marker, sizeof marker, "@@MGOUTARR%d@@", idx);
+        decls.push_back(m[0].str() + "\n" + (a.prec.empty() ? "" : a.prec + " ") + a.type + " " +
+                        a.name + "_mgio[" + std::to_string(a.n) + "];");
+        cur.replace(m.position(), m.length(), marker);
+    }
+    if (arrs.empty()) return essl;
+
+    // (b) Rewrite every  <name>[  access to the scratch array (word boundary).
+    for (const auto& a : arrs) {
+        cur = std::regex_replace(cur, std::regex("\\b" + a.name + "\\["), a.name + "_mgio[");
+    }
+
+    // (c) Restore declarations, each followed by its scratch declaration.
+    // Plain string replacement -- the marker must never be treated as a regex.
+    for (size_t i = 0; i < decls.size(); ++i) {
+        char marker[48];
+        snprintf(marker, sizeof marker, "@@MGOUTARR%d@@", (int)i);
+        const std::string mk(marker);
+        size_t p = cur.find(mk);
+        while (p != std::string::npos) {
+            cur.replace(p, mk.length(), decls[i]);
+            p = cur.find(mk, p);
+        }
+    }
+
+    // (d) Insert constant-index copies just before main()'s closing brace.
+    static std::regex main_re(R"(void\s+main\s*\(\s*\)\s*\{)");
+    std::smatch mm;
+    if (std::regex_search(cur, mm, main_re)) {
+        const size_t body_start = mm.position() + mm.length();
+        int depth = 1;
+        size_t i = body_start;
+        for (; i < cur.length() && depth > 0; ++i) {
+            if (cur[i] == '{') depth++;
+            else if (cur[i] == '}') depth--;
+        }
+        if (depth == 0 && i > 0) {
+            const size_t close = i - 1;
+            std::string copies = "\n    // mg: constant-index fragment-output copies (ESSL 300)\n";
+            for (const auto& a : arrs) {
+                for (int k = 0; k < a.n; ++k) {
+                    copies += "    " + a.name + "[" + std::to_string(k) + "] = " + a.name +
+                              "_mgio[" + std::to_string(k) + "];\n";
+                }
+            }
+            cur.insert(close, copies);
+        }
+    }
+    return cur;
 }
 
 std::string GLSLtoGLSLES(const char* glsl_code, GLenum glsl_type, uint essl_version, uint glsl_version,
@@ -1317,6 +1435,10 @@ static void GLSLtoGLSLES_2_impl(const char* glsl_code, GLenum glsl_type, uint es
     }
     essl = processOutColorLocations(essl);
     essl = forceSupporterOutput(essl);
+    // Amethyst Task 32: OIT fragment-output arrays are written with loop
+    // variables, which ESSL 300 rejects. No-op when the shader has no
+    // output arrays (all non-OIT shaders).
+    essl = fix_dynamic_output_indexing(essl);
 
     t_conv_stage = "done";
     LOG_D("Originally GLSL to GLSL ES Complete: \n%s", essl.c_str())
