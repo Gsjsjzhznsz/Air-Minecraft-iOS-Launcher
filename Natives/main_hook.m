@@ -1342,6 +1342,25 @@ void rebindZinkStrideFixForNewImage(void) {
 // 此前 snapshot-10 未触发是因为该版本不走 RenderPearl 的 shaderc 编译路径
 // —— dlsym 拦截日志只证明符号被解析，不代表函数被调用。
 //
+// 26.3-pre-1 真机第五击（hs_err_pid27946，构建 744642f2，Task 30 判读）：
+// shaderc 首批 8 次编译 + MG 转换全部成功、首帧已渲染；第 9 次编译（LWJGL
+// Java 直调路径，经本 wrapper → shaderc-shim → impl）在
+// glslang::TParseContext::lValueErrorCheck+0x204 崩。反汇编（impl dylib 本地
+// 复核）：EOpVectorSwizzle 分支的 swizzle 重复分量检查循环里
+// `(*p)->getAsTyped()->getAsConstantUnion()->getConstArray()[0]` 链条，
+// TIntermConstantUnion 对象偏移 +0xd8 的 constArray 指针字段装着 8 字节 ASCII
+// （si_addr=0x66617263656e6900 ≈ "\0inceraf"）——池内存被释放后又被字符串
+// 分配复用的特征，非栈溢出（32MB 栈 free=32705k）。
+// 修复职责分层：本文件维持快照 + 32MB hop + 逐编译取证日志；
+// shaderc/spvc **生命周期入口**（compiler/options 的 initialize/release/
+// clone/add_macro_definition、spvc context destroy 族）由 shaderc_shim.c /
+// spvc_shim.c 纳入编译同一把锁——release-vs-compile 竞态（MC 资源重载 = 旧
+// RenderPearl 管线释放 + 新管线并发编译）是当前主嫌疑，MobileGlues 侧另加
+// 转换进程级互斥（见 MobileGlues-cpp/gl/glsl/glsl_for_es.cpp）。
+// options 结构体为 impl 私有不透明类型无法深拷贝；其内嵌宏名/宏值在
+// add_macro_definition 时已由 impl 拷贝为自有内存，危险面是 options 结构
+// 本体被并发 release——已由 shim 锁关闭。
+//
 // 对 26.3 之前版本无影响：只有真正 dlsym 请求这些符号的代码（LWJGL 的
 // shaderc / spvc 绑定）才会被包装。与 JavaLauncher.m 的 -Xss32M 形成双保险
 // —— 即便运行时注入的 -Xss1M 覆盖了我们的参数，本重定向仍按构造生效。
@@ -1425,13 +1444,29 @@ static void *ame_shaderc_run_on_big_stack(ame_shaderc_compile_fn real, void *com
                                           const char *input_file, const char *entry_point,
                                           void *options) {
     ame_log_redirect_once("shaderc");
-    static bool sLoggedSnapshot = false;
-    if (!sLoggedSnapshot) {
-        sLoggedSnapshot = true;
-        NSLog(@"[shaderc] snapshotting source buffers on caller thread before 32MB-stack hop "
-              @"(source=%p size=%zu kind=%d): MemoryStack pages can be decommitted while the job runs",
-              source, source_size, kind);
+    // Task 30 取证日志（hs_err_pid27946）：逐编译打印全参数（长度/文件名/入口名/
+    // options 指针 + source 头 16 字节安全转写）。下轮崩溃日志可据此直接指认：
+    // 崩溃的是第几次编译、参数是否来自已释放内存（对照 [shaderc-shim] 的
+    // options_release / compiler_release 行与 BLOCKED 行）。
+    static int sCompileSeq = 0;
+    int seq = __sync_fetch_and_add(&sCompileSeq, 1);
+    char head[17];
+    head[0] = '\0';
+    if (source != NULL && source_size > 0) {
+        size_t n = (source_size < 16) ? source_size : 16;
+        for (size_t i = 0; i < n; ++i) {
+            unsigned char c = (unsigned char)source[i];
+            head[i] = (c >= 0x20 && c < 0x7f) ? (char)c : '.';
+        }
+        head[n] = '\0';
     }
+    // 截断 C 字符串副本（防止超长文件名刷爆 latestlog 管道窗口）。
+    char inBuf[49], epBuf[33];
+    snprintf(inBuf, sizeof(inBuf), "%s", input_file ? input_file : "(null)");
+    snprintf(epBuf, sizeof(epBuf), "%s", entry_point ? entry_point : "(null)");
+    NSLog(@"[shaderc] compile#%d snapshot: len=%zu kind=%d in='%s' entry='%s' opt=%p "
+          @"head16='%s' (source snapshot + 32MB-stack hop)",
+          seq, source_size, kind, inBuf, epBuf, options, head);
 
     // 1) 调用方线程上快照输入：此刻源码页刚被 nUTF8 写入，必然可读。
     char *source_copy = (source != NULL) ? ame_copy_bytes(source, source_size) : NULL;

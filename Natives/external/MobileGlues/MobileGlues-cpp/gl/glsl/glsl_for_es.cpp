@@ -1223,6 +1223,22 @@ static void GLSLtoGLSLES_2_entry(void* p) {
 
 std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_version, int& return_code) {
 #if defined(__APPLE__)
+    // Process-wide serialization of the whole GLSL->ESSL conversion (Amethyst
+    // Task 30, 2026-09, hs_err_pid27946). glslang's parse/link/codegen share
+    // process-global state (built-in symbol table, pools); Minecraft 26.x
+    // issues glShaderSource from multiple Java threads (RenderThread +
+    // Worker-Main during resource reload), so two conversions could parse
+    // concurrently and corrupt each other's AST -- the on-device
+    // "l-value of swizzle / selector read garbage" family that has killed
+    // this process since MobileGlues 2.0.1 (x86_64 + ASan clean, arm64
+    // device only). The lock lives on the CALLING thread around the hop:
+    // the dedicated conversion thread always runs to completion (siglongjmp
+    // lands inside the entry function, which then returns), so the join
+    // returns and the lock releases even after a recovered SIGSEGV.
+    // Recursive so any future re-entrant conversion path degrades to
+    // sequential instead of deadlocking.
+    static std::recursive_mutex g_conv_serial;
+    std::lock_guard<std::recursive_mutex> conv_guard(g_conv_serial);
     std::string out;
     int rc = 0;
     GLSLtoGLSLES_2_Args args{glsl_code, glsl_type, essl_version, &rc, &out};
