@@ -891,11 +891,11 @@ static bool ame_embedSDLViewIntoHost(void) {
         }
         UIView *sdlView = sdlWindow.rootViewController.view;
         if (sdlView == nil) {
-            NSLog(@"[AmethystEmbed] SDL window %p has no view (embed skipped)", (void *)sdlWindow);
+            NSLog(@"[AmethystEmbed] SDL window %p has no view (embed skipped)", (__bridge void *)sdlWindow);
             return false;
         }
         NSLog(@"[AmethystEmbed] SDL window=%p view=%p class=%@ frame=%@",
-              (void *)sdlWindow, (void *)sdlView, NSStringFromClass(sdlView.class),
+              (__bridge void *)sdlWindow, (__bridge void *)sdlView, NSStringFromClass(sdlView.class),
               NSStringFromCGRect(sdlView.frame));
 
         // 2. 定位宿主游戏区：任何非 SDL 窗口里的 GameSurfaceView，其 superview 即 touchView
@@ -945,7 +945,7 @@ static bool ame_embedSDLViewIntoHost(void) {
 
         ame_embeddedSDLView = sdlView;
         NSLog(@"[AmethystEmbed] SUCCESS: SDL view embedded into host touchView=%@ (window=%p); GameSurfaceView kept VISIBLE (GL render target); SDL UIWindow hidden",
-              NSStringFromClass(touchView.class), (void *)hostWindow);
+              NSStringFromClass(touchView.class), (__bridge void *)hostWindow);
         return true;
     }
 }

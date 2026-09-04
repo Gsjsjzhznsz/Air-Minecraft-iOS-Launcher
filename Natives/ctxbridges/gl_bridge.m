@@ -217,7 +217,7 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         UIView *layerView = layer.delegate;  // CALayer.delegate == owning UIView
         BOOL inWindow = (layerView != nil && [(UIView *)layerView window] != nil);
         NSLog(@"[RenderDiag] EGL window surface created: surface=%p layer=%p bounds=%.0fx%.0f contentsScale=%.2f drawableSize=%.0fx%.0f ownerInWindow=%d",
-              (void *)bundle->surface, (void *)layer,
+              (void *)bundle->surface, (__bridge void *)layer,
               layer.bounds.size.width, layer.bounds.size.height,
               (double)layer.contentsScale, drawable.width, drawable.height, (int)inWindow);
     }

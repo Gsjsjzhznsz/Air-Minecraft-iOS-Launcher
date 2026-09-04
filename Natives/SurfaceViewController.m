@@ -2480,7 +2480,7 @@ static UIView *findSDL_uikitview(UIView *root) {
             CGSize drawable = isMetal ? ((CAMetalLayer *)l).drawableSize : CGSizeZero;
             BOOL inWindow = (self.surfaceView.window != nil);
             NSLog(@"[RenderDiag] fps=%ld swapOK=%lu swapFail=%lu mem=%.0fMB layer=%p drawable=%.0fx%.0f scale=%.2f bounds=%.0fx%.0f inWindow=%d",
-                  (long)fps, swapOK, swapFail, memoryMB, (void *)l,
+                  (long)fps, swapOK, swapFail, memoryMB, (__bridge void *)l,
                   drawable.width, drawable.height, (double)l.contentsScale,
                   l.bounds.size.width, l.bounds.size.height, (int)inWindow);
         }
