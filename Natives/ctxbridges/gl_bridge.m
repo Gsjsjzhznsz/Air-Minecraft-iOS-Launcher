@@ -4,6 +4,7 @@
 
 #include <dlfcn.h>
 #include <string.h>
+#include <stdatomic.h>
 #include "bridge_tbl.h"
 #include "environ.h"
 #include "gl_bridge.h"
@@ -11,6 +12,28 @@
 
 static EGLDisplay g_EglDisplay;
 static egl_library handle;
+
+// ============================================================================
+// 黑屏取证（Task 32）：eglSwapBuffers 成功/失败原子计数器
+//
+// 背景（latestlog b199c07 设备实测）：游戏完整启动（390 shader 全部转换成功、
+// 资源/图集/声音加载完毕、SDL 事件循环存活、MC 事件被推入队列），但屏幕全黑。
+// 旧版 gl_swap_buffers 只在 eglGetError()==EGL_BAD_SURFACE 时才打日志，
+// 其余错误码（EGL_BAD_NATIVE_WINDOW / EGL_CONTEXT_LOST / EGL_BAD_ALLOC 等）
+// 完全静默；而 pojavSwapBuffers 的 "First frame rendered" 又是无条件打印的，
+// 无法证明首帧真的上屏。这两个计数器 + SurfaceVC 的 5 秒心跳日志
+// （[RenderDiag] fps= swapOK= swapFail=）可以一锤定音地判断：
+//   - swapFail 持续增长 → 呈现路径断了（layer/surface 生命周期问题）
+//   - swapOK 增长但黑屏 → 帧被换入了错误的目标（覆盖/尺寸/scale 问题）
+//   - 两个都不动 → 渲染线程已卡死（渲染循环在启动后期被阻塞）
+// ============================================================================
+static _Atomic unsigned long g_eglSwapOK = 0;
+static _Atomic unsigned long g_eglSwapFail = 0;
+
+void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail) {
+    if (ok) *ok = atomic_load(&g_eglSwapOK);
+    if (fail) *fail = atomic_load(&g_eglSwapFail);
+}
 
 static void* load_egl_symbol(void *dl_handle, const char *symbol) {
     dlerror();
@@ -185,6 +208,19 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         free(bundle);
         return NULL;
     }
+    // 黑屏取证（Task 32）：surface 创建成功时，把呈现目标的完整状态记入日志——
+    // layer 指针/bounds/contentsScale/drawableSize/是否已在窗口层级。
+    // 若后续黑屏，对照此处即可判断 layer 尺寸/层级在上下文创建时是否就已经不对。
+    {
+        BOOL isMetal = [layer isKindOfClass:CAMetalLayer.class];
+        CGSize drawable = isMetal ? ((CAMetalLayer *)layer).drawableSize : CGSizeZero;
+        UIView *layerView = layer.delegate;  // CALayer.delegate == owning UIView
+        BOOL inWindow = (layerView != nil && [(UIView *)layerView window] != nil);
+        NSLog(@"[RenderDiag] EGL window surface created: surface=%p layer=%p bounds=%.0fx%.0f contentsScale=%.2f drawableSize=%.0fx%.0f ownerInWindow=%d",
+              (void *)bundle->surface, (void *)layer,
+              layer.bounds.size.width, layer.bounds.size.height,
+              (double)layer.contentsScale, drawable.width, drawable.height, (int)inWindow);
+    }
 
     const EGLint gles_ctx_attribs[] = {
         EGL_CONTEXT_CLIENT_VERSION, 3,
@@ -281,10 +317,25 @@ void gl_swap_buffers() {
         NSLog(@"EGLBridge: gl_swap_buffers called with no current context, ignored");
         return;
     }
-    if (!handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface) && handle.eglGetError() == EGL_BAD_SURFACE) {
-        NSLog(@"eglSwapBuffers error 0x%x", handle.eglGetError());
-        //stopSwapBuffers = true;
-        //closeGLFWWindow();
+    // 黑屏取证（Task 32）：记录每次 swap 的真实结果。
+    // 成功：首次打一条日志（证明呈现路径至少活过一次）；之后交给原子计数器，
+    // 由 SurfaceViewController 的 [RenderDiag] 5 秒心跳汇总上报。
+    // 失败：任意错误码都打（去掉旧版 EGL_BAD_SURFACE 过滤），前 10 次逐条打，
+    // 之后每 100 次打一条，避免日志爆炸。
+    EGLBoolean swapResult = handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface);
+    if (!swapResult) {
+        unsigned long fails = atomic_fetch_add(&g_eglSwapFail, 1) + 1;
+        unsigned int eglErr = (unsigned int)(uintptr_t)handle.eglGetError();
+        if (fails <= 10 || fails % 100 == 0) {
+            NSLog(@"[RenderDiag] eglSwapBuffers FAILED #%lu eglError=0x%x surface=%p (render loop alive, presentation broken)",
+                  fails, eglErr, (void *)currentBundle->gl.surface);
+        }
+        return;
+    }
+    unsigned long oks = atomic_fetch_add(&g_eglSwapOK, 1) + 1;
+    if (oks == 1) {
+        NSLog(@"[RenderDiag] first eglSwapBuffers OK surface=%p (presentation path confirmed)",
+              (void *)currentBundle->gl.surface);
     }
 }
 

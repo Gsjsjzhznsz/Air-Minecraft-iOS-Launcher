@@ -2461,6 +2461,30 @@ static UIView *findSDL_uikitview(UIView *root) {
     if ([self.gameMenuOverlay isKindOfClass:[GameMenuOverlayView class]]) {
         [(GameMenuOverlayView *)self.gameMenuOverlay updateFPS:fps memoryUsageMB:memoryMB];
     }
+
+    // 4. 黑屏取证心跳（Task 32）：每 5 秒一条 [RenderDiag] 日志。
+    // 三元判据（配合 gl_bridge.m 的 ame_egl_swap_stats）：
+    //   - swapFail 增长 → eglSwapBuffers 报错，呈现路径断（layer/surface 生命周期）
+    //   - swapOK 增长但用户仍黑屏 → 帧成功换入了 layer 但没上屏（覆盖/层级/尺寸）
+    //   - swapOK/swapFail 都不增长且 fps=0 → 渲染循环卡死（启动后期阻塞）
+    // 同时带上 layer 现场（drawableSize/contentsScale/bounds/inWindow），
+    // 一次日志即可同时判断"渲染活不活"与"呈现层状态对不对"。
+    {
+        static int s_diagTick = 0;
+        if (++s_diagTick >= 5) {
+            s_diagTick = 0;
+            unsigned long swapOK = 0, swapFail = 0;
+            ame_egl_swap_stats(&swapOK, &swapFail);
+            CALayer *l = self.surfaceView.layer;
+            BOOL isMetal = [l isKindOfClass:CAMetalLayer.class];
+            CGSize drawable = isMetal ? ((CAMetalLayer *)l).drawableSize : CGSizeZero;
+            BOOL inWindow = (self.surfaceView.window != nil);
+            NSLog(@"[RenderDiag] fps=%ld swapOK=%lu swapFail=%lu mem=%.0fMB layer=%p drawable=%.0fx%.0f scale=%.2f bounds=%.0fx%.0f inWindow=%d",
+                  (long)fps, swapOK, swapFail, memoryMB, (void *)l,
+                  drawable.width, drawable.height, (double)l.contentsScale,
+                  l.bounds.size.width, l.bounds.size.height, (int)inWindow);
+        }
+    }
 }
 
 - (double)currentPhysFootprintMB {

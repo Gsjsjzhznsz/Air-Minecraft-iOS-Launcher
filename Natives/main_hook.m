@@ -267,6 +267,15 @@ void hooked___assert_rtn(const char* func, const char* file, int line, const cha
 }
 
 void hooked_exit(int code) {
+    // Task 32 黑屏取证：exit 时刻的呈现路径快照。
+    // MC 26.3 设备实测黑屏约 20 秒后干净退出（exit(0)）—— 退出时渲染循环
+    // 是否还在交换帧、呈现路径是否健康，是判定"黑屏 = 渲染停了"还是
+    // "黑屏 = 帧没上屏"的最后一块拼图（计数器由 gl_bridge.m 维护）。
+    {
+        unsigned long swapOK = 0, swapFail = 0;
+        ame_egl_swap_stats(&swapOK, &swapFail);
+        NSLog(@"[RenderDiag] exit(%d) snapshot: swapOK=%lu swapFail=%lu", code, swapOK, swapFail);
+    }
     NSLog(@"exit(%d) called", code);
     if (code != 0) {
         char exitMsg[64];

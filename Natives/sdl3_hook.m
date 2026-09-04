@@ -33,10 +33,12 @@
 #include <dlfcn.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>   // strcasecmp
 #include <sys/types.h>
+#include <objc/runtime.h>
 
 #pragma mark - SDL3 常量（与 SDL_video.h 对齐，避免依赖 SDL 头文件）
 
@@ -82,6 +84,25 @@ typedef bool (*ame_fn_SDL_GL_SetSwapInterval)(int interval);
 typedef bool (*ame_fn_SDL_GL_DestroyContext)(void *context);
 typedef void *(*ame_fn_SDL_GL_GetCurrentContext)(void);
 
+// ============================================================================
+// 黑屏取证（Task 32）：窗口生命周期 + 事件泵钩子（全部透传 + 日志，零行为改动）
+//
+// 动机：MC 26.3 设备实测（latestlog b199c07）游戏完整启动但黑屏、约 20 秒后
+// exit(0) 干净退出。现有日志看不出：
+//   a) MC 何时对（复用的）SDL 窗口调用 ShowWindow/SetWindowSize —— 若真实
+//      SDL UIKit 窗口被显示，它会不会盖住 SurfaceVC 的 CAMetalLayer；
+//   b) MC 的事件泵到底收到了什么 —— 尤其触发干净退出的 QUIT /
+//      WINDOW_CLOSE_REQUESTED 事件从何而来（用户只按了 7 次 ESC，推给 SDL
+//      的都是 KEY_DOWN/UP + MOUSE_MOTION，正常不足以退游戏）。
+// 这些钩子只记录、不改变任何行为，一次设备日志即可回答上述问题。
+// ============================================================================
+typedef bool (*ame_fn_SDL_ShowWindow)(void *window);
+typedef bool (*ame_fn_SDL_HideWindow)(void *window);
+typedef bool (*ame_fn_SDL_SetWindowSize)(void *window, int w, int h);
+typedef bool (*ame_fn_SDL_SetWindowPosition)(void *window, int x, int y);
+typedef bool (*ame_fn_SDL_SetWindowFullscreen)(void *window, bool fullscreen);
+typedef bool (*ame_fn_SDL_PollEvent)(void *event);
+
 static ame_fn_SDL_GL_SetAttribute ame_real_GL_SetAttribute = NULL;
 static ame_fn_SDL_CreateWindow ame_real_CreateWindow = NULL;
 static ame_fn_SDL_CreateWindowWithProperties ame_real_CreateWindowWithProperties = NULL;
@@ -99,6 +120,17 @@ static ame_fn_SDL_GL_GetProcAddress ame_real_GL_GetProcAddress = NULL;
 static ame_fn_SDL_GL_SetSwapInterval ame_real_GL_SetSwapInterval = NULL;
 static ame_fn_SDL_GL_DestroyContext ame_real_GL_DestroyContext = NULL;
 static ame_fn_SDL_GL_GetCurrentContext ame_real_GL_GetCurrentContext = NULL;
+
+// Task 32 窗口生命周期 / 事件泵钩子对应的真实函数指针
+static ame_fn_SDL_ShowWindow ame_real_ShowWindow = NULL;
+static ame_fn_SDL_HideWindow ame_real_HideWindow = NULL;
+static ame_fn_SDL_SetWindowSize ame_real_SetWindowSize = NULL;
+static ame_fn_SDL_SetWindowPosition ame_real_SetWindowPosition = NULL;
+static ame_fn_SDL_SetWindowFullscreen ame_real_SetWindowFullscreen = NULL;
+static ame_fn_SDL_PollEvent ame_real_PollEvent = NULL;
+
+// Task 32 embed：嵌入宿主层级的 SDL 视图（主线程赋值；定义见 "7) Amethyst embed" 一节）
+static UIView *ame_embeddedSDLView = NULL;
 
 #pragma mark - EGL 真实函数（首次解析后固定，避免跨 loader 调用）
 
@@ -339,6 +371,51 @@ static void ame_maybeWrapEgl(const char *name, void **out) {
 
 #pragma mark - SDL 函数包装
 
+// Task 32 embed 前置声明（实现在文件后部 "7) Amethyst embed" 一节）
+static bool ame_embedSDLViewIntoHost(void);
+static void ame_refrontEmbeddedViewOnMain(void);
+
+// Task 32 窗口生命周期/事件泵钩子前置声明（实现在 "6) 窗口生命周期" 一节；
+// 供 ame_maybeWrapWindowHook（SDL_LoadFunction 解析路径）引用）
+static bool ame_SDL_ShowWindow(void *window);
+static bool ame_SDL_HideWindow(void *window);
+static bool ame_SDL_SetWindowSize(void *window, int w, int h);
+static bool ame_SDL_SetWindowPosition(void *window, int x, int y);
+static bool ame_SDL_SetWindowFullscreen(void *window, bool fullscreen);
+static bool ame_SDL_PollEvent(void *event);
+
+// Task 32：当 MC 通过 SDL_LoadFunction（而非 dlsym）解析符号时，同样把
+// 窗口生命周期/事件泵钩子装上（防御性双路覆盖，与 amethyst_sdl3_hook_resolve
+// 一致；设备实测 MC 走 dlsym 路径，但保留此路径防未来变化）。
+static void ame_maybeWrapWindowHook(const char *name, void **out) {
+    if (name == NULL || out == NULL || *out == NULL) return;
+    if (strcmp(name, "SDL_ShowWindow") == 0) {
+        if (ame_real_ShowWindow == NULL)
+            ame_real_ShowWindow = (ame_fn_SDL_ShowWindow)*out;
+        *out = (void *)ame_SDL_ShowWindow;
+    } else if (strcmp(name, "SDL_HideWindow") == 0) {
+        if (ame_real_HideWindow == NULL)
+            ame_real_HideWindow = (ame_fn_SDL_HideWindow)*out;
+        *out = (void *)ame_SDL_HideWindow;
+    } else if (strcmp(name, "SDL_SetWindowSize") == 0) {
+        if (ame_real_SetWindowSize == NULL)
+            ame_real_SetWindowSize = (ame_fn_SDL_SetWindowSize)*out;
+        *out = (void *)ame_SDL_SetWindowSize;
+    } else if (strcmp(name, "SDL_SetWindowPosition") == 0) {
+        if (ame_real_SetWindowPosition == NULL)
+            ame_real_SetWindowPosition = (ame_fn_SDL_SetWindowPosition)*out;
+        *out = (void *)ame_SDL_SetWindowPosition;
+    } else if (strcmp(name, "SDL_SetWindowFullscreen") == 0) {
+        if (ame_real_SetWindowFullscreen == NULL)
+            ame_real_SetWindowFullscreen = (ame_fn_SDL_SetWindowFullscreen)*out;
+        *out = (void *)ame_SDL_SetWindowFullscreen;
+    } else if (strcmp(name, "SDL_PollEvent") == 0) {
+        if (ame_real_PollEvent == NULL)
+            ame_real_PollEvent = (ame_fn_SDL_PollEvent)*out;
+        *out = (void *)ame_SDL_PollEvent;
+    }
+}
+
 static void *ame_SDL_CreateWindow(const char *title, int w, int h, uint32_t flags) {
     ame_forceEglProfileEs();
     NSDebugLog(@"[SDLHook] SDL_CreateWindow title=%s %dx%d flags=0x%x",
@@ -354,6 +431,26 @@ static void *ame_SDL_CreateWindow(const char *title, int w, int h, uint32_t flag
     if (reuse && wnd != NULL) {
         ame_primaryWindow = wnd;
         ame_primaryWindowRefs = 1;
+        // Task 32 黑屏修复：首个真实 SDL 窗口创建成功后立即执行 embed。
+        // 原生 UIKit_CreateWindow 内部已经把 UIKit 工作派发到主线程完成，
+        // 此处主线程处于空闲 runloop 状态，dispatch_sync 安全（launchJVM 在
+        // 后台线程，主线程没有任何等待渲染线程的锁）。若嵌入失败，保持现状
+        // 并留日志（行为回退到修复前，不引入新风险）。
+        static bool s_embedTried = false;
+        if (!s_embedTried) {
+            s_embedTried = true;
+            __block bool embedOK = false;
+            if ([NSThread isMainThread]) {
+                embedOK = ame_embedSDLViewIntoHost();
+            } else {
+                dispatch_sync(dispatch_get_main_queue(), ^{
+                    embedOK = ame_embedSDLViewIntoHost();
+                });
+            }
+            if (!embedOK) {
+                NSDebugLog(@"[AmethystEmbed] embed FAILED -- falling back to legacy behavior (SDL will own a separate UIWindow; expect black screen if MC calls SDL_ShowWindow)");
+            }
+        }
     }
     NSDebugLog(@"[SDLHook] SDL_CreateWindow -> %p", wnd);
     return wnd;
@@ -397,6 +494,7 @@ static void ame_SDL_DestroyWindow(void *window) {
 static void *ame_SDL_LoadFunction(void *handle, const char *name) {
     void *r = ame_real_LoadFunction ? ame_real_LoadFunction(handle, name) : NULL;
     ame_maybeWrapEgl(name, &r);
+    ame_maybeWrapWindowHook(name, &r);
     return r;
 }
 
@@ -641,6 +739,246 @@ static void *ame_SDL_GL_GetCurrentContext(void) {
     return g_glContext;
 }
 
+#pragma mark - 6) Task 32 窗口生命周期 / 事件泵取证（透传 + 日志）
+
+// 全部透传到真实 SDL，行为零改动；只把调用记录下来。
+// SDL3 ABI：bool SDL_ShowWindow(SDL_Window*) / bool SDL_SetWindowSize(SDL_Window*, int, int) 等。
+
+static bool ame_SDL_ShowWindow(void *window) {
+    // Task 32 黑屏修复：embedded 时绝不让 SDL 自己的 UIWindow 保持可见
+    // （原生 makeKeyAndVisible 的空窗口会盖住 GameSurfaceView = 黑屏）。
+    // 但仍然调用真实的 UIKit_ShowWindow（补上 SDL 内部状态：鼠标焦点等）。
+    // 注意：原生 SDL3 的 UIKit_ShowWindow 直接在调用线程 makeKeyAndVisible，
+    // 而调用方是 JVM 渲染线程 —— 离主线程调 UIKit 在 iOS 16+ 会被线程保护命中。
+    // 所以：在主线程同步跑真实函数，随后立即中和覆盖（隐藏 SDL 窗口 +
+    // re-front 嵌入视图 + 恢复宿主 key window）。整个过程同步完成，
+    // 无中间可感知的黑窗闪烁。
+    if (ame_embeddedSDLView != NULL) {
+        __block bool r = false;
+        if ([NSThread isMainThread]) {
+            if (ame_real_ShowWindow) r = ame_real_ShowWindow(window);
+            ame_refrontEmbeddedViewOnMain();
+        } else {
+            dispatch_sync(dispatch_get_main_queue(), ^{
+                if (ame_real_ShowWindow) r = ame_real_ShowWindow(window);
+                ame_refrontEmbeddedViewOnMain();
+            });
+        }
+        NSDebugLog(@"[SDLHook] SDL_ShowWindow(%p) -> %d (embedded path: real call on main, SDL UIWindow re-hidden, embedded view re-fronted)",
+                   window, (int)r);
+        return r;
+    }
+    // 未嵌入：旧路径。原生函数直接在调用线程执行（与修复前行为一致）。
+    bool r = ame_real_ShowWindow ? ame_real_ShowWindow(window) : false;
+    NSDebugLog(@"[SDLHook] SDL_ShowWindow(%p) -> %d (NOT embedded: real call, SDL's own UIWindow becomes key+visible)", window, (int)r);
+    return r;
+}
+
+static bool ame_SDL_HideWindow(void *window) {
+    bool r = ame_real_HideWindow ? ame_real_HideWindow(window) : false;
+    NSDebugLog(@"[SDLHook] SDL_HideWindow(%p) -> %d", window, (int)r);
+    return r;
+}
+
+static bool ame_SDL_SetWindowSize(void *window, int w, int h) {
+    bool r = ame_real_SetWindowSize ? ame_real_SetWindowSize(window, w, h) : false;
+    NSDebugLog(@"[SDLHook] SDL_SetWindowSize(%p, %d, %d) -> %d", window, w, h, (int)r);
+    return r;
+}
+
+static bool ame_SDL_SetWindowPosition(void *window, int x, int y) {
+    bool r = ame_real_SetWindowPosition ? ame_real_SetWindowPosition(window, x, y) : false;
+    NSDebugLog(@"[SDLHook] SDL_SetWindowPosition(%p, %d, %d) -> %d", window, x, y, (int)r);
+    return r;
+}
+
+static bool ame_SDL_SetWindowFullscreen(void *window, bool fullscreen) {
+    bool r = ame_real_SetWindowFullscreen ? ame_real_SetWindowFullscreen(window, fullscreen) : false;
+    NSDebugLog(@"[SDLHook] SDL_SetWindowFullscreen(%p, %d) -> %d", window, (int)fullscreen, (int)r);
+    return r;
+}
+
+// SDL_PollEvent：MC 渲染线程每帧调用，是"事件泵活着"的最强证据，也是
+// 捕获 QUIT / 窗口关闭事件的唯一位置。日志策略（避免爆炸）：
+//   - QUIT 类（0x100-0x10F，含 SDL_EVENT_QUIT/TERMINATING/LOW_MEMORY/后台切换）
+//     与窗口类（0x200-0x20F，含 CLOSE_REQUESTED/SHOWN/HIDDEN/RESIZED/FOCUS）：
+//     每一条都打
+//   - 其余类型（我们注入的 0x300 键 / 0x400 鼠标等高频事件）：前 30 条逐条打，
+//     之后每 500 条打 1 条采样
+//   - 无事件（返回 false）不打
+static bool ame_SDL_PollEvent(void *event) {
+    bool r = ame_real_PollEvent ? ame_real_PollEvent(event) : false;
+    if (r && event != NULL) {
+        uint32_t type = *(const uint32_t *)event;
+        if ((type >= 0x100 && type <= 0x10F) || (type >= 0x200 && type <= 0x20F)) {
+            NSDebugLog(@"[SDLHook] SDL_PollEvent got type=0x%x (quit/window-class, Task32)", type);
+        } else {
+            static _Atomic unsigned long s_pollCount = 0;
+            unsigned long n = atomic_fetch_add(&s_pollCount, 1) + 1;
+            if (n <= 30 || n % 500 == 0) {
+                NSDebugLog(@"[SDLHook] SDL_PollEvent #%lu type=0x%x (sampled, event loop alive)",
+                           n, type);
+            }
+        }
+    }
+    return r;
+}
+
+#pragma mark - 7) Amethyst embed：把 SDL UIKit 视图嵌入宿主层级（Task 32 黑屏修复）
+
+// ============================================================================
+// 黑屏根因（Task 32，经反汇编实锤）：
+//   patches/sdl3-amethyst.patch 描述了 "embed SDL view into host window" 设计，
+//   但随包发布的 libSDL3.dylib 只包含最小补丁（Amethyst_SetSDLWindow 的
+//   dlsym 注册有代码引用；embed 相关字符串——ControlLayout / GameSurfaceView /
+//   [AmethystSDL] 各日志——全部是零引用的孤儿字符串）。
+//   结果：GL 路径（MobileGlues/gl4es/Mithril/MobileGL）下 MC 通过我们的
+//   EGL bridge 渲染进 GameSurfaceView 的 CAMetalLayer；而 MC 建窗后调用
+//   SDL_ShowWindow 时，原生 UIKit_ShowWindow 会 makeKeyAndVisible SDL 自己的
+//   UIWindow——一个没有任何渲染内容的窗口——盖在 GameSurfaceView 上 = 全黑。
+//   zink/Vulkan 路径不受影响：Vulkan surface 建在 SDL 窗口自己的 view 上，
+//   内容就渲染进那个"盖子"里，所以那条路径历史上可见。
+//
+// 修复（在启动器侧实现 patch 的 embed 设计）：
+//   1) 首个真实 SDL_CreateWindow 返回后，找到 SDL 的 UIWindow
+//      （rootViewController 类名含 SDL_uikitviewcontroller）；
+//   2) 把它的 view 嵌入宿主 touchView（GameSurfaceView 之上）。
+//      与 patch 的差异：不隐藏 GameSurfaceView —— 我们的 GL 渲染目标正是
+//      它的 layer；SDL 视图保持透明让画面透出来；
+//   3) 隐藏 SDL 自己的 UIWindow，此后 SDL_ShowWindow 被本钩子接管
+//      （embedded 分支只 re-front 嵌入视图，绝不再 makeKeyAndVisible）；
+//   4) 运行时给 SDL 视图类补 hitTest:withEvent: -> nil（与 patch 一致：
+//      触摸全部回落给 touchView，由启动器输入桥处理，避免 SDL 自己
+//      的 UIKit 触摸处理与启动器手势双路冲突）。
+//   附加收益：SurfaceViewController::findSDL_uikitview（键盘事件转发）
+//      从此能在 self.view 层级里找到 SDL 视图 —— 物理键盘开始工作。
+// ============================================================================
+
+// static UIView *ame_embeddedSDLView = NULL;  // 已提前声明于文件头部（供 ShowWindow/CreateWindow 钩子使用）
+
+static UIView *ame_findSubviewOfClass(UIView *root, Class cls) {
+    if (cls == nil) return nil;
+    if ([root isKindOfClass:cls]) return root;
+    for (UIView *sub in root.subviews) {
+        UIView *found = ame_findSubviewOfClass(sub, cls);
+        if (found) return found;
+    }
+    return nil;
+}
+
+// 与 patch 相同语义：嵌入式 SDL 视图对 hitTest 返回 nil，触摸穿透给 touchView
+static UIView *ame_sdlHitTestShim(id self, SEL _cmd, CGPoint point, UIEvent *event) {
+    return nil;
+}
+
+// 只在主线程调用。返回 true 表示嵌入成功。
+static bool ame_embedSDLViewIntoHost(void) {
+    @autoreleasepool {
+        // 1. 定位 SDL 自己的 UIWindow（rootViewController 为 SDL_uikitviewcontroller）
+        UIWindow *sdlWindow = nil;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            UIViewController *rc = w.rootViewController;
+            if (rc != nil &&
+                [NSStringFromClass(rc.class) rangeOfString:@"SDL_uikitviewcontroller"].location != NSNotFound) {
+                sdlWindow = w;
+                break;
+            }
+        }
+        if (sdlWindow == nil) {
+            NSLog(@"[AmethystEmbed] no SDL UIWindow found in %lu app windows (embed skipped)",
+                  (unsigned long)[UIApplication sharedApplication].windows.count);
+            return false;
+        }
+        UIView *sdlView = sdlWindow.rootViewController.view;
+        if (sdlView == nil) {
+            NSLog(@"[AmethystEmbed] SDL window %p has no view (embed skipped)", (void *)sdlWindow);
+            return false;
+        }
+        NSLog(@"[AmethystEmbed] SDL window=%p view=%p class=%@ frame=%@",
+              (void *)sdlWindow, (void *)sdlView, NSStringFromClass(sdlView.class),
+              NSStringFromCGRect(sdlView.frame));
+
+        // 2. 定位宿主游戏区：任何非 SDL 窗口里的 GameSurfaceView，其 superview 即 touchView
+        UIView *gameSurface = nil;
+        UIWindow *hostWindow = nil;
+        for (UIWindow *w in [UIApplication sharedApplication].windows) {
+            if (w == sdlWindow) continue;
+            UIView *found = ame_findSubviewOfClass(w, NSClassFromString(@"GameSurfaceView"));
+            if (found != nil) {
+                gameSurface = found;
+                hostWindow = w;
+                break;
+            }
+        }
+        if (gameSurface == nil || gameSurface.superview == nil) {
+            NSLog(@"[AmethystEmbed] GameSurfaceView not found in host windows (embed failed: is SurfaceViewController presented?)");
+            return false;
+        }
+        UIView *touchView = gameSurface.superview;
+
+        // 3. 嵌入：SDL 视图置于 touchView 内（GameSurfaceView 之上），保持透明。
+        //    不隐藏 GameSurfaceView —— GL 路径下它是真正的渲染呈现层。
+        [sdlView removeFromSuperview];
+        sdlView.frame = touchView.bounds;
+        sdlView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        sdlView.backgroundColor = nil;
+        sdlView.opaque = NO;
+        [touchView addSubview:sdlView];
+        // 把 touchView 里其它子视图（虚拟鼠标指针等）重新压到 SDL 视图之上
+        for (UIView *sub in [touchView.subviews copy]) {
+            if (sub != sdlView) [touchView bringSubviewToFront:sub];
+        }
+
+        // 4. hitTest 穿透（仅当 SDL 视图类自身没有实现时补上，避免覆盖上游行为）
+        Class viewCls = object_getClass(sdlView);
+        Method hitTestMethod = class_getInstanceMethod(viewCls, @selector(hitTest:withEvent:));
+        if (hitTestMethod == nil ||
+            class_getInstanceMethod(UIView.class, @selector(hitTest:withEvent:)) == hitTestMethod) {
+            Method base = class_getInstanceMethod(UIView.class, @selector(hitTest:withEvent:));
+            const char *enc = base ? method_getTypeEncoding(base) : "@@:{CGPoint=ff}@";
+            class_addMethod(viewCls, @selector(hitTest:withEvent:), (IMP)ame_sdlHitTestShim, enc);
+            NSLog(@"[AmethystEmbed] hitTest shim installed on %@", NSStringFromClass(viewCls));
+        }
+
+        // 5. SDL 自己的 UIWindow 退场（永远隐藏；ShowWindow 钩子不再 makeKeyAndVisible）
+        sdlWindow.hidden = YES;
+
+        ame_embeddedSDLView = sdlView;
+        NSLog(@"[AmethystEmbed] SUCCESS: SDL view embedded into host touchView=%@ (window=%p); GameSurfaceView kept VISIBLE (GL render target); SDL UIWindow hidden",
+              NSStringFromClass(touchView.class), (void *)hostWindow);
+        return true;
+    }
+}
+
+static void ame_refrontEmbeddedViewOnMain(void) {
+    UIView *v = ame_embeddedSDLView;
+    if (v == nil) return;
+    // 1. 重新隐藏任何被真实 ShowWindow 重新显示的 SDL UIWindow，并恢复宿主 key window
+    for (UIWindow *w in [UIApplication sharedApplication].windows) {
+        UIViewController *rc = w.rootViewController;
+        if (rc != nil &&
+            [NSStringFromClass(rc.class) rangeOfString:@"SDL_uikitviewcontroller"].location != NSNotFound &&
+            !w.hidden) {
+            w.hidden = YES;
+            // key window 可能刚被切到这个即将隐藏的窗口上，挑一个可见的宿主窗口按回去
+            for (UIWindow *w2 in [UIApplication sharedApplication].windows) {
+                if (w2 != w && !w2.hidden && w2.rootViewController != nil) {
+                    [w2 makeKeyWindow];
+                    break;
+                }
+            }
+        }
+    }
+    // 2. 在宿主容器里 re-front 嵌入视图，并把容器内其它子视图（虚拟鼠标指针等）压在上面
+    UIView *container = v.superview;
+    if (container == nil) return;
+    [v removeFromSuperview];
+    [container addSubview:v];
+    for (UIView *sub in [container.subviews copy]) {
+        if (sub != v) [container bringSubviewToFront:sub];
+    }
+}
+
 #pragma mark - 对 main_hook.m 的接入点
 
 /// 由 hooked_dlsym 在返回 orig_dlsym 之前调用。
@@ -695,6 +1033,50 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
             ame_real_UnloadObject = (ame_fn_SDL_UnloadObject)amethyst_orig_dlsym(handle, name);
         }
         return (void *)ame_SDL_UnloadObject;
+    }
+    // Task 32 窗口生命周期 / 事件泵取证钩子（透传 + 日志）。
+    // 注意：这些钩子不依赖渲染器类型 —— zink / Vulkan 路径同样需要知道
+    // MC 的窗口显示行为与事件泵状态（黑屏取证对所有渲染路径都有意义）。
+    if (strcmp(name, "SDL_ShowWindow") == 0) {
+        if (ame_real_ShowWindow == NULL) {
+            ame_real_ShowWindow = (ame_fn_SDL_ShowWindow)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_ShowWindow (real=%p)", (void *)ame_real_ShowWindow);
+        return (void *)ame_SDL_ShowWindow;
+    }
+    if (strcmp(name, "SDL_HideWindow") == 0) {
+        if (ame_real_HideWindow == NULL) {
+            ame_real_HideWindow = (ame_fn_SDL_HideWindow)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_HideWindow (real=%p)", (void *)ame_real_HideWindow);
+        return (void *)ame_SDL_HideWindow;
+    }
+    if (strcmp(name, "SDL_SetWindowSize") == 0) {
+        if (ame_real_SetWindowSize == NULL) {
+            ame_real_SetWindowSize = (ame_fn_SDL_SetWindowSize)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_SetWindowSize (real=%p)", (void *)ame_real_SetWindowSize);
+        return (void *)ame_SDL_SetWindowSize;
+    }
+    if (strcmp(name, "SDL_SetWindowPosition") == 0) {
+        if (ame_real_SetWindowPosition == NULL) {
+            ame_real_SetWindowPosition = (ame_fn_SDL_SetWindowPosition)amethyst_orig_dlsym(handle, name);
+        }
+        return (void *)ame_SDL_SetWindowPosition;
+    }
+    if (strcmp(name, "SDL_SetWindowFullscreen") == 0) {
+        if (ame_real_SetWindowFullscreen == NULL) {
+            ame_real_SetWindowFullscreen = (ame_fn_SDL_SetWindowFullscreen)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_SetWindowFullscreen (real=%p)", (void *)ame_real_SetWindowFullscreen);
+        return (void *)ame_SDL_SetWindowFullscreen;
+    }
+    if (strcmp(name, "SDL_PollEvent") == 0) {
+        if (ame_real_PollEvent == NULL) {
+            ame_real_PollEvent = (ame_fn_SDL_PollEvent)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_PollEvent (real=%p)", (void *)ame_real_PollEvent);
+        return (void *)ame_SDL_PollEvent;
     }
     // SDL_GL_SetAttribute 不接管：MC 自己调用它设属性是合法行为，我们只在
     // 建窗前主动调用同一个函数来强制 ES profile（见 ame_forceEglProfileEs）。
