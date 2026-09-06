@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
@@ -305,7 +306,114 @@ void pojavSetWindowHint(int hint, int value) {
     }
 }
 
+// ---- Task 39：首帧呈现门控（shaderc 编译风暴静止期） ----
+//
+// 四份日志交叉时序铁证：
+//   * e28e4c3-GL（零崩溃）：首次 eglSwapBuffers 在全部 402 次 shaderc 编译
+//     完成之后（6.4s）；其后 2.8s 的 post-effect 编译（#391-402）全部干净，
+//     全日志 0 崩溃。
+//   * bec59b4 / 2613e41 / 2092d27（三连崩）：首次 present 全部插入编译风暴
+//     正中（t≈370-485ms），紧随其后的 terrain/OIT 编译在
+//     libshaderc_impl+0x512430（Task 34 cave 内 constArray 指针解链 ldr）读到
+//     被踩踏的池内存——si_addr 是 ASCII 源码碎片（释放后复用的堆块）。
+//   * bec59b4 的 crash si_addr=0x400000008000c 与 2092d27 的 si_addr 乱码族
+//     同源：首次 present 的 Metal 机制（首个 CAMetalLayer drawable 分配/CA
+//     注册/遮罩移除/框架内部大块分配）在编译活跃期落地会踩碎 glslang 池块。
+//
+// 修复：复刻已验证的零崩溃时序 —— 首次真实 present 等 shaderc 编译活动
+// 静止 >= 2s（或 15s 强制上限防无限黑屏）才放行。被门控期间丢弃帧（启动
+// 遮罩本来就在上屏，用户无感知）。后续 present 不门控：e28e4c3-GL 已实证
+// 稳态 present 与后续编译共存安全（title 屏持续 60fps present + #391-402
+// 编译全部干净）。Vulkan 路径不经过 pojavSwapBuffers（CAMetalLayer 直呈），
+// 零崩溃 Vulkan 运行已实证安全，本门控对其惰性。
+
+/// 进程启动起的毫秒数（与 shaderc_shim 的 ame_shim_ms 同款惰性 t0）。
+static uint64_t ame_eb_now_ms(void) {
+    static struct timespec t0;
+    static volatile int t0_set = 0;
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+    if (!t0_set) {
+        t0 = now;
+        t0_set = 1;
+    }
+    return (uint64_t)(now.tv_sec - t0.tv_sec) * 1000ull +
+           (uint64_t)(now.tv_nsec - t0.tv_nsec) / 1000000ull;
+}
+
+typedef uint64_t (*ame_quiescence_fn_t)(void);
+
+/// 惰性解析 libshaderc.dylib（shaderc_shim.c）导出的编译静默信号。
+/// 与 spvc_shim 的主锁协商同款姿势：按已加载镜像 dlopen（仅引用计数 +1，
+/// 不会产生第二个实例）后按 handle dlsym，规避 RTLD_LOCAL 不可见问题。
+/// RTLD_NOLOAD：镜像未加载（LWJGL 尚未 bootstrap，或非 shaderc 路径）时
+/// 返回 NULL —— 无信号即无 shaderc 活动，调用方按"安静"放行（此时也根本
+/// 没有 glslang 池可踩）。解析成功后缓存。
+static ame_quiescence_fn_t ame_eb_quiescence_fn(void) {
+    static ame_quiescence_fn_t s_fn = NULL;
+    if (s_fn != NULL) return s_fn;
+    static const char *const kCandidates[] = {
+        "@rpath/libshaderc.dylib",
+        "@loader_path/libshaderc.dylib",
+        "libshaderc.dylib",
+        NULL,
+    };
+    for (int i = 0; kCandidates[i] != NULL; ++i) {
+        void *h = dlopen(kCandidates[i], RTLD_NOLOAD | RTLD_LAZY);
+        if (h == NULL) continue;
+        ame_quiescence_fn_t fn =
+            (ame_quiescence_fn_t)dlsym(h, "ame_shaderc_compile_quiescence_ms");
+        if (fn != NULL) {
+            s_fn = fn;
+            NSLog(@"[egl_bridge] shaderc quiescence signal acquired -- first-present gate armed (Task 39)");
+            break;
+        }
+    }
+    return s_fn;
+}
+
+/// 首帧呈现是否放行。YES = 允许本次 present + 首帧通知 + 遮罩移除。
+static BOOL ame_eb_first_present_gate_allows(void) {
+    // 2s 静止窗口：复刻 e28e4c3-GL 零崩溃时序（首 present 距最后一次编译
+    // >= 2s；其后 2.8s 出现的下一批编译全部干净）。
+    const uint64_t kQuietMs = 2000;
+    // 15s 强制上限：极端场景（超大量光影/资源包、风暴永不停）不能让启动
+    // 遮罩无限期挡屏——到点强制放行，代价是回到旧时序的风险。
+    const uint64_t kForceCapMs = 15000;
+    static uint64_t s_firstAttemptMs = 0;
+    static uint64_t s_deferredFrames = 0;
+
+    ame_quiescence_fn_t fn = ame_eb_quiescence_fn();
+    uint64_t quiet = (fn != NULL) ? fn() : UINT64_MAX;
+    if (quiet >= kQuietMs) return YES; // 从未活动（UINT64_MAX）或已静止
+
+    uint64_t now = ame_eb_now_ms();
+    if (s_firstAttemptMs == 0) s_firstAttemptMs = now;
+    if (now - s_firstAttemptMs >= kForceCapMs) {
+        NSLog(@"[egl_bridge] First present force-released after %llums cap (quiet=%llums, dropped %llu frames) (Task 39)",
+              (unsigned long long)(now - s_firstAttemptMs),
+              (unsigned long long)quiet,
+              (unsigned long long)s_deferredFrames);
+        return YES;
+    }
+    s_deferredFrames++;
+    if (s_deferredFrames == 1 || (s_deferredFrames % 120) == 0) {
+        NSLog(@"[egl_bridge] First present deferred: shader compile storm active (quiet=%llums < %llu, dropped frames=%llu) (Task 39)",
+              (unsigned long long)quiet,
+              (unsigned long long)kQuietMs,
+              (unsigned long long)s_deferredFrames);
+    }
+    return NO;
+}
+
 void pojavSwapBuffers() {
+    // Task 39：首帧呈现门控 —— 在 shaderc 编译风暴静止前，不进行首次
+    // eglSwapBuffers/遮罩移除（被门控的帧直接丢弃，遮罩仍在上屏，MC 渲染
+    // 线程继续跑）。详见 ame_eb_first_present_gate_allows 的取证注释。
+    if (!s_firstFrameRendered && !ame_eb_first_present_gate_allows()) {
+        return;
+    }
+
     // FPS 计数（参照 FCL/ZL2 在 native swap buffer 入口计数，反映真实渲染帧率）
     atomic_fetch_add(&_pojavFpsCounter, 1);
 

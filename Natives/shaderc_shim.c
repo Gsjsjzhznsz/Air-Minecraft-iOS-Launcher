@@ -167,8 +167,35 @@ static unsigned long ame_shim_tid(void) {
     return (unsigned long)(((uintptr_t)pthread_self()) & 0xffffffffull);
 }
 
+// ---- Task 39：编译活动心跳（首帧呈现门控信号，供 egl_bridge dlsym） ----
+// egl_bridge.m 的首帧门控（pojavSwapBuffers）在放行首次 eglSwapBuffers 前，
+// 通过 dlsym 本函数确认 shaderc 编译风暴已静止 >= 2s。四份日志交叉取证：
+// bec59b4/2613e41/2092d27 三连崩溃构建的首次 present 全部插入编译风暴中
+//（First swap 行后紧跟首个 compile CRASHED）；e28e4c3-GL 零崩溃构建的首
+// present 在全部 402 次编译完成后（且其后 2.8s 的 post-effect 编译全部
+// 干净）。返回 UINT64_MAX = 进程从未有过 shaderc 活动（调用方按"安静"处理）。
+// 原子访问：渲染线程（读）与 ForkJoin 编译 worker（写）并发无锁。
+static volatile uint64_t ame_last_compile_activity_ms = 0;
+
+static void ame_note_compile_activity(void) {
+    uint64_t t = (uint64_t)ame_shim_ms();
+    if (t == 0) t = 1; // 0 保留给"从未活动"；首次调用与 t0 同毫秒的碰撞兜底
+    __atomic_store_n(&ame_last_compile_activity_ms, t, __ATOMIC_RELAXED);
+}
+
+// 距上一次 shaderc 侧活动的毫秒数；UINT64_MAX = 从未活动。
+uint64_t ame_shaderc_compile_quiescence_ms(void) {
+    uint64_t last = __atomic_load_n(&ame_last_compile_activity_ms, __ATOMIC_RELAXED);
+    if (last == 0) return UINT64_MAX;
+    double now = ame_shim_ms();
+    return (now > (double)last) ? (uint64_t)(now - (double)last) : 0;
+}
+
 // 取锁；若已有 in-flight 编译持有锁，先打 BLOCKED 取证行再等待。
 static void ame_shim_lock_or_report_blocked(const char *what, const void *obj) {
+    // Task 39：所有走锁的 API 入口（options/compiler 生命周期等）都算编译
+    // 风暴活动，让 egl_bridge 的首帧门控信号更保守（宁多延不误判）。
+    ame_note_compile_activity();
     if (pthread_mutex_trylock(&ame_shaderc_shim_lock) == 0) return;
     fprintf(stderr,
             "[shaderc-shim] %s(%p) BLOCKED behind in-flight compile -- waiting "
@@ -523,6 +550,8 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
         return NULL;
     }
     pthread_mutex_lock(&ame_shaderc_shim_lock);
+    // Task 39：编译入口心跳（本函数直取锁，不经 lock_or_report_blocked）。
+    ame_note_compile_activity();
     // Task 38：句柄间接层翻译（锁内读表，避免与 initialize/release 的表操作
     // 竞争；重建后 java 句柄指向新 live 句柄）。
     void *live_compiler = ame_translate_compiler(compiler);
@@ -602,6 +631,8 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
     }
     ame_in_compile = 0;
     ame_crash_net_restore();
+    // Task 39：编译出口心跳 —— 风暴静止窗口从最后一次编译结束起算。
+    ame_note_compile_activity();
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     return result;
 }
