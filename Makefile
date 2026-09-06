@@ -395,6 +395,10 @@ assets:
 dep_shader_shims:
 	echo '[Amethyst v$(VERSION)] dep_shader_shims - start'
 	cp $(SOURCEDIR)/Natives/resources/Frameworks/libshaderc_impl.dylib $(WORKINGDIR)/ || exit 1
+	# Task 34: machine-code null/bounds guards for glslang lValueErrorCheck
+	# (device SIGSEGV at +0x204, Task-30 same-family corruption). Idempotent;
+	# exits 1 with instructions if the impl binary no longer matches.
+	python3 $(SOURCEDIR)/scripts/patch_shaderc_lvalue_guard.py $(WORKINGDIR)/libshaderc_impl.dylib || exit 1
 	install_name_tool -id @rpath/libshaderc_impl.dylib $(WORKINGDIR)/libshaderc_impl.dylib || exit 1
 	cp $(SOURCEDIR)/Natives/resources/Frameworks/libspirv-cross-c-shared.0.impl.dylib $(WORKINGDIR)/ || exit 1
 	install_name_tool -id @rpath/libspirv-cross-c-shared.0.impl.dylib $(WORKINGDIR)/libspirv-cross-c-shared.0.impl.dylib || exit 1

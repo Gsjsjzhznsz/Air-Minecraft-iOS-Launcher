@@ -45,12 +45,29 @@
 // 数与线程标识；release 在锁被占用时先打 "BLOCKED behind in-flight compile"
 // 再等锁——若真机日志出现该行，即证明 release-vs-compile 竞态真实发生过
 // （且已被本次修复挡下）。
+//
+// Task 34（hs_err_pid33505，构建 777302c）：黑屏修复验证通过（embed 成功、
+// 首帧 eglSwapBuffers OK、fps=10），但 shaderc compile#7（terrain 顶点）在
+// glslang::TParseContext::lValueErrorCheck+0x204 SIGSEGV——与 Task 30 同签名
+// 同 PC，且同一二进制同一 shader 在上一轮跑了 390 次全过 = 非确定性堆踩踏。
+// 双层修复：
+//   1) scripts/patch_shaderc_lvalue_guard.py 对 libshaderc_impl.dylib 做机器码
+//      级补丁（把脆弱 swizzle 循环体重定位到 __TEXT 尾部 cave，加 5 重空指针
+//      + 1 重负值 + 1 重越界防护，与 MobileGlues 源码级 nullguard patch 等价）；
+//   2) 本文件加装“编译窗口崩溃恢复网”：真实编译期间进程级接管 SIGSEGV/SIGBUS，
+//      编译线程内崩溃→siglongjmp 回未恢复并重试一次；重试再崩→返回 NULL 并
+//      把崩溃信息打进日志（非编译线程的崩溃照旧链回 JVM 处理器走 hs_err）。
+//      这样即便 impl 里还藏着其它同类脆弱点，也只损失单个 shader 编译而不是
+//      整个进程。恢复代价：被丢弃的解析树内存泄漏（罕见事件，可接受）。
 
 #include <dlfcn.h>
 #include <pthread.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 static pthread_mutex_t ame_shaderc_shim_lock;
@@ -135,6 +152,81 @@ typedef void *(*ame_shaderc_shim_compile_fn_t)(void *compiler, const char *sourc
                                                const char *input_file,
                                                const char *entry_point, void *options);
 
+// ---- Task 34：编译窗口崩溃恢复网（SIGSEGV/SIGBUS） ----
+// 状态全部线程局部（编译串行，但同时只有一个编译线程带网运行）；
+// 旧的 sigaction 快照是进程级的，只在持锁的 install/restore 窗口内读写。
+static __thread sigjmp_buf ame_compile_jmp;
+static __thread volatile sig_atomic_t ame_in_compile = 0;
+static __thread volatile sig_atomic_t ame_last_call_crashed = 0;
+static struct sigaction ame_prev_segv;
+static struct sigaction ame_prev_bus;
+static int ame_net_installed = 0;
+
+static void ame_compile_crash_handler(int sig, siginfo_t *si, void *ctx) {
+    if (ame_in_compile) {
+        ame_in_compile = 0;
+        // 阻断本信号，防止 longjmp 展开过程中同一错误页立即重触发
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, sig);
+        sigprocmask(SIG_BLOCK, &set, NULL);
+        fprintf(stderr,
+                "[shaderc-shim] compile CRASHED (sig=%d si_addr=%p tid=%lx t=%.0fms) "
+                "-- recovered via longjmp\n",
+                sig, si ? si->si_addr : NULL, ame_shim_tid(), ame_shim_ms());
+        siglongjmp(ame_compile_jmp, 1);
+    }
+    // 非编译线程（或非编译窗口）：链回先前安装的处理器（通常是 JVM 的，
+    // 走 hs_err 报告路径），保持进程其它部分的崩溃语义不变。
+    struct sigaction prev = (sig == SIGBUS) ? ame_prev_bus : ame_prev_segv;
+    if (prev.sa_flags & SA_SIGINFO) {
+        prev.sa_sigaction(sig, si, ctx);
+    } else if (prev.sa_handler == SIG_DFL) {
+        // 恢复默认处置并返回；出错指令重执行时内核套用默认动作。
+        signal(sig, SIG_DFL);
+    } else if (prev.sa_handler == SIG_IGN) {
+        /* 忽略 */
+    } else {
+        prev.sa_handler(sig);
+    }
+}
+
+// 仅在持有 ame_shaderc_shim_lock 时调用（编译串行化保证单线程 install/restore）。
+static void ame_crash_net_install(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = ame_compile_crash_handler;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&sa.sa_mask);
+    if (sigaction(SIGSEGV, &sa, &ame_prev_segv) != 0) return;
+    if (sigaction(SIGBUS, &sa, &ame_prev_bus) != 0) {
+        sigaction(SIGSEGV, &ame_prev_segv, NULL);
+        return;
+    }
+    ame_net_installed = 1;
+}
+
+static void ame_crash_net_restore(void) {
+    if (!ame_net_installed) return;
+    sigaction(SIGSEGV, &ame_prev_segv, NULL);
+    sigaction(SIGBUS, &ame_prev_bus, NULL);
+    ame_net_installed = 0;
+}
+
+// 带网调用真实编译；崩溃恢复后置 ame_last_call_crashed 并返回 NULL。
+static void *ame_call_real_guarded(ame_shaderc_shim_compile_fn_t fn, void *compiler,
+                                   const char *source, size_t source_size, int kind,
+                                   const char *input_file, const char *entry_point,
+                                   void *options) {
+    ame_last_call_crashed = 0;
+    ame_in_compile = 1;
+    if (sigsetjmp(ame_compile_jmp, 1) == 0) {
+        return fn(compiler, source, source_size, kind, input_file, entry_point, options);
+    }
+    ame_last_call_crashed = 1;
+    return NULL;
+}
+
 static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
                                       const char *source, size_t source_size,
                                       int kind, const char *input_file,
@@ -156,9 +248,32 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             "opt=%p in='%.48s'\n",
             seq, ame_shim_ms(), ame_shim_tid(), kind, source_size, compiler, options,
             input_file ? input_file : "(null)");
-    void *result = ((ame_shaderc_shim_compile_fn_t)real)(compiler, source, source_size,
-                                                         kind, input_file, entry_point,
-                                                         options);
+    // Task 34：崩溃恢复网罩住真实调用；首次崩溃→重试一次（新鲜解析树，
+    // 堆踩踏通常是瞬态的）；重试再崩→返回 NULL（上层把它当编译失败；
+    // 若上层解引用 NULL 而 JVM 处理器此时已恢复，仍会得到带本垫片取证日志
+    // 的 hs_err——诊断链不丢失）。
+    ame_crash_net_install();
+    void *result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, compiler,
+                                         source, source_size, kind, input_file,
+                                         entry_point, options);
+    if (ame_last_call_crashed) {
+        fprintf(stderr,
+                "[shaderc-shim] compile#%d crashed on first attempt -- retrying once "
+                "with fresh parse state\n",
+                seq);
+        result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, compiler,
+                                       source, source_size, kind, input_file,
+                                       entry_point, options);
+        if (ame_last_call_crashed) {
+            fprintf(stderr,
+                    "[shaderc-shim] compile#%d crashed on RETRY too -- giving up, "
+                    "returning NULL (shader compile will be reported failed)\n",
+                    seq);
+            result = NULL;
+        }
+    }
+    ame_in_compile = 0;
+    ame_crash_net_restore();
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     return result;
 }
