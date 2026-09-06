@@ -159,8 +159,14 @@ METHOD_JAVA_UNPACK = \
 	cd $(SOURCEDIR)/depends; \
 	if [ ! -f "java-$(1)-openjdk/release" ] && [ ! -f "$(ls jre$(1)-*.tar.xz)" ]; then \
 		if [ "$(RUNNER)" != "1" ]; then \
-			wget '$(2)' -q --show-progress; \
-			unzip jre*-ios-aarch64.zip && rm jre*-ios-aarch64.zip; \
+			wget_ok=0; \
+			for attempt in 1 2 3 4 5; do \
+				if wget '$(2)' --timeout=90 --tries=2 --retry-connrefused --show-progress -O jre$(1)-ios-aarch64.zip; then wget_ok=1; break; fi; \
+				echo '[jre] download failed (attempt '$$attempt'/5), retrying in 15s: $(2)'; \
+				sleep 15; \
+			done; \
+			if [ "$$wget_ok" != "1" ]; then echo '[jre] FATAL: could not download $(2) after 5 attempts'; exit 1; fi; \
+			unzip jre$(1)-ios-aarch64.zip && rm jre$(1)-ios-aarch64.zip; \
 		fi; \
 		mkdir -p java-$(1)-openjdk; \
 		tar xvf jre$(1)-*.tar.xz -C java-$(1)-openjdk; \
