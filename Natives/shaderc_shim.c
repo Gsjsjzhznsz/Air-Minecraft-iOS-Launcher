@@ -123,7 +123,10 @@
 //      set_forced_version_profile 五个设置口并打印值——揭示 GL 路径 vs
 //      Vulkan 路径的编译选项差异（优化等级/目标环境）。
 
+#include <dirent.h>
 #include <dlfcn.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
@@ -133,7 +136,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "shaderc_sandbox.h" // Task 42：进程外编译沙箱（父侧集成点）
 
@@ -206,7 +212,188 @@ static void ame_shim_lock_or_report_blocked(const char *what, const void *obj) {
     pthread_mutex_lock(&ame_shaderc_shim_lock);
 }
 
-// Task 38 前置声明：镜像基址取证（定义见构造器之后）。
+// 前置声明（定义在下方 result 访问器族；本文件公开 ABI，非 static）。
+int shaderc_result_get_compilation_status(void *result);
+size_t shaderc_result_get_length(void *result);
+const char *shaderc_result_get_bytes(void *result);
+const char *shaderc_result_get_spv_bytes(void *result);
+size_t shaderc_result_get_spv_length(void *result);
+static int ame_is_fake_result(const void *result); // 定义见 fake result 节
+
+// ---- Task 43：SPIR-V 磁盘缓存（跨启动单调积累）----
+// 动机：跨 42 个 task 的取证已证明进程内崩溃是非确定性堆踩踏（同二进制
+// 同输入：一次 run 390 次全过、另一 run 63% 崩）。fork server（Task 43
+// 主修复）根治根因；本缓存作为独立防线让【任何路径】的成功编译跨启动
+// 固化：每次 run 只剩未命中的 shader 需要真编译，运气单调积累；沙箱被
+// 沙盒拒绝的最坏情况下，也只需崩溃有限次即可集齐全部缓存。
+// key = FNV-1a(entry/kind/源码字节/输入名/入口名/options 全字段)。
+// 写入 tmp+rename 原子；损坏条目读失败即删；AME_SHADERC_CACHE_OFF 可关。
+// 命中返回 malloc 的 ame_sb_result_t（magic 复用沙箱结果链路，访问器族
+// 零新增代码）；沙箱/进程内两路成功结果统一在编译出口落盘。
+// 锁策略：ame_cache_lock 是叶子锁（不进 master 锁序）；文件 I/O 在锁外
+//（rename 原子性保证并发安全）。
+static pthread_mutex_t ame_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static int ame_cache_state = 0; // 0 未初始化 / 1 可用 / -1 禁用
+static char ame_cache_dir[3800];
+#define AME_CACHE_MAX_FILES 4096
+#define AME_CACHE_MAX_BLOB (64u * 1024u * 1024u)
+
+static uint64_t ame_cache_fnv(const void *data, size_t n, uint64_t h) {
+    const unsigned char *p = (const unsigned char *)data;
+    while (n--) {
+        h ^= (uint64_t)*p++;
+        h *= 0x100000001b3ull;
+    }
+    return h;
+}
+
+static uint64_t ame_cache_key(int entry, int kind, const char *source, size_t source_len,
+                              const char *input_file, const char *entry_point,
+                              const ame_sb_opt_fields_t *opt) {
+    uint64_t h = 0xcbf29ce484222325ull;
+    h = ame_cache_fnv(&entry, sizeof(int), h);
+    h = ame_cache_fnv(&kind, sizeof(int), h);
+    h = ame_cache_fnv(&source_len, sizeof(size_t), h);
+    if (source_len > 0) h = ame_cache_fnv(source, source_len, h);
+    if (input_file != NULL) {
+        h = ame_cache_fnv(input_file, strlen(input_file) + 1, h);
+    } else {
+        h = ame_cache_fnv("\x01", 1, h); // NULL 与 "" 区分
+    }
+    if (entry_point != NULL) {
+        h = ame_cache_fnv(entry_point, strlen(entry_point) + 1, h);
+    } else {
+        h = ame_cache_fnv("\x01", 1, h);
+    }
+    if (opt != NULL) h = ame_cache_fnv(opt, sizeof *opt, h);
+    return h;
+}
+
+// 持锁调用：初始化目录 + 防御性清理（残留 .tmp 删除；条目超限整目录清空）。
+static void ame_cache_init_locked(void) {
+    if (ame_cache_state != 0) return;
+    if (getenv("AME_SHADERC_CACHE_OFF") != NULL) {
+        ame_cache_state = -1;
+        return;
+    }
+    const char *home = getenv("POJAV_HOME");
+    if (home == NULL || *home == '\0') {
+        ame_cache_state = -1;
+        return;
+    }
+    snprintf(ame_cache_dir, sizeof ame_cache_dir, "%s/ame_shaderc_cache", home);
+    if (mkdir(ame_cache_dir, 0755) != 0 && errno != EEXIST) {
+        ame_cache_state = -1;
+        return;
+    }
+    int count = 0, wiped = 0;
+    DIR *d = opendir(ame_cache_dir);
+    if (d != NULL) {
+        struct dirent *de;
+        char path[4096];
+        while ((de = readdir(d)) != NULL) {
+            if (de->d_name[0] == '.') continue;
+            const char *ext = strrchr(de->d_name, '.');
+            if (ext != NULL && strcmp(ext, ".tmp") == 0) {
+                // 崩溃残留的半写文件
+                snprintf(path, sizeof path, "%s/%s", ame_cache_dir, de->d_name);
+                unlink(path);
+                wiped++;
+                continue;
+            }
+            count++;
+        }
+        closedir(d);
+    }
+    if (count > AME_CACHE_MAX_FILES) {
+        d = opendir(ame_cache_dir);
+        if (d != NULL) {
+            struct dirent *de;
+            char path[4096];
+            while ((de = readdir(d)) != NULL) {
+                if (de->d_name[0] == '.') continue;
+                snprintf(path, sizeof path, "%s/%s", ame_cache_dir, de->d_name);
+                unlink(path);
+            }
+            closedir(d);
+            count = 0;
+            wiped += 1 << 20; // 标记：整目录清空
+        }
+    }
+    ame_cache_state = 1;
+    fprintf(stderr, "[shaderc-cache] enabled at %s (%d entries%s)\n", ame_cache_dir,
+            count, wiped ? ", cleaned" : "");
+}
+
+static void *ame_cache_lookup(uint64_t key) {
+    pthread_mutex_lock(&ame_cache_lock);
+    ame_cache_init_locked();
+    if (ame_cache_state != 1) {
+        pthread_mutex_unlock(&ame_cache_lock);
+        return NULL;
+    }
+    char path[4096];
+    snprintf(path, sizeof path, "%s/%016llx.spv", ame_cache_dir,
+             (unsigned long long)key);
+    pthread_mutex_unlock(&ame_cache_lock);
+
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) return NULL;
+    ame_sb_result_t *res = NULL;
+    do {
+        if (fseek(f, 0, SEEK_END) != 0) break;
+        long sz = ftell(f);
+        if (sz < 0 || (unsigned long)sz > AME_CACHE_MAX_BLOB) break;
+        if (fseek(f, 0, SEEK_SET) != 0) break;
+        res = (ame_sb_result_t *)malloc(sizeof(ame_sb_result_t) + (size_t)sz + 1);
+        if (res == NULL) break;
+        res->magic = AME_SB_RESULT_MAGIC;
+        res->status = 0; // 只存成功编译
+        res->spv_len = (uint32_t)sz;
+        res->err_len = 0;
+        if (sz > 0 && fread((char *)ame_sb_result_spv(res), 1, (size_t)sz, f) != (size_t)sz) {
+            free(res);
+            res = NULL;
+            break;
+        }
+        *(char *)ame_sb_result_err(res) = '\0';
+    } while (0);
+    fclose(f);
+    if (res == NULL) unlink(path); // 损坏条目：删除，下次重编译
+    return res;
+}
+
+static int ame_cache_store(uint64_t key, const void *bytes, uint32_t len) {
+    if (bytes == NULL || len == 0 || len > AME_CACHE_MAX_BLOB) return -1;
+    pthread_mutex_lock(&ame_cache_lock);
+    ame_cache_init_locked();
+    if (ame_cache_state != 1) {
+        pthread_mutex_unlock(&ame_cache_lock);
+        return -1;
+    }
+    char path[4096], tmp[4096];
+    snprintf(path, sizeof path, "%s/%016llx.spv", ame_cache_dir,
+             (unsigned long long)key);
+    snprintf(tmp, sizeof tmp, "%s/%016llx.tmp", ame_cache_dir,
+             (unsigned long long)key);
+    pthread_mutex_unlock(&ame_cache_lock);
+
+    FILE *f = fopen(tmp, "wb");
+    if (f == NULL) return -1;
+    int ok = (fwrite(bytes, 1, len, f) == len) && (fflush(f) == 0);
+    fclose(f);
+    if (!ok) {
+        unlink(tmp);
+        return -1;
+    }
+    if (rename(tmp, path) != 0) {
+        unlink(tmp);
+        return -1;
+    }
+    return 0;
+}
+
+// Task 38 前置声明：镜像基址取证（定义见下方 result 访问器族之后）。
 static void ame_log_impl_bases(void);
 
 __attribute__((constructor))
@@ -717,18 +904,34 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             "opt=%p in='%.48s'\n",
             seq, ame_shim_ms(), ame_shim_tid(), kind, source_size, compiler, options,
             input_file ? input_file : "(null)");
+    // Task 43：磁盘缓存优先于一切编译路径（命中 = 毫秒级返回 + 零 glslang
+    // 暴露 + 零崩溃窗口）。key 覆盖 entry/kind/源码/输入名/入口名/options
+    // 全字段——MC 版本或管线配置变化自动失效。
+    ame_sb_opt_fields_t fields;
+    ame_opt_shadow_fill(options, &fields);
+    int sb_entry = strcmp(sym, "shaderc_compile_into_spv_assembly") == 0    ? 1
+                   : strcmp(sym, "shaderc_compile_into_preprocessed_text") == 0 ? 2
+                                                                                : 0;
+    uint64_t cache_key = ame_cache_key(sb_entry, kind, source, source_size, input_file,
+                                       entry_point, &fields);
+    void *cache_hit = ame_cache_lookup(cache_key);
+    if (cache_hit != NULL) {
+        ame_sb_result_t *r = (ame_sb_result_t *)cache_hit;
+        fprintf(stderr,
+                "[shaderc-cache] compile#%d HIT key=%016llx spv=%uB (t=%.0fms)\n",
+                seq, (unsigned long long)cache_key, r->spv_len, ame_shim_ms());
+        ame_note_compile_activity(); // 命中也算编译活动（首帧门控语义不变）
+        pthread_mutex_unlock(&ame_shaderc_shim_lock);
+        return cache_hit;
+    }
     // Task 42：进程外沙箱编译（首选项）。41 个 task 的取证已证明进程内堆踩踏
     // 锁不可防（主锁/门控/重建均不愈），唯一根治 = 编译离开 JVM 进程。沙箱
     // 返回的 ame_sb_result_t 携带真实 status/SPIR-V/错误文本——成功编译与
     // 编译失败都与 impl 语义一致；沙箱传输双重失败（返回 NULL）才落回下方
     // 进程内旧链路（崩溃网 + 重试 + 重建 + 合成失败，行为不劣于 Task 38）。
     // 心跳在出口照常更新——Task 39 首帧门控的静止窗口仍以编译结束起算。
+    // Task 43：成功结果（status==0 且有字节）就地落盘缓存。
     if (ame_sandbox_active()) {
-        ame_sb_opt_fields_t fields;
-        ame_opt_shadow_fill(options, &fields);
-        int sb_entry = strcmp(sym, "shaderc_compile_into_spv_assembly") == 0    ? 1
-                       : strcmp(sym, "shaderc_compile_into_preprocessed_text") == 0 ? 2
-                                                                                    : 0;
         double t0 = ame_shim_ms();
         void *sb = ame_sandbox_compile(sb_entry, source, source_size, kind, input_file,
                                        entry_point, &fields);
@@ -737,6 +940,9 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             fprintf(stderr,
                     "[shaderc-sandbox] compile#%d -> status=%d spv=%uB err=%uB (rt=%.0fms)\n",
                     seq, r->status, r->spv_len, r->err_len, ame_shim_ms() - t0);
+            if (r->status == 0 && r->spv_len > 0) {
+                ame_cache_store(cache_key, ame_sb_result_spv(r), r->spv_len);
+            }
             ame_note_compile_activity();
             pthread_mutex_unlock(&ame_shaderc_shim_lock);
             return sb;
@@ -800,6 +1006,24 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
     // 抛 NPE，绝不能把 NULL 交出去。
     if (result == NULL) {
         result = ame_fake_result_create(seq);
+    }
+    // Task 43：进程内成功编译也落缓存——沙箱被沙盒拒绝的最坏情况下，每次
+    // run 崩溃前的"幸运编译"跨启动固化，缓存命中率逐次上升直至全命中。
+    // 访问器走本文件自己的拦截链（fake/sb/真实对象三分支；均无锁、
+    // 只读），在持 master 锁状态下调用无死锁风险。
+    if (!ame_is_fake_result(result)) {
+        if (shaderc_result_get_compilation_status(result) == 0) {
+            size_t blen = (sb_entry == 0) ? shaderc_result_get_spv_length(result)
+                                          : shaderc_result_get_length(result);
+            if (blen > 0 && blen < AME_CACHE_MAX_BLOB) {
+                const char *bptr = (sb_entry == 0)
+                                       ? shaderc_result_get_spv_bytes(result)
+                                       : shaderc_result_get_bytes(result);
+                if (bptr != NULL) {
+                    ame_cache_store(cache_key, bptr, (uint32_t)blen);
+                }
+            }
+        }
     }
     ame_in_compile = 0;
     ame_crash_net_restore();

@@ -19,6 +19,24 @@
 //
 // Vulkan / GL 两条路径的 RenderPearl GLSL→SPIR-V 编译都经此沙箱
 // （干净进程里编译，两边同样受益；沙箱失效时自动降级，不回归现状）。
+//
+// Task 43（latestlog 9c98cc7）：posix_spawn 在真机沙盒安装上恒 EPERM
+//（505 行失败日志，沙箱从未启动，进程内回退照旧 322 次 SIGSEGV）——
+// iOS 沙盒 deny 的是 process-【exec】，plain fork()（不 exec）是允许的
+// 线路。因此沙箱拉起策略改为两级：
+//   1) fork server（主路径）：main.m 在 init_redirectStdio 之后、
+//      JVM/hook/ANGLE 诞生之前 fork() 本进程（无 exec）。子进程在进程
+//      只有主线程 + 日志读取线程的时刻分叉——JVM/JIT/渲染线程不存在，
+//      踩堆的"外部写入者"在子进程地址空间里【从未运行过】，堆天然纯净；
+//      且此时 dyld/malloc 锁全部空闲，子进程可安全 dlopen impl。
+//      父进程把 fd/pid 经 setenv 桥接给后期才加载的 shim
+//      （AME_SB_FORK_FD / AME_SB_FORK_PID，仅本进程可见）。
+//      子进程 stderr 已是 latestlog 管道——子进程取证直接落 latestlog。
+//   2) posix_spawn（备用）：TrollStore/no-sandbox 安装上仍然可用
+//      （JIT 自 spawn 先例）；失败一次即记死（不再每次编译重试刷屏）。
+// 子进程另配崩溃网（sigsetjmp 长跳 + glslang 进程状态重建 + 同一请求
+// 最多 4 次尝试）：impl 内崩溃不再等于 helper 死亡——恢复后继续服务，
+// 崩溃永远困在子进程地址空间里，父进程（JVM）不可能再被 shaderc 拖死。
 
 #ifndef AME_SHADERC_SANDBOX_H
 #define AME_SHADERC_SANDBOX_H
@@ -88,6 +106,18 @@ void *ame_sandbox_compile(int entry, const char *source, size_t source_size,
 // 阻塞服务循环：读请求 → 重建 options → 32MB 栈上编译 → 写响应。
 // EOF（父进程退出/关闭）时干净返回 0。
 int ame_shaderc_sandbox_child_main(void);
+
+// Task 43：fd 直传版本（fork server 子进程不经 env，直接拿父进程传下的
+// socketpair fd 进入服务循环；posix_spawn 路径仍走 env 版）。
+int ame_shaderc_sandbox_child_main_fd(int fd);
+
+// ---- fork server 侧 API（main.m 在 init_redirectStdio 之后调用）----
+// Task 43：在 JVM/hook/渲染线程诞生前 fork() 编译服务器（不 exec）。
+// 返回 0 = fork server 在线（握手完成，fd/pid 已 setenv 桥接给 shim）；
+// -1 = fork/握手失败（沙盒禁 fork、impl 加载失败等）——调用方照常继续，
+// shim 后续自动走 posix_spawn/进程内旧路径，零行为回退。
+// 幂等：重复调用直接返回上次结果；AME_SHADERC_SANDBOX[_OFF] 环境下跳过。
+int ame_sb_fork_server_early(void);
 
 #ifdef __cplusplus
 }

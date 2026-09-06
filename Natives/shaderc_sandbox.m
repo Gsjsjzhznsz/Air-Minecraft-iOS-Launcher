@@ -23,24 +23,54 @@
 //   - 每次编译在专用 32MB 栈线程上执行（glslang 深递归，照抄 main_hook.m
 //     的 hop 结构——子进程里没有 hooked_dlsym wrapper 兜底，必须自带）。
 //   - 子进程 stderr 继承父进程的 latestlog 管道——崩溃网/取证日志直接落盘。
+//
+// Task 43 增补（latestlog 9c98cc7：posix_spawn 在真机沙盒上恒 EPERM）：
+//   - fork server：main.m 在 init_redirectStdio 之后、JVM/hook/渲染线程诞生
+//     之前 fork()（不 exec）——iOS 沙盒 deny 的是 process-exec，plain fork
+//     可用；fork 时刻进程只有主线程+日志读取线程，子进程堆天然纯净。
+//     fd/pid 经 setenv（AME_SB_FORK_FD/AME_SB_FORK_PID）桥接给后期加载的 shim。
+//   - 子进程崩溃网：SEGV/BUS/ILL/FPE/ABRT → siglongjmp 回编译现场（同一
+//     32MB 栈线程内），glslang 进程状态重建（Finalize+Initialize+新 compiler）
+//     后重试，同一请求最多 4 次；崩溃永远困死于子进程，不再需要“重启
+//     helper”。posix_spawn 失败一次即记死（不再每次编译刷屏）。
+//   - Linux 可移植守卫（__APPLE__ / /proc/self/exe）：本文件可在 Linux
+//     上真实编译运行，支撑 fork 链路功能测试。
 
 #include "shaderc_sandbox.h"
 
 #include <dlfcn.h>
 #include <errno.h>
 #include <libgen.h>
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
+#endif
 #include <pthread.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <spawn.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+
+// 可移植：取当前可执行文件绝对路径（Darwin _NSGetExecutablePath / Linux
+// /proc/self/exe）。返回 0 成功。
+static int sb_exe_path(char *buf, uint32_t buflen) {
+#ifdef __APPLE__
+    return _NSGetExecutablePath(buf, &buflen) != 0 ? -1 : 0;
+#else
+    ssize_t n = readlink("/proc/self/exe", buf, buflen - 1);
+    if (n <= 0) return -1;
+    buf[n] = '\0';
+    return 0;
+#endif
+}
 
 // ---- 基础开关 ----
 static int s_sb_is_child = -1;   // -1 未判定 / 0 父进程 / 1 helper 子进程
@@ -59,6 +89,81 @@ int ame_sandbox_active(void) {
         }
     }
     return s_sb_is_child == 0;
+}
+
+// ---- Task 43：子进程崩溃网（共享状态与处理器）----
+// 子进程没有 JVM：崩溃可以激进恢复（长跳）而不是退出。处理器只做两件事：
+// 活动保护区内 → siglongjmp 回保护区；保护区外 → _exit(66)（父进程见
+// EOF 自动降级进程内路径，行为不劣于 Task 42）。
+// s_active_jmp 指向“当前唯一活动保护区”的跳转目标（子进程同一时刻只有
+// 一个编译在进行：32MB 栈 worker 内 or 回路线程的结果提取段）。
+static sigjmp_buf *volatile s_sb_active_jmp = NULL;
+
+static void sb_child_sig_handler(int sig, siginfo_t *si, void *uc) {
+    (void)si;
+    (void)uc;
+    sigjmp_buf *j = s_sb_active_jmp;
+    if (j == NULL) {
+        // 保护区外崩溃（子进程自身 bug）：干净退出，父进程走降级链
+        static const char kMsg[] =
+            "[shaderc-sandbox] child: fatal crash outside compile guard -- exiting\n";
+        (void)write(2, kMsg, sizeof(kMsg) - 1);
+        _exit(66);
+    }
+    s_sb_active_jmp = NULL;
+    siglongjmp(*j, sig);
+}
+
+static void sb_child_install_net(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = sb_child_sig_handler;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK; // 栈溢出型崩溃也能进处理器
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    sigaction(SIGILL, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL); // glslang 内部 assert/abort 同样可恢复
+}
+
+// 子进程取证日志：raw write(2)（避开 stdio FILE 锁——fork 瞬间父进程侧
+// 理论上可能有线程持锁；信号处理器上下文也可安全使用）。
+static void sb_clog(const char *fmt, ...) {
+    char buf[512];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    if (n <= 0) return;
+    if ((size_t)n >= sizeof buf) n = (int)sizeof buf - 1;
+    (void)write(2, buf, (size_t)n);
+}
+
+// 保护区线程注册 sigaltstack（64KB；正常路径回收，崩溃路径泄漏可接受）。
+static void *sb_altstack_arm(void) {
+    void *stk = mmap(NULL, 64 * 1024, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (stk == MAP_FAILED) return NULL;
+    stack_t ss;
+    memset(&ss, 0, sizeof ss);
+    ss.ss_sp = stk;
+    ss.ss_size = 64 * 1024;
+    ss.ss_flags = 0;
+    if (sigaltstack(&ss, NULL) != 0) {
+        munmap(stk, 64 * 1024);
+        return NULL;
+    }
+    return stk;
+}
+
+static void sb_altstack_disarm(void *stk) {
+    if (stk == NULL) return;
+    stack_t ss;
+    memset(&ss, 0, sizeof ss);
+    ss.ss_flags = SS_DISABLE;
+    sigaltstack(&ss, NULL);
+    munmap(stk, 64 * 1024);
 }
 
 // ---- 帧收发（带长度防御）----
@@ -126,6 +231,8 @@ static void sb_kill_child(void) {
 }
 
 // posix_spawn 自身可执行文件。返回 0 = helper 就绪（收到 ready 握手）。
+// Task 43：仅作备用拉起路径（TrollStore/no-sandbox 安装可用）；沙盒安装
+// 上 EPERM 一次即被调用方记死，不再重复尝试。
 static int sb_spawn(void) {
     sb_reap();
     int fds[2];
@@ -144,8 +251,7 @@ static int sb_spawn(void) {
 #endif
 
     char path[4096];
-    uint32_t plen = (uint32_t)sizeof path;
-    if (_NSGetExecutablePath(path, &plen) != 0) {
+    if (sb_exe_path(path, (uint32_t)sizeof path) != 0) {
         fprintf(stderr, "[shaderc-sandbox] executable path too long\n");
         close(fds[0]);
         close(fds[1]);
@@ -205,6 +311,91 @@ static int sb_spawn(void) {
     return 0;
 }
 
+// ---- Task 43：fork server（主拉起路径，无 exec）----
+// main.m 在 init_redirectStdio 之后、JVM/hook/渲染线程诞生之前调用。
+// fork 时刻：stdout/stderr 已接 latestlog 管道（子进程取证直接落盘）；
+// 进程只有主线程 + 日志读取线程（read() 阻塞中，不持 malloc/stdio 锁）
+// —— fork 后子进程可安全 dlopen impl；父进程 env 桥接 fd/pid 给 shim。
+// 幂等；失败返回 -1（调用方照常继续，零行为回退）。
+static int s_fork_done = 0;
+static int s_fork_rc = -1;
+
+int ame_sb_fork_server_early(void) {
+    if (s_fork_done) return s_fork_rc;
+    s_fork_done = 1;
+    if (getenv("AME_SHADERC_SANDBOX") != NULL) { // helper 本体（spawn 路径）
+        s_fork_rc = 0;
+        return 0;
+    }
+    if (getenv("AME_SHADERC_SANDBOX_OFF") != NULL) {
+        fprintf(stderr, "[shaderc-sandbox] fork server skipped (Sandbox OFF)\n");
+        s_fork_rc = -1;
+        return s_fork_rc;
+    }
+    int fds[2];
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
+        fprintf(stderr, "[shaderc-sandbox] fork server: socketpair failed errno=%d\n",
+                errno);
+        s_fork_rc = -1;
+        return s_fork_rc;
+    }
+    // 握手阶段 10s 超时（impl dlopen + compiler 初始化通常毫秒级）
+    struct timeval tv10 = {10, 0};
+    setsockopt(fds[0], SOL_SOCKET, SO_RCVTIMEO, &tv10, sizeof tv10);
+#ifdef SO_NOSIGPIPE
+    setsockopt(fds[0], SOL_SOCKET, SO_NOSIGPIPE, &(int){1}, sizeof(int));
+#endif
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        fprintf(stderr,
+                "[shaderc-sandbox] fork() failed errno=%d -- sandbox disabled "
+                "(iOS sandbox denies fork on this install?)\n",
+                errno);
+        close(fds[0]);
+        close(fds[1]);
+        s_fork_rc = -1;
+        return s_fork_rc;
+    }
+    if (pid == 0) {
+        // 子进程：此后只用 POSIX + impl C API（无 ObjC/CF/dispatch/stdout）
+        close(fds[0]);
+        int rc = ame_shaderc_sandbox_child_main_fd(fds[1]);
+        _exit(rc & 0xff);
+    }
+    close(fds[1]);
+    s_child_fd = fds[0];
+    s_child_pid = pid;
+
+    // ready 握手：子进程完成崩溃网安装 + impl dlopen + compiler 初始化
+    uint32_t rdy = 0;
+    if (sb_recv_u32(s_child_fd, &rdy) != 0 || rdy != AME_SB_RDY_MAGIC) {
+        fprintf(stderr,
+                "[shaderc-sandbox] fork helper handshake failed (pid=%d) -- "
+                "sandbox disabled\n",
+                (int)pid);
+        sb_kill_child();
+        s_fork_rc = -1;
+        return s_fork_rc;
+    }
+    // 握手完成后恢复 60s 收发超时（与 sb_spawn 语义一致）
+    struct timeval tv60 = {60, 0};
+    setsockopt(fds[0], SOL_SOCKET, SO_RCVTIMEO, &tv60, sizeof tv60);
+    setsockopt(fds[0], SOL_SOCKET, SO_SNDTIMEO, &tv60, sizeof tv60);
+
+    // env 桥接：shim（libshaderc.dylib）后期才加载，同进程 getenv 可见
+    char fdbuf[16], pidbuf[16];
+    snprintf(fdbuf, sizeof fdbuf, "%d", s_child_fd);
+    snprintf(pidbuf, sizeof pidbuf, "%d", (int)pid);
+    setenv("AME_SB_FORK_FD", fdbuf, 1);
+    setenv("AME_SB_FORK_PID", pidbuf, 1);
+    fprintf(stderr,
+            "[shaderc-sandbox] fork server online (pid=%d, fd=%d) -- Task 43\n",
+            (int)pid, s_child_fd);
+    s_fork_rc = 0;
+    return 0;
+}
+
 // 请求头（12 个 u32：magic/kind/entry/三段长度/opt_blen —— 打包为定长 40 字节）
 typedef struct {
     uint32_t magic;
@@ -218,10 +409,32 @@ typedef struct {
 } sb_req_hdr_t;
 
 // ---- 父进程：沙箱编译 ----
+// Task 43：posix_spawn 失败一次即记死（真机沙盒上恒 EPERM，旧实现每次编译
+// 重试 2 次刷出 505 行失败日志）；fork server 的 fd 经 env 桥接惰性收养。
+static int s_spawn_dead = 0;    // posix_spawn 永久失败（本进程不再尝试）
+static int s_env_adopted = 0;   // AME_SB_FORK_FD 桥接只做一次
+
+static void sb_adopt_fork_env(void) {
+    if (s_env_adopted) return;
+    s_env_adopted = 1;
+    if (s_child_fd >= 0) return; // 已持有（fork server 同映像调用等极端场景）
+    const char *fd_s = getenv("AME_SB_FORK_FD");
+    if (fd_s == NULL) return;
+    int fd = atoi(fd_s);
+    if (fd <= 0) return;
+    const char *pid_s = getenv("AME_SB_FORK_PID");
+    s_child_fd = fd;
+    s_child_pid = (pid_s != NULL) ? (pid_t)atoi(pid_s) : -1;
+    fprintf(stderr,
+            "[shaderc-sandbox] adopted early-fork helper (fd=%d pid=%d) -- Task 43\n",
+            fd, (int)s_child_pid);
+}
+
 void *ame_sandbox_compile(int entry, const char *source, size_t source_size,
                           int kind, const char *input_file, const char *entry_point,
                           const ame_sb_opt_fields_t *opt) {
     if (!ame_sandbox_active()) return NULL;
+    sb_adopt_fork_env(); // Task 43：收养 main() 早期 fork 的 server
 
     ame_sb_opt_fields_t default_opt;
     memset(&default_opt, 0, sizeof default_opt);
@@ -236,7 +449,13 @@ void *ame_sandbox_compile(int entry, const char *source, size_t source_size,
     }
 
     for (int attempt = 0; attempt < 2; ++attempt) {
-        if (s_child_fd < 0 && sb_spawn() != 0) continue;
+        if (s_child_fd < 0) {
+            if (s_spawn_dead) break; // posix_spawn 已记死：直接降级进程内
+            if (sb_spawn() != 0) {
+                s_spawn_dead = 1;
+                break;
+            }
+        }
 
         sb_req_hdr_t hdr;
         memset(&hdr, 0, sizeof hdr);
@@ -323,9 +542,12 @@ typedef int (*ame_impl_result_status_fn)(void *);
 typedef const char *(*ame_impl_result_bytes_fn)(void *);
 typedef size_t (*ame_impl_result_len_fn)(void *);
 typedef const char *(*ame_impl_result_msg_fn)(void *);
+// Task 43：glslang 进程级状态重建入口（impl 导出，设备符号名已验证）。
+typedef void (*ame_glslang_void_fn)(void);
 
 typedef struct {
     void *compiler;
+    void *impl_handle; // dlopen 句柄（重建时 dlsym 用）
     ame_impl_compile_fn into_spv;
     ame_impl_compile_fn into_asm;
     ame_impl_compile_fn into_pre;
@@ -344,13 +566,16 @@ typedef struct {
     ame_impl_result_bytes_fn result_bytes;
     ame_impl_result_len_fn result_len;
     ame_impl_result_msg_fn result_msg;
+    ame_impl_init_fn compiler_init;      // Task 43：重建用
+    ame_impl_release_fn compiler_release; // Task 43：重建用
+    ame_glslang_void_fn glslang_init;     // _ZN7glslang17InitializeProcessEv
+    ame_glslang_void_fn glslang_fini;     // _ZN7glslang15FinalizeProcessEv
 } sb_impl_t;
 
 static int sb_child_load_impl(sb_impl_t *impl) {
     memset(impl, 0, sizeof *impl);
     char exe[4096];
-    uint32_t elen = (uint32_t)sizeof exe;
-    if (_NSGetExecutablePath(exe, &elen) != 0) return -1;
+    if (sb_exe_path(exe, (uint32_t)sizeof exe) != 0) return -1;
     char pathbuf[4096 + 64];
     snprintf(pathbuf, sizeof pathbuf, "%s/Frameworks/libshaderc_impl.dylib", dirname(exe));
     void *h = dlopen(pathbuf, RTLD_NOW | RTLD_LOCAL);
@@ -358,9 +583,10 @@ static int sb_child_load_impl(sb_impl_t *impl) {
         h = dlopen("libshaderc_impl.dylib", RTLD_NOW | RTLD_LOCAL);
     }
     if (h == NULL) {
-        fprintf(stderr, "[shaderc-sandbox] child: dlopen impl failed: %s\n", dlerror());
+        sb_clog("[shaderc-sandbox] child: dlopen impl failed: %s\n", dlerror());
         return -1;
     }
+    impl->impl_handle = h;
     // 显式解析（各入口类型不同，逐一 dlsym；任何一个缺失都算致命）
     impl->into_spv = (ame_impl_compile_fn)dlsym(h, "shaderc_compile_into_spv");
     impl->into_asm = (ame_impl_compile_fn)dlsym(h, "shaderc_compile_into_spv_assembly");
@@ -384,13 +610,61 @@ static int sb_child_load_impl(sb_impl_t *impl) {
     ame_impl_init_fn compiler_init = (ame_impl_init_fn)dlsym(h, "shaderc_compiler_initialize");
     ame_impl_release_fn compiler_release = (ame_impl_release_fn)dlsym(h, "shaderc_compiler_release");
     if (compiler_init == NULL) return -1;
+    impl->compiler_init = compiler_init;
+    impl->compiler_release = compiler_release;
+    // Task 43：glslang 进程级重建入口（符号名与 Task 38 设备实测一致）
+    impl->glslang_init =
+        (ame_glslang_void_fn)dlsym(h, "_ZN7glslang17InitializeProcessEv");
+    impl->glslang_fini =
+        (ame_glslang_void_fn)dlsym(h, "_ZN7glslang15FinalizeProcessEv");
     impl->compiler = compiler_init();
     if (impl->compiler == NULL) return -1;
-    (void)compiler_release; // compiler 进程级长存（与父进程行为一致）
+    sb_clog("[shaderc-sandbox] child: impl loaded (glslang rebuild %s)\n",
+            (impl->glslang_init && impl->glslang_fini) ? "armed" : "unavailable");
     return 0;
 }
 
+// ---- Task 43：子进程 glslang 进程状态重建（回路线程上罩网执行）----
+// 编译崩溃后毒可能残留在 glslang 跨编译存活的全局结构里（符号表/字符串
+// 池/池分配器头）；Finalize+Initialize 全拆重建。释放旧 compiler 本身可能
+// 崩（半构造对象）——整段罩在崩溃网里：第一段崩 → 跳过 release 直接
+// Finalize+Init；再崩 → 返回 -1（调用方放弃重试/退出子进程）。
+static int sb_child_rebuild_core(sb_impl_t *impl, int with_release) {
+    if (with_release && impl->compiler != NULL && impl->compiler_release != NULL) {
+        impl->compiler_release(impl->compiler);
+        impl->compiler = NULL;
+    }
+    if (impl->glslang_fini != NULL) impl->glslang_fini();
+    if (impl->glslang_init != NULL) impl->glslang_init();
+    if (impl->compiler_init != NULL) impl->compiler = impl->compiler_init();
+    return (impl->compiler != NULL) ? 0 : -1;
+}
+
+static int sb_child_rebuild(sb_impl_t *impl) {
+    sigjmp_buf j;
+    s_sb_active_jmp = &j;
+    if (sigsetjmp(j, 1) == 0) {
+        int rc = sb_child_rebuild_core(impl, 1);
+        s_sb_active_jmp = NULL;
+        return rc;
+    }
+    // 第一段（含 release）崩：处理器已清 s_sb_active_jmp
+    sb_clog("[shaderc-sandbox] child: rebuild crashed during compiler release -- "
+            "retrying bare glslang cycle\n");
+    s_sb_active_jmp = &j;
+    if (sigsetjmp(j, 1) == 0) {
+        int rc = sb_child_rebuild_core(impl, 0);
+        s_sb_active_jmp = NULL;
+        return rc;
+    }
+    sb_clog("[shaderc-sandbox] child: bare glslang rebuild crashed too -- giving up\n");
+    return -1;
+}
+
 // 32MB 栈 hop（子进程内自带；结构同 main_hook.m 的 ame_run_on_32mb_stack）
+// Task 43：job 增加崩溃网字段——worker 线程内 sigsetjmp 包住 impl 调用，
+// 崩溃 → siglongjmp 跳回【同一线程】的 setjmp 点（绝不跨线程长跳），
+// worker 正常返回后由回路线程决策重建/重试。
 typedef struct {
     sb_impl_t *impl;
     int entry;
@@ -402,36 +676,54 @@ typedef struct {
     ame_sb_opt_fields_t opt;
     void *options;
     void *result;
+    volatile int crashed;   // 0 = 未崩 / 非 0 = 崩溃信号编号
 } sb_job_t;
 
 static void *sb_job_main(void *arg) {
     sb_job_t *job = (sb_job_t *)arg;
     sb_impl_t *im = job->impl;
 
-    // 按影子字段重建 options
-    job->options = im->opt_init();
-    if (job->options != NULL) {
-        im->opt_set_env(job->options, job->opt.target_env, job->opt.target_env_version);
-        im->opt_set_opt(job->options, job->opt.optimization_level);
-        if (job->opt.generate_debug) im->opt_set_dbg(job->options, 1);
-        if (job->opt.source_language) im->opt_set_lang(job->options, job->opt.source_language);
-        if (job->opt.has_forced) im->opt_set_vp(job->options, job->opt.forced_version, job->opt.forced_profile);
-        for (int i = 0; i < job->opt.macro_count && i < AME_SB_MAX_MACROS; ++i) {
-            const char *name = job->opt.macro_name[i];
-            const char *value = job->opt.macro_value[i];
-            if (job->opt.macro_has_value[i]) {
-                im->opt_macro(job->options, name, strlen(name), value, strlen(value));
-            } else {
-                im->opt_macro(job->options, name, strlen(name), NULL, 0);
+    // 本 worker 线程注册 sigaltstack（栈溢出型崩溃处理器也能跑）
+    void *altstk = sb_altstack_arm();
+
+    job->crashed = 0;
+    sigjmp_buf j;
+    s_sb_active_jmp = &j;
+    if (sigsetjmp(j, 1) == 0) {
+        // 按影子字段重建 options
+        job->options = im->opt_init();
+        if (job->options != NULL) {
+            im->opt_set_env(job->options, job->opt.target_env, job->opt.target_env_version);
+            im->opt_set_opt(job->options, job->opt.optimization_level);
+            if (job->opt.generate_debug) im->opt_set_dbg(job->options, 1);
+            if (job->opt.source_language) im->opt_set_lang(job->options, job->opt.source_language);
+            if (job->opt.has_forced) im->opt_set_vp(job->options, job->opt.forced_version, job->opt.forced_profile);
+            for (int i = 0; i < job->opt.macro_count && i < AME_SB_MAX_MACROS; ++i) {
+                const char *name = job->opt.macro_name[i];
+                const char *value = job->opt.macro_value[i];
+                if (job->opt.macro_has_value[i]) {
+                    im->opt_macro(job->options, name, strlen(name), value, strlen(value));
+                } else {
+                    im->opt_macro(job->options, name, strlen(name), NULL, 0);
+                }
             }
         }
-    }
 
-    ame_impl_compile_fn fn = (job->entry == 1) ? im->into_asm
-                             : (job->entry == 2) ? im->into_pre
-                                                 : im->into_spv;
-    job->result = fn(im->compiler, job->source, job->source_size, job->kind, job->input,
-                     job->entry_point, job->options);
+        ame_impl_compile_fn fn = (job->entry == 1) ? im->into_asm
+                                 : (job->entry == 2) ? im->into_pre
+                                                     : im->into_spv;
+        job->result = fn(im->compiler, job->source, job->source_size, job->kind,
+                         job->input, job->entry_point, job->options);
+        s_sb_active_jmp = NULL;
+    } else {
+        // 崩溃路径：处理器已清 s_sb_active_jmp；跳回值 = 信号编号。
+        // 半构造的 options/result 直接泄漏（子进程，量级有界）——释放本身
+        // 可能再崩，不值得冒险。
+        job->crashed = 1;
+        job->result = NULL;
+        job->options = NULL;
+    }
+    sb_altstack_disarm(altstk);
     return NULL;
 }
 
@@ -447,21 +739,21 @@ static void *sb_run_on_32mb(void *(*main_fn)(void *), void *job) {
     return job;
 }
 
-// ---- 子进程：服务循环 ----
-int ame_shaderc_sandbox_child_main(void) {
-    const char *fd_s = getenv("AME_SB_FD");
-    int fd = (fd_s != NULL) ? atoi(fd_s) : 3;
-    if (fd <= 0) fd = 3;
+// ---- 子进程：服务循环（Task 43：崩溃自愈 + 同请求最多 4 次尝试）----
+#define AME_SB_CHILD_MAX_ATTEMPTS 4
 
+static int ame_sb_child_serve_fd(int fd) {
     sb_impl_t impl;
+    sb_child_install_net(); // 先装崩溃网（impl 加载/初始化也受保护）
     if (sb_child_load_impl(&impl) != 0) {
-        fprintf(stderr, "[shaderc-sandbox] child: impl load failed -- exiting\n");
+        sb_clog("[shaderc-sandbox] child: impl load failed -- exiting\n");
         return 1;
     }
     uint32_t rdy = AME_SB_RDY_MAGIC;
     if (sb_send_all(fd, &rdy, 4) != 0) return 0; // 父进程已退出
 
-    fprintf(stderr, "[shaderc-sandbox] child loop online (compiler=%p)\n", impl.compiler);
+    sb_clog("[shaderc-sandbox] child loop online (pid=%d compiler=%p)\n",
+            (int)getpid(), impl.compiler);
 
     for (;;) {
         sb_req_hdr_t hdr;
@@ -469,7 +761,7 @@ int ame_shaderc_sandbox_child_main(void) {
         if (hdr.magic != AME_SB_REQ_MAGIC || hdr.source_len > AME_SB_MAX_BLOB ||
             hdr.input_len > 8192 || hdr.entry_len > 2048 ||
             hdr.opt_blen != sizeof(ame_sb_opt_fields_t)) {
-            fprintf(stderr, "[shaderc-sandbox] child: malformed request header\n");
+            sb_clog("[shaderc-sandbox] child: malformed request header\n");
             return 2;
         }
 
@@ -498,40 +790,111 @@ int ame_shaderc_sandbox_child_main(void) {
             return 0;
         }
 
-        // 编译（32MB 栈线程上）
-        sb_job_t job;
-        memset(&job, 0, sizeof job);
-        job.impl = &impl;
-        job.entry = (int)hdr.entry;
-        job.source = source;
-        job.source_size = hdr.source_len;
-        job.kind = (int)hdr.kind;
-        job.input = input;
-        job.entry_point = ep;
-        job.opt = opt;
-        if (sb_run_on_32mb(sb_job_main, &job) == NULL) {
-            job.result = NULL;
-        }
-
-        // 提取结果
-        int status = 3; // internal_error（hop 失败/结果为空时的兜底）
+        // 编译（32MB 栈线程上；崩溃 → 重建 glslang → 重试，最多 4 次）
+        int status = 3; // internal_error（兜底）
         const char *spv = "";
         size_t spv_len = 0;
         const char *err = "";
-        if (job.result != NULL) {
-            status = impl.result_status(job.result);
-            spv = impl.result_spv_bytes(job.result);
-            spv_len = impl.result_spv_len(job.result);
-            if (spv_len == 0) {
-                // assembly / preprocessed 文本走 get_bytes/get_length
-                spv = impl.result_bytes(job.result);
-                spv_len = impl.result_len(job.result);
+        char giveup_msg[256];
+        int attempts = 0;
+        int done = 0;           // 循环正常 break（无论编译成败）= 1
+        void *pending_result = NULL;  // 响应发送【之后】才释放（spv/err 指向其内部缓冲）
+        void *pending_options = NULL;
+        int suspect_result = 0;  // 提取段崩过：跳过 release（防二次崩，泄漏有界）
+
+        while (attempts < AME_SB_CHILD_MAX_ATTEMPTS) {
+            attempts++;
+            sb_job_t job;
+            memset(&job, 0, sizeof job);
+            job.impl = &impl;
+            job.entry = (int)hdr.entry;
+            job.source = source;
+            job.source_size = hdr.source_len;
+            job.kind = (int)hdr.kind;
+            job.input = input;
+            job.entry_point = ep;
+            job.opt = opt;
+            if (sb_run_on_32mb(sb_job_main, &job) == NULL) {
+                job.result = NULL;
             }
-            const char *m = impl.result_msg(job.result);
-            err = (m != NULL) ? m : "";
-        } else {
-            err = "[sandbox] 32MB stack hop failed (pthread_create)";
+
+            if (job.crashed) {
+                sb_clog("[shaderc-sandbox] child: compile crashed on attempt %d/%d "
+                        "(fresh-thread retry with glslang rebuild)\n",
+                        attempts, AME_SB_CHILD_MAX_ATTEMPTS);
+                if (sb_child_rebuild(&impl) != 0) {
+                    // 重建本身崩死：子进程不再可靠，干净退出走父进程降级链
+                    free(source);
+                    free(input);
+                    free(ep);
+                    return 4;
+                }
+                continue; // 换全新线程 + 全新进程状态重试
+            }
+
+            // 结果提取（回路线程上罩网：毒化的 result 访问也可能崩）
+            int extract_ok = 1;
+            if (job.result != NULL) {
+                sigjmp_buf ej;
+                s_sb_active_jmp = &ej;
+                if (sigsetjmp(ej, 1) == 0) {
+                    status = impl.result_status(job.result);
+                    spv = impl.result_spv_bytes(job.result);
+                    spv_len = impl.result_spv_len(job.result);
+                    if (spv_len == 0) {
+                        // assembly / preprocessed 文本走 get_bytes/get_length
+                        spv = impl.result_bytes(job.result);
+                        spv_len = impl.result_len(job.result);
+                    }
+                    const char *m = impl.result_msg(job.result);
+                    err = (m != NULL) ? m : "";
+                    s_sb_active_jmp = NULL;
+                } else {
+                    // 提取段崩溃：视作编译崩溃走重建重试
+                    extract_ok = 0;
+                    suspect_result = 1;
+                    sb_clog("[shaderc-sandbox] child: result extraction crashed "
+                            "(attempt %d/%d)\n",
+                            attempts, AME_SB_CHILD_MAX_ATTEMPTS);
+                }
+            } else {
+                err = "[sandbox] 32MB stack hop failed (pthread_create)";
+            }
+
+            if (!extract_ok) {
+                pending_options = job.options; // options 正常，发送后释放
+                if (sb_child_rebuild(&impl) != 0) {
+                    free(source);
+                    free(input);
+                    free(ep);
+                    return 4;
+                }
+                continue;
+            }
+
+            // 成功路径：释放延后到响应发送之后（spv/err 指向 result 内部缓冲）
+            pending_result = job.result;
+            pending_options = job.options;
+            done = 1;
+            break; // 完成（无论编译成败，只要没崩就出循环）
         }
+
+        // 循环耗尽 = 4 次全崩：合成 internal_error 响应，子进程继续服务
+        if (!done) {
+            snprintf(giveup_msg, sizeof giveup_msg,
+                     "[amethyst] sandbox-child compile crashed %d times -- "
+                     "internal_error (child still serving)",
+                     AME_SB_CHILD_MAX_ATTEMPTS);
+            err = giveup_msg;
+            // 耗尽后也重建一次，保证后续请求从干净状态开始
+            if (sb_child_rebuild(&impl) != 0) {
+                free(source);
+                free(input);
+                free(ep);
+                return 4;
+            }
+        }
+
         if (spv == NULL) { spv = ""; spv_len = 0; }
         size_t err_len = strlen(err);
         if (err_len > 1024u * 1024u) err_len = 1024u * 1024u;
@@ -545,15 +908,30 @@ int ame_shaderc_sandbox_child_main(void) {
                  (spv_len == 0 || sb_send_all(fd, spv, spv_len) == 0) &&
                  sb_send_all(fd, err, err_len + 1) == 0;
 
-        if (job.result != NULL && impl.result_release != NULL) {
-            impl.result_release(job.result);
+        // 响应发送完毕才释放（spv/err 指向 result 内部缓冲；与原 Task 42 同序）
+        if (pending_result != NULL && !suspect_result && impl.result_release != NULL) {
+            impl.result_release(pending_result);
         }
-        if (job.options != NULL && impl.opt_release != NULL) {
-            impl.opt_release(job.options);
+        if (pending_options != NULL && impl.opt_release != NULL) {
+            impl.opt_release(pending_options);
         }
+
         free(source);
         free(input);
         free(ep);
         if (!ok) return 0; // 父进程断开
     }
+}
+
+// env 版入口（posix_spawn 路径）：fd 从 AME_SB_FD 取。
+int ame_shaderc_sandbox_child_main(void) {
+    const char *fd_s = getenv("AME_SB_FD");
+    int fd = (fd_s != NULL) ? atoi(fd_s) : 3;
+    if (fd <= 0) fd = 3;
+    return ame_shaderc_sandbox_child_main_fd(fd);
+}
+
+// fd 直传入口（Task 43 fork server 路径）。
+int ame_shaderc_sandbox_child_main_fd(int fd) {
+    return ame_sb_child_serve_fd(fd);
 }

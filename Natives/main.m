@@ -24,6 +24,11 @@
 #include "utils.h"
 #include "codesign.h"
 
+// Task 43：shaderc 编译 fork server（实现于 Natives/shaderc_sandbox.m，
+// CMake 同时编进本可执行文件）。在 init_redirectStdio 之后调用——见
+// main() 内注释。
+int ame_sb_fork_server_early(void);
+
 #define CS_PLATFORM_BINARY 0x4000000
 #define PT_TRACE_ME 0
 #define PT_DETACH 11 
@@ -370,6 +375,15 @@ int main(int argc, char *argv[]) {
     isJailbroken = init_checkForJailbreak();
     init_setupHomeDirectory();
     init_redirectStdio();
+    // Task 43：在此 fork shaderc 编译服务器（不 exec）。位置选择的三个理由：
+    //   1) stderr 已接 latestlog 管道——子进程取证（sb_clog raw write）直接
+    //      经管道落 latestlog.txt（父进程的日志读取线程活着，跨进程收走）；
+    //   2) 进程此刻只有主线程 + 日志读取线程（read() 阻塞中，不持 malloc/
+    //      stdio/dyld 锁）——子进程可安全 dlopen impl + malloc；
+    //   3) JVM/JIT/hook/ANGLE 均未诞生——进程内堆踩踏的“外部写入者”在子
+    //      进程地址空间里从未运行，编译环境天然纯净。
+    // 失败（沙盒禁 fork 等）只打日志，launcher 照常继续（shim 自动降级）。
+    ame_sb_fork_server_early();
     init_logDeviceAndVer(argv[0]);
 
     loadPreferences(NO);
