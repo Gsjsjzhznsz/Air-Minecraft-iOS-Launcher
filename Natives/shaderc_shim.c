@@ -60,6 +60,33 @@
 //      这样即便 impl 里还藏着其它同类脆弱点，也只损失单个 shader 编译而不是
 //      整个进程。恢复代价：被丢弃的解析树内存泄漏（罕见事件，可接受）。
 
+//
+// Task 37（latestlog 2026-09-06 18:42，构建 e28e4c3，GL 渲染器路径）：
+// 渲染器切换成功后 GL 链路首次贯通（embed 成功、首帧 eglSwapBuffers OK），
+// 但资源重载阶段 shaderc 复杂 shader（terrain/entity/clouds…）全部双崩
+// （重试必崩 = 确定性环境破坏，非瞬态踩踏），崩溃网恢复后返回 NULL →
+// LWJGL Checks.check 对 NULL 指针抛 NPE →
+// GlslCompiler.compileToSpv:147 → CompletionException → 游戏崩溃。
+// 崩溃窗口与 MobileGlues 转换器激活窗口完全重合（[MG] Shader N converted
+// 从 t≈280ms 起持续工作；compile#1-4 在 MG 启动前全部成功；同窗口内简单
+// shader 也成功、复杂 shader 全崩）。全进程实际存在四套转换引擎并发：
+// 本 impl 的 glslang + spvc 的 SPIRV-Cross（RenderPearl 管线，两把独立的
+// shim 锁）vs MG 内嵌的 glslang + SPIRV-Cross（GLSLtoGLSLES_2，仅自带
+// g_conv_serial 自身互斥）——跨引擎零串行。MG 侧自己的注释（glsl_for_es.cpp
+// g_conv_serial 处）已实证同库并发解析会互踩 AST；跨引擎并发同理可信。
+// 三连修复：
+//   1) ame_master_compile_lock：本垫片升级为跨库总锁持有者并导出 C 符号；
+//      spvc_shim / MobileGlues 的 GLSLtoGLSLES_2 通过 dlopen("libshaderc.dylib")
+//      + dlsym 协商同一把锁（拿不到则各自退回本地锁，向后兼容）；
+//      shaderc 编译 / spvc 交叉编译 / MG 转换三方彻底串行，并发窗口归零。
+//   2) 双崩后不再返回 NULL：合成 fake result（magic 标记 + status=
+//      internal_error + 取证错误消息），并拦截 shaderc_result_* 访问器族
+//      （release / status / errors / warnings / message / bytes / length /
+//      spv_bytes / spv_length）识别 fake 指针——LWJGL 拿到非 NULL 句柄，
+//      MC 走正常「编译失败」路径，NPE 消失；
+//   3) 崩溃网打印崩溃 PC/LR（arm64 ucontext）——下轮日志可直接对着 impl
+//      符号表离线 symbolicate，定位具体 glslang 函数。
+
 #include <dlfcn.h>
 #include <pthread.h>
 #include <setjmp.h>
@@ -67,12 +94,22 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 static pthread_mutex_t ame_shaderc_shim_lock;
 static void *ame_shaderc_shim_impl = NULL;
 static void *(*ame_shaderc_shim_real_dlsym)(void *, const char *) = NULL;
+
+// ---- Task 37：跨库编译总锁导出 ----
+// spvc_shim 与 MobileGlues 的 GLSL 转换器（GLSLtoGLSLES_2）在运行时
+// dlopen("libshaderc.dylib") 后 dlsym("ame_master_compile_lock") 拿到本函数，
+// 与本垫片的编译/生命周期锁共用同一把递归互斥锁，消灭「四引擎并发」窗口。
+// 返回值恒非 NULL；协商失败方退回各自本地锁，不影响本垫片自身行为。
+pthread_mutex_t *ame_master_compile_lock(void) {
+    return &ame_shaderc_shim_lock;
+}
 
 // 进程启动起的毫秒数（取证时间轴；首个调用线程初始化 t0，毫秒精度足够）。
 static double ame_shim_ms(void) {
@@ -165,15 +202,26 @@ static int ame_net_installed = 0;
 static void ame_compile_crash_handler(int sig, siginfo_t *si, void *ctx) {
     if (ame_in_compile) {
         ame_in_compile = 0;
+        // Task 37：崩溃 PC/LR 取证（arm64 ucontext）——离线对着 impl 符号表
+        // symbolicate 即可定位崩溃函数（lValueErrorCheck 家族或新脆弱点）。
+        uint64_t pc = 0, lr = 0;
+#if defined(__aarch64__)
+        if (ctx != NULL) {
+            ucontext_t *uc = (ucontext_t *)ctx;
+            pc = (uint64_t)uc->uc_mcontext->__ss.__pc;
+            lr = (uint64_t)uc->uc_mcontext->__ss.__lr;
+        }
+#endif
         // 阻断本信号，防止 longjmp 展开过程中同一错误页立即重触发
         sigset_t set;
         sigemptyset(&set);
         sigaddset(&set, sig);
         sigprocmask(SIG_BLOCK, &set, NULL);
         fprintf(stderr,
-                "[shaderc-shim] compile CRASHED (sig=%d si_addr=%p tid=%lx t=%.0fms) "
-                "-- recovered via longjmp\n",
-                sig, si ? si->si_addr : NULL, ame_shim_tid(), ame_shim_ms());
+                "[shaderc-shim] compile CRASHED (sig=%d si_addr=%p pc=%p lr=%p "
+                "tid=%lx t=%.0fms) -- recovered via longjmp\n",
+                sig, si ? si->si_addr : NULL, (void *)pc, (void *)lr,
+                ame_shim_tid(), ame_shim_ms());
         siglongjmp(ame_compile_jmp, 1);
     }
     // 非编译线程（或非编译窗口）：链回先前安装的处理器（通常是 JVM 的，
@@ -227,6 +275,9 @@ static void *ame_call_real_guarded(ame_shaderc_shim_compile_fn_t fn, void *compi
     return NULL;
 }
 
+// Task 37 前置声明：合成失败 result（定义见下方 result 访问器族）。
+static void *ame_fake_result_create(int seq);
+
 static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
                                       const char *source, size_t source_size,
                                       int kind, const char *input_file,
@@ -249,9 +300,9 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             seq, ame_shim_ms(), ame_shim_tid(), kind, source_size, compiler, options,
             input_file ? input_file : "(null)");
     // Task 34：崩溃恢复网罩住真实调用；首次崩溃→重试一次（新鲜解析树，
-    // 堆踩踏通常是瞬态的）；重试再崩→返回 NULL（上层把它当编译失败；
-    // 若上层解引用 NULL 而 JVM 处理器此时已恢复，仍会得到带本垫片取证日志
-    // 的 hs_err——诊断链不丢失）。
+    // 堆踩踏通常是瞬态的）；重试再崩→返回合成失败 result（Task 37：绝不能
+    // 返回 NULL——LWJGL Checks.check 对 NULL 抛 NPE，真机 CompletionException
+    // 的直接死因）；诊断链不丢失。
     ame_crash_net_install();
     void *result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, compiler,
                                          source, source_size, kind, input_file,
@@ -267,15 +318,129 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
         if (ame_last_call_crashed) {
             fprintf(stderr,
                     "[shaderc-shim] compile#%d crashed on RETRY too -- giving up, "
-                    "returning NULL (shader compile will be reported failed)\n",
+                    "returning synthetic failure result (compilation will be "
+                    "reported failed, no NULL to LWJGL)\n",
                     seq);
-            result = NULL;
+            // Task 37：合成 fake result（status=internal_error + 取证消息）。
+            result = ame_fake_result_create(seq);
         }
     }
     ame_in_compile = 0;
     ame_crash_net_restore();
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     return result;
+}
+
+// ---- Task 37：合成失败 result（防 NULL → NPE） ----
+// 双崩后 MC/LWJGL 需要一个非 NULL 的 shaderc_compilation_result_t；本层
+// 用 malloc 的 fake 对象（magic 头识别）+ 拦截的 result 访问器族共同实现。
+// malloc 失败的兑底静态件用低位翻转的 magic 标记（release 跳过 free）。
+// 访问器转发真实对象时不加锁：result 为调用线程独占的个体堆对象，不存在
+// release-vs-compile 的全局状态竞态（Task 30 已证明危险面在 options/compiler）。
+typedef struct {
+    uint64_t magic;   // AME_FAKE_RESULT_MAGIC / _STATIC
+    int seq;          // 崩溃的编译序号（取证）
+    char message[96]; // 固定错误消息（含序号）
+} ame_fake_result_t;
+
+#define AME_FAKE_RESULT_MAGIC        0x5A17EFA2E51DULL
+#define AME_FAKE_RESULT_MAGIC_STATIC (0x5A17EFA2E51DULL ^ 1ull)
+
+static int ame_is_fake_result(const void *result) {
+    if (result == NULL) return 0;
+    uint64_t m = *(const uint64_t *)result;
+    return m == AME_FAKE_RESULT_MAGIC || m == AME_FAKE_RESULT_MAGIC_STATIC;
+}
+
+static void ame_fake_result_fill(ame_fake_result_t *fr, uint64_t magic, int seq) {
+    fr->magic = magic;
+    fr->seq = seq;
+    snprintf(fr->message, sizeof(fr->message),
+             "[amethyst] shaderc compile #%d crashed twice (shim recovery)", seq);
+}
+
+static void *ame_fake_result_create(int seq) {
+    ame_fake_result_t *fr = (ame_fake_result_t *)malloc(sizeof(ame_fake_result_t));
+    if (fr != NULL) {
+        ame_fake_result_fill(fr, AME_FAKE_RESULT_MAGIC, seq);
+        return fr;
+    }
+    // malloc 失败的极端场景：静态兑底件（magic 低位翻转，release 识别跳过 free）。
+    static ame_fake_result_t s_static_fake;
+    ame_fake_result_fill(&s_static_fake, AME_FAKE_RESULT_MAGIC_STATIC, seq);
+    return &s_static_fake;
+}
+
+// ---- result 访问器族：fake → 合成值；真实对象 → 转发 impl ----
+// （拿不到 impl 符号时返回安全值，绝不把 NULL 指针交给 impl 解引用）。
+// shaderc_compilation_status 枚举： success=0 / invalid_stage=1 /
+// compilation_error=2 / internal_error=3 —— fake 报 3。
+
+void shaderc_result_release(void *result) {
+    if (ame_is_fake_result(result)) {
+        if (*(uint64_t *)result == AME_FAKE_RESULT_MAGIC) free(result);
+        return;
+    }
+    void *real = ame_shaderc_shim_resolve("shaderc_result_release");
+    if (real == NULL || result == NULL) return;
+    ((void (*)(void *))real)(result);
+}
+
+int shaderc_result_get_compilation_status(void *result) {
+    if (ame_is_fake_result(result)) return 3; // shaderc_compilation_status_internal_error
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_compilation_status");
+    if (real == NULL || result == NULL) return 3;
+    return ((int (*)(void *))real)(result);
+}
+
+size_t shaderc_result_get_num_errors(void *result) {
+    if (ame_is_fake_result(result)) return 1;
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_num_errors");
+    if (real == NULL || result == NULL) return 0;
+    return ((size_t (*)(void *))real)(result);
+}
+
+size_t shaderc_result_get_num_warnings(void *result) {
+    if (ame_is_fake_result(result)) return 0;
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_num_warnings");
+    if (real == NULL || result == NULL) return 0;
+    return ((size_t (*)(void *))real)(result);
+}
+
+const char *shaderc_result_get_error_message(void *result) {
+    if (ame_is_fake_result(result))
+        return ((ame_fake_result_t *)result)->message;
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_error_message");
+    if (real == NULL || result == NULL) return "(shim: result missing)";
+    return ((const char *(*)(void *))real)(result);
+}
+
+const char *shaderc_result_get_bytes(void *result) {
+    if (ame_is_fake_result(result)) return "";
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_bytes");
+    if (real == NULL || result == NULL) return "";
+    return ((const char *(*)(void *))real)(result);
+}
+
+size_t shaderc_result_get_length(void *result) {
+    if (ame_is_fake_result(result)) return 0;
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_length");
+    if (real == NULL || result == NULL) return 0;
+    return ((size_t (*)(void *))real)(result);
+}
+
+const char *shaderc_result_get_spv_bytes(void *result) {
+    if (ame_is_fake_result(result)) return "";
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_spv_bytes");
+    if (real == NULL || result == NULL) return "";
+    return ((const char *(*)(void *))real)(result);
+}
+
+size_t shaderc_result_get_spv_length(void *result) {
+    if (ame_is_fake_result(result)) return 0;
+    void *real = ame_shaderc_shim_resolve("shaderc_result_get_spv_length");
+    if (real == NULL || result == NULL) return 0;
+    return ((size_t (*)(void *))real)(result);
 }
 
 // ---- 生命周期入口（Task 30）：与编译共用同一把锁，关闭 release-vs-compile

@@ -16,6 +16,16 @@
 // 真实库改名 libspirv-cross-c-shared.0.impl.dylib（-reexport_library 透传全部
 // 符号）；未拦截的原始 dlsym 获取方式与死锁规避，见 shaderc_shim.c 顶部注释。
 // 兼容名软链 libspirv-cross.dylib 由 Makefile payload 段照旧创建，指向本垫片。
+//
+// Task 37（GL 渲染器路径 latestlog 2026-09-06 18:42）：真机日志铁证四引擎
+// 并发——shaderc 编译（shaderc_shim 锁）与 spvc 交叉编译（本垫片锁，两把
+// 互不相干）与 MobileGlues 转换器（仅自带 g_conv_serial）同时工作；复杂
+// shader（terrain/entity）在此窗口全部双崩。本垫片改为运行时协商
+// libshaderc.dylib（shaderc_shim）导出的 ame_master_compile_lock()，把
+// spvc 的全部入口挂到跨库总锁上，与 shaderc 编译、MG 转换彻底互斥；
+// 协商失败（独立构建/加载顺序异常）退回本地锁，行为与旧版一致。
+// 死锁审查：spvc 转发 impl 期间不回调 shaderc/MG，单向锁序无环；首次协商
+// 的 dlopen 只拿 dyld 锁（与编译互不相嵌）。
 
 #include <dlfcn.h>
 #include <pthread.h>
@@ -24,9 +34,42 @@
 #include <stdio.h>
 #include <time.h>
 
-static pthread_mutex_t ame_spvc_shim_lock;
+static pthread_mutex_t ame_spvc_shim_lock;  // 本地回退锁（master 协商失败时用）
+static pthread_mutex_t *g_ame_master_lock = NULL;
 static void *ame_spvc_shim_impl = NULL;
 static void *(*ame_spvc_shim_real_dlsym)(void *, const char *) = NULL;
+
+// ---- Task 37：与 libshaderc.dylib（shaderc_shim）协商跨库编译总锁 ----
+// 惰性一次性：首个取锁的调用触发。dlopen 同 install name 的已加载镜像
+// 只增加引用计数并返回同一 handle（MC/LWJGL 必然已加载或即将加载同一文件）
+// 因此这里不会产生第二个 shaderc 实例。并发首次调用最坏双重 dlopen/dlsym
+// 写同值，无害。
+static pthread_mutex_t *ame_spvc_master_or_local(void) {
+    static volatile int s_negotiated = 0;
+    if (!s_negotiated) {
+        s_negotiated = 1;
+        static const char *const kCandidates[] = {
+            "@rpath/libshaderc.dylib",
+            "@loader_path/libshaderc.dylib",
+            "libshaderc.dylib",
+            NULL,
+        };
+        for (int i = 0; kCandidates[i] != NULL && g_ame_master_lock == NULL; ++i) {
+            void *h = dlopen(kCandidates[i], RTLD_LAZY);
+            if (h == NULL || ame_spvc_shim_real_dlsym == NULL) continue;
+            pthread_mutex_t *(*fn)(void) =
+                (pthread_mutex_t *(*)(void))ame_spvc_shim_real_dlsym(
+                    h, "ame_master_compile_lock");
+            if (fn != NULL) g_ame_master_lock = fn();
+        }
+        fprintf(stderr, g_ame_master_lock
+                ? "[spvc-shim] master compile lock negotiated %p -- shaderc/spvc/MG "
+                  "serialization ON\n"
+                : "[spvc-shim] master lock unavailable -- falling back to local lock\n",
+                g_ame_master_lock ? (void *)g_ame_master_lock : NULL);
+    }
+    return (g_ame_master_lock != NULL) ? g_ame_master_lock : &ame_spvc_shim_lock;
+}
 
 // 进程启动起的毫秒数 + 线程标识（取证时间轴，与 shaderc-shim 日志对齐）。
 static double ame_spvc_shim_ms(void) {
@@ -47,12 +90,13 @@ static unsigned long ame_spvc_shim_tid(void) {
 }
 
 static void ame_spvc_shim_lock_or_report_blocked(const char *what, const void *obj) {
-    if (pthread_mutex_trylock(&ame_spvc_shim_lock) == 0) return;
+    pthread_mutex_t *lock = ame_spvc_master_or_local();
+    if (pthread_mutex_trylock(lock) == 0) return;
     fprintf(stderr,
             "[spvc-shim] %s(%p) BLOCKED behind in-flight parse/compile -- waiting "
             "(t=%.0fms tid=%lx)\n",
             what, obj, ame_spvc_shim_ms(), ame_spvc_shim_tid());
-    pthread_mutex_lock(&ame_spvc_shim_lock);
+    pthread_mutex_lock(lock);
 }
 
 __attribute__((constructor))
@@ -110,11 +154,11 @@ int spvc_context_parse_spirv(void *context, const unsigned *spirv, size_t word_c
                         "error\n");
         return -1;
     }
-    pthread_mutex_lock(&ame_spvc_shim_lock);
+    pthread_mutex_lock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] parse_spirv words=%zu ctx=%p (t=%.0fms tid=%lx)\n",
             word_count, context, ame_spvc_shim_ms(), ame_spvc_shim_tid());
     int rc = ((ame_spvc_shim_parse_fn_t)real)(context, spirv, word_count, parsed_ir);
-    pthread_mutex_unlock(&ame_spvc_shim_lock);
+    pthread_mutex_unlock(ame_spvc_master_or_local());
     return rc;
 }
 
@@ -125,11 +169,11 @@ int spvc_compiler_compile(void *compiler, const char **source) {
                         "error\n");
         return -1;
     }
-    pthread_mutex_lock(&ame_spvc_shim_lock);
+    pthread_mutex_lock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] compiler_compile comp=%p (t=%.0fms tid=%lx)\n",
             compiler, ame_spvc_shim_ms(), ame_spvc_shim_tid());
     int rc = ((ame_spvc_shim_compile_fn_t)real)(compiler, source);
-    pthread_mutex_unlock(&ame_spvc_shim_lock);
+    pthread_mutex_unlock(ame_spvc_master_or_local());
     return rc;
 }
 
@@ -140,9 +184,9 @@ int spvc_compiler_compile(void *compiler, const char **source) {
 int spvc_context_create(void **context) {
     void *real = ame_spvc_shim_resolve("spvc_context_create");
     if (real == NULL || context == NULL) return -1;
-    pthread_mutex_lock(&ame_spvc_shim_lock);
+    pthread_mutex_lock(ame_spvc_master_or_local());
     int rc = ((int (*)(void **))real)(context);
-    pthread_mutex_unlock(&ame_spvc_shim_lock);
+    pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] context_create -> %p rc=%d (t=%.0fms tid=%lx)\n",
             (context ? *context : NULL), rc, ame_spvc_shim_ms(), ame_spvc_shim_tid());
     return rc;
@@ -153,7 +197,7 @@ void spvc_context_destroy(void *context) {
     if (real == NULL || context == NULL) return;
     ame_spvc_shim_lock_or_report_blocked("context_destroy", context);
     ((void (*)(void *))real)(context);
-    pthread_mutex_unlock(&ame_spvc_shim_lock);
+    pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] context_destroy %p done (t=%.0fms tid=%lx)\n",
             context, ame_spvc_shim_ms(), ame_spvc_shim_tid());
 }
@@ -165,7 +209,7 @@ void spvc_context_release_allocations(void *context) {
     if (real == NULL || context == NULL) return;
     ame_spvc_shim_lock_or_report_blocked("release_allocations", context);
     ((void (*)(void *))real)(context);
-    pthread_mutex_unlock(&ame_spvc_shim_lock);
+    pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] release_allocations %p done (t=%.0fms tid=%lx)\n",
             context, ame_spvc_shim_ms(), ame_spvc_shim_tid());
 }
@@ -174,10 +218,10 @@ int spvc_context_create_compiler(void *context, int backend, void *parsed_ir,
                                  int capture_mode, void **compiler) {
     void *real = ame_spvc_shim_resolve("spvc_context_create_compiler");
     if (real == NULL || compiler == NULL) return -1;
-    pthread_mutex_lock(&ame_spvc_shim_lock);
+    pthread_mutex_lock(ame_spvc_master_or_local());
     int rc = ((int (*)(void *, int, void *, int, void **))real)(
         context, backend, parsed_ir, capture_mode, compiler);
-    pthread_mutex_unlock(&ame_spvc_shim_lock);
+    pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] create_compiler backend=%d -> %p rc=%d (t=%.0fms "
                     "tid=%lx)\n",
             backend, (compiler ? *compiler : NULL), rc, ame_spvc_shim_ms(),

@@ -1357,6 +1357,44 @@ std::string GLSLtoGLSLES_2(const char* glsl_code, GLenum glsl_type, uint essl_ve
     // sequential instead of deadlocking.
     static std::recursive_mutex g_conv_serial;
     std::lock_guard<std::recursive_mutex> conv_guard(g_conv_serial);
+
+    // ---- Amethyst Task 37: cross-engine master compile lock ----
+    // On-device evidence (latestlog 2026-09-06 18:42, GL renderer path):
+    // while this converter ran, RenderPearl's shaderc compiles of complex
+    // shaders (terrain/entity/clouds) crashed deterministically in the
+    // SAME time window -- four shader engines were running concurrently
+    // (this converter's embedded glslang+SPIRV-Cross vs shaderc/spvc shims,
+    // with three independent locks). Negotiate the master lock exported by
+    // libshaderc.dylib (the shaderc_shim forwarder, RTLD-safe dlopen of an
+    // already-loaded image -> same instance) and hold it across the whole
+    // conversion hop so shaderc compiles, spvc cross-compiles and MG
+    // conversions are fully serialized. Lock order is one-way
+    // (g_conv_serial -> master; the shims never take g_conv_serial), no
+    // cycles. Failure to negotiate (shim absent, standalone MG build)
+    // degrades to the Task-30 behavior above -- a no-op guard.
+    struct MasterLockGuard {
+        pthread_mutex_t* m;
+        explicit MasterLockGuard(pthread_mutex_t* mm) : m(mm) {
+            if (m) pthread_mutex_lock(m);
+        }
+        ~MasterLockGuard() { if (m) pthread_mutex_unlock(m); }
+    };
+    static pthread_mutex_t* ame_master = (pthread_mutex_t*)1; // 1 = not yet negotiated
+    if (ame_master == (pthread_mutex_t*)1) {
+        ame_master = nullptr;
+        // dlopen an already-loaded image only bumps its refcount and returns
+        // the same handle, so this never creates a second shaderc instance.
+        // "ame_master_compile_lock" is not in the launcher's fishhook prefix
+        // list, so dlsym resolves it unhooked.
+        void* h = dlopen("libshaderc.dylib", RTLD_LAZY);
+        if (h) {
+            if (auto fn = (pthread_mutex_t* (*)())dlsym(h, "ame_master_compile_lock"))
+                ame_master = fn();
+        }
+        LOG_I("[MG] amethyst master compile lock %s (shaderc/spvc/MG full serialization)",
+              ame_master ? "negotiated" : "unavailable -- conversion serialized within MG only")
+    }
+    MasterLockGuard master_guard(ame_master);
     std::string out;
     int rc = 0;
     GLSLtoGLSLES_2_Args args{glsl_code, glsl_type, essl_version, &rc, &out};
