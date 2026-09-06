@@ -86,11 +86,48 @@
 //      MC 走正常「编译失败」路径，NPE 消失；
 //   3) 崩溃网打印崩溃 PC/LR（arm64 ucontext）——下轮日志可直接对着 impl
 //      符号表离线 symbolicate，定位具体 glslang 函数。
+//
+// Task 38（latestlog 2026-09-06 19:42，构建 2613e41，GL 渲染器路径“崩溃了”）：
+// 判读：GL 链路全线贯通（embed/EGL 表面/首帧上屏/后端 OpenGL+ANGLE），资源
+// 重载阶段 564 次编译中 342 次在固定 PC（0x133a0a430，两次变体相差 8 字节
+// =指针解链的相邻两级 load）SIGSEGV，si_addr 为 ASCII 字符串/浮点常量字节
+// （"minecraft"/"visible"/float 数据）= 堆踩踏读脏指针；合成失败结果生效
+// （NPE 已消失）→ MC 抛 ShaderCompileException → 全部 pipeline 程序加载失败
+// → CompletionException → 游戏崩溃退出（crash-2026-09-06_19.42.26）。
+// 离线 symbolicate：impl 的 Task34 补丁字节在（trampoline+cave 验证通过），
+// 16KB 页对齐穷举（pc mod 16K = 0xa430 → 5 个候选偏移）无一匹配崩溃形状
+// → 崩溃 PC 不在 impl / mobileglues / spvc / SDL3 / MoltenVK 等任何本地可
+// 枚举镜像 → 极大概率在共享缓存（libsystem malloc 的元数据遍历）。
+// 关键时序证据（三份日志交叉比对）：
+//   e28e4c3-GL（零崩溃）：402 次编译全部完成后才首次 swap（第 6002 行）；
+//   Vulkan（零崩溃）：无 eglSwapBuffers（CAMetalLayer 直呈），无首帧
+//     确认-遮罩移除路径；
+//   bec59b4/2613e41（崩溃）：首次成功 swap（MG 前端 presentSurface 生效）
+//     在 t≈460ms、编译风暴正中，紧随其后的复杂 shader 编译必崩。
+// 结论：渲染首帧绘制通路（MG 每帧翻译层/ANGLE/Metal/遮罩移除）与编译并发
+// 时踩踏堆；Task 37 总锁无效证明非跨引擎并发竞态。另实锤：2613e41 运行中
+// MG 转换全部命中磁盘缓存（GLSLtoGLSLES_2 未被调用，协商日志未打），
+// MG 内嵌 glslang 根本没跑——写入者是 MG 之外的某处。
+// 四连修复：
+//   1) 崩溃网加装 dladdr 取证：直接打印崩溃 PC/LR 所在镜像名、符号名与
+//      偏移，下轮日志无需离线猜 slide 即可定位崩溃函数；
+//   2) 编译器句柄间接层（java 句柄 ↔ live impl 句柄映射 + 引用计数）；
+//   3) glslang 进程状态重建自愈：双崩后释放全部 live compiler（最后一次
+//      release 触发 glslang::FinalizeProcess() 拆掉毒化的全局符号表/池）
+//      → 重新 initialize（全新 InitializeProcess）→ 全句柄重映射 → 再试
+//      编译一次。预算 5 次/进程（每次重建约 50-300ms）。毒化若在 glslang
+//      持久结构中则直接痊愈；若在 malloc 自由区域则预算耗尽后退回合成失败
+//      （与现状一致，零回退）；
+//   4) options 取证：拦截 set_target_env / set_source_language /
+//      set_optimization_level / set_generate_debug_info /
+//      set_forced_version_profile 五个设置口并打印值——揭示 GL 路径 vs
+//      Vulkan 路径的编译选项差异（优化等级/目标环境）。
 
 #include <dlfcn.h>
 #include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -140,6 +177,9 @@ static void ame_shim_lock_or_report_blocked(const char *what, const void *obj) {
     pthread_mutex_lock(&ame_shaderc_shim_lock);
 }
 
+// Task 38 前置声明：镜像基址取证（定义见构造器之后）。
+static void ame_log_impl_bases(void);
+
 __attribute__((constructor))
 static void ame_shaderc_shim_init(void) {
     pthread_mutexattr_t lock_attr;
@@ -164,11 +204,39 @@ static void ame_shaderc_shim_init(void) {
         ame_shaderc_shim_impl = dlopen(kCandidates[i], RTLD_NOW | RTLD_LOCAL);
         if (ame_shaderc_shim_impl != NULL) {
             fprintf(stderr, "[shaderc-shim] impl loaded via %s\n", kCandidates[i]);
+            ame_log_impl_bases();
             return;
         }
     }
     fprintf(stderr, "[shaderc-shim] FAILED to load libshaderc_impl.dylib: %s\n",
             dlerror());
+}
+
+// Task 38：镜像基址取证。用 dladdr 反查 impl 的两个入口与 glslang 重建
+// 入口（编译期符号已离线确认导出：InitializeProcess 0xc10f8 / Finalize
+// Process 0xc1160 / ShInitialize 0xbf6e8），把运行时 slide 打进日志——
+// 下轮任何 PC 都能离线对上 impl 符号表（73542 个符号）。
+static void ame_log_impl_bases(void) {
+    if (ame_shaderc_shim_real_dlsym == NULL || ame_shaderc_shim_impl == NULL)
+        return;
+    static const char *const kSyms[] = {
+        "shaderc_compiler_initialize",
+        "_ZN7glslang17InitializeProcessEv",
+        "_ZN7glslang15FinalizeProcessEv",
+    };
+    for (size_t i = 0; i < sizeof(kSyms) / sizeof(kSyms[0]); ++i) {
+        void *sym = ame_shaderc_shim_real_dlsym(ame_shaderc_shim_impl, kSyms[i]);
+        Dl_info info;
+        if (sym && dladdr(sym, &info) && info.dli_fbase) {
+            fprintf(stderr,
+                    "[shaderc-shim] impl base = %p (%s @ %p, image offset %#lx)\n",
+                    info.dli_fbase, kSyms[i], sym,
+                    (unsigned long)((uintptr_t)sym - (uintptr_t)info.dli_fbase));
+        } else {
+            fprintf(stderr, "[shaderc-shim] impl symbol %s -> %p (dladdr %s)\n",
+                    kSyms[i], sym, (sym ? "resolved, base unknown" : "MISSING"));
+        }
+    }
 }
 
 // 每次调用惰性重试（构造期 dyld 环境尚未就绪等极端场景的兜底）
@@ -189,9 +257,8 @@ typedef void *(*ame_shaderc_shim_compile_fn_t)(void *compiler, const char *sourc
                                                const char *input_file,
                                                const char *entry_point, void *options);
 
-// ---- Task 34：编译窗口崩溃恢复网（SIGSEGV/SIGBUS） ----
-// 状态全部线程局部（编译串行，但同时只有一个编译线程带网运行）；
-// 旧的 sigaction 快照是进程级的，只在持锁的 install/restore 窗口内读写。
+// ---- Task 34：编译窗口崩溃恢复网（SIGSEGV/SIGBUS）——状态声明 ----
+// （提前声明：Task 38 的重建函数也要罩网。处理器/install/restore 实现见下方。）
 static __thread sigjmp_buf ame_compile_jmp;
 static __thread volatile sig_atomic_t ame_in_compile = 0;
 static __thread volatile sig_atomic_t ame_last_call_crashed = 0;
@@ -199,6 +266,146 @@ static struct sigaction ame_prev_segv;
 static struct sigaction ame_prev_bus;
 static int ame_net_installed = 0;
 
+// ---- Task 38：编译器句柄间接层 + glslang 进程状态重建 ----
+// 目的：双崩（重试必崩 = 确定性环境破坏）后，把 glslang 的进程级全局状态
+// （内置符号表 / 字符串池 / 池分配器头——InitializeProcess 建立后跨编译存活）
+// 整体拆掉重建，让毒化随 FinalizeProcess 一起释放。重建必须经由 shaderc
+// 公开 ABI（compiler_release 在最后一个 compiler 时才调 FinalizeProcess、
+// compiler_initialize 建立全新状态），因此 MC 持有的 java 侧句柄需要间接层：
+//   java_handle（MC/LWJGL 持有，永不变）  ──映射──▶  live impl 句柄
+// 重建时全部 live 句柄被释放、换成同一个新初始化的句柄；引用计数保证多个
+// java 句柄共享一个 live 句柄时 release 语义正确（最后一个才真正 release）。
+// 映射只在 ame_shaderc_shim_lock 内读写（initialize/release/compile 全部持
+// 锁，无并发窗口）。
+typedef struct {
+    void *java_handle;
+    void *live_handle; // NULL = 重建失败后的“已失效”标记
+} ame_compiler_entry_t;
+#define AME_COMPILER_MAP_MAX 32
+static ame_compiler_entry_t ame_compiler_map[AME_COMPILER_MAP_MAX];
+static int ame_compiler_map_count = 0;
+static int ame_glslang_rebuilds = 0; // 预算：每进程最多 5 次
+#define AME_GLSLANG_REBUILD_BUDGET 5
+
+// 前置声明（重建函数定义在下方，compile 主链路要用）。
+static void *ame_translate_compiler(void *java_handle);
+
+// 注册：initialize 返回的句柄进表（恒等映射初始）。容量溢出时退化为直通
+// 并打一次性告警（重建不覆盖该句柄，安全降级）。
+static void *ame_register_compiler(void *java_handle) {
+    if (java_handle == NULL) return NULL;
+    if (ame_compiler_map_count < AME_COMPILER_MAP_MAX) {
+        ame_compiler_map[ame_compiler_map_count].java_handle = java_handle;
+        ame_compiler_map[ame_compiler_map_count].live_handle = java_handle;
+        ame_compiler_map_count++;
+    } else {
+        static bool s_overflow_warned = false;
+        if (!s_overflow_warned) {
+            s_overflow_warned = true;
+            fprintf(stderr,
+                    "[shaderc-shim] compiler map overflow (%d) -- handles beyond "
+                    "this point bypass rebuild indirection\n",
+                    AME_COMPILER_MAP_MAX);
+        }
+    }
+    return java_handle;
+}
+
+// 引用计数释放：同一 live 句柄被 N 个 java 句柄引用时，只有最后一个 release
+// 真正下到 impl（避免共享 live 句柄双重释放）。live==NULL（已失效）直接跳过。
+static void ame_unregister_compiler(void *java_handle) {
+    int idx = -1;
+    for (int i = 0; i < ame_compiler_map_count; ++i) {
+        if (ame_compiler_map[i].java_handle == java_handle) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0) return; // 溢出表外的句柄：直通路径，由调用方自行处理
+    void *live = ame_compiler_map[idx].live_handle;
+    // 删除表项（swap with last）
+    ame_compiler_map[idx] = ame_compiler_map[ame_compiler_map_count - 1];
+    ame_compiler_map_count--;
+    if (live == NULL) return;
+    // 还有别的 java 句柄共享这个 live？
+    for (int i = 0; i < ame_compiler_map_count; ++i) {
+        if (ame_compiler_map[i].live_handle == live) return;
+    }
+    void *real = ame_shaderc_shim_resolve("shaderc_compiler_release");
+    if (real != NULL) ((void (*)(void *))real)(live);
+}
+
+// 查表：java → live。不在表内（溢出/异常）返回原句柄并一次性告警。
+static void *ame_translate_compiler(void *java_handle) {
+    if (java_handle == NULL) return NULL;
+    for (int i = 0; i < ame_compiler_map_count; ++i) {
+        if (ame_compiler_map[i].java_handle == java_handle) {
+            return ame_compiler_map[i].live_handle;
+        }
+    }
+    return java_handle; // 直通（表外句柄）
+}
+
+// glslang 进程状态重建：释放全部 live 句柄（最后一次 release 触发
+// glslang::FinalizeProcess 拆全局状态）→ 重新 initialize → 全表重映射。
+// 成功返回新的 live 句柄；失败返回 NULL（表项 live 置 NULL，后续编译走
+// 合成失败，release 走空操作，进程存活）。
+// 重建自身也罩在崩溃网内：release/init 在毒化状态上崩 → longjmp 回来 →
+// 全部句柄失效（安全降级），绝不把崩溃漏给 JVM 处理器。
+// 调用方必须已持锁（递归）。
+static void *ame_glslang_rebuild(void) {
+    void *rel = ame_shaderc_shim_resolve("shaderc_compiler_release");
+    void *init = ame_shaderc_shim_resolve("shaderc_compiler_initialize");
+    if (rel == NULL || init == NULL) {
+        fprintf(stderr, "[shaderc-shim] rebuild unavailable (ABI symbols missing)\n");
+        return NULL;
+    }
+    ame_last_call_crashed = 0;
+    ame_in_compile = 1;
+    void *fresh = NULL;
+    if (sigsetjmp(ame_compile_jmp, 1) == 0) {
+        // 逐个去重释放 live 句柄（共享 live 只释放一次）
+        for (int i = 0; i < ame_compiler_map_count; ++i) {
+            void *live = ame_compiler_map[i].live_handle;
+            if (live == NULL) continue;
+            for (int j = 0; j < i; ++j) {
+                if (ame_compiler_map[j].live_handle == live) {
+                    live = NULL;
+                    break;
+                }
+            }
+            if (live != NULL) ((void (*)(void *))rel)(live);
+        }
+        fresh = ((void *(*)(void))init)();
+    } else {
+        // 重建途中崩溃：句柄全部失效（live 已释放的不能再碰；未释放的保守
+        // 一并失效），编译走合成失败，进程存活。
+        fprintf(stderr,
+                "[shaderc-shim] rebuild itself CRASHED -- invalidating all mapped "
+                "handles (synthetic failure path, process alive)\n");
+        fresh = NULL;
+        for (int i = 0; i < ame_compiler_map_count; ++i) {
+            ame_compiler_map[i].live_handle = NULL;
+        }
+        ame_last_call_crashed = 1;
+    }
+    ame_in_compile = 0;
+    fprintf(stderr,
+            "[shaderc-shim] glslang process state rebuilt (fresh compiler %p, "
+            "remapped %d handles, rebuilds used %d/%d)%s\n",
+            fresh, ame_compiler_map_count, ame_glslang_rebuilds,
+            AME_GLSLANG_REBUILD_BUDGET, (fresh != NULL) ? "" : " [DEGRADED]");
+    if (fresh != NULL) {
+        for (int i = 0; i < ame_compiler_map_count; ++i) {
+            ame_compiler_map[i].live_handle = fresh;
+        }
+    }
+    return fresh;
+}
+
+// ---- Task 34：编译窗口崩溃恢复网（SIGSEGV/SIGBUS）——实现 ----
+// 状态全部线程局部（编译串行，但同时只有一个编译线程带网运行）；
+// 旧的 sigaction 快照是进程级的，只在持锁的 install/restore 窗口内读写。
 static void ame_compile_crash_handler(int sig, siginfo_t *si, void *ctx) {
     if (ame_in_compile) {
         ame_in_compile = 0;
@@ -212,6 +419,25 @@ static void ame_compile_crash_handler(int sig, siginfo_t *si, void *ctx) {
             lr = (uint64_t)uc->uc_mcontext->__ss.__lr;
         }
 #endif
+        // Task 38：dladdr 就地 symbolicate。dladdr 对已加载镜像走闭环链表、
+        // 不加锁，信号上下文可用（本垫片在崩溃网内本就 fprintf+siglongjmp）。
+        // 直接打印镜像名/符号名/偏移，下轮日志无需离线推 slide。
+        const char *pc_img = "?", *pc_sym = "?";
+        uintptr_t pc_img_off = 0, pc_sym_off = 0;
+        const char *lr_img = "?", *lr_sym = "?";
+        uintptr_t lr_img_off = 0;
+        Dl_info info;
+        if (pc && dladdr((void *)(uintptr_t)pc, &info)) {
+            pc_img = info.dli_fname ? info.dli_fname : "?";
+            pc_sym = info.dli_sname ? info.dli_sname : "(no symbol)";
+            pc_img_off = (uintptr_t)pc - (uintptr_t)info.dli_fbase;
+            pc_sym_off = info.dli_saddr ? (uintptr_t)pc - (uintptr_t)info.dli_saddr : 0;
+        }
+        if (lr && dladdr((void *)(uintptr_t)lr, &info)) {
+            lr_img = info.dli_fname ? info.dli_fname : "?";
+            lr_sym = info.dli_sname ? info.dli_sname : "(no symbol)";
+            lr_img_off = (uintptr_t)lr - (uintptr_t)info.dli_fbase;
+        }
         // 阻断本信号，防止 longjmp 展开过程中同一错误页立即重触发
         sigset_t set;
         sigemptyset(&set);
@@ -222,6 +448,14 @@ static void ame_compile_crash_handler(int sig, siginfo_t *si, void *ctx) {
                 "tid=%lx t=%.0fms) -- recovered via longjmp\n",
                 sig, si ? si->si_addr : NULL, (void *)pc, (void *)lr,
                 ame_shim_tid(), ame_shim_ms());
+        if (pc) {
+            fprintf(stderr,
+                    "[shaderc-shim] crash site: pc in %s + %#lx (%s + %#lx); "
+                    "lr in %s + %#lx (%s)\n",
+                    pc_img, (unsigned long)pc_img_off, pc_sym,
+                    (unsigned long)pc_sym_off, lr_img, (unsigned long)lr_img_off,
+                    lr_sym);
+        }
         siglongjmp(ame_compile_jmp, 1);
     }
     // 非编译线程（或非编译窗口）：链回先前安装的处理器（通常是 JVM 的，
@@ -289,6 +523,18 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
         return NULL;
     }
     pthread_mutex_lock(&ame_shaderc_shim_lock);
+    // Task 38：句柄间接层翻译（锁内读表，避免与 initialize/release 的表操作
+    // 竞争；重建后 java 句柄指向新 live 句柄）。
+    void *live_compiler = ame_translate_compiler(compiler);
+    if (live_compiler == NULL) {
+        // 重建失败后的已失效句柄：不再进 impl，直接合成失败。
+        pthread_mutex_unlock(&ame_shaderc_shim_lock);
+        fprintf(stderr,
+                "[shaderc-shim] compile on invalidated compiler %p -- synthetic "
+                "failure\n",
+                compiler);
+        return ame_fake_result_create(0);
+    }
     // 逐编译取证（Task 30）：编译序号 + compiler/options 指针 + kind + 长度 +
     // 文件名。下轮崩溃日志可直接对照：第几次编译、compiler 是否在重载后换新、
     // options 指针是否曾被 options_release 日志指认。
@@ -300,11 +546,12 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             seq, ame_shim_ms(), ame_shim_tid(), kind, source_size, compiler, options,
             input_file ? input_file : "(null)");
     // Task 34：崩溃恢复网罩住真实调用；首次崩溃→重试一次（新鲜解析树，
-    // 堆踩踏通常是瞬态的）；重试再崩→返回合成失败 result（Task 37：绝不能
-    // 返回 NULL——LWJGL Checks.check 对 NULL 抛 NPE，真机 CompletionException
-    // 的直接死因）；诊断链不丢失。
+    // 堆踩踏通常是瞬态的）；重试再崩→Task 38：glslang 进程状态重建后
+    // 最后一搏；仍崩→返回合成失败 result（Task 37：绝不能返回 NULL——
+    // LWJGL Checks.check 对 NULL 抛 NPE，真机 CompletionException 的直接死因）；
+    // 诊断链不丢失。
     ame_crash_net_install();
-    void *result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, compiler,
+    void *result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, live_compiler,
                                          source, source_size, kind, input_file,
                                          entry_point, options);
     if (ame_last_call_crashed) {
@@ -312,9 +559,31 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
                 "[shaderc-shim] compile#%d crashed on first attempt -- retrying once "
                 "with fresh parse state\n",
                 seq);
-        result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, compiler,
+        result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, live_compiler,
                                        source, source_size, kind, input_file,
                                        entry_point, options);
+        if (ame_last_call_crashed && ame_glslang_rebuilds < AME_GLSLANG_REBUILD_BUDGET) {
+            // Task 38 自愈：双崩 = 确定性毒化。拆掉 glslang 全局状态重建后
+            // 再试一次（毒化若在持久符号表/字符串池中则痊愈）。
+            ame_glslang_rebuilds++;
+            fprintf(stderr,
+                    "[shaderc-shim] compile#%d crashed on RETRY too -- rebuilding "
+                    "glslang process state (attempt %d/%d)\n",
+                    seq, ame_glslang_rebuilds, AME_GLSLANG_REBUILD_BUDGET);
+            void *rebuilt = ame_glslang_rebuild();
+            if (rebuilt != NULL) {
+                live_compiler = rebuilt;
+                result = ame_call_real_guarded(
+                    (ame_shaderc_shim_compile_fn_t)real, live_compiler, source,
+                    source_size, kind, input_file, entry_point, options);
+                if (!ame_last_call_crashed && result != NULL) {
+                    fprintf(stderr,
+                            "[shaderc-shim] compile#%d RECOVERED via glslang "
+                            "process-state rebuild\n",
+                            seq);
+                }
+            }
+        }
         if (ame_last_call_crashed) {
             fprintf(stderr,
                     "[shaderc-shim] compile#%d crashed on RETRY too -- giving up, "
@@ -324,6 +593,12 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             // Task 37：合成 fake result（status=internal_error + 取证消息）。
             result = ame_fake_result_create(seq);
         }
+    }
+    // Task 38 兜底护栏：任何未崩溃却返回 NULL 的路径（理论上不应存在，但
+    // 重建重试后的内部状态未知）一律换合成失败——LWJGL Checks.check 对 NULL
+    // 抛 NPE，绝不能把 NULL 交出去。
+    if (result == NULL) {
+        result = ame_fake_result_create(seq);
     }
     ame_in_compile = 0;
     ame_crash_net_restore();
@@ -452,6 +727,8 @@ void *shaderc_compiler_initialize(void) {
     if (real == NULL) return NULL;
     pthread_mutex_lock(&ame_shaderc_shim_lock);
     void *compiler = ((void *(*)(void))real)();
+    // Task 38：入句柄表（恒等映射初始；重建时整体重映射）。
+    compiler = ame_register_compiler(compiler);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     fprintf(stderr, "[shaderc-shim] compiler_initialize -> %p (t=%.0fms tid=%lx)\n",
             compiler, ame_shim_ms(), ame_shim_tid());
@@ -462,6 +739,24 @@ void shaderc_compiler_release(void *compiler) {
     void *real = ame_shaderc_shim_resolve("shaderc_compiler_release");
     if (real == NULL || compiler == NULL) return;
     ame_shim_lock_or_report_blocked("compiler_release", compiler);
+    // Task 38：句柄表销号（共享 live 的引用计数语义；表外句柄直通 impl）。
+    if (ame_compiler_map_count > 0) {
+        bool found = false;
+        for (int i = 0; i < ame_compiler_map_count; ++i) {
+            if (ame_compiler_map[i].java_handle == compiler) {
+                found = true;
+                break;
+            }
+        }
+        if (found) {
+            ame_unregister_compiler(compiler);
+            pthread_mutex_unlock(&ame_shaderc_shim_lock);
+            fprintf(stderr, "[shaderc-shim] compiler_release %p done (t=%.0fms tid=%lx)\n",
+                    compiler, ame_shim_ms(), ame_shim_tid());
+            return;
+        }
+    }
+    // 表外（溢出/异常）句柄：维持旧行为直下 impl。
     ((void (*)(void *))real)(compiler);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     fprintf(stderr, "[shaderc-shim] compiler_release %p done (t=%.0fms tid=%lx)\n",
@@ -506,6 +801,52 @@ void shaderc_compile_options_add_macro_definition(void *options, const char *nam
     ((void (*)(void *, const char *, size_t, const char *, size_t))real)(
         options, name, name_length, value, value_length);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
+}
+
+// ---- Task 38：options 取证（透传 + 打印值） ----
+// 揭示 MC RenderPearl 在 GL 路径 vs Vulkan 路径下喂给 shaderc 的编译选项差异
+// （目标环境 / 源语言 / 优化等级 / 调试信息 / 强制版本）。枚举值以 int 打印，
+// 与 shaderc.h 的枚举定义人工对照（target_env: 0=vulkan 1=opengl 3=webgpu...
+// optimization_level: 0=无 1=size 2=performance 3=size+performance）。
+// 不入锁（options 为单线程作用域对象，同 Task 30 结论）。
+void shaderc_compile_options_set_target_env(void *options, int env, unsigned int version) {
+    void *real = ame_shaderc_shim_resolve("shaderc_compile_options_set_target_env");
+    if (real == NULL || options == NULL) return;
+    fprintf(stderr, "[shaderc-shim] options_set: target_env=%d version=%u (opt=%p t=%.0fms)\n",
+            env, version, options, ame_shim_ms());
+    ((void (*)(void *, int, unsigned int))real)(options, env, version);
+}
+
+void shaderc_compile_options_set_source_language(void *options, int lang) {
+    void *real = ame_shaderc_shim_resolve("shaderc_compile_options_set_source_language");
+    if (real == NULL || options == NULL) return;
+    fprintf(stderr, "[shaderc-shim] options_set: source_language=%d (opt=%p t=%.0fms)\n",
+            lang, options, ame_shim_ms());
+    ((void (*)(void *, int))real)(options, lang);
+}
+
+void shaderc_compile_options_set_optimization_level(void *options, int level) {
+    void *real = ame_shaderc_shim_resolve("shaderc_compile_options_set_optimization_level");
+    if (real == NULL || options == NULL) return;
+    fprintf(stderr, "[shaderc-shim] options_set: optimization_level=%d (opt=%p t=%.0fms)\n",
+            level, options, ame_shim_ms());
+    ((void (*)(void *, int))real)(options, level);
+}
+
+void shaderc_compile_options_set_generate_debug_info(void *options) {
+    void *real = ame_shaderc_shim_resolve("shaderc_compile_options_set_generate_debug_info");
+    if (real == NULL || options == NULL) return;
+    fprintf(stderr, "[shaderc-shim] options_set: generate_debug_info ON (opt=%p t=%.0fms)\n",
+            options, ame_shim_ms());
+    ((void (*)(void *))real)(options);
+}
+
+void shaderc_compile_options_set_forced_version_profile(void *options, int version, int profile) {
+    void *real = ame_shaderc_shim_resolve("shaderc_compile_options_set_forced_version_profile");
+    if (real == NULL || options == NULL) return;
+    fprintf(stderr, "[shaderc-shim] options_set: forced_version=%d profile=%d (opt=%p t=%.0fms)\n",
+            version, profile, options, ame_shim_ms());
+    ((void (*)(void *, int, int))real)(options, version, profile);
 }
 
 void *shaderc_compile_into_spv(void *compiler, const char *source, size_t source_size,
