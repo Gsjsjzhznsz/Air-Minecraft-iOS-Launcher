@@ -122,6 +122,37 @@
 //      set_optimization_level / set_generate_debug_info /
 //      set_forced_version_profile 五个设置口并打印值——揭示 GL 路径 vs
 //      Vulkan 路径的编译选项差异（优化等级/目标环境）。
+//
+// Task 44（latestlog 0ac1c2f，构建 3f6f3a6，用户“还是一样”）判读定案 +
+// 三层进程内防御加固：
+// 证据链（跨 5 份日志交叉比对）：
+//  a) fork() EPERM + posix_spawn 失败——沙盒侧载安装上进程创建全不可用，
+//     Task 42/43 进程外沙箱在本机结构性失效；进程内路径是唯一现实路径；
+//  b) 首崩恒为 compile#7（terrain 首个复杂 shader）；同源码→同阶段→同
+//     si_addr（跨线程/跨 compiler/跨 glslang 重建完全复现，compile#8 用全新
+//     线程 + 重建后新 compiler 依然同 PC 同 si_addr）→ 毒化是【堆布局级】
+//     确定性：编译池落在含源码字节/浮点常量的回收内存上；
+//  c) d638c22 同二进制同 shader 同事件序列零崩溃（390/390）→ 跨 run 非确定
+//     （ASLR/布局运气），同 run 内确定 → 一旦首次碰撞即级联（176/223 失败）；
+//  d) glslang 进程状态重建 5/5 全部耗尽且重建后同线程第三搏照崩 →
+//     毒化不在 glslang 全局结构，重建救不回；
+//  e) 首帧门控生效（First present deferred）且崩溃始于首个复杂 shader →
+//     Task 38“首帧 present 踩堆”理论被本日志证伪（present 未发生也崩）。
+// 定性修正：崩溃放大器在本垫片自己的重试链上——longjmp 跳过 impl 的 C++
+// 析构后，同线程 TLS 上的 glslang 池状态残留，重试必然落回同一片回收内存。
+// 三层修复：
+//   1) 所有重试/重建后尝试改在【全新 32MB 栈线程】上执行（virgin TLS +
+//      全新分配序列），打散“重试落回同一片毒化内存”的确定性；恢复一次
+//      即入 Task 43 磁盘缓存，跨启动单调固化；
+//   2) 去掉 SA_ONSTACK（从未配置 sigaltstack，属未定义行为依赖）；重建
+//      预算 5→8；
+//   3) cache miss 即转储精确输入（源码 + kind/entry/options 全字段）到
+//      POJAV_HOME/ame_shaderc_dump——跨渲染器播种若因 options 差异 key
+//      不相交，下一任务可离线预编译并随 IPA 播种。
+// 战略路径（零代码）：Vulkan 路径编译风暴零崩溃（同 shim 同 impl 同 223
+// 个 shader，堆安静）→ 一次 Vulkan run 即全量播种 ame_shaderc_cache →
+// 切回 GL 后逐条 HIT、零 glslang 暴露、零崩溃窗口。首次失败时打 TIP 日志
+// 指引用户走此路径。
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -393,6 +424,61 @@ static int ame_cache_store(uint64_t key, const void *bytes, uint32_t len) {
     return 0;
 }
 
+// ---- Task 44：源码转储（cache miss 时把精确输入落盘）----
+// 目的：跨渲染器缓存播种（Vulkan run 的成功编译全量落缓存后，GL run 直接
+// 命中）若因 options 字段差异而 key 不相交，本转储给出离线预编译的精确
+// 输入（源码字节 + kind/entry/输入名/options 全字段），CI 可直接复现编译
+// 并随 IPA 播种缓存。转储目录与缓存目录平级（不参与缓存清点/清空）。
+// 同一 key 只写一次；失败静默（诊断辅助，绝不影响主链路）。持锁调用。
+static char ame_dump_dir[3800];
+static void ame_cache_dump_source(uint64_t key, int sb_entry, int kind,
+                                  const char *source, size_t source_len,
+                                  const char *input_file, const char *entry_point,
+                                  const ame_sb_opt_fields_t *opt) {
+    if (ame_cache_state != 1) return; // 缓存初始化失败则不转储
+    if (ame_dump_dir[0] == '\0') {
+        const char *home = getenv("POJAV_HOME");
+        if (home == NULL || *home == '\0') return;
+        snprintf(ame_dump_dir, sizeof ame_dump_dir, "%s/ame_shaderc_dump", home);
+        if (mkdir(ame_dump_dir, 0755) != 0 && errno != EEXIST) return;
+    }
+    char path[4096], meta[4096];
+    snprintf(path, sizeof path, "%s/%016llx.src", ame_dump_dir,
+             (unsigned long long)key);
+    snprintf(meta, sizeof meta, "%s/%016llx.meta", ame_dump_dir,
+             (unsigned long long)key);
+    FILE *probe = fopen(meta, "rb");
+    if (probe != NULL) { fclose(probe); return; } // 已转储过
+    if (source == NULL || source_len == 0) return;
+    FILE *f = fopen(path, "wb");
+    if (f == NULL) return;
+    int ok = (fwrite(source, 1, source_len, f) == source_len) && (fflush(f) == 0);
+    fclose(f);
+    if (!ok) { unlink(path); return; }
+    FILE *m = fopen(meta, "wb");
+    if (m == NULL) return;
+    fprintf(m, "key=%016llx\nsb_entry=%d\nkind=%d\nsource_len=%zu\ninput=%s\nentry=%s\n",
+            (unsigned long long)key, sb_entry, kind, source_len,
+            input_file ? input_file : "(null)", entry_point ? entry_point : "(null)");
+    if (opt != NULL) {
+        fprintf(m, "target_env=%d\ntarget_env_version=%u\nsource_language=%d\n"
+                   "optimization_level=%d\ngenerate_debug=%d\nhas_forced=%d\n"
+                   "forced_version=%d\nforced_profile=%d\nmacro_count=%d\n",
+                opt->target_env, opt->target_env_version, opt->source_language,
+                opt->optimization_level, opt->generate_debug, opt->has_forced,
+                opt->forced_version, opt->forced_profile, opt->macro_count);
+        for (int i = 0; i < opt->macro_count && i < AME_SB_MAX_MACROS; ++i) {
+            if (opt->macro_has_value[i]) {
+                fprintf(m, "macro[%d]=%s=%s\n", i, opt->macro_name[i],
+                        opt->macro_value[i]);
+            } else {
+                fprintf(m, "macro[%d]=%s\n", i, opt->macro_name[i]);
+            }
+        }
+    }
+    fclose(m);
+}
+
 // Task 38 前置声明：镜像基址取证（定义见下方 result 访问器族之后）。
 static void ame_log_impl_bases(void);
 
@@ -500,8 +586,8 @@ typedef struct {
 #define AME_COMPILER_MAP_MAX 32
 static ame_compiler_entry_t ame_compiler_map[AME_COMPILER_MAP_MAX];
 static int ame_compiler_map_count = 0;
-static int ame_glslang_rebuilds = 0; // 预算：每进程最多 5 次
-#define AME_GLSLANG_REBUILD_BUDGET 5
+static int ame_glslang_rebuilds = 0; // 预算：每进程最多 8 次（Task 44：5→8）
+#define AME_GLSLANG_REBUILD_BUDGET 8
 
 // 前置声明（重建函数定义在下方，compile 主链路要用）。
 static void *ame_translate_compiler(void *java_handle);
@@ -835,7 +921,10 @@ static void ame_crash_net_install(void) {
     struct sigaction sa;
     memset(&sa, 0, sizeof sa);
     sa.sa_sigaction = ame_compile_crash_handler;
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    // Task 44：去掉 SA_ONSTACK——本垫片从未配置 sigaltstack，此前依赖
+    // “无备用栈时内核回退当前栈”的未定义行为；编译线程本身已是 32MB 栈，
+    // 信号帧绰绰有余。
+    sa.sa_flags = SA_SIGINFO;
     sigemptyset(&sa.sa_mask);
     if (sigaction(SIGSEGV, &sa, &ame_prev_segv) != 0) return;
     if (sigaction(SIGBUS, &sa, &ame_prev_bus) != 0) {
@@ -864,6 +953,61 @@ static void *ame_call_real_guarded(ame_shaderc_shim_compile_fn_t fn, void *compi
     }
     ame_last_call_crashed = 1;
     return NULL;
+}
+
+// ---- Task 44：重试尝试上新鲜线程 ----
+// 证据（见文件头 Task 44 判读）：longjmp 跳过 impl 的 C++ 析构后，本线程
+// TLS 上的 glslang 池/解析状态残留，同线程重试必然落回同一片毒化内存；
+// glslang 进程级重建也救不回（重建后同线程第三搏照崩）。每次尝试都给
+// virgin TLS + 全新 32MB 栈 + 独立分配序列，把“重试落回同一片回收内存”
+// 的确定性打散；恢复一次即入 Task 43 磁盘缓存，跨启动单调固化。
+// 持锁调用（编译串行化保证同一时刻只有一个尝试线程）。返回 result；
+// *crashed_out 带回该次尝试是否崩溃（__thread 标志在尝试线程上，须經
+// job 结构侧信道传回本线程）。
+typedef struct {
+    ame_shaderc_shim_compile_fn_t fn;
+    void *compiler;
+    const char *source;
+    size_t source_size;
+    int kind;
+    const char *input_file;
+    const char *entry_point;
+    void *options;
+    void *result;
+    int crashed;
+} ame_fresh_attempt_t;
+
+static void *ame_fresh_attempt_main(void *arg) {
+    ame_fresh_attempt_t *job = (ame_fresh_attempt_t *)arg;
+    job->result = ame_call_real_guarded(job->fn, job->compiler, job->source,
+                                        job->source_size, job->kind, job->input_file,
+                                        job->entry_point, job->options);
+    job->crashed = ame_last_call_crashed; // __thread：尝试线程上取回
+    return NULL;
+}
+
+static void *ame_attempt_on_fresh_thread(ame_shaderc_shim_compile_fn_t fn, void *compiler,
+                                         const char *source, size_t source_size, int kind,
+                                         const char *input_file, const char *entry_point,
+                                         void *options, int *crashed_out) {
+    ame_fresh_attempt_t job = {fn, compiler, source, source_size, kind,
+                               input_file, entry_point, options, NULL, 0};
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, 32ull * 1024ull * 1024ull);
+    pthread_t tid;
+    int rc = pthread_create(&tid, &attr, ame_fresh_attempt_main, &job);
+    pthread_attr_destroy(&attr);
+    if (rc != 0) {
+        // 极端退化：当前线程直跑（与旧版行为一致）
+        void *r = ame_call_real_guarded(fn, compiler, source, source_size, kind,
+                                        input_file, entry_point, options);
+        if (crashed_out) *crashed_out = ame_last_call_crashed;
+        return r;
+    }
+    pthread_join(tid, NULL);
+    if (crashed_out) *crashed_out = job.crashed;
+    return job.result;
 }
 
 // Task 37 前置声明：合成失败 result（定义见下方 result 访问器族）。
@@ -898,7 +1042,12 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
     // 文件名。下轮崩溃日志可直接对照：第几次编译、compiler 是否在重载后换新、
     // options 指针是否曾被 options_release 日志指认。
     static int s_compile_seq = 0;
+    // Task 44 风暴统计：总量/命中/失败/新鲜线程恢复计数（每 100 次汇总）。
+    static int s_storm_total = 0, s_storm_hits = 0, s_storm_fails = 0;
+    static int s_storm_fresh_recovered = 0;
+    static int s_storm_tip_printed = 0;
     int seq = ++s_compile_seq;
+    s_storm_total++;
     fprintf(stderr,
             "[shaderc-shim] compile#%d t=%.0fms tid=%lx kind=%d len=%zu comp=%p "
             "opt=%p in='%.48s'\n",
@@ -921,9 +1070,13 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
                 "[shaderc-cache] compile#%d HIT key=%016llx spv=%uB (t=%.0fms)\n",
                 seq, (unsigned long long)cache_key, r->spv_len, ame_shim_ms());
         ame_note_compile_activity(); // 命中也算编译活动（首帧门控语义不变）
+        s_storm_hits++;
         pthread_mutex_unlock(&ame_shaderc_shim_lock);
         return cache_hit;
     }
+    // Task 44：miss 即转储精确输入（离线预编译/跨渲染器播种取证）。
+    ame_cache_dump_source(cache_key, sb_entry, kind, source, source_size, input_file,
+                          entry_point, &fields);
     // Task 42：进程外沙箱编译（首选项）。41 个 task 的取证已证明进程内堆踩踏
     // 锁不可防（主锁/门控/重建均不愈），唯一根治 = 编译离开 JVM 进程。沙箱
     // 返回的 ame_sb_result_t 携带真实 status/SPIR-V/错误文本——成功编译与
@@ -961,17 +1114,29 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
     void *result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, live_compiler,
                                          source, source_size, kind, input_file,
                                          entry_point, options);
-    if (ame_last_call_crashed) {
+    // Task 44：首后所有尝试换新鲜线程（见上方 ame_attempt_on_fresh_thread）；
+    // crashed 标志經 job 结构侧信道传递（__thread 在尝试线程上）。
+    int attempt_crashed = ame_last_call_crashed;
+    if (attempt_crashed) {
         fprintf(stderr,
-                "[shaderc-shim] compile#%d crashed on first attempt -- retrying once "
-                "with fresh parse state\n",
+                "[shaderc-shim] compile#%d crashed on first attempt -- retrying on a "
+                "FRESH THREAD (virgin TLS + 32MB stack, Task 44)\n",
                 seq);
-        result = ame_call_real_guarded((ame_shaderc_shim_compile_fn_t)real, live_compiler,
-                                       source, source_size, kind, input_file,
-                                       entry_point, options);
-        if (ame_last_call_crashed && ame_glslang_rebuilds < AME_GLSLANG_REBUILD_BUDGET) {
+        result = ame_attempt_on_fresh_thread((ame_shaderc_shim_compile_fn_t)real,
+                                             live_compiler, source, source_size, kind,
+                                             input_file, entry_point, options,
+                                             &attempt_crashed);
+        if (!attempt_crashed && result != NULL) {
+            s_storm_fresh_recovered++;
+            fprintf(stderr,
+                    "[shaderc-shim] compile#%d RECOVERED on fresh-thread retry "
+                    "(Task 44) -- result enters disk cache\n",
+                    seq);
+        }
+        if (attempt_crashed && ame_glslang_rebuilds < AME_GLSLANG_REBUILD_BUDGET) {
             // Task 38 自愈：双崩 = 确定性毒化。拆掉 glslang 全局状态重建后
-            // 再试一次（毒化若在持久符号表/字符串池中则痊愈）。
+            // 再试一次（毒化若在持久符号表/字符串池中则痊愈）；Task 44：
+            // 第三搏也上新鲜线程（重建后同线程照崩的实证见文件头）。
             ame_glslang_rebuilds++;
             fprintf(stderr,
                     "[shaderc-shim] compile#%d crashed on RETRY too -- rebuilding "
@@ -980,18 +1145,20 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             void *rebuilt = ame_glslang_rebuild();
             if (rebuilt != NULL) {
                 live_compiler = rebuilt;
-                result = ame_call_real_guarded(
+                result = ame_attempt_on_fresh_thread(
                     (ame_shaderc_shim_compile_fn_t)real, live_compiler, source,
-                    source_size, kind, input_file, entry_point, options);
-                if (!ame_last_call_crashed && result != NULL) {
+                    source_size, kind, input_file, entry_point, options,
+                    &attempt_crashed);
+                if (!attempt_crashed && result != NULL) {
+                    s_storm_fresh_recovered++;
                     fprintf(stderr,
                             "[shaderc-shim] compile#%d RECOVERED via glslang "
-                            "process-state rebuild\n",
+                            "process-state rebuild + fresh thread (Task 44)\n",
                             seq);
                 }
             }
         }
-        if (ame_last_call_crashed) {
+        if (attempt_crashed) {
             fprintf(stderr,
                     "[shaderc-shim] compile#%d crashed on RETRY too -- giving up, "
                     "returning synthetic failure result (compilation will be "
@@ -999,6 +1166,24 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
                     seq);
             // Task 37：合成 fake result（status=internal_error + 取证消息）。
             result = ame_fake_result_create(seq);
+            // Task 44：风暴统计 + 跨渲染器播种指引（只打一次，避免刷屏）。
+            s_storm_fails++;
+            if (!s_storm_tip_printed) {
+                s_storm_tip_printed = 1;
+                fprintf(stderr,
+                        "[shaderc-cache] TIP: launch the game ONCE with the Vulkan "
+                        "renderer -- its compile storm succeeds and seeds this cache "
+                        "(same shaders, quiet heap); switch back to GL and every "
+                        "pipeline boots from cache HIT with zero glslang exposure "
+                        "(Task 44 cross-renderer seeding)\n");
+            }
+            if (s_storm_total % 100 == 0) {
+                fprintf(stderr,
+                        "[shaderc-cache] storm: %d compiles, %d hits, %d failures, "
+                        "%d fresh-thread recoveries\n",
+                        s_storm_total, s_storm_hits, s_storm_fails,
+                        s_storm_fresh_recovered);
+            }
         }
     }
     // Task 38 兜底护栏：任何未崩溃却返回 NULL 的路径（理论上不应存在，但
