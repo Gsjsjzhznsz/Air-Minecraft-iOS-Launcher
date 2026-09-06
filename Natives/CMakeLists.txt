@@ -270,6 +270,9 @@ add_executable(AngelAuraAmethyst
   dyld_patch_platform.m
   main.m
   main_hook.m
+  # Task 42：shaderc 编译进程外沙箱（父进程 spawn 本体为 helper 子进程，
+  # Unix socket 传输编译请求/响应；详见 Natives/shaderc_sandbox.h 注释）
+  shaderc_sandbox.m
   # SDL3 兼容层（移植自 ZalithLauncher2 的 sdl_hook.c）：建窗前强制 ES profile、
   # 主窗口复用、EGL 兼容重试、Vulkan 加载器句柄共享。iOS 无 bytehook，
   # 由 main_hook.m 的 hooked_dlsym 驱动。
@@ -316,7 +319,7 @@ add_executable(AngelAuraAmethyst
   installer/modpack/ModpackConfiguration.m
   installer/modpack/ModpackAPI.m
   installer/modpack/ModrinthAPI.m
-	installer/modpack/CurseForgeAPI.m
+        installer/modpack/CurseForgeAPI.m
 
   input/ControllerInput.m
   input/GyroInput.m

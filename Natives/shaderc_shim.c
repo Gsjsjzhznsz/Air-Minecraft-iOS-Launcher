@@ -135,6 +135,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "shaderc_sandbox.h" // Task 42：进程外编译沙箱（父侧集成点）
+
 static pthread_mutex_t ame_shaderc_shim_lock;
 static void *ame_shaderc_shim_impl = NULL;
 static void *(*ame_shaderc_shim_real_dlsym)(void *, const char *) = NULL;
@@ -316,6 +318,147 @@ static int ame_glslang_rebuilds = 0; // 预算：每进程最多 5 次
 
 // 前置声明（重建函数定义在下方，compile 主链路要用）。
 static void *ame_translate_compiler(void *java_handle);
+
+// ---- Task 42：options 影子注册表 ----
+// 目的：进程外沙箱编译需要 options 的字段值，但 options 是 impl 私有不透明
+// 类型无法跨进程传递。本注册表在 shim 拦截的 initialize/clone/release/
+// add_macro_definition/set_* 入口处把值镜像下来（编译请求携带快照，子进程
+// 按快照重建）。注册表自带小锁（叶子锁，不参与 master 锁序）；options 本身
+// 的并发语义维持 Task 30 结论不变（setter 不入 master 锁）。
+typedef struct {
+    void *options; // 键：MC/LWJGL 侧持有的 options 指针（malloc 可复用地址）
+    ame_sb_opt_fields_t fields;
+    int in_use;
+} ame_opt_shadow_entry_t;
+#define AME_OPT_SHADOW_MAX 64
+static ame_opt_shadow_entry_t ame_opt_shadow[AME_OPT_SHADOW_MAX];
+static pthread_mutex_t ame_opt_shadow_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void ame_opt_shadow_defaults(ame_sb_opt_fields_t *f) {
+    memset(f, 0, sizeof *f);
+    // impl 的 shaderc_compile_options_initialize 默认值（shaderc.h 文档语义）
+    f->target_env = 0;        // shaderc_target_env_vulkan
+    f->target_env_version = 0;
+    f->source_language = 0;   // shaderc_source_language_glsl
+    f->optimization_level = 0;// shaderc_optimization_level_zero
+    f->generate_debug = 0;
+    f->has_forced = 0;
+    f->macro_count = 0;
+}
+
+// 查找/创建（initialize 与地址复用场景共用）：找不到就开新槽（无空槽则忽略）
+static ame_opt_shadow_entry_t *ame_opt_shadow_slot(void *options, int create) {
+    ame_opt_shadow_entry_t *free_slot = NULL;
+    for (int i = 0; i < AME_OPT_SHADOW_MAX; ++i) {
+        if (ame_opt_shadow[i].in_use && ame_opt_shadow[i].options == options)
+            return &ame_opt_shadow[i];
+        if (!ame_opt_shadow[i].in_use && free_slot == NULL) free_slot = &ame_opt_shadow[i];
+    }
+    if (!create || free_slot == NULL) return NULL;
+    free_slot->in_use = 1;
+    free_slot->options = options;
+    ame_opt_shadow_defaults(&free_slot->fields);
+    return free_slot;
+}
+
+static void ame_opt_shadow_register(void *options) {
+    if (options == NULL) return;
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    // malloc 地址复用防御：同地址命中旧条目时【重置字段】（新 options 对象
+    // 与旧对象共享地址但配置状态全新）；无条目则开新槽。
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 0);
+    if (e != NULL) {
+        ame_opt_shadow_defaults(&e->fields);
+    } else {
+        ame_opt_shadow_slot(options, 1);
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+
+static void ame_opt_shadow_clone(const void *src, void *dst) {
+    if (src == NULL || dst == NULL) return;
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot((void *)src, 0);
+    ame_opt_shadow_entry_t *n = ame_opt_shadow_slot(dst, 1);
+    if (e != NULL && n != NULL) n->fields = e->fields;
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+
+static void ame_opt_shadow_release(void *options) {
+    if (options == NULL) return;
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    for (int i = 0; i < AME_OPT_SHADOW_MAX; ++i) {
+        if (ame_opt_shadow[i].in_use && ame_opt_shadow[i].options == options) {
+            ame_opt_shadow[i].in_use = 0;
+            ame_opt_shadow[i].options = NULL;
+        }
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+
+static void ame_opt_shadow_fill(const void *options, ame_sb_opt_fields_t *out) {
+    ame_opt_shadow_defaults(out);
+    if (options == NULL) return;
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot((void *)options, 0);
+    if (e != NULL) *out = e->fields;
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+
+// setter 写入（fields 更新 + 可选宏追加）；全部走注册表小锁。
+static void ame_opt_shadow_set_env(void *options, int env, unsigned version) {
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 1);
+    if (e != NULL) {
+        e->fields.target_env = env;
+        e->fields.target_env_version = version;
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+static void ame_opt_shadow_set_int(void *options, int which, int value) {
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 1);
+    if (e != NULL) {
+        switch (which) {
+            case 0: e->fields.source_language = value; break;
+            case 1: e->fields.optimization_level = value; break;
+            case 2: e->fields.generate_debug = value; break;
+        }
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+static void ame_opt_shadow_set_vp(void *options, int version, int profile) {
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 1);
+    if (e != NULL) {
+        e->fields.has_forced = 1;
+        e->fields.forced_version = version;
+        e->fields.forced_profile = profile;
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
+static void ame_opt_shadow_macro(void *options, const char *name, size_t name_len,
+                                 const char *value, size_t value_len) {
+    if (options == NULL || name == NULL || name_len == 0) return;
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 1);
+    if (e != NULL && e->fields.macro_count < AME_SB_MAX_MACROS) {
+        int idx = e->fields.macro_count++;
+        size_t n = name_len < AME_SB_MACRO_NAME_MAX - 1 ? name_len : AME_SB_MACRO_NAME_MAX - 1;
+        memcpy(e->fields.macro_name[idx], name, n);
+        e->fields.macro_name[idx][n] = '\0';
+        if (value != NULL && value_len > 0) {
+            size_t v = value_len < AME_SB_MACRO_VALUE_MAX - 1 ? value_len
+                                                              : AME_SB_MACRO_VALUE_MAX - 1;
+            memcpy(e->fields.macro_value[idx], value, v);
+            e->fields.macro_value[idx][v] = '\0';
+            e->fields.macro_has_value[idx] = 1;
+        } else {
+            e->fields.macro_has_value[idx] = 0;
+        }
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+}
 
 // 注册：initialize 返回的句柄进表（恒等映射初始）。容量溢出时退化为直通
 // 并打一次性告警（重建不覆盖该句柄，安全降级）。
@@ -574,6 +717,35 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             "opt=%p in='%.48s'\n",
             seq, ame_shim_ms(), ame_shim_tid(), kind, source_size, compiler, options,
             input_file ? input_file : "(null)");
+    // Task 42：进程外沙箱编译（首选项）。41 个 task 的取证已证明进程内堆踩踏
+    // 锁不可防（主锁/门控/重建均不愈），唯一根治 = 编译离开 JVM 进程。沙箱
+    // 返回的 ame_sb_result_t 携带真实 status/SPIR-V/错误文本——成功编译与
+    // 编译失败都与 impl 语义一致；沙箱传输双重失败（返回 NULL）才落回下方
+    // 进程内旧链路（崩溃网 + 重试 + 重建 + 合成失败，行为不劣于 Task 38）。
+    // 心跳在出口照常更新——Task 39 首帧门控的静止窗口仍以编译结束起算。
+    if (ame_sandbox_active()) {
+        ame_sb_opt_fields_t fields;
+        ame_opt_shadow_fill(options, &fields);
+        int sb_entry = strcmp(sym, "shaderc_compile_into_spv_assembly") == 0    ? 1
+                       : strcmp(sym, "shaderc_compile_into_preprocessed_text") == 0 ? 2
+                                                                                    : 0;
+        double t0 = ame_shim_ms();
+        void *sb = ame_sandbox_compile(sb_entry, source, source_size, kind, input_file,
+                                       entry_point, &fields);
+        if (sb != NULL) {
+            ame_sb_result_t *r = (ame_sb_result_t *)sb;
+            fprintf(stderr,
+                    "[shaderc-sandbox] compile#%d -> status=%d spv=%uB err=%uB (rt=%.0fms)\n",
+                    seq, r->status, r->spv_len, r->err_len, ame_shim_ms() - t0);
+            ame_note_compile_activity();
+            pthread_mutex_unlock(&ame_shaderc_shim_lock);
+            return sb;
+        }
+        fprintf(stderr,
+                "[shaderc-sandbox] compile#%d sandbox unavailable -- falling back to "
+                "in-process impl (legacy path)\n",
+                seq);
+    }
     // Task 34：崩溃恢复网罩住真实调用；首次崩溃→重试一次（新鲜解析树，
     // 堆踩踏通常是瞬态的）；重试再崩→Task 38：glslang 进程状态重建后
     // 最后一搏；仍崩→返回合成失败 result（Task 37：绝不能返回 NULL——
@@ -658,6 +830,12 @@ static int ame_is_fake_result(const void *result) {
     return m == AME_FAKE_RESULT_MAGIC || m == AME_FAKE_RESULT_MAGIC_STATIC;
 }
 
+// Task 42：沙箱结果识别（ame_sb_result_t，见 shaderc_sandbox.h）
+static int ame_is_sb_result(const void *result) {
+    if (result == NULL) return 0;
+    return *(const uint64_t *)result == AME_SB_RESULT_MAGIC;
+}
+
 static void ame_fake_result_fill(ame_fake_result_t *fr, uint64_t magic, int seq) {
     fr->magic = magic;
     fr->seq = seq;
@@ -687,6 +865,10 @@ void shaderc_result_release(void *result) {
         if (*(uint64_t *)result == AME_FAKE_RESULT_MAGIC) free(result);
         return;
     }
+    if (ame_is_sb_result(result)) { // Task 42：沙箱结果直接 free（spv/err 内嵌）
+        free(result);
+        return;
+    }
     void *real = ame_shaderc_shim_resolve("shaderc_result_release");
     if (real == NULL || result == NULL) return;
     ((void (*)(void *))real)(result);
@@ -694,6 +876,8 @@ void shaderc_result_release(void *result) {
 
 int shaderc_result_get_compilation_status(void *result) {
     if (ame_is_fake_result(result)) return 3; // shaderc_compilation_status_internal_error
+    if (ame_is_sb_result(result))
+        return ((const ame_sb_result_t *)result)->status; // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_compilation_status");
     if (real == NULL || result == NULL) return 3;
     return ((int (*)(void *))real)(result);
@@ -701,6 +885,8 @@ int shaderc_result_get_compilation_status(void *result) {
 
 size_t shaderc_result_get_num_errors(void *result) {
     if (ame_is_fake_result(result)) return 1;
+    if (ame_is_sb_result(result))
+        return (((const ame_sb_result_t *)result)->status != 0) ? 1 : 0; // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_num_errors");
     if (real == NULL || result == NULL) return 0;
     return ((size_t (*)(void *))real)(result);
@@ -716,6 +902,8 @@ size_t shaderc_result_get_num_warnings(void *result) {
 const char *shaderc_result_get_error_message(void *result) {
     if (ame_is_fake_result(result))
         return ((ame_fake_result_t *)result)->message;
+    if (ame_is_sb_result(result))
+        return ame_sb_result_err((const ame_sb_result_t *)result); // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_error_message");
     if (real == NULL || result == NULL) return "(shim: result missing)";
     return ((const char *(*)(void *))real)(result);
@@ -723,6 +911,8 @@ const char *shaderc_result_get_error_message(void *result) {
 
 const char *shaderc_result_get_bytes(void *result) {
     if (ame_is_fake_result(result)) return "";
+    if (ame_is_sb_result(result))
+        return ame_sb_result_spv((const ame_sb_result_t *)result); // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_bytes");
     if (real == NULL || result == NULL) return "";
     return ((const char *(*)(void *))real)(result);
@@ -730,6 +920,8 @@ const char *shaderc_result_get_bytes(void *result) {
 
 size_t shaderc_result_get_length(void *result) {
     if (ame_is_fake_result(result)) return 0;
+    if (ame_is_sb_result(result))
+        return ((const ame_sb_result_t *)result)->spv_len; // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_length");
     if (real == NULL || result == NULL) return 0;
     return ((size_t (*)(void *))real)(result);
@@ -737,6 +929,8 @@ size_t shaderc_result_get_length(void *result) {
 
 const char *shaderc_result_get_spv_bytes(void *result) {
     if (ame_is_fake_result(result)) return "";
+    if (ame_is_sb_result(result))
+        return ame_sb_result_spv((const ame_sb_result_t *)result); // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_spv_bytes");
     if (real == NULL || result == NULL) return "";
     return ((const char *(*)(void *))real)(result);
@@ -744,6 +938,8 @@ const char *shaderc_result_get_spv_bytes(void *result) {
 
 size_t shaderc_result_get_spv_length(void *result) {
     if (ame_is_fake_result(result)) return 0;
+    if (ame_is_sb_result(result))
+        return ((const ame_sb_result_t *)result)->spv_len; // Task 42
     void *real = ame_shaderc_shim_resolve("shaderc_result_get_spv_length");
     if (real == NULL || result == NULL) return 0;
     return ((size_t (*)(void *))real)(result);
@@ -799,6 +995,8 @@ void *shaderc_compile_options_initialize(void) {
     if (real == NULL) return NULL;
     pthread_mutex_lock(&ame_shaderc_shim_lock);
     void *options = ((void *(*)(void))real)();
+    // Task 42：影子注册（沙箱序列化的字段源）
+    ame_opt_shadow_register(options);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     return options;
 }
@@ -808,6 +1006,8 @@ void *shaderc_compile_options_clone(const void *options) {
     if (real == NULL || options == NULL) return NULL;
     pthread_mutex_lock(&ame_shaderc_shim_lock);
     void *cloned = ((void *(*)(const void *))real)(options);
+    // Task 42：影子字段随 clone 复制
+    ame_opt_shadow_clone(options, cloned);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
     return cloned;
 }
@@ -818,6 +1018,8 @@ void shaderc_compile_options_release(void *options) {
     ame_shim_lock_or_report_blocked("options_release", options);
     ((void (*)(void *))real)(options);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
+    // Task 42：影子注销（编译请求携带字段快照，句柄销毁后无需保留）
+    ame_opt_shadow_release(options);
     fprintf(stderr, "[shaderc-shim] options_release %p done (t=%.0fms tid=%lx)\n",
             options, ame_shim_ms(), ame_shim_tid());
 }
@@ -832,6 +1034,8 @@ void shaderc_compile_options_add_macro_definition(void *options, const char *nam
     ((void (*)(void *, const char *, size_t, const char *, size_t))real)(
         options, name, name_length, value, value_length);
     pthread_mutex_unlock(&ame_shaderc_shim_lock);
+    // Task 42：宏入影子表（锁外小锁，防长宏拷贝占住 master 锁）
+    ame_opt_shadow_macro(options, name, name_length, value, value_length);
 }
 
 // ---- Task 38：options 取证（透传 + 打印值） ----
@@ -846,6 +1050,7 @@ void shaderc_compile_options_set_target_env(void *options, int env, unsigned int
     fprintf(stderr, "[shaderc-shim] options_set: target_env=%d version=%u (opt=%p t=%.0fms)\n",
             env, version, options, ame_shim_ms());
     ((void (*)(void *, int, unsigned int))real)(options, env, version);
+    ame_opt_shadow_set_env(options, env, version); // Task 42 影子镜像
 }
 
 void shaderc_compile_options_set_source_language(void *options, int lang) {
@@ -854,6 +1059,7 @@ void shaderc_compile_options_set_source_language(void *options, int lang) {
     fprintf(stderr, "[shaderc-shim] options_set: source_language=%d (opt=%p t=%.0fms)\n",
             lang, options, ame_shim_ms());
     ((void (*)(void *, int))real)(options, lang);
+    ame_opt_shadow_set_int(options, 0, lang); // Task 42 影子镜像
 }
 
 void shaderc_compile_options_set_optimization_level(void *options, int level) {
@@ -862,6 +1068,7 @@ void shaderc_compile_options_set_optimization_level(void *options, int level) {
     fprintf(stderr, "[shaderc-shim] options_set: optimization_level=%d (opt=%p t=%.0fms)\n",
             level, options, ame_shim_ms());
     ((void (*)(void *, int))real)(options, level);
+    ame_opt_shadow_set_int(options, 1, level); // Task 42 影子镜像
 }
 
 void shaderc_compile_options_set_generate_debug_info(void *options) {
@@ -870,6 +1077,7 @@ void shaderc_compile_options_set_generate_debug_info(void *options) {
     fprintf(stderr, "[shaderc-shim] options_set: generate_debug_info ON (opt=%p t=%.0fms)\n",
             options, ame_shim_ms());
     ((void (*)(void *))real)(options);
+    ame_opt_shadow_set_int(options, 2, 1); // Task 42 影子镜像
 }
 
 void shaderc_compile_options_set_forced_version_profile(void *options, int version, int profile) {
@@ -878,6 +1086,7 @@ void shaderc_compile_options_set_forced_version_profile(void *options, int versi
     fprintf(stderr, "[shaderc-shim] options_set: forced_version=%d profile=%d (opt=%p t=%.0fms)\n",
             version, profile, options, ame_shim_ms());
     ((void (*)(void *, int, int))real)(options, version, profile);
+    ame_opt_shadow_set_vp(options, version, profile); // Task 42 影子镜像
 }
 
 void *shaderc_compile_into_spv(void *compiler, const char *source, size_t source_size,

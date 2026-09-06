@@ -336,6 +336,16 @@ void init_setupHomeDirectory() {
 }
 
 int main(int argc, char *argv[]) {
+    // Task 42：shaderc 编译沙箱 helper 子进程分支。必须在【一切】launcher/JVM/
+    // hook 初始化之前分支（pJLI_Launch、ptrace JIT 分支都在其后）。父进程的
+    // shaderc shim 通过 posix_spawn 以 AME_SHADERC_SANDBOX=1 + AME_SB_FD=3
+    // 拉起本进程；此路径只有 dlopen(libshaderc_impl) + 32MB 栈编译循环，
+    // 不触碰 UIKit/JavaLauncher/偏好设置。EOF（父退出）即干净返回。
+    if (getenv("AME_SHADERC_SANDBOX") != NULL) {
+        extern int ame_shaderc_sandbox_child_main(void);
+        return ame_shaderc_sandbox_child_main();
+    }
+
     if (pJLI_Launch) {
         return pJLI_Launch(argc, (const char **)argv,
                    0, NULL, // sizeof(const_jargs) / sizeof(char *), const_jargs,
