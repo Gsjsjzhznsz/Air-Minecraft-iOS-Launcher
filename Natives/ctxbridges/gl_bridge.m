@@ -35,6 +35,216 @@ void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail) {
     if (fail) *fail = atomic_load(&g_eglSwapFail);
 }
 
+// ============================================================================
+// Task 41：交换时刻 GL 状态取证 + 自愈呈现（GL 路径黑屏定位）
+//
+// 现状（latestlog d638c22）：swapOK=529、fps=57、390 编译零崩溃、图集/音效
+// 全齐、遮罩正常移除——但画面全黑。MC RenderPearl GL 后端自建 1180x820 双
+// 缓冲交换链 FBO（[MG] depth alloc #1/#2 两个 D32F 1180x820）。最后疑点：
+// MC 的合成画面从未进入 FBO 0（ANGLE 窗口后缓冲），或进入后被翻译层丢弃。
+//
+// 本块在每次 eglSwapBuffers 之前（MC 渲染线程、MC 上下文 current）：
+//   1) 探针帧（#1-#5 + 每 200 帧）：glGetIntegerv 查 DRAW/READ binding +
+//      viewport；readback 当前 FBO 中心 8x8（UBYTE 失败换 FLOAT，覆盖 HDR
+//      浮点格式）；readback FBO 0 中心 + 远角 8x8；全部记日志。
+//   2) 自愈 latch：FBO 0 平坦且当前 FBO 有内容 → mode=blit：此后每帧
+//      swap 前 raw ANGLE glBlitFramebuffer(viewport -> 表面实际尺寸)，
+//      scissor 保存/恢复、read/draw binding 恢复。FBO 0 有内容 →
+//      mode=normal 永不干预。unknown 保持探针。
+//
+// ES 指针从 MG 同款 pin 路径解析（@executable_path/Frameworks/
+// libGLESv2.framework/libGLESv2），指向同一 ANGLE 镜像；对 gl4es 等
+// 渲染器同样适用（它们的底层同为 ANGLE ES 上下文）。
+// ============================================================================
+typedef void (*ame_es_getint_t)(unsigned int, int *);
+typedef void (*ame_es_bindfb_t)(unsigned int, unsigned int);
+typedef void (*ame_es_readpx_t)(int, int, int, int, unsigned int, unsigned int, void *);
+typedef unsigned int (*ame_es_geterr_t)(void);
+typedef unsigned char (*ame_es_isenabled_t)(unsigned int);
+typedef void (*ame_es_enable_t)(unsigned int, unsigned char);
+typedef void (*ame_es_blitfb_t)(int, int, int, int, int, int, int, int, unsigned int, unsigned int);
+
+typedef struct {
+    ame_es_getint_t    getIntegerv;
+    ame_es_bindfb_t    bindFramebuffer;
+    ame_es_readpx_t    readPixels;
+    ame_es_geterr_t    getError;
+    ame_es_isenabled_t isEnabled;
+    ame_es_enable_t    enable;
+    ame_es_blitfb_t    blitFramebuffer;
+    EGLBoolean (*querySurface)(EGLDisplay, EGLSurface, EGLint, EGLint *);
+} ame_es_t;
+
+static ame_es_t ame_es(void) {
+    static ame_es_t s_es;
+    static BOOL s_tried = NO;
+    if (s_tried) return s_es;
+    s_tried = YES;
+    static const char *const kCandidates[] = {
+        "@executable_path/Frameworks/libGLESv2.framework/libGLESv2",
+        "@rpath/libGLESv2.framework/libGLESv2",
+        "libGLESv2",
+        NULL,
+    };
+    void *h = NULL;
+    for (int i = 0; kCandidates[i] != NULL; ++i) {
+        h = dlopen(kCandidates[i], RTLD_NOW | RTLD_LOCAL);
+        if (h != NULL) {
+            NSLog(@"[RenderDiag] Task41 ES probe pinned to %s", kCandidates[i]);
+            break;
+        }
+    }
+    if (h == NULL) {
+        NSLog(@"[RenderDiag] Task41 ES probe unavailable (libGLESv2 not loadable)");
+        return s_es;
+    }
+    s_es.getIntegerv     = (ame_es_getint_t)dlsym(h, "glGetIntegerv");
+    s_es.bindFramebuffer = (ame_es_bindfb_t)dlsym(h, "glBindFramebuffer");
+    s_es.readPixels      = (ame_es_readpx_t)dlsym(h, "glReadPixels");
+    s_es.getError        = (ame_es_geterr_t)dlsym(h, "glGetError");
+    s_es.isEnabled       = (ame_es_isenabled_t)dlsym(h, "glIsEnabled");
+    s_es.enable          = (ame_es_enable_t)dlsym(h, "glEnable");
+    s_es.blitFramebuffer = (ame_es_blitfb_t)dlsym(h, "glBlitFramebuffer");
+    // eglQuerySurface 在 libEGL（ANGLE EGL）里，与 libGLESv2 同一 ANGLE 家族，
+    // 已加载镜像 dlopen 仅引用计数 +1。自行解析以避免前向依赖文件后部的
+    // ame_raw_query_surface（static 声明位于本块之后，不可提前引用）。
+    static const char *const kEglCandidates[] = {
+        "@executable_path/Frameworks/libEGL.framework/libEGL",
+        "@rpath/libEGL.framework/libEGL",
+        "libEGL",
+        NULL,
+    };
+    for (int i = 0; kEglCandidates[i] != NULL; ++i) {
+        void *he = dlopen(kEglCandidates[i], RTLD_NOW | RTLD_LOCAL);
+        if (he != NULL) {
+            s_es.querySurface = (EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint *))dlsym(he, "eglQuerySurface");
+            break;
+        }
+    }
+    return s_es;
+}
+
+// 统计 8x8 RGBA UBYTE 块里不同颜色的个数（1 = 平坦）
+static int ame_count_unique_rgba(const unsigned char *buf, int n_px) {
+    int uniq = 0;
+    unsigned int seen[64];
+    for (int i = 0; i < n_px; ++i) {
+        unsigned int c = ((unsigned)buf[i*4] << 24) | ((unsigned)buf[i*4+1] << 16) |
+                         ((unsigned)buf[i*4+2] << 8) | (unsigned)buf[i*4+3];
+        BOOL found = NO;
+        for (int j = 0; j < uniq; ++j) if (seen[j] == c) { found = YES; break; }
+        if (!found && uniq < 64) seen[uniq++] = c;
+    }
+    return uniq;
+}
+
+// 浮点 readback 兜底：方差>阈值 = 有内容
+static BOOL ame_float_readback_has_content(ame_es_t es, int x, int y) {
+    float buf[8 * 8 * 4];
+    es.readPixels(x, y, 8, 8, 0x1908 /*GL_RGBA*/, 0x1406 /*GL_FLOAT*/, buf);
+    if (es.getError() != 0) return NO; // 未知
+    float minv = 1e30f, maxv = -1e30f;
+    for (int i = 0; i < 8 * 8 * 4; ++i) {
+        if (buf[i] < minv) minv = buf[i];
+        if (buf[i] > maxv) maxv = buf[i];
+    }
+    return (maxv - minv) > 0.001f;
+}
+
+// 探针 + 自愈主入口。swapIndex 从 1 计。
+// 0 = undecided, 1 = normal, 2 = self-heal blit
+static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapIndex) {
+    ame_es_t es = ame_es();
+    if (es.getIntegerv == NULL || es.bindFramebuffer == NULL || es.readPixels == NULL) return;
+
+    static int s_mode = 0;          // 0 undecided / 1 normal / 2 blit
+    const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode == 0;
+    int drawFb = 0, readFb = 0, viewport[4] = {0, 0, 0, 0};
+    es.getIntegerv(0x8CA9 /*GL_DRAW_FRAMEBUFFER_BINDING*/, &drawFb);
+    es.getIntegerv(0x8CAA /*GL_READ_FRAMEBUFFER_BINDING*/, &readFb);
+    es.getIntegerv(0x0BA2 /*GL_VIEWPORT*/, viewport);
+    while (es.getError() != 0) {}   // 清残留错误
+
+    int surfW = 0, surfH = 0;
+    if (es.querySurface != NULL && surface != EGL_NO_SURFACE) {
+        EGLint sw = 0, sh = 0;
+        if (es.querySurface(g_EglDisplay, surface, 0x3056 /*EGL_WIDTH*/, &sw) &&
+            es.querySurface(g_EglDisplay, surface, 0x3057 /*EGL_HEIGHT*/, &sh)) {
+            surfW = sw; surfH = sh;
+        }
+    }
+    if (surfW <= 0) surfW = viewport[2];
+    if (surfH <= 0) surfH = viewport[3];
+
+    if (probe) {
+        unsigned char cur[8 * 8 * 4];
+        int curUniq = 0, curErr = 0;
+        int cx = viewport[0] + viewport[2] / 2 - 4;
+        int cy = viewport[1] + viewport[3] / 2 - 4;
+        es.readPixels(cx, cy, 8, 8, 0x1908, 0x1401 /*GL_UNSIGNED_BYTE*/, cur);
+        curErr = (int)es.getError();
+        if (curErr == 0) curUniq = ame_count_unique_rgba(cur, 64);
+        BOOL curContent = (curErr == 0 && curUniq > 1);
+        if (!curContent && curErr == 0) {
+            // 64 像素全同色但非黑也可能是一帧纯色，浮点兜底区分方差
+            curContent = ame_float_readback_has_content(es, cx, cy);
+            if (curContent) curUniq = -1; // 标记浮点方差路径
+        }
+
+        // FBO 0 readback：中心 + 远角
+        es.bindFramebuffer(0x8D40 /*GL_FRAMEBUFFER*/, 0);
+        unsigned char fb0[8 * 8 * 4];
+        int fb0Uniq = 0, fb0Err = 0;
+        int fx = surfW / 2 - 4, fy = surfH / 2 - 4;
+        es.readPixels(fx, fy, 8, 8, 0x1908, 0x1401, fb0);
+        fb0Err = (int)es.getError();
+        if (fb0Err == 0) fb0Uniq = ame_count_unique_rgba(fb0, 64);
+        unsigned char corner[8 * 8 * 4];
+        int cornerUniq = 0;
+        es.readPixels(surfW - 12, surfH - 12, 8, 8, 0x1908, 0x1401, corner);
+        if (es.getError() == 0) cornerUniq = ame_count_unique_rgba(corner, 64);
+        es.bindFramebuffer(0x8D40, (unsigned)drawFb);   // 恢复
+        while (es.getError() != 0) {}
+
+        NSLog(@"[RenderDiag] swap#%lu (Task41): drawFb=%d readFb=%d viewport=%d,%d %dx%d surface=%dx%d cur=(uniq=%d err=0x%x) fbo0=(uniq=%d corner=%d err=0x%x) mode=%d",
+              swapIndex, drawFb, readFb, viewport[0], viewport[1], viewport[2], viewport[3],
+              surfW, surfH, curUniq, curErr, fb0Uniq, cornerUniq, fb0Err, s_mode);
+
+        // latch 判定（只在确凿时）
+        BOOL fbo0Flat = (fb0Err == 0 && fb0Uniq <= 1);
+        BOOL fbo0Content = (fb0Err == 0 && fb0Uniq > 1);
+        if (s_mode == 0 && fbo0Content) {
+            s_mode = 1;
+            NSLog(@"[RenderDiag] Task41 latch: NORMAL present (FBO 0 has content at swap time)");
+        } else if (s_mode == 0 && fbo0Flat && curContent && drawFb != 0) {
+            s_mode = 2;
+            NSLog(@"[RenderDiag] Task41 latch: SELF-HEAL present blit (MC frame lives in FBO %d, FBO 0 is flat -- blitting every swap)", drawFb);
+        }
+    }
+
+    if (s_mode == 2) {
+        // 自愈：READ = MC 当前 FBO，DRAW = FBO 0，viewport -> surface 尺寸缩放 blit
+        int scissorWasOn = es.isEnabled(0x0C11 /*GL_SCISSOR_TEST*/);
+        if (scissorWasOn) es.enable(0x0C11, 0 /*GL_FALSE*/);
+        es.bindFramebuffer(0x8CA8 /*GL_READ_FRAMEBUFFER*/, (unsigned)drawFb);
+        es.bindFramebuffer(0x8CA9 /*GL_DRAW_FRAMEBUFFER*/, 0);
+        es.blitFramebuffer(0, 0, viewport[2], viewport[3],
+                           0, 0, surfW, surfH,
+                           0x4000 /*GL_COLOR_BUFFER_BIT*/, 0x2601 /*GL_LINEAR*/);
+        unsigned int blitErr = es.getError();
+        es.bindFramebuffer(0x8CA8, (unsigned)readFb);
+        es.bindFramebuffer(0x8CA9, (unsigned)drawFb);
+        if (scissorWasOn) es.enable(0x0C11, 1 /*GL_TRUE*/);
+        while (es.getError() != 0) {}
+        static unsigned long s_blitLogs = 0;
+        s_blitLogs++;
+        if (s_blitLogs <= 3 || s_blitLogs % 300 == 0 || blitErr != 0) {
+            NSLog(@"[RenderDiag] self-heal blit #%lu (Task41): src=%dx%d dst=%dx%d blitErr=0x%x",
+                  s_blitLogs, viewport[2], viewport[3], surfW, surfH, blitErr);
+        }
+    }
+}
+
 static void* load_egl_symbol(void *dl_handle, const char *symbol) {
     dlerror();
     void *addr = dlsym(dl_handle, symbol);
@@ -504,6 +714,8 @@ void gl_swap_buffers() {
     // 由 SurfaceViewController 的 [RenderDiag] 5 秒心跳汇总上报。
     // 失败：任意错误码都打（去掉旧版 EGL_BAD_SURFACE 过滤），前 10 次逐条打，
     // 之后每 100 次打一条，避免日志爆炸。
+    ame_task41_swap_forensics(currentBundle->gl.surface,
+                              atomic_load(&g_eglSwapOK) + atomic_load(&g_eglSwapFail) + 1);
     EGLBoolean swapResult = handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface);
     if (!swapResult) {
         unsigned long fails = atomic_fetch_add(&g_eglSwapFail, 1) + 1;

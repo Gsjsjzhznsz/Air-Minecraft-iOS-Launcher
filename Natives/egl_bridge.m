@@ -329,16 +329,20 @@ void pojavSetWindowHint(int hint, int value) {
 
 /// 进程启动起的毫秒数（与 shaderc_shim 的 ame_shim_ms 同款惰性 t0）。
 static uint64_t ame_eb_now_ms(void) {
-    static struct timespec t0;
+    // Task 41 修复：旧实现 (uint64_t)(now.tv_nsec - t0.tv_nsec) 在秒位进位、
+    // 纳秒位退位时无符号下溢（实测打印 18446744074337ms 假值），导致 15s
+    // 强制上限在 0.63s 误触发、首帧在编译风暴正中放行。改为同域毫秒差，
+    // now >= t0 恒成立（CLOCK_MONOTONIC_RAW 单调），无下溢可能。
+    static uint64_t t0_ms = 0;
     static volatile int t0_set = 0;
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC_RAW, &now);
+    uint64_t now_ms = (uint64_t)now.tv_sec * 1000ull + (uint64_t)now.tv_nsec / 1000000ull;
     if (!t0_set) {
-        t0 = now;
+        t0_ms = now_ms;
         t0_set = 1;
     }
-    return (uint64_t)(now.tv_sec - t0.tv_sec) * 1000ull +
-           (uint64_t)(now.tv_nsec - t0.tv_nsec) / 1000000ull;
+    return now_ms - t0_ms;
 }
 
 typedef uint64_t (*ame_quiescence_fn_t)(void);
