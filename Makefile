@@ -342,6 +342,19 @@ dep_mg:
 	else \
 		echo 'glslang-lvalue-nullguard.patch already applied or submodule absent - continuing'; \
 	fi
+	# Task 45: pool-block zero-fill + constArray size guards, applied ON TOP of
+	# the nullguard patch (requires it). The prebuilt libshaderc_impl.dylib crash
+	# family (45 tasks: constArray+0xd8 reads recycled source-text bytes -> SIGSEGV
+	# -> all pipelines fail -> MC dies) is closed at the source level: every fresh
+	# glslang pool block (malloc-recycled OR freelist-reused) is zero-filled, so
+	# any un-initialized / stale field read observes 0/NULL and the nullguards
+	# degrade gracefully (identity swizzle / skipped element) instead of dying.
+	# Idempotent: --check first, matching the nullguard block above.
+	@if git -C $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang apply --check $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang-pool-zero-and-size-guards.patch >/dev/null 2>&1; then \
+		git -C $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang apply $(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang-pool-zero-and-size-guards.patch && echo 'glslang-pool-zero-and-size-guards.patch applied'; \
+	else \
+		echo 'glslang-pool-zero-and-size-guards.patch already applied or submodule absent - continuing'; \
+	fi
 	mkdir -p $(WORKINGDIR)/mobileglues
 	# Task 27: 显式设 CMAKE_BUILD_TYPE=RelWithDebInfo。此前未设置（--config 对
 	# 单配置生成器无效），CMake 不追加 -O2/-DNDEBUG：整库 -O0 且 glslang/
@@ -360,7 +373,14 @@ dep_mg:
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 		$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/
 
-	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues
+	# Task 45: also build the SPIRV emitter + default resource limits static
+	# libraries - dep_shader_shims links them (with libglslang.a) into the
+	# from-source libshaderc_impl.dylib. mobileglues itself only links
+	# glslang::glslang, so these targets must be named explicitly.
+	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues SPIRV glslang-default-resource-limits
+	@test -f "$(WORKINGDIR)/mobileglues/SPIRV/libSPIRV.a" || { echo "ERROR: libSPIRV.a missing - from-source shaderc impl cannot link"; exit 1; }
+	@test -f "$(WORKINGDIR)/mobileglues/glslang/libglslang.a" || { echo "ERROR: libglslang.a missing - from-source shaderc impl cannot link"; exit 1; }
+	@test -f "$(WORKINGDIR)/mobileglues/glslang/libglslang-default-resource-limits.a" || { echo "ERROR: libglslang-default-resource-limits.a missing - from-source shaderc impl cannot link"; exit 1; }
 	cp $(WORKINGDIR)/mobileglues/libmobileglues*.dylib $(WORKINGDIR)/
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
 dep_mobilegl:
@@ -398,13 +418,36 @@ assets:
 #      resolution path (hooked dlsym / RTLD_DEFAULT / any direct dlsym) lands
 #      on the locking forwarders. Deadlock avoidance details in
 #      Natives/shaderc_shim.c header comment.
-dep_shader_shims:
+dep_shader_shims: dep_mg
 	echo '[Amethyst v$(VERSION)] dep_shader_shims - start'
-	cp $(SOURCEDIR)/Natives/resources/Frameworks/libshaderc_impl.dylib $(WORKINGDIR)/ || exit 1
-	# Task 34: machine-code null/bounds guards for glslang lValueErrorCheck
-	# (device SIGSEGV at +0x204, Task-30 same-family corruption). Idempotent;
-	# exits 1 with instructions if the impl binary no longer matches.
-	python3 $(SOURCEDIR)/scripts/patch_shaderc_lvalue_guard.py $(WORKINGDIR)/libshaderc_impl.dylib || exit 1
+	# Task 45: build libshaderc_impl.dylib FROM SOURCE - glue over the glslang C
+	# interface (Natives/shaderc_impl_glue.c) linked against the SAME pinned
+	# f5f664d static libs dep_mg just built (nullguard + pool-zero/size-guard
+	# patches applied). Retires the prebuilt unpatched impl blob and the Task-34
+	# machine-code cave patch (scripts/patch_shaderc_lvalue_guard.py stays
+	# in-repo for archaeology). The 45-task crash family (constArray+0xd8
+	# reading recycled source-text bytes, deterministic per-run / ASLR-luck
+	# across runs, surviving every in-process mitigation) had exactly one
+	# untested variable left - the impl binary itself; now the only glslang in
+	# the process is the patched, freshly-built one. dep_mg ordering: this
+	# target links dep_mg's outputs (parallel-make safety).
+	extra_glslang_libs=""; \
+	for l in libOGLCompiler.a libOSDependent.a; do \
+		if [ -f "$(WORKINGDIR)/mobileglues/glslang/$$l" ]; then \
+			extra_glslang_libs="$$extra_glslang_libs $(WORKINGDIR)/mobileglues/glslang/$$l"; \
+		fi; \
+	done; \
+	echo "[shaderc-impl] linking from-source impl (extra libs:$$extra_glslang_libs)"; \
+	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
+		-install_name @rpath/libshaderc_impl.dylib \
+		-I$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang \
+		-o $(WORKINGDIR)/libshaderc_impl.dylib \
+		$(SOURCEDIR)/Natives/shaderc_impl_glue.c \
+		$(WORKINGDIR)/mobileglues/SPIRV/libSPIRV.a \
+		$(WORKINGDIR)/mobileglues/glslang/libglslang.a \
+		$(WORKINGDIR)/mobileglues/glslang/libglslang-default-resource-limits.a \
+		$$extra_glslang_libs \
+		-lc++ || exit 1
 	install_name_tool -id @rpath/libshaderc_impl.dylib $(WORKINGDIR)/libshaderc_impl.dylib || exit 1
 	cp $(SOURCEDIR)/Natives/resources/Frameworks/libspirv-cross-c-shared.0.impl.dylib $(WORKINGDIR)/ || exit 1
 	install_name_tool -id @rpath/libspirv-cross-c-shared.0.impl.dylib $(WORKINGDIR)/libspirv-cross-c-shared.0.impl.dylib || exit 1

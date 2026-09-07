@@ -153,6 +153,29 @@
 // 个 shader，堆安静）→ 一次 Vulkan run 即全量播种 ame_shaderc_cache →
 // 切回 GL 后逐条 HIT、零 glslang 暴露、零崩溃窗口。首次失败时打 TIP 日志
 // 指引用户走此路径。
+//
+// Task 45（latestlog 2026-09-07 16:34，用户"还是不行，这次连 Vulkan 都不行"）
+// 判读 + 架构根治：本轮 Vulkan run 同样死于 shaderc 编译风暴（compile#7
+// terrain 起双崩→合成失败→"Failed to load required shader programs"→MC 崩
+// 溃退出；fps=0 swapOK=0，渲染链路本身无辜）——"Vulkan 播种"战略路径被证
+// 伪（同一毒化家族对两条 RenderPearl 路径无差别）。45 个任务里唯一从未换
+// 过的变量是 libshaderc_impl.dylib 这个预编译 blob 本身（Task 44 实证：同
+// blob 同 shader 同事件序列，一个 run 390/390 全过、另一个 run 63% 崩 =
+// 跨 run ASLR/堆布局运气）。本任务直接换掉这个变量：
+//   dep_shader_shims 现在从源码构建 libshaderc_impl.dylib——
+//   Natives/shaderc_impl_glue.c（shaderc 全 ABI 之上的 glslang C 接口实现）
+//   链接 dep_mg 刚构建的同一 pin f5f664d 静态库（nullguard 源码补丁 + Task
+//   45 池清零/size 守卫补丁都已打上）。进程里唯一的 glslang 从此就是那个
+//   打了补丁、新鲜构建、MobileGlues 同源的一份；Task 34 的机器码 cave 补
+//   （patch_shaderc_lvalue_guard.py）随之退役（脚本留档）。本垫片的串行化/
+//   崩溃网/重建/缓存/沙箱链路零改动——转发目标从预编译 blob 变成了源码
+//   构建 impl，沙箱子进程按路径 dlopen 的也是它。
+// 端到端验证（Linux 真实构建双补丁 glslang + glue 链接 + 27 断言测试）：
+// VS/FS 出合法 SPIR-V、MC 精确调用形态（vulkan 1.2 + debug info）、宏注入
+// 在 #version 行之后（glslang set_preamble 会把 #version 挤下首行使版本
+// 回落 110）、非 NUL 结尾源码、错误路径、300 次风暴、finalize/init 引用计
+// 数循环全绿；preprocess→parse 的 C 接口强序（parse 编译的是
+// preprocessedGLSL 而非原始源码）已内建。
 
 #include <dirent.h>
 #include <dlfcn.h>
@@ -1171,11 +1194,10 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             if (!s_storm_tip_printed) {
                 s_storm_tip_printed = 1;
                 fprintf(stderr,
-                        "[shaderc-cache] TIP: launch the game ONCE with the Vulkan "
-                        "renderer -- its compile storm succeeds and seeds this cache "
-                        "(same shaders, quiet heap); switch back to GL and every "
-                        "pipeline boots from cache HIT with zero glslang exposure "
-                        "(Task 44 cross-renderer seeding)\n");
+                        "[shaderc-cache] TIP: this run uses the from-source "
+                        "glslang impl (Task 45); the disk cache still shortens "
+                        "every later launch -- successful compiles accumulate "
+                        "across runs automatically\n");
             }
             if (s_storm_total % 100 == 0) {
                 fprintf(stderr,
