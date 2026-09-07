@@ -377,10 +377,26 @@ dep_mg:
 	# libraries - dep_shader_shims links them (with libglslang.a) into the
 	# from-source libshaderc_impl.dylib. mobileglues itself only links
 	# glslang::glslang, so these targets must be named explicitly.
+	# Task 46: the archives land under <build>/3rdparty/glslang/ - the
+	# MobileGlues superbuild add_subdirectory(3rdparty/glslang) keeps
+	# source-relative binary dirs. Task 45 checked the standalone-glslang
+	# layout (<build>/SPIRV/..., produced only by a manual standalone
+	# configure) and aborted CI with "libSPIRV.a missing" right after an
+	# all-green compile (run 34105892191). Check the superbuild layout,
+	# fall back to locating the archive by name, fail with a listing.
 	cmake --build $(WORKINGDIR)/mobileglues --config RelWithDebInfo -j$(JOBS) --target mobileglues SPIRV glslang-default-resource-limits
-	@test -f "$(WORKINGDIR)/mobileglues/SPIRV/libSPIRV.a" || { echo "ERROR: libSPIRV.a missing - from-source shaderc impl cannot link"; exit 1; }
-	@test -f "$(WORKINGDIR)/mobileglues/glslang/libglslang.a" || { echo "ERROR: libglslang.a missing - from-source shaderc impl cannot link"; exit 1; }
-	@test -f "$(WORKINGDIR)/mobileglues/glslang/libglslang-default-resource-limits.a" || { echo "ERROR: libglslang-default-resource-limits.a missing - from-source shaderc impl cannot link"; exit 1; }
+	@mg_spirv_a=$(WORKINGDIR)/mobileglues/3rdparty/glslang/SPIRV/libSPIRV.a; \
+	[ -f "$$mg_spirv_a" ] || mg_spirv_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libSPIRV.a -print -quit 2>/dev/null); \
+	mg_glslang_a=$(WORKINGDIR)/mobileglues/3rdparty/glslang/glslang/libglslang.a; \
+	[ -f "$$mg_glslang_a" ] || mg_glslang_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libglslang.a -print -quit 2>/dev/null); \
+	mg_rl_a=$(WORKINGDIR)/mobileglues/3rdparty/glslang/glslang/libglslang-default-resource-limits.a; \
+	[ -f "$$mg_rl_a" ] || mg_rl_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libglslang-default-resource-limits.a -print -quit 2>/dev/null); \
+	if [ -z "$$mg_spirv_a" ] || [ ! -f "$$mg_spirv_a" ] || [ -z "$$mg_glslang_a" ] || [ ! -f "$$mg_glslang_a" ] || [ -z "$$mg_rl_a" ] || [ ! -f "$$mg_rl_a" ]; then \
+		echo "ERROR: glslang static libs unresolved (spirv=$$mg_spirv_a glslang=$$mg_glslang_a rl=$$mg_rl_a) - from-source shaderc impl cannot link"; \
+		find $(WORKINGDIR)/mobileglues -type f -name "lib*.a" 2>/dev/null | head -20; \
+		exit 1; \
+	fi; \
+	echo "[shaderc-impl] glslang static libs OK (spirv=$$mg_spirv_a glslang=$$mg_glslang_a rl=$$mg_rl_a)"
 	cp $(WORKINGDIR)/mobileglues/libmobileglues*.dylib $(WORKINGDIR)/
 	echo '[Amethyst v$(VERSION)] dep_mg - end'
 dep_mobilegl:
@@ -431,21 +447,39 @@ dep_shader_shims: dep_mg
 	# untested variable left - the impl binary itself; now the only glslang in
 	# the process is the patched, freshly-built one. dep_mg ordering: this
 	# target links dep_mg's outputs (parallel-make safety).
+	# Task 46: resolve the glslang static libs from the superbuild layout
+	# (<build>/3rdparty/glslang/...). Task 45 pointed at the
+	# standalone-glslang layout (<build>/SPIRV/...), which this build never
+	# produces - CI run 34105892191 died at "libSPIRV.a missing" after an
+	# all-green compile. Primary: superbuild paths; fallback: locate by
+	# archive name under the mobileglues build tree so future CMake layout
+	# drift cannot break the link.
+	mg_bindir=$(WORKINGDIR)/mobileglues/3rdparty/glslang; \
+	mg_spirv_a=$$mg_bindir/SPIRV/libSPIRV.a; \
+	[ -f "$$mg_spirv_a" ] || mg_spirv_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libSPIRV.a -print -quit 2>/dev/null); \
+	mg_glslang_a=$$mg_bindir/glslang/libglslang.a; \
+	[ -f "$$mg_glslang_a" ] || mg_glslang_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libglslang.a -print -quit 2>/dev/null); \
+	mg_rl_a=$$mg_bindir/glslang/libglslang-default-resource-limits.a; \
+	[ -f "$$mg_rl_a" ] || mg_rl_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libglslang-default-resource-limits.a -print -quit 2>/dev/null); \
+	if [ -z "$$mg_spirv_a" ] || [ ! -f "$$mg_spirv_a" ] || [ -z "$$mg_glslang_a" ] || [ ! -f "$$mg_glslang_a" ] || [ -z "$$mg_rl_a" ] || [ ! -f "$$mg_rl_a" ]; then \
+		echo "ERROR: glslang static libs unresolved (spirv=$$mg_spirv_a glslang=$$mg_glslang_a rl=$$mg_rl_a) - from-source shaderc impl cannot link"; \
+		exit 1; \
+	fi; \
 	extra_glslang_libs=""; \
 	for l in libOGLCompiler.a libOSDependent.a; do \
-		if [ -f "$(WORKINGDIR)/mobileglues/glslang/$$l" ]; then \
-			extra_glslang_libs="$$extra_glslang_libs $(WORKINGDIR)/mobileglues/glslang/$$l"; \
+		if [ -f "$$mg_bindir/glslang/$$l" ]; then \
+			extra_glslang_libs="$$extra_glslang_libs $$mg_bindir/glslang/$$l"; \
 		fi; \
 	done; \
-	echo "[shaderc-impl] linking from-source impl (extra libs:$$extra_glslang_libs)"; \
+	echo "[shaderc-impl] linking from-source impl (spirv=$$mg_spirv_a glslang=$$mg_glslang_a rl=$$mg_rl_a extra libs:$$extra_glslang_libs)"; \
 	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
 		-install_name @rpath/libshaderc_impl.dylib \
 		-I$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang \
 		-o $(WORKINGDIR)/libshaderc_impl.dylib \
 		$(SOURCEDIR)/Natives/shaderc_impl_glue.c \
-		$(WORKINGDIR)/mobileglues/SPIRV/libSPIRV.a \
-		$(WORKINGDIR)/mobileglues/glslang/libglslang.a \
-		$(WORKINGDIR)/mobileglues/glslang/libglslang-default-resource-limits.a \
+		"$$mg_spirv_a" \
+		"$$mg_glslang_a" \
+		"$$mg_rl_a" \
 		$$extra_glslang_libs \
 		-lc++ || exit 1
 	install_name_tool -id @rpath/libshaderc_impl.dylib $(WORKINGDIR)/libshaderc_impl.dylib || exit 1
