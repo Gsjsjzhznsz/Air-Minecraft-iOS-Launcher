@@ -866,10 +866,8 @@ static UIView *ame_findSubviewOfClass(UIView *root, Class cls) {
     return nil;
 }
 
-// 与 patch 相同语义：嵌入式 SDL 视图对 hitTest 返回 nil，触摸穿透给 touchView
-static UIView *ame_sdlHitTestShim(id self, SEL _cmd, CGPoint point, UIEvent *event) {
-    return nil;
-}
+// Task 49：旧的 hitTest 穿透 shim 已移除——MC 26.3 输入走 SDL3 事件泵，
+// 触摸必须命中 SDL 视图（详见 ame_embedSDLViewIntoHost 步骤 4 注释）。
 
 // 只在主线程调用。返回 true 表示嵌入成功。
 static bool ame_embedSDLViewIntoHost(void) {
@@ -929,16 +927,16 @@ static bool ame_embedSDLViewIntoHost(void) {
             if (sub != sdlView) [touchView bringSubviewToFront:sub];
         }
 
-        // 4. hitTest 穿透（仅当 SDL 视图类自身没有实现时补上，避免覆盖上游行为）
-        Class viewCls = object_getClass(sdlView);
-        Method hitTestMethod = class_getInstanceMethod(viewCls, @selector(hitTest:withEvent:));
-        if (hitTestMethod == nil ||
-            class_getInstanceMethod(UIView.class, @selector(hitTest:withEvent:)) == hitTestMethod) {
-            Method base = class_getInstanceMethod(UIView.class, @selector(hitTest:withEvent:));
-            const char *enc = base ? method_getTypeEncoding(base) : "@@:{CGPoint=ff}@";
-            class_addMethod(viewCls, @selector(hitTest:withEvent:), (IMP)ame_sdlHitTestShim, enc);
-            NSLog(@"[AmethystEmbed] hitTest shim installed on %@", NSStringFromClass(viewCls));
-        }
+        // 4. Task 49：不再安装 hitTest 穿透 shim。
+        //    旧设计把 SDL 视图的 hitTest 返回 nil，让触摸落到 touchView，走
+        //    Pojav 的 GLFW 回调链。但 latestlog 53febda 铁证：该链已死
+        //    （InputDiag sendCursorPos GLFW_invoke_CursorPos=0x0、isInputReady=0，
+        //    触摸全部丢弃），而 MC 26.3 的输入走 SDL3 事件泵（SDL_EVENT_*，
+        //    需要触摸命中 SDL 视图）。移除 shim 后：触摸命中 SDL 视图 →
+        //    SDL3 合成 finger/mouse 事件 → MC 输入恢复；虚拟鼠标指针等
+        //    touchView 子视图已在步骤 3 压回 SDL 视图之上，控制按钮不受影响；
+        //    touchView 上的手势识别器仍能观察子视图触摸（UIKit 语义）。
+        NSLog(@"[AmethystEmbed] hitTest shim NOT installed (Task49: SDL3 native input needs real touches)");
 
         // 5. SDL 自己的 UIWindow 退场（永远隐藏；ShowWindow 钩子不再 makeKeyAndVisible）
         sdlWindow.hidden = YES;

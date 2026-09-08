@@ -64,6 +64,15 @@ typedef unsigned int (*ame_es_geterr_t)(void);
 typedef unsigned char (*ame_es_isenabled_t)(unsigned int);
 typedef void (*ame_es_enable_t)(unsigned int, unsigned char);
 typedef void (*ame_es_blitfb_t)(int, int, int, int, int, int, int, int, unsigned int, unsigned int);
+typedef void (*ame_es_bindtex_t)(unsigned int, unsigned int);
+typedef void (*ame_es_texparami_t)(unsigned int, unsigned int, int);
+typedef void (*ame_es_gentex_t)(int, unsigned int *);
+typedef void (*ame_es_deltex_t)(int, const unsigned int *);
+typedef void (*ame_es_teximg2d_t)(unsigned int, int, int, int, int, int, unsigned int, unsigned int, const void *);
+typedef void (*ame_es_genfb_t)(int, unsigned int *);
+typedef void (*ame_es_delfb_t)(int, const unsigned int *);
+typedef void (*ame_es_fbtex2d_t)(unsigned int, unsigned int, unsigned int, unsigned int, int);
+typedef unsigned int (*ame_es_checkfb_t)(unsigned int);
 
 typedef struct {
     ame_es_getint_t    getIntegerv;
@@ -74,6 +83,15 @@ typedef struct {
     ame_es_enable_t    enable;
     ame_es_blitfb_t    blitFramebuffer;
     EGLBoolean (*querySurface)(EGLDisplay, EGLSurface, EGLint, EGLint *);
+    ame_es_bindtex_t   bindTexture;        // Task 49 几何自愈
+    ame_es_texparami_t texParameteri;      // Task 49 几何自愈
+    ame_es_gentex_t    genTextures;        // Task 49 几何自愈
+    ame_es_deltex_t    deleteTextures;     // Task 49 几何自愈
+    ame_es_teximg2d_t  texImage2D;         // Task 49 几何自愈
+    ame_es_genfb_t     genFramebuffers;    // Task 49 几何自愈
+    ame_es_delfb_t     deleteFramebuffers; // Task 49 几何自愈
+    ame_es_fbtex2d_t   framebufferTexture2D; // Task 49 几何自愈
+    ame_es_checkfb_t   checkFramebufferStatus; // Task 49 几何自愈
 } ame_es_t;
 
 static ame_es_t ame_es(void) {
@@ -106,6 +124,16 @@ static ame_es_t ame_es(void) {
     s_es.isEnabled       = (ame_es_isenabled_t)dlsym(h, "glIsEnabled");
     s_es.enable          = (ame_es_enable_t)dlsym(h, "glEnable");
     s_es.blitFramebuffer = (ame_es_blitfb_t)dlsym(h, "glBlitFramebuffer");
+    // Task 49：几何自愈 blit 需要的 FBO/纹理管理函数（同源 libGLESv2/ANGLE）
+    s_es.bindTexture     = (ame_es_bindtex_t)dlsym(h, "glBindTexture");
+    s_es.texParameteri   = (ame_es_texparami_t)dlsym(h, "glTexParameteri");
+    s_es.genTextures     = (ame_es_gentex_t)dlsym(h, "glGenTextures");
+    s_es.deleteTextures  = (ame_es_deltex_t)dlsym(h, "glDeleteTextures");
+    s_es.texImage2D      = (ame_es_teximg2d_t)dlsym(h, "glTexImage2D");
+    s_es.genFramebuffers = (ame_es_genfb_t)dlsym(h, "glGenFramebuffers");
+    s_es.deleteFramebuffers = (ame_es_delfb_t)dlsym(h, "glDeleteFramebuffers");
+    s_es.framebufferTexture2D = (ame_es_fbtex2d_t)dlsym(h, "glFramebufferTexture2D");
+    s_es.checkFramebufferStatus = (ame_es_checkfb_t)dlsym(h, "glCheckFramebufferStatus");
     // eglQuerySurface 在 libEGL（ANGLE EGL）里，与 libGLESv2 同一 ANGLE 家族，
     // 已加载镜像 dlopen 仅引用计数 +1。自行解析以避免前向依赖文件后部的
     // ame_raw_query_surface（static 声明位于本块之后，不可提前引用）。
@@ -152,8 +180,97 @@ static BOOL ame_float_readback_has_content(ame_es_t es, int x, int y) {
     return (maxv - minv) > 0.001f;
 }
 
+// ============================================================================
+// Task 49：几何自愈 blit（scratch-FBO 两段中转）
+//
+// latestlog 53febda（d11eb66）铁证：MC 的帧确实在后缓冲里，但只覆盖
+// viewport 区域（1180x820，SDL3 点数），而表面是 2x 像素（2360x1640 或
+// 1640x2360）——帧占后缓冲左上 ~25%，其余永远平坦暗色（corner=27，近乎黑）。
+// 用户看到的就是"黑屏"。旧版 mode-2 blit 直接 READ=drawFb → DRAW=0，
+// 但实测 drawFb==0（MC 交换时刻绑定回默认帧缓冲）→ blit 变成 FBO0→FBO0
+// 自拷贝，矩形重叠 = ES 非法/无操作，且旧 latch 判据永不满足 → 自愈从未
+// 启动。
+//
+// 新设计（几何判定，零回读、每帧确定性）：
+//   viewport 维度 != surface 维度 → 帧无法覆盖后缓冲 → 启用两段 blit：
+//     段1: READ = (drawFb ? drawFb : 0) 的 viewport 区域 → scratch（缩放到 surface 尺寸）
+//     段2: READ = scratch → DRAW = FBO 0 全表面（1:1）
+//   两段各自无矩形重叠，ES3 合法。帧被放大铺满整个后缓冲 = 全屏可见，
+//   无论 1x/2x 尺寸单位失配、竖横转置、创建竞态还是旋转残留。
+//   表面尺寸变化时 scratch 懒重建（glTexImage2D 同名重分配）。
+// ============================================================================
+static unsigned int g_ame49_scratch_fb = 0;
+static unsigned int g_ame49_scratch_tex = 0;
+static int g_ame49_scratch_w = 0, g_ame49_scratch_h = 0;
+static int g_ame49_heal_disabled = 0;   // scratch FBO 完整性失败后的永久熔断
+
+static void ame_task49_geo_heal_blit(ame_es_t es, int drawFb, int readFb,
+                                     int vw, int vh, int sw, int sh) {
+    if (g_ame49_heal_disabled) return;
+    if (es.genFramebuffers == NULL || es.genTextures == NULL ||
+        es.texImage2D == NULL || es.framebufferTexture2D == NULL ||
+        es.checkFramebufferStatus == NULL || es.bindTexture == NULL ||
+        es.texParameteri == NULL || es.blitFramebuffer == NULL) {
+        g_ame49_heal_disabled = 1;   // 函数指针不全：熔断（创建执法/卫兵钉扎仍在）
+        return;
+    }
+    // 1) scratch 尺寸跟随 surface（懒创建 / 尺寸变化时重分配）
+    if (g_ame49_scratch_fb == 0 || g_ame49_scratch_w != sw || g_ame49_scratch_h != sh) {
+        if (g_ame49_scratch_fb == 0) {
+            es.genFramebuffers(1, &g_ame49_scratch_fb);
+            es.genTextures(1, &g_ame49_scratch_tex);
+        }
+        es.bindTexture(0x0DE1 /*GL_TEXTURE_2D*/, g_ame49_scratch_tex);
+        es.texImage2D(0x0DE1, 0, 0x8058 /*GL_RGBA8*/, sw, sh, 0,
+                      0x1908 /*GL_RGBA*/, 0x1401 /*GL_UNSIGNED_BYTE*/, NULL);
+        es.texParameteri(0x0DE1, 0x2801 /*GL_TEXTURE_MIN_FILTER*/, 0x2601 /*GL_LINEAR*/);
+        es.texParameteri(0x0DE1, 0x2800 /*GL_TEXTURE_MAG_FILTER*/, 0x2601 /*GL_LINEAR*/);
+        es.bindFramebuffer(0x8D40 /*GL_FRAMEBUFFER*/, g_ame49_scratch_fb);
+        es.framebufferTexture2D(0x8D40, 0x8CE0 /*GL_COLOR_ATTACHMENT0*/,
+                                0x0DE1, g_ame49_scratch_tex, 0);
+        if (es.checkFramebufferStatus(0x8D40) != 0x8CD5 /*GL_FRAMEBUFFER_COMPLETE*/) {
+            NSLog(@"[RenderDiag] Task49 scratch FBO incomplete %dx%d -- geo-heal fused off", sw, sh);
+            es.bindFramebuffer(0x8D40, (unsigned)drawFb);
+            while (es.getError() != 0) {}
+            if (g_ame49_scratch_fb != 0) es.deleteFramebuffers(1, &g_ame49_scratch_fb);
+            if (g_ame49_scratch_tex != 0) es.deleteTextures(1, &g_ame49_scratch_tex);
+            g_ame49_scratch_fb = 0; g_ame49_scratch_tex = 0;
+            g_ame49_scratch_w = 0; g_ame49_scratch_h = 0;
+            g_ame49_heal_disabled = 1;
+            return;
+        }
+        g_ame49_scratch_w = sw; g_ame49_scratch_h = sh;
+        NSLog(@"[RenderDiag] Task49 scratch FBO ready %dx%d", sw, sh);
+    }
+    // 2) scissor 保存/关闭 + 两段 blit
+    int scissorWasOn = es.isEnabled(0x0C11 /*GL_SCISSOR_TEST*/);
+    if (scissorWasOn) es.enable(0x0C11, 0 /*GL_FALSE*/);
+    // 段1：MC 帧（viewport 区域，源 = MC 当前 FBO 或 FBO 0）→ scratch 全尺寸缩放
+    es.bindFramebuffer(0x8CA8 /*GL_READ_FRAMEBUFFER*/, (unsigned)(drawFb != 0 ? drawFb : 0));
+    es.bindFramebuffer(0x8CA9 /*GL_DRAW_FRAMEBUFFER*/, g_ame49_scratch_fb);
+    es.blitFramebuffer(0, 0, vw, vh, 0, 0, sw, sh,
+                       0x4000 /*GL_COLOR_BUFFER_BIT*/, 0x2601 /*GL_LINEAR*/);
+    // 段2：scratch → FBO 0 全表面 1:1
+    es.bindFramebuffer(0x8CA8, g_ame49_scratch_fb);
+    es.bindFramebuffer(0x8CA9, 0);
+    es.blitFramebuffer(0, 0, sw, sh, 0, 0, sw, sh,
+                       0x4000, 0x2601 /*GL_LINEAR*/);
+    unsigned int blitErr = es.getError();
+    // 3) 状态恢复
+    es.bindFramebuffer(0x8CA8, (unsigned)readFb);
+    es.bindFramebuffer(0x8CA9, (unsigned)drawFb);
+    if (scissorWasOn) es.enable(0x0C11, 1 /*GL_TRUE*/);
+    while (es.getError() != 0) {}
+    static unsigned long s_blitLogs = 0;
+    s_blitLogs++;
+    if (s_blitLogs <= 3 || s_blitLogs % 300 == 0 || blitErr != 0) {
+        NSLog(@"[RenderDiag] geo-heal blit #%lu (Task49): srcFb=%d %dx%d -> scratch %dx%d -> FBO0 %dx%d blitErr=0x%x",
+              s_blitLogs, drawFb, vw, vh, sw, sh, sw, sh, blitErr);
+    }
+}
+
 // 探针 + 自愈主入口。swapIndex 从 1 计。
-// 0 = undecided, 1 = normal, 2 = self-heal blit
+// 0 = undecided, 1 = normal, 2 = geo-heal blit
 static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapIndex) {
     ame_es_t es = ame_es();
     if (es.getIntegerv == NULL || es.bindFramebuffer == NULL || es.readPixels == NULL) return;
@@ -177,6 +294,20 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     if (surfW <= 0) surfW = viewport[2];
     if (surfH <= 0) surfH = viewport[3];
 
+    // Task 49：几何失配判定（每帧、零回读、确定性）。
+    // viewport 维度 != surface 维度 → MC 的帧无法铺满后缓冲（1x/2x 尺寸单位
+    // 失配或竖横转置——latestlog 53febda 的确切形态）→ 立即启用 geo-heal。
+    // 此判定优先于一切 latch：几何不匹配时“FBO 0 有内容”也不等于可见。
+    const BOOL geoMismatch = (viewport[2] > 0 && viewport[3] > 0 &&
+                              surfW > 0 && surfH > 0 &&
+                              (viewport[2] != surfW || viewport[3] != surfH));
+    if (geoMismatch && s_mode != 2) {
+        NSLog(@"[RenderDiag] Task49 geo mismatch ENGAGED: viewport=%dx%d surface=%dx%d (was mode=%d) -- frame covers only %.0f%% of backbuffer",
+              viewport[2], viewport[3], surfW, surfH, s_mode,
+              100.0 * (double)viewport[2] * (double)viewport[3] / ((double)surfW * (double)surfH));
+        s_mode = 2;
+    }
+
     if (probe) {
         unsigned char cur[8 * 8 * 4];
         int curUniq = 0, curErr = 0;
@@ -192,57 +323,53 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             if (curContent) curUniq = -1; // 标记浮点方差路径
         }
 
-        // FBO 0 readback：中心 + 远角
+        // FBO 0 readback：Task 49 修正探针位置——改探 viewport 中心（MC 帧
+        // 实际所在区域；53febda 铁证：旧探 surface 中心/远角落在帧区域之外，
+        // 把“帧在左上 25%”误诊成“FBO 0 全平坦”），远角保留作覆盖率诊断。
         es.bindFramebuffer(0x8D40 /*GL_FRAMEBUFFER*/, 0);
         unsigned char fb0[8 * 8 * 4];
         int fb0Uniq = 0, fb0Err = 0;
-        int fx = surfW / 2 - 4, fy = surfH / 2 - 4;
+        int fx = viewport[0] + viewport[2] / 2 - 4;
+        int fy = viewport[1] + viewport[3] / 2 - 4;
+        if (fx < 0) fx = 0;
+        if (fy < 0) fy = 0;
+        if (fx + 8 > surfW) fx = (surfW > 8) ? (surfW - 8) : 0;
+        if (fy + 8 > surfH) fy = (surfH > 8) ? (surfH - 8) : 0;
         es.readPixels(fx, fy, 8, 8, 0x1908, 0x1401, fb0);
         fb0Err = (int)es.getError();
         if (fb0Err == 0) fb0Uniq = ame_count_unique_rgba(fb0, 64);
         unsigned char corner[8 * 8 * 4];
         int cornerUniq = 0;
-        es.readPixels(surfW - 12, surfH - 12, 8, 8, 0x1908, 0x1401, corner);
+        es.readPixels((surfW > 12) ? (surfW - 12) : 0, (surfH > 12) ? (surfH - 12) : 0,
+                      8, 8, 0x1908, 0x1401, corner);
         if (es.getError() == 0) cornerUniq = ame_count_unique_rgba(corner, 64);
         es.bindFramebuffer(0x8D40, (unsigned)drawFb);   // 恢复
         while (es.getError() != 0) {}
 
-        NSLog(@"[RenderDiag] swap#%lu (Task41): drawFb=%d readFb=%d viewport=%d,%d %dx%d surface=%dx%d cur=(uniq=%d err=0x%x) fbo0=(uniq=%d corner=%d err=0x%x) mode=%d",
+        NSLog(@"[RenderDiag] swap#%lu (Task41): drawFb=%d readFb=%d viewport=%d,%d %dx%d surface=%dx%d cur=(uniq=%d err=0x%x) fbo0vp=(uniq=%d corner=%d err=0x%x) mode=%d",
               swapIndex, drawFb, readFb, viewport[0], viewport[1], viewport[2], viewport[3],
               surfW, surfH, curUniq, curErr, fb0Uniq, cornerUniq, fb0Err, s_mode);
 
-        // latch 判定（只在确凿时）
+        // latch 判定（Task 49 重写：几何优先，允许降级）
         BOOL fbo0Flat = (fb0Err == 0 && fb0Uniq <= 1);
         BOOL fbo0Content = (fb0Err == 0 && fb0Uniq > 1);
-        if (s_mode == 0 && fbo0Content) {
+        if (s_mode == 0 && fbo0Content && !geoMismatch) {
             s_mode = 1;
-            NSLog(@"[RenderDiag] Task41 latch: NORMAL present (FBO 0 has content at swap time)");
+            NSLog(@"[RenderDiag] Task41 latch: NORMAL present (FBO 0 has content at viewport center, geometry aligned)");
         } else if (s_mode == 0 && fbo0Flat && curContent && drawFb != 0) {
             s_mode = 2;
-            NSLog(@"[RenderDiag] Task41 latch: SELF-HEAL present blit (MC frame lives in FBO %d, FBO 0 is flat -- blitting every swap)", drawFb);
+            NSLog(@"[RenderDiag] Task41 latch: GEO-HEAL (MC frame lives in FBO %d, FBO 0 is flat -- blitting every swap)", drawFb);
+        } else if (s_mode == 1 && fbo0Flat && curContent && drawFb != 0) {
+            // Task 49：降级——曾判 NORMAL，但现在帧从未进后缓冲（留在 MC 自己
+            // 的 FBO）→ 重新启用自愈。旧版单向 latch 是自愈永不启动的原因之一。
+            s_mode = 2;
+            NSLog(@"[RenderDiag] Task41 latch DEMOTED to GEO-HEAL (FBO 0 went flat while MC FBO %d has content)", drawFb);
         }
     }
 
     if (s_mode == 2) {
-        // 自愈：READ = MC 当前 FBO，DRAW = FBO 0，viewport -> surface 尺寸缩放 blit
-        int scissorWasOn = es.isEnabled(0x0C11 /*GL_SCISSOR_TEST*/);
-        if (scissorWasOn) es.enable(0x0C11, 0 /*GL_FALSE*/);
-        es.bindFramebuffer(0x8CA8 /*GL_READ_FRAMEBUFFER*/, (unsigned)drawFb);
-        es.bindFramebuffer(0x8CA9 /*GL_DRAW_FRAMEBUFFER*/, 0);
-        es.blitFramebuffer(0, 0, viewport[2], viewport[3],
-                           0, 0, surfW, surfH,
-                           0x4000 /*GL_COLOR_BUFFER_BIT*/, 0x2601 /*GL_LINEAR*/);
-        unsigned int blitErr = es.getError();
-        es.bindFramebuffer(0x8CA8, (unsigned)readFb);
-        es.bindFramebuffer(0x8CA9, (unsigned)drawFb);
-        if (scissorWasOn) es.enable(0x0C11, 1 /*GL_TRUE*/);
-        while (es.getError() != 0) {}
-        static unsigned long s_blitLogs = 0;
-        s_blitLogs++;
-        if (s_blitLogs <= 3 || s_blitLogs % 300 == 0 || blitErr != 0) {
-            NSLog(@"[RenderDiag] self-heal blit #%lu (Task41): src=%dx%d dst=%dx%d blitErr=0x%x",
-                  s_blitLogs, viewport[2], viewport[3], surfW, surfH, blitErr);
-        }
+        // Task 49：两段 scratch-FBO blit（源=MC 帧 viewport 区域，缩放铺满 FBO 0）
+        ame_task49_geo_heal_blit(es, drawFb, readFb, viewport[2], viewport[3], surfW, surfH);
     }
 }
 
@@ -394,6 +521,17 @@ static void ame48_swap_geometry_guard(basic_render_window_t *bundle) {
                 } else {
                     NSLog(@"[GLGeo] Task48 re-create eglCreateWindowSurface FAILED err=0x%x",
                           (unsigned int)(uintptr_t)handle.eglGetError());
+                }
+                // Task 49：3 次重建全部失败（53febda 铁证：同 layer 二次建
+                // window surface 恒 EGL_BAD_ALLOC 0x3003）→ 接受当前表面尺寸
+                // 为新期望值，停止漂移循环。可见性由 Task49 几何自愈 blit
+                // 兜底（viewport→表面缩放铺满），不再依赖表面重建。
+                if (g_ame48_recreates >= 3) {
+                    NSLog(@"[GLGeo] Task48 accepts drifted surface %dx%d as new expected (re-create exhausted, geo-heal blit covers)",
+                          (int)sw, (int)sh);
+                    g_ame48_expected_w = (int)sw;
+                    g_ame48_expected_h = (int)sh;
+                    g_ame48_drift_swaps = 0;
                 }
             }
         }
@@ -744,19 +882,50 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     // attrib，会 EGL_BAD_ATTRIBUTE）——钉 layer 让 ANGLE 创建时自己读到。
     const char *rend48 = renderer.UTF8String;
     const BOOL mobileGlues48 = rend48 && strcmp(rend48, RENDERER_NAME_MOBILEGLUES) == 0;
+    int pinW48 = 0, pinH48 = 0;   // Task 49：创建时 1x 期望尺寸（0 = 不启用）
     if (mobileGlues48 && [layer isKindOfClass:CAMetalLayer.class]) {
         CAMetalLayer *ml48 = (CAMetalLayer *)layer;
         CGSize pts48 = layer.bounds.size;
-        int w48 = (int)MAX(1.0, round(pts48.width));
-        int h48 = (int)MAX(1.0, round(pts48.height));
+        pinW48 = (int)MAX(1.0, round(pts48.width));
+        pinH48 = (int)MAX(1.0, round(pts48.height));
         CGSize old48 = ml48.drawableSize;
-        ml48.drawableSize = CGSizeMake(w48, h48);
+        ml48.drawableSize = CGSizeMake(pinW48, pinH48);
         NSLog(@"[GLGeo] Task48 creation pin: bounds=%.0fx%.0f contentsScale=%.2f drawableSize %.0fx%.0f -> %dx%d (MC SDL viewport predicted)",
               pts48.width, pts48.height, (double)layer.contentsScale,
-              old48.width, old48.height, w48, h48);
+              old48.width, old48.height, pinW48, pinH48);
     }
-    bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
-        (__bridge EGLNativeWindowType)layer, mobileGL ? mobileGLSurfaceAttribs : NULL);
+    // Task 49：创建后尺寸执法重试环。
+    // latestlog 53febda（d11eb66）铁证：pin 打出 "drawableSize 2360x1640 -> 1180x820"，
+    // 紧随其后的创建诊断却报 drawableSize=2360x1640（eglQuerySurface 也为 2360x1640）
+    // —— 主线程 layout/updateSavedResolution 在 pin 与 eglCreateWindowSurface 之间
+    // 把 2x 像素值写回 layer，ANGLE 读 2x 建表面，1x-vs-2x 失配从此锁死：
+    // MC viewport（SDL3 点数 1180x820）只覆盖 2x 后缓冲（2360x1640）左上 25%，
+    // 其余区域永远平坦暗色（探针 corner=27）——黑屏直接成因。
+    // 修复：创建后立刻用 raw ANGLE eglQuerySurface 验尺寸，失配则重新钉扎 +
+    // 销毁重建（最多 5 次）。表面创建早于 eglMakeCurrent，销毁/重建安全；
+    // 5 次后仍失配则接受现状（交换卫兵 + Task49 几何自愈 blit 兜底）。
+    for (int attempt49 = 0; attempt49 < 5; ++attempt49) {
+        bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
+            (__bridge EGLNativeWindowType)layer, mobileGL ? mobileGLSurfaceAttribs : NULL);
+        if (bundle->surface == EGL_NO_SURFACE) break;          // 交给下方原有错误处理
+        if (pinW48 <= 0 || ame_raw_query_surface == NULL) break; // 未启用尺寸执法
+        EGLint sw49 = 0, sh49 = 0;
+        if (ame_raw_query_surface(g_EglDisplay, bundle->surface, EGL_WIDTH, &sw49) &&
+            ame_raw_query_surface(g_EglDisplay, bundle->surface, EGL_HEIGHT, &sh49) &&
+            sw49 == pinW48 && sh49 == pinH48) {
+            break;  // 尺寸正确
+        }
+        if (attempt49 == 4) {
+            NSLog(@"[GLGeo] Task49 creation size mismatch persisted after 5 attempts: surface=%dx%d expected=%dx%d -- accepting (swap guard + geo-heal blit will cover)",
+                  (int)sw49, (int)sh49, pinW48, pinH48);
+            break;
+        }
+        NSLog(@"[GLGeo] Task49 creation mismatch #%d: surface=%dx%d expected=%dx%d -- re-pin & re-create",
+              attempt49 + 1, (int)sw49, (int)sh49, pinW48, pinH48);
+        handle.eglDestroySurface(g_EglDisplay, bundle->surface);
+        bundle->surface = EGL_NO_SURFACE;
+        ((CAMetalLayer *)layer).drawableSize = CGSizeMake(pinW48, pinH48);  // 重新钉扎 1x
+    }
     if (!bundle->surface) {
         NSDebugLog(@"EGLBridge: eglCreateWindowSurface finished with error: 0x%x", handle.eglGetError());
         free(bundle);
