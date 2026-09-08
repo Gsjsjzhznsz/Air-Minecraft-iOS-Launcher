@@ -140,6 +140,24 @@ static SDL3_WindowID getSDLWindowID(void) {
     return 0;
 }
 
+// Task51 Fix G：触控坐标是“像素”语义（UIKit 点 × screenScale=2，HotbarDiag
+// 的 phys=2360x1640 即此口径），而 SDL 窗口是“点”语义（1180x820）。
+// e6886e2 日志铁证：Path B 直接转发触控像素坐标 x=1551（超 SDL 窗口宽
+// 1180）→ MC 丢弃超界鼠标事件 → 触摸“完全无反应”。本换算统一施加在
+// SDL 事件合成出口（pushSDLMouse* 三函数内部），所有调用路径生效。
+// UIScreen.mainScreen.scale 线程安全（Apple 文档：UIScreen 属性除动画
+// 外均可任意线程读）；static 缓存后仅首次读一次。
+static float ame51_px_to_pt(float v) {
+    static CGFloat ame51_scale = 0;
+    if (ame51_scale <= 0) {
+        CGFloat s = [UIScreen mainScreen].scale;
+        if (s < 1) s = 1;
+        ame51_scale = s;
+        NSLog(@"[InputDiag] Task51 touch px->pt scale=%.2f (phys coords / scale for SDL window pts)", (double)s);
+    }
+    return (float)(v / ame51_scale);
+}
+
 // Push a mouse motion event into SDL's event queue
 static void pushSDLMouseMotion(float x, float y, float xrel, float yrel) {
     if (!pSDL_PushEvent || !g_sdlWindow) return;
@@ -149,10 +167,10 @@ static void pushSDLMouseMotion(float x, float y, float xrel, float yrel) {
     ev.windowID = getSDLWindowID();
     ev.which = 0;
     ev.state = 0;
-    ev.x = x;
-    ev.y = y;
-    ev.xrel = xrel;
-    ev.yrel = yrel;
+    ev.x = ame51_px_to_pt(x);          // Task51: 触控像素 -> SDL 窗口点
+    ev.y = ame51_px_to_pt(y);
+    ev.xrel = ame51_px_to_pt(xrel);    // 增量同口径换算
+    ev.yrel = ame51_px_to_pt(yrel);
     pSDL_PushEvent((void*)&ev);
 }
 
@@ -168,8 +186,8 @@ static void pushSDLMouseButton(uint8_t sdlButton, bool down, float x, float y) {
     ev.button = sdlButton;
     ev.down = down;
     ev.clicks = 1;
-    ev.x = x;
-    ev.y = y;
+    ev.x = ame51_px_to_pt(x);          // Task51: 触控像素 -> SDL 窗口点
+    ev.y = ame51_px_to_pt(y);
     pSDL_PushEvent((void*)&ev);
 }
 
@@ -200,8 +218,8 @@ static void pushSDLMouseWheel(float x, float y) {
     ev.x = x;
     ev.y = y;
     ev.direction = 0;
-    ev.mouse_x = cursorX;
-    ev.mouse_y = cursorY;
+    ev.mouse_x = ame51_px_to_pt((float)cursorX);   // Task51: px -> pt
+    ev.mouse_y = ame51_px_to_pt((float)cursorY);
     ev.integer_x = (int32_t)x;
     ev.integer_y = (int32_t)y;
     pSDL_PushEvent((void*)&ev);

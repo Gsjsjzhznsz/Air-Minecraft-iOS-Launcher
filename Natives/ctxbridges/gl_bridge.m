@@ -323,6 +323,37 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
               viewport[2], viewport[3], surfW, surfH, s_mode,
               100.0 * (double)viewport[2] * (double)viewport[3] / ((double)surfW * (double)surfH));
         s_mode = 2;
+        // Task51 Fix F'：转置固化时让 drawable 跟随 surface（present 自洽）。
+        // 证据链：622166a 证伪渲染线程写 drawableSize（CA 提交树分叉，全日志
+        // 0 条 "Task48 pin" 生效）；e6886e2 证明主线程写有效（Task50 对齐即
+        // 主线程写、eglQuerySurface 立即确认）。故 dispatch_async 主线程
+        // 一次性把 drawableSize 钉成 surface 实际尺寸：drawable == backbuffer
+        // 纹理 → Metal present 无条件匹配 → 内容上屏。contentsGravity 把
+        // surface 尺寸内容拉伸铺 layer bounds，blit 的 squash 与 bounds 拉伸
+        // 互逆 → 1:1 无变形显示（仅中间分辨率 1x 软化）。
+        // 触发条件 s_mode != 2 保证整个生命周期至多执行一次，无逐帧开销。
+        void *ame51_layer_ref = g_ame48_layer_cf;
+        if (ame51_layer_ref != NULL) {
+            int pw = surfW, ph = surfH;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                @try {
+                    CALayer *l = (__bridge CALayer *)ame51_layer_ref;
+                    if ([l isKindOfClass:CAMetalLayer.class]) {
+                        CAMetalLayer *ml = (CAMetalLayer *)l;
+                        CGSize old = ml.drawableSize;
+                        if ((int)round(old.width) != pw || (int)round(old.height) != ph) {
+                            ml.drawableSize = CGSizeMake((CGFloat)pw, (CGFloat)ph);
+                            NSLog(@"[GLGeo] Task51 present-align (main thread): drawableSize %.0fx%.0f -> %dx%d == surface (drawable==backbuffer, present self-consistent)",
+                                  old.width, old.height, pw, ph);
+                        } else {
+                            NSLog(@"[GLGeo] Task51 present-align: already aligned %dx%d (drawable==surface)", pw, ph);
+                        }
+                    }
+                } @catch (NSException *e) {
+                    NSLog(@"[GLGeo] Task51 present-align exception: %@", e);
+                }
+            });
+        }
     }
 
     if (probe) {
@@ -366,6 +397,51 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
         NSLog(@"[RenderDiag] swap#%lu (Task41): drawFb=%d readFb=%d viewport=%d,%d %dx%d surface=%dx%d cur=(uniq=%d err=0x%x) fbo0vp=(uniq=%d corner=%d err=0x%x) mode=%d",
               swapIndex, drawFb, readFb, viewport[0], viewport[1], viewport[2], viewport[3],
               surfW, surfH, curUniq, curErr, fb0Uniq, cornerUniq, fb0Err, s_mode);
+
+        // Task51 取证：呈现层可见性全量 dump（首帧 + 每 500 帧，主线程执行）。
+        // 动机：连续四轮日志（48/49/50/51 基线）都显示"GL 全绿 + present 成功"
+        // 但用户黑屏——断点极可能在 UIKit 呈现层（layer 不在树 / 被遮挡 /
+        // hidden / transform 旋转 / window 不显示）。本 dump 一次打印全部
+        // 可见性关键状态，下轮日志无论好坏都能一锤定音。
+        if (swapIndex == 1 || (swapIndex > 0 && swapIndex % 500 == 0)) {
+            void *ame51_h_layer = g_ame48_layer_cf;
+            int h_sw = surfW, h_sh = surfH;
+            unsigned long h_idx = swapIndex;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                @try {
+                    CALayer *l = (__bridge CALayer *)ame51_h_layer;
+                    if (l == nil) {
+                        NSLog(@"[GLGeo] Task51 hierarchy #%lu: render layer is NIL", h_idx);
+                        return;
+                    }
+                    NSMutableString *chain = [NSMutableString stringWithCapacity:256];
+                    CALayer *cur = l;
+                    int depth = 0;
+                    while (cur != nil && depth < 10) {
+                        [chain appendFormat:@" -> [%@ %dx%d pos=(%d,%d) hid=%d op=%.2f%@]",
+                            NSStringFromClass(cur.class),
+                            (int)round(cur.bounds.size.width), (int)round(cur.bounds.size.height),
+                            (int)round(cur.position.x), (int)round(cur.position.y),
+                            (int)cur.hidden, (double)cur.opacity,
+                            CATransform3DIsIdentity(cur.transform) ? @"" : @" ROT"];
+                        cur = (CALayer *)cur.superlayer;
+                        depth++;
+                    }
+                    NSString *dw = @"n/a";
+                    if ([l isKindOfClass:CAMetalLayer.class]) {
+                        CAMetalLayer *ml = (CAMetalLayer *)l;
+                        dw = [NSString stringWithFormat:@"%.0fx%.0f",
+                              ml.drawableSize.width, ml.drawableSize.height];
+                    }
+                    BOOL inTree = (l.superlayer != nil);
+                    NSLog(@"[GLGeo] Task51 hierarchy #%lu: layer=%p drawable=%@ scale=%.2f surface=%dx%d inTree=%d chain=%@",
+                          h_idx, ame51_h_layer, dw, (double)l.contentsScale,
+                          h_sw, h_sh, (int)inTree, chain);
+                } @catch (NSException *e) {
+                    NSLog(@"[GLGeo] Task51 hierarchy exception: %@", e);
+                }
+            });
+        }
 
         // latch 判定（Task 49 重写：几何优先，允许降级）
         BOOL fbo0Flat = (fb0Err == 0 && fb0Uniq <= 1);

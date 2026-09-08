@@ -28,6 +28,7 @@
 //   AMETHYST_VULKAN_PTR=<hex>     启用 SDL_LoadObject 句柄共享
 
 #import <Foundation/Foundation.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import "utils.h"
 
 #include <dlfcn.h>
@@ -800,15 +801,62 @@ static bool ame_SDL_HideWindow(void *window) {
     return r;
 }
 
+// Task51 Fix E：Pojav/Java 侧以“像素”语义调 SDL_SetWindowSize（2360x1640），
+// 而 SDL3-on-iOS 是“点”语义（屏幕 1180x820 点）。e6886e2 日志铁证：
+// 创建正确的 EGL surface（1180x820）在其后第 342 行被
+//   [SDLHook] SDL_SetWindowSize(0x12fd53800, 2360, 1640) -> 1
+//   [SDLHook] SDL_SetWindowPosition(0x12fd53800, -590, -410) -> 0
+// 连锁击穿——超屏 SDL 窗口把嵌入的 SDL_uikitview 拉成 2360x1640 点 +
+// 负偏移，ANGLE 表面随之被转置锁死 820x1180 全程不恢复（swap#1..#200
+// surface 恒 820x1180），present 纹理与 drawable 失配 = 黑屏。
+// 钳制规则：宽或高超过屏幕点数 → 除 2（像素→点）；仍超则硬钳屏幕点数。
+// CGDisplayBounds 无 UIKit 依赖、线程安全（SDL 调用来自 Java 渲染线程）。
+static CGSize ame51_display_pts(void) {
+    static CGSize pts = {0, 0};
+    if (pts.width <= 0 || pts.height <= 0) {
+        CGRect db = CGDisplayBounds(CGMainDisplayID());
+        CGFloat w = db.size.width, h = db.size.height;
+        if (w <= 0 || h <= 0) {            // CG 失败兜底：iPad Air M4 量级
+            w = 1180; h = 820;
+        }
+        // CG 返回竖屏口径（820x1180）时翻成横屏口径（Info.plist 已锁横屏）
+        if (w < h) { CGFloat t = w; w = h; h = t; }
+        pts = CGSizeMake(w, h);
+        NSLog(@"[SDLHook] Task51 display pts cached: %.0fx%.0f", pts.width, pts.height);
+    }
+    return pts;
+}
+
 static bool ame_SDL_SetWindowSize(void *window, int w, int h) {
-    bool r = ame_real_SetWindowSize ? ame_real_SetWindowSize(window, w, h) : false;
-    NSDebugLog(@"[SDLHook] SDL_SetWindowSize(%p, %d, %d) -> %d", window, w, h, (int)r);
+    int cw = w, ch = h;
+    if (w > 0 && h > 0) {
+        CGSize pts = ame51_display_pts();
+        int maxW = (int)pts.width, maxH = (int)pts.height;
+        if (maxW > 0 && maxH > 0 && (w > maxW || h > maxH)) {
+            cw = (w > maxW) ? (w / 2) : w;   // 像素语义折半 = 点语义
+            ch = (h > maxH) ? (h / 2) : h;
+            if (cw > maxW) cw = maxW;
+            if (ch > maxH) ch = maxH;
+            NSLog(@"[SDLHook] Task51 SetWindowSize pixel->point clamp: %dx%d -> %dx%d (display %dx%d pts)",
+                  w, h, cw, ch, maxW, maxH);
+        }
+    }
+    bool r = ame_real_SetWindowSize ? ame_real_SetWindowSize(window, cw, ch) : false;
+    NSDebugLog(@"[SDLHook] SDL_SetWindowSize(%p, %d, %d) -> %d", window, cw, ch, (int)r);
     return r;
 }
 
 static bool ame_SDL_SetWindowPosition(void *window, int x, int y) {
-    bool r = ame_real_SetWindowPosition ? ame_real_SetWindowPosition(window, x, y) : false;
-    NSDebugLog(@"[SDLHook] SDL_SetWindowPosition(%p, %d, %d) -> %d", window, x, y, (int)r);
+    int cx = x, cy = y;
+    if (x < 0 || y < 0) {
+        // Task51：超屏窗口（像素语义）居中产生的负偏移，把嵌入的 SDL 视图
+        // 坐标系拖离屏幕原点 → 触摸命中区域错位。钳回 (0,0)。
+        if (cx < 0) cx = 0;
+        if (cy < 0) cy = 0;
+        NSLog(@"[SDLHook] Task51 SetWindowPosition clamp: %d,%d -> %d,%d", x, y, cx, cy);
+    }
+    bool r = ame_real_SetWindowPosition ? ame_real_SetWindowPosition(window, cx, cy) : false;
+    NSDebugLog(@"[SDLHook] SDL_SetWindowPosition(%p, %d, %d) -> %d", window, cx, cy, (int)r);
     return r;
 }
 
