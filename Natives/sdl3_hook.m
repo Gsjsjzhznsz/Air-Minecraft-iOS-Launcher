@@ -28,7 +28,7 @@
 //   AMETHYST_VULKAN_PTR=<hex>     启用 SDL_LoadObject 句柄共享
 
 #import <Foundation/Foundation.h>
-#import <CoreGraphics/CoreGraphics.h>
+#import <UIKit/UIKit.h>
 #import "utils.h"
 
 #include <dlfcn.h>
@@ -810,16 +810,24 @@ static bool ame_SDL_HideWindow(void *window) {
 // 负偏移，ANGLE 表面随之被转置锁死 820x1180 全程不恢复（swap#1..#200
 // surface 恒 820x1180），present 纹理与 drawable 失配 = 黑屏。
 // 钳制规则：宽或高超过屏幕点数 → 除 2（像素→点）；仍超则硬钳屏幕点数。
-// CGDisplayBounds 无 UIKit 依赖、线程安全（SDL 调用来自 Java 渲染线程）。
+// 屏幕点数来源：UIScreen.mainScreen.bounds（Apple 文档确认 UIScreen 属性
+// 线程安全，可在 SDL 的 Java 调用线程上读；首次调用后 static 缓存）。
+// 注：CGDisplayBounds/CGMainDisplayID 是 macOS 专属 API，iOS 不可用
+//（c56e03f 首次 CI 构建实测报 undeclared function，本版已回退 UIKit 路径）。
 static CGSize ame51_display_pts(void) {
     static CGSize pts = {0, 0};
     if (pts.width <= 0 || pts.height <= 0) {
-        CGRect db = CGDisplayBounds(CGMainDisplayID());
-        CGFloat w = db.size.width, h = db.size.height;
-        if (w <= 0 || h <= 0) {            // CG 失败兜底：iPad Air M4 量级
+        CGFloat w = 0, h = 0;
+        @try {
+            CGRect b = [UIScreen mainScreen].bounds;   // 线程安全属性
+            w = b.size.width; h = b.size.height;
+        } @catch (NSException *e) {
+            NSLog(@"[SDLHook] Task51 mainScreen bounds exception: %@", e);
+        }
+        if (w <= 0 || h <= 0) {            // 异常兜底：iPad Air M4 量级
             w = 1180; h = 820;
         }
-        // CG 返回竖屏口径（820x1180）时翻成横屏口径（Info.plist 已锁横屏）
+        // UIScreen 返回竖屏口径（820x1180）时翻成横屏口径（Info.plist 已锁横屏）
         if (w < h) { CGFloat t = w; w = h; h = t; }
         pts = CGSizeMake(w, h);
         NSLog(@"[SDLHook] Task51 display pts cached: %.0fx%.0f", pts.width, pts.height);
