@@ -196,6 +196,7 @@
 #include <unistd.h>
 
 #include "shaderc_sandbox.h" // Task 42：进程外编译沙箱（父侧集成点）
+#include "shaderc_include.h" // Task 47：RenderPearl 26.3 #include 文本展开
 
 static pthread_mutex_t ame_shaderc_shim_lock;
 static void *ame_shaderc_shim_impl = NULL;
@@ -625,6 +626,11 @@ typedef struct {
     void *options; // 键：MC/LWJGL 侧持有的 options 指针（malloc 可复用地址）
     ame_sb_opt_fields_t fields;
     int in_use;
+    // Task 47：include 上行回调（LWJGL libffi closure，仅本进程有效——
+    // 绝不进入 ame_sb_opt_fields_t，否则会被序列化传给沙箱子进程变成野指针）。
+    void *inc_resolver;
+    void *inc_releaser;
+    void *inc_user_data;
 } ame_opt_shadow_entry_t;
 #define AME_OPT_SHADOW_MAX 64
 static ame_opt_shadow_entry_t ame_opt_shadow[AME_OPT_SHADOW_MAX];
@@ -654,6 +660,9 @@ static ame_opt_shadow_entry_t *ame_opt_shadow_slot(void *options, int create) {
     free_slot->in_use = 1;
     free_slot->options = options;
     ame_opt_shadow_defaults(&free_slot->fields);
+    free_slot->inc_resolver = NULL; // 地址复用防御：全新对象无 include 回调
+    free_slot->inc_releaser = NULL;
+    free_slot->inc_user_data = NULL;
     return free_slot;
 }
 
@@ -1036,6 +1045,16 @@ static void *ame_attempt_on_fresh_thread(ame_shaderc_shim_compile_fn_t fn, void 
 // Task 37 前置声明：合成失败 result（定义见下方 result 访问器族）。
 static void *ame_fake_result_create(int seq);
 
+// Task 47：cleanup attribute 辅助——编译函数多出口（缓存命中/沙箱/进程
+// 内/合成失败）统一释放展开 buffer，杜绝泄漏。
+static void ame_ptr_cleanup_generic(void *p) {
+    void **slot = (void **)p;
+    if (slot != NULL && *slot != NULL) {
+        free(*slot);
+        *slot = NULL;
+    }
+}
+
 static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
                                       const char *source, size_t source_size,
                                       int kind, const char *input_file,
@@ -1076,6 +1095,49 @@ static void *ame_shaderc_shim_compile(const char *sym, void *compiler,
             "opt=%p in='%.48s'\n",
             seq, ame_shim_ms(), ame_shim_tid(), kind, source_size, compiler, options,
             input_file ? input_file : "(null)");
+    // Task 47：RenderPearl 26.3 的 `#include <minecraft:...>` 在此展开。
+    // 展开必须在调用者线程（= LWJGL/ForkJoin JVM 线程）同步进行：resolver
+    // 是 LWJGL libffi upcall，线程安全。展开后的干净源码统一进入下方缓存
+    // key / 源码 dump / 沙箱 / 进程内全部下游——沙箱子进程因此无需任何
+    // 回调即可编译含 include 的管线（函数指针不可跨进程，这是沙箱路径唯一
+    // 可行的 include 支持方式）。展开失败（溢出/深度）保留原始行，下游
+    // glslang 会给出与今日一致的可见诊断，绝不静默吞错。
+    size_t ame_orig_source_size = source_size;
+    char *ame_expanded_local __attribute__((
+        cleanup(ame_ptr_cleanup_generic))) = NULL;
+    if (source_size > 0 && ame_source_has_include(source, source_size)) {
+        ame_include_resolver_fn inc_resolver = NULL;
+        ame_include_releaser_fn inc_releaser = NULL;
+        void *inc_ud = NULL;
+        {
+            pthread_mutex_lock(&ame_opt_shadow_lock);
+            ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 0);
+            if (e != NULL) {
+                inc_resolver = (ame_include_resolver_fn)e->inc_resolver;
+                inc_releaser = (ame_include_releaser_fn)e->inc_releaser;
+                inc_ud = e->inc_user_data;
+            }
+            pthread_mutex_unlock(&ame_opt_shadow_lock);
+        }
+        if (inc_resolver != NULL) {
+            ame_expanded_local = ame_include_expand(
+                source, source_size, input_file, inc_resolver, inc_ud,
+                inc_releaser, inc_ud, &source_size);
+            if (ame_expanded_local != NULL) {
+                source = ame_expanded_local;
+                fprintf(stderr,
+                        "[shaderc-shim] compile#%d #include expanded: %zu -> %zu "
+                        "bytes (resolver=%p)\n",
+                        seq, ame_orig_source_size, source_size, (void *)inc_resolver);
+            }
+        } else {
+            fprintf(stderr,
+                    "[shaderc-shim] compile#%d source contains #include but no "
+                    "include callbacks registered (opt=%p) -- passing through; impl "
+                    "will report 'extension not requested'\n",
+                    seq, options);
+        }
+    }
     // Task 43：磁盘缓存优先于一切编译路径（命中 = 毫秒级返回 + 零 glslang
     // 暴露 + 零崩溃窗口）。key 覆盖 entry/kind/源码/输入名/入口名/options
     // 全字段——MC 版本或管线配置变化自动失效。
@@ -1500,6 +1562,29 @@ void shaderc_compile_options_set_optimization_level(void *options, int level) {
             level, options, ame_shim_ms());
     ((void (*)(void *, int))real)(options, level);
     ame_opt_shadow_set_int(options, 1, level); // Task 42 影子镜像
+}
+
+// Task 47：RenderPearl 26.3 的 include 上行回调入口。Mojang 的 GlslCompiler
+// 对每个管线编译都设置 resolver（LWJGL libffi closure）；旧 glue 将其 no-op
+// 丢弃导致 34 个必需管线因 '#include: required extension not requested'
+// 全部编译失败。本拦截把回调存入影子注册表（仅本进程有效，绝不序列化给
+// 沙箱子进程），编译入口用它在调用者线程做文本展开（见 ame_include_expand）。
+// 不转发给 impl：include 语义已在 shim 层收口，impl 收到的是展开后的干净源码。
+void shaderc_compile_options_set_include_callbacks(void *options, void *resolver,
+                                                   void *result_releaser,
+                                                   void *user_data) {
+    pthread_mutex_lock(&ame_opt_shadow_lock);
+    ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 1);
+    if (e != NULL) {
+        e->inc_resolver = resolver;
+        e->inc_releaser = result_releaser;
+        e->inc_user_data = user_data;
+    }
+    pthread_mutex_unlock(&ame_opt_shadow_lock);
+    fprintf(stderr,
+            "[shaderc-shim] options_set: include_callbacks resolver=%p "
+            "releaser=%p ud=%p (opt=%p t=%.0fms)\n",
+            resolver, result_releaser, user_data, options, ame_shim_ms());
 }
 
 void shaderc_compile_options_set_generate_debug_info(void *options) {

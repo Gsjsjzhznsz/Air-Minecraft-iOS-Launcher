@@ -490,6 +490,7 @@ dep_shader_shims: dep_mg
 		-Wl,-reexport_library,$(WORKINGDIR)/libshaderc_impl.dylib \
 		-o $(WORKINGDIR)/libshaderc.dylib \
 		$(SOURCEDIR)/Natives/shaderc_shim.c \
+		$(SOURCEDIR)/Natives/shaderc_include.c \
 		$(SOURCEDIR)/Natives/shaderc_sandbox.m || exit 1
 	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
 		-install_name @rpath/libspirv-cross-c-shared.0.dylib \
