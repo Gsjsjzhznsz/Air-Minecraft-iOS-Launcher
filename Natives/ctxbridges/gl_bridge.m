@@ -4,6 +4,7 @@
 
 #include <dlfcn.h>
 #include <string.h>
+#include <time.h>
 #include <stdatomic.h>
 #include "bridge_tbl.h"
 #include "environ.h"
@@ -242,6 +243,162 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             NSLog(@"[RenderDiag] self-heal blit #%lu (Task41): src=%dx%d dst=%dx%d blitErr=0x%x",
                   s_blitLogs, viewport[2], viewport[3], surfW, surfH, blitErr);
         }
+    }
+}
+
+// ============================================================================
+// Task 48：呈现几何卫兵（GL 路径黑屏根因修复）
+//
+// 设备铁证（latestlog 1518ce1，iPad Air M4 / iPadOS 26.6）：
+//   - 渲染管线 100% 健康：1032 帧 swap 全成功、fps=57、swapFail=0、GL 零错误、
+//     MC 26.3 到标题画面（图集/音效全载入）、fbo 内容探针 uniq=44-49；
+//   - [RenderDiag] EGL surface 创建时 = 2360x1640（layer 当时正确，eglQuerySurface
+//     证实），但到交换时 surface = 1640x2360（竖屏转置）且 1032 帧永不恢复；
+//   - CAMetalLayer 心跳报 drawable=2360x1640（横屏正确）、bounds=1180x820；
+//   - MC 的 glViewport = 1180x820（SDL3-on-iOS 以"点"而非"像素"回报窗口尺寸，
+//     MC 请求 2360x1640 被钳到 1180x820 → MC 实际以 1x 渲染）。
+// 三者互相失配 → 呈现的 backbuffer 维度与 drawable 维度对不上 → 屏幕全黑。
+//
+// 修复策略（对"谁转置了 surface"不做任何单一假设，全部自愈）：
+//   1) 创建钉扎：MobileGlues 渲染器在 eglCreateWindowSurface 前把
+//      drawableSize 钉到 layer.bounds（点数）——即 MC 将要渲染的真实尺寸
+//      （1180x820）。ANGLE 在创建时刻会读 layer（本日志已证实此读取可靠），
+//      于是 surface == MC viewport == drawable，三者一致，画面 1:1 全屏。
+//   2) 交换卫兵：每次 eglSwapBuffers 前核对 surface 实际尺寸 vs layer
+//      drawableSize，不等则立刻把 drawableSize 钉回 surface 尺寸
+//      （drawable 必须等于将要呈现的 backbuffer 尺寸——这是"帧能上屏"的
+//      硬约束，无论 ANGLE/MG/旋转把哪边改了都能收敛）。
+//   3) 重建升级：若 surface 偏离创建时的期望尺寸并稳定持续 30+ 帧，
+//      限速（5s）重建 EGL window surface（先钉 layer，再创建，MG 前端
+//      MakeCurrent 重绑，销毁旧表面）——重建是重置 ANGLE 内部表面尺寸的
+//      唯一可靠手段。最多 3 次，避免无限循环。
+//
+// 线程安全：卫兵在 MC 渲染线程（上下文 current）运行；只触碰 CALayer/
+// CAMetalLayer API（Apple 明确支持渲染线程驱动 CAMetalLayer），不碰 UIKit。
+// layer 指针在创建时以 CFBridgingRetain 缓存，避免渲染线程访问 UIView。
+// Vulkan 路径完全不受影响（本文件仅 GL 桥）。
+// ============================================================================
+static void *g_ame48_layer_cf = NULL;        // CFBridgingRetain 的呈现 layer
+static int   g_ame48_expected_w = 0;         // 期望表面宽（创建钉扎值）
+static int   g_ame48_expected_h = 0;         // 期望表面高
+static long  g_ame48_drift_swaps = 0;        // surface != 期望 的连续帧数
+static int   g_ame48_recreates = 0;          // 已重建次数（上限 3）
+static uint64_t g_ame48_last_recreate_ms = 0;
+
+static uint64_t ame48_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ull + (uint64_t)ts.tv_nsec / 1000000ull;
+}
+
+/// 创建时调用：缓存呈现 layer、记录期望尺寸、复位卫兵状态。
+static void ame48_record_creation(CALayer *layer, EGLDisplay dpy, EGLSurface surface) {
+    if (g_ame48_layer_cf != NULL) {
+        CFRelease(g_ame48_layer_cf);
+        g_ame48_layer_cf = NULL;
+    }
+    if (layer != nil) {
+        g_ame48_layer_cf = (void *)CFBridgingRetain(layer);
+    }
+    g_ame48_drift_swaps = 0;
+    g_ame48_recreates = 0;
+    g_ame48_last_recreate_ms = 0;
+    g_ame48_expected_w = 0;
+    g_ame48_expected_h = 0;
+    // 期望值 = 创建完成时 ANGLE 报告的表面实际尺寸（创建钉扎生效后
+    // 即 MC 的渲染尺寸）。查询失败则保持 0（卫兵漂移检测停用，
+    // 但"drawable == surface"的逐帧钉扎仍然全程有效）。
+    ame_es_t es = ame_es();
+    if (es.querySurface != NULL && surface != EGL_NO_SURFACE) {
+        EGLint sw = 0, sh = 0;
+        if (es.querySurface(dpy, surface, EGL_WIDTH, &sw) &&
+            es.querySurface(dpy, surface, EGL_HEIGHT, &sh) && sw > 0 && sh > 0) {
+            g_ame48_expected_w = sw;
+            g_ame48_expected_h = sh;
+        }
+    }
+    NSLog(@"[GLGeo] Task48 creation recorded: layer=%p expectedSurface=%dx%d",
+          g_ame48_layer_cf, g_ame48_expected_w, g_ame48_expected_h);
+}
+
+/// 交换卫兵：gl_swap_buffers 每帧调用（渲染线程、上下文 current）。
+/// 返回值无意义；所有自愈动作都直接作用于 layer / bundle->gl.surface。
+static void ame48_swap_geometry_guard(basic_render_window_t *bundle) {
+    if (bundle == NULL || bundle->gl.surface == EGL_NO_SURFACE) return;
+    CALayer *layer = (__bridge CALayer *)g_ame48_layer_cf;
+    if (layer == nil || ![layer isKindOfClass:CAMetalLayer.class]) return;
+    ame_es_t es = ame_es();
+    if (es.querySurface == NULL) return;
+
+    EGLint sw = 0, sh = 0;
+    if (!es.querySurface(g_EglDisplay, bundle->gl.surface, EGL_WIDTH, &sw) ||
+        !es.querySurface(g_EglDisplay, bundle->gl.surface, EGL_HEIGHT, &sh)) {
+        return;  // 查询失败（EGL 错误）不干预
+    }
+    if (sw <= 0 || sh <= 0) return;
+
+    CAMetalLayer *ml = (CAMetalLayer *)layer;
+    CGSize d = ml.drawableSize;
+    int dw = (int)round(d.width), dh = (int)round(d.height);
+
+    // -- 1) 呈现一致性钉扎：drawable 必须 == surface 实际尺寸 -------------
+    // nextDrawable 的纹理尺寸由 drawableSize 决定；它与 backbuffer 尺寸
+    // 失配时呈现内容被丢弃/裁剪（黑屏家族的直接成因）。
+    if (dw != sw || dh != sh) {
+        ml.drawableSize = CGSizeMake(sw, sh);
+        static long s_pinCount = 0;
+        s_pinCount++;
+        if (s_pinCount <= 5 || s_pinCount % 300 == 0) {
+            NSLog(@"[GLGeo] Task48 pin #%ld: drawableSize %dx%d -> surface %dx%d (drift=%ld)",
+                  s_pinCount, dw, dh, (int)sw, (int)sh, g_ame48_drift_swaps);
+        }
+    }
+
+    // -- 2) 期望漂移检测：surface 偏离创建时的 MC 渲染尺寸 -----------------
+    if (g_ame48_expected_w > 0 && (sw != g_ame48_expected_w || sh != g_ame48_expected_h)) {
+        g_ame48_drift_swaps++;
+        if (g_ame48_drift_swaps == 1 || g_ame48_drift_swaps % 200 == 0) {
+            NSLog(@"[GLGeo] Task48 drift: surface=%dx%d expected=%dx%d (consecutive=%ld)",
+                  (int)sw, (int)sh, g_ame48_expected_w, g_ame48_expected_h, g_ame48_drift_swaps);
+        }
+
+        // -- 3) 升级：稳定漂移 30+ 帧 → 限速重建表面 -----------------------
+        // 重建是唯一能重置 ANGLE 内部表面尺寸的手段（window surface 没有
+        // eglResize API）。安全：GL 对象（纹理/FBO/程序）属于 context，
+        // 重建 surface 不销毁它们；MC viewport == 期望尺寸，重建后 1:1。
+        if (g_ame48_drift_swaps >= 30 && g_ame48_recreates < 3) {
+            uint64_t now = ame48_now_ms();
+            if (now - g_ame48_last_recreate_ms >= 5000) {
+                g_ame48_last_recreate_ms = now;
+                g_ame48_recreates++;
+                // 先把 layer 钉到期望尺寸（ANGLE 创建时读取它）
+                ml.drawableSize = CGSizeMake(g_ame48_expected_w, g_ame48_expected_h);
+                EGLSurface fresh = handle.eglCreateWindowSurface(
+                    g_EglDisplay, bundle->gl.config,
+                    (__bridge EGLNativeWindowType)layer, NULL);
+                if (fresh != EGL_NO_SURFACE &&
+                    handle.eglMakeCurrent(g_EglDisplay, fresh, fresh, bundle->gl.context)) {
+                    handle.eglDestroySurface(g_EglDisplay, bundle->gl.surface);
+                    NSLog(@"[GLGeo] Task48 surface RE-CREATED #%d: %dx%d -> %dx%d (was drifted for %ld swaps)",
+                          g_ame48_recreates, (int)sw, (int)sh,
+                          g_ame48_expected_w, g_ame48_expected_h, g_ame48_drift_swaps);
+                    bundle->gl.surface = fresh;
+                    g_ame48_drift_swaps = 0;
+                } else if (fresh != EGL_NO_SURFACE) {
+                    // MakeCurrent 失败：回到旧表面继续渲染，旧表面仍被卫兵钉住
+                    NSLog(@"[GLGeo] Task48 re-create MakeCurrent FAILED err=0x%x -- reverting",
+                          (unsigned int)(uintptr_t)handle.eglGetError());
+                    handle.eglMakeCurrent(g_EglDisplay, bundle->gl.surface,
+                                          bundle->gl.surface, bundle->gl.context);
+                    handle.eglDestroySurface(g_EglDisplay, fresh);
+                } else {
+                    NSLog(@"[GLGeo] Task48 re-create eglCreateWindowSurface FAILED err=0x%x",
+                          (unsigned int)(uintptr_t)handle.eglGetError());
+                }
+            }
+        }
+    } else {
+        g_ame48_drift_swaps = 0;
     }
 }
 
@@ -577,6 +734,27 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_HEIGHT, (EGLint)MAX(1.0, round(layer.bounds.size.height * layer.contentsScale)),
         EGL_NONE
     };
+    // Task 48 创建钉扎（MobileGlues 专属）：eglCreateWindowSurface 前把
+    // drawableSize 钉到 layer.bounds（点数）。MC 26.3 RenderPearl 走 SDL3，
+    // SDL3-on-iOS 以"点"回报窗口尺寸——MC 请求 2360x1640 像素会被钳到
+    // 1180x820 点，即 MC 实际以 1x（bounds 点数）渲染。把表面与 drawable
+    // 都钉到这个尺寸，surface == MC viewport == drawable 三者一致，
+    // 画面 1:1 上屏（黑屏根因 = 三者失配，详见 ame48_swap_geometry_guard）。
+    // 注意不能给 ANGLE 传 EGL_WIDTH/EGL_HEIGHT（window surface 的非法
+    // attrib，会 EGL_BAD_ATTRIBUTE）——钉 layer 让 ANGLE 创建时自己读到。
+    const char *rend48 = renderer.UTF8String;
+    const BOOL mobileGlues48 = rend48 && strcmp(rend48, RENDERER_NAME_MOBILEGLUES) == 0;
+    if (mobileGlues48 && [layer isKindOfClass:CAMetalLayer.class]) {
+        CAMetalLayer *ml48 = (CAMetalLayer *)layer;
+        CGSize pts48 = layer.bounds.size;
+        int w48 = (int)MAX(1.0, round(pts48.width));
+        int h48 = (int)MAX(1.0, round(pts48.height));
+        CGSize old48 = ml48.drawableSize;
+        ml48.drawableSize = CGSizeMake(w48, h48);
+        NSLog(@"[GLGeo] Task48 creation pin: bounds=%.0fx%.0f contentsScale=%.2f drawableSize %.0fx%.0f -> %dx%d (MC SDL viewport predicted)",
+              pts48.width, pts48.height, (double)layer.contentsScale,
+              old48.width, old48.height, w48, h48);
+    }
     bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
         (__bridge EGLNativeWindowType)layer, mobileGL ? mobileGLSurfaceAttribs : NULL);
     if (!bundle->surface) {
@@ -606,6 +784,9 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
                 NSLog(@"[RenderDiag] eglQuerySurface: %dx%d", sw, sh);
             }
         }
+        // Task 48：记录呈现 layer（CFBridgingRetain）与期望表面尺寸，
+        // 供 ame48_swap_geometry_guard 逐帧自愈使用。
+        ame48_record_creation(layer, g_EglDisplay, bundle->surface);
     }
 
     const EGLint gles_ctx_attribs[] = {
@@ -709,6 +890,9 @@ void gl_swap_buffers() {
         NSLog(@"EGLBridge: gl_swap_buffers called with no current context, ignored");
         return;
     }
+    // Task 48 呈现几何卫兵：先于一切交换动作执行（可能在内部重建表面，
+    // 重建后 currentBundle->gl.surface 已更新，后续探针/交换都作用于新表面）。
+    ame48_swap_geometry_guard(currentBundle);
     // 黑屏取证（Task 32）：记录每次 swap 的真实结果。
     // 成功：首次打一条日志（证明呈现路径至少活过一次）；之后交给原子计数器，
     // 由 SurfaceViewController 的 [RenderDiag] 5 秒心跳汇总上报。

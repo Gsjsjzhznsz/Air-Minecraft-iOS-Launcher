@@ -277,6 +277,14 @@ void hooked_exit(int code) {
         NSLog(@"[RenderDiag] exit(%d) snapshot: swapOK=%lu swapFail=%lu", code, swapOK, swapFail);
     }
     NSLog(@"exit(%d) called", code);
+    // Task 48：exit(0) 也写回溯。此前只有非零退出才落 fatal_trace.txt；而
+    // 实测黑屏约 20 秒后的静默 exit(0)（渲染循环仍在交换）来源不明——
+    // MC 窗口可见性看门狗 / JVM 主线程 / 启动器超时都有可能。回溯写入
+    // $POJAV_HOME/fatal_trace.txt（O_APPEND、malloc-free），下轮日志即可
+    // 一锤定音定位调用者。code==0 的回溯不弹崩溃界面、不影响正常退出。
+    if (code == 0) {
+        ame_write_fatal_trace("exit(0) backtrace (Task 48, black-screen-era silent exit)");
+    }
     if (code != 0) {
         char exitMsg[64];
         snprintf(exitMsg, sizeof(exitMsg), "exit(%d) called", code);
