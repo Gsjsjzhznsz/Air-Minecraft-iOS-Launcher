@@ -220,6 +220,10 @@ static unsigned int g_ame49_scratch_fb = 0;
 static unsigned int g_ame49_scratch_tex = 0;
 static int g_ame49_scratch_w = 0, g_ame49_scratch_h = 0;
 static int g_ame49_heal_disabled = 0;   // scratch FBO 完整性失败后的永久熔断
+// Task51：呈现 layer 引用（CFBridgingRetain）。声明前置——swap 诊断函数
+//（Fix F' 钉扎与 hierarchy dump）在本文件更早处使用，原声明位置（Task48
+// 段内）在使用点之后，b9634f4 CI 实测报 undeclared identifier。
+static void *g_ame48_layer_cf = NULL;
 
 static void ame_task49_geo_heal_blit(ame_es_t es, int drawFb, int readFb,
                                      int vw, int vh, int sw, int sh) {
@@ -505,7 +509,7 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
 // layer 指针在创建时以 CFBridgingRetain 缓存，避免渲染线程访问 UIView。
 // Vulkan 路径完全不受影响（本文件仅 GL 桥）。
 // ============================================================================
-static void *g_ame48_layer_cf = NULL;        // CFBridgingRetain 的呈现 layer
+//（声明已前置至 Task49 静态区——见 g_ame48_layer_cf）
 static int   g_ame48_expected_w = 0;         // 期望表面宽（创建钉扎值）
 static int   g_ame48_expected_h = 0;         // 期望表面高
 static long  g_ame48_drift_swaps = 0;        // surface != drawable 的连续帧数（纯取证）
