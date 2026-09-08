@@ -102,6 +102,8 @@ typedef bool (*ame_fn_SDL_SetWindowSize)(void *window, int w, int h);
 typedef bool (*ame_fn_SDL_SetWindowPosition)(void *window, int x, int y);
 typedef bool (*ame_fn_SDL_SetWindowFullscreen)(void *window, bool fullscreen);
 typedef bool (*ame_fn_SDL_PollEvent)(void *event);
+// Task 50：SDL_WindowFlags 是 Uint32（SDL_video.h）
+typedef unsigned int (*ame_fn_SDL_GetWindowFlags)(void *window);
 
 static ame_fn_SDL_GL_SetAttribute ame_real_GL_SetAttribute = NULL;
 static ame_fn_SDL_CreateWindow ame_real_CreateWindow = NULL;
@@ -128,6 +130,7 @@ static ame_fn_SDL_SetWindowSize ame_real_SetWindowSize = NULL;
 static ame_fn_SDL_SetWindowPosition ame_real_SetWindowPosition = NULL;
 static ame_fn_SDL_SetWindowFullscreen ame_real_SetWindowFullscreen = NULL;
 static ame_fn_SDL_PollEvent ame_real_PollEvent = NULL;
+static ame_fn_SDL_GetWindowFlags ame_real_GetWindowFlags = NULL;
 
 // Task 32 embed：嵌入宿主层级的 SDL 视图（主线程赋值；定义见 "7) Amethyst embed" 一节）
 static UIView *ame_embeddedSDLView = NULL;
@@ -383,6 +386,7 @@ static bool ame_SDL_SetWindowSize(void *window, int w, int h);
 static bool ame_SDL_SetWindowPosition(void *window, int x, int y);
 static bool ame_SDL_SetWindowFullscreen(void *window, bool fullscreen);
 static bool ame_SDL_PollEvent(void *event);
+static unsigned int ame_SDL_GetWindowFlags(void *window);   // Task 50（实现见 5) 节，供 maybeWrapWindowHook 前向引用）
 
 // Task 32：当 MC 通过 SDL_LoadFunction（而非 dlsym）解析符号时，同样把
 // 窗口生命周期/事件泵钩子装上（防御性双路覆盖，与 amethyst_sdl3_hook_resolve
@@ -413,6 +417,10 @@ static void ame_maybeWrapWindowHook(const char *name, void **out) {
         if (ame_real_PollEvent == NULL)
             ame_real_PollEvent = (ame_fn_SDL_PollEvent)*out;
         *out = (void *)ame_SDL_PollEvent;
+    } else if (strcmp(name, "SDL_GetWindowFlags") == 0) {
+        if (ame_real_GetWindowFlags == NULL)
+            ame_real_GetWindowFlags = (ame_fn_SDL_GetWindowFlags)*out;
+        *out = (void *)ame_SDL_GetWindowFlags;
     }
 }
 
@@ -504,6 +512,18 @@ static void *ame_SDL_EGL_GetProcAddress(const char *proc) {
     if (proc == NULL || r == NULL) return r;
     ame_maybeWrapEgl(proc, &r);
     return r;
+}
+
+// Task 50：SDL_GetWindowFlags 剥离 MINIMIZED 位（0x40）。
+// embed（Task 32/49）隐藏 SDL 自有 UIWindow 是防"空窗黑盖子"的必要动作，
+// 但 SDL/UIKit 会把隐藏的窗口标记为 minimized。renderpearl 26.3 的
+// GlSurface.acquireNextTexture 查询窗口 flags，看到 MINIMIZED 即抛
+// "Cannot acquire minimized window" 跳帧（622166a 实测两次）。
+// 对 MC 撒一个无害的谎：窗口永不 minimized —— 画面/输入不受影响，
+// 真正的后台切换由 SDL_APP_WILL_ENTER_BACKGROUND 等事件表达，语义完整。
+static unsigned int ame_SDL_GetWindowFlags(void *window) {
+    unsigned int f = ame_real_GetWindowFlags ? ame_real_GetWindowFlags(window) : 0;
+    return f & ~0x40u;   // 0x40 = SDL_WINDOW_MINIMIZED（SDL2/SDL3 同值）
 }
 
 // Vulkan 加载器一致性：MC 26.3 起 RenderPearl 要求 SDL 与 LWJGL 使用同一
@@ -1075,6 +1095,13 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
         }
         NSDebugLog(@"[SDLHook] hooked SDL_PollEvent (real=%p)", (void *)ame_real_PollEvent);
         return (void *)ame_SDL_PollEvent;
+    }
+    if (strcmp(name, "SDL_GetWindowFlags") == 0) {
+        if (ame_real_GetWindowFlags == NULL) {
+            ame_real_GetWindowFlags = (ame_fn_SDL_GetWindowFlags)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_GetWindowFlags (real=%p, MINIMIZED stripped)", (void *)ame_real_GetWindowFlags);
+        return (void *)ame_SDL_GetWindowFlags;
     }
     // SDL_GL_SetAttribute 不接管：MC 自己调用它设属性是合法行为，我们只在
     // 建窗前主动调用同一个函数来强制 ES profile（见 ame_forceEglProfileEs）。

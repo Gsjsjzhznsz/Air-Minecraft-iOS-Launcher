@@ -197,6 +197,11 @@ void pojavIncrementFpsCounter();
 // 与上面的 FPS 计数器区分：FPS 计 pojavSwapBuffers 入口调用（成功与否都+1），
 // 这两个计数器计 eglSwapBuffers 的真实返回值，用于判断呈现路径是否断裂。
 void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail);
+// Task 50：GL 呈现层所有权（gl_bridge.m 实现）。GL 路径创建 EGL surface
+// 成功后为真——SurfaceViewController.updateSavedResolution 据此把呈现层
+// 对齐到 1x 点数（bounds 跟随旋转），与 MC viewport/ANGLE surface 保持
+// 单一事实源。Vulkan 路径恒为假（MoltenVK 自管 drawableSize，行为不变）。
+bool ame_gl_surface_owns_layer();
 // 运行时判定 MC 真实渲染路径是否为 Vulkan（clientAPI == GLFW_NO_API）。
 // 比 SurfaceViewController 在 viewDidLoad 时的静态字符串推断更准确：
 // - 真正 Vulkan 路径（graphicsApi=prefer_vulkan 或 default 走 Vulkan）→ 返回 true

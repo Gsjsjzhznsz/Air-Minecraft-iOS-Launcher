@@ -1346,7 +1346,32 @@ static UIView *findSDL_uikitview(UIView *root);
     if ((windowHeight % 2) != 0) { --windowHeight; }
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.surfaceView.layer;
-        metalLayer.drawableSize = CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
+        // Task 50（黑屏根因修复，622166a 日志实证）：
+        // GL 路径下本层由 EGL surface 呈现，必须与 MC 的真实渲染分辨率
+        // 对齐——MC 26.3+SDL3 以"点"回报窗口尺寸（viewport=1180x820）。
+        // 旧代码无条件写 2x 像素 drawableSize（2360x1640）：
+        //   - 创建时 ANGLE 按 bounds×contentsScale 建出 2x surface，MC 的
+        //     帧只覆盖后缓冲左上 25%；
+        //   - 旋转时（viewWillTransition→本函数）2x 值与 ANGLE surface、
+        //     旋转后的 bounds 互相打架，surface 被锁死转置（1640x2360），
+        //     600+ 帧 present 尺寸失配 = 全黑。
+        // 修复：GL 拥有呈现层期间对齐 1x（contentsScale=1.0、drawableSize=
+        // bounds 点数）。surface==drawable==MC viewport 恒成立，旋转时三者
+        // 随 bounds 同步翻转，CoreAnimation 把 1x 帧最近邻放大到物理屏。
+        // Vulkan 路径（标志为假）保持旧的 2x 行为——MoltenVK 自管
+        // drawableSize，与 EGL 呈现互不干扰。
+        if (ame_gl_surface_owns_layer()) {
+            CGFloat ptsW50 = MAX(1.0, round(self.surfaceView.bounds.size.width));
+            CGFloat ptsH50 = MAX(1.0, round(self.surfaceView.bounds.size.height));
+            self.surfaceView.layer.contentsScale = 1.0;
+            metalLayer.drawableSize = CGSizeMake(ptsW50, ptsH50);
+            windowWidth = (int)ptsW50;
+            windowHeight = (int)ptsH50;
+            if ((windowWidth % 2) != 0) { --windowWidth; }
+            if ((windowHeight % 2) != 0) { --windowHeight; }
+        } else {
+            metalLayer.drawableSize = CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
+        }
         // 解锁帧率（关闭垂直同步）：三缓冲。
         // 默认 maximumDrawableCount（通常为 2）下，当两个 drawable 都在等待呈现时，
         // nextDrawable 会阻塞到 vblank 释放一个 drawable，间接把渲染线程锁在刷新率。

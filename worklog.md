@@ -22,3 +22,33 @@ Stage Summary:
 - 共同 bug（GL 与 Vulkan 同时失效）定位并修复：26.3 renderpearl 的 #include 上行回调被 glue no-op 丢弃；修复 = shim 层文本展开，沙箱与 in-process 双路径统一受益
 - 产物：Natives/shaderc_include.c/h（新增）、shaderc_shim.c（+85 行）、Makefile（+1 行）、scripts/fix_task47_makefile.py、scripts/test_task47_include.c、scripts/test_task47_e2e.sh、scripts/test_task47_e2e_driver.c、scripts/task47_fixtures/（真实 vanilla shader）
 - 预期设备表现：latestlog 出现 "[shaderc-shim] options_set: include_callbacks" 与 "[amethyst-include] expanded N include(s)"，34 个管线编译通过，游戏进入标题屏
+
+---
+Task ID: 50
+Agent: main (Super Z)
+Task: 黑屏根因修复——呈现几何单一事实源（latestlog 622166a 取证，用户上传仓库日志）
+
+Work Log:
+- 拉取用户上传至仓库的最新日志 latestlog.txt（8932 行，commit 622166a，iPad Air M4/iPadOS 26.6，MobileGlues GL 路径）：游戏实际运行健康（57fps、swapOK=586、swapFail=0、FBO0 有内容、遮罩 7.7s 正常移除）但用户全程黑屏
+- 铁证链定案（与 Task48/49 旧结论相反）：
+  * 全日志 0 条 "Task48 pin" = 旧卫兵逐帧钉扎从未生效（渲染线程与主线程读到不同 drawableSize = CALayer 跨线程状态分叉）
+  * 创建时 eglQuerySurface=2360x1640（横屏 2x），swap 期恒 1640x2360（转置）且永不恢复 = surface 被锁死转置
+  * 心跳 drawable 序列 [2360x1640, 2360x1640, 1640x2360, 2360x1640] 跟随视图方向，与 swap 期 surface 恒矛盾 = present 尺寸失配 = 黑屏直接成因
+  * 重建表面恒 EGL_BAD_ALLOC 0x3003（同 layer 二次建 window surface 必败）
+  * renderpearl 两次抛 "Cannot acquire minimized window"（embed 隐藏 SDL UIWindow → SDL 标记 minimized）
+  * 结构性根源：MC 26.3+SDL3 以点回报窗口尺寸（viewport=1180x820）而呈现层 contentsScale=2.0/drawableSize=2360x1640，1x-vs-2x + 三套尺寸各自跟随不同主人（ANGLE surface / 主线程 drawable / SDL viewport）+ 旋转时互相打架
+- 修复（4 文件，全部围绕"单一事实源"）：
+  * gl_bridge.m：Task50 1x 对齐（创建时主线程 dispatch_sync 写 contentsScale=1.0 + drawableSize=bounds 点数——无论 ANGLE 读 bounds×scale 还是 drawableSize 都 == MC viewport；取代 Task48 钉扎与 Task49 重试环，单次建面）；卫兵降级为纯取证（删除 pin/重建/打架）；geo-heal latch 双向化（几何恢复即退出逐帧 blit）；新增 ame_gl_surface_owns_layer() 跨线程标志（currentBundle 是 __thread 的，主线程读不到）
+  * SurfaceViewController.m updateSavedResolution：GL 拥有呈现层时对齐 1x 跟随 bounds（旋转时三者同步翻转）；Vulkan 路径保持旧 2x 行为（MoltenVK 自管）
+  * sdl3_hook.m：拦截 SDL_GetWindowFlags 剥离 SDL_WINDOW_MINIMIZED(0x40)——renderpearl 不再因 embed 隐藏 SDL 窗口而跳帧；补前置声明修 use-before-declare
+  * utils.h：声明 ame_gl_surface_owns_layer
+- 本地验证（用户强制要求"提交前彻底确认"）：
+  * scripts/verify_task50.py 日志重放仿真：14/14 PASS——旧代码模型逐项复现日志实测（A1-A7：pin=0、重建失败、surface 锁死转置、心跳 drawable 序列逐项一致、不变量 8/8 帧违反、终态三值互异）；新代码模型全程 surface==drawable==viewport（B1-B3：0 违反、geo-heal 永不触发）；悲观场景（ANGLE 仍转置）geo-heal 保证全屏可见非黑（B2）；minimized 位剥离验证（C）
+  * 结构平衡检查：4 文件 brace/paren/bracket delta=0（sdl3_hook 的 -6 为 HEAD 既有，与本改动无关）
+  * diff 逐块复审：对齐块→surface 创建顺序正确（attribs 读对齐后 layer）、标志仅在 surface 创建成功后置位、gl_terminate 清位、前向声明补齐
+  * 本机无 iOS SDK/clang，真实编译由 CI（macOS runner xcrun）执行
+
+Stage Summary:
+- 黑屏根因定案并修复：呈现几何三套尺寸（ANGLE surface / 主线程 drawable / SDL viewport）互相打架 + 跨线程 layer 写入分叉 + 1x-vs-2x 结构性失配；修复 = 1x 单一事实源 + 主线程单写入者 + 卫兵降级取证 + minimized 谎言
+- 预期设备表现：[GLGeo] Task50 1x alignment 日志、swap 探针 surface==viewport（1180x820）、mode=1 正常呈现、无 minimized 异常；即使 ANGLE 外部再转置，geo-heal blit 保证全屏可见（压扁而非黑屏）
+- 遗留：控制按钮输入桥（GLFW 回调 NULL，ESC 等虚拟键无效——触摸经 SDL 视图已可用）；2x 渲染分辨率（现为 1x 放大，MC 像素风下可接受）；Vulkan 路径需要用户提供 latestlog 才能诊断
