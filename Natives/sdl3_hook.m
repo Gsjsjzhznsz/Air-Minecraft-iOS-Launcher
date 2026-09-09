@@ -990,7 +990,22 @@ static bool ame_embedSDLViewIntoHost(void) {
         }
         UIView *touchView = gameSurface.superview;
 
-        // 3. 嵌入：SDL 视图置于 touchView 内（GameSurfaceView 之上），保持透明。
+        // 3. Task 52（黑屏本因根治）：供应商 libSDL3.dylib 打了 Zalith 同源嵌入
+        //    补丁（UIKit_CreateWindow → Amethyst_CreateWindowOnMain →
+        //    Amethyst_EmbedSDLViewIntoHostWindow，反汇编实锤 @0x152e6c），
+        //    它在自己的嵌入流程里按类名找到 GameSurfaceView 并执行
+        //    [GameSurfaceView setHidden:YES] —— 因为 Zalith 架构里 SDL 的
+        //    metal view 才是渲染目标。但本启动器 GL/EGL 与 Vulkan/MoltenVK
+        //    的渲染目标恰恰是 GameSurfaceView 的 CAMetalLayer：帧全部呈现
+        //    进一个被隐藏的 layer = 渲染指标全绿 + 永久黑屏（Task 48-51 的
+        //    几何修复治标不治本的真正原因）。其 NSLog 是真 NSLog（本 app 把
+        //    NSLog 宏重定义为 printf），所以 latestlog 里完全不可见。
+        //    本嵌入后于它运行（真 SDL_CreateWindow 返回之后），此处揭开并
+        //    钉住层级；gl_bridge 的每帧卫兵（Task52 guard）负责持续执法。
+        BOOL task52WasHidden = gameSurface.hidden || gameSurface.layer.hidden;
+        gameSurface.hidden = NO;
+        gameSurface.layer.hidden = NO;
+        // 3.5 嵌入：SDL 视图置于 touchView 内（GameSurfaceView 之上），保持透明。
         //    不隐藏 GameSurfaceView —— GL 路径下它是真正的渲染呈现层。
         [sdlView removeFromSuperview];
         sdlView.frame = touchView.bounds;
@@ -998,9 +1013,18 @@ static bool ame_embedSDLViewIntoHost(void) {
         sdlView.backgroundColor = nil;
         sdlView.opaque = NO;
         [touchView addSubview:sdlView];
-        // 把 touchView 里其它子视图（虚拟鼠标指针等）重新压到 SDL 视图之上
+        // 把 touchView 里其它子视图（虚拟鼠标指针等）重新压到 SDL 视图之上。
+        // Task 52：GameSurfaceView 除外 —— 它必须保持在 SDL 触摸视图之下
+        //（画面在下、触摸层在上；旧循环把它也压到顶，只因当时它已被供应商
+        //  补丁藏起来而 hitTest 跳过、侥幸不挡输入）。
         for (UIView *sub in [touchView.subviews copy]) {
-            if (sub != sdlView) [touchView bringSubviewToFront:sub];
+            if (sub != sdlView && sub != gameSurface) [touchView bringSubviewToFront:sub];
+        }
+        // Task 52：z 序终局钉扎 —— GameSurfaceView 紧贴 SDL 触摸视图之下
+        //（两个嵌入的 re-front 循环都可能把它抬到 SDL 视图之上）。
+        [touchView insertSubview:gameSurface belowSubview:sdlView];
+        if (task52WasHidden) {
+            NSLog(@"[AmethystEmbed] Task52: GameSurfaceView was HIDDEN by SDL provider embed patch -- UN-HIDDEN and pinned below SDL touch view (it is our render target; black-screen root cause fixed)");
         }
 
         // 4. Task 49：不再安装 hitTest 穿透 shim。
@@ -1048,9 +1072,30 @@ static void ame_refrontEmbeddedViewOnMain(void) {
     if (container == nil) return;
     [v removeFromSuperview];
     [container addSubview:v];
+    // Task 52：GameSurfaceView 不参与 re-front（画面层必须保持在触摸层之下）
+    UIView *task52GS = ame_findSubviewOfClass(container, NSClassFromString(@"GameSurfaceView"));
     for (UIView *sub in [container.subviews copy]) {
-        if (sub != v) [container bringSubviewToFront:sub];
+        if (sub != v && sub != task52GS) [container bringSubviewToFront:sub];
     }
+    // Task 52：揭 hide + z 序钉扎（SDL 供应商补丁的 ShowEmbeddedTask / 任何
+    // 后续嵌入重跑都可能再次 setHidden:YES —— 见 ame_embedSDLViewIntoHost 步骤 3 注释）
+    if (task52GS != nil && task52GS != v) {
+        if (task52GS.hidden || task52GS.layer.hidden) {
+            task52GS.hidden = NO;
+            task52GS.layer.hidden = NO;
+            NSLog(@"[AmethystEmbed] Task52 re-front: GameSurfaceView re-hidden by external code -- UN-HIDDEN again");
+        }
+        if (task52GS.superview == container &&
+            [container.subviews indexOfObjectIdenticalTo:task52GS] > [container.subviews indexOfObjectIdenticalTo:v]) {
+            [container insertSubview:task52GS belowSubview:v];
+        }
+    }
+}
+
+/// Task 52：gl_bridge 的每帧可见性卫兵需要拿到嵌入的 SDL 触摸视图（z 序执法）。
+/// 返回裸指针（__bridge，不转移所有权；调用方只做只读比较，不当 ARC 对象持有）。
+void *ame_hook_getEmbeddedSDLView(void) {
+    return (__bridge void *)ame_embeddedSDLView;
 }
 
 #pragma mark - 对 main_hook.m 的接入点

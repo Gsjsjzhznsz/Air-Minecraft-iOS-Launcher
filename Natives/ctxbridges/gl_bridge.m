@@ -225,6 +225,10 @@ static int g_ame49_heal_disabled = 0;   // scratch FBO 完整性失败后的永�
 // 段内）在使用点之后，b9634f4 CI 实测报 undeclared identifier。
 static void *g_ame48_layer_cf = NULL;
 
+// Task52：来自 sdl3_hook.m —— 嵌入的 SDL 触摸视图（可见性卫兵 z 序执法用）。
+// 返回值是 __bridge 裸指针，只做同一性比较，不得解引用为 ARC 对象持有。
+extern void *ame_hook_getEmbeddedSDLView(void);
+
 static void ame_task49_geo_heal_blit(ame_es_t es, int drawFb, int readFb,
                                      int vw, int vh, int sw, int sh) {
     if (g_ame49_heal_disabled) return;
@@ -443,6 +447,66 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                           h_sw, h_sh, (int)inTree, chain);
                 } @catch (NSException *e) {
                     NSLog(@"[GLGeo] Task51 hierarchy exception: %@", e);
+                }
+            });
+        }
+
+        // ====================================================================
+        // Task 52：呈现层可见性卫兵（每 50 帧一次，主线程异步执行，零渲染阻塞）。
+        //
+        // 根因（hierarchy dump 实锤，b805f51 日志 8967 行）：CAMetalLayer
+        //   hid=1 —— 供应商 libSDL3.dylib 的 Zalith 同源嵌入补丁在每次真实
+        //   SDL_CreateWindow / SDL_Metal_CreateView 时按类名查找并
+        //   [GameSurfaceView setHidden:YES]（反汇编 @0x152e6c）。GL 帧全部
+        //   呈现进这个被隐藏的 layer → 渲染全绿 + 黑屏。
+        // 本卫兵持续执法三不变量（嵌入层的步骤 3.5 负责首拍，这里兜住
+        //   MetalCreate/后续嵌入重跑/任何外部隐藏者的复发）：
+        //   1) 渲染 layer 可见；2) SDL 触摸视图 z 序高于画面层；3)
+        //   drawableSize == surface 尺寸（present 自洽，接替一次性 Fix F'，
+        //   对抗宿主 updateSavedResolution 的周期性写回）。
+        // ====================================================================
+        if (swapIndex == 1 || (swapIndex > 0 && swapIndex % 50 == 0)) {
+            int g52_sw = surfW, g52_sh = surfH;
+            unsigned long g52_idx = swapIndex;
+            void *g52_layer = g_ame48_layer_cf;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                @try {
+                    // 1) 揭开渲染层（主线程读写，权威值）
+                    UIView *g52_gs = [SurfaceViewController surface];
+                    if (g52_gs != nil && (g52_gs.hidden || g52_gs.layer.hidden)) {
+                        g52_gs.hidden = NO;
+                        g52_gs.layer.hidden = NO;
+                        NSLog(@"[GLGeo] Task52 guard #%lu: render layer was HIDDEN by external code -- UN-HIDDEN (surface=%dx%d)",
+                              g52_idx, g52_sw, g52_sh);
+                    }
+                    // 2) z 序：SDL 触摸视图必须在画面层之上（否则触摸被画面层截走）
+                    UIView *g52_sdl = (__bridge UIView *)ame_hook_getEmbeddedSDLView();
+                    if (g52_gs != nil && g52_sdl != nil && g52_gs.superview != nil &&
+                        g52_sdl.superview == g52_gs.superview) {
+                        NSArray *g52_subs = g52_gs.superview.subviews;
+                        NSUInteger g52_gi = [g52_subs indexOfObjectIdenticalTo:g52_gs];
+                        NSUInteger g52_si = [g52_subs indexOfObjectIdenticalTo:g52_sdl];
+                        if (g52_gi != NSNotFound && g52_si != NSNotFound && g52_gi > g52_si) {
+                            [g52_gs.superview insertSubview:g52_gs belowSubview:g52_sdl];
+                            NSLog(@"[GLGeo] Task52 guard #%lu: z-order re-pinned (GameSurfaceView below SDL touch view)",
+                                  g52_idx);
+                        }
+                    }
+                    // 3) present 自洽：drawableSize == surface 尺寸（持续执法）
+                    CALayer *g52_l = (__bridge CALayer *)g52_layer;
+                    if (g52_l != nil && [g52_l isKindOfClass:CAMetalLayer.class] &&
+                        g52_sw > 0 && g52_sh > 0) {
+                        CAMetalLayer *g52_ml = (CAMetalLayer *)g52_l;
+                        CGSize g52_old = g52_ml.drawableSize;
+                        if (fabs(g52_old.width - (double)g52_sw) > 0.5 ||
+                            fabs(g52_old.height - (double)g52_sh) > 0.5) {
+                            g52_ml.drawableSize = CGSizeMake(g52_sw, g52_sh);
+                            NSLog(@"[GLGeo] Task52 guard #%lu: present-align drawable %.0fx%.0f -> %dx%d (== surface, self-consistent present)",
+                                  g52_idx, g52_old.width, g52_old.height, g52_sw, g52_sh);
+                        }
+                    }
+                } @catch (NSException *e) {
+                    NSLog(@"[GLGeo] Task52 guard exception: %@", e);
                 }
             });
         }
