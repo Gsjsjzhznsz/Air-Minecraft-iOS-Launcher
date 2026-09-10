@@ -191,6 +191,36 @@ static void pushSDLMouseButton(uint8_t sdlButton, bool down, float x, float y) {
     pSDL_PushEvent((void*)&ev);
 }
 
+// Task 53（输入修复）：SDL3 键事件的 key 字段（SDL_Keycode）。MC/RenderPearl
+// 部分路径读 ev.key 而非 scancode；此前恒 0，空格/ESC/回车等在游戏内可能
+// 无响应。纯函数计算（不 dlsym SDL_GetKeyFromScancode——规避跨版本 ABI
+// 差异）：字母=小写 ASCII、数字=ASCII、常用控制键=SDL 控制字符码，其余
+// = scancode | SDLK_SCANCODE_MASK(0x40000000)。
+static uint32_t ame53_keycode_from_scancode(SDL3_Scancode sc) {
+    if (sc >= 4 && sc <= 29)  return (uint32_t)('a' + (sc - 4));   // A-Z -> SDLK_a..z
+    if (sc >= 30 && sc <= 38) return (uint32_t)('1' + (sc - 30));  // 1-9 -> SDLK_1..9
+    if (sc == 39)             return (uint32_t)'0';                // SDLK_0
+    switch (sc) {
+        case 40: return 0x0D;   // SDLK_RETURN
+        case 41: return 0x1B;   // SDLK_ESCAPE
+        case 42: return 0x08;   // SDLK_BACKSPACE
+        case 43: return 0x09;   // SDLK_TAB
+        case 44: return 0x20;   // SDLK_SPACE
+        case 45: return 0x2D;   // SDLK_MINUS '-'
+        case 46: return 0x3D;   // SDLK_EQUAL '='
+        case 47: return 0x5B;   // SDLK_LEFTBRACKET '['
+        case 48: return 0x5D;   // SDLK_RIGHTBRACKET ']'
+        case 49: return 0x5C;   // SDLK_BACKSLASH '\\'
+        case 51: return 0x3B;   // SDLK_SEMICOLON ';'
+        case 52: return 0x27;   // SDLK_APOSTROPHE '\''
+        case 53: return 0x60;   // SDLK_GRAVE '`'
+        case 54: return 0x2C;   // SDLK_COMMA ','
+        case 55: return 0x2E;   // SDLK_PERIOD '.'
+        case 56: return 0x2F;   // SDLK_SLASH '/'
+        default:  return ((uint32_t)sc) | 0x40000000u;  // 功能键/小键盘等
+    }
+}
+
 // Push a keyboard event into SDL's event queue
 static void pushSDLKeyboardEvent(SDL3_Scancode scancode, bool down) {
     if (!pSDL_PushEvent || !g_sdlWindow) return;
@@ -200,7 +230,7 @@ static void pushSDLKeyboardEvent(SDL3_Scancode scancode, bool down) {
     ev.windowID = getSDLWindowID();
     ev.which = 0;
     ev.scancode = scancode;
-    ev.key = 0;
+    ev.key = ame53_keycode_from_scancode(scancode);   // Task53: 补 key sym
     ev.mod = 0;
     ev.down = down;
     ev.repeat = false;
@@ -229,7 +259,13 @@ static void pushSDLMouseWheel(float x, float y) {
 static int glfwKeyToSDLScancode(int glfwKey) {
     // Printable keys: ASCII-based, same as USB HID usage
     if (glfwKey >= GLFW_KEY_A && glfwKey <= GLFW_KEY_Z) return 4 + (glfwKey - GLFW_KEY_A);   // SDL_SCANCODE_A=4
-    if (glfwKey >= GLFW_KEY_0 && glfwKey <= GLFW_KEY_9) return 39 + (glfwKey - GLFW_KEY_0);   // SDL_SCANCODE_0=39
+    // Task 53（输入修复）：数字键修正。SDL 扫描码是 HID 顺序 1,2,...,9,0
+    //（SDL_SCANCODE_1=30 ... SDL_SCANCODE_9=38, SDL_SCANCODE_0=39），不是
+    // 0,1,...,9。旧映射 `39 + (glfwKey - GLFW_KEY_0)` 把 1-9 全部偏移 +10
+    //（→40..48 = RETURN/ESC/BACKSPACE/TAB/SPACE/MINUS/...），表现为：快捷栏
+    // 数字键全部失效、按 5 变成空格等错乱。
+    if (glfwKey >= GLFW_KEY_1 && glfwKey <= GLFW_KEY_9) return 30 + (glfwKey - GLFW_KEY_1); // SDL_SCANCODE_1=30..SDL_SCANCODE_9=38
+    if (glfwKey == GLFW_KEY_0) return 39;                                                  // SDL_SCANCODE_0=39
     if (glfwKey >= GLFW_KEY_F1 && glfwKey <= GLFW_KEY_F25) return 58 + (glfwKey - GLFW_KEY_F1); // SDL_SCANCODE_F1=58
     if (glfwKey >= GLFW_KEY_NUMPAD_0 && glfwKey <= GLFW_KEY_NUMPAD_9) return 98 + (glfwKey - GLFW_KEY_NUMPAD_0);
     switch (glfwKey) {

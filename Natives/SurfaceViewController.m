@@ -1364,7 +1364,17 @@ static UIView *findSDL_uikitview(UIView *root);
             CGFloat ptsW50 = MAX(1.0, round(self.surfaceView.bounds.size.width));
             CGFloat ptsH50 = MAX(1.0, round(self.surfaceView.bounds.size.height));
             self.surfaceView.layer.contentsScale = 1.0;
-            metalLayer.drawableSize = CGSizeMake(ptsW50, ptsH50);
+            // Task 53（分裂画面根治之一）：surface 与 MC viewport 几何失配
+            //（转置锁死、重对齐未治愈/熔断）期间停写 drawableSize——此期
+            // Task52 guard 正以 surface 尺寸独占写权保持 present 自洽（全屏
+            // 压扁-拉伸往返，宽高比还原）；本函数若继续写 bounds 会与之每
+            // 帧拉锯，产生"左半屏压扁 + 右半屏残帧"的分裂画面（f4ab8e3
+            // 日志的 guard #200..#1400 反复 present-align 即其指纹）。重对
+            // 齐成功后 surface==bounds==drawable，本写入变为同值 no-op，
+            // 单一事实源正常恢复。
+            if (!ame_gl_surface_transposed()) {
+                metalLayer.drawableSize = CGSizeMake(ptsW50, ptsH50);
+            }
             windowWidth = (int)ptsW50;
             windowHeight = (int)ptsH50;
             if ((windowWidth % 2) != 0) { --windowWidth; }

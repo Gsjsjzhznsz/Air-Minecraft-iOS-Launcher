@@ -294,6 +294,162 @@ static void ame_task49_geo_heal_blit(ame_es_t es, int drawFb, int readFb,
     }
 }
 
+// ============================================================================
+// Task 53：EGL 表面重对齐（画面分裂 + 输入异常根因根治）
+//
+// 设备铁证（latestlog f4ab8e3，iPad Air M4 / iPadOS 26.6，Task52 修复黑屏
+// 后的首轮真机日志）：
+//   - 表面创建时 1180x820（eglQuerySurface 双确认），但首次交换时已转置为
+//     820x1180 且 1400+ 帧锁死永不恢复（转置发生在加载期"无 swap 的盲窗"
+//     ——窗口事件/UIKit 布局瞬时竖屏，ANGLE 随 layer 重读几何时捕获转置
+//     值，Task48 已证其转置后不随 layer 回横屏）；
+//   - MC viewport 恒 1180x820：帧被裁到转置后缓冲左侧 820 列，Task49
+//     geo-heal blit 再把整帧压扁铺进 820x1180；
+//   - drawableSize 拉锯战：updateSavedResolution（写 bounds 横屏 1180x820）
+//     vs Task52 guard（写 surface 转置值 820x1180，每 200 帧互覆）→
+//     drawable 为横屏的帧：blit 只覆盖左侧 820x820，右侧 360 列残留原始
+//     帧内容 = 用户看到的"画面分裂"（左半压扁 + 右半残影）；
+//   - 触摸按全窗口 1180x820 点空间映射（Task51 px->pt 换算本身正确），
+//     所见画面却错位/压扁 → 点不中所见按钮 = "输入异常"。
+//
+// 修复（治本——消灭转置本身，让全部补偿机制回到无害 no-op）：
+//   几何失配首检出时销毁优先重建 EGL window surface。Task48 重建恒败
+//   （EGL_BAD_ALLOC 0x3003）的根因是"先建后毁"——同 layer 双 surface
+//   并存；销毁优先（先 MakeCurrent 解绑再销毁）则层自由，创建必成：
+//     1) 主线程 dispatch_sync 钉扎 layer（contentsScale=1.0、drawableSize=
+//        bounds 点数）——Task50 已证主线程写是唯一可靠写入路径；
+//     2) eglMakeCurrent(无表面) 解绑 → eglDestroySurface(旧) →
+//        eglCreateWindowSurface（读钉扎后的横屏 layer）→ eglMakeCurrent
+//        (新表面)（经 Task36 前端路由，MGContext 跟踪保持；前端
+//        MakeCurrent 对 EGL_NO_SURFACE 纯透传，安全）；
+//     3) 成功后 surface == viewport == drawable == bounds：几何失配判定
+//        不再触发、geo-heal 自动退出（Task50 latch 恢复分支）、拉锯战
+//        自然终止（两写者写同值）、画面 1:1 全屏、触摸坐标与所见画面对齐
+//        （输入随几何自愈）；
+//     4) 失败兜底：预算 3 次 + 2s 限速 + 链路任一步失败即永久熔断，回退
+//        Task49/51/52 既有补偿路径（行为不劣于修复前，零回归）。
+// ============================================================================
+static int      g_ame53_attempts = 0;    // 已消耗的重试预算
+static uint64_t g_ame53_last_ms = 0;     // 上次尝试时刻（2s 限速）
+static int      g_ame53_disabled = 0;    // 熔断：预算耗尽或链路失败
+static int      g_ame53_transposed = 0;  // surface 与 MC viewport 失配标志
+//（供 updateSavedResolution 判断停火——失配未治愈期间让 Task52 guard
+//  独占 drawableSize 写权，终结拉锯战；由交换路径逐帧刷新）
+
+bool ame_gl_surface_transposed(void) {
+    return g_ame53_transposed != 0;
+}
+
+static uint64_t ame53_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000ull + (uint64_t)ts.tv_nsec / 1000000ull;
+}
+
+/// 销毁优先的表面重对齐。调用方：MC 渲染线程（swap 路径、上下文 current）。
+/// 返回 YES = 表面已重建对齐（调用方把 latch mode 复位为 0，下一帧重评）。
+static BOOL ame_task53_realign_surface(void) {
+    if (g_ame53_disabled) return NO;
+    if (g_ame53_attempts >= 3) {
+        g_ame53_disabled = 1;
+        NSLog(@"[GLGeo] Task53 realign: budget exhausted after %d attempts -- fused off, compensation path continues", g_ame53_attempts);
+        return NO;
+    }
+    uint64_t now = ame53_now_ms();
+    if (g_ame53_last_ms != 0 && now - g_ame53_last_ms < 2000) return NO;
+    g_ame53_last_ms = now;
+    g_ame53_attempts++;
+
+    basic_render_window_t *bundle = currentBundle;
+    CALayer *layer = (__bridge CALayer *)g_ame48_layer_cf;
+    if (bundle == NULL || layer == nil || ![layer isKindOfClass:CAMetalLayer.class]) {
+        NSLog(@"[GLGeo] Task53 realign: prerequisites missing (bundle/layer) -- fused off");
+        g_ame53_disabled = 1;
+        return NO;
+    }
+
+    NSLog(@"[GLGeo] Task53 realign: attempt %d/3 (destroy-first recreate, locked transposed surface)", g_ame53_attempts);
+
+    // 1) 主线程钉扎（Task50 同款可靠路径）：contentsScale=1.0 +
+    //    drawableSize=bounds 点数。重建的表面读此值 → 横屏尺寸。
+    __block CGSize pin53 = CGSizeZero;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @try {
+            CAMetalLayer *ml53 = (CAMetalLayer *)layer;
+            CGFloat w53 = MAX(1.0, round(layer.bounds.size.width));
+            CGFloat h53 = MAX(1.0, round(layer.bounds.size.height));
+            layer.contentsScale = 1.0;
+            ml53.drawableSize = CGSizeMake(w53, h53);
+            pin53 = CGSizeMake(w53, h53);
+        } @catch (NSException *e) {
+            NSLog(@"[GLGeo] Task53 pin exception: %@", e);
+        }
+    });
+    if (pin53.width < 1 || pin53.height < 1) {
+        NSLog(@"[GLGeo] Task53 realign FAILED: layer pin unavailable -- fused off, compensation continues");
+        g_ame53_disabled = 1;
+        return NO;
+    }
+
+    // 2) 销毁优先重建：同一时刻至多一个 surface 拥有 layer。
+    //    先 MakeCurrent 解绑——EGL 的销毁是延迟语义（surface 不再 current
+    //    才真正释放对 layer 的占用；跳过这步=Task48 的 EGL_BAD_ALLOC）。
+    EGLSurface oldSurface = bundle->gl.surface;
+    EGLContext ctx53 = bundle->gl.context;
+    handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx53);
+    handle.eglDestroySurface(g_EglDisplay, oldSurface);
+    while (handle.eglGetError() != EGL_SUCCESS) {}
+
+    // 3) 重建（与 gl_init_context 同参：MobileGL 需显式宽高，其余传 NULL
+    //    让 ANGLE 读 layer；首轮 NULL 失败再试显式宽高兜底）。
+    const BOOL mobileGL53 = isMobileGLRenderer(getenv("AMETHYST_RENDERER"));
+    EGLSurface newSurface = EGL_NO_SURFACE;
+    for (int try53 = 0; try53 < 2 && newSurface == EGL_NO_SURFACE; try53++) {
+        const EGLint attribs53[] = {
+            EGL_WIDTH,  (EGLint)pin53.width,
+            EGL_HEIGHT, (EGLint)pin53.height,
+            EGL_NONE
+        };
+        newSurface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->gl.config,
+            (__bridge EGLNativeWindowType)layer,
+            (mobileGL53 || try53 > 0) ? attribs53 : NULL);
+        if (newSurface == EGL_NO_SURFACE) {
+            NSLog(@"[GLGeo] Task53 create attempt %d failed: eglError=0x%x", try53 + 1,
+                  (unsigned int)(uintptr_t)handle.eglGetError());
+        }
+    }
+    if (newSurface == EGL_NO_SURFACE) {
+        NSLog(@"[GLGeo] Task53 realign FAILED: surface recreation refused after destroy -- fused off (watch [RenderDiag] eglSwapBuffers FAILED lines)");
+        g_ame53_disabled = 1;
+        return NO;
+    }
+
+    // 4) 绑定新表面（Task36 前端路由保持 MGContext 跟踪）并更新 bundle。
+    if (!handle.eglMakeCurrent(g_EglDisplay, newSurface, newSurface, ctx53)) {
+        NSLog(@"[GLGeo] Task53 realign FAILED: eglMakeCurrent error 0x%x -- fused off",
+              (unsigned int)(uintptr_t)handle.eglGetError());
+        handle.eglDestroySurface(g_EglDisplay, newSurface);
+        g_ame53_disabled = 1;
+        return NO;
+    }
+    bundle->gl.surface = newSurface;
+    while (handle.eglGetError() != EGL_SUCCESS) {}
+
+    // 5) 验证（es.querySurface 与交换探针同源，权威值）。
+    ame_es_t es53 = ame_es();
+    EGLint qw53 = 0, qh53 = 0;
+    if (es53.querySurface != NULL &&
+        es53.querySurface(g_EglDisplay, newSurface, 0x3056 /*EGL_WIDTH*/, &qw53) &&
+        es53.querySurface(g_EglDisplay, newSurface, 0x3057 /*EGL_HEIGHT*/, &qh53)) {
+        NSLog(@"[GLGeo] Task53 realign SUCCESS: surface %p -> %p, eglQuerySurface=%dx%d (transposed lock cured; layer bounds %.0fx%.0f)",
+              (void *)oldSurface, (void *)newSurface, qw53, qh53, pin53.width, pin53.height);
+    } else {
+        NSLog(@"[GLGeo] Task53 realign SUCCESS (query unavailable): surface %p -> %p, expected %.0fx%.0f",
+              (void *)oldSurface, (void *)newSurface, pin53.width, pin53.height);
+    }
+    return YES;
+}
+
 // 探针 + 自愈主入口。swapIndex 从 1 计。
 // 0 = undecided, 1 = normal, 2 = geo-heal blit
 static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapIndex) {
@@ -326,7 +482,38 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     const BOOL geoMismatch = (viewport[2] > 0 && viewport[3] > 0 &&
                               surfW > 0 && surfH > 0 &&
                               (viewport[2] != surfW || viewport[3] != surfH));
+    g_ame53_transposed = geoMismatch ? 1 : 0;
+    if (!geoMismatch) {
+        // Task53：对齐帧重置冷却——下一个失配剧集（几何从对齐转为失配）立即可
+        // 重试。否则冷却期被跳过的尝试会让 mode 卡在 2（补偿态不重入分支），
+        // realign 永远失去重臂机会（逻辑测试 S3 场景实测暴露）。
+        g_ame53_last_ms = 0;
+    }
     if (geoMismatch && s_mode != 2) {
+        // Task 53（画面分裂根治）：几何失配首检出时先治本——销毁优先重建
+        // 被转置锁死的 EGL surface。成功后 surface==viewport==drawable==
+        // bounds，Task49 heal / Task51 present-align / Task52 guard 的补偿
+        // 全部回到 no-op，drawableSize 拉锯战自然终止（两写者写同值）。
+        if (ame_task53_realign_surface()) {
+            // 表面已对齐：mode 复位，下一帧重新 latch（几何对齐 + FBO0 有
+            // 内容 → NORMAL，geo-heal 经 Task50 恢复分支自动退出）。
+            s_mode = 0;
+            g_ame53_transposed = 0;
+            // 刷新本地 surfW/surfH：下方探针 / hierarchy / guard 全部输出新
+            // 表面的真实状态。surface 形参此时是已销毁的旧句柄，改查
+            // currentBundle 里的新表面。
+            basic_render_window_t *b53 = currentBundle;
+            if (b53 != NULL && es.querySurface != NULL && b53->gl.surface != EGL_NO_SURFACE) {
+                EGLint sw53 = 0, sh53 = 0;
+                if (es.querySurface(g_EglDisplay, b53->gl.surface, 0x3056 /*EGL_WIDTH*/, &sw53) &&
+                    es.querySurface(g_EglDisplay, b53->gl.surface, 0x3057 /*EGL_HEIGHT*/, &sh53)) {
+                    surfW = sw53;
+                    surfH = sh53;
+                }
+            }
+            NSLog(@"[RenderDiag] Task53 realign applied: viewport=%dx%d surface=%dx%d (mode reset; expect NORMAL latch next frame)",
+                  viewport[2], viewport[3], surfW, surfH);
+        } else {
         NSLog(@"[RenderDiag] Task49 geo mismatch ENGAGED: viewport=%dx%d surface=%dx%d (was mode=%d) -- frame covers only %.0f%% of backbuffer",
               viewport[2], viewport[3], surfW, surfH, s_mode,
               100.0 * (double)viewport[2] * (double)viewport[3] / ((double)surfW * (double)surfH));
@@ -362,6 +549,7 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                 }
             });
         }
+        }  // Task53 else：重对齐不可用/失败 → 既有补偿路径（行为不变）
     }
 
     if (probe) {

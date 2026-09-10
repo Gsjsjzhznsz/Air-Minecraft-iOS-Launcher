@@ -202,6 +202,12 @@ void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail);
 // 对齐到 1x 点数（bounds 跟随旋转），与 MC viewport/ANGLE surface 保持
 // 单一事实源。Vulkan 路径恒为假（MoltenVK 自管 drawableSize，行为不变）。
 bool ame_gl_surface_owns_layer();
+// Task 53：EGL surface 与 MC viewport 几何失配（转置锁死且重对齐未治愈）
+// 期间为真（gl_bridge.m 实现，交换路径逐帧刷新）。updateSavedResolution
+// 据此停写 drawableSize——失配期由 Task52 guard 以 surface 尺寸独占写权
+// （present 自洽），避免两写者拉锯产生"左半屏压扁 + 右半屏残帧"的分裂
+// 画面；重对齐成功后 surface==bounds，正常写入恢复为同值 no-op。
+bool ame_gl_surface_transposed();
 // 运行时判定 MC 真实渲染路径是否为 Vulkan（clientAPI == GLFW_NO_API）。
 // 比 SurfaceViewController 在 viewDidLoad 时的静态字符串推断更准确：
 // - 真正 Vulkan 路径（graphicsApi=prefer_vulkan 或 default 走 Vulkan）→ 返回 true
