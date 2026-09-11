@@ -82,3 +82,41 @@ Stage Summary:
 - 修复 = 验证门控的梯度重对齐（覆盖 ANGLE 三种读数机制假说）+ 写者方向统一（横屏信号）
 - 下轮日志判读表：Task55 realign attempt/stepA/B/C + 每步 verify 行；治愈 = "CURED by stepX: query=1180x820" + swap surface==viewport；顽固 = 三条 NOT-cured 精确指认 ANGLE 忽略哪种机制 + guard heal-align 行确认拉锯已死
 - 输入错位随画面治愈自然对齐（坐标链路自洽，Task53 已证），本轮无输入侧改动
+
+---
+Task ID: 56
+Agent: main (Super Z)
+Task: 画面分裂+输入错位+退后台"崩溃"三连根因定案与修复（latestlog 1bd9f32/Task55 构建取证；用户线索"另一开发者说关闭小窗就能解决"）
+
+Work Log:
+- 拉取用户上传的新日志（1bd9f32，dbac097/Task55 构建，2026-09-12 06:01 会话）：Task54 启动崩溃修复继续生效（include 回调稳定、进世界、57fps/132 swap）；Task55 梯度 realign A/B/C 三步全部 NOT cured（0 CURED）；日志尾部 renderpearl SurfaceException "Cannot acquire minimized window"（上一轮已知遗留）仍然发生
+- 用户关键新线索："关闭小窗就能解决"——与日志第 17 行 [SceneDelegate] Failed to update geometry: UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向"（每轮日志必现）交叉验证 → app 一直在 iPadOS 26 窗口模式（小窗）下运行：Info.plist 从未声明 UIRequiresFullScreen，iPad 按窗口化 app 对待，方向控制权归系统
+- 崩溃链反编译定案（下载 26.3-pre-3 官方 client.jar + jawa/原始字节解析）：
+  * Minecraft.createSurface 传给 renderpearl 的 BooleanSupplier = window::isIconified（BootstrapMethods 绑定实锤）
+  * GlSurface.acquireNextTexture（Java:46）= `if (supplier.getAsBoolean()) throw SurfaceException("Cannot acquire minimized window")`——仅 22 字节
+  * Window.handleEvent 的 lookupswitch：case 0x209 → onIconified(true)；0x20a/0x20b → onIconified(false)
+  * 随包 libSDL3.dylib 实为 SDL 3.4.0（revision 字符串实锤）；官方 release-3.4.0 头文件核对：WINDOW_MINIMIZED=0x209，与 LWJGL 3.4.1 常量一致——无枚举错位（曾假设错位，已证伪）
+  * 日志事件序列：启动期 0x207(PIXEL_SIZE_CHANGED，无害) → 退后台瞬间 0x209(MINIMIZED) → MC iconified=true → 下一帧 acquireNextTexture 抛异常
+  * renderFrame 反编译：异常被 catch+WARN（日志里那行 WARN+堆栈就是它），随即 surfaceIsInvalid=true + windowSurfaceNeedsReconfiguring=true；回前台后 configure() 在同一 CAMetalLayer 二次建 EGL window surface 必败 EGL_BAD_ALLOC（Task50 已证）→ 表面永久失效 → 冻结/黑屏 = 用户看到的"崩溃"
+  * 本移植真正呈现面是宿主 GameSurfaceView 的 CAMetalLayer（SDL 窗口只是被隐藏的事件壳）——"最小化"纯属谎言，呈现面前后始终有效
+- 分裂画面/输入错位根因链（与"小窗"线索闭环）：窗口模式 → requestGeometryUpdate 被拒（Code=101）→ 场景几何无法强制横屏 → 加载期表面转置 820x1180 vs drawable 1180x820 → Task55 的主线程几何信号/重建全部失败（系统拥有窗口几何，应用侧写不动）→ 拉锯 = 分裂；画面扭曲导致触点与所见错位 = 输入错位（坐标链本身 ×2/÷2 自洽，Task51 已修）。另一位开发者"关闭小窗就能解决"= 绕开触发器的 workaround，同时确证根因
+- 修复（dd43731，三层）：
+  1) Natives/Info.plist 加 UIRequiresFullScreen=true（字节级补丁保留 tab，防 Edit 工具全文件空白规范化——Task47 同款坑）：app 只能全屏运行，夺回方向控制权，场景几何恒横屏，表面不再转置
+  2) sdl3_hook.m SDL_PollEvent 吞掉 SDL_EVENT_WINDOW_MINIMIZED(0x209)：MC 永不进入 iconified，退后台/回前台零异常风暴、零表面失效（MAXIMIZED/RESTORED 仍放行作纵深防御）
+  3) SceneDelegate.m sceneDidBecomeActive 非横屏时重试 requestGeometryUpdate（防御纵深）
+- 本地验证：plist XML 合法+键值正确；两 .m 阴影编译（ObjC→GNU C 机械转换）0 错误；括号平衡与 HEAD 差异 0；行为级回放测试（1bd9f32 真实事件序列）：新钩子 0 异常 0 表面失效 vs 旧钩子 1 异常+失效
+- push dd43731 → CI run 34655737487 构建成功；产物验证（IPA artifact 10285846691）：
+  * Info.plist UIRequiresFullScreen=True ✓
+  * 反汇编实锤新逻辑在：subs w8,w8,#0x209 @0x10001a280、atomic counter、dn%50、循环回跳、__LINE__=0x38f(911) ✓
+  * 重要方法论沉淀：含中文的 ObjC 字面量被 clang 编成 UTF-16LE 存 __TEXT,__ustring——ASCII strings 搜不到会误判"没编进去"（本轮差点误判）；今后验证指纹一律用纯 ASCII 日志串
+- 用户装机测试预期锚点（dd43731 构建）：
+  * 第 17 行 geometry Code=101 错误消失（全屏后 requestGeometryUpdate 不再被拒）
+  * app 无法再进入小窗/分屏/台前调度——只能全屏
+  * 退后台再回前台：游戏不冻结不黑屏，"[SDLHook] Task56 drop SDL_EVENT_WINDOW_MINIMIZED #N" 指纹出现（首 10 条逐条+每 50 条采样）
+  * 画面不再分裂（表面不再转置）；若 ANGLE 仍偶发转置，Task55 realign 此时应有系统配合、可 CURED
+  * 输入随画面治愈自然对齐
+
+Stage Summary:
+- 三症状（分裂画面+输入错位+退后台崩溃）统一根因定案：app 未声明 UIRequiresFullScreen → iPadOS 26 窗口模式（小窗）→ 几何失控 + 最小化事件毒杀游戏
+- "关闭小窗就能解决"被采纳为根因确证并升级为代码级强制（UIRequiresFullScreen）——不是建议用户别开小窗，而是 app 从此没有小窗
+- 已知遗留：posix_spawn ENOENT（沙箱 helper 不可用，回退正常）；1x 渲染分辨率；Terracotta 多人仍禁用中
