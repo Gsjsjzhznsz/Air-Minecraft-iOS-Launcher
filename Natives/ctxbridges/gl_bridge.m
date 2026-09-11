@@ -346,13 +346,73 @@ static uint64_t ame53_now_ms(void) {
     return (uint64_t)ts.tv_sec * 1000ull + (uint64_t)ts.tv_nsec / 1000000ull;
 }
 
-/// 销毁优先的表面重对齐。调用方：MC 渲染线程（swap 路径、上下文 current）。
-/// 返回 YES = 表面已重建对齐（调用方把 latch mode 复位为 0，下一帧重评）。
+// ---- Task 55：梯度式重对齐的三个辅助 ----
+
+// 同步等待主队列 runloop 拍数（每拍强制 [CATransaction flush]：CA 事务立即
+// 提交，ANGLE 若监听 layer/CA 通知则获得触发窗口；dispatch_sync 嵌套保证
+// 至少走过 turns 个主队列周期）。
+static void ame55_wait_main_turns(int turns) {
+    for (int i = 0; i < turns; ++i) {
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            @try { [CATransaction flush]; } @catch (NSException *e) {}
+        });
+    }
+}
+
+// 渲染线程同步等待 ms 毫秒（主队列 dispatch_after 栅栏——期间主 runloop 照
+// 常转动，CA/ANGLE 有完整窗口清理）。Step B 的销毁-重建真间隔。
+static void ame55_main_gap_ms(uint64_t ms) {
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC),
+                   dispatch_get_main_queue(), ^{ dispatch_semaphore_signal(sem); });
+    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+}
+
+// 治愈判定：querySurface == layer 期望几何（与交换探针同源的权威值）。
+// outQ 非 NULL 时回填实际查询值（日志指纹用）。
+static BOOL ame55_verify_surface(ame_es_t es, EGLSurface s, CGSize expected,
+                                 EGLint *outQW, EGLint *outQH) {
+    if (es.querySurface == NULL || s == EGL_NO_SURFACE) return NO;
+    EGLint w = 0, h = 0;
+    if (!es.querySurface(g_EglDisplay, s, 0x3056 /*EGL_WIDTH*/, &w) ||
+        !es.querySurface(g_EglDisplay, s, 0x3057 /*EGL_HEIGHT*/, &h)) return NO;
+    if (outQW) *outQW = w;
+    if (outQH) *outQH = h;
+    return (w == (EGLint)MAX(1.0, round(expected.width))) &&
+           (h == (EGLint)MAX(1.0, round(expected.height)));
+}
+
+/// Task 55 梯度式表面重对齐（取代 Task53 的单式 destroy-recreate）。
+/// 调用方：MC 渲染线程（swap 路径、上下文 current）。
+/// 返回 YES = querySurface == layer bounds（真治愈；调用方复位 latch mode）。
+///
+/// a901050 真机日志判读（Task 54 构建，2026-09-11 23:10，驱动本轮设计）：
+///   - 初始创建 querySurface=1180x820 正确；盲窗内（8500 行加载、零 swap）
+///     转置为 820x1180；Task53 destroy-first recreate 后【依然 820x1180】
+///     ——对着横屏 layer（pin 打印 bounds 1180x820）重建仍转置；
+///   - 旧判定只验“create 非 NULL”即宣称 SUCCESS（假成功）→ transposed=0 →
+///     updateSavedResolution ceasefire 解除 → drawableSize 拉锯回归 →
+///     画面分裂（用户本轮症状）；
+///   - 转置的 ANGLE 读数源（transform 链 / UIScreen 回退 / swapchain 缓存）
+///     现有日志无法裁定 → 梯度覆盖三假说，每步独立验证 + 指纹日志，
+///     无论哪条路走通都能治愈，全失败则下轮日志带回决定性证据。
+///
+/// 梯度（一步治愈即停）：
+///   A 几何信号（零销毁）：主线程写 drawableSize=bounds + bounds 轻碰
+///     （1pt 偏差同事务写回）+ 2 拍主 runloop（CATransaction flush）→ 查询。
+///     假说：ANGLE 监听 layer 几何事件（622166a 转置即其跟随能力的实证）。
+///   B 延迟重建（Task53 原方案强化）：destroy → 100ms 真间隔（修句柄即时
+///     回收复用——上轮新旧句柄同为 0x1 的疑点）→ recreate（显式横屏
+///     attribs）→ MakeCurrent → 2 拍 → 查询。
+///   C 反向转置旅程：写 drawableSize=转置值 → 2 拍 → 写回横屏 bounds →
+///     2 拍 → 查询（复现盲窗转置事件的正向旅程、收尾落在横屏——若 ANGLE
+///     是事件驱动跟随，一来一回落在最后的横屏值上）。
+/// 全失败 → 本轮 attempt 失败（预算 3 次梯度 + 2s 冷却不变，熔断后补偿照旧）。
 static BOOL ame_task53_realign_surface(void) {
     if (g_ame53_disabled) return NO;
     if (g_ame53_attempts >= 3) {
         g_ame53_disabled = 1;
-        NSLog(@"[GLGeo] Task53 realign: budget exhausted after %d attempts -- fused off, compensation path continues", g_ame53_attempts);
+        NSLog(@"[GLGeo] Task55 realign: budget exhausted after %d attempts -- fused off, compensation path continues", g_ame53_attempts);
         return NO;
     }
     uint64_t now = ame53_now_ms();
@@ -363,91 +423,141 @@ static BOOL ame_task53_realign_surface(void) {
     basic_render_window_t *bundle = currentBundle;
     CALayer *layer = (__bridge CALayer *)g_ame48_layer_cf;
     if (bundle == NULL || layer == nil || ![layer isKindOfClass:CAMetalLayer.class]) {
-        NSLog(@"[GLGeo] Task53 realign: prerequisites missing (bundle/layer) -- fused off");
+        NSLog(@"[GLGeo] Task55 realign: prerequisites missing (bundle/layer) -- fused off");
         g_ame53_disabled = 1;
         return NO;
     }
 
-    NSLog(@"[GLGeo] Task53 realign: attempt %d/3 (destroy-first recreate, locked transposed surface)", g_ame53_attempts);
+    NSLog(@"[GLGeo] Task55 realign: attempt %d/3 (gradient A geometry-signal -> B deferred-recreate -> C transpose-roundtrip)",
+          g_ame53_attempts);
 
-    // 1) 主线程钉扎（Task50 同款可靠路径）：contentsScale=1.0 +
-    //    drawableSize=bounds 点数。重建的表面读此值 → 横屏尺寸。
-    __block CGSize pin53 = CGSizeZero;
+    // 期望几何（主线程权威 bounds；contentsScale 一并对齐 1x）。
+    __block CGSize pin55 = CGSizeZero;
     dispatch_sync(dispatch_get_main_queue(), ^{
         @try {
-            CAMetalLayer *ml53 = (CAMetalLayer *)layer;
-            CGFloat w53 = MAX(1.0, round(layer.bounds.size.width));
-            CGFloat h53 = MAX(1.0, round(layer.bounds.size.height));
+            CGFloat w55 = MAX(1.0, round(layer.bounds.size.width));
+            CGFloat h55 = MAX(1.0, round(layer.bounds.size.height));
             layer.contentsScale = 1.0;
-            ml53.drawableSize = CGSizeMake(w53, h53);
-            pin53 = CGSizeMake(w53, h53);
+            pin55 = CGSizeMake(w55, h55);
         } @catch (NSException *e) {
-            NSLog(@"[GLGeo] Task53 pin exception: %@", e);
+            NSLog(@"[GLGeo] Task55 pin exception: %@", e);
         }
     });
-    if (pin53.width < 1 || pin53.height < 1) {
-        NSLog(@"[GLGeo] Task53 realign FAILED: layer pin unavailable -- fused off, compensation continues");
+    if (pin55.width < 1 || pin55.height < 1) {
+        NSLog(@"[GLGeo] Task55 realign FAILED: layer pin unavailable -- fused off, compensation continues");
         g_ame53_disabled = 1;
         return NO;
     }
 
-    // 2) 销毁优先重建：同一时刻至多一个 surface 拥有 layer。
-    //    先 MakeCurrent 解绑——EGL 的销毁是延迟语义（surface 不再 current
-    //    才真正释放对 layer 的占用；跳过这步=Task48 的 EGL_BAD_ALLOC）。
-    EGLSurface oldSurface = bundle->gl.surface;
-    EGLContext ctx53 = bundle->gl.context;
-    handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx53);
-    handle.eglDestroySurface(g_EglDisplay, oldSurface);
-    while (handle.eglGetError() != EGL_SUCCESS) {}
+    ame_es_t es55 = ame_es();
+    EGLSurface cur55 = bundle->gl.surface;
+    EGLint q55w = 0, q55h = 0;
 
-    // 3) 重建（与 gl_init_context 同参：MobileGL 需显式宽高，其余传 NULL
-    //    让 ANGLE 读 layer；首轮 NULL 失败再试显式宽高兜底）。
-    const BOOL mobileGL53 = isMobileGLRenderer(getenv("AMETHYST_RENDERER"));
-    EGLSurface newSurface = EGL_NO_SURFACE;
-    for (int try53 = 0; try53 < 2 && newSurface == EGL_NO_SURFACE; try53++) {
-        const EGLint attribs53[] = {
-            EGL_WIDTH,  (EGLint)pin53.width,
-            EGL_HEIGHT, (EGLint)pin53.height,
+    // --- Step A：零销毁几何信号 ---
+    NSLog(@"[GLGeo] Task55 realign stepA: drawableSize=bounds + bounds nudge + 2 main turns (no destroy)");
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @try {
+            CAMetalLayer *mlA = (CAMetalLayer *)layer;
+            mlA.drawableSize = pin55;
+            // bounds 轻碰：1pt 偏差再写回（同一 CA 事务内提交原值，屏幕无可
+            // 感知闪变；目的是强制 CA/KVO 发出“layer 几何变化”通知）。
+            CGRect bA = layer.bounds;
+            layer.bounds = CGRectMake(bA.origin.x, bA.origin.y, bA.size.width, bA.size.height + 1.0);
+            layer.bounds = bA;
+        } @catch (NSException *e) {
+            NSLog(@"[GLGeo] Task55 stepA exception: %@", e);
+        }
+    });
+    ame55_wait_main_turns(2);
+    if (ame55_verify_surface(es55, cur55, pin55, &q55w, &q55h)) {
+        NSLog(@"[GLGeo] Task55 realign CURED by stepA: query=%dx%d == bounds %.0fx%.0f (ANGLE follows layer geometry; transposed lock released)",
+              q55w, q55h, pin55.width, pin55.height);
+        return YES;
+    }
+    NSLog(@"[GLGeo] Task55 stepA verify: query=%dx%d expected=%.0fx%.0f -- NOT cured (ANGLE ignored drawableSize+bounds nudge)",
+          q55w, q55h, pin55.width, pin55.height);
+
+    // --- Step B：销毁 + 100ms 真间隔 + 重建（修句柄即时回收复用） ---
+    NSLog(@"[GLGeo] Task55 realign stepB: destroy -> 100ms gap -> recreate (explicit landscape attribs)");
+    EGLContext ctx55 = bundle->gl.context;
+    EGLSurface old55 = cur55;
+    handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, ctx55);
+    handle.eglDestroySurface(g_EglDisplay, old55);
+    while (handle.eglGetError() != EGL_SUCCESS) {}
+    ame55_main_gap_ms(100);
+
+    const BOOL mobileGL55 = isMobileGLRenderer(getenv("AMETHYST_RENDERER"));
+    EGLSurface new55 = EGL_NO_SURFACE;
+    for (int try55 = 0; try55 < 2 && new55 == EGL_NO_SURFACE; try55++) {
+        const EGLint attribs55[] = {
+            EGL_WIDTH,  (EGLint)pin55.width,
+            EGL_HEIGHT, (EGLint)pin55.height,
             EGL_NONE
         };
-        newSurface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->gl.config,
+        new55 = handle.eglCreateWindowSurface(g_EglDisplay, bundle->gl.config,
             (__bridge EGLNativeWindowType)layer,
-            (mobileGL53 || try53 > 0) ? attribs53 : NULL);
-        if (newSurface == EGL_NO_SURFACE) {
-            NSLog(@"[GLGeo] Task53 create attempt %d failed: eglError=0x%x", try53 + 1,
+            (mobileGL55 || try55 > 0) ? attribs55 : NULL);
+        if (new55 == EGL_NO_SURFACE) {
+            NSLog(@"[GLGeo] Task55 create attempt %d failed: eglError=0x%x", try55 + 1,
                   (unsigned int)(uintptr_t)handle.eglGetError());
         }
     }
-    if (newSurface == EGL_NO_SURFACE) {
-        NSLog(@"[GLGeo] Task53 realign FAILED: surface recreation refused after destroy -- fused off (watch [RenderDiag] eglSwapBuffers FAILED lines)");
+    if (new55 == EGL_NO_SURFACE) {
+        NSLog(@"[GLGeo] Task55 stepB FAILED: recreation refused after destroy+gap (old surface %p) -- fused off, compensation continues",
+              (void *)old55);
+        bundle->gl.surface = EGL_NO_SURFACE;
         g_ame53_disabled = 1;
         return NO;
     }
-
-    // 4) 绑定新表面（Task36 前端路由保持 MGContext 跟踪）并更新 bundle。
-    if (!handle.eglMakeCurrent(g_EglDisplay, newSurface, newSurface, ctx53)) {
-        NSLog(@"[GLGeo] Task53 realign FAILED: eglMakeCurrent error 0x%x -- fused off",
+    if (!handle.eglMakeCurrent(g_EglDisplay, new55, new55, ctx55)) {
+        NSLog(@"[GLGeo] Task55 stepB FAILED: eglMakeCurrent error 0x%x -- fused off",
               (unsigned int)(uintptr_t)handle.eglGetError());
-        handle.eglDestroySurface(g_EglDisplay, newSurface);
+        handle.eglDestroySurface(g_EglDisplay, new55);
+        bundle->gl.surface = EGL_NO_SURFACE;
         g_ame53_disabled = 1;
         return NO;
     }
-    bundle->gl.surface = newSurface;
+    bundle->gl.surface = new55;
+    cur55 = new55;
     while (handle.eglGetError() != EGL_SUCCESS) {}
-
-    // 5) 验证（es.querySurface 与交换探针同源，权威值）。
-    ame_es_t es53 = ame_es();
-    EGLint qw53 = 0, qh53 = 0;
-    if (es53.querySurface != NULL &&
-        es53.querySurface(g_EglDisplay, newSurface, 0x3056 /*EGL_WIDTH*/, &qw53) &&
-        es53.querySurface(g_EglDisplay, newSurface, 0x3057 /*EGL_HEIGHT*/, &qh53)) {
-        NSLog(@"[GLGeo] Task53 realign SUCCESS: surface %p -> %p, eglQuerySurface=%dx%d (transposed lock cured; layer bounds %.0fx%.0f)",
-              (void *)oldSurface, (void *)newSurface, qw53, qh53, pin53.width, pin53.height);
-    } else {
-        NSLog(@"[GLGeo] Task53 realign SUCCESS (query unavailable): surface %p -> %p, expected %.0fx%.0f",
-              (void *)oldSurface, (void *)newSurface, pin53.width, pin53.height);
+    ame55_wait_main_turns(2);
+    if (ame55_verify_surface(es55, cur55, pin55, &q55w, &q55h)) {
+        NSLog(@"[GLGeo] Task55 realign CURED by stepB: surface %p -> %p, query=%dx%d == bounds %.0fx%.0f",
+              (void *)old55, (void *)new55, q55w, q55h, pin55.width, pin55.height);
+        return YES;
     }
-    return YES;
+    NSLog(@"[GLGeo] Task55 stepB verify: query=%dx%d expected=%.0fx%.0f -- NOT cured (recreate reads transposed geometry)",
+          q55w, q55h, pin55.width, pin55.height);
+
+    // --- Step C：反向转置旅程 ---
+    NSLog(@"[GLGeo] Task55 realign stepC: transpose roundtrip (drawableSize transposed -> turns -> landscape -> turns)");
+    __block CGSize pinC = pin55;
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @try {
+            CAMetalLayer *mlC = (CAMetalLayer *)layer;
+            mlC.drawableSize = CGSizeMake(pinC.height, pinC.width);
+        } @catch (NSException *e) {
+            NSLog(@"[GLGeo] Task55 stepC exception: %@", e);
+        }
+    });
+    ame55_wait_main_turns(2);
+    dispatch_sync(dispatch_get_main_queue(), ^{
+        @try {
+            CAMetalLayer *mlC = (CAMetalLayer *)layer;
+            mlC.drawableSize = pinC;
+        } @catch (NSException *e) {
+            NSLog(@"[GLGeo] Task55 stepC exception: %@", e);
+        }
+    });
+    ame55_wait_main_turns(2);
+    if (ame55_verify_surface(es55, cur55, pin55, &q55w, &q55h)) {
+        NSLog(@"[GLGeo] Task55 realign CURED by stepC: query=%dx%d == bounds %.0fx%.0f (event-follow confirmed: roundtrip landed landscape)",
+              q55w, q55h, pin55.width, pin55.height);
+        return YES;
+    }
+    NSLog(@"[GLGeo] Task55 stepC verify: query=%dx%d expected=%.0fx%.0f -- NOT cured (gradient exhausted this attempt; compensation continues, retry after cooldown)",
+          q55w, q55h, pin55.width, pin55.height);
+    return NO;
 }
 
 // 探针 + 自愈主入口。swapIndex 从 1 计。
@@ -490,10 +600,10 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
         g_ame53_last_ms = 0;
     }
     if (geoMismatch && s_mode != 2) {
-        // Task 53（画面分裂根治）：几何失配首检出时先治本——销毁优先重建
-        // 被转置锁死的 EGL surface。成功后 surface==viewport==drawable==
-        // bounds，Task49 heal / Task51 present-align / Task52 guard 的补偿
-        // 全部回到 no-op，drawableSize 拉锯战自然终止（两写者写同值）。
+        // Task 55（画面分裂根治）：几何失配首检出时先治本——梯度式重对齐
+        //（A 几何信号 / B 延迟重建 / C 反向转置旅程，一步治愈即停；治愈判定
+        // = querySurface == layer bounds，杜绝 Task53 假成功）。成功后
+        // surface==viewport==drawable==bounds，补偿全部回到 no-op。
         if (ame_task53_realign_surface()) {
             // 表面已对齐：mode 复位，下一帧重新 latch（几何对齐 + FBO0 有
             // 内容 → NORMAL，geo-heal 经 Task50 恢复分支自动退出）。
@@ -511,41 +621,42 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                     surfH = sh53;
                 }
             }
-            NSLog(@"[RenderDiag] Task53 realign applied: viewport=%dx%d surface=%dx%d (mode reset; expect NORMAL latch next frame)",
+            NSLog(@"[RenderDiag] Task55 realign applied: viewport=%dx%d surface=%dx%d (mode reset; expect NORMAL latch next frame)",
                   viewport[2], viewport[3], surfW, surfH);
         } else {
         NSLog(@"[RenderDiag] Task49 geo mismatch ENGAGED: viewport=%dx%d surface=%dx%d (was mode=%d) -- frame covers only %.0f%% of backbuffer",
               viewport[2], viewport[3], surfW, surfH, s_mode,
               100.0 * (double)viewport[2] * (double)viewport[3] / ((double)surfW * (double)surfH));
         s_mode = 2;
-        // Task51 Fix F'：转置固化时让 drawable 跟随 surface（present 自洽）。
-        // 证据链：622166a 证伪渲染线程写 drawableSize（CA 提交树分叉，全日志
-        // 0 条 "Task48 pin" 生效）；e6886e2 证明主线程写有效（Task50 对齐即
-        // 主线程写、eglQuerySurface 立即确认）。故 dispatch_async 主线程
-        // 一次性把 drawableSize 钉成 surface 实际尺寸：drawable == backbuffer
-        // 纹理 → Metal present 无条件匹配 → 内容上屏。contentsGravity 把
-        // surface 尺寸内容拉伸铺 layer bounds，blit 的 squash 与 bounds 拉伸
-        // 互逆 → 1:1 无变形显示（仅中间分辨率 1x 软化）。
-        // 触发条件 s_mode != 2 保证整个生命周期至多执行一次，无逐帧开销。
+        // Task51 Fix F'（Task55 语义反转）：转置固化期一次性把 drawableSize
+        // 钉到【横屏 bounds 值】——与 Task52 guard 的 heal-align 同向。
+        // 旧语义（钉成 surface 转置值"present 自洽"）被 a901050 日志证伪：
+        // 它与 guard 一起反向钉死转置，阻断 ANGLE 依据 drawableSize 自愈；
+        // 且旧语义下 drawableSize 拉锯（updateSavedResolution 写 bounds）即
+        // 用户看到的"画面分裂"。失配期间保持单一写者单一方向（横屏信号）；
+        // 治愈后本写入变同值 no-op。主线程 dispatch_async（e6886e2 证明主
+        // 线程写有效；622166a 证伪渲染线程写）。
+        // 触发条件 s_mode != 2 保证整个失配剧集至多执行一次，guard 随后接管。
         void *ame51_layer_ref = g_ame48_layer_cf;
         if (ame51_layer_ref != NULL) {
-            int pw = surfW, ph = surfH;
             dispatch_async(dispatch_get_main_queue(), ^{
                 @try {
                     CALayer *l = (__bridge CALayer *)ame51_layer_ref;
                     if ([l isKindOfClass:CAMetalLayer.class]) {
                         CAMetalLayer *ml = (CAMetalLayer *)l;
                         CGSize old = ml.drawableSize;
-                        if ((int)round(old.width) != pw || (int)round(old.height) != ph) {
-                            ml.drawableSize = CGSizeMake((CGFloat)pw, (CGFloat)ph);
-                            NSLog(@"[GLGeo] Task51 present-align (main thread): drawableSize %.0fx%.0f -> %dx%d == surface (drawable==backbuffer, present self-consistent)",
-                                  old.width, old.height, pw, ph);
+                        CGFloat bw = MAX(1.0, round(l.bounds.size.width));
+                        CGFloat bh = MAX(1.0, round(l.bounds.size.height));
+                        if (fabs(old.width - bw) > 0.5 || fabs(old.height - bh) > 0.5) {
+                            ml.drawableSize = CGSizeMake(bw, bh);
+                            NSLog(@"[GLGeo] Task51 heal-align (main thread): drawableSize %.0fx%.0f -> %.0fx%.0f == bounds (landscape signal, same direction as Task52 guard heal)",
+                                  old.width, old.height, bw, bh);
                         } else {
-                            NSLog(@"[GLGeo] Task51 present-align: already aligned %dx%d (drawable==surface)", pw, ph);
+                            NSLog(@"[GLGeo] Task51 heal-align: already at bounds %.0fx%.0f (landscape signal in place)", bw, bh);
                         }
                     }
                 } @catch (NSException *e) {
-                    NSLog(@"[GLGeo] Task51 present-align exception: %@", e);
+                    NSLog(@"[GLGeo] Task51 heal-align exception: %@", e);
                 }
             });
         }
@@ -680,17 +791,35 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                                   g52_idx);
                         }
                     }
-                    // 3) present 自洽：drawableSize == surface 尺寸（持续执法）
+                    // 3) present 几何执法（Task55 语义自适应）：
+                    //    - 失配未治愈（转置锁死）：写【横屏 bounds 值】——持续
+                    //      给 ANGLE“回横屏”信号。a901050 日志铁证：写 surface
+                    //      转置值（820x1180）是反向钉死——它阻断 ANGLE 依据
+                    //      drawableSize 自愈的一切可能（622166a 铁证 ANGLE
+                    //      具备跟随 layer 几何能力；Task50 证明主线程写入是
+                    //      唯一可靠通道）。若 ANGLE 不跟随，压扁 blit + CA
+                    //      拉伸双重互逆、纵横比还原，优于持续压扁+拉锯分裂。
+                    //    - 已治愈/无失配：写 surface 值（present 自洽维护，
+                    //      治愈后两值相同，同值 no-op）。
                     CALayer *g52_l = (__bridge CALayer *)g52_layer;
                     if (g52_l != nil && [g52_l isKindOfClass:CAMetalLayer.class] &&
                         g52_sw > 0 && g52_sh > 0) {
                         CAMetalLayer *g52_ml = (CAMetalLayer *)g52_l;
                         CGSize g52_old = g52_ml.drawableSize;
-                        if (fabs(g52_old.width - (double)g52_sw) > 0.5 ||
-                            fabs(g52_old.height - (double)g52_sh) > 0.5) {
-                            g52_ml.drawableSize = CGSizeMake(g52_sw, g52_sh);
-                            NSLog(@"[GLGeo] Task52 guard #%lu: present-align drawable %.0fx%.0f -> %dx%d (== surface, self-consistent present)",
-                                  g52_idx, g52_old.width, g52_old.height, g52_sw, g52_sh);
+                        BOOL g52_heal = ame_gl_surface_transposed();
+                        CGSize g52_target = g52_heal
+                            ? CGSizeMake(MAX(1.0, round(g52_l.bounds.size.width)),
+                                         MAX(1.0, round(g52_l.bounds.size.height)))
+                            : CGSizeMake(g52_sw, g52_sh);
+                        if (fabs(g52_old.width - g52_target.width) > 0.5 ||
+                            fabs(g52_old.height - g52_target.height) > 0.5) {
+                            g52_ml.drawableSize = g52_target;
+                            NSLog(@"[GLGeo] Task52 guard #%lu: %@ drawable %.0fx%.0f -> %.0fx%.0f (%@)",
+                                  g52_idx, g52_heal ? @"heal-align" : @"present-align",
+                                  g52_old.width, g52_old.height,
+                                  g52_target.width, g52_target.height,
+                                  g52_heal ? @"transposed-uncured: feeding landscape bounds signal"
+                                           : @"== surface, self-consistent present");
                         }
                     }
                 } @catch (NSException *e) {
