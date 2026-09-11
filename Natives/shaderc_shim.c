@@ -671,9 +671,16 @@ static void ame_opt_shadow_register(void *options) {
     pthread_mutex_lock(&ame_opt_shadow_lock);
     // malloc 地址复用防御：同地址命中旧条目时【重置字段】（新 options 对象
     // 与旧对象共享地址但配置状态全新）；无条目则开新槽。
+    // Task 54：旧条目分支必须同时清 inc_* 三指针 —— 旧主人（另一 worker
+    // 线程）的 include 回调是可能已释放的 LWJGL libffi closure，继承即悬空
+    // 指针；slot 创建分支（ame_opt_shadow_slot create=1）已清，此分支此前
+    // 漏清。与 release 的锁内注销（Task 54 主修复）双保险。
     ame_opt_shadow_entry_t *e = ame_opt_shadow_slot(options, 0);
     if (e != NULL) {
         ame_opt_shadow_defaults(&e->fields);
+        e->inc_resolver = NULL;
+        e->inc_releaser = NULL;
+        e->inc_user_data = NULL;
     } else {
         ame_opt_shadow_slot(options, 1);
     }
@@ -685,7 +692,15 @@ static void ame_opt_shadow_clone(const void *src, void *dst) {
     pthread_mutex_lock(&ame_opt_shadow_lock);
     ame_opt_shadow_entry_t *e = ame_opt_shadow_slot((void *)src, 0);
     ame_opt_shadow_entry_t *n = ame_opt_shadow_slot(dst, 1);
-    if (e != NULL && n != NULL) n->fields = e->fields;
+    if (e != NULL && n != NULL) {
+        n->fields = e->fields;
+        // Task 54：真实 impl 的 options_clone 会复制 include 回调（回调是
+        // options 结构体的值成员）——影子层镜像同一语义，否则 clone 出的
+        // options 编译含 #include 的源码会误入无回调直通路径。
+        n->inc_resolver = e->inc_resolver;
+        n->inc_releaser = e->inc_releaser;
+        n->inc_user_data = e->inc_user_data;
+    }
     pthread_mutex_unlock(&ame_opt_shadow_lock);
 }
 
@@ -1510,9 +1525,27 @@ void shaderc_compile_options_release(void *options) {
     if (real == NULL || options == NULL) return;
     ame_shim_lock_or_report_blocked("options_release", options);
     ((void (*)(void *))real)(options);
-    pthread_mutex_unlock(&ame_shaderc_shim_lock);
-    // Task 42：影子注销（编译请求携带字段快照，句柄销毁后无需保留）
+    // Task 42：影子注销（编译请求携带字段快照，句柄销毁后无需保留）。
+    // Task 54：注销必须在 master 锁【内】完成。旧代码在 unlock 之后才清理，
+    // 与 options_initialize 的 malloc 地址复用构成 ABA：T1 release 解锁后、
+    // 清理前，T2 的 initialize 拿到同一地址并注册了新的 include 回调，T1 
+    // 随后的锁外清理会把 T2 的回调一并抹掉 —— 下一个含 #include 的编译
+    // 走 "no include callbacks registered" 直通路径，glslang 报
+    // "'#include' : required extension not requested"，必需管线编译失败
+    // （真机 2026-09-10 22:17：beacon_beam_translucent + entity_translucent_cull
+    // 双失败 → "Failed to load required shader programs" → 启动 16s 崩溃）。
+    // 锁序：master → shadow，与 initialize/clone/编译入口一致，无死锁风险。
     ame_opt_shadow_release(options);
+    pthread_mutex_unlock(&ame_shaderc_shim_lock);
+    // Task 54 一次性指纹：strings 产物验证 + 下轮日志锚点（首个 release 即打）。
+    {
+        static int s_task54_marker = 0;
+        if (!s_task54_marker) {
+            s_task54_marker = 1;
+            fprintf(stderr, "[shaderc-shim] Task54 options-shadow release under master "
+                            "lock (ABA address-reuse race fixed)\n");
+        }
+    }
     fprintf(stderr, "[shaderc-shim] options_release %p done (t=%.0fms tid=%lx)\n",
             options, ame_shim_ms(), ame_shim_tid());
 }
