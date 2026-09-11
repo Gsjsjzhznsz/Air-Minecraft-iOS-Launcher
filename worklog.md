@@ -52,3 +52,33 @@ Stage Summary:
 - 黑屏根因定案并修复：呈现几何三套尺寸（ANGLE surface / 主线程 drawable / SDL viewport）互相打架 + 跨线程 layer 写入分叉 + 1x-vs-2x 结构性失配；修复 = 1x 单一事实源 + 主线程单写入者 + 卫兵降级取证 + minimized 谎言
 - 预期设备表现：[GLGeo] Task50 1x alignment 日志、swap 探针 surface==viewport（1180x820）、mode=1 正常呈现、无 minimized 异常；即使 ANGLE 外部再转置，geo-heal blit 保证全屏可见（压扁而非黑屏）
 - 遗留：控制按钮输入桥（GLFW 回调 NULL，ESC 等虚拟键无效——触摸经 SDL 视图已可用）；2x 渲染分辨率（现为 1x 放大，MC 像素风下可接受）；Vulkan 路径需要用户提供 latestlog 才能诊断
+
+---
+Task ID: 55
+Agent: main (Super Z)
+Task: 画面分裂根因第二轮根治（latestlog f93e882 / a901050 构建取证；用户症状"画面分裂"，非崩溃）
+
+Work Log:
+- 拉取用户上传的新日志（f93e882，a901050/Task54 构建，2026-09-11 23:10 会话，67 秒游戏时长）：Task54 崩溃修复真机确认生效——include 回调稳定、零 shader 管线失败、游戏完整进入世界（玩家 yiqiu4178 登录、3662 帧 60fps）。启动崩溃已死
+- 画面分裂机制链定案（本轮目标）：
+  * 337 行：初始 eglQuerySurface=1180x820 创建时正确；盲窗内（8500 行加载、零 swap）转置为 820x1180
+  * 8874-8876 行：Task53 realign 于首次 swap 前执行，destroy+recreate 后依然 820x1180（对着横屏 layer！）却打印 "SUCCESS (transposed lock cured)" = 假成功——判定只验 create!=NULL，未验几何
+  * 假成功 → g_ame53_transposed=0 → updateSavedResolution ceasefire 解除 → drawableSize 拉锯回归（guard 写 820x1180 vs 其它写者 1180x820）→ 交替几何 = 用户看到的分裂画面
+  * 新旧 surface 句柄同为 0x1（ANGLE HandleAllocator 回收）——destroy+即时 recreate 复用槽位
+  * Task52 guard + Task51 present-align 失配期写 surface 转置值 = 反向钉死：阻断 ANGLE 依据 drawableSize 自愈（622166a 证 ANGLE 有跟随能力；Task50 证主线程写入唯一可靠）
+- 修复（gl_bridge.m 四处，Task 55）：
+  * ame55_verify_surface：治愈判定 = querySurface == layer bounds；假成功不可能；每步独立验证+日志
+  * 梯度重对齐 A→B→C（一步治愈即停）：A 几何信号（主线程 drawableSize=bounds + bounds 1pt 轻碰 + 2 拍主 runloop + CATransaction flush）；B 延迟重建（destroy → 100ms 真间隔（信号量栅栏）→ 显式横屏 attribs 重建 → 2 拍 → 验证）；C 反向转置旅程（转置值 → 2 拍 → 横屏 → 2 拍 → 验证）。预算 3 次 + 2s 冷却 + 对齐帧重臂不变
+  * Task52 guard 方向自适应：失配未治愈写横屏 bounds（持续自愈信号；ANGLE 不跟随时压扁 blit + CA 拉伸互逆、纵横比还原）；治愈后写 surface 值（同值 no-op）。日志区分 heal-align/present-align
+  * Task51 一次性对齐反转为 heal 语义（写 bounds，与 guard 同向）
+- 本地验证（不盲提交）：
+  * scripts/verify_task55_structure.py：括号平衡（175/730）、18/18 指纹、4/4 旧文本清除、梯度顺序、验证门控 ×3、guard 读主线程 bounds——全过
+  * scripts/shadow_compile_task55.py：提取四区块 → ObjC→GNU C 机械转换（block 大括号配对内联展开、dispatch_after 处理、__bridge/点语法/NSLog 转换）→ gcc -fsyntax-only -Wall -Wextra 0 错误
+  * scripts/test_task55_logic.c：21/21 PASS——ANGLE 行为模型 M1（A 治愈）/M2（B 治愈）/M3（C 治愈）/M4（顽固全败）、假成功拒绝、预算/冷却/熔断/重臂、guard 双向、T51 单发、400 帧零写者冲突（拉锯死）
+- 提交 e59e934（rebase 于 f93e882 之上），推送触发 CI run 126
+
+Stage Summary:
+- Task54 崩溃修复真机确认；本轮根因 = realign 假成功 + guard/T51 反向钉死 + 拉锯回归
+- 修复 = 验证门控的梯度重对齐（覆盖 ANGLE 三种读数机制假说）+ 写者方向统一（横屏信号）
+- 下轮日志判读表：Task55 realign attempt/stepA/B/C + 每步 verify 行；治愈 = "CURED by stepX: query=1180x820" + swap surface==viewport；顽固 = 三条 NOT-cured 精确指认 ANGLE 忽略哪种机制 + guard heal-align 行确认拉锯已死
+- 输入错位随画面治愈自然对齐（坐标链路自洽，Task53 已证），本轮无输入侧改动
