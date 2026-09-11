@@ -173,6 +173,28 @@ extern __weak UIWindow *mainWindow;
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
+    // Task 56（小窗根因修复，纵深防御）：
+    // Info.plist 已加 UIRequiresFullScreen，app 现在只能全屏运行，
+    // willConnect 里的 requestGeometryUpdate 不再被窗口模式拒绝
+    // （旧日志每轮必现 UISceneErrorDomain Code=101"当前窗口模式不允许
+    // 以编程方式更改界面方向"）。这里补一道 becomeActive 重试：万一
+    // 首次请求因时机问题失败（或系统在启动动画期间短暂竖屏），
+    // 场景激活时再要一次横屏几何，确保 scene bounds 与锁定的横屏方向
+    // 一致——这是"表面转置→画面分裂→输入错位"链条的源头。
+    if (@available(iOS 16.0, *)) {
+        UIWindowScene *windowScene = (UIWindowScene *)scene;
+        UIInterfaceOrientation orient = windowScene.interfaceOrientation;
+        if (UIInterfaceOrientationIsLandscape(orient)) {
+            return;  // 已横屏，无需重试
+        }
+        UIWindowSceneGeometryPreferencesIOS *geometryPreferences = [[UIWindowSceneGeometryPreferencesIOS alloc] init];
+        geometryPreferences.interfaceOrientations = UIInterfaceOrientationMaskLandscape;
+        [windowScene requestGeometryUpdateWithPreferences:geometryPreferences errorHandler:^(NSError *error) {
+            NSLog(@"[SceneDelegate] Task56 geometry retry on becomeActive failed: %@", error);
+        }];
+        NSLog(@"[SceneDelegate] Task56 geometry retry on becomeActive (orientation=%ld not landscape)",
+              (long)orient);
+    }
 }
 
 - (void)sceneWillResignActive:(UIScene *)scene {

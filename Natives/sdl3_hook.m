@@ -882,10 +882,36 @@ static bool ame_SDL_SetWindowFullscreen(void *window, bool fullscreen) {
 //   - 其余类型（我们注入的 0x300 键 / 0x400 鼠标等高频事件）：前 30 条逐条打，
 //     之后每 500 条打 1 条采样
 //   - 无事件（返回 false）不打
+//
+// Task 56（退后台/切窗"崩溃"根治，1bd9f32 日志取证 + client.jar 反编译定案）：
+//   MC 26.3 经 LWJGL 3.4.1（SDL 3.4.x 枚举）把 SDL_EVENT_WINDOW_MINIMIZED(0x209)
+//   交给 Window.handleEvent → onIconified(true) → Minecraft.createSurface 传给
+//   renderpearl 的 BooleanSupplier 就是 window::isIconified（反编译实锤）→
+//   GlSurface.acquireNextTexture 见 iconified 即抛 SurfaceException("Cannot
+//   acquire minimized window")。renderFrame 虽 catch 住了异常，但随即置
+//   surfaceIsInvalid=true + windowSurfaceNeedsReconfiguring=true；回前台后
+//   configure() 在同一 CAMetalLayer 上二次建 EGL window surface 必败
+//   EGL_BAD_ALLOC（Task50 实证）→ 表面永久失效 → 游戏冻结/黑屏 = 用户看到的
+//   "崩溃"。本移植里真正的呈现面是宿主 GameSurfaceView 的 CAMetalLayer，
+//   SDL 窗口只是被隐藏的"事件壳"（Task32 embed）——它"最小化"纯属谎言：
+//   画面根本不在那个窗口里，呈现面在退后台前后始终有效。
+//   修复：在事件出口掐断 MINIMIZED(0x209)，MC 永不进入 iconified 状态，
+//   后台/前台往返零异常风暴、零表面失效。MAXIMIZED(0x20a)/RESTORED(0x20b)
+//   仍放行（它们调 onIconified(false)，是纵深防御）。
 static bool ame_SDL_PollEvent(void *event) {
-    bool r = ame_real_PollEvent ? ame_real_PollEvent(event) : false;
-    if (r && event != NULL) {
+    if (!ame_real_PollEvent) return false;
+    for (;;) {
+        bool r = ame_real_PollEvent(event);
+        if (!r || event == NULL) return r;
         uint32_t type = *(const uint32_t *)event;
+        if (type == 0x209) {  // SDL_EVENT_WINDOW_MINIMIZED（SDL 3.4.0 实测枚举）
+            static _Atomic unsigned long s_minDropCount = 0;
+            unsigned long dn = atomic_fetch_add(&s_minDropCount, 1) + 1;
+            if (dn <= 10 || dn % 50 == 0) {
+                NSDebugLog(@"[SDLHook] Task56 drop SDL_EVENT_WINDOW_MINIMIZED #%lu (iconified 源头掐断：宿主 CAMetalLayer 仍可呈现)", dn);
+            }
+            continue;  // 丢弃，取下一条
+        }
         if ((type >= 0x100 && type <= 0x10F) || (type >= 0x200 && type <= 0x20F)) {
             NSDebugLog(@"[SDLHook] SDL_PollEvent got type=0x%x (quit/window-class, Task32)", type);
         } else {
@@ -896,8 +922,8 @@ static bool ame_SDL_PollEvent(void *event) {
                            n, type);
             }
         }
+        return r;
     }
-    return r;
 }
 
 #pragma mark - 7) Amethyst embed：把 SDL UIKit 视图嵌入宿主层级（Task 32 黑屏修复）
