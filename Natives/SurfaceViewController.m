@@ -1346,39 +1346,32 @@ static UIView *findSDL_uikitview(UIView *root);
     if ((windowHeight % 2) != 0) { --windowHeight; }
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.surfaceView.layer;
-        // Task 50（黑屏根因修复，622166a 日志实证）：
-        // GL 路径下本层由 EGL surface 呈现，必须与 MC 的真实渲染分辨率
-        // 对齐——MC 26.3+SDL3 以"点"回报窗口尺寸（viewport=1180x820）。
-        // 旧代码无条件写 2x 像素 drawableSize（2360x1640）：
-        //   - 创建时 ANGLE 按 bounds×contentsScale 建出 2x surface，MC 的
-        //     帧只覆盖后缓冲左上 25%；
-        //   - 旋转时（viewWillTransition→本函数）2x 值与 ANGLE surface、
-        //     旋转后的 bounds 互相打架，surface 被锁死转置（1640x2360），
-        //     600+ 帧 present 尺寸失配 = 全黑。
-        // 修复：GL 拥有呈现层期间对齐 1x（contentsScale=1.0、drawableSize=
-        // bounds 点数）。surface==drawable==MC viewport 恒成立，旋转时三者
-        // 随 bounds 同步翻转，CoreAnimation 把 1x 帧最近邻放大到物理屏。
-        // Vulkan 路径（标志为假）保持旧的 2x 行为——MoltenVK 自管
-        // drawableSize，与 EGL 呈现互不干扰。
+        // Task 60（画面模糊根因修复，5f1df50 真机日志实证）：
+        // Task50 的 1x 钉扎（contentsScale=1.0、drawableSize=bounds 点数）
+        // 把 EGL surface 压到 1180x820，CoreAnimation 线性放大 2x 到物理屏
+        // 2360x1640 → 全屏模糊（用户实测"画面模糊"）；MC 26.2 LWJGL 路径
+        // viewport 2360x1640 ≠ surface 1180x820 → Task49 geo-heal 每帧降采样
+        // blit → 双重模糊 + blit 开销（用户实测"MG 对 LWJGL 兼容性倒退"）。
+        //
+        // 渲染/输入口径已由 Task58（EGL 查询常量修正）+ Task59（输入像素直通）
+        // 定案：启动器像素口径 2360x1640 == launchJVM 告知值 == MC 窗口信念
+        // == MC 输入归一化基准。因此 GL 分支与非 GL 分支统一：
+        //   drawableSize = windowWidth x windowHeight（= physical x resolutionScale），
+        //   contentsScale 维持上方 screenScale x resolutionScale。
+        // surface==drawable==物理像素 1:1 呈现零缩放；resolutionScale < 1
+        // 时按比例整体缩放（保留用户分辨率偏好的语义）；旋转时 bounds 跟随
+        // → 三者同步翻转。本写入与 gl_init_context 的 Task60 创建对齐块
+        // 同口径（主线程单一写者纪律不变）。
         if (ame_gl_surface_owns_layer()) {
-            CGFloat ptsW50 = MAX(1.0, round(self.surfaceView.bounds.size.width));
-            CGFloat ptsH50 = MAX(1.0, round(self.surfaceView.bounds.size.height));
-            self.surfaceView.layer.contentsScale = 1.0;
             // Task 53（分裂画面根治之一）：surface 与 MC viewport 几何失配
             //（转置锁死、重对齐未治愈/熔断）期间停写 drawableSize——此期
             // Task52 guard 正以 surface 尺寸独占写权保持 present 自洽（全屏
-            // 压扁-拉伸往返，宽高比还原）；本函数若继续写 bounds 会与之每
-            // 帧拉锯，产生"左半屏压扁 + 右半屏残帧"的分裂画面（f4ab8e3
-            // 日志的 guard #200..#1400 反复 present-align 即其指纹）。重对
-            // 齐成功后 surface==bounds==drawable，本写入变为同值 no-op，
-            // 单一事实源正常恢复。
+            // 压扁-拉伸往返，宽高比还原）；本函数若继续写会与之每帧拉锯。
+            // 重对齐成功后 surface==drawable==bounds 像素，本写入变为同值
+            // no-op，单一事实源正常恢复。
             if (!ame_gl_surface_transposed()) {
-                metalLayer.drawableSize = CGSizeMake(ptsW50, ptsH50);
+                metalLayer.drawableSize = CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
             }
-            windowWidth = (int)ptsW50;
-            windowHeight = (int)ptsH50;
-            if ((windowWidth % 2) != 0) { --windowWidth; }
-            if ((windowHeight % 2) != 0) { --windowHeight; }
         } else {
             metalLayer.drawableSize = CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
         }

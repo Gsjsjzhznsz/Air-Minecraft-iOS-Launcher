@@ -43,8 +43,9 @@ void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail) {
 // 主线程（updateSavedResolution）读它永远得到 NULL。因此需要一个跨线程
 // 的原子标志：GL 路径在 gl_init_context 成功创建 surface 后置位，
 // gl_terminate 清零。SurfaceViewController 据此判断"GL 拥有呈现层"，
-// 并把 layer 对齐到 1x 点数（Task 50 单一事实源几何，详见 gl_init_context
-// 内的 Task50 大注释）。Vulkan 路径不创建 EGL surface → 标志恒 0 →
+// 并把 layer 对齐到原生 scale 像素（Task60 单一事实源几何，详见
+// gl_init_context 内的 Task60 对齐块；Task50 1x 已退役——CA 线性 2x
+// 放大是画面模糊根源）。Vulkan 路径不创建 EGL surface → 标志恒 0 →
 // 主线程保持旧的 2x 行为（MoltenVK 自管 drawableSize，互不干扰）。
 // ============================================================================
 static _Atomic int g_ame50_gl_owns_layer = 0;
@@ -436,14 +437,17 @@ static BOOL ame_task53_realign_surface(void) {
     NSLog(@"[GLGeo] Task55 realign: attempt %d/3 (gradient A geometry-signal -> B deferred-recreate -> C transpose-roundtrip)",
           g_ame53_attempts);
 
-    // 期望几何（主线程权威 bounds；contentsScale 一并对齐 1x）。
+    // 期望几何（主线程权威 bounds x contentsScale，像素口径——Task60：
+    // surface/query/drawable 全链已统一像素口径；旧 1x 点数 pin 会让
+    // verify 永远 FAIL、heal 步骤把 drawableSize 拉回 1x）。
     __block CGSize pin55 = CGSizeZero;
     dispatch_sync(dispatch_get_main_queue(), ^{
         @try {
             CGFloat w55 = MAX(1.0, round(layer.bounds.size.width));
             CGFloat h55 = MAX(1.0, round(layer.bounds.size.height));
-            layer.contentsScale = 1.0;
-            pin55 = CGSizeMake(w55, h55);
+            CGFloat sc55 = layer.contentsScale;
+            if (sc55 <= 0.0) sc55 = 1.0;
+            pin55 = CGSizeMake(round(w55 * sc55), round(h55 * sc55));
         } @catch (NSException *e) {
             NSLog(@"[GLGeo] Task55 pin exception: %@", e);
         }
@@ -693,12 +697,18 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                         CGSize old = ml.drawableSize;
                         CGFloat bw = MAX(1.0, round(l.bounds.size.width));
                         CGFloat bh = MAX(1.0, round(l.bounds.size.height));
-                        if (fabs(old.width - bw) > 0.5 || fabs(old.height - bh) > 0.5) {
-                            ml.drawableSize = CGSizeMake(bw, bh);
-                            NSLog(@"[GLGeo] Task51 heal-align (main thread): drawableSize %.0fx%.0f -> %.0fx%.0f == bounds (landscape signal, same direction as Task52 guard heal)",
-                                  old.width, old.height, bw, bh);
+                        // Task 60：像素口径（bounds x contentsScale）——与
+                        // surface/drawable 全链一致；旧 1x 点数写入会把 2x
+                        // drawableSize 拉回 1x（模糊回归）。
+                        CGFloat sc51 = l.contentsScale;
+                        if (sc51 <= 0.0) sc51 = 1.0;
+                        CGSize tgt51 = CGSizeMake(round(bw * sc51), round(bh * sc51));
+                        if (fabs(old.width - tgt51.width) > 0.5 || fabs(old.height - tgt51.height) > 0.5) {
+                            ml.drawableSize = tgt51;
+                            NSLog(@"[GLGeo] Task51 heal-align (main thread): drawableSize %.0fx%.0f -> %.0fx%.0f == bounds x scale (landscape signal, same direction as Task52 guard heal)",
+                                  old.width, old.height, tgt51.width, tgt51.height);
                         } else {
-                            NSLog(@"[GLGeo] Task51 heal-align: already at bounds %.0fx%.0f (landscape signal in place)", bw, bh);
+                            NSLog(@"[GLGeo] Task51 heal-align: already at bounds x scale %.0fx%.0f (landscape signal in place)", tgt51.width, tgt51.height);
                         }
                     }
                 } @catch (NSException *e) {
@@ -853,9 +863,14 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                         CAMetalLayer *g52_ml = (CAMetalLayer *)g52_l;
                         CGSize g52_old = g52_ml.drawableSize;
                         BOOL g52_heal = ame_gl_surface_transposed();
+                        // Task 60：heal 分支同样用像素口径（bounds x
+                        // contentsScale）——与 present 分支的 surface 像素
+                        // 口径同尺度，避免把 2x drawableSize 拉回 1x。
+                        CGFloat g52_sc = g52_l.contentsScale;
+                        if (g52_sc <= 0.0) g52_sc = 1.0;
                         CGSize g52_target = g52_heal
-                            ? CGSizeMake(MAX(1.0, round(g52_l.bounds.size.width)),
-                                         MAX(1.0, round(g52_l.bounds.size.height)))
+                            ? CGSizeMake(round(MAX(1.0, round(g52_l.bounds.size.width)) * g52_sc),
+                                         round(MAX(1.0, round(g52_l.bounds.size.height)) * g52_sc))
                             : CGSizeMake(g52_sw, g52_sh);
                         if (fabs(g52_old.width - g52_target.width) > 0.5 ||
                             fabs(g52_old.height - g52_target.height) > 0.5) {
@@ -982,8 +997,9 @@ static void ame48_record_creation(CALayer *layer, EGLDisplay dpy, EGLSurface sur
 ///      "Task48 pin" = 逐帧钉扎从未生效）；
 ///   2. 同 layer 二次 eglCreateWindowSurface 恒 EGL_BAD_ALLOC 0x3003；
 ///   3. 钉扎与 updateSavedResolution（旋转时主线程写 2x）互相打架。
-/// Task50 之后几何由"1x 单一事实源"保证一致（gl_init_context 创建时对齐 +
-/// updateSavedResolution GL 分支跟随 bounds），本函数只保留漂移取证。
+/// Task60 之后几何由"原生 scale 像素单一事实源"保证一致（gl_init_context
+/// 创建时对齐 + updateSavedResolution GL 分支跟随 bounds x scale 像素），
+/// 本函数只保留漂移取证（surface vs drawable，同为像素口径）。
 /// ANGLE 会随 layer 自然 resize（622166a 的 surface 转置事件即实证），
 /// 瞬态失配由 Task49 geo-heal blit 兜底（双向 latch，几何恢复即退出）。
 static void ame48_swap_geometry_guard(basic_render_window_t *bundle) {
@@ -1342,10 +1358,10 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
 
     CALayer *layer = SurfaceViewController.surface.layer;
     // ============================================================================
-    // Task 50（黑屏根因修复）：呈现几何单一事实源 —— 1x 点数对齐。
+    // Task 50（黑屏根因修复）→ Task 60（画面模糊根因修复）：呈现几何单一
+    // 事实源 —— 原生 scale 像素对齐。
     //
-    // latestlog 622166a 铁证链（本块取代 Task48 创建钉扎 + Task49 重试环，
-    // 二者被同份日志证明无效且有害）：
+    // 历史（622166a 黑屏时代，本块取代 Task48 创建钉扎 + Task49 重试环）：
     //   1. 全日志 0 条 "Task48 pin"（卫兵逐帧钉扎从未生效）——渲染线程读
     //      layer 属性与主线程心跳读到不同值（CALayer 跨线程状态分叉），
     //      跨线程写 drawableSize 打不进主线程的 CA 提交树；
@@ -1357,22 +1373,29 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     //      而 drawable/viewport 是横屏 2360x1640 —— 600+ 帧 present 尺寸
     //      失配 = 用户看到的全黑。
     //
-    // 根因是结构性的：MC 26.3+SDL3 以"点"回报窗口尺寸（viewport=1180x820），
-    // 而本层 contentsScale=2.0、drawableSize=2360x1640（像素）。MC 的帧只
-    // 覆盖后缓冲左上 25%；方向翻转时 drawable/surface/viewport 各随其主，
-    // 永不重合。
+    // 当年黑屏的结构性根源：三套尺寸（1x 点 viewport / 2x drawable /
+    // ANGLE surface）互相打架。Task50 以 1x 点数对齐终结拉锯——但代价
+    // 是渲染分辨率减半：
+    //   - MC 26.3：surface 1180x820 → MC viewport 跟随 → 半分辨率渲染，
+    //     CA 线性放大 2x = 全屏模糊（5f1df50 真机实测"画面模糊"；
+    //     "MC 像素风格最近邻无损"的假设不成立——CAMetalLayer 默认线性
+    //     过滤，且 MC 26.3 有平滑光照/字体/渐变）；
+    //   - MC 26.2 LWJGL：MC 信念 2360x1640 ≠ surface 1180x820 → Task49
+    //     geo-heal 每帧降采样 blit（双重模糊 + 带宽开销）= 真机实测
+    //     "MG 对 LWJGL 兼容性倒退"（MG 2.0.16 SYMBOL THEFT 警告为无害
+    //     环境诊断——其符号解析不依赖 flat 顺序）。
     //
-    // 修复：把呈现层对齐到 MC 的真实渲染分辨率（点数）：
-    //   contentsScale = 1.0 且 drawableSize = bounds（点）。此后无论 ANGLE
-    //   读 bounds×scale 还是 drawableSize，surface 都 == MC viewport ==
-    //   drawable；CoreAnimation 把 1x 帧最近邻放大到物理屏（MC 像素风格
-    //   下视觉无损）；旋转时三者随 bounds 同步翻转，ANGLE 自然跟随 resize
-    //   （622166a 中 surface 2360x1640→1640x2360 的转置正是 ANGLE 跟随
-    //   layer 的实证——能力一直在，只是此前三套尺寸互相打架）。
-    //   Vulkan 路径不受影响：gl_init_context 只在 GL 路径执行；Vulkan 下
-    //   本标志恒 0，updateSavedResolution 保持旧行为，MoltenVK 自管层。
+    // Task 60 修复（口径已由 Task58 EGL 常量修正 + Task59 输入像素直通
+    // 定案）：对齐到原生 scale 像素——contentsScale = 权威 screen scale
+    //（layer 所属 view 的 window screen，兜底主屏），drawableSize =
+    // bounds × scale（= 2360x1640）。全链像素口径：surface==drawable==
+    // 物理屏像素 1:1 零缩放；launchJVM 告知 MC 的 2360x1640 与 MC 窗口
+    // 信念一致；输入链（Task59 直通）零影响；26.2 LWJGL viewport 2360x1640
+    // == surface → geo-heal blit 自然退出。旋转时 bounds 跟随 → 同步翻转
+    //（ANGLE 具备跟随 layer 几何能力，622166a 转置事件即实证）。
+    //   Vulkan 路径不受影响：gl_init_context 只在 GL 路径执行。
     // ============================================================================
-    // Task50 对齐写 layer 必须发生在主线程：旧代码的致命伤之一就是从渲染线程
+    // Task60 对齐写 layer 必须发生在主线程：旧代码的致命伤之一就是从渲染线程
     // 写 drawableSize（CALayer 跨线程状态分叉：渲染线程读到一套、主线程的
     // CA 提交树另一套——622166a 心跳 drawable=2360x1640 与卫兵读取 1640x2360
     // 的矛盾即其表现）。单一写入者纪律：本块与 updateSavedResolution（主线程，
@@ -1380,38 +1403,50 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     if ([layer isKindOfClass:CAMetalLayer.class]) {
         __block CGSize oldDrawable50 = CGSizeZero;
         __block CGFloat oldScale50 = 0.0;
-        void (^align50)(void) = ^{
-            CAMetalLayer *ml50 = (CAMetalLayer *)layer;
-            CGFloat w50 = MAX(1.0, round(layer.bounds.size.width));
-            CGFloat h50 = MAX(1.0, round(layer.bounds.size.height));
-            oldDrawable50 = ml50.drawableSize;
+        void (^align60)(void) = ^{
+            CAMetalLayer *ml60 = (CAMetalLayer *)layer;
+            CGFloat w60 = MAX(1.0, round(layer.bounds.size.width));
+            CGFloat h60 = MAX(1.0, round(layer.bounds.size.height));
+            // Task 60：权威 scale —— layer 所属 view 的 window screen
+            //（外接屏正确），兜底主屏，再兜底 1.0。与 Task59 输入链的
+            // screenScale 同源；resolutionScale 语义由宿主
+            // updateSavedResolution 负责（此处创建时以原生 scale 钉齐）。
+            CGFloat scale60 = 0.0;
+            UIView *v60 = (UIView *)layer.delegate;  // CALayer.delegate == owning UIView
+            if (v60 != nil && v60.window != nil && v60.window.screen != nil) {
+                scale60 = v60.window.screen.scale;
+            }
+            if (scale60 <= 0.0) scale60 = UIScreen.mainScreen.scale;
+            if (scale60 <= 0.0) scale60 = 1.0;
+            oldDrawable50 = ml60.drawableSize;
             oldScale50 = layer.contentsScale;
-            layer.contentsScale = 1.0;
-            ml50.drawableSize = CGSizeMake(w50, h50);
+            layer.contentsScale = scale60;
+            ml60.drawableSize = CGSizeMake(round(w60 * scale60), round(h60 * scale60));
         };
         if ([NSThread isMainThread]) {
-            align50();
+            align60();
         } else {
             // gl_init_context 运行于 JVM 渲染线程；此刻主线程处于空闲 runloop
             // （launchJVM 在后台线程，主线程无任何等待渲染线程的锁——同窗口期
             // ame_embedSDLViewIntoHost 的 dispatch_sync 已在设备上验证安全）。
-            dispatch_sync(dispatch_get_main_queue(), align50);
+            dispatch_sync(dispatch_get_main_queue(), align60);
         }
-        NSLog(@"[GLGeo] Task50 1x alignment (main thread): bounds=%.0fx%.0f drawableSize %.0fx%.0f scale %.2f -> drawableSize %.0fx%.0f scale 1.00 (surface==viewport==drawable, single source of truth)",
+        NSLog(@"[GLGeo] Task60 native-scale alignment (main thread): bounds=%.0fx%.0f drawableSize %.0fx%.0f scale %.2f -> drawableSize %.0fx%.0f scale %.2f (surface==drawable==physical px; Task50 1x retired -- CA linear 2x upscale was the blur)",
               layer.bounds.size.width, layer.bounds.size.height,
               oldDrawable50.width, oldDrawable50.height, oldScale50,
-              MAX(1.0, round(layer.bounds.size.width)),
-              MAX(1.0, round(layer.bounds.size.height)));
+              layer.bounds.size.width * layer.contentsScale,
+              layer.bounds.size.height * layer.contentsScale,
+              (double)layer.contentsScale);
     }
     // MobileGL 的 eglCreateWindowSurface 不会从 CALayer 推断尺寸，必须显式给出
-    // 宽高（读取已对齐 1x 的 layer，与 drawableSize 保持一致），否则 surface 会按
-    // 1x1 创建，进世界后画面异常。其余渲染器从 layer 自行推断，传 NULL。
+    // 宽高（读取已对齐原生 scale 的 layer，与 drawableSize 保持一致），否则 surface
+    // 会按 1x1 创建，进世界后画面异常。其余渲染器从 layer 自行推断，传 NULL。
     const EGLint mobileGLSurfaceAttribs[] = {
         EGL_WIDTH, (EGLint)MAX(1.0, round(layer.bounds.size.width * layer.contentsScale)),
         EGL_HEIGHT, (EGLint)MAX(1.0, round(layer.bounds.size.height * layer.contentsScale)),
         EGL_NONE
     };
-    // 单次创建（无重试环）：1x 对齐后 ANGLE 无论读 bounds×scale 还是
+    // 单次创建（无重试环）：原生 scale 对齐后 ANGLE 无论读 bounds×scale 还是
     // drawableSize 都得到与 MC viewport 相同的尺寸，无需执法。
     bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
         (__bridge EGLNativeWindowType)layer, mobileGL ? mobileGLSurfaceAttribs : NULL);
@@ -1446,7 +1481,7 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         // 供 ame48_swap_geometry_guard 逐帧自愈使用。
         ame48_record_creation(layer, g_EglDisplay, bundle->surface);
         // Task 50：GL 拥有呈现层（跨线程标志）——此后主线程
-        // updateSavedResolution 走 1x 对齐分支（bounds 跟随旋转）。
+        // updateSavedResolution 走原生 scale 对齐分支（bounds x scale 跟随旋转）。
         atomic_store(&g_ame50_gl_owns_layer, 1);
     }
 
