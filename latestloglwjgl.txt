@@ -1,0 +1,1286 @@
+[shaderc-sandbox] fork() failed errno=1 -- sandbox disabled (iOS sandbox denies fork on this install?)
+[Pre-Init] Amethyst iOS Remastered INIT!
+[Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
+[Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
+[Pre-Init] Version: 5.0.0
+[Pre-Init] Commit: 5f1df50 (main)
+[Pre-Init] Device: iPad Air 11-inch (M4)
+[Pre-Init] iPadOS 26.6 (23G71) (Unjailbroken)
+[Pre-init] Entitlements availability:
+* com.apple.developer.kernel.extended-virtual-addressing: NO
+* com.apple.developer.kernel.increased-memory-limit: YES
+* com.apple.private.security.no-sandbox: NO
+* jb.pmap_cs.custom_trust: NO
+* dynamic-codesigning: NO
+[Debugging] Debug log enabled: YES
+[Pre-init] Restored game directory preference (default)
+[SceneDelegate] Failed to update geometry: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
+[SceneDelegate] Terracotta temporarily disabled for crash investigation
+[IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Library/Caches/IconLoader, mirror enabled: YES
+[LauncherRootVC] Loaded 915 remote versions
+[DownloadTaskManager] updateTaskWithId:stageAtIndex:rate: invalid stage index 3 for task BE6FD872-E10A-423E-ACA1-D257B8F42B74
+[DownloadTaskManager] updateTaskWithId:stageAtIndex:rate: invalid stage index 4 for task BE6FD872-E10A-423E-ACA1-D257B8F42B74
+[MCDL] SHA1 failed for 26.2.json (expected: bc42e43dfe43d65a2f6c2c1dbb322c75134e51fe, got: ef815ab76bce3f1a4c2d7fe712527304923bbe3a)
+[MCDL] Downloading 26.2.json
+[MCDL] SHA1 passed for 26.2.json
+[MCDL] Replacing JNA 5.17.0 with 5.13.0 for iOS compatibility (required by 26.2)
+[MCDL] SHA1 failed for assets/indexes/32.json (expected: 2293e7186d4483016d6b938ea9aabe300e8a29be, got: c12254a593cdebaf8e8102250a71d8f40124a0b5)
+[MCDL] Downloading assets/indexes/32.json
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-vulkan:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-vulkan:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-vulkan:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:unsafe
+[MCDL] Downloading minecraft/resourcepacks/high_contrast.zip
+[MCDL] Downloading minecraft/resourcepacks/programmer_art.zip
+[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=0 trollStore=0 CS_DEBUGGED=0 ppid=1 traced=0 exn=0 JIT_FLAGS=0x7
+[IconLoader] App entered background: cancelled all ongoing downloads
+[SurfaceViewController] FPS counter setup: profileRenderer=libmobileglues.dylib, envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
+[SurfaceVC] CAMetalLayer configured: drawableSize=2360x1640, maximumDrawableCount=3, presentsWithTransaction=0, drawsAsynchronously=1, contentsScale=2.00
+[TouchController] Sender ready on port 12450
+[SurfaceViewController] Launching Minecraft with accountId: EEA76071-D34E-4283-AD78-4BA7B4C4750C, version: 25, size: 2360x1640
+[JavaLauncher] Beginning JVM launch
+[JavaLauncher] MoltenVK performance tracking + IMMEDIATE present mode requested for VSync diagnosis
+[JavaLauncher] Framerate unlock configuration:
+[JavaLauncher]   video.disable_game_vsync=1
+[JavaLauncher]   POJAV_DISABLE_VSYNC=1
+[JavaLauncher]   UIScreen.maximumFramesPerSecond=60
+[JavaLauncher] Reading custom environment variables
+[JavaLauncher] Warning: skipped empty value custom env variable: 
+[DyldLVBypass] TXM debug JIT mapping active — keeping debugger attached for dyld bypass
+[DyldLVBypass] init
+[DyldLVBypass] Using redirectFunctionMirrored
+[DyldLVBypass] found dyld_mmap at 0x19c8ffc34
+[DyldLVBypass] hook dyld_mmap succeed!
+[DyldLVBypass] found dyld_fcntl at 0x19c906910
+[DyldLVBypass] hook dyld_fcntl succeed!
+[JavaLauncher] init_loadMobileGluesConfig: renderer=libmobileglues.dylib
+[JavaLauncher] MobileGlues renderer detected, config will take effect.
+[JavaLauncher]   mobileglues.enable_angle = 0 -> enableANGLE = 0 (3=ForceEnable, 0=DisableIfPossible)
+[JavaLauncher]   mobileglues.enable_no_error = 0 -> enableNoError = 0
+[JavaLauncher]   mobileglues.enable_ext_timer_query = 1 -> enableExtTimerQuery = 1
+[JavaLauncher]   mobileglues.enable_ext_compute_shader = 0 -> enableExtComputeShader = 0
+[JavaLauncher]   mobileglues.enable_ext_direct_state_access = 0 -> enableExtDirectStateAccess = 0
+[JavaLauncher]   mobileglues.max_glsl_cache_size = 32 -> maxGlslCacheSize = 32
+[JavaLauncher]   mobileglues.multidraw_mode = 0 -> multidrawMode = 0
+[JavaLauncher]   mobileglues.angle_depth_clear_fix_mode = 0 -> angleDepthClearFixMode = 0
+[JavaLauncher]   mobileglues.custom_gl_version = 0 (raw)
+[JavaLauncher]   -> customGLVersion = 40 (decimal, MobileGlues Version(int) format)
+[JavaLauncher]   mobileglues.fsr1_setting = 0 -> fsr1Setting = 0
+[JavaLauncher] MobileGlues config written to /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/MG/config.json
+[JavaLauncher] config.json content:
+{
+  "multidrawMode" : 0,
+  "fsr1Setting" : 0,
+  "maxGlslCacheSize" : 32,
+  "enableANGLE" : 0,
+  "enableExtDirectStateAccess" : 0,
+  "customGLVersion" : 40,
+  "enableExtTimerQuery" : 1,
+  "enableExtComputeShader" : 0,
+  "enableNoError" : 0,
+  "angleDepthClearFixMode" : 0
+}
+[PLProfiles] Applying javaVersion (25)
+[JavaLauncher] RENDERER is set to libmobileglues.dylib
+[JavaLauncher] GRAPHICS_API is set to default
+[JavaLauncher] Looking for Java 25 or later
+[JavaLauncher] JAVA_HOME has been set to /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk
+[JavaLauncher] Max RAM allocation is set to 2967 MB
+[JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks
+[JavaLauncher] Published Metallum surface view: 0x11236a4c0 (scale=2)
+[JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
+[JavaLauncher] JVM GC optimization: G1GC + MaxGCPauseMillis=50 + StringDeduplication (Java 17+)
+[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[JavaLauncher] Caciocavallo: isJava8=0 libs=libs_caciocavallo17 mode=/a
+[JavaLauncher] Reading custom JVM flags
+[Init] Found JLI lib
+[JavaLauncher] Using LWJGL 341 (mcVersion=26.2)
+[JavaLauncher] Using LWJGL jar at /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/libs/lwjgl-341/lwjgl.jar
+[Init] Calling JLI_Launch
+[PLDisplayLinkTarget] displayLinkTick #2 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+OpenJDK 64-Bit Server VM warning: Option UseCompressedClassPointers was deprecated in version 25.0 and will likely be removed in a future release.
+[PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[JIT26] Requesting 64 MB for JIT mapping
+[JIT26] Got JIT mapping 0x15f66c000 from debugger
+[JIT26] mapping at RW=0x16366c000, RX=0x15f66c000
+WARNING: Unknown module: cpw.mods.bootstraplauncher specified to --add-exports
+WARNING: package sun.security.action not in java.base
+PatchJNAAgent: premain called
+Arc Capes DNS Injector
+Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
+Added DNS cache entry: s.optifine.net/23.95.137.176
+[PojavLauncher] VSync disabled, maxFps/maxFramerate/framerateLimit set to 260
+[PojavLauncher]   enableVsync=false
+[PojavLauncher]   maxFps=260
+[PojavLauncher]   maxFramerate=260
+[PojavLauncher]   framerateLimit=260
+[PojavLauncher]   inactivityFpsLimit=minimized
+[PojavLauncher] MC 26.2+ graphicsApi cleared (default)
+Launching Minecraft 26.2
+[PojavLauncher] Using fallback log4j config: /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/log4j-rce-patch-1.12.xml
+[Tools] Replacing JNA 5.17.0 with 5.13.0 for iOS compatibility
+Args init finished. Now starting game
+[shaderc-shim] impl loaded via @loader_path/libshaderc_impl.dylib
+[shaderc-shim] impl base = 0x129800000 (shaderc_compiler_initialize @ 0x129804000, image offset 0x4000)
+[shaderc-shim] impl base = 0x129800000 (_ZN7glslang17InitializeProcessEv @ 0x1298c2390, image offset 0xc2390)
+[shaderc-shim] impl base = 0x129800000 (_ZN7glslang15FinalizeProcessEv @ 0x1298c23f8, image offset 0xc23f8)
+Initializing MobileGlues ...
+The Open Source License of MobileGlues: 
+  GNU LGPL-2.1 License
+MG_DIR_PATH = /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/MG
+config.json loaded successfully
+[MobileGlues] Setting: enableAngle                 = false
+[MobileGlues] Setting: ignoreError                 = 0
+[MobileGlues] Setting: enableExtComputeShader      = false
+[MobileGlues] Setting: enableExtTimerQuery         = true
+[MobileGlues] Setting: enableExtDirectStateAccess  = false
+[MobileGlues] Setting: maxGlslCacheSize            = 32
+[MobileGlues] Setting: angleDepthClearFixMode      = 0
+[MobileGlues] Setting: bufferCoherentAsFlush       = 0
+[MobileGlues] Setting: customGLVersion             = 4.0.0
+[MobileGlues] Setting: fsr1Setting                 = 0
+[MobileGlues] Setting: hideMGEnvLevel              = 0
+[spvc-shim] impl loaded via @loader_path/libspirv-cross-c-shared.0.impl.dylib
+[InputDiag] initSDLEventFuncs: PushEvent=0x0 GetWindowID=0x0 g_sdlWindow=0x0
+[JNI] JNI_OnLoadGLFW registered, class=0x1051ffa3a, method=0x128ed4cc8, keyDownBuffer=0x14e122bc0
+PatchJNAAgent: Replacing class
+Platform.isMac called from com.sun.jna.Native
+Platform.isMac called from com.sun.jna.Native
+Platform.isMac called from com.sun.jna.NativeLibrary
+Platform.isMac called from com.sun.jna.NativeLibrary
+[18:13:22] [main/WARN]: Failed sysctl call: hw.packages, Error code: 1
+Platform.isMac called from com.sun.jna.NativeLibrary
+Platform.isMac called from com.sun.jna.NativeLibrary
+Platform.isMac called from com.sun.jna.NativeLibrary
+Platform.isMac called from com.sun.jna.NativeLibrary
+Platform.isMac called from com.sun.jna.NativeLibrary
+Platform.isMac called from com.sun.jna.NativeLibrary
+[input_bridge] Blocked fork/exec of 'sysctl' (iOS sandbox forbids fork/exec)
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.brand_string, Error code: 1
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.vendor, Error code: 2
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.stepping, Error code: 2
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.model, Error code: 2
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.family, Error code: 2
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.signature, Error code: 2
+[18:13:22] [main/WARN]: Failed sysctl call: machdep.cpu.feature_bits, Error code: 2
+[input_bridge] Blocked fork/exec of 'system_profiler' (iOS sandbox forbids fork/exec)
+[input_bridge] Blocked fork/exec of 'system_profiler' (iOS sandbox forbids fork/exec)
+[18:13:22] [main/WARN]: Failed sysctl call: vm.swapusage, Error code: 1
+[input_bridge] Blocked fork/exec of 'id' (iOS sandbox forbids fork/exec)
+[18:13:22] [main/WARN]: Failed sysctl call: kern.argmax, Error code: 1
+[18:13:22] [Datafixer Bootstrap #0/INFO]: 295 Datafixer optimizations took 211 milliseconds
+[18:13:24] [Render thread/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[18:13:24] [Render thread/INFO]: Setting user: yiqiu4178
+[18:13:24] [Render thread/INFO]: Backend library: LWJGL version 3.4.1
+[MG-Bridge] MobileGlues frontend image loaded (0x8b5a82a0, mg_init_gles=0x12b64f7a0); lifecycle EGL will route through it after bootstrap
+[egl_bridge] pojavCreateContext: clientAPI=196609 (GLFW_NO_API=0), renderer=libmobileglues.dylib, graphicsApi=default
+[egl_bridge] OpenGL path: creating EGL/GL context via br_init_context
+mg_init_gles: loading GL ES function pointers (Apple platform)
+
+[MG] mg_init_gles: GL ES table pinned to real ANGLE libGLESv2 via @executable_path/Frameworks/libGLESv2.framework/libGLESv2
+OpenGL ES Version: OpenGL ES 3.0.0 (300)
+Not Detected GL_EXT_multi_draw_indirect!
+Enable-capability extensions: multisample_compatibility=0 clip_cull_distance=0 depth_clamp=1 sRGB_write_control=0 NV_polygon_mode=0 OES_sample_shading=0
+[MG] GLES ptr glShaderSource <- /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks/libGLESv2.framework/libGLESv2
+[MG] GLES ptr glCompileShader <- /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks/libGLESv2.framework/libGLESv2
+[MG] GLES ptr glGetString <- /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks/libGLESv2.framework/libGLESv2
+[MG] GLES ptr glCreateShader <- /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks/libGLESv2.framework/libGLESv2
+multidrawMode/multidrawDisableBackends are no longer used. The selection is an order now: multidrawOrder (global, backend names best first, may contain "native") and multidrawOrder<EntryPoint> for per-function exceptions.
+multidrawModeArrays is no longer used; see multidrawOrder / multidrawOrderArrays
+[MobileGlues] multidrawOrderArrays               = unroll
+[MobileGlues] multidrawOrderElements             = unroll
+[MobileGlues] multidrawOrderElementsBaseVertex   = unroll
+glMultiDrawArraysIndirect: no backend in the order is available on this device; keeping multiindirect
+[MobileGlues] multidrawOrderArraysIndirect       = multiindirect
+glMultiDrawElementsIndirect: no backend in the order is available on this device; keeping multiindirect
+[MobileGlues] multidrawOrderElementsIndirect     = multiindirect
+mg_init_gles: done (2936 GL ES functions resolved)
+
+[MG-Bridge] bootstrap: mg_init_gles complete under throwaway ES context (GLES/ANGLE handles bound, caps detected)
+[MG-Bridge] EGL lifecycle routed through MobileGlues frontend (MGContext tracking + presentSurface active)
+EGLBridge: Binding to OpenGL ES
+[GLGeo] Task50 1x alignment (main thread): bounds=1180x820 drawableSize 2360x1640 scale 2.00 -> drawableSize 1180x820 scale 1.00 (surface==viewport==drawable, single source of truth)
+[RenderDiag] EGL window surface created: surface=0x1 layer=0x126356f40 bounds=1180x820 contentsScale=1.00 drawableSize=1180x820 ownerInWindow=1
+[RenderDiag] eglQuerySurface: 1180x820
+[RenderDiag] Task41 ES probe pinned to @executable_path/Frameworks/libGLESv2.framework/libGLESv2
+[GLGeo] Task48 creation recorded: layer=0x126356f40 expectedSurface=1180x820
+[MG-Bridge] eglMakeCurrent via frontend OK (ctx=0x2) -- MGContext tracked, per-context state bound
+[gl_bridge] mg_init_gles() called after eglMakeCurrent
+[gl_bridge] eglSwapInterval(0) set immediately after eglMakeCurrent (POJAV_DISABLE_VSYNC=1, renderer=libmobileglues.dylib)
+[MG] 2.0.16 own-image resolution: handle for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks/libmobileglues.dylib
+[MG] SYMBOL THEFT: flat namespace resolves glFramebufferTexture2D to 0x25cd79610, this layer's export is 0x12b66c338 -- the application is calling someone else for this function
+[MG] SYMBOL THEFT: flat namespace resolves glTexImage2D to 0x25cd79118, this layer's export is 0x12b673b40 -- the application is calling someone else for this function
+[MG] SYMBOL THEFT: flat namespace resolves glDrawArrays to 0x25cd78750, this layer's export is 0x12b67b824 -- the application is calling someone else for this function
+[18:13:24] [Render thread/INFO]: Using graphics backend OpenGL, using drivers: 4.0.0 MobileGlues 2.0.17
+[18:13:24] [Render thread/INFO]: Using graphics device: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 26.6 (Build 23G71)) | OpenGL ES 3.0.0 (Swung0x48, BZLZHH, Tungsten)
+[18:13:24] [Render thread/INFO]: Using graphics device extensions: 
+[18:13:24] [Download-2/ERROR]: Failed to fetch user properties
+com.mojang.authlib.exceptions.InvalidCredentialsException: Status: 401
+	at com.mojang.authlib.exceptions.MinecraftClientHttpException.toAuthenticationException(MinecraftClientHttpException.java:70)
+	at com.mojang.authlib.yggdrasil.YggdrasilUserApiService.fetchProperties(YggdrasilUserApiService.java:173)
+	at net.minecraft.client.Minecraft.lambda$new$1(Minecraft.java:438)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+Caused by: MinecraftClientHttpException[type=HTTP_ERROR, status=401, response=ErrorResponse[path=/player/attributes, error=null, errorMessage=null, details=null]]
+	at com.mojang.authlib.minecraft.client.MinecraftClient.buildHttpException(MinecraftClient.java:170)
+	at com.mojang.authlib.minecraft.client.MinecraftClient.readServiceResponse(MinecraftClient.java:147)
+	at com.mojang.authlib.minecraft.client.MinecraftClient.getWithEtag(MinecraftClient.java:81)
+	at com.mojang.authlib.minecraft.client.MinecraftClient.get(MinecraftClient.java:65)
+	at com.mojang.authlib.yggdrasil.YggdrasilUserApiService.fetchProperties(YggdrasilUserApiService.java:123)
+	... 5 more
+[MG] depth alloc #1: GL_DEPTH_COMPONENT32F 2360x1640, shadow tex 7, driver-bound tex 7, upload err 0x0, depth bits -1
+[MG] depth alloc #2: GL_DEPTH_COMPONENT32F 2360x1640, shadow tex 8, driver-bound tex 8, upload err 0x0, depth bits -1
+[MG] amethyst master compile lock negotiated (shaderc/spvc/MG full serialization)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=517, head='#version 330
+
+// Can't moj_import in things used during startup, when resource packs don't exist')
+GLSL parse OK (glslver=330)
+[MG] Shader 1 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=455, head='#version 330
+
+// Can't moj_import in things used during startup, when resource packs don't exist')
+GLSL parse OK (glslver=330)
+[MG] Shader 2 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=571, head='#version 330
+
+// Can't moj_import in things used during startup, when resource packs don't exist')
+GLSL parse OK (glslver=330)
+[MG] Shader 4 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=534, head='#version 330
+
+// Can't moj_import in things used during startup, when resource packs don't exist')
+GLSL parse OK (glslver=330)
+[MG] Shader 5 converted OK (glslver=330 -> essl ver=300)
+[18:13:24] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[InputDiag] pojavPumpEvents: isInputReady set to YES, showingWindow=0x10500cf80
+[InputDiag] pojavPumpEvents #1: window=0x10500cf80 GLFW_invoke_Key=0x107b800f0 GLFW_invoke_CursorPos=0x107b800b0 GLFW_invoke_Char=0x107b80100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[egl_bridge] shaderc quiescence signal acquired -- first-present gate armed (Task 39)
+[egl_bridge] First swap attempted, removing launch overlay (present confirmation: [RenderDiag] first eglSwapBuffers OK)
+[GLGeo] Task58 query constants corrected: surface=1180x820 viewport=2360x1640 (EGL_WIDTH=0x3057/EGL_HEIGHT=0x3056 per egl.h; legacy probe read them swapped since Task41)
+[GLGeo] Task57 render-thread layer read (split-brain probe): bounds=1180x820 drawable=1180x820 scale=1.00 sublayers=0 surface=1180x820 (对照主线程心跳: bounds/drawable 恒 1180x820)
+[GLGeo] Task55 realign: attempt 1/3 (gradient A geometry-signal -> B deferred-recreate -> C transpose-roundtrip)
+[GLGeo] Task55 realign stepA: drawableSize=bounds + bounds nudge + 2 main turns (no destroy)
+[GLGeo] Task55 realign CURED by stepA: query=1180x820 == bounds 1180x820 (ANGLE follows layer geometry; transposed lock released)
+[RenderDiag] Task55 realign applied: viewport=2360x1640 surface=1180x820 (mode reset; expect NORMAL latch next frame)
+[RenderDiag] swap#1 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=24 err=0x0) fbo0vp=(uniq=1 corner=1 err=0x0) mode=0
+[GLGeo] Task51 hierarchy #1: layer=0x126356f40 drawable=1180x820 scale=1.00 surface=1180x820 inTree=1 chain= -> [CAMetalLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1210x820 pos=(605,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [UIWindowLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [_UIWindowTransformLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [_UIWindowTransformLayer 1180x820 pos=(590,410) hid=0 op=1.00]
+[RenderDiag] first eglSwapBuffers OK surface=0x1 (presentation path confirmed)
+[InputDiag] pojavPumpEvents #2: window=0x10500cf80 GLFW_invoke_Key=0x107b800f0 GLFW_invoke_CursorPos=0x107b800b0 GLFW_invoke_Char=0x107b80100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[GLGeo] Task57 render-thread layer read (split-brain probe): bounds=1180x820 drawable=1180x820 scale=1.00 sublayers=0 surface=1180x820 (对照主线程心跳: bounds/drawable 恒 1180x820)
+[RenderDiag] Task49 geo mismatch ENGAGED: viewport=2360x1640 surface=1180x820 (was mode=0) -- frame covers only 400% of backbuffer
+[GLGeo] Task51 heal-align: already at bounds 1180x820 (landscape signal in place)
+[RenderDiag] swap#2 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=26 err=0x0) fbo0vp=(uniq=1 corner=1 err=0x0) mode=2
+[RenderDiag] Task49 scratch FBO ready 1180x820
+[RenderDiag] geo-heal blit #1 (Task49): srcFb=0 2360x1640 -> scratch 1180x820 -> FBO0 1180x820 blitErr=0x0
+[InputDiag] pojavPumpEvents #3: window=0x10500cf80 GLFW_invoke_Key=0x107b800f0 GLFW_invoke_CursorPos=0x107b800b0 GLFW_invoke_Char=0x107b80100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[RenderDiag] swap#3 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=26 err=0x0) fbo0vp=(uniq=1 corner=1 err=0x0) mode=2
+[RenderDiag] geo-heal blit #2 (Task49): srcFb=0 2360x1640 -> scratch 1180x820 -> FBO0 1180x820 blitErr=0x0
+[InputDiag] pojavPumpEvents #4: window=0x10500cf80 GLFW_invoke_Key=0x107b800f0 GLFW_invoke_CursorPos=0x107b800b0 GLFW_invoke_Char=0x107b80100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[RenderDiag] swap#4 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=26 err=0x0) fbo0vp=(uniq=1 corner=1 err=0x0) mode=2
+[RenderDiag] geo-heal blit #3 (Task49): srcFb=0 2360x1640 -> scratch 1180x820 -> FBO0 1180x820 blitErr=0x0
+[InputDiag] pojavPumpEvents #5: window=0x10500cf80 GLFW_invoke_Key=0x107b800f0 GLFW_invoke_CursorPos=0x107b800b0 GLFW_invoke_Char=0x107b80100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[RenderDiag] swap#5 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=26 err=0x0) fbo0vp=(uniq=1 corner=1 err=0x0) mode=2
+[18:13:25] [Download-1/INFO]: Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: 0
+[18:13:25] [Download-1/ERROR]: Failed to fetch Realms feature flags
+com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: 0'
+	at com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:528)
+	at com.mojang.realmsclient.client.RealmsClient.fetchFeatureFlags(RealmsClient.java:187)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+[18:13:25] [Worker-Main-2/INFO]: Found unifont_pua-17.0.01.hex, loading
+[18:13:25] [Worker-Main-4/INFO]: Found unifont_all_no_pua-17.0.01.hex, loading
+[18:13:25] [Worker-Main-1/INFO]: Found unifont_jp_patch-17.0.01.hex, loading
+[SurfaceViewController] Launch overlay dismissed after 4.4 seconds
+[RenderDiag] fps=33 swapOK=33 swapFail=0 mem=924MB layer=0x126356f40 drawable=1180x820 scale=1.00 bounds=1180x820 inWindow=1
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2759, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 1 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2254, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 2 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3862, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+#define MINECRAFT_L')
+GLSL parse OK (glslver=330)
+[MG] Shader 6 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2478, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 8 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2544, head='#version 330
+#define PORTAL_LAYERS 15
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 10 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3853, head='#version 330
+#define PORTAL_LAYERS 15
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 11 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2383, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 13 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2016, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 14 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 16 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 17 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2499, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 19 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2235, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 20 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4714, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define EMISSIVE
+#define NO_OVERLAY
+#define NO_CARDINAL_LI')
+GLSL parse OK (glslver=330)
+[MG] Shader 22 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3225, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define EMISSIVE
+#define NO_OVERLAY
+#define NO_CARDINAL_LI')
+GLSL parse OK (glslver=330)
+[MG] Shader 23 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=213, head='#version 330
+
+out vec2 texCoord;
+
+void main() {
+    vec2 uv = vec2((gl_VertexID << 1) & 2, gl_Ve')
+GLSL parse OK (glslver=330)
+[MG] Shader 25 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2100, head='#version 330
+
+layout(std140) uniform LightmapInfo {
+    float SkyFactor;
+    float BlockFactor;
+')
+GLSL parse OK (glslver=330)
+[MG] Shader 26 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3062, head='#version 330
+#define IS_GUI
+#define IS_GRAYSCALE
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_')
+GLSL parse OK (glslver=330)
+[MG] Shader 29 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2731, head='#version 330
+#define IS_GUI
+#define IS_GRAYSCALE
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_')
+GLSL parse OK (glslver=330)
+[MG] Shader 30 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4646, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define PER_FACE_LIGHTING
+#line 1 0
+
+#if defined(PER_FACE_')
+GLSL parse OK (glslver=330)
+[MG] Shader 32 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3157, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define PER_FACE_LIGHTING
+#line 1 0
+
+#line 0 1
+/*#version ')
+GLSL parse OK (glslver=330)
+[MG] Shader 33 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3016, head='#version 330
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+#line 0 1
+/*#version 330*/
+
+layou')
+GLSL parse OK (glslver=330)
+[MG] Shader 35 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2685, head='#version 330
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+#line 0 1
+/*#version 330*/
+
+layou')
+GLSL parse OK (glslver=330)
+[MG] Shader 36 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3586, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 38 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2127, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 39 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4663, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define EMISSIVE
+#define PER_FACE_LIGHTING
+#line 1 0
+
+#if ')
+GLSL parse OK (glslver=330)
+[MG] Shader 41 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3174, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define EMISSIVE
+#define PER_FACE_LIGHTING
+#line 1 0
+
+#lin')
+GLSL parse OK (glslver=330)
+[MG] Shader 42 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=666, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 44 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=368, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 45 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3047, head='#version 330
+#define IS_GRAYSCALE
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+#l')
+GLSL parse OK (glslver=330)
+[MG] Shader 47 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2716, head='#version 330
+#define IS_GRAYSCALE
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+#l')
+GLSL parse OK (glslver=330)
+[MG] Shader 48 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=720, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 50 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2496, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 51 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3049, head='#version 330
+#define IS_SEE_THROUGH
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+')
+GLSL parse OK (glslver=330)
+[MG] Shader 53 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2718, head='#version 330
+#define IS_SEE_THROUGH
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+')
+GLSL parse OK (glslver=330)
+[MG] Shader 54 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2860, head='#version 330
+#define IS_SEE_THROUGH
+#line 1 0
+
+#ifndef IS_SEE_THROUGH
+#line 0 1
+/*#version 330*/')
+GLSL parse OK (glslver=330)
+[MG] Shader 56 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2412, head='#version 330
+#define IS_SEE_THROUGH
+#line 1 0
+
+#ifndef IS_SEE_THROUGH
+#line 0 1
+/*#version 330*/')
+GLSL parse OK (glslver=330)
+[MG] Shader 57 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3073, head='#version 330
+#define ALPHA_CUTOUT 0.5
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 59 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=5266, head='#version 330
+#define ALPHA_CUTOUT 0.5
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 60 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=602, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 62 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=259, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 63 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 65 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 66 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4620, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#if defined(PER_FACE_LIGHTING) || !defined(NO_C')
+GLSL parse OK (glslver=330)
+[MG] Shader 72 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3131, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 73 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=658, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 75 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=412, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 76 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2727, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 79 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=1927, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 80 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3038, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 82 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=5231, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 83 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2445, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 87 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2109, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 88 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4639, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define NO_OVERLAY
+#line 1 0
+
+#if defined(PER_FACE_LIGHTIN')
+GLSL parse OK (glslver=330)
+[MG] Shader 90 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3150, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define NO_OVERLAY
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+')
+GLSL parse OK (glslver=330)
+[MG] Shader 91 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2818, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 95 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2325, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 96 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4663, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define PER_FACE_LIGHTING
+#define DISSOLVE
+#line 1 0
+
+#if ')
+GLSL parse OK (glslver=330)
+[MG] Shader 99 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3174, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define PER_FACE_LIGHTING
+#define DISSOLVE
+#line 1 0
+
+#lin')
+GLSL parse OK (glslver=330)
+[MG] Shader 100 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4660, head='#version 330
+#define EMISSIVE
+#define NO_OVERLAY
+#define NO_CARDINAL_LIGHTING
+#line 1 0
+
+#if def')
+GLSL parse OK (glslver=330)
+[MG] Shader 102 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3171, head='#version 330
+#define EMISSIVE
+#define NO_OVERLAY
+#define NO_CARDINAL_LIGHTING
+#line 1 0
+
+#line 0')
+GLSL parse OK (glslver=330)
+[MG] Shader 103 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=146, head='#version 330
+
+uniform sampler2D InSampler;
+
+in vec2 texCoord;
+
+out vec4 fragColor;
+
+void main() ')
+GLSL parse OK (glslver=330)
+[MG] Shader 105 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2783, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 107 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2290, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 108 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4614, head='#version 330
+#define NO_OVERLAY
+#line 1 0
+
+#if defined(PER_FACE_LIGHTING) || !defined(NO_CARDINA')
+GLSL parse OK (glslver=330)
+[MG] Shader 110 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3125, head='#version 330
+#define NO_OVERLAY
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fo')
+GLSL parse OK (glslver=330)
+[MG] Shader 111 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2513, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 113 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2273, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 114 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 117 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=471, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 118 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=779, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform SpriteAnimationInfo {
+    mat4 ')
+GLSL parse OK (glslver=330)
+[MG] Shader 124 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=572, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform SpriteAnimationInfo {
+    mat4 ')
+GLSL parse OK (glslver=330)
+[MG] Shader 125 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=726, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 127 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 128 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2544, head='#version 330
+#define PORTAL_LAYERS 16
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 130 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3853, head='#version 330
+#define PORTAL_LAYERS 16
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 131 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=933, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Globals {
+    ivec3 CameraBlock')
+GLSL parse OK (glslver=330)
+[MG] Shader 134 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4665, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define NO_OVERLAY
+#define PER_FACE_LIGHTING
+#line 1 0
+
+#i')
+GLSL parse OK (glslver=330)
+[MG] Shader 139 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3176, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define NO_OVERLAY
+#define PER_FACE_LIGHTING
+#line 1 0
+
+#l')
+GLSL parse OK (glslver=330)
+[MG] Shader 140 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2471, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 142 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2497, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 143 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2818, head='#version 330
+#define ALPHA_CUTOUT 0.5
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 146 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2325, head='#version 330
+#define ALPHA_CUTOUT 0.5
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 147 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3073, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 149 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=5266, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#line 1 0
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) unif')
+GLSL parse OK (glslver=330)
+[MG] Shader 150 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4697, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define APPLY_TEXTURE_MATRIX
+#define NO_OVERLAY
+#define NO')
+GLSL parse OK (glslver=330)
+[MG] Shader 154 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3208, head='#version 330
+#define ALPHA_CUTOUT 0.1
+#define APPLY_TEXTURE_MATRIX
+#define NO_OVERLAY
+#define NO')
+GLSL parse OK (glslver=330)
+[MG] Shader 155 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3041, head='#version 330
+#define IS_GUI
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+#line 0 ')
+GLSL parse OK (glslver=330)
+[MG] Shader 157 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2710, head='#version 330
+#define IS_GUI
+#line 1 0
+
+#if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
+#line 0 ')
+GLSL parse OK (glslver=330)
+[MG] Shader 158 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=380, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform SpriteAnimationInfo {
+    mat4 ')
+GLSL parse OK (glslver=330)
+[MG] Shader 160 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3070, head='#version 330
+#define IS_GRAYSCALE
+#define IS_SEE_THROUGH
+#line 1 0
+
+#if !defined(IS_GUI) && !def')
+GLSL parse OK (glslver=330)
+[MG] Shader 162 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2739, head='#version 330
+#define IS_GRAYSCALE
+#define IS_SEE_THROUGH
+#line 1 0
+
+#if !defined(IS_GUI) && !def')
+GLSL parse OK (glslver=330)
+[MG] Shader 163 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 167 converted OK (glslver=330 -> essl ver=300)
+[MG] Shader 168 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4328, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 172 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=1811, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 173 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=4585, head='#version 330
+
+#if defined(PER_FACE_LIGHTING) || !defined(NO_CARDINAL_LIGHTING)
+#line 0 1
+/*#vers')
+GLSL parse OK (glslver=330)
+[MG] Shader 175 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=3096, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    fl')
+GLSL parse OK (glslver=330)
+[MG] Shader 176 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=649, head='#version 330
+
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform DynamicTransforms {
+    mat4 Mo')
+GLSL parse OK (glslver=330)
+[MG] Shader 178 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=148, head='#version 330
+
+uniform samplerCube Sampler0;
+
+in vec3 texCoord0;
+
+out vec4 fragColor;
+
+void main(')
+GLSL parse OK (glslver=330)
+[MG] Shader 179 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2827, head='#version 330
+
+#ifndef IS_SEE_THROUGH
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+  ')
+GLSL parse OK (glslver=330)
+[MG] Shader 188 converted OK (glslver=330 -> essl ver=300)
+[MG] shader conversion dispatched to dedicated 32MB-stack thread (len=2379, head='#version 330
+
+#ifndef IS_SEE_THROUGH
+#line 0 1
+/*#version 330*/
+
+layout(std140) uniform Fog {
+  ')
+GLSL parse OK (glslver=330)
+[MG] Shader 189 converted OK (glslver=330 -> essl ver=300)
+[18:13:26] [Render thread/INFO]: OpenAL initialized on device CoreAudio Default
+[18:13:26] [Render thread/INFO]: Sound engine started
+[18:13:26] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 2048x2048x4 minecraft:textures/atlas/blocks.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[18:13:26] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[18:13:26] [Download-1/INFO]: Could not authorize you against Realms server: java.lang.RuntimeException: Failed to parse into SignedJWT: 0
+[18:13:26] [Download-1/ERROR]: Couldn't connect to realms
+com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'java.lang.RuntimeException: Failed to parse into SignedJWT: 0'
+	at com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:528)
+	at com.mojang.realmsclient.client.RealmsClient.clientCompatible(RealmsClient.java:308)
+	at com.mojang.realmsclient.RealmsAvailability.lambda$check$0(RealmsAvailability.java:48)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Unknown Source)
+[HotbarDiag] REJECT isGrabbing=0 | x=366.0 y=890.0 | phys=2360x1640 guiScale=1 resScale=1.00 sdlWin=0x0
+[InputDiag] sendCursorPos #1: event=0 x=1180.0 y=820.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #2: event=2 x=1172.0 y=806.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #3: event=2 x=1165.0 y=796.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #4: event=2 x=1159.0 y=787.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #5: event=2 x=1152.0 y=782.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #6: event=2 x=1145.0 y=779.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #7: event=2 x=1135.0 y=779.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #8: event=2 x=1122.0 y=779.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #9: event=2 x=1107.0 y=779.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #10: event=2 x=1089.0 y=777.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[RenderDiag] swap#200 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=24 err=0x0) fbo0vp=(uniq=26 corner=27 err=0x0) mode=2
+[InputDiag] sendCursorPos #50: event=2 x=858.0 y=982.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #100: event=2 x=867.0 y=1459.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[RenderDiag] fps=60 swapOK=289 swapFail=0 mem=1009MB layer=0x126356f40 drawable=1180x820 scale=1.00 bounds=1180x820 inWindow=1
+[InputDiag] pojavPumpEvents #300: window=0x10500cf80 GLFW_invoke_Key=0x107b800f0 GLFW_invoke_CursorPos=0x107b800b0 GLFW_invoke_Char=0x107b80100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[RenderDiag] geo-heal blit #300 (Task49): srcFb=0 2360x1640 -> scratch 1180x820 -> FBO0 1180x820 blitErr=0x0
+[InputDiag] sendCursorPos #150: event=2 x=732.0 y=733.0 GLFW_invoke_CursorPos=0x107b800b0 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[RenderDiag] swap#400 (Task41): drawFb=0 readFb=0 viewport=0,0 2360x1640 surface=1180x820 cur=(uniq=26 err=0x0) fbo0vp=(uniq=8 corner=5 err=0x0) mode=2
+[IconLoader] App entered background: cancelled all ongoing downloads
