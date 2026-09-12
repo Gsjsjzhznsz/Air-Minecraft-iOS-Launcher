@@ -20,6 +20,11 @@
 @property(nonatomic) TrackedTextField *inputTextField;
 @property(nonatomic) BOOL toggleHidden;
 - (void)updateControlHiddenState:(BOOL)hide;
+// Task64-fix：loadCustomControls 实现在 SurfaceViewController.m 的类扩展里，
+// 对本 category 编译单元不可见（CI 实锤：no visible @interface declares the
+// selector 'loadCustomControls'）。此处声明补上可见性，签名与实现一致
+// （无参、void 返回，SurfaceViewController.m:1744）。
+- (void)loadCustomControls;
 @end
 
 // category 不能存储 ivar，用 associated object 实现 menuDimView
