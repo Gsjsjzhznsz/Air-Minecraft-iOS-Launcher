@@ -14,8 +14,11 @@
 #include <assert.h>
 #include <dlfcn.h>
 #include <libgen.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <stdatomic.h>
+#include <string.h>
+#include <stdio.h>
 
 #include "jni.h"
 #include "glfw_keycodes.h"
@@ -785,6 +788,60 @@ int guiScale = 1;
 int mcscale(CGFloat input) {
     return (int)((guiScale * input)/resolutionScale);
 }
+
+// ============================================================================
+// Task 63：guiScale 原生直读（物品栏点击修复）
+//
+// 现象（7c4bff5 构建日志实锤）：grab 状态每次切换都打印
+//   "updateMCGuiScale skipped: no JNIEnv for this thread"
+// —— GetEnv 与 AttachCurrentThread 在同步线程上双双失败，Java 侧
+// UIKit.updateMCGuiScale() 从未被调用，guiScale 永远卡在初始值 1。
+// 后果：mcscale() 把 hotbar 命中区缩到约 180x20 物理像素（2360x1640
+// 屏上），点击物品栏几乎必然落空，被当作普通游戏触摸消费。
+//
+// 修复思路：不再依赖 JNIEnv。options.txt 就在 POJAV_GAME_DIR（= cwd
+// = -Duser.dir，main.m 已 setenv）下，native 直接解析 guiScale 行，
+// 复刻 Java 侧 UIKit.updateMCGuiScale() 的完整算法：
+//   raw = options.txt 的 guiScale（0/缺省 = auto）
+//   auto = max(min(mGLFWWindowWidth/320, mGLFWWindowHeight/240), 1)
+//   scale = (raw == 0 || auto < raw) ? auto : raw
+// 其中 mGLFWWindow* 与 native 全局 windowWidth/windowHeight 同源
+// （launchJVM 告知的启动器像素口径）。
+//
+// 刷新时机：grab 状态每次切换（进游戏/开菜单/关菜单）。用户在 MC
+// 设置里改 GUI 大小必然经过"开菜单(grab off) → 改 → 关菜单(grab on)"，
+// 下一次切换即拿到新值。文件只在切换沿读取（状态不变不读），开销可忽略。
+// ============================================================================
+static int readGuiScaleFromOptions(void) {
+    const char *gameDir = getenv("POJAV_GAME_DIR");
+    if (gameDir == NULL) return 0;
+    char path[PATH_MAX];
+    if (snprintf(path, sizeof(path), "%s/options.txt", gameDir) >= (int)sizeof(path)) return 0;
+    FILE *f = fopen(path, "r");
+    if (f == NULL) return 0;
+    int value = 0;
+    char line[256];
+    while (fgets(line, sizeof(line), f) != NULL) {
+        if (strncmp(line, "guiScale:", 9) == 0) {
+            value = atoi(line + 9);
+            break;
+        }
+    }
+    fclose(f);
+    return value;   // 0 = 未找到行（视为 auto）
+}
+
+static void refreshGuiScaleNatively(void) {
+    int raw = readGuiScaleFromOptions();
+    if (windowWidth <= 0 || windowHeight <= 0) return;   // 启动早期兜底
+    int autoScale = MAX(MIN(windowWidth / 320, windowHeight / 240), 1);
+    int newScale = (raw == 0 || autoScale < raw) ? autoScale : raw;
+    if (newScale != guiScale) {
+        NSLog(@"[HotbarDiag] Task63 native guiScale refresh: %d -> %d (raw=%d auto=%d win=%dx%d)",
+              guiScale, newScale, raw, autoScale, windowWidth, windowHeight);
+        guiScale = newScale;
+    }
+}
 int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
     // 诊断：物品栏点不动时，靠这段代码一次性定位卡在哪一环。
     // 可能的失败原因互不相关，只看现象无法区分：
@@ -1026,53 +1083,14 @@ void CallbackBridge_syncGrabStateFromSDL(BOOL relMode, const char *source) {
     else if (!relMode && showCursor) showCursor();
 
     // 刷新 guiScale（物品栏命中判定依赖它）。
-    // MC 26.3 走 SDL 时 glfwSetInputMode 不会被调用，guiScale 不会自动更新。
-    //
-    // 不加 isInputReady 判断：26.3 下 pojavPumpEvents 从不执行，isInputReady 恒为 NO，
-    // 加了会让这里永远跳过。
-    JNIEnv *scaleEnv = NULL;
-    BOOL scaleDidAttach = NO;
-    if (runtimeJavaVMPtr != NULL) {
-        if ((*runtimeJavaVMPtr)->GetEnv(runtimeJavaVMPtr, (void **)&scaleEnv, JNI_VERSION_1_4) != JNI_OK || scaleEnv == NULL) {
-            scaleEnv = NULL;
-            if ((*runtimeJavaVMPtr)->AttachCurrentThread(runtimeJavaVMPtr, &scaleEnv, NULL) == JNI_OK && scaleEnv != NULL) {
-                scaleDidAttach = YES;
-            } else {
-                scaleEnv = NULL;
-            }
-        }
-    }
-    if (scaleEnv != NULL) {
-        @try {
-            jclass uikitClass = (*scaleEnv)->FindClass(scaleEnv, "net/kdt/pojavlaunch/uikit/UIKit");
-            if (uikitClass == NULL) {
-                if ((*scaleEnv)->ExceptionCheck(scaleEnv)) (*scaleEnv)->ExceptionClear(scaleEnv);
-                NSLog(@"[InputDiag] updateMCGuiScale: UIKit class not found");
-            } else {
-                jmethodID updateScale = (*scaleEnv)->GetStaticMethodID(scaleEnv, uikitClass, "updateMCGuiScale", "()V");
-                if (updateScale == NULL) {
-                    if ((*scaleEnv)->ExceptionCheck(scaleEnv)) (*scaleEnv)->ExceptionClear(scaleEnv);
-                    NSLog(@"[InputDiag] updateMCGuiScale: method not found");
-                } else {
-                    (*scaleEnv)->CallStaticVoidMethod(scaleEnv, uikitClass, updateScale);
-                    if ((*scaleEnv)->ExceptionCheck(scaleEnv)) {
-                        (*scaleEnv)->ExceptionDescribe(scaleEnv);
-                        (*scaleEnv)->ExceptionClear(scaleEnv);
-                    } else {
-                        NSLog(@"[InputDiag] updateMCGuiScale called, guiScale=%d", guiScale);
-                    }
-                }
-                (*scaleEnv)->DeleteLocalRef(scaleEnv, uikitClass);
-            }
-        } @catch (NSException *e) {
-            NSLog(@"[InputDiag] updateMCGuiScale exception: %@", e);
-        }
-        if (scaleDidAttach) {
-            (*runtimeJavaVMPtr)->DetachCurrentThread(runtimeJavaVMPtr);
-        }
-    } else {
-        NSLog(@"[InputDiag] updateMCGuiScale skipped: no JNIEnv for this thread");
-    }
+    // Task 63：改用 native 直读 options.txt。旧 JNI 链（GetEnv/Attach 后
+    // 调 Java 侧 UIKit.updateMCGuiScale）在同步线程上双双失败，日志
+    // "updateMCGuiScale skipped: no JNIEnv for this thread" 每次 grab
+    // 切换都出现，guiScale 永远卡 1。native 直读不依赖 JNIEnv，
+    // 算法与 Java 侧完全一致（见 readGuiScaleFromOptions 注释块）。
+    // Java_..._UIKit_updateMCGuiScale JNI 导出保留：LWJGL 路径下
+    // Java 侧（GLFW.java glfwSetInputMode 链）仍会主动推送。
+    refreshGuiScaleNatively();
 
     // UI 侧（虚拟鼠标指针等）切回主线程刷新
     dispatch_async(dispatch_get_main_queue(), ^{
