@@ -1032,7 +1032,23 @@ static bool ame_SDL_PollEvent(void *event) {
         } else {
             static _Atomic unsigned long s_pollCount = 0;
             unsigned long n = atomic_fetch_add(&s_pollCount, 1) + 1;
-            if (n <= 30 || n % 500 == 0) {
+            // Task64：键盘类事件（0x300 KEY_DOWN / 0x301 KEY_UP）单独计数并
+            // 逐条记录（虚拟控件按键是离散低频事件，不会刷屏；旧采样窗口
+            // n<=30/%500 基本永远漏掉键盘事件——上一轮日志只看到 sendKey 入口
+            // 与 mouse consumed，键盘消费侧完全不可见，"移动键是否送达 MC"
+            // 无法裁定）。布局与 input_bridge_v3.m 推送侧 SDL3_KeyboardEvent
+            // 一致：scancode@24(int) key@28(u32) down@36(bool)。
+            if (type == 0x300 || type == 0x301) {
+                static _Atomic unsigned long s_task64KeyCount = 0;
+                unsigned long kn = atomic_fetch_add(&s_task64KeyCount, 1) + 1;
+                if (kn <= 50 || kn % 100 == 0) {
+                    int ksc = *(const int *)((const char *)event + 24);
+                    uint32_t kkey = *(const uint32_t *)((const char *)event + 28);
+                    uint8_t kdown = *(const uint8_t *)((const char *)event + 36);
+                    NSDebugLog(@"[SDLHook] Task64 key consumed #%lu type=0x%x scancode=%d key=%u down=%d (MC-side)",
+                               (unsigned long)kn, type, ksc, kkey, kdown);
+                }
+            } else if (n <= 30 || n % 500 == 0) {
                 // Task59：鼠标类事件附带坐标——0x400 motion / 0x401 button down /
                 // 0x402 button up 的 x/y 同在偏移 28/32（与 input_bridge_v3.m 推送
                 // 用的 SDL3 结构体布局一致）。直接观测“MC 实际消费的鼠标坐标”，

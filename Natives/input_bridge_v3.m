@@ -1254,6 +1254,16 @@ void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods) {
         int sdlScancode = glfwKeyToSDLScancode(key);
         if (sdlScancode != 0) {
             pushSDLKeyboardEvent(sdlScancode, action != 0);
+        } else {
+            // Task64：键无法映射到 SDL 扫描码 = 事件被静默丢弃。旧代码零日志，
+            // "按键没反应"时无从分辨是控件没触发还是映射丢失。glfwKeyToSDLScancode
+            // 的 default 分支返回 0（如 GLFW_KEY_UNKNOWN=0 或未覆盖的特殊键）。
+            static _Atomic int s_task64DroppedKeys = 0;
+            int dk = atomic_fetch_add(&s_task64DroppedKeys, 1) + 1;
+            if (dk <= 20 || dk % 100 == 0) {
+                NSLog(@"[InputDiag] Task64 key DROPPED (no SDL scancode mapping) #%d: glfwKey=%d action=%d -- button silently dead",
+                      dk, key, action);
+            }
         }
     }
 
