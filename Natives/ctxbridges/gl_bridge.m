@@ -600,10 +600,33 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
         g_ame53_last_ms = 0;
     }
     if (geoMismatch && s_mode != 2) {
+        // Task 57（取证闭环）：失配首检出瞬间，从【渲染线程】（本函数运行处，
+        // 与 ANGLE 的 layer 读取同一执行环境）读一次渲染层几何。主线程心跳
+        // （SurfaceViewController updateGameStats）读同一 layer 对象恒报横屏
+        // 1180x820，而 ANGLE 在此环境算出转置 820x1180——两侧并排入日志，
+        // CALayer 跨线程 split-brain（622166a 心跳 2360x1640 vs 卫兵读
+        // 1640x2360；bbe6d63 零 drift 行 = 渲染线程 drawableSize 读数与转置
+        // 表面一致）一锤定音。sublayers 计数顺带证伪/证实 ANGLE 自建子层假说
+        // （initialize 的 isKindOfClass:[CAMetalLayer class] 为真 → 直接使用，
+        // 计数应为 0）。
+        {
+            CALayer *l57 = (__bridge CALayer *)g_ame48_layer_cf;
+            if (l57 != nil) {
+                BOOL m57 = [l57 isKindOfClass:CAMetalLayer.class];
+                CGSize d57 = m57 ? ((CAMetalLayer *)l57).drawableSize : CGSizeZero;
+                NSLog(@"[GLGeo] Task57 render-thread layer read (split-brain probe): bounds=%.0fx%.0f drawable=%.0fx%.0f scale=%.2f sublayers=%lu surface=%dx%d (对照主线程心跳: bounds/drawable 恒 1180x820)",
+                      l57.bounds.size.width, l57.bounds.size.height,
+                      d57.width, d57.height, (double)l57.contentsScale,
+                      (unsigned long)[l57.sublayers count], surfW, surfH);
+            }
+        }
         // Task 55（画面分裂根治）：几何失配首检出时先治本——梯度式重对齐
         //（A 几何信号 / B 延迟重建 / C 反向转置旅程，一步治愈即停；治愈判定
         // = querySurface == layer bounds，杜绝 Task53 假成功）。成功后
         // surface==viewport==drawable==bounds，补偿全部回到 no-op。
+        // Task 57 补丁生效时本分支预期不可达（表面冻结在创建几何 = viewport）；
+        // 可达即说明 viewport 变化（窗口 resize）——stepB 销毁重建成为冻结
+        // 体制下唯一合法换尺寸通道，予以保留。
         if (ame_task53_realign_surface()) {
             // 表面已对齐：mode 复位，下一帧重新 latch（几何对齐 + FBO0 有
             // 内容 → NORMAL，geo-heal 经 Task50 恢复分支自动退出）。

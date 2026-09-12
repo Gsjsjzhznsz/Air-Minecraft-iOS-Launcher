@@ -499,7 +499,23 @@ dep_shader_shims: dep_mg
 		$(SOURCEDIR)/Natives/spvc_shim.c || exit 1
 	echo '[Amethyst v$(VERSION)] dep_shader_shims - end'
 
-payload: native dep_mg java jre assets dep_shader_shims
+dep_angle_freeze:
+	echo '[Amethyst v$(VERSION)] dep_angle_freeze - start'
+	# Task 57 (hua-mian-fen-lie gen-zhi): 8-byte machine-code patch -- ANGLE Metal
+	# WindowSurfaceMtl::checkIfLayerResized: expected size source switched from
+	# bounds*contentsScale (poisoned by windowed-mode background-thread portrait
+	# geometry, CALayer cross-thread split-brain) to the surface's own latched
+	# mWidth/mHeight ([x19,#0x430/0x438]) -- surface size frozen at creation
+	# geometry (creation reads always clean); transposition becomes physically
+	# impossible; on drawableSize drift the enforcement branch re-writes the
+	# frozen value back onto the layer. Idempotent; loud failure on byte
+	# mismatch (ANGLE version drift guard); full root-cause chain in script
+	# header comments (scripts/patch_angle_surface_freeze.py).
+	python3 $(SOURCEDIR)/scripts/patch_angle_surface_freeze.py \
+		$(SOURCEDIR)/Natives/resources/Frameworks/libGLESv2.framework/libGLESv2 || exit 1
+	echo '[Amethyst v$(VERSION)] dep_angle_freeze - end'
+
+payload: native dep_mg java jre assets dep_shader_shims dep_angle_freeze
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)
