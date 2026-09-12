@@ -105,6 +105,9 @@ typedef bool (*ame_fn_SDL_SetWindowFullscreen)(void *window, bool fullscreen);
 typedef bool (*ame_fn_SDL_PollEvent)(void *event);
 // Task 50：SDL_WindowFlags 是 Uint32（SDL_video.h）
 typedef unsigned int (*ame_fn_SDL_GetWindowFlags)(void *window);
+// Task 61：SDL3 尺寸查询（SDL_video.h：返回 bool，出参 int*）
+typedef bool (*ame_fn_SDL_GetWindowSize)(void *window, int *w, int *h);
+typedef bool (*ame_fn_SDL_GetWindowSizeInPixels)(void *window, int *w, int *h);
 
 static ame_fn_SDL_GL_SetAttribute ame_real_GL_SetAttribute = NULL;
 static ame_fn_SDL_CreateWindow ame_real_CreateWindow = NULL;
@@ -132,6 +135,8 @@ static ame_fn_SDL_SetWindowPosition ame_real_SetWindowPosition = NULL;
 static ame_fn_SDL_SetWindowFullscreen ame_real_SetWindowFullscreen = NULL;
 static ame_fn_SDL_PollEvent ame_real_PollEvent = NULL;
 static ame_fn_SDL_GetWindowFlags ame_real_GetWindowFlags = NULL;
+static ame_fn_SDL_GetWindowSize ame_real_GetWindowSize = NULL;
+static ame_fn_SDL_GetWindowSizeInPixels ame_real_GetWindowSizeInPixels = NULL;
 
 // Task 32 embed：嵌入宿主层级的 SDL 视图（主线程赋值；定义见 "7) Amethyst embed" 一节）
 static UIView *ame_embeddedSDLView = NULL;
@@ -388,6 +393,8 @@ static bool ame_SDL_SetWindowPosition(void *window, int x, int y);
 static bool ame_SDL_SetWindowFullscreen(void *window, bool fullscreen);
 static bool ame_SDL_PollEvent(void *event);
 static unsigned int ame_SDL_GetWindowFlags(void *window);   // Task 50（实现见 5) 节，供 maybeWrapWindowHook 前向引用）
+static bool ame_SDL_GetWindowSize(void *window, int *w, int *h);            // Task 61（实现见 5) 节）
+static bool ame_SDL_GetWindowSizeInPixels(void *window, int *w, int *h);   // Task 61（实现见 5) 节）
 
 // Task 32：当 MC 通过 SDL_LoadFunction（而非 dlsym）解析符号时，同样把
 // 窗口生命周期/事件泵钩子装上（防御性双路覆盖，与 amethyst_sdl3_hook_resolve
@@ -422,6 +429,14 @@ static void ame_maybeWrapWindowHook(const char *name, void **out) {
         if (ame_real_GetWindowFlags == NULL)
             ame_real_GetWindowFlags = (ame_fn_SDL_GetWindowFlags)*out;
         *out = (void *)ame_SDL_GetWindowFlags;
+    } else if (strcmp(name, "SDL_GetWindowSize") == 0) {
+        if (ame_real_GetWindowSize == NULL)
+            ame_real_GetWindowSize = (ame_fn_SDL_GetWindowSize)*out;
+        *out = (void *)ame_SDL_GetWindowSize;
+    } else if (strcmp(name, "SDL_GetWindowSizeInPixels") == 0) {
+        if (ame_real_GetWindowSizeInPixels == NULL)
+            ame_real_GetWindowSizeInPixels = (ame_fn_SDL_GetWindowSizeInPixels)*out;
+        *out = (void *)ame_SDL_GetWindowSizeInPixels;
     }
 }
 
@@ -525,6 +540,72 @@ static void *ame_SDL_EGL_GetProcAddress(const char *proc) {
 static unsigned int ame_SDL_GetWindowFlags(void *window) {
     unsigned int f = ame_real_GetWindowFlags ? ame_real_GetWindowFlags(window) : 0;
     return f & ~0x40u;   // 0x40 = SDL_WINDOW_MINIMIZED（SDL2/SDL3 同值）
+}
+
+// ============================================================================
+// Task 61（SDL3 路径分辨率根因修复，44fef06 日志定案）：
+//
+//   现象：Task60 表面侧已全绿（drawableSize=2360x1640 scale=2.00，
+//   eglQuerySurface=2360x1640），但 swap 探针 viewport=1180x820 ≠
+//   surface=2360x1640 → Task49 geo-heal 每帧 2x 升采样 blit（1180x820 →
+//   scratch 2360x1640 → FBO0）＝用户实测“SDL 的分辨率还是不行”（全屏模糊）。
+//
+//   根因：SDL3 uikit 驱动的窗口以“点”为单位——Task51 钳制把 MC 的
+//   2360x1640（像素语义）压到 1180x820 点；随后 uikit 发出本会话唯一的
+//   尺寸事件 SDL_EVENT_WINDOW_RESIZED(0x207) data1/data2=1180x820（点），
+//   MC 26.3 按像素语义消费（日志实测：0x207 后 viewport 即 1180x820）→
+//   渲染分辨率被压半。与此同时 MC 的输入基准来自像素路径
+//   （SDL_GetWindowSizeInPixels：1180x820 点 x screenScale 2 = 2360x1640，
+//   == 启动器告知值，Task59 输入直通已实证）——桌面平台两条路径恒相等，
+//   iOS retina 上分裂 2x：画面半分辨率、输入却全尺寸，即本症状。
+//
+//   修复（三路同值，全部收敛到启动器像素口径 windowWidth×windowHeight，
+//   == launchJVM 告知 == EGL surface(Task60) == MC 输入基准(Task59)）：
+//     1) SDL_GetWindowSize（点路径）→ 上报 windowWidth×windowHeight；
+//     2) SDL_GetWindowSizeInPixels → 钉到 windowWidth×windowHeight
+//        （当前本就等于该值——钉住后不再依赖 UIKit 窗口点尺寸）；
+//     3) 0x207/0x208 事件 data1/data2 改写（见 PollEvent 内 Task61 块）。
+//   UIKit 真实窗口仍由 Task51 钳制保持在 1180x820 点——几何/嵌入/触摸
+//   路由零改动；MC 侧看到的世界与已“完全正常”的 LWJGL/MG 26.2 路径
+//   （viewport==surface==2360x1640）完全对齐。viewport==surface 后
+//   Task50 恢复分支自动退出 geo-heal，逐帧 blit 开销随之消失。
+//
+//   注：windowWidth/windowHeight 为 SurfaceViewController::updateSavedResolution
+//   主线程写、此处渲染线程读的 plain int（environ.h 全局）；会话期间值稳定，
+//   旋转时与 drawableSize 同步更新（Task60 统一写入者），口径始终一致。
+// ============================================================================
+static bool ame_SDL_GetWindowSize(void *window, int *w, int *h) {
+    bool r = ame_real_GetWindowSize ? ame_real_GetWindowSize(window, w, h) : false;
+    if (window != NULL && windowWidth > 0 && windowHeight > 0) {
+        if (r && w != NULL && h != NULL) {
+            static _Atomic unsigned long s_task61_q1 = 0;
+            unsigned long n61 = atomic_fetch_add(&s_task61_q1, 1) + 1;
+            if (n61 <= 20 || n61 % 500 == 0) {
+                NSLog(@"[SDLHook] Task61 SDL_GetWindowSize: %dx%d (SDL pts) -> %dx%d (launcher px; render res unified)",
+                      *w, *h, windowWidth, windowHeight);
+            }
+        }
+        if (w != NULL) *w = windowWidth;
+        if (h != NULL) *h = windowHeight;
+    }
+    return r;
+}
+
+static bool ame_SDL_GetWindowSizeInPixels(void *window, int *w, int *h) {
+    bool r = ame_real_GetWindowSizeInPixels ? ame_real_GetWindowSizeInPixels(window, w, h) : false;
+    if (window != NULL && windowWidth > 0 && windowHeight > 0) {
+        if (r && w != NULL && h != NULL) {
+            static _Atomic unsigned long s_task61_q2 = 0;
+            unsigned long n62 = atomic_fetch_add(&s_task61_q2, 1) + 1;
+            if (n62 <= 20 || n62 % 500 == 0) {
+                NSLog(@"[SDLHook] Task61 SDL_GetWindowSizeInPixels: %dx%d (native) -> %dx%d (pinned launcher px)",
+                      *w, *h, windowWidth, windowHeight);
+            }
+        }
+        if (w != NULL) *w = windowWidth;
+        if (h != NULL) *h = windowHeight;
+    }
+    return r;
 }
 
 // Vulkan 加载器一致性：MC 26.3 起 RenderPearl 要求 SDL 与 LWJGL 使用同一
@@ -912,8 +993,42 @@ static bool ame_SDL_PollEvent(void *event) {
             }
             continue;  // 丢弃，取下一条
         }
+        // ---------------------------------------------------------------
+        // Task 61（SDL3 路径分辨率根因修复）：uikit 驱动的窗口事件以“点”为
+        // 单位——RESIZED(0x207) 携带 Task51 钳制后的 1180x820 点，MC 26.3 按
+        // 像素语义消费（本会话仅此一条尺寸事件，44fef06 实测）→ 渲染分辨率
+        // 压半。改写 data1/data2 为启动器像素口径 windowWidth×windowHeight
+        // （== launchJVM 告知 == EGL surface(Task60) == MC 输入基准(Task59)）。
+        // PIXEL_SIZE_CHANGED(0x208) 同改（防御性：uikit 当前不发此事件，若
+        // 未来 SDL 版本发出，两路口径仍一致）。SDL_WindowEvent 布局：
+        // type@0 reserved@4 timestamp@8 windowID@16 data1@20 data2@24（与
+        // 0x400 鼠标事件 x/y@28/32 同系布局，input_bridge_v3.m 推送侧互证）。
+        // ---------------------------------------------------------------
+        if (type == 0x207 /*SDL_EVENT_WINDOW_RESIZED*/ ||
+            type == 0x208 /*SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED*/) {
+            int d61a = *(int *)((char *)event + 20);
+            int d61b = *(int *)((char *)event + 24);
+            if (windowWidth > 0 && windowHeight > 0 &&
+                (d61a != windowWidth || d61b != windowHeight)) {
+                *(int *)((char *)event + 20) = windowWidth;
+                *(int *)((char *)event + 24) = windowHeight;
+                static _Atomic unsigned long s_task61_rewrites = 0;
+                unsigned long rn61 = atomic_fetch_add(&s_task61_rewrites, 1) + 1;
+                if (rn61 <= 20 || rn61 % 500 == 0) {
+                    NSLog(@"[SDLHook] Task61 window-size event 0x%x rewritten: %dx%d -> %dx%d (pts->px; UIKit window untouched, MC renders native res)",
+                          type, d61a, d61b, windowWidth, windowHeight);
+                }
+            }
+        }
         if ((type >= 0x100 && type <= 0x10F) || (type >= 0x200 && type <= 0x20F)) {
-            NSDebugLog(@"[SDLHook] SDL_PollEvent got type=0x%x (quit/window-class, Task32)", type);
+            if (type >= 0x200 && type <= 0x20F) {
+                int wd1 = *(const int *)((const char *)event + 20);
+                int wd2 = *(const int *)((const char *)event + 24);
+                NSDebugLog(@"[SDLHook] SDL_PollEvent got type=0x%x data1=%d data2=%d (window-class, Task32/61 forensics)",
+                           type, wd1, wd2);
+            } else {
+                NSDebugLog(@"[SDLHook] SDL_PollEvent got type=0x%x (quit-class, Task32)", type);
+            }
         } else {
             static _Atomic unsigned long s_pollCount = 0;
             unsigned long n = atomic_fetch_add(&s_pollCount, 1) + 1;
@@ -1240,6 +1355,23 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
         }
         NSDebugLog(@"[SDLHook] hooked SDL_GetWindowFlags (real=%p, MINIMIZED stripped)", (void *)ame_real_GetWindowFlags);
         return (void *)ame_SDL_GetWindowFlags;
+    }
+    // Task 61：尺寸查询接管（pts->px 语义统一，见 5) 节注释）。
+    if (strcmp(name, "SDL_GetWindowSize") == 0) {
+        if (ame_real_GetWindowSize == NULL) {
+            ame_real_GetWindowSize = (ame_fn_SDL_GetWindowSize)amethyst_orig_dlsym(handle, name);
+        }
+        NSLog(@"[SDLHook] hooked SDL_GetWindowSize (real=%p, Task61 px semantics: windowWidth x windowHeight)",
+              (void *)ame_real_GetWindowSize);
+        return (void *)ame_SDL_GetWindowSize;
+    }
+    if (strcmp(name, "SDL_GetWindowSizeInPixels") == 0) {
+        if (ame_real_GetWindowSizeInPixels == NULL) {
+            ame_real_GetWindowSizeInPixels = (ame_fn_SDL_GetWindowSizeInPixels)amethyst_orig_dlsym(handle, name);
+        }
+        NSLog(@"[SDLHook] hooked SDL_GetWindowSizeInPixels (real=%p, Task61 pinned to launcher px)",
+              (void *)ame_real_GetWindowSizeInPixels);
+        return (void *)ame_SDL_GetWindowSizeInPixels;
     }
     // SDL_GL_SetAttribute 不接管：MC 自己调用它设属性是合法行为，我们只在
     // 建窗前主动调用同一个函数来强制 ES profile（见 ame_forceEglProfileEs）。
