@@ -173,14 +173,14 @@ extern __weak UIWindow *mainWindow;
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
-    // Task 56（小窗根因修复，纵深防御）：
-    // Info.plist 已加 UIRequiresFullScreen，app 现在只能全屏运行，
-    // willConnect 里的 requestGeometryUpdate 不再被窗口模式拒绝
-    // （旧日志每轮必现 UISceneErrorDomain Code=101"当前窗口模式不允许
-    // 以编程方式更改界面方向"）。这里补一道 becomeActive 重试：万一
-    // 首次请求因时机问题失败（或系统在启动动画期间短暂竖屏），
-    // 场景激活时再要一次横屏几何，确保 scene bounds 与锁定的横屏方向
-    // 一致——这是"表面转置→画面分裂→输入错位"链条的源头。
+    // Task 62（窗口模式平反）：Task 56 曾以 UIRequiresFullScreen 灭小窗来断
+    // "几何失控→表面转置→画面分裂"链条，但后续取证（Task 58-61）证明真凶
+    // 另有其人——EGL 查询常量对调（58）、输入 px÷2（59）、1x 钉扎模糊（60）、
+    // SDL3 点/像素分裂（61），窗口模式从未是肇因，且 Info.plist 已改回
+    // UIRequiresFullScreen=false（恢复 iPadOS 26 多任务/窗口化）。本重试保留作
+    // 纵深防御：窗口模式下系统拥有几何，requestGeometryUpdate 可能被拒
+    // （Code=101 为良性噪声，旧日志全屏下也出现）；后台崩溃链的真正修复
+    // （sdl3_hook 吞噬 MINIMIZED 事件）与呈现模式无关，继续生效。
     if (@available(iOS 16.0, *)) {
         UIWindowScene *windowScene = (UIWindowScene *)scene;
         UIInterfaceOrientation orient = windowScene.interfaceOrientation;

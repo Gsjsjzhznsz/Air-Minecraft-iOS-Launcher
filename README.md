@@ -33,6 +33,11 @@
 | Change | Description |
 |--------|-------------|
 | **LWJGL 3.4.1 Compatibility** | Updated LWJGL to a 3.4.1-compatible layer, enabling mods like Sodium 0.9+ that require LWJGL >= 3.4.1. Uses developer herbrine8403's approach: 3.3.x base modules + lwjgl-callback-descriptor.jar (3.4.1) + source overlay for dual-API compatibility. |
+| **Minecraft 26.3 via SDL3** | MC 26.3 dropped GLFW for SDL3. We ported the SDL3-embedding approach from [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) (its Android `sdl_hook.c` became `Natives/sdl3_hook.m`: ES profile forcing, main-window reuse, Vulkan loader handle sharing, EGL compat retry) and ship a patched `libSDL3.dylib` (`patches/sdl3-amethyst.patch`: uikit touch passthrough, text-field re-add safety, host-view embedding). |
+| **Native-Resolution Rendering Fix** | Root-caused and fixed the entire resolution chain: swapped EGL query constants, 1x render-scale pin, and SDL3 point/pixel size split. The game now renders 1:1 at native 2x retina resolution with sharp visuals on both the SDL3 (26.3) and LWJGL/GLFW (26.2) paths. |
+| **Pixel-Accurate Touch Input** | Fixed the long-standing input-offset bug (pixel-vs-point semantic mismatch across the input bridge). Touch coordinates now land exactly where your finger is, in-game and in menus. |
+| **Custom Controls Editor Fixes** | Fixed the crash when saving an edited control (`unrecognized selector doUpdateButton:from:to:` -- the editor was presented through a UINavigationController wrapper) and restored the full-screen editing canvas from the Settings entry. Undo history is now scoped to the editor's lifetime. |
+| **Windowed Mode Restored** | iPadOS 26 multitasking/windowing re-enabled (`UIRequiresFullScreen` removed). The earlier suspicion that windowed mode caused the split-picture/blur bugs was disproven -- the true root causes (EGL constants, px/pt semantics) were fixed instead. Backgrounding resilience (MINIMIZED event handling) is mode-independent and stays. |
 | **Optimized JIT Re-launch** | When JIT is already enabled on non-iOS-26 devices, the game launches directly without re-requesting via stikjit://. On iOS 26+ devices that require debug JIT mapping, the UniversalJIT26 script is loaded silently (without showing a waiting dialog) to avoid background transition crashes while still ensuring brk instructions are handled. |
 | **In-App Language Switching** | Added a language picker in Settings > General that allows switching between Follow System, Simplified Chinese, and English without restarting the app. The `localize()` function respects the user's choice while maintaining the full fallback chain. |
 | **Enhanced Chinese Localization** | Complete Chinese UI translation (1955+ lines), more comprehensive than upstream. |
@@ -84,7 +89,7 @@ Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (THIS REPO - Chinese UX, JIT optimi
 - **Multi-Account** -- Seamlessly switch between Microsoft, local, and third-party authentication accounts.
 - **Auto Renderer Selection** -- Automatically chooses the optimal rendering backend (including MobileGlues, MoltenVK, and more) when set to Auto.
 - **Auto JVM Selection** -- Automatically selects the correct JVM version (Java 8, 17, 21, or 25) based on the game version.
-- **Minecraft 26.X Support** -- Experimental support for Minecraft 26.x.
+- **Minecraft 26.X Support** -- Experimental support for Minecraft 26.x: 26.2 runs through the LWJGL/GLFW path, 26.3+ runs through the SDL3 path (embedding approach ported from ZalithLauncher2).
 - **Custom Mouse Pointer** -- Customize the virtual mouse pointer skin in settings.
 - **Custom News URL** -- Configure a custom news feed URL for the launcher home screen.
 - **TouchController Support** -- Communicates with the TouchController mod via both UDP local proxy and XCFramework, delivering full touchscreen control on iOS.
@@ -173,6 +178,7 @@ This project would not exist without the following fork chain:
 
 - **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- The original iOS Minecraft launcher that started it all.
 - **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- The major remastered fork that added the modern UI, mod management, BMCLAPI support, multi-account, and auto renderer/JVM selection. This is the direct upstream of Air.
+- **[ZalithLauncher/ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2)** -- The SDL3 window-embedding approach used for Minecraft 26.3+ was borrowed from this project: its Android-side `sdl_hook.c` compatibility layer was ported to iOS as `Natives/sdl3_hook.m`, and its SDL embedding patches informed our `patches/sdl3-amethyst.patch` against the SDL uikit backend. Vendored as the `ThirdParty/ZalithLauncher2` submodule for reference.
 
 ## About Translations
 
@@ -182,6 +188,7 @@ If you would like to contribute translations for this project, please go to [Cro
 
 | Component | Purpose | License | Source |
 |-----------|---------|---------|--------|
+| SDL3 | Game window & input backend for MC 26.3+ (embedded in the host view, patched) | zlib | [GitHub](https://github.com/libsdl-org/SDL) -- patched via `patches/sdl3-amethyst.patch`; embedding approach ported from [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) |
 | Caciocavallo | AWT runtime framework | GPL-2.0 | [GitHub](https://github.com/PojavLauncherTeam/caciocavallo) |
 | jsr305 | Code annotation support | BSD-3 | [Google Code](https://code.google.com/p/jsr-305) |
 | Boardwalk | Core functionality adaptation | Apache-2.0 | [GitHub](https://github.com/zhuowei/Boardwalk) |

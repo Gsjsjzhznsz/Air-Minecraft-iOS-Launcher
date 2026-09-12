@@ -21,11 +21,26 @@
 @property(nonatomic) NSString* currentFileName;
 @property(nonatomic) CGRect selectedPoint;
 @property(nonatomic) UINavigationBar* navigationBar;
+@property(nonatomic, strong) NSUndoManager* task62_undoManager;
 
 @end
 
 @implementation CustomControlsViewController
 #define isInGame [self.presentingViewController respondsToSelector:@selector(loadCustomControls)]
+
+// Task 62：私有撤销管理器。UIViewController 默认的 undoManager 是窗口级共享
+// 对象，寿命长于本编辑器——编辑器销毁后，共享管理器里残留的撤销调用
+// （doAddButton/doRemoveButton/doUpdateButton…）指向已释放的 self，一旦触发
+// 撤销就是对野指针发消息的同族 “unrecognized selector” 闪退。改为编辑器私有
+// 实例后，撤销记录随编辑器一起释放，永远不会越过编辑器生命周期；编辑期间
+// 的摇动撤销仍经响应链取到本 getter，行为不变。
+- (NSUndoManager *)undoManager
+{
+    if (self.task62_undoManager == nil) {
+        self.task62_undoManager = [[NSUndoManager alloc] init];
+    }
+    return self.task62_undoManager;
+}
 
 - (void)viewDidLoad
 {
@@ -460,6 +475,9 @@
     if (![self.currentGesture isKindOfClass:[UILongPressGestureRecognizer class]]) {
         vc.targetButton = (ControlButton *)self.currentGesture.view;
     }
+    // Task 62：注入编辑器弱引用，取代对 presentingViewController 的盲转型
+    // （后者在编辑器被容器包裹时是容器本身，不是编辑器）。
+    vc.controlsEditor = self;
     [self presentViewController:vc animated:YES completion:nil];
 }
 
@@ -920,8 +938,33 @@ CGFloat currentY;
         }
     }
 
-    [(CustomControlsViewController *)self.presentingViewController
-        doUpdateButton:self.targetButton from:self.oldProperties to:newProperties];
+    // Task 62：不再对 presentingViewController 盲转型（编辑器被 UINavigationController
+    // 包裹时它是容器本身 → “unrecognized selector doUpdateButton:from:to:” 闪退，
+    // 即本轮日志实锤的崩溃）。优先用呈现时注入的 controlsEditor 弱引用；
+    // 兼容旧呈现结构时沿呈现链向上找（含容器的子节点）；都找不到则降级为
+    // “属性已直接生效、跳过撤销注册”，绝不让保存路径崩溃。
+    CustomControlsViewController *editor = self.controlsEditor;
+    if (editor == nil) {
+        for (UIViewController *vc = self.presentingViewController; vc != nil && editor == nil; vc = vc.presentingViewController) {
+            if ([vc isKindOfClass:CustomControlsViewController.class]) {
+                editor = (CustomControlsViewController *)vc;
+                break;
+            }
+            for (UIViewController *child in vc.childViewControllers) {
+                if ([child isKindOfClass:CustomControlsViewController.class]) {
+                    editor = (CustomControlsViewController *)child;
+                    break;
+                }
+            }
+        }
+    }
+    if (editor != nil) {
+        [editor doUpdateButton:self.targetButton from:self.oldProperties to:newProperties];
+    } else {
+        // 兜底：属性在编辑过程中已直接写入 button.properties，编辑本身不丢失，
+        // 仅跳过撤销注册与布局数据同步的额外登记。
+        NSLog(@"[CustomControls] Task62: editor not found in presentation chain -- edit applied without undo registration");
+    }
     self.oldProperties = nil;
     [self dismissViewControllerAnimated:YES completion:nil];
 }

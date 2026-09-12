@@ -33,6 +33,11 @@
 | 改动 | 说明 |
 |------|------|
 | **LWJGL 3.4.1 兼容** | 更新 LWJGL 至 3.4.1 兼容层，支持 Sodium 0.9+ 等要求 LWJGL >= 3.4.1 的模组。采用 herbrine8403 的方案：3.3.x 基础模块 + lwjgl-callback-descriptor.jar (3.4.1) + 源码覆盖层同时兼容两种 Callback API。 |
+| **Minecraft 26.3 SDL3 通路** | MC 26.3 弃用 GLFW 改用 SDL3。我们借鉴了 [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) 的 SDL3 嵌入方案：将其 Android 端 `sdl_hook.c` 兼容层移植为 `Natives/sdl3_hook.m`（ES profile 强制、主窗口复用、Vulkan 加载器句柄共享、EGL 兼容重试），并随包发布打了补丁的 `libSDL3.dylib`（`patches/sdl3-amethyst.patch`：uikit 触摸穿透、文本框重挂安全、宿主视图嵌入）。 |
+| **原生分辨率渲染修复** | 根因定位并修复了整个分辨率链路：EGL 查询常量对调、1x 渲染钉扎、SDL3 点/像素尺寸分裂。游戏现以原生 2x retina 分辨率 1:1 渲染，SDL3（26.3）与 LWJGL/GLFW（26.2）两条路径画面均锐利。 |
+| **像素级精准触控** | 修复长期存在的输入错位 bug（输入桥像素/点语义错配）。触控坐标现在精确落在手指所在位置，游戏内与菜单均准确。 |
+| **键位调整编辑器修复** | 修复保存控件时闪退（`unrecognized selector doUpdateButton:from:to:`，编辑器被 UINavigationController 包裹呈现所致）并恢复设置入口的全屏编辑画布。撤销记录现与编辑器同生命周期。 |
+| **窗口模式恢复** | 恢复 iPadOS 26 多任务/窗口化（移除 `UIRequiresFullScreen`）。此前怀疑窗口模式导致画面分裂/模糊，后经取证排除——真因（EGL 常量、px/pt 语义）已另行修复。后台稳定性（MINIMIZED 事件处理）与呈现模式无关，继续生效。 |
 | **JIT 优化重连** | 在非 iOS 26 设备上，JIT 已启用时直接启动游戏。在 iOS 26+ 需要调试 JIT 映射的设备上，静默加载 UniversalJIT26 脚本（不显示等待对话框），避免后台切换闪退的同时确保 brk 指令能被正确处理。 |
 | **应用内语言切换** | 在设置 > 通用中新增语言选择器，支持跟随系统、简体中文、English 三种选项，切换后立即生效无需重启。 |
 | **增强中文本地化** | 完整中文界面翻译（1955+ 行），覆盖比上游更全面。 |
@@ -83,7 +88,7 @@ Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、J
 - **账户限制解除** -- 支持本地账户、演示模式和第三方认证，无需 Microsoft 账户即可下载和游玩。
 - **多账户支持** -- 在 Microsoft 账户、本地账户和第三方认证账户之间无缝切换。
 - **自动渲染器选择** -- 设为 Auto 时自动选择最优渲染后端（含 MobileGlues、MoltenVK 等渲染器）。
-- **适配 Minecraft 26.X** -- 添加 Minecraft 26.X 支持（实验性）
+- **适配 Minecraft 26.X** -- 添加 Minecraft 26.X 支持（实验性）：26.2 走 LWJGL/GLFW 通路，26.3+ 走 SDL3 通路（嵌入方案借鉴自 ZalithLauncher2）。
 - **自定义鼠标指针** -- 在设置中自定义虚拟鼠标指针皮肤。
 - **TouchController 支持** -- 通过 UDP 和 XCFramework 两种通信方式与 TouchController Mod 通信，为 iOS 提供完整的触屏控制。
 - **AI 深度集成** -- (开发中，目标为实现 AI 完全管理启动器，包括资源下载、实例管理等功能)
@@ -170,11 +175,13 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 - **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- 最初的 iOS Minecraft 启动器，一切的起点。
 - **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- 主要重制版 Fork，添加了现代化 UI、Mod 管理、BMCLAPI 下载源、多账户、自动渲染器/JVM 选择等功能。这是 Air 的直接上游。
+- **[ZalithLauncher/ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2)** -- Minecraft 26.3+ 使用的 SDL3 窗口嵌入方案借鉴自该项目：其 Android 端 `sdl_hook.c` 兼容层被移植为 iOS 端的 `Natives/sdl3_hook.m`，其 SDL 嵌入补丁也启发了我们针对 SDL uikit 后端的 `patches/sdl3-amethyst.patch`。以 `ThirdParty/ZalithLauncher2` 子模块形式随仓库引用。
 
 ## 第三方组件
 
 | 组件 | 用途 | 许可证 | 来源 |
 |------|------|--------|------|
+| SDL3 | MC 26.3+ 的游戏窗口与输入后端（嵌入宿主视图，已打补丁） | zlib | [GitHub](https://github.com/libsdl-org/SDL) -- 经 `patches/sdl3-amethyst.patch` 打补丁；嵌入方案借鉴自 [ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2) |
 | Caciocavallo | AWT 运行时框架 | GPL-2.0 | [GitHub](https://github.com/PojavLauncherTeam/caciocavallo) |
 | jsr305 | 代码注解支持 | BSD-3 | [Google Code](https://code.google.com/p/jsr-305) |
 | Boardwalk | 核心功能适配 | Apache-2.0 | [GitHub](https://github.com/zhuowei/Boardwalk) |

@@ -1882,6 +1882,16 @@
     NSDictionary *item = self.prefContents[indexPath.section][indexPath.row];
 
     // 特殊处理：键位调整界面需要 setDefaultCtrl / getDefaultCtrl 回调
+    // Task 62 修复：此处曾经把编辑器包进 UINavigationController 再按默认样式呈现，
+    // 引发两个 bug——
+    //   1) 默认样式 = pageSheet，iPadOS 26 上是居中悬浮矩形，编辑器画布缩成
+    //      “屏幕中间的正方形”而非铺满全屏；
+    //   2) UIKit 会把容器子 VC 的 present 请求转发给容器本身，于是按钮编辑页
+    //      (CCMenuViewController) 的 presentingViewController 是这个导航控制器
+    //      而不是编辑器。actionEditFinish 完成时盲转型后向它发
+    //      doUpdateButton:from:to: → “unrecognized selector” 闪退。
+    // 键位调整是全屏画布编辑器，必须与另外两个入口（启动器主页 enterCustomControls、
+    // 游戏内 actionOpenCustomControls）一致：OverFullScreen 直接呈现、不包导航控制器。
     if ([item[@"key"] isEqualToString:@"custom_controls"]) {
         CustomControlsViewController *vc = [[CustomControlsViewController alloc] init];
         vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
@@ -1891,10 +1901,7 @@
         vc.getDefaultCtrl = ^{
             return getPrefObject(@"control.default_ctrl");
         };
-        UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-        nav.navigationBar.prefersLargeTitles = YES;
-        nav.modalInPresentation = YES;
-        [self.navigationController presentViewController:nav animated:YES completion:nil];
+        [self presentViewController:vc animated:YES completion:nil];
         return;
     }
 
