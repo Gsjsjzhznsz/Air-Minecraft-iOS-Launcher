@@ -3,6 +3,7 @@
 #import "ControlSubButton.h"
 #import "CustomControlsUtils.h"
 #import "../LauncherPreferences.h"
+#import "../PLProfiles.h"
 #import "../ios_uikit_bridge.h"
 #include "../glfw_keycodes.h"
 #include "../utils.h"
@@ -416,6 +417,63 @@ void generateAndSaveCustomControl() {
     } else {
         NSLog(@"Built-in custom control layout not found");
     }
+}
+
+NSString* restoreDefaultCustomControl() {
+    // Task 64（恢复默认控件）：
+    // 用户场景：App 升级带来新模板（如 Task 63 的 custom.json v7 重写）后，
+    // 设备上仍是旧布局；或旧布局在历史崩溃（Task 62 之前的保存闪退）中写坏，
+    // 导致进游戏控件全部无反应（loadControlFile 解析失败 = 零控件加载）。
+    // generateAndSave* 系列“仅当文件不存在才生成”的语义无法自愈这两种情况，
+    // 需要一个显式的“恢复出厂”入口：永远删除重建。
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *controlmapDir = [NSString stringWithFormat:@"%s/controlmap", getenv("POJAV_HOME")];
+    NSString *defaultPath = [controlmapDir stringByAppendingPathComponent:@"default.json"];
+    NSString *customPath = [controlmapDir stringByAppendingPathComponent:@"custom.json"];
+
+    // 目录兜底（正常必然存在，防御 POJAV_HOME 被清空的极端情况）
+    NSError *error = nil;
+    if (![fm fileExistsAtPath:controlmapDir]) {
+        if (![fm createDirectoryAtPath:controlmapDir withIntermediateDirectories:YES attributes:nil error:&error]) {
+            return error.localizedDescription;
+        }
+    }
+
+    // 1) 删除两个出厂布局文件（用户自建的其他布局不受影响）
+    for (NSString *path in @[defaultPath, customPath]) {
+        if ([fm fileExistsAtPath:path]) {
+            if (![fm removeItemAtPath:path error:&error]) {
+                NSLog(@"[CustomControls] Task64 restore: remove failed (%@): %@", path.lastPathComponent, error.localizedDescription);
+                return error.localizedDescription;
+            }
+        }
+    }
+
+    // 2) 从出厂来源重建
+    //    default.json：generateAndSaveDefaultControl 程序化生成 v5 布局
+    //    custom.json：App Bundle 内置模板（Task 63 v7）
+    generateAndSaveDefaultControl();
+    generateAndSaveCustomControl();
+
+    if (![fm fileExistsAtPath:defaultPath]) {
+        NSLog(@"[CustomControls] Task64 restore: default.json regeneration failed");
+        return localize(@"custom_controls.restore_default.error.template", nil);
+    }
+    // custom.json 复制失败不阻断（默认布局是 default.json，custom 仅作为模板存在）
+    if (![fm fileExistsAtPath:customPath]) {
+        NSLog(@"[CustomControls] Task64 restore: custom.json copy failed (non-fatal, default layout unaffected)");
+    }
+
+    // 3) 复位激活布局指针（档案感知：与 actionOpenCustomControls 的写入路径一致）
+    if (PLProfiles.current.selectedProfile[@"defaultTouchCtrl"]) {
+        PLProfiles.current.selectedProfile[@"defaultTouchCtrl"] = @"default.json";
+        [PLProfiles.current save];
+    } else {
+        setPrefObject(@"control.default_ctrl", @"default.json");
+    }
+
+    NSLog(@"[CustomControls] Task64 restore default: factory layouts regenerated (default.json + custom.json), active layout reset to default.json");
+    return nil;
 }
 
 void loadControlObject(UIView* targetView, NSMutableDictionary* controlDictionary) {

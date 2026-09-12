@@ -87,7 +87,9 @@ static PLLogOutputView* current;
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil message:line preferredStyle:UIAlertControllerStyleActionSheet];
     alert.popoverPresentationController.sourceView = cell;
     alert.popoverPresentationController.sourceRect = cell.bounds;
-    UIAlertAction *share = [UIAlertAction actionWithTitle:localize(localize(@"Share", nil), nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+    // Task 64: 修复双重 localize —— 旧代码 localize(localize(@"Share")) 把翻译结果再当
+    // key 查一次（英文环境碰巧自反，中文环境查"分享"落回原值，纯冗余调用）。
+    UIAlertAction *share = [UIAlertAction actionWithTitle:localize(@"Share", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         UIActivityViewController *activityVC = [[UIActivityViewController alloc] initWithActivityItems:@[line] applicationActivities:nil];
         activityVC.popoverPresentationController.sourceView = _navigationBar;
         activityVC.popoverPresentationController.sourceRect = _navigationBar.bounds;

@@ -236,11 +236,12 @@
         UIMenuItem *actionExit = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.exit", nil) action:@selector(actionMenuExit)];
         UIMenuItem *actionSave = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.save", nil) action:@selector(actionMenuSave)];
         UIMenuItem *actionLoad = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.load", nil) action:@selector(actionMenuLoad)];
+        UIMenuItem *actionRestoreDefault = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.restore_default", nil) action:@selector(actionMenuRestoreDefault)];
         UIMenuItem *actionSafeArea = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.safe_area", nil) action:@selector(actionMenuSafeArea)];
         UIMenuItem *actionAddButton = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.add_button", nil) action:@selector(actionMenuAddButton)];
         UIMenuItem *actionAddDrawer = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.add_drawer", nil) action:@selector(actionMenuAddDrawer)];
         UIMenuItem *actionAddJoystick = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.add_joystick", nil) action:@selector(actionMenuAddJoystick)];
-        [menuController setMenuItems:@[actionExit, actionSave, actionLoad, actionSafeArea, actionAddButton, actionAddDrawer, actionAddJoystick]];
+        [menuController setMenuItems:@[actionExit, actionSave, actionLoad, actionRestoreDefault, actionSafeArea, actionAddButton, actionAddDrawer, actionAddJoystick]];
 
         CGPoint point = [sender locationInView:sender.view];
         self.selectedPoint = CGRectMake(point.x, point.y, 1.0, 1.0);
@@ -317,6 +318,31 @@
 
 - (void)actionMenuSave {
     [self actionMenuSaveWithExit:NO];
+}
+
+/// Task 64（恢复默认控件）：编辑器内的“恢复默认”入口。
+/// 重建出厂布局后直接在画布上热加载 default.json，并把默认布局指针复位
+/// （与游戏内菜单 actionRestoreDefaultControls 共用 restoreDefaultCustomControl）。
+- (void)actionMenuRestoreDefault {
+    UIAlertController *controller = [UIAlertController alertControllerWithTitle:localize(@"custom_controls.control_menu.restore_default", nil)
+        message:localize(@"game.menu.restore_default_controls.confirm", nil)
+        preferredStyle:UIAlertControllerStyleAlert];
+    [controller addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [controller addAction:[UIAlertAction actionWithTitle:localize(@"OK", nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        NSString *error = restoreDefaultCustomControl();
+        if (error) {
+            showDialog(localize(@"Error", nil), error);
+            return;
+        }
+        // 清空撤销栈（旧布局的撤销记录指向已不存在的控件树）
+        [self.undoManager removeAllActions];
+        // 画布热加载出厂默认布局，同步编辑器当前文件名与默认布局指针
+        self.currentFileName = @"default";
+        [self loadControlFile:@"default.json"];
+        self.setDefaultCtrl(@"default.json");
+        NSLog(@"[CustomControls] Task64 editor restore applied, canvas reloaded with default.json");
+    }]];
+    [self presentViewController:controller animated:YES completion:nil];
 }
 
 - (void)actionOpenFilePicker:(void (^)(NSString *name))handler {

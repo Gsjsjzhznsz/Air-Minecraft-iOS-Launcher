@@ -5,6 +5,8 @@
 #import "SurfaceViewController.h"
 #import "GameMenuOverlayView.h"
 #import "TrackedTextField.h"
+#import "customcontrols/CustomControlsUtils.h"
+#import "ios_uikit_bridge.h"
 #import "utils.h"
 #import "ScreenUtils.h"
 // ZeroTier/Terracotta 联机暂时移除（排查启动崩溃）
@@ -45,6 +47,7 @@ static const void *kMenuDimViewKey = &kMenuDimViewKey;
         @"game.menu.force_close",          // 强制关闭
         @"game.menu.log_output",            // 日志输出
         @"game.menu.custom_controls",       // 按键布局编辑
+        @"game.menu.restore_default_controls", // Task 64: 恢复默认控件（重建出厂布局）
         @"game.menu.multiplayer",           // 联机（陶瓦联机 Terracotta，右上角可切换 ZeroTier）
         @"game.menu.toggle_stats",          // FPS/内存显示开关
         @"game.menu.toggle_controls",       // 隐藏/显示控制按钮
@@ -220,6 +223,33 @@ static const void *kMenuDimViewKey = &kMenuDimViewKey;
     [self presentViewController:alert animated:YES completion:nil];
 }
 
+/// Task 64（恢复默认控件）：强制重建出厂布局并热重载。
+/// 用户场景：旧布局在历史崩溃中写坏 / App 升级后模板换代，导致进游戏控件
+/// 全部无反应。此入口删除 default.json 与 custom.json 后从出厂来源重建，
+/// 并把激活布局指针复位为 default.json，最后热重载控件（无需重启游戏）。
+- (void)actionRestoreDefaultControls {
+    [self dismissMenu];
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:localize(@"game.menu.restore_default_controls", nil)
+                          message:localize(@"game.menu.restore_default_controls.confirm", nil)
+                   preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"OK", nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction *action) {
+        NSString *error = restoreDefaultCustomControl();
+        if (error) {
+            NSLog(@"[CustomControls] Task64 restore failed: %@", error);
+            showDialog(localize(@"Error", nil), error);
+            return;
+        }
+        // 热重载：与 actionOpenCustomControls 关闭编辑器后的重载路径一致
+        // （removeAllButtons + loadCustomControls 会重新挂接 executebtn_* 触摸目标）
+        [self.ctrlView removeAllButtons];
+        [self loadCustomControls];
+        NSLog(@"[CustomControls] Task64 in-game restore applied, controls reloaded");
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)actionOpenCustomControls {
     [self dismissMenu];
     [self.ctrlView removeAllButtons];
@@ -387,27 +417,30 @@ static const void *kMenuDimViewKey = &kMenuDimViewKey;
         case 2: // 按键布局编辑
             [self actionOpenCustomControls];
             break;
-        case 3: // 联机（陶瓦联机 Terracotta，与 HMCL/FCL/ZL2 互通；右上角可切换到 ZeroTier）
+        case 3: // Task 64: 恢复默认控件
+            [self actionRestoreDefaultControls];
+            break;
+        case 4: // 联机（陶瓦联机 Terracotta，与 HMCL/FCL/ZL2 互通；右上角可切换到 ZeroTier）
             [self actionOpenMultiplayer];
             break;
-        case 4: // FPS/内存显示开关
+        case 5: // FPS/内存显示开关
             if ([self.gameMenuOverlay isKindOfClass:[GameMenuOverlayView class]]) {
                 [(GameMenuOverlayView *)self.gameMenuOverlay toggleStatsLabel];
             }
             break;
-        case 5: // 隐藏/显示控制按钮
+        case 6: // 隐藏/显示控制按钮
             [self actionToggleControls];
             break;
-        case 6: // 虚拟鼠标开关
+        case 7: // 虚拟鼠标开关
             [self actionToggleVirtualMouse];
             break;
-        case 7: // 游戏内键盘
+        case 8: // 游戏内键盘
             [self actionToggleKeyboard];
             break;
-        case 8: // 分辨率调整
+        case 9: // 分辨率调整
             [self actionAdjustResolution];
             break;
-        case 9: // 设置
+        case 10: // 设置
             [self actionOpenPreferences];
             break;
     }

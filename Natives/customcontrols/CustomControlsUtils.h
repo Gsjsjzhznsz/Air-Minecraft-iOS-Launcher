@@ -13,7 +13,15 @@ BOOL convertLayoutIfNecessary(NSMutableDictionary* dict);
 void generateAndSaveDefaultControl();
 void generateAndSaveCustomControl();
 void generateAndSaveDefaultControlForGamepad();
-void generateAndSaveCustomControl();
+/// Task 64（恢复默认控件）：强制重建出厂布局文件。
+/// 删除 $POJAV_HOME/controlmap/default.json 与 custom.json 后从出厂来源重新生成
+/// （default.json = 程序化 v5 布局；custom.json = App Bundle 内置模板），
+/// 并把当前档案/偏好 defaultTouchCtrl 复位为 default.json。
+/// 返回 nil = 成功；非 nil = 错误描述（调用方用 showDialog 展示）。
+/// 与 generateAndSaveCustomControl 的区别：后者只在文件不存在时复制（升级 App
+/// 不会刷新旧布局——这正是 Task 63 模板升级后旧布局残留的根源），本函数是
+/// 显式的“恢复出厂”，永远覆盖重建。
+NSString* restoreDefaultCustomControl();
 void loadControlObject(UIView* targetView, NSMutableDictionary* controlDictionary);
 
 void initKeycodeTable(NSMutableArray* keyCodeMap, NSMutableArray* keyValueMap);

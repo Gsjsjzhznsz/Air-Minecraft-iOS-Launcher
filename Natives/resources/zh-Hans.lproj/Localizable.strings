@@ -1958,3 +1958,23 @@
 "preference.auto" = "自动";
 "preference.auto_select" = "自动选择";
 "i18n_str_2068" = "应用语言";
+
+/* Task 64: restore default controls + common keys */
+"game.menu.restore_default_controls" = "恢复默认控件";
+"game.menu.restore_default_controls.confirm" = "将删除并重建默认布局文件（default.json / custom.json），并把当前使用的布局重置为出厂默认。其他自定义布局不受影响。确定继续？";
+"custom_controls.control_menu.restore_default" = "恢复默认";
+"custom_controls.restore_default.error.template" = "未找到内置控件模板";
+"Cancel" = "取消";
+"OK" = "确定";
+"Done" = "完成";
+"Delete" = "删除";
+"Error" = "错误";
+"Warning" = "警告";
+"None" = "无";
+"Release" = "正式版";
+"Rename" = "重命名";
+"Share" = "分享";
+"Sign in" = "登录";
+"Edit profile" = "编辑档案";
+"login.title" = "登录";
+"login.cancelled" = "登录已取消";

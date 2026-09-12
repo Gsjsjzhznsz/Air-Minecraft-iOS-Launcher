@@ -1960,3 +1960,23 @@
 "preference.auto" = "Auto";
 "preference.auto_select" = "Auto";
 "i18n_str_2068" = "App Language";
+
+/* Task 64: restore default controls + common keys */
+"game.menu.restore_default_controls" = "Restore Default Controls";
+"game.menu.restore_default_controls.confirm" = "This will delete and regenerate the default layouts (default.json / custom.json) and reset the active layout to the factory default. Other custom layouts you saved are not affected. Continue?";
+"custom_controls.control_menu.restore_default" = "Restore Default";
+"custom_controls.restore_default.error.template" = "Built-in control template not found";
+"Cancel" = "Cancel";
+"OK" = "OK";
+"Done" = "Done";
+"Delete" = "Delete";
+"Error" = "Error";
+"Warning" = "Warning";
+"None" = "None";
+"Release" = "Release";
+"Rename" = "Rename";
+"Share" = "Share";
+"Sign in" = "Sign in";
+"Edit profile" = "Edit profile";
+"login.title" = "Sign In";
+"login.cancelled" = "Sign-in cancelled";

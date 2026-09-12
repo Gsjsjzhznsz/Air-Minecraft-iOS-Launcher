@@ -1954,3 +1954,23 @@
 
 "preference.auto" = "自动";
 "preference.auto_select" = "自动选择";
+
+/* Task 64: restore default controls + common keys */
+"game.menu.restore_default_controls" = "恢復預設控件";
+"game.menu.restore_default_controls.confirm" = "將刪除並重建預設佈局檔案（default.json / custom.json），並把目前使用的佈局重設為出廠預設。其他自訂佈局不受影響。確定繼續？";
+"custom_controls.control_menu.restore_default" = "恢復預設";
+"custom_controls.restore_default.error.template" = "未找到內建控件範本";
+"Cancel" = "取消";
+"OK" = "確定";
+"Done" = "完成";
+"Delete" = "刪除";
+"Error" = "錯誤";
+"Warning" = "警告";
+"None" = "無";
+"Release" = "正式版";
+"Rename" = "重新命名";
+"Share" = "分享";
+"Sign in" = "登入";
+"Edit profile" = "編輯設定檔";
+"login.title" = "登入";
+"login.cancelled" = "登入已取消";
