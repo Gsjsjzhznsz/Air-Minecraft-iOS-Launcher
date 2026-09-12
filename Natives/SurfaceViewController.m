@@ -1435,7 +1435,10 @@ static UIView *findSDL_uikitview(UIView *root);
 
 - (void)updateGrabState {
     if (isGrabbing == JNI_TRUE) {
-        CGFloat screenScale = self.surfaceView.layer.contentsScale;
+        // Task59：contentsScale 已被 Task52 呈现对齐钉成 1.0，作输入乘数会缺 ×2
+        // （lastVirtualMousePoint 是点，乘 1 后落入 MC 2360 像素空间的 1/4 处）。
+        // 与 sendTouchPoint 同口径：用 screenScale（scene.screen.scale，即 2.0）。
+        CGFloat screenScale = self.screenScale > 0 ? self.screenScale : UIScreen.mainScreen.scale;
         CallbackBridge_nativeSendCursorPos(ACTION_DOWN, lastVirtualMousePoint.x * screenScale, lastVirtualMousePoint.y * screenScale);
         virtualMouseFrame.origin.x = self.view.frame.size.width / 2;
         virtualMouseFrame.origin.y = self.view.frame.size.height / 2;
@@ -1871,7 +1874,12 @@ static UIView *findSDL_uikitview(UIView *root);
 
 - (void)sendTouchEvent:(UITouch *)touchEvent withUIEvent:(UIEvent *)uievent withEvent:(int)event
 {
-    CGPoint locationInView = [touchEvent locationInView:self.rootView];
+    // Task59：rootView 比 surfaceView 宽 30pt（菜单溢出，层级转储 1210x820 层），
+    // 游戏画面在 rootView 内两侧各缩进 15pt——用 rootView 坐标会给启动器直发
+    // 路径引入 +15pt 恒定水平偏移，且与 TouchController mod 的 surfaceView
+    // 归一化口径不一致。改用 surfaceView 参考系（mod 路径同款，下游
+    // touchHotbar 的 phys=2360x1640 数学也以游戏表面为基准）。
+    CGPoint locationInView = [touchEvent locationInView:self.surfaceView];
     switch (event) {
         case ACTION_DOWN:
             self.clickRange = CGRectMake(locationInView.x - 2, locationInView.y - 2, 5, 5);

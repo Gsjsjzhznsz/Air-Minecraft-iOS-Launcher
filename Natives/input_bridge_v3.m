@@ -140,22 +140,35 @@ static SDL3_WindowID getSDLWindowID(void) {
     return 0;
 }
 
-// Task51 Fix G：触控坐标是“像素”语义（UIKit 点 × screenScale=2，HotbarDiag
-// 的 phys=2360x1640 即此口径），而 SDL 窗口是“点”语义（1180x820）。
-// e6886e2 日志铁证：Path B 直接转发触控像素坐标 x=1551（超 SDL 窗口宽
-// 1180）→ MC 丢弃超界鼠标事件 → 触摸“完全无反应”。本换算统一施加在
-// SDL 事件合成出口（pushSDLMouse* 三函数内部），所有调用路径生效。
-// UIScreen.mainScreen.scale 线程安全（Apple 文档：UIScreen 属性除动画
-// 外均可任意线程读）；static 缓存后仅首次读一次。
+// Task 59：触控坐标“像素”直通（Task51 的 ÷2 换算移除）。
+//
+// Task51 Fix G 引入 ÷2（UIScreen.scale=2）时基于两个假设：
+//   a. SDL 窗口点空间（1180x820）是 MC 鼠标事件的正确坐标系；
+//   b. 超出 SDL 窗口宽度的坐标会被 MC 丢弃（"x=1551 → 无反应"）。
+// f335789 真机日志（376192f 构建）推翻了这两个假设：
+//   1. 启动器把 windowWidth/windowHeight=2360x1640（物理像素口径）经
+//      launchJVM 喂给 MC（"[SurfaceViewController] Launching Minecraft
+//      ... size: 2360x1640"），MC 26.3 据此创建 SDL 窗口（"[SDLHook]
+//      SDL_CreateWindow ... 2360x1640"）——MC Window 对象/输入归一化基准
+//      是启动器告知的 2360x1640，而不是 Task51 钳制后的实际 SDL 窗口
+//      1180x820 点。渲染尺寸由 renderpearl 适配真实 EGL 表面（1180x820，
+//      Task58 后画面 1:1 正常），与输入归一化解耦。
+//   2. TouchController mod（运行在 MC 内）的参考分辨率同为 2360x1640
+//      （sendCursorPos x 最大 1802 > 1180，整数坐标实锤）。
+//   3. Task58 后画面正常但输入仍错位：若 MC 按 1180 归一化，÷2 后的坐标
+//      恰好对齐——仍错位 ⟹ MC 不按 1180 归一化。Task51 的"超界丢弃"推断
+//      出自黑屏时代的"全无反应"，当时画面本身就没渲染，无取证价值。
+// 结论：SDL 鼠标事件必须携带 2360x1640 像素口径的原始坐标（与 MC 窗口
+// 信念一致）。÷2 把每个输入位置压到真实位置的一半处 = "输入错位"。
+// 本函数保留为恒等直通（pushSDLMouse* 调用点零改动），一次性指纹确认
+// 新构建在跑。
 static float ame51_px_to_pt(float v) {
-    static CGFloat ame51_scale = 0;
-    if (ame51_scale <= 0) {
-        CGFloat s = [UIScreen mainScreen].scale;
-        if (s < 1) s = 1;
-        ame51_scale = s;
-        NSLog(@"[InputDiag] Task51 touch px->pt scale=%.2f (phys coords / scale for SDL window pts)", (double)s);
+    static BOOL ame59_logged = NO;
+    if (!ame59_logged) {
+        ame59_logged = YES;
+        NSLog(@"[InputDiag] Task59 raw px pass-through: SDL mouse coords stay in launcher-px space (= MC window belief, launcher-told 2360x1640); Task51 /2 removed -- it halved every input position");
     }
-    return (float)(v / ame51_scale);
+    return v;
 }
 
 // Push a mouse motion event into SDL's event queue

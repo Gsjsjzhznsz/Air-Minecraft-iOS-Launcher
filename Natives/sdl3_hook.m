@@ -918,8 +918,19 @@ static bool ame_SDL_PollEvent(void *event) {
             static _Atomic unsigned long s_pollCount = 0;
             unsigned long n = atomic_fetch_add(&s_pollCount, 1) + 1;
             if (n <= 30 || n % 500 == 0) {
-                NSDebugLog(@"[SDLHook] SDL_PollEvent #%lu type=0x%x (sampled, event loop alive)",
-                           n, type);
+                // Task59：鼠标类事件附带坐标——0x400 motion / 0x401 button down /
+                // 0x402 button up 的 x/y 同在偏移 28/32（与 input_bridge_v3.m 推送
+                // 用的 SDL3 结构体布局一致）。直接观测“MC 实际消费的鼠标坐标”，
+                // 与 InputDiag sendCursorPos（入口）逐值对照，闭环输入对齐取证。
+                if (type >= 0x400 && type <= 0x402) {
+                    float ex = *(const float *)((const char *)event + 28);
+                    float ey = *(const float *)((const char *)event + 32);
+                    NSDebugLog(@"[SDLHook] Task59 mouse consumed #%lu type=0x%x x=%.1f y=%.1f (MC-side coords)",
+                               (unsigned long)n, type, ex, ey);
+                } else {
+                    NSDebugLog(@"[SDLHook] SDL_PollEvent #%lu type=0x%x (sampled, event loop alive)",
+                               (unsigned long)n, type);
+                }
             }
         }
         return r;
