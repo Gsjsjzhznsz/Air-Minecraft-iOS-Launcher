@@ -105,6 +105,8 @@ typedef bool (*ame_fn_SDL_SetWindowFullscreen)(void *window, bool fullscreen);
 typedef bool (*ame_fn_SDL_PollEvent)(void *event);
 // Task 50：SDL_WindowFlags 是 Uint32（SDL_video.h）
 typedef unsigned int (*ame_fn_SDL_GetWindowFlags)(void *window);
+// Task 65：SDL_GetWindowFromEvent（SDL_events.h：const SDL_Event* -> SDL_Window*）
+typedef void *(*ame_fn_SDL_GetWindowFromEvent)(const void *event);
 // Task 61：SDL3 尺寸查询（SDL_video.h：返回 bool，出参 int*）
 typedef bool (*ame_fn_SDL_GetWindowSize)(void *window, int *w, int *h);
 typedef bool (*ame_fn_SDL_GetWindowSizeInPixels)(void *window, int *w, int *h);
@@ -135,6 +137,8 @@ static ame_fn_SDL_SetWindowPosition ame_real_SetWindowPosition = NULL;
 static ame_fn_SDL_SetWindowFullscreen ame_real_SetWindowFullscreen = NULL;
 static ame_fn_SDL_PollEvent ame_real_PollEvent = NULL;
 static ame_fn_SDL_GetWindowFlags ame_real_GetWindowFlags = NULL;
+// Task 65：键盘事件窗口句柄解析救援（实现见 5) 节）
+static ame_fn_SDL_GetWindowFromEvent ame_real_GetWindowFromEvent = NULL;
 static ame_fn_SDL_GetWindowSize ame_real_GetWindowSize = NULL;
 static ame_fn_SDL_GetWindowSizeInPixels ame_real_GetWindowSizeInPixels = NULL;
 
@@ -393,6 +397,7 @@ static bool ame_SDL_SetWindowPosition(void *window, int x, int y);
 static bool ame_SDL_SetWindowFullscreen(void *window, bool fullscreen);
 static bool ame_SDL_PollEvent(void *event);
 static unsigned int ame_SDL_GetWindowFlags(void *window);   // Task 50（实现见 5) 节，供 maybeWrapWindowHook 前向引用）
+static void *ame_SDL_GetWindowFromEvent(const void *event); // Task 65（实现见 5) 节，键盘句柄解析救援）
 static bool ame_SDL_GetWindowSize(void *window, int *w, int *h);            // Task 61（实现见 5) 节）
 static bool ame_SDL_GetWindowSizeInPixels(void *window, int *w, int *h);   // Task 61（实现见 5) 节）
 
@@ -429,6 +434,11 @@ static void ame_maybeWrapWindowHook(const char *name, void **out) {
         if (ame_real_GetWindowFlags == NULL)
             ame_real_GetWindowFlags = (ame_fn_SDL_GetWindowFlags)*out;
         *out = (void *)ame_SDL_GetWindowFlags;
+    } else if (strcmp(name, "SDL_GetWindowFromEvent") == 0) {
+        // Task 65：键盘事件窗口句柄解析救援（NULL 回落主窗口）
+        if (ame_real_GetWindowFromEvent == NULL)
+            ame_real_GetWindowFromEvent = (ame_fn_SDL_GetWindowFromEvent)*out;
+        *out = (void *)ame_SDL_GetWindowFromEvent;
     } else if (strcmp(name, "SDL_GetWindowSize") == 0) {
         if (ame_real_GetWindowSize == NULL)
             ame_real_GetWindowSize = (ame_fn_SDL_GetWindowSize)*out;
@@ -540,6 +550,66 @@ static void *ame_SDL_EGL_GetProcAddress(const char *proc) {
 static unsigned int ame_SDL_GetWindowFlags(void *window) {
     unsigned int f = ame_real_GetWindowFlags ? ame_real_GetWindowFlags(window) : 0;
     return f & ~0x40u;   // 0x40 = SDL_WINDOW_MINIMIZED（SDL2/SDL3 同值）
+}
+
+// ============================================================================
+// Task 65（键盘事件静默丢弃根治 —— "进游戏动不了"的真正根因）：
+//
+// 证据链（bd7d528 日志，7d18163 构建）：
+//   1. 虚拟控件触发 ✓（sendKey W/A/S/D 全在）
+//   2. SDL 事件推送 ✓（glfwKeyToSDLScancode 映射无误）
+//   3. MC 事件泵消费 ✓（"Task64 key consumed" 52 条，scancode/key/down 全对）
+//   4. 玩家不动 ✗ —— 丢弃点在 MC Java 侧第一道检查。
+//
+// 反编译 client.jar（26.3-rc-2）定案：KeyboardHandler.keyPress 首行
+//   if (handle == 0L || handle != window.handle()) return;
+// handle 来自 SDLEvents.SDL_GetWindowFromEvent(event)。MC 26.3 的
+// SDLEventHandler 五个事件处理器里，handleKeyEvent 是唯一把 getWindowHandle
+// 放在 minecraft.execute(lambda) 内部懒惰求值的（mouse motion/button/wheel/
+// text 全部在 lambda 外急切求值成 long）。lambda 延迟执行时，pollEvents 的
+// while 循环已把 SDL_Event 缓冲区复用给后续事件（或已随 try-with-resources
+// 释放）——getWindowHandle 读到的是复用/释放后的数据，type 不在有效集合 →
+// SDL_GetWindowFromEvent 返回 NULL → keyPress 首行 handle==0 直接 return →
+// 键盘事件全灭。鼠标因急切求值全程无恙——与实测"相机/点击正常、移动键死"
+// 完全吻合。桌面端 lambda 在渲染线程可重入 executor 上立即执行，缓冲区仍
+// 有效，此 MC 侧缺陷不显现（本移植的线程时序让它暴露）。
+//
+// 修复：钩住 SDL_GetWindowFromEvent。真实解析返回 NULL 时回落
+// ame_primaryWindow（= MC 经我们 SDL_CreateWindow 钩子拿到的窗口 =
+// window.handle()，三处指针对证日志一致）。全 MC 反编译确认该函数仅
+// SDLEventHandler.getWindowHandle 一个调用方；本进程单窗口，回落值与正确
+// 解析值恒等，正常路径零行为变化；键盘 lambda 从此恒拿正确句柄。
+// 同时输出观测日志：键盘类解析逐条记录（含真实返回值与回落标记），
+// 鼠标类采样记录——下轮日志可直接验证根因与修复效果。
+// ============================================================================
+static void *ame_SDL_GetWindowFromEvent(const void *event) {
+    void *w = ame_real_GetWindowFromEvent ? ame_real_GetWindowFromEvent(event) : NULL;
+    static _Atomic unsigned long s_task65Calls = 0;
+    static _Atomic unsigned long s_task65Fallbacks = 0;
+    unsigned long n = atomic_fetch_add(&s_task65Calls, 1) + 1;
+    bool fellBack = NO;
+    if (w == NULL && ame_primaryWindow != NULL) {
+        w = ame_primaryWindow;
+        fellBack = YES;
+        atomic_fetch_add(&s_task65Fallbacks, 1);
+    }
+    uint32_t type = (event != NULL) ? *(const uint32_t *)event : 0;
+    if (type == 0x300 || type == 0x301) {
+        // 键盘类解析：离散低频，逐条记录（前 60 + 每 100）
+        static _Atomic unsigned long s_task65KeyCalls = 0;
+        unsigned long kn = atomic_fetch_add(&s_task65KeyCalls, 1) + 1;
+        if (kn <= 60 || kn % 100 == 0) {
+            uint32_t kwid = *(const uint32_t *)((const char *)event + 16);
+            NSDebugLog(@"[SDLHook] Task65 key window resolve #%lu type=0x%x windowID=%u -> %p%s (fb %lu/%lu)",
+                       (unsigned long)kn, type, (unsigned)kwid, w, fellBack ? " FALLBACK" : "",
+                       (unsigned long)atomic_load(&s_task65Fallbacks),
+                       (unsigned long)atomic_load(&s_task65Calls));
+        }
+    } else if (n <= 20 || n % 500 == 0) {
+        NSDebugLog(@"[SDLHook] Task65 window resolve #%lu type=0x%x -> %p%s",
+                   (unsigned long)n, (unsigned)type, w, fellBack ? " FALLBACK" : "");
+    }
+    return w;
 }
 
 // ============================================================================
@@ -1045,8 +1115,11 @@ static bool ame_SDL_PollEvent(void *event) {
                     int ksc = *(const int *)((const char *)event + 24);
                     uint32_t kkey = *(const uint32_t *)((const char *)event + 28);
                     uint8_t kdown = *(const uint8_t *)((const char *)event + 36);
-                    NSDebugLog(@"[SDLHook] Task64 key consumed #%lu type=0x%x scancode=%d key=%u down=%d (MC-side)",
-                               (unsigned long)kn, type, ksc, kkey, kdown);
+                    // Task65：附带 windowID@16 —— 与 GetWindowFromEvent 钩子的
+                    // 解析观测对证（推送侧 windowID 是否始终正确）。
+                    uint32_t kwid = *(const uint32_t *)((const char *)event + 16);
+                    NSDebugLog(@"[SDLHook] Task64 key consumed #%lu type=0x%x scancode=%d key=%u down=%d windowID=%u (MC-side)",
+                               (unsigned long)kn, type, ksc, kkey, kdown, (unsigned)kwid);
                 }
             } else if (n <= 30 || n % 500 == 0) {
                 // Task59：鼠标类事件附带坐标——0x400 motion / 0x401 button down /
@@ -1371,6 +1444,15 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
         }
         NSDebugLog(@"[SDLHook] hooked SDL_GetWindowFlags (real=%p, MINIMIZED stripped)", (void *)ame_real_GetWindowFlags);
         return (void *)ame_SDL_GetWindowFlags;
+    }
+    // Task 65：键盘事件窗口句柄解析救援（真实解析 NULL 回落主窗口，
+    // 见 5) 节注释——MC 26.3 handleKeyEvent 懒惰求值 + 缓冲区复用缺陷）。
+    if (strcmp(name, "SDL_GetWindowFromEvent") == 0) {
+        if (ame_real_GetWindowFromEvent == NULL) {
+            ame_real_GetWindowFromEvent = (ame_fn_SDL_GetWindowFromEvent)amethyst_orig_dlsym(handle, name);
+        }
+        NSDebugLog(@"[SDLHook] hooked SDL_GetWindowFromEvent (real=%p, Task65 keyboard handle rescue)", (void *)ame_real_GetWindowFromEvent);
+        return (void *)ame_SDL_GetWindowFromEvent;
     }
     // Task 61：尺寸查询接管（pts->px 语义统一，见 5) 节注释）。
     if (strcmp(name, "SDL_GetWindowSize") == 0) {
