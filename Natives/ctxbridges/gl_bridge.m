@@ -374,8 +374,13 @@ static BOOL ame55_verify_surface(ame_es_t es, EGLSurface s, CGSize expected,
                                  EGLint *outQW, EGLint *outQH) {
     if (es.querySurface == NULL || s == EGL_NO_SURFACE) return NO;
     EGLint w = 0, h = 0;
-    if (!es.querySurface(g_EglDisplay, s, 0x3056 /*EGL_WIDTH*/, &w) ||
-        !es.querySurface(g_EglDisplay, s, 0x3057 /*EGL_HEIGHT*/, &h)) return NO;
+    // Task 58 根因修正（画面分裂定案）：EGL_HEIGHT=0x3056、EGL_WIDTH=0x3057
+    //（egl.h 官方定义，Natives/external/mesa/EGL/egl.h:90/123）。旧代码两常量
+    // 对调（0x3056 当宽、0x3057 当高）→ 宽高读反 → “治愈判定”永远失败——
+    // 这就是 Task53/55 realign 历轮报 "NOT cured (recreate reads transposed
+    // geometry)" 的真相：新表面其实一直是横屏健康的。
+    if (!es.querySurface(g_EglDisplay, s, EGL_WIDTH, &w) ||
+        !es.querySurface(g_EglDisplay, s, EGL_HEIGHT, &h)) return NO;
     if (outQW) *outQW = w;
     if (outQH) *outQH = h;
     return (w == (EGLint)MAX(1.0, round(expected.width))) &&
@@ -577,9 +582,25 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     int surfW = 0, surfH = 0;
     if (es.querySurface != NULL && surface != EGL_NO_SURFACE) {
         EGLint sw = 0, sh = 0;
-        if (es.querySurface(g_EglDisplay, surface, 0x3056 /*EGL_WIDTH*/, &sw) &&
-            es.querySurface(g_EglDisplay, surface, 0x3057 /*EGL_HEIGHT*/, &sh)) {
+        // Task 58 根因修正（画面分裂 + 输入错位定案）：EGL_HEIGHT=0x3056、
+        // EGL_WIDTH=0x3057。自 Task41 起本探针把 0x3056 读进 surfW、0x3057 读进
+        // surfH——宽高颠倒，1180x820 的健康表面被读成 "820x1180 转置" →
+        // geoMismatch 每帧误判 → Task49 geo-heal 把完好的横屏帧 blit 进竖屏
+        // scratch 再回写 → 分裂画面 + 输入错位全部由补偿链自造（Task48/49/50/
+        // 51/52/53/55/56/57 六轮修复追的都是这个幻影；ANGLE 实现/Metal layer/
+        // drawable 全程健康——创建时用宏查询的 1180x820 即铁证，Task57 split-brain
+        // 探针读渲染线程 layer 恒横屏为旁证）。改用官方宏，永绝后患。
+        if (es.querySurface(g_EglDisplay, surface, EGL_WIDTH, &sw) &&
+            es.querySurface(g_EglDisplay, surface, EGL_HEIGHT, &sh)) {
             surfW = sw; surfH = sh;
+        }
+        // Task 58 一次性指纹：修正后的读数（下轮设备日志验证点——预期
+        // surface == viewport，latch NORMAL，geo-heal/blit 全不触发）。
+        static BOOL s_task58_logged = NO;
+        if (!s_task58_logged && surfW > 0 && surfH > 0) {
+            s_task58_logged = YES;
+            NSLog(@"[GLGeo] Task58 query constants corrected: surface=%dx%d viewport=%dx%d (EGL_WIDTH=0x3057/EGL_HEIGHT=0x3056 per egl.h; legacy probe read them swapped since Task41)",
+                  surfW, surfH, viewport[2], viewport[3]);
         }
     }
     if (surfW <= 0) surfW = viewport[2];
@@ -638,8 +659,10 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             basic_render_window_t *b53 = currentBundle;
             if (b53 != NULL && es.querySurface != NULL && b53->gl.surface != EGL_NO_SURFACE) {
                 EGLint sw53 = 0, sh53 = 0;
-                if (es.querySurface(g_EglDisplay, b53->gl.surface, 0x3056 /*EGL_WIDTH*/, &sw53) &&
-                    es.querySurface(g_EglDisplay, b53->gl.surface, 0x3057 /*EGL_HEIGHT*/, &sh53)) {
+                // Task 58：常量修正（0x3056=EGL_HEIGHT、0x3057=EGL_WIDTH，
+                // 与探针/验证函数同源同修）。
+                if (es.querySurface(g_EglDisplay, b53->gl.surface, EGL_WIDTH, &sw53) &&
+                    es.querySurface(g_EglDisplay, b53->gl.surface, EGL_HEIGHT, &sh53)) {
                     surfW = sw53;
                     surfH = sh53;
                 }

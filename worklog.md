@@ -120,3 +120,41 @@ Stage Summary:
 - 三症状（分裂画面+输入错位+退后台崩溃）统一根因定案：app 未声明 UIRequiresFullScreen → iPadOS 26 窗口模式（小窗）→ 几何失控 + 最小化事件毒杀游戏
 - "关闭小窗就能解决"被采纳为根因确证并升级为代码级强制（UIRequiresFullScreen）——不是建议用户别开小窗，而是 app 从此没有小窗
 - 已知遗留：posix_spawn ENOENT（沙箱 helper 不可用，回退正常）；1x 渲染分辨率；Terracotta 多人仍禁用中
+
+---
+Task ID: 57
+Agent: main (Super Z)
+Task: 画面分裂第三轮：冻结 ANGLE 窗口表面尺寸源（bbe6d63 日志取证；本轮补录——de3daa6 曾为空提交）
+
+Work Log:
+- 拉取用户上传的 bbe6d63 日志（Task56 构建 5f8e5f3）：UIRequiresFullScreen 未能阻止窗口模式（Code=101 仍在 willConnect 触发），Task55 梯度 realign A/B/C 全部 NOT cured（query=820x1180 vs expected=1180x820），表面仍"转置"
+- 反汇编自带 ANGLE（libGLESv2）：checkIfLayerResized（每帧 obtainNextDrawable 执行）是几何执法者——expected=[layer bounds]×contentsScale，读渲染线程视角；主线程 drawableSize 写入结构性无效（执法者只读 bounds）
+- 修复（3e5e051，8 字节机器补丁）：checkIfLayerResized @0x1aaca0 的 fmul d0,d10,d0/fmul d1,d11,d1（expected←bounds×scale）改为 ldr d0,[x19,#0x430]/ldr d1,[x19,#0x438]（expected←冻结的 mWidth/mHeight）——表面尺寸物理上不可能再被 layer 读数改变；Makefile 新增 dep_angle_freeze 接入 payload；gl_bridge.m 增加 Task57 渲染线程 layer 读取探针（split-brain 一锤定音用）
+- 本地验证：补丁应用/幂等/--verify 三遍；CI run 34661034866 构建成功且日志实锤 "PATCHED ✓ @0x1aaca0"
+
+Stage Summary:
+- 产物：scripts/patch_angle_surface_freeze.py、Makefile dep_angle_freeze、gl_bridge.m Task57 探针
+- 预期：表面冻结在创建几何（创建读恒干净），转置物理隔离；代价=合法 resize 退化为 CA 拉伸
+- 遗留（下轮定案）：Task57 构建实测仍分裂——见 Task 58（真根因不在 ANGLE，而在我们自己的探针常量）
+
+---
+Task ID: 58
+Agent: main (Super Z)
+Task: 画面分裂+输入错位真根因定案与根治——EGL 查询常量自 Task41 起对调（7d8dcfd 日志取证）
+
+Work Log:
+- 拉取用户上传的 7d8dcfd 日志（Task57 构建 3e5e051，2026-09-12 12:33 会话）：Task57 freeze 补丁确认在 IPA 内（CI 日志 PATCHED ✓）但用户实测仍分裂；Task55 realign A/B/C 依旧全败
+- 决定性新证据（Task57 split-brain 探针首触发，8989 行）：渲染线程读 layer bounds=1180x820 drawable=1180x820 scale=1.00 sublayers=0——与主线程完全一致、全程横屏干净 → "跨线程脏读毒化"假说被证伪
+- 矛盾收敛：补丁在+mWidth/mHeight 无第三写入者（全二进制扫描 [impl+0x430] 写者仅 ctor 清零/initialize/checkIfLayerResized 三处）+无拉锯日志 → impl 表面从未被毒化；但 Task41 交换探针仍报 surface=820x1180
+- 反汇编链条（本轮全部完成）：initialize()=mWidth←[layer bounds]×contentsScale（selector 全解析：setDevice/setPixelFormat/setFramebufferOnly/bounds/contentsScale/setDrawableSize）✓干净；checkIfLayerResized 完整语义重构 ✓；egl::Surface::getWidth() 仅在 EGL_FIXED_SIZE_ANGLE(0x3201) 属性存在时返回前端 mState（我们从不传）→ 返回 impl 真值 ✓；SetSurfaceAttrib 的 0x3056→setFixedHeight/0x3057→setFixedWidth 其实是正确映射
+- 真根因水落石出：egl.h 官方定义 EGL_HEIGHT=0x3056、EGL_WIDTH=0x3057（仓库内 mesa/MobileGlues 两份 egl.h 互证）——gl_bridge.m 三处（Task41 交换探针 580-581、ame55_verify_surface 377-378、Task53/55 realign 刷新 641-642）自 Task41 起把 0x3056 当宽、0x3057 当高，宽高读反！1180x820 的健康表面（创建时宏查询铁证）被读成 "820x1180 转置" → geoMismatch 每帧误判 → Task49 geo-heal 把完好横屏帧 blit 进竖屏 scratch 再回写 → 分裂画面+输入错位全部由我们自己的补偿链制造；Task48/49/50/51/52/53/55/56/57 六轮修复追的都是这个幻影
+- 历史日志全部吻合：622166a（2x 时代）swap 期 "1640x2360" = 2360x1640 的对调读数；bbe6d63/3e5e051 "820x1180" = 1180x820 的对调读数
+- 修复（gl_bridge.m，三处）：裸常量 0x3056/0x3057 → EGL_WIDTH/EGL_HEIGHT 宏，注释同步修正，新增一次性 Task58 指纹日志；修正后 viewport==surface → latch NORMAL → geo-heal/blit/realign/present-align 全部不触发，画面 1:1 原样呈现，输入随画面对齐
+- "关闭小窗模式"线索定性：它指向的是触发条件的可见性，而非缺陷本身；常量修正后小窗模式下 layer/surface/viewport 恒 1180x820（历轮日志一致），小窗不再有影响
+- 本地验证（scripts/verify_task58.py，13/13 PASS）：无残留误标注、宏调用 6 处、指纹存在、括号平衡 delta=0；日志重放仿真——旧探针模型精确复现日志（幻影 820x1180+1570 次 blit+3 步 realign 全败），修正探针模型读 1180x820 → NORMAL、0 次 blit、0 次 realign
+- Task57 freeze 补丁与 Task56 MINIMIZED 吞噬保留（纵深防御+已证实的崩溃修复）
+
+Stage Summary:
+- 画面分裂/输入错位根因定案：gl_bridge.m 三处 EGL_WIDTH(0x3057)/EGL_HEIGHT(0x3056) 常量对调，"转置表面"是探针自造的幻影，可见症状由 geo-heal 补偿链制造
+- 下轮设备日志判读锚点："[GLGeo] Task58 query constants corrected: surface=1180x820 viewport=1180x820" + "Task41 latch: NORMAL present"，且全程零 "geo mismatch ENGAGED"/"geo-heal blit"/"realign" 行 = 修复生效；画面应 1:1 完整、输入对齐
+- 影响分辨率的因素全链（本轮完整测绘）：SDL 窗口点尺寸(1180x820)/物理像素(2360x1640)/contentsScale(1x)/CAMetalLayer.bounds/drawableSize/ANGLE impl mWidth/bounds×scale/EGL 前端 mState(仅 FIXED_SIZE 时生效)/viewport——除最后两项在本案为误读来源外，其余全程自洽
