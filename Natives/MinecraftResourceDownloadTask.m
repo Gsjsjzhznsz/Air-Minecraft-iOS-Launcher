@@ -394,7 +394,62 @@ static const NSUInteger kMCStageIndexVerify = 5;
         if (json[@"NSErrorObject"]) {
             [self finishDownloadWithErrorString:[json[@"NSErrorObject"] localizedDescription]];
             return;
-        } else if (json[@"inheritsFrom"]) {
+        }
+
+        // ===== Task 71 修复（启动侧自愈）：版本 JSON 内部 id 与目录名不一致 =====
+        // 场景：整合包导入（Task 5.6 versionId 唯一化，目录名带 -<hash8> 后缀）但
+        // installModLoader 写入的 Fabric/Quilt meta profile 内部 id 是无后缀标准名
+        // （旧构建已落盘的坏档）。后果链：
+        //   metadata.id = 内部 id（无后缀）→ JavaLauncher 以其为 args[1] →
+        //   Java Tools.getVersionInfo 读 versions/<无后缀>/<无后缀>.json →
+        //   文件实际在带后缀目录 → FileNotFoundException（用户看到的"json丢失"）→ exit(1)。
+        // 自愈动作（对已存在的坏档）：①把 JSON 内部 id 重写为目录名 versionStr；
+        // ②把此前被无后缀 id 误导而下载到无后缀目录的 client.jar 迁移到本目录
+        // （避免整包重下）；③旧目录搬空后清理，避免版本列表出现幽灵条目。
+        // 不一致只可能出现在"目录名 != JSON id"的坏档上，正常安装（两者一致）零影响。
+        NSString *task71InternalId = [json[@"id"] isKindOfClass:[NSString class]] ? json[@"id"] : nil;
+        if (versionStr.length > 0 && task71InternalId.length > 0 && ![task71InternalId isEqualToString:versionStr]) {
+            NSLog(@"[MCDL] Task71 version JSON id mismatch: folder=%@ internal=%@ — healing",
+                  versionStr, task71InternalId);
+            json[@"id"] = versionStr;
+            NSError *task71WriteError = saveJSONToFile(json, path);
+            if (task71WriteError) {
+                // 非致命：写回失败时仅内存修正（本次启动仍可用），下轮再自愈
+                NSLog(@"[MCDL] Task71 heal write failed (non-fatal): %@",
+                      task71WriteError.localizedDescription);
+            } else {
+                NSLog(@"[MCDL] Task71 version JSON id healed: %@ -> %@",
+                      task71InternalId, versionStr);
+            }
+
+            // client.jar 迁移：versions/<internalId>/<internalId>.jar -> versions/<versionStr>/<versionStr>.jar
+            NSString *task71OldJar = [NSString stringWithFormat:@"%1$s/versions/%2$@/%2$@.jar",
+                                      getenv("POJAV_GAME_DIR"), task71InternalId];
+            NSString *task71NewJar = [NSString stringWithFormat:@"%1$s/versions/%2$@/%2$@.jar",
+                                      getenv("POJAV_GAME_DIR"), versionStr];
+            NSFileManager *task71FM = [NSFileManager defaultManager];
+            if ([task71FM fileExistsAtPath:task71OldJar] && ![task71FM fileExistsAtPath:task71NewJar]) {
+                NSError *task71MoveError = nil;
+                if ([task71FM moveItemAtPath:task71OldJar toPath:task71NewJar error:&task71MoveError]) {
+                    NSLog(@"[MCDL] Task71 client jar migrated: %@ -> %@",
+                          task71OldJar.lastPathComponent, task71NewJar.lastPathComponent);
+                    // 旧目录搬空后清理（目录内仍有 json 等文件时保留，不做破坏性删除）
+                    NSString *task71OldDir = task71OldJar.stringByDeletingLastPathComponent;
+                    NSArray *task71Remaining = [task71FM contentsOfDirectoryAtPath:task71OldDir error:nil];
+                    if (task71Remaining.count == 0) {
+                        [task71FM removeItemAtPath:task71OldDir error:nil];
+                        NSLog(@"[MCDL] Task71 empty legacy version dir removed: %@", task71OldDir);
+                    }
+                } else {
+                    // 迁移失败不阻断：client.jar 走正常下载路径补齐（SHA 校验兜底）
+                    NSLog(@"[MCDL] Task71 client jar migration failed (will re-download): %@",
+                          task71MoveError.localizedDescription);
+                }
+            }
+        }
+        // ===== Task 71 自愈结束 =====
+
+        if (json[@"inheritsFrom"]) {
             version = (id)[MinecraftResourceUtils findVersion:json[@"inheritsFrom"] inList:remoteVersionList];
             if (version) {
                 path = [NSString stringWithFormat:@"%1$s/versions/%2$@/%2$@.json", getenv("POJAV_GAME_DIR"), json[@"inheritsFrom"]];

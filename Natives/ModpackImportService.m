@@ -2093,6 +2093,33 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
             if (error) *error = dlError;
             return NO;
         }
+
+        // Task 71 修复（json丢失根因）：Fabric/Quilt meta profile 的内部 "id" 是标准名
+        // （如 fabric-loader-0.19.5-26.2，不带后缀），而整合包唯一化 versionId 是
+        // <标准名>-<hash8>（如 fabric-loader-0.19.5-26.2-ea503303）。
+        // Java 端 Tools.getVersionInfo(args[1]) 按 metadata.id 定位
+        // versions/<id>/<id>.json——id 与目录名不一致时启动必报 FileNotFoundException
+        // （用户看到的"json丢失"），且 client.jar 会因 id 无后缀被下到无后缀目录。
+        // 此处下载完成后把内部 id 重写为 versionId，保证
+        // 目录名 == JSON 内部 id == Java 启动查找 id 三者一致。
+        NSMutableDictionary *profileJSON = parseJSONFromFile(versionJsonPath);
+        if (profileJSON && !profileJSON[@"NSErrorObject"]) {
+            NSString *internalId = [profileJSON[@"id"] isKindOfClass:[NSString class]] ? profileJSON[@"id"] : nil;
+            if (internalId.length > 0 && ![internalId isEqualToString:versionId]) {
+                profileJSON[@"id"] = versionId;
+                NSError *rewriteError = saveJSONToFile(profileJSON, versionJsonPath);
+                if (rewriteError) {
+                    // 非致命：写入失败时保留原文件（启动侧 Task71 自愈会兜底）
+                    NSLog(@"[ModpackImport] Task71 loader profile id rewrite failed (non-fatal): %@",
+                          rewriteError.localizedDescription);
+                } else {
+                    NSLog(@"[ModpackImport] Task71 loader profile id rewritten: %@ -> %@",
+                          internalId, versionId);
+                }
+            }
+        } else {
+            NSLog(@"[ModpackImport] Task71 could not re-parse loader profile json for id rewrite (non-fatal)");
+        }
         return YES;
     }
 
