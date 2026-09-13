@@ -2966,124 +2966,24 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 
     NSLog(@"[DownloadVC] Vanilla version JSON missing, downloading: %@", versionId);
 
-    // 2. 在后台线程拉取 Mojang 版本清单并下载 version JSON
+    // Task 70 修复：原实现为“单 URL 硬编码”（按偏好二选一 official/bmclapi，单次请求、无重试、
+    // 无候选轮换）。piston-meta 不可达的网络环境下（典型如国内直连）直接失败 → 整合包“原版预装”
+    // 链路断在第一步，后续只能弹“无法安装原版”或更下游的“缺少父版本 version.json”死路
+    // （即用户遇到的“json 丢失”）。
+    // 这里整体收敛到 ForgeDirectInstaller.ensureParentVersionExists:（与 Forge 直装、
+    // ModpackImportService.ensureCompleteVersionInstalled 同一条已验证路径）：
+    //   - 本地 JSON 已存在时直接跳过（含本方法开头的存在性检查，双保险）
+    //   - 拉取清单与版本 JSON 均走 PLMirrorCenter GameFile 候选（官方 ↔ BMCLAPI 轮换）
+    //     + 3 次重试 + 线性退避，任一候选可用即成功
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSString *downloadSource = getPrefObject(@"general.download_source") ?: @"official";
-        BOOL useBMCLAPI = [downloadSource isEqualToString:@"bmclapi"];
-        NSString *manifestURL = useBMCLAPI
-            ? @"https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json"
-            : @"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
-
-        NSURL *url = [NSURL URLWithString:manifestURL];
-        if (!url) {
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
+        NSError *fetchError = nil;
+        BOOL ok = [ForgeDirectInstaller ensureParentVersionExists:versionId error:&fetchError];
+        if (!ok) {
+            NSLog(@"[DownloadVC] ensureVanillaVersionJSONExists: %@ failed: %@", versionId, fetchError.localizedDescription ?: @"unknown");
+        } else {
+            NSLog(@"[DownloadVC] Vanilla version JSON ensured: %@", versionJsonPath);
         }
-
-        NSMutableURLRequest *manifestRequest = [NSMutableURLRequest requestWithURL:url];
-        manifestRequest.timeoutInterval = 30.0;
-        manifestRequest.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        [manifestRequest setValue:@"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15" forHTTPHeaderField:@"User-Agent"];
-
-        // 使用 NSURLSession 替代已废弃的 NSURLConnection sendSynchronousRequest
-        dispatch_semaphore_t manifestSem = dispatch_semaphore_create(0);
-        __block NSData *manifestData = nil;
-        NSURLSessionDataTask *manifestTask = [[NSURLSession sharedSession] dataTaskWithRequest:manifestRequest
-                                                                              completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            manifestData = data;
-            dispatch_semaphore_signal(manifestSem);
-        }];
-        [manifestTask resume];
-        dispatch_semaphore_wait(manifestSem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30 * NSEC_PER_SEC)));
-
-        if (!manifestData) {
-            NSLog(@"[DownloadVC] Failed to download version manifest");
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        NSDictionary *manifest = [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:nil];
-        NSArray *versions = [manifest isKindOfClass:[NSDictionary class]] ? manifest[@"versions"] : nil;
-        if (![versions isKindOfClass:[NSArray class]]) {
-            NSLog(@"[DownloadVC] Invalid version manifest format");
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        // 3. 查找匹配的版本条目，获取 version JSON URL
-        NSString *versionJSONURL = nil;
-        for (NSDictionary *v in versions) {
-            if ([v isKindOfClass:[NSDictionary class]] && [v[@"id"] isEqualToString:versionId]) {
-                versionJSONURL = [v[@"url"] isKindOfClass:[NSString class]] ? v[@"url"] : nil;
-                break;
-            }
-        }
-        if (!versionJSONURL) {
-            NSLog(@"[DownloadVC] Version %@ not found in manifest", versionId);
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        // BMCLAPI 镜像：替换 Mojang 官方域名
-        if (useBMCLAPI) {
-            versionJSONURL = [versionJSONURL stringByReplacingOccurrencesOfString:@"piston-meta.mojang.com"
-                                                                        withString:@"bmclapi2.bangbang93.com"];
-            versionJSONURL = [versionJSONURL stringByReplacingOccurrencesOfString:@"launchermeta.mojang.com"
-                                                                        withString:@"bmclapi2.bangbang93.com"];
-        }
-
-        // 4. 下载 version JSON（使用 NSURLSession 替代已废弃的 NSURLConnection）
-        NSURL *jsonURL = [NSURL URLWithString:versionJSONURL];
-        if (!jsonURL) {
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        NSMutableURLRequest *jsonRequest = [NSMutableURLRequest requestWithURL:jsonURL];
-        jsonRequest.timeoutInterval = 30.0;
-        jsonRequest.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
-        [jsonRequest setValue:@"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15" forHTTPHeaderField:@"User-Agent"];
-
-        // 使用 NSURLSession dataTaskWithCompletionHandler 替代已废弃的 NSURLConnection sendSynchronousRequest
-        // 已在外层 dispatch_async 到后台队列，此处用信号量等待结果
-        dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-        __block NSData *jsonData = nil;
-        NSURLSessionDataTask *jsonTask = [[NSURLSession sharedSession] dataTaskWithRequest:jsonRequest
-                                                                          completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            jsonData = data;
-            dispatch_semaphore_signal(sem);
-        }];
-        [jsonTask resume];
-        // 等待最多 30 秒（与 timeoutInterval 一致）
-        dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30 * NSEC_PER_SEC)));
-
-        if (!jsonData) {
-            NSLog(@"[DownloadVC] Failed to download version JSON for %@", versionId);
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        // 5. 创建版本目录并写入 JSON
-        NSError *dirError = nil;
-        [NSFileManager.defaultManager createDirectoryAtPath:versionDir
-                                withIntermediateDirectories:YES
-                                                 attributes:nil
-                                                      error:&dirError];
-        if (dirError) {
-            NSLog(@"[DownloadVC] Failed to create version dir: %@", dirError.localizedDescription);
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        NSError *writeErr = nil;
-        if (![jsonData writeToFile:versionJsonPath options:NSDataWritingAtomic error:&writeErr]) {
-            NSLog(@"[DownloadVC] Failed to write version JSON: %@", writeErr.localizedDescription);
-            if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(NO); });
-            return;
-        }
-
-        NSLog(@"[DownloadVC] Vanilla version JSON saved: %@ (%lu bytes)", versionJsonPath, (unsigned long)jsonData.length);
-        if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(YES); });
+        if (completion) dispatch_async(dispatch_get_main_queue(), ^{ completion(ok); });
     });
 }
 

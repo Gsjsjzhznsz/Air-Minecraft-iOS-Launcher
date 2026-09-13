@@ -462,18 +462,34 @@ NSString *const ForgeDirectInstallerErrorDomain = @"ForgeDirectInstallerErrorDom
                                                                            options:0
                                                                              error:nil];
     NSTextCheckingResult *match = [regex firstMatchInString:versionId options:0 range:NSMakeRange(0, versionId.length)];
-    if (!match || match.numberOfRanges < 2) return 8;
-    NSString *minorStr = [versionId substringWithRange:[match rangeAtIndex:1]];
-    NSInteger minor = [minorStr integerValue];
-    NSString *patchStr = match.numberOfRanges >= 3 && [match rangeAtIndex:2].location != NSNotFound
-                        ? [versionId substringWithRange:[match rangeAtIndex:2]]
-                        : @"0";
-    NSInteger patch = [patchStr integerValue];
-    if (minor >= 21) return 21;                  // 1.21+
-    if (minor >= 20 && patch >= 5) return 21;    // 1.20.5+
-    if (minor >= 18) return 17;                  // 1.18+
-    if (minor >= 17) return 17;                  // 1.17（项目未捆绑 Java 16，Java 17 可向后兼容运行 1.17）
-    return 8;                                     // 1.16.5 及以下
+    if (match && match.numberOfRanges >= 2) {
+        NSString *minorStr = [versionId substringWithRange:[match rangeAtIndex:1]];
+        NSInteger minor = [minorStr integerValue];
+        NSString *patchStr = match.numberOfRanges >= 3 && [match rangeAtIndex:2].location != NSNotFound
+                            ? [versionId substringWithRange:[match rangeAtIndex:2]]
+                            : @"0";
+        NSInteger patch = [patchStr integerValue];
+        if (minor >= 21) return 21;                  // 1.21+
+        if (minor >= 20 && patch >= 5) return 21;    // 1.20.5+
+        if (minor >= 18) return 17;                  // 1.18+
+        if (minor >= 17) return 17;                  // 1.17（项目未捆绑 Java 16，Java 17 可向后兼容运行 1.17）
+        return 8;                                     // 1.16.5 及以下
+    }
+    // Task 70 修复：无 1.x 片段 → 年份制版本判定（26.x = 1.21.8 起新版本号方案）。
+    // "26.2-forge-…"、"fabric-loader-0.19.5-26.2"、"26.2-neoforge-…" 等此前全部回落
+    // Java 8；26.x 官方 javaVersion.majorVersion=25，按锚定在开头或 [-_] 后的两位年份
+    // （≥26）判定 Java 25。26w 系列快照（如 26w14a）同属 26.x 线。
+    // 注：1.x 命中时不会走到这里，"1.20.1-forge-47.3.0" 中的 47.x 不会误判。
+    if ([versionId hasPrefix:@"26w"]) return 25;
+    NSRegularExpression *yearRegex = [NSRegularExpression regularExpressionWithPattern:@"(?:^|[-_])(\\d{2})\\."
+                                                                               options:0
+                                                                                 error:nil];
+    NSTextCheckingResult *yearMatch = [yearRegex firstMatchInString:versionId options:0 range:NSMakeRange(0, versionId.length)];
+    if (yearMatch && yearMatch.numberOfRanges >= 2) {
+        NSInteger year = [[versionId substringWithRange:[yearMatch rangeAtIndex:1]] integerValue];
+        if (year >= 26) return 25;
+    }
+    return 8;
 }
 
 #pragma mark - Old format (Forge 1.12.2-)

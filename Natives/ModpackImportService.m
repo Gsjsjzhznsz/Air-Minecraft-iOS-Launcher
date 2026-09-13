@@ -2396,7 +2396,15 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
 /// 根据 MC 版本推断所需 Java 主版本号
 /// 1.20.5+ → 21, 1.18+ → 17, 1.17 → 17（项目未捆绑 Java 16，Java 17 可向后兼容），1.16.5- → 8
 - (NSInteger)javaMajorVersionForMC:(NSString *)mcVersion {
+    // Task 70 修复：26.x 年份制新版本号（1.21.8 起的新方案）此前落入 1.x 解析分支——
+    // "26.2" 的 minor=2，全部阈值不命中 → 返回 Java 8。而 26.x 官方 javaVersion.majorVersion=25
+    // （与 JavaLauncher.m 同口径），导致整合包 profile 被写成 Java 8（此前仅靠 launchJVM 的
+    // “低于 minVersion 则忽略”守卫兜底才没崩）。26w 系列快照同属 26.x 线。
+    if (![mcVersion isKindOfClass:[NSString class]] || mcVersion.length == 0) return 8;
+    if ([mcVersion hasPrefix:@"26w"]) return 25;
     NSArray *parts = [mcVersion componentsSeparatedByString:@"."];
+    NSInteger first = [parts.firstObject integerValue];
+    if (first >= 26) return 25;       // 年份制 26.x 及后续（27.x…）→ Java 25
     if (parts.count < 2) return 8;
     NSInteger major = [parts[1] integerValue];
     if (major >= 21) return 21;       // 1.21+

@@ -3,6 +3,7 @@
 
 #import "authenticator/BaseAuthenticator.h"
 #import "installer/modpack/ModpackAPI.h"
+#import "installer/ForgeDirectInstaller.h"
 #import "AFNetworking.h"
 #import "LauncherNavigationController.h"
 #import "LauncherPreferences.h"
@@ -355,7 +356,23 @@ static const NSUInteger kMCStageIndexVerify = 5;
             return;
         }
         if (self.metadata[@"inheritsFrom"]) {
-            NSMutableDictionary *inheritsFromDict = parseJSONFromFile([NSString stringWithFormat:@"%1$s/versions/%2$@/%2$@.json", getenv("POJAV_GAME_DIR"), self.metadata[@"inheritsFrom"]]);
+            NSString *parentJsonPath = [NSString stringWithFormat:@"%1$s/versions/%2$@/%2$@.json", getenv("POJAV_GAME_DIR"), self.metadata[@"inheritsFrom"]];
+            NSMutableDictionary *inheritsFromDict = parseJSONFromFile(parentJsonPath);
+            if (!inheritsFromDict || inheritsFromDict[@"NSErrorObject"]) {
+                // Task 70 修复：父版本 JSON 缺失或损坏（半截写入/解析失败）时，旧实现直接弹
+                // “缺少父版本 %@ 的 version.json”死路——用户明明预装过原版（如 26.2）也会因
+                // 文件损坏被误报“丢失”，未预装时也不会尝试自动补拉。现在：删除坏文件 → 走
+                // ForgeDirectInstaller.ensureParentVersionExists（官方/BMCLAPI 候选轮换 + 3 次
+                // 重试自动补拉）→ 重新解析，仍失败才报错。
+                [NSFileManager.defaultManager removeItemAtPath:parentJsonPath error:nil];
+                NSError *healError = nil;
+                if ([ForgeDirectInstaller ensureParentVersionExists:self.metadata[@"inheritsFrom"] error:&healError]) {
+                    NSLog(@"[MCDL] Task70 parent version JSON re-fetched from manifest: %@", parentJsonPath);
+                    inheritsFromDict = parseJSONFromFile(parentJsonPath);
+                } else {
+                    NSLog(@"[MCDL] Task70 parent version manifest fetch failed: %@", healError.localizedDescription ?: @"unknown");
+                }
+            }
             if (inheritsFromDict && !inheritsFromDict[@"NSErrorObject"]) {  // 添加错误字典检测
                 // 修复：parseJSONFromFile 返回错误字典而非 nil，
                 //   导致 inheritsFrom 父版本缺失时错误字典被当作 metadata
@@ -385,19 +402,26 @@ static const NSUInteger kMCStageIndexVerify = 5;
                 // 阶段5修复（参照 FCL ModpackHelper.ensureCompleteVersion）：
                 // findVersion 失败通常因为 remoteVersionList 尚未加载（整合包导入在后台线程，
                 // 不经过 DownloadViewController 的清单加载流程）。
-                // 此时检查父版本 JSON 是否已由 ensureParentVersionExists 预先下载：
-                //   - 已存在 → 直接走 completionBlock，后续 libraries/assets 下载照常进行
-                //   - 不存在 → 报错（启动器无法继续）
+                // Task 70 修复：本地父版本 JSON 也不存在时，不再直接弹
+                // “缺少父版本 %@ 的 version.json，且远程版本清单未加载”死路（用户只能手动预装
+                // 原版再重试），而是主动走 ForgeDirectInstaller.ensureParentVersionExists 从
+                // Mojang/BMCLAPI 版本清单拉取（候选轮换 + 重试）——与用户“提前下载原版”等价，
+                // 但无需任何手动操作。只有清单也拉不到（网络完全不可用）才报错。
                 NSString *parentJsonPath = [NSString stringWithFormat:@"%1$s/versions/%2$@/%2$@.json",
                                             getenv("POJAV_GAME_DIR"), json[@"inheritsFrom"]];
-                if ([NSFileManager.defaultManager fileExistsAtPath:parentJsonPath]) {
-                    NSLog(@"[MCDL] remoteVersionList not loaded, but parent version JSON exists: %@", parentJsonPath);
-                    completionBlock();
-                    return;
-                } else {
-                    [self finishDownloadWithErrorString:[NSString stringWithFormat:localize(@"i18n_str_447", nil), json[@"inheritsFrom"]]];
-                    return;
+                if (![NSFileManager.defaultManager fileExistsAtPath:parentJsonPath]) {
+                    NSError *fetchError = nil;
+                    if ([ForgeDirectInstaller ensureParentVersionExists:json[@"inheritsFrom"] error:&fetchError]) {
+                        NSLog(@"[MCDL] Task70 parent version JSON fetched from manifest: %@", parentJsonPath);
+                    } else {
+                        NSLog(@"[MCDL] Task70 parent version manifest fetch failed: %@", fetchError.localizedDescription ?: @"unknown");
+                        [self finishDownloadWithErrorString:[NSString stringWithFormat:localize(@"i18n_str_447", nil), json[@"inheritsFrom"]]];
+                        return;
+                    }
                 }
+                NSLog(@"[MCDL] remoteVersionList not loaded, but parent version JSON exists: %@", parentJsonPath);
+                completionBlock();
+                return;
             }
         } else {
             completionBlock();
@@ -510,14 +534,19 @@ static const NSUInteger kMCStageIndexVerify = 5;
 
 - (void)downloadVersion:(NSDictionary *)version {
     self.currentVersionId = version[@"id"];
-    self.stageReportingEnabled = YES;
     [self prepareForDownload];
 
     // ===== 阶段上报初始化（redesign-download-ui Phase 3 Task 3.1）=====
     // 原版 6 步：获取版本清单→下载版本JSON→下载客户端→下载库文件→下载资源文件→验证完整性
+    // Task 70 修复：stageReportingEnabled 原本在 prepareForDownload 之前置 YES，而
+    // prepareForDownload 内 addObserver(NSKeyValueObservingOptionInitial) 会立即同步触发
+    // 一次 KVO 回调 → 此时 vanilla 6 阶段尚未 setTaskWithId:stages: 写入 →
+    // "updateTaskWithId:stageAtIndex:rate: invalid stage index 3/4" 噪音每次必现
+    // （见 2d321fa 日志 128-129 行）。移到阶段写入完成后才开启。
     DownloadTaskManager *manager = [DownloadTaskManager sharedManager];
     NSString *taskId = self.currentDownloadTaskItem.taskId;
     [manager setTaskWithId:taskId stages:PLTaskStagesVanilla()];
+    self.stageReportingEnabled = YES;
     self.currentDownloadTaskItem.autoPresentDetail = YES;
     // 阶段0 版本清单：版本对象由调用方（版本列表/预装流程）解析提供，直接标记完成
     [manager updateTaskWithId:taskId stageAtIndex:kMCStageIndexFetchManifest status:PLTaskStageStatusCompleted];
