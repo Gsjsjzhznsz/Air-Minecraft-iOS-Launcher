@@ -299,6 +299,15 @@ jre: native
 	if [ -f "$(ls jre*.tar.xz)" ]; then rm $(SOURCEDIR)/depends/jre*.tar.xz; fi; \
 	cd $(SOURCEDIR); \
 	rm -rf $(SOURCEDIR)/depends/java-{8,17,21,25}-openjdk/{ASSEMBLY_EXCEPTION,bin,include,jre,legal,LICENSE,man,THIRD_PARTY_README,lib/{ct.sym,jspawnhelper,libjsig.dylib,src.zip,tools.jar}}; \
+	# Task 74: FFM upcall stub mirror translation fix. UpcallStub::create in the
+	# bundled JRE 21/25 forgets mirrored_find_rw() after CodeCache::allocate(),
+	# so the first CodeBlob header store writes the RX-only debugger JIT region
+	# -> SIGBUS (Controlify/FFM upcalls on iOS 26+ TXM mirror JIT). JRE 17 is
+	# unaffected (OptimizedEntryBlob::create already translates). Idempotent;
+	# loud failure on runtime version drift. Details: scripts/patch_jre_upcall_mirror.py.
+	python3 $(SOURCEDIR)/scripts/patch_jre_upcall_mirror.py \
+		$(POJAV_JRE21_DIR)/lib/server/libjvm.dylib \
+		$(POJAV_JRE25_DIR)/lib/server/libjvm.dylib || exit 1; \
 	$(call METHOD_DIRCHECK,$(OUTPUTDIR)/java_runtimes); \
 	cp -R $(POJAV_JRE8_DIR) $(OUTPUTDIR)/java_runtimes; \
 	cp -R $(POJAV_JRE17_DIR) $(OUTPUTDIR)/java_runtimes; \
