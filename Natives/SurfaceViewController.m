@@ -1265,7 +1265,9 @@ static UIView *findSDL_uikitview(UIView *root);
     // 导致系统在 JVM 启动阶段 SIGKILL 进程（日志表现为 "XPC connection interrupted"）。
     int allocmem;
     if (getPrefBool(@"java.auto_ram")) {
-        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.4 : 0.25;
+        // Task68: 与 JavaLauncher.m launchJVM 的 allocmem 计算同步 0.4 -> 0.5
+        // （MC 26.3 内存足迹上调自动内存默认；两处必须逐字一致，否则 Jetsam 上限错位 → 启动期 SIGKILL）。
+        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
         allocmem = roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
     } else {
         allocmem = (int)getPrefInt(@"java.allocated_memory");

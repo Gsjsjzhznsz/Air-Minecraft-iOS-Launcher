@@ -672,7 +672,14 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
     int allocmem;
     if (getPrefBool(@"java.auto_ram")) {
-        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.4 : 0.25;
+        // Task68: auto_ratio 0.4 -> 0.5（memorystatus entitlement 设备）。
+        // 依据（Task60/67 日志实测）：MC 26.3 进世界进程内存 1.2GB -> 3.1GB（视距 32 会话），
+        // 恢复原生 2x 分辨率后预计峰值 3.6-4.0GB；旧默认 0.4（8GB 设备 = 2967MB）在区块加载
+        // 分配风暴期 heap 余量过薄，GC 停顿是「加载区块即卡顿」的候选主因之一。
+        // 0.5（8GB 设备 = 3709MB）后：Jetsam task limit = 3709 + 1024 = 4733MB，
+        // 仍低于物理内存（约 7.4GB）与 5GB increased-memory-limit 上限，安全边界不变。
+        // 注意：本计算必须与 SurfaceViewController.m updateJetsamControl 保持一致（Task68 同步修改）。
+        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
         allocmem = roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
     } else {
         allocmem = getPrefInt(@"java.allocated_memory");
@@ -742,6 +749,19 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     }
     PUSH_MARGV_LITERAL("-Xms128M");
     PUSH_MARGV_FORMAT(@"-Xmx%dM", allocmem);
+    // ============================================================================
+    // Task68: GC / safepoint 停顿观测（「加载区块卡顿」归因层）
+    // ============================================================================
+    // 目的：把 Java 侧停顿（GC 暂停、safepoint）与 [RenderDiag] fps/mem 行放进同一 latestlog
+    // 时间轴；配合 MC 自身的 "Resizing Chunk Sections UBO" 行，下轮日志即可把游戏中掉帧归因到
+    // GC 风暴 / 区块网格上传 / UBO 单帧重配 三者之一，不再靠推测。
+    // 仅 Java 9+ 注入（minVersion > 8，与 defaultJRETag 的 1_16_5_older 分界同源）：
+    // Java 8 无统一日志语法，误注入会导致 JVM 拒绝启动。
+    // 输出量可控：gc 与 safepoint 两个 tag（每次 GC/safepoint 一行量级），非 gc* 全量。
+    if (minVersion > 8) {
+        PUSH_MARGV_LITERAL("-Xlog:gc,safepoint:stdout:time,uptime");
+        NSLog(@"[JavaLauncher] Task68 GC/safepoint pause logging enabled (-Xlog:gc,safepoint -> stdout)");
+    }
     // library.path: 单一 Frameworks 路径（对齐 Ynnyny 仓库）
     //
     // 关键修复（26.2 启动崩溃）：之前 workspace 将 LWJGL dylib 分裂为 lwjgl33/ 和 lwjgl34/ 子目录，
