@@ -64,12 +64,17 @@ bool ame_gl_surface_owns_layer(void) {
 //
 // 本块在每次 eglSwapBuffers 之前（MC 渲染线程、MC 上下文 current）：
 //   1) 探针帧（#1-#5 + 每 200 帧）：glGetIntegerv 查 DRAW/READ binding +
-//      viewport；readback 当前 FBO 中心 8x8（UBYTE 失败换 FLOAT，覆盖 HDR
-//      浮点格式）；readback FBO 0 中心 + 远角 8x8；全部记日志。
-//   2) 自愈 latch：FBO 0 平坦且当前 FBO 有内容 → mode=blit：此后每帧
-//      swap 前 raw ANGLE glBlitFramebuffer(viewport -> 表面实际尺寸)，
-//      scissor 保存/恢复、read/draw binding 恢复。FBO 0 有内容 →
-//      mode=normal 永不干预。unknown 保持探针。
+//      viewport，eglQuerySurface 查表面尺寸（Task58 官方宏），记日志。
+//      【Task 75】回读探针已退役——4770b53 日志实锤：swap#8400（游戏暂停
+//      剧集、dynamic_fps 降帧）探针 glReadPixels 触发 ANGLE Metal
+//      readPixelsCopyImpl → CopyBGRA8ToRGBA8 SIGBUS（读的是即将呈现的
+//      CAMetalLayer drawable 纹理；iOS glReadPixels 间歇性崩溃为社区已知
+//      现象；上游 herbrine8403/Amethyst-iOS swap 路径全程零回读同源佐证）。
+//      内容 uniq/fbo0/corner 字段随之移除。
+//   2) 自愈 latch（Task 75 几何判据化，零回读）：几何对齐（viewport==
+//      surface）→ mode=normal；几何失配 → Task55 realign / Task49
+//      geo-heal blit（纯 blit 零回读、确定性）。黑屏时代（Task41-58）已
+//      闭案：几何判据 + 呈现层卫兵（Task52）足以覆盖全部已知形态。
 //
 // ES 指针从 MG 同款 pin 路径解析（@executable_path/Frameworks/
 // libGLESv2.framework/libGLESv2），指向同一 ANGLE 镜像；对 gl4es 等
@@ -77,7 +82,6 @@ bool ame_gl_surface_owns_layer(void) {
 // ============================================================================
 typedef void (*ame_es_getint_t)(unsigned int, int *);
 typedef void (*ame_es_bindfb_t)(unsigned int, unsigned int);
-typedef void (*ame_es_readpx_t)(int, int, int, int, unsigned int, unsigned int, void *);
 typedef unsigned int (*ame_es_geterr_t)(void);
 typedef unsigned char (*ame_es_isenabled_t)(unsigned int);
 typedef void (*ame_es_enable_t)(unsigned int, unsigned char);
@@ -95,7 +99,6 @@ typedef unsigned int (*ame_es_checkfb_t)(unsigned int);
 typedef struct {
     ame_es_getint_t    getIntegerv;
     ame_es_bindfb_t    bindFramebuffer;
-    ame_es_readpx_t    readPixels;
     ame_es_geterr_t    getError;
     ame_es_isenabled_t isEnabled;
     ame_es_enable_t    enable;
@@ -137,7 +140,7 @@ static ame_es_t ame_es(void) {
     }
     s_es.getIntegerv     = (ame_es_getint_t)dlsym(h, "glGetIntegerv");
     s_es.bindFramebuffer = (ame_es_bindfb_t)dlsym(h, "glBindFramebuffer");
-    s_es.readPixels      = (ame_es_readpx_t)dlsym(h, "glReadPixels");
+    // Task 75：glReadPixels 解析已移除（回读探针退役，Swap 路径零回读）。
     s_es.getError        = (ame_es_geterr_t)dlsym(h, "glGetError");
     s_es.isEnabled       = (ame_es_isenabled_t)dlsym(h, "glIsEnabled");
     s_es.enable          = (ame_es_enable_t)dlsym(h, "glEnable");
@@ -171,32 +174,9 @@ static ame_es_t ame_es(void) {
     return s_es;
 }
 
-// 统计 8x8 RGBA UBYTE 块里不同颜色的个数（1 = 平坦）
-static int ame_count_unique_rgba(const unsigned char *buf, int n_px) {
-    int uniq = 0;
-    unsigned int seen[64];
-    for (int i = 0; i < n_px; ++i) {
-        unsigned int c = ((unsigned)buf[i*4] << 24) | ((unsigned)buf[i*4+1] << 16) |
-                         ((unsigned)buf[i*4+2] << 8) | (unsigned)buf[i*4+3];
-        BOOL found = NO;
-        for (int j = 0; j < uniq; ++j) if (seen[j] == c) { found = YES; break; }
-        if (!found && uniq < 64) seen[uniq++] = c;
-    }
-    return uniq;
-}
-
-// 浮点 readback 兜底：方差>阈值 = 有内容
-static BOOL ame_float_readback_has_content(ame_es_t es, int x, int y) {
-    float buf[8 * 8 * 4];
-    es.readPixels(x, y, 8, 8, 0x1908 /*GL_RGBA*/, 0x1406 /*GL_FLOAT*/, buf);
-    if (es.getError() != 0) return NO; // 未知
-    float minv = 1e30f, maxv = -1e30f;
-    for (int i = 0; i < 8 * 8 * 4; ++i) {
-        if (buf[i] < minv) minv = buf[i];
-        if (buf[i] > maxv) maxv = buf[i];
-    }
-    return (maxv - minv) > 0.001f;
-}
+// Task 75：ame_count_unique_rgba / ame_float_readback_has_content 已随
+// 回读探针一并退役（唯一调用方是探针的内容判定；保留会成死代码告警）。
+// 8x8 回读 → uniq 计数 → “有内容”判定的整条链路自此处消失。
 
 // ============================================================================
 // Task 49：几何自愈 blit（scratch-FBO 两段中转）
@@ -573,7 +553,7 @@ static BOOL ame_task53_realign_surface(void) {
 // 0 = undecided, 1 = normal, 2 = geo-heal blit
 static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapIndex) {
     ame_es_t es = ame_es();
-    if (es.getIntegerv == NULL || es.bindFramebuffer == NULL || es.readPixels == NULL) return;
+    if (es.getIntegerv == NULL || es.bindFramebuffer == NULL) return;
 
     static int s_mode = 0;          // 0 undecided / 1 normal / 2 blit
     const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode == 0;
@@ -720,46 +700,21 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     }
 
     if (probe) {
-        unsigned char cur[8 * 8 * 4];
-        int curUniq = 0, curErr = 0;
-        int cx = viewport[0] + viewport[2] / 2 - 4;
-        int cy = viewport[1] + viewport[3] / 2 - 4;
-        es.readPixels(cx, cy, 8, 8, 0x1908, 0x1401 /*GL_UNSIGNED_BYTE*/, cur);
-        curErr = (int)es.getError();
-        if (curErr == 0) curUniq = ame_count_unique_rgba(cur, 64);
-        BOOL curContent = (curErr == 0 && curUniq > 1);
-        if (!curContent && curErr == 0) {
-            // 64 像素全同色但非黑也可能是一帧纯色，浮点兜底区分方差
-            curContent = ame_float_readback_has_content(es, cx, cy);
-            if (curContent) curUniq = -1; // 标记浮点方差路径
-        }
-
-        // FBO 0 readback：Task 49 修正探针位置——改探 viewport 中心（MC 帧
-        // 实际所在区域；53febda 铁证：旧探 surface 中心/远角落在帧区域之外，
-        // 把“帧在左上 25%”误诊成“FBO 0 全平坦”），远角保留作覆盖率诊断。
-        es.bindFramebuffer(0x8D40 /*GL_FRAMEBUFFER*/, 0);
-        unsigned char fb0[8 * 8 * 4];
-        int fb0Uniq = 0, fb0Err = 0;
-        int fx = viewport[0] + viewport[2] / 2 - 4;
-        int fy = viewport[1] + viewport[3] / 2 - 4;
-        if (fx < 0) fx = 0;
-        if (fy < 0) fy = 0;
-        if (fx + 8 > surfW) fx = (surfW > 8) ? (surfW - 8) : 0;
-        if (fy + 8 > surfH) fy = (surfH > 8) ? (surfH - 8) : 0;
-        es.readPixels(fx, fy, 8, 8, 0x1908, 0x1401, fb0);
-        fb0Err = (int)es.getError();
-        if (fb0Err == 0) fb0Uniq = ame_count_unique_rgba(fb0, 64);
-        unsigned char corner[8 * 8 * 4];
-        int cornerUniq = 0;
-        es.readPixels((surfW > 12) ? (surfW - 12) : 0, (surfH > 12) ? (surfH - 12) : 0,
-                      8, 8, 0x1908, 0x1401, corner);
-        if (es.getError() == 0) cornerUniq = ame_count_unique_rgba(corner, 64);
-        es.bindFramebuffer(0x8D40, (unsigned)drawFb);   // 恢复
-        while (es.getError() != 0) {}
-
-        NSLog(@"[RenderDiag] swap#%lu (Task41): drawFb=%d readFb=%d viewport=%d,%d %dx%d surface=%dx%d cur=(uniq=%d err=0x%x) fbo0vp=(uniq=%d corner=%d err=0x%x) mode=%d",
+        // Task 75：回读探针退役（整块移除）。原实现在此对当前 FBO 中心、
+        // FBO 0 中心、FBO 0 远角各做 8x8 glReadPixels（UBYTE + FLOAT 兜底），
+        // uniq 计数判断“有内容”。4770b53 日志：同一探针连续 46 次成功后
+        // （swap#1..#8200 全部 err=0x0），第 47 次 swap#8400（游戏暂停、
+        // dynamic_fps 降帧剧集）在回读中触发 angle::CopyBGRA8ToRGBA8+0x114
+        // SIGBUS，帧栈：GL_ReadPixels ← ame_task41_swap_forensics ←
+        // gl_swap_buffers。根因：drawFb==0 时回读对象是即将 eglSwapBuffers
+        // 呈现的 CAMetalLayer drawable 纹理，ANGLE Metal readback 的 staging
+        // blit 与 drawable 生命周期存在竞态（暂停时帧间隔变长、回收周期
+        // 改变，竞态窗口被踩中）；iOS glReadPixels 间歇崩溃为社区已知现象，
+        // 上游 Amethyst swap 路径从不回读。诊断收益早已归零（Task58 后几何
+        // 判据已覆盖），风险是整机崩溃——退役，swap 路径自此零回读。
+        NSLog(@"[RenderDiag] swap#%lu (Task75 geo-probe): drawFb=%d readFb=%d viewport=%d,%d %dx%d surface=%dx%d mode=%d (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)",
               swapIndex, drawFb, readFb, viewport[0], viewport[1], viewport[2], viewport[3],
-              surfW, surfH, curUniq, curErr, fb0Uniq, cornerUniq, fb0Err, s_mode);
+              surfW, surfH, s_mode);
 
         // Task51 取证：呈现层可见性全量 dump（首帧 + 每 500 帧，主线程执行）。
         // 动机：连续四轮日志（48/49/50/51 基线）都显示"GL 全绿 + present 成功"
@@ -889,27 +844,24 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             });
         }
 
-        // latch 判定（Task 49 重写：几何优先，允许降级）
-        BOOL fbo0Flat = (fb0Err == 0 && fb0Uniq <= 1);
-        BOOL fbo0Content = (fb0Err == 0 && fb0Uniq > 1);
-        if (s_mode == 0 && fbo0Content && !geoMismatch) {
+        // latch 判定（Task 75 重写：纯几何判据，零回读）。
+        // 旧版依赖 FBO 0 内容回读（fbo0Content/fbo0Flat）——回读已随 Task75
+        // 退役（SIGBUS 崩溃源，见上方退役说明）。新判据：几何对齐
+        // （viewport==surface）本身就是"帧能铺满后缓冲"的充要信号（Task58
+        // 定案：surface==viewport 的会话 100% 健康，本日志 43 次探针同证）。
+        // 几何失配的检出/治愈/降级路径（geoMismatch 分支：Task57 探测 →
+        // Task55 realign → Task51/52 钉扎）不受影响，全部零回读。进入
+        // mode=2 的唯一通道 = geoMismatch 分支的 realign 失败；退出通道保留
+        // Task50 语义（几何恢复对齐即退出，不再要求内容证据）。
+        if (s_mode == 0 && !geoMismatch) {
             s_mode = 1;
-            NSLog(@"[RenderDiag] Task41 latch: NORMAL present (FBO 0 has content at viewport center, geometry aligned)");
-        } else if (s_mode == 0 && fbo0Flat && curContent && drawFb != 0) {
-            s_mode = 2;
-            NSLog(@"[RenderDiag] Task41 latch: GEO-HEAL (MC frame lives in FBO %d, FBO 0 is flat -- blitting every swap)", drawFb);
-        } else if (s_mode == 1 && fbo0Flat && curContent && drawFb != 0) {
-            // Task 49：降级——曾判 NORMAL，但现在帧从未进后缓冲（留在 MC 自己
-            // 的 FBO）→ 重新启用自愈。旧版单向 latch 是自愈永不启动的原因之一。
-            s_mode = 2;
-            NSLog(@"[RenderDiag] Task41 latch DEMOTED to GEO-HEAL (FBO 0 went flat while MC FBO %d has content)", drawFb);
-        } else if (s_mode == 2 && !geoMismatch && fbo0Content) {
-            // Task 50：反向恢复——几何已对齐（viewport==surface）且 FBO 0 有
-            // 内容 → 退出 geo-heal，停止逐帧 scratch 中转。旧版一旦进入
-            // mode=2 便永不退出（几何修复后仍每帧 blit，白耗带宽且状态机
-            // 无法回到正常呈现路径）。
+            NSLog(@"[RenderDiag] Task41 latch: NORMAL present (geometry aligned, readback retired by Task75)");
+        } else if (s_mode == 2 && !geoMismatch) {
+            // Task 50 语义保留（判据改几何）：几何恢复对齐 → 退出 geo-heal，
+            // 停止逐帧 scratch 中转（旧版一旦进入 mode=2 便永不退出，几何
+            // 修复后仍每帧 blit，白耗带宽且状态机无法回到正常呈现路径）。
             s_mode = 1;
-            NSLog(@"[RenderDiag] Task50 heal disengaged: geometry aligned (viewport==surface) and FBO 0 has content -- back to normal present");
+            NSLog(@"[RenderDiag] Task50 heal disengaged: geometry aligned (viewport==surface) -- back to normal present");
         }
     }
 
