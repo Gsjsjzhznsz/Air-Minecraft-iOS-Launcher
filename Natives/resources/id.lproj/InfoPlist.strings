@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air menggunakan jaringan lokal untuk menemukan dan berkomunikasi dengan AltServer serta server LAN, dan mengaktifkan multipemain via Terracotta (kompatibel dengan HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Air menggunakan mikrofon untuk mendukung mod obrolan suara.";

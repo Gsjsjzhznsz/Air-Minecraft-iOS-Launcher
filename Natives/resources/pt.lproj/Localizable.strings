@@ -48,3 +48,4 @@
 "preference.title.auto_ram" = "RAM automática";
 "preference.detail.auto_ram" = "Ativa o ajuste automático de RAM";
 "preference.detail.allocated_memory" = "Controla quanta memória é dada ao Minecraft";
+"preference.profile.title.lwjgl_version" = "Versão do LWJGL";

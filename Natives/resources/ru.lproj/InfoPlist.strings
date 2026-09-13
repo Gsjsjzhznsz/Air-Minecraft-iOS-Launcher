@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air использует локальную сеть для поиска AltServer и LAN-серверов, а также для мультиплеера через Terracotta (совместимо с HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Air использует микрофон для поддержки модов голосового чата.";

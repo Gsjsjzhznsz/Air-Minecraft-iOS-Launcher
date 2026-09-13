@@ -54,3 +54,4 @@
 "preference.detail.auto_ram" = "เปิดใช้งานตัวปรับ RAM อัตโนมัติ";
 "preference.detail.allocated_memory" = "ควบคุมเเรมที่จะให้กับเกมมายคราฟ";
 "controller_configurator.playstation.title.named_back" = "เลือก";
+"preference.profile.title.lwjgl_version" = "เวอร์ชัน LWJGL";

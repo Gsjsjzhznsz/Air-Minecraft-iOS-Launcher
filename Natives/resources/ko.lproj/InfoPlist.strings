@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air가 로컬 네트워크를 사용하여 AltServer 및 LAN 서버를 찾아 통신하고, Terracotta를 통한 멀티플레이(HMCL/FCL/ZL2 호환)를 활성화합니다.";
+"NSMicrophoneUsageDescription" = "Air가 마이크를 사용하여 음성 채팅 모드 기능을 활성화합니다.";

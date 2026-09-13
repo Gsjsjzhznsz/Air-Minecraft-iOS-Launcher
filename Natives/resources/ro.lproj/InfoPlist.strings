@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air folosește rețeaua locală pentru a găsi și comunica cu AltServer și servere LAN, precum și pentru a activa multiplayerul prin Terracotta (compatibil cu HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Air folosește microfonul pentru a suporta modurile de chat vocal.";

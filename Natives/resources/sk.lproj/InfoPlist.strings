@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air používa miestnu sieť na vyhľadávanie a komunikáciu so servermi AltServer a LAN a na povolenie hry pre viacerých hráčov cez Terracotta (kompatibilné s HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Air používa mikrofón na podporu modov hlasového chatu.";

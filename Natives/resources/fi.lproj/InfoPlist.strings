@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air käyttää paikallisverkkoa AltServer- ja LAN-palvelimien löytämiseen ja kommunikointiin sekä moninpelin käyttöönottoon Terracottan kautta (yhteensopiva HMCL/FCL/ZL2:n kanssa).";
+"NSMicrophoneUsageDescription" = "Air käyttää mikrofonia puhechat-modien tukemiseen.";

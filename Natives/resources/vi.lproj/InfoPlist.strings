@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air sử dụng mạng cục bộ để tìm kiếm và giao tiếp với AltServer cùng các máy chủ LAN, đồng thời bật chế độ nhiều người chơi qua Terracotta (tương thích HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Air sử dụng micrô để hỗ trợ mod trò chuyện thoại.";

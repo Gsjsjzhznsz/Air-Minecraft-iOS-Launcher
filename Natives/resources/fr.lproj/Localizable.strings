@@ -192,3 +192,4 @@
 "preference.title.debug_show_layout_overlap" = "Afficher le chevauchement de la mise en page";
 "preference.detail.debug_show_layout_overlap" = "Superposez chaque vue avec une couleur transparente pour révéler des vues qui se chevauchent.";
 "controller_configurator.playstation.title.named_back" = "Sélectionner";
+"preference.profile.title.lwjgl_version" = "Version de LWJGL";

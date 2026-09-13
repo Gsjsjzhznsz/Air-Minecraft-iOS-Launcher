@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Az Air a helyi hálózatot használja az AltServer- és LAN-kiszolgálók megtalálásához és kommunikációhoz, valamint a Terracottán keresztüli többjátékos mód engedélyezéséhez (HMCL/FCL/ZL2 kompatibilis).";
+"NSMicrophoneUsageDescription" = "Az Air a mikrofont használja a hangcsevegő-modok támogatásához.";

@@ -243,3 +243,4 @@
 
 "controller_configurator.section.config_files" = "Текущий файл настроек";
 "controller_configurator.section.controller_style" = "Тип контроллера";
+"preference.profile.title.lwjgl_version" = "Версия LWJGL";

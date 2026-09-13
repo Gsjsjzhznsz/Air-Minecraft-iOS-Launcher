@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Το Air χρησιμοποιεί το τοπικό δίκτυο για εύρεση και επικοινωνία με AltServer και διακομιστές LAN, καθώς και για ενεργοποίηση πολλών παικτών μέσω Terracotta (συμβατό με HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Το Air χρησιμοποιεί το μικρόφωνο για υποστήριξη mod φωνητικής συνομιλίας.";

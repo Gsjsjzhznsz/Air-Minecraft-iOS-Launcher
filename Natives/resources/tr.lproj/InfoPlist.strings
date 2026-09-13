@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air, AltServer ve LAN sunucularını bulmak ve onlarla iletişim kurmak için yerel ağı kullanır ve Terracotta üzerinden çok oyunculu oyunu etkinleştirir (HMCL/FCL/ZL2 uyumlu).";
+"NSMicrophoneUsageDescription" = "Air, sesli sohbet modlarını desteklemek için mikrofonu kullanır.";

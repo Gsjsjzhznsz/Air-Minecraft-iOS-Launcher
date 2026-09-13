@@ -29,3 +29,4 @@
 "Settings" = "Settings";
 
 "preference.title.renderer" = "Renderitzador";
+"preference.profile.title.lwjgl_version" = "Versió de LWJGL";

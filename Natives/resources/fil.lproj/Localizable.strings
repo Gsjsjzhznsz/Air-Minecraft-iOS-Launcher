@@ -186,3 +186,4 @@
 "preference.title.debug_show_layout_overlap" = "Ipakita ang layout na magkakapatong";
 "preference.detail.debug_show_layout_overlap" = "I-overlay ang bawat view gamit ang isang transparent na kulay upang ipakita ang mga magkakapatong na view.";
 "controller_configurator.playstation.title.named_back" = "Iselekta";
+"preference.profile.title.lwjgl_version" = "Bersyon ng LWJGL";

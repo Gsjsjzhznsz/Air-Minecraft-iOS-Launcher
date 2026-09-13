@@ -170,3 +170,4 @@
 "preference.title.debug_show_layout_overlap" = "Mostrar sobreposição de layout";
 "preference.detail.debug_show_layout_overlap" = "Sobreponha cada exibições com cores transparentes para revelar visões de sobreposição.";
 "controller_configurator.playstation.title.named_back" = "Selecionar";
+"preference.profile.title.lwjgl_version" = "Versão do LWJGL";

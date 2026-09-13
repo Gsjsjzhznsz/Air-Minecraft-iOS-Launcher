@@ -27,10 +27,15 @@
 
 #include "JavaLauncher.h"
 
+// Task66：抓取切换沿复位摇杆方向去重状态（实现于 customcontrols/ControlJoystick.m）
+extern void AmeControlJoystickOnGrabChange(BOOL grabbed);
+
 // SDL3 event injection via dlsym — used when GLFW callbacks are NULL (MC 26.3)
-// Only SDL_PushEvent and SDL_GetWindowID are exported from libSDL3.dylib.
-// Internal functions like SDL_SendMouseMotion are NOT exported, so we construct
-// SDL_Event structs and push them directly.
+// SDL_PushEvent / SDL_GetWindowID / SDL_GetKeyboardState / SDL_SetModState are
+// exported from libSDL3.dylib (Task66 symbol-table verified). Internal functions
+// like SDL_SendKeyboardKey are NOT exported (LOCAL symbol), so we construct
+// SDL_Event structs and push them directly, then sync SDL's internal keyboard
+// state array manually (ame66_syncKeyboardState).
 //
 // We cannot #include <SDL3/SDL_events.h> from the Natives build, so we define
 // the minimal constants and structs we need inline.
@@ -113,9 +118,21 @@ typedef bool SDL_PushEvent_func(void *event);
 typedef uint32_t SDL_GetWindowID_func(void *window);
 typedef bool SDL_HideCursor_func(void);
 typedef bool SDL_ShowCursor_func(void);
+// Task 66：SDL 内部键盘状态同步（导出符号已在 libSDL3.dylib 符号表实锤：
+// SDL_GetKeyboardState @0x2a56c / SDL_SetModState @0x2a584，N_EXT|N_SECT）。
+// SDL_SendKeyboardKey 是 LOCAL 符号不可 dlsym，官方管线不可用，改手动同步。
+typedef const bool *SDL_GetKeyboardState_func(int *numkeys);
+typedef unsigned short SDL_GetModState_func(void);
+typedef void SDL_SetModState_func(unsigned short modstate);
 
 static SDL_PushEvent_func     *pSDL_PushEvent     = NULL;
 static SDL_GetWindowID_func   *pSDL_GetWindowID   = NULL;
+static SDL_GetKeyboardState_func *pSDL_GetKeyboardState = NULL;  // Task66
+static SDL_GetModState_func   *pSDL_GetModState   = NULL;        // Task66
+static SDL_SetModState_func   *pSDL_SetModState   = NULL;        // Task66
+static bool *ame66_kbState = NULL;   // Task66：SDL 内部键盘状态数组（SDL_GetKeyboardState 返回值，直接写入）
+static int    ame66_kbNumKeys = 0;   // Task66：数组长度（SDL3 = 512 = SDL_NUM_SCANCODES）
+static unsigned short ame66_virtualMods = 0;  // Task66：虚拟修饰键掩码（我们注入的 shift/ctrl/alt/gui）
 static void *g_sdlWindow = NULL;  // The real SDL3 window pointer
 
 static void initSDLEventFuncs(void) {
@@ -124,8 +141,12 @@ static void initSDLEventFuncs(void) {
     inited = YES;
     pSDL_PushEvent   = dlsym(RTLD_DEFAULT, "SDL_PushEvent");
     pSDL_GetWindowID = dlsym(RTLD_DEFAULT, "SDL_GetWindowID");
-    NSLog(@"[InputDiag] initSDLEventFuncs: PushEvent=%p GetWindowID=%p g_sdlWindow=%p",
-        (void*)pSDL_PushEvent, (void*)pSDL_GetWindowID, g_sdlWindow);
+    pSDL_GetKeyboardState = dlsym(RTLD_DEFAULT, "SDL_GetKeyboardState");  // Task66
+    pSDL_GetModState = dlsym(RTLD_DEFAULT, "SDL_GetModState");            // Task66
+    pSDL_SetModState = dlsym(RTLD_DEFAULT, "SDL_SetModState");            // Task66
+    NSLog(@"[InputDiag] initSDLEventFuncs: PushEvent=%p GetWindowID=%p g_sdlWindow=%p Task66GetKBState=%p SetModState=%p",
+        (void*)pSDL_PushEvent, (void*)pSDL_GetWindowID, g_sdlWindow,
+        (void*)pSDL_GetKeyboardState, (void*)pSDL_SetModState);
 }
 
 // Called from UIKit_CreateWindow to register the real SDL window
@@ -237,6 +258,87 @@ static uint32_t ame53_keycode_from_scancode(SDL3_Scancode sc) {
     }
 }
 
+// ============================================================================
+// Task 66（虚拟键状态同步）：SDL 内部键盘状态与注入事件解耦的根因修复
+//
+// 现象链（用户实测："很奇怪要按下 shift 才能移动" + 摇杆需反复晃动才动）：
+//   Path B 用 SDL_PushEvent 注入虚拟键事件，事件能被 MC 消费（Task64/65
+//   日志已证 1:1 送达），但 SDL_PushEvent 只入队——SDL_GetKeyboardState()
+//   返回的内部状态数组与 SDL_GetModState() 的修饰键态由 SDL 自家管线
+//   （SDL_SendKeyboardKey，LOCAL 符号不可 dlsym）维护，对注入事件零感知。
+//
+//   MC 26.3（反编译实锤）有四类消费点轮询"真实"键盘态而非事件流：
+//   1. MouseHandler.grabMouse() → KeyMapping.setAll()
+//      （InputQuirks.RESTORE_KEY_STATE_AFTER_MOUSE_GRAB = !OSX = iOS 恒真）
+//      把所有键盘键位 isDown 强制覆盖为 SDL_GetKeyboardState 轮询值。
+//      虚拟键不可见 → 每次进出菜单/进世界，摇杆按住的 W/A/S/D 全被清成
+//      false；而 ControlJoystick.callbackMoveX 有 lastDirection 去重，
+//      同方向不再重发 → 玩家"卡住"直到换方向——与日志实测（90 秒内
+//      450+ sendKey ≈ 112 次换向 = 用户反复晃动摇杆挣扎）完全吻合。
+//   2. Minecraft.hasShiftDown()/hasControlDown()/hasAltDown()
+//      轮询 scancode 225/229/224/228 → 虚拟 Shift/Ctrl 永远不可见。
+//   3. SDLEventHandler.handleMouseButtonEvent 把 SDL_GetModState() 塞进
+//      MouseButtonInfo → 修饰键语义（shift 点击等）丢失。
+//   4. InputQuirks.isQuitShortcutDown / isShiftInvertedScroll 同源受害。
+//
+// 修复：pushSDLKeyboardEvent 推完事件后，把该键写入 SDL_GetKeyboardState
+// 返回的内部数组（SDL 拥有的 .bss 内存，单写者竞争仅剩蓝牙真键盘，同键
+// 同时一虚一真属罕见且自愈）；修饰键事件额外维护虚拟掩码，经 SDL_SetModState
+// 合并进 SDL 修饰键态（保留非托管位，不清真键盘的修饰键）。
+// ============================================================================
+
+// SDL3 Keymod 位（SDL_Keymod，与 SDL2 同值）
+#define AME66_KMOD_LSHIFT 0x0001
+#define AME66_KMOD_RSHIFT 0x0002
+#define AME66_KMOD_LCTRL  0x0040
+#define AME66_KMOD_RCTRL  0x0080
+#define AME66_KMOD_LALT   0x0100
+#define AME66_KMOD_RALT   0x0200
+#define AME66_KMOD_LGUI   0x0400
+#define AME66_KMOD_RGUI   0x0800
+#define AME66_KMOD_MANAGED_MASK (0x0003u | 0x00C0u | 0x0300u | 0x0C00u)
+
+static void ame66_syncKeyboardState(int sc, bool down) {
+    // 惰性获取 SDL 内部键盘状态数组
+    if (ame66_kbState == NULL && pSDL_GetKeyboardState != NULL) {
+        int n = 0;
+        ame66_kbState = (bool *)pSDL_GetKeyboardState(&n);
+        ame66_kbNumKeys = n;
+        NSLog(@"[InputDiag] Task66 kb-state sync ready: array=%p numkeys=%d (SDL_GetKeyboardState passthrough)",
+              (void *)ame66_kbState, ame66_kbNumKeys);
+    }
+    if (ame66_kbState != NULL && sc > 0 && sc < ame66_kbNumKeys) {
+        ame66_kbState[sc] = down;
+    }
+
+    // 修饰键掩码：合并进 SDL 修饰键态（保留非托管位，不清真键盘修饰键）
+    unsigned short bit = 0;
+    switch (sc) {
+        case 225: bit = AME66_KMOD_LSHIFT; break;   // SDL_SCANCODE_LEFT_SHIFT
+        case 229: bit = AME66_KMOD_RSHIFT; break;   // SDL_SCANCODE_RIGHT_SHIFT
+        case 224: bit = AME66_KMOD_LCTRL;  break;   // SDL_SCANCODE_LEFT_CONTROL
+        case 228: bit = AME66_KMOD_RCTRL;  break;   // SDL_SCANCODE_RIGHT_CONTROL
+        case 226: bit = AME66_KMOD_LALT;   break;   // SDL_SCANCODE_LEFT_ALT
+        case 230: bit = AME66_KMOD_RALT;   break;   // SDL_SCANCODE_RIGHT_ALT
+        case 227: bit = AME66_KMOD_LGUI;   break;   // SDL_SCANCODE_LEFT_GUI
+        case 231: bit = AME66_KMOD_RGUI;   break;   // SDL_SCANCODE_RIGHT_GUI
+    }
+    if (bit) {
+        if (down) {
+            ame66_virtualMods |= bit;
+        } else {
+            ame66_virtualMods &= (unsigned short)~bit;
+        }
+        if (pSDL_SetModState && pSDL_GetModState) {
+            unsigned short real = pSDL_GetModState();
+            unsigned short merged = (unsigned short)((real & ~AME66_KMOD_MANAGED_MASK) | ame66_virtualMods);
+            pSDL_SetModState(merged);
+            NSLog(@"[InputDiag] Task66 modstate sync: sc=%d down=%d virt=0x%x real=0x%x merged=0x%x",
+                  sc, down ? 1 : 0, ame66_virtualMods, real, merged);
+        }
+    }
+}
+
 // Push a keyboard event into SDL's event queue
 static void pushSDLKeyboardEvent(SDL3_Scancode scancode, bool down) {
     if (!pSDL_PushEvent || !g_sdlWindow) return;
@@ -251,6 +353,7 @@ static void pushSDLKeyboardEvent(SDL3_Scancode scancode, bool down) {
     ev.down = down;
     ev.repeat = false;
     pSDL_PushEvent((void*)&ev);
+    ame66_syncKeyboardState((int)scancode, down);   // Task66：同步 SDL 内部键盘态
 }
 
 // Push a mouse wheel event into SDL's event queue
@@ -639,6 +742,8 @@ void pojavPumpEvents(void* window) {
             if (relMode != isGrabbing) {
                 BOOL wasGrabbing = isGrabbing;
                 isGrabbing = relMode;
+                // Task66：兑底路径同样复位摇杆方向去重状态
+                AmeControlJoystickOnGrabChange(relMode);
 
                 if (!wasGrabbing && relMode) {
                     pushSDLMouseButton(1, false, (float)cursorX, (float)cursorY);
@@ -1066,6 +1171,12 @@ void CallbackBridge_syncGrabStateFromSDL(BOOL relMode, const char *source) {
     isGrabbing = relMode;
     NSLog(@"[InputDiag] grab state -> %d (was %d, source=%s)",
           relMode, wasGrabbing, source ? source : "?");
+
+    // Task66：抓取切换时复位摇杆方向去重状态。1→0（开界面）时摇杆补发
+    // WASD 释放；两个沿都把 lastDirection 复位，迫使下次推杆重发全量状态
+    // （配合 ame66_syncKeyboardState，setAll 恢复的 SDL 态从此与虚拟键一致）。
+    AmeControlJoystickOnGrabChange(relMode);
+
 
     // 进入抓取时补发一次左键释放：菜单里那次 ACTION_DOWN 否则永远不会抬起
     if (!wasGrabbing && relMode) {

@@ -206,3 +206,4 @@
 "controller_configurator.title.type.xbox" = "Xbox";
 "controller_configurator.title.type.playstation" = "PlayStation";
 "controller_configurator.playstation.title.named_back" = "Pilih";
+"preference.profile.title.lwjgl_version" = "Versi LWJGL";

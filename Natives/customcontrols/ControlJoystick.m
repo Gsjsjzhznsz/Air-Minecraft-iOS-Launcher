@@ -20,6 +20,34 @@ extern BOOL leftShiftHeld;
 extern CGFloat lastXValue; // lastHorizontalValue
 extern CGFloat lastYValue; // lastVerticalValue
 
+// ============================================================================
+// Task 66（抓取切换时的摇杆状态复位）：
+// callbackMoveX 的 lastDirection 去重会在方向不变时吞掉全量刷新。
+// MC 开关界面时（grab 1→0/0→1）：Java 侧 releaseAll/setAll 会清空/重建
+// 键位态（setAll 轮询 SDL_GetKeyboardState——Task66 已让虚拟键可见），
+// 摇杆若不重新发送全量状态，同方向推杆会被去重吞掉 → “推杆不动，
+// 换个方向才动”。两个方向切换沿都把 lastDirection 复位到 -2（未知），
+// 迫使下一次 touchesMoved 重发全量 W/A/S/D 状态。
+// 1→0（开界面）时额外补发 4 键释放：镜像物理键盘语义，防止虚拟键在
+// SDL 键盘数组里滞留（否则关界面后 setAll 会恢复幽灵行走）。
+// 由 input_bridge_v3.m 的 CallbackBridge_syncGrabStateFromSDL 调用。
+// ============================================================================
+static char ame66_joystickLastDirection = -2;
+
+void AmeControlJoystickOnGrabChange(BOOL grabbed) {
+    if (!grabbed && ame66_joystickLastDirection >= 0) {
+        // 开界面：释放当前方向的全部按键（W/A/S/D up）
+        CallbackBridge_nativeSendKey(GLFW_KEY_W, 0, 0, 0);
+        CallbackBridge_nativeSendKey(GLFW_KEY_A, 0, 0, 0);
+        CallbackBridge_nativeSendKey(GLFW_KEY_S, 0, 0, 0);
+        CallbackBridge_nativeSendKey(GLFW_KEY_D, 0, 0, 0);
+        NSLog(@"[Task66] joystick reset on ungrab: WASD released (lastDirection=%d)",
+              (int)ame66_joystickLastDirection);
+    }
+    // 双向复位：0→1 时 setAll 已从 SDL 状态恢复真实态，-2 迫使下次重发全量
+    ame66_joystickLastDirection = -2;
+}
+
 // From CustomControlsUtils
 NSMutableDictionary* createButton(NSString* name, int* keycodes, NSString* dynamicX, NSString* dynamicY, CGFloat width, CGFloat height);
 
@@ -130,7 +158,9 @@ NSMutableDictionary* createButton(NSString* name, int* keycodes, NSString* dynam
         return;
     }
 
-    static char lastDirection = -2;
+    // Task66：lastDirection 提升为文件级 ame66_joystickLastDirection，
+    // 抓取切换沿可复位（见文件头 AmeControlJoystickOnGrabChange）
+    char lastDirection = ame66_joystickLastDirection;
     char direction = -1;
     if (xValue != 0 && yValue != 0) {
         CGFloat degree = atan2f(yValue, xValue) * (180.0 / M_PI);
@@ -176,7 +206,7 @@ NSMutableDictionary* createButton(NSString* name, int* keycodes, NSString* dynam
         mod);
 
     self.fwdLockView.hidden = direction != DIRECTION_NORTH;
-    lastDirection = direction;
+    ame66_joystickLastDirection = direction;
 }
 
 - (void)setFrame:(CGRect)frame {

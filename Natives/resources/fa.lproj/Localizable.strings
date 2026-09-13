@@ -187,3 +187,4 @@
 "preference.title.debug_show_layout_overlap" = "نمایش همپوشانی طرح";
 "preference.detail.debug_show_layout_overlap" = "هر نما را با یک رنگ شفاف پوشش دهید تا نماهای همپوشانی نشان داده شود.";
 "controller_configurator.playstation.title.named_back" = "انتخاب";
+"preference.profile.title.lwjgl_version" = "نسخه LWJGL";

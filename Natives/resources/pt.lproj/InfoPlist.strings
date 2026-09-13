@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "A Air usa a rede local para encontrar e comunicar com o AltServer e servidores LAN, e ativar o multijogador via Terracotta (compatível com HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "A Air usa o microfone para suportar mods de chat de voz.";

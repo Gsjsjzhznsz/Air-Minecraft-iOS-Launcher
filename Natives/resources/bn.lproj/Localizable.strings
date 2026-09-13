@@ -2,3 +2,4 @@
 
 "game.title.exit_code" = "গেম কোড সহ প্রস্থান করেছে %d";
 "login.option.select" = "আ্যকাউন্ট নির্বাচন করুন";
+"preference.profile.title.lwjgl_version" = "LWJGL সংস্করণ";

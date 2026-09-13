@@ -70,3 +70,4 @@
 "preference.detail.debug_auto_correction" = "Lubab mängus teksti kirjutamisel automaatparanduse.";
 "preference.title.debug_hide_home_indicator" = "Peida koduindikaator";
 "preference.detail.debug_hide_home_indicator" = "See keelab koduindikaatori lukustamise. Koduindikaatori samal ajal peitmiseks ja lukustamiseks pead kasutama Guided Access'i.";
+"preference.profile.title.lwjgl_version" = "LWJGL versioon";

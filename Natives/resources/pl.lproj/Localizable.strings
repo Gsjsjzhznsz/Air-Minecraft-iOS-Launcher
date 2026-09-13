@@ -177,3 +177,4 @@
 "preference.title.debug_show_layout_overlap" = "Pokaż nakładające się układy";
 "preference.detail.debug_show_layout_overlap" = "Nakładaj każdy widok przezroczystym kolorem, aby odsłonić nakładające się widoki.";
 "controller_configurator.playstation.title.named_back" = "Wybierz";
+"preference.profile.title.lwjgl_version" = "Wersja LWJGL";

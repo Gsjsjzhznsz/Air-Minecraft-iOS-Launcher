@@ -3,3 +3,4 @@
 "custom_controls.button_edit.bg_color" = "Baggrundsfarve";
 
 "News" = "Nyt";
+"preference.profile.title.lwjgl_version" = "LWJGL-version";

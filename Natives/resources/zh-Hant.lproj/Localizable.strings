@@ -1974,3 +1974,4 @@
 "Edit profile" = "編輯設定檔";
 "login.title" = "登入";
 "login.cancelled" = "登入已取消";
+"preference.profile.title.lwjgl_version" = "LWJGL 版本";

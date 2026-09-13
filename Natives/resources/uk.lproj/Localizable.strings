@@ -258,3 +258,4 @@
 "controller_configurator.playstation.title.thumb_left" = "L3";
 "controller_configurator.playstation.title.thumb_right" = "R3";
 "controller_configurator.section.controller_style" = "Тип контролера";
+"preference.profile.title.lwjgl_version" = "Версія LWJGL";

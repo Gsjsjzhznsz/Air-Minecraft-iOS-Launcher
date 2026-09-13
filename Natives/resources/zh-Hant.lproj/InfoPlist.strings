@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air 使用本地網路來尋找並與 AltServer 及區域網路伺服器通訊，並透過 Terracotta 啟用聯機功能（相容 HMCL/FCL/ZL2）。";
+"NSMicrophoneUsageDescription" = "Air 使用麥克風來實現語音聊天模組功能。";

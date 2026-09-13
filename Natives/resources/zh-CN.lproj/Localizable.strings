@@ -1974,3 +1974,4 @@
 "Edit profile" = "编辑档案";
 "login.title" = "登录";
 "login.cancelled" = "登录已取消";
+"preference.profile.title.lwjgl_version" = "LWJGL 版本";

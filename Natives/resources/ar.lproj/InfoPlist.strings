@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "يستخدم Air الشبكة المحلية للعثور على AltServer وخوادم LAN والتواصل معها، وتمكين اللعب الجماعي عبر Terracotta (متوافق مع HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "يستخدم Air الميكروفون لدعم إضافات الدردشة الصوتية.";

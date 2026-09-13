@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air ใช้เครือข่ายภายในเพื่อค้นหาและสื่อสารกับ AltServer และเซิร์ฟเวอร์ LAN รวมถึงเปิดใช้งานผู้เล่นหลายคนผ่าน Terracotta (เข้ากันได้กับ HMCL/FCL/ZL2)";
+"NSMicrophoneUsageDescription" = "Air ใช้ไมโครโฟนเพื่อรองรับม็อดแชทด้วยเสียง";

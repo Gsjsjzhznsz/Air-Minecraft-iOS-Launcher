@@ -1,3 +1,4 @@
 "game.menu.log_output" = "लॉग आउटपुट";
 "custom_controls.control_menu.exit" = "बाहर जाएं";
 "login.option.select" = "एकाउंट का चयन करें ";
+"preference.profile.title.lwjgl_version" = "LWJGL संस्करण";

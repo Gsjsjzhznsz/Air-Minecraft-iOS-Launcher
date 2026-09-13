@@ -19,3 +19,4 @@
 "Settings" = "Көйләүҙәр";
 
 "preference.title.renderer" = "Рендерер";
+"preference.profile.title.lwjgl_version" = "LWJGL version";

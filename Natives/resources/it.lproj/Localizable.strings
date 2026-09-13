@@ -162,3 +162,4 @@
 "preference.title.debug_show_layout_overlap" = "Mostra sovrapposizione del layout";
 "preference.detail.debug_show_layout_overlap" = "Sovrapponi ad ogni visuale un colore trasparente per mostrare visuali sovrapposte.";
 "controller_configurator.playstation.title.named_back" = "Seleziona";
+"preference.profile.title.lwjgl_version" = "Versione LWJGL";

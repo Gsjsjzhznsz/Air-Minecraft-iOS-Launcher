@@ -1,0 +1,2 @@
+"NSLocalNetworkUsageDescription" = "Air はローカルネットワークを使用して AltServer や LAN サーバーを検索・通信し、Terracotta によるマルチプレイ（HMCL/FCL/ZL2 互換）を有効にします。";
+"NSMicrophoneUsageDescription" = "Air はマイクを使用してボイスチャット MOD の機能を有効にします。";

@@ -21,3 +21,4 @@
 
 "preference.title.game_directory" = "Spelkatalog";
 "preference.detail.allocated_memory" = "Kontrollerar hur mycket minne som ges till Minecraft";
+"preference.profile.title.lwjgl_version" = "LWJGL-version";
