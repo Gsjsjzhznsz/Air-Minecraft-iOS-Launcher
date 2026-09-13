@@ -1,0 +1,227 @@
+[shaderc-sandbox] fork() failed errno=1 -- sandbox disabled (iOS sandbox denies fork on this install?)
+[Pre-Init] Amethyst iOS Remastered INIT!
+[Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
+[Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
+[Pre-Init] Version: 5.0.0
+[Pre-Init] Commit: 28ed841 (main)
+[Pre-Init] Device: iPad Air 11-inch (M4)
+[Pre-Init] iPadOS 26.6 (23G71) (Unjailbroken)
+[Pre-init] Entitlements availability:
+* com.apple.developer.kernel.extended-virtual-addressing: NO
+* com.apple.developer.kernel.increased-memory-limit: YES
+* com.apple.private.security.no-sandbox: NO
+* jb.pmap_cs.custom_trust: NO
+* dynamic-codesigning: NO
+[Debugging] Debug log enabled: YES
+[Pre-init] Restored game directory preference (default)
+[SceneDelegate] Failed to update geometry: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
+[SceneDelegate] Terracotta temporarily disabled for crash investigation
+[IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Library/Caches/IconLoader, mirror enabled: YES
+[LauncherRootVC] Loaded 915 remote versions
+[ModpackDownload] Modpack download attempt 1: https://cdn.modrinth.com/data/1KVo5zza/versions/ssWn7YI0/Fabulously.Optimized-v14.1.0.mrpack
+[DownloadVC] Vanilla 26.2 already installed (JSON + jar exist), skip preinstall
+[ModpackDL] Extracted overrides/config/crash_assistant/config.toml
+[ModpackDL] Extracted overrides/config/crash_assistant/crash_assistant_localization_overrides/en_us.json
+[ModpackDL] Extracted overrides/config/crash_assistant/scripts/log_analysis/blame-mods.jexl
+[ModpackDL] Extracted overrides/config/fabric_loader_dependencies.json
+[ModpackDL] Extracted overrides/config/isxander-main-menu-credits.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/BBEConfig.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/NoChatReports/NCR-Client.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/NoChatReports/NCR-Common.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/PaginatedAdvancements.json5
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/bettergrass.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/cape-provider/config.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/config.toml
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/be_by.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/en_us.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/es_es.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/es_ve.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/et_ee.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/fr_fr.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/he_il.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/it_it.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/ms_my.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/pl_pl.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/ro_ro.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/ru_ru.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/vi_vn.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/zh_cn.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/zh_tw.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/zlm_arab.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/scripts/log_analysis/blame-mods.jexl
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/cwb.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/debugify.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/dynamic_fps.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/entity_texture_features.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/fabric_loader_dependencies.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/fastquit.toml
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/iris.properties
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/isxander-main-menu-credits.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/lambdynlights.toml
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/midnightlib.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/modernfix-mixins.properties
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/modmenu.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/moreculling.toml
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/reeses_sodium_options.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/renice-shot.properties
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/rrls.toml
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/sodium-extra-options.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/config/sodium-shadowy-path-blocks-options.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/debug-profile.json
+[ModpackDL] Extracted overrides/config/modpack_defaults/options.txt
+[ModpackDL] Extracted overrides/resourcepacks/Mod Menu Helper.zip
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[ModpackImport] Mod download completed: 51/51 succeeded, 0 failed, 0 skipped(404), 42.79 MB transferred
+[PLDownload] Attempt 1/2 retry=0 meta.fabricmc.net
+[ModpackImport] Ensuring complete version is installed: fabric-loader-0.19.5-26.2-ea503303 (parent version: 26.2)
+[ForgeDirect] Parent version JSON already exists: /var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/versions/26.2/26.2.json
+[MCDL] SHA1 passed for 26.2.json
+[MCDL] insertSafety: how to insert assetIndex?
+[MCDL] insertSafety: how to insert assets?
+[MCDL] Replacing JNA 5.17.0 with 5.13.0 for iOS compatibility (required by fabric-loader-0.19.5-26.2)
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-shaderc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-spvc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-vma:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-vulkan:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-vulkan:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-vulkan:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:unsafe
+[MCDL] Unknown artifact object for org.ow2.asm:asm:9.10.1, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar, have to assume it's good.
+[MCDL] Unknown artifact object for org.ow2.asm:asm-analysis:9.10.1, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar, have to assume it's good.
+[MCDL] Unknown artifact object for org.ow2.asm:asm-commons:9.10.1, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar, have to assume it's good.
+[MCDL] Unknown artifact object for org.ow2.asm:asm-tree:9.10.1, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar, have to assume it's good.
+[MCDL] Unknown artifact object for org.ow2.asm:asm-util:9.10.1, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar, have to assume it's good.
+[MCDL] Unknown artifact object for net.fabricmc:sponge-mixin:0.17.4+mixin.0.8.7, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/net/fabricmc/sponge-mixin/0.17.4+mixin.0.8.7/sponge-mixin-0.17.4+mixin.0.8.7.jar, have to assume it's good.
+[MCDL] Unknown artifact object for net.fabricmc:fabric-loader:0.19.5, attempting to generate one
+[MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar, have to assume it's good.
+[ModpackImport] Full version download completed: fabric-loader-0.19.5-26.2-ea503303
+[IconLoader] App entered background: cancelled all ongoing downloads

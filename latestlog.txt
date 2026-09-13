@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 5.0.0
-[Pre-Init] Commit: fe3f083 (main)
+[Pre-Init] Commit: 28ed841 (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 26.6 (23G71) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -18,115 +18,6 @@
 [SceneDelegate] Terracotta temporarily disabled for crash investigation
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Library/Caches/IconLoader, mirror enabled: YES
 [LauncherRootVC] Loaded 915 remote versions
-[ModpackDownload] Modpack download attempt 1: https://cdn.modrinth.com/data/1KVo5zza/versions/HiDsl7yh/Fabulously.Optimized-v14.0.0.mrpack
-[DownloadVC] Vanilla 26.2 already installed (JSON + jar exist), skip preinstall
-[ModpackDL] Extracted overrides/config/crash_assistant/config.toml
-[ModpackDL] Extracted overrides/config/crash_assistant/crash_assistant_localization_overrides/en_us.json
-[ModpackDL] Extracted overrides/config/crash_assistant/scripts/log_analysis/blame-mods.jexl
-[ModpackDL] Extracted overrides/config/fabric_loader_dependencies.json
-[ModpackDL] Extracted overrides/config/isxander-main-menu-credits.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/BBEConfig.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/NoChatReports/NCR-Client.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/NoChatReports/NCR-Common.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/PaginatedAdvancements.json5
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/bettergrass.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/cape-provider/config.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/config.toml
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/be_by.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/en_us.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/es_es.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/es_ve.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/et_ee.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/fr_fr.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/he_il.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/it_it.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/ms_my.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/pl_pl.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/ro_ro.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/ru_ru.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/vi_vn.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/zh_cn.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/zh_tw.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/crash_assistant_localization_overrides/zlm_arab.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/crash_assistant/scripts/log_analysis/blame-mods.jexl
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/cwb.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/debugify.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/dynamic_fps.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/entity_texture_features.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/fabric_loader_dependencies.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/fastquit.toml
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/iris.properties
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/isxander-main-menu-credits.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/lambdynlights.toml
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/midnightlib.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/modernfix-mixins.properties
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/modmenu.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/moreculling.toml
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/reeses_sodium_options.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/renice-shot.properties
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/rrls.toml
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/sodium-extra-options.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/config/sodium-shadowy-path-blocks-options.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/debug-profile.json
-[ModpackDL] Extracted overrides/config/modpack_defaults/options.txt
-[ModpackDL] Extracted overrides/resourcepacks/Mod Menu Helper.zip
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
-[ModpackImport] Mod download completed: 51/51 succeeded, 0 failed, 0 skipped(404), 43.39 MB transferred
-[PLDownload] Attempt 1/2 retry=0 meta.fabricmc.net
-[ModpackImport] Ensuring complete version is installed: fabric-loader-0.19.5-26.2-3e4176b6 (parent version: 26.2)
-[ForgeDirect] Parent version JSON already exists: /var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/versions/26.2/26.2.json
-[DownloadTaskManager] updateTaskWithId:stageAtIndex:rate: invalid stage index 3 for task FBD40B80-52A6-469A-9011-8A534100D22F
-[DownloadTaskManager] updateTaskWithId:stageAtIndex:rate: invalid stage index 4 for task FBD40B80-52A6-469A-9011-8A534100D22F
 [MCDL] SHA1 passed for 26.2.json
 [MCDL] insertSafety: how to insert assetIndex?
 [MCDL] insertSafety: how to insert assets?
@@ -225,6 +116,216 @@
 [MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/net/fabricmc/sponge-mixin/0.17.4+mixin.0.8.7/sponge-mixin-0.17.4+mixin.0.8.7.jar, have to assume it's good.
 [MCDL] Unknown artifact object for net.fabricmc:fabric-loader:0.19.5, attempting to generate one
 [MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/net/fabricmc/fabric-loader/0.19.5/fabric-loader-0.19.5.jar, have to assume it's good.
-[MCDL] Downloading fabric-loader-0.19.5-26.2.jar
-[ModpackImport] Full version download completed: fabric-loader-0.19.5-26.2-3e4176b6
+[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=0 trollStore=0 CS_DEBUGGED=0 ppid=1 traced=0 exn=0 JIT_FLAGS=0x7
+[IconLoader] App entered background: cancelled all ongoing downloads
+[SurfaceViewController] FPS counter setup: profileRenderer=libMoltenVK.dylib, envRenderer=(null), graphicsApi=(null), isVulkan=1, configuredVulkanExpected=1 (actual path decided at runtime via pojavIsActualVulkanPath)
+[SurfaceVC] CAMetalLayer configured: drawableSize=2360x1640, maximumDrawableCount=3, presentsWithTransaction=0, drawsAsynchronously=1, contentsScale=2.00
+[TouchController] Sender ready on port 12450
+[SurfaceViewController] Launching Minecraft with accountId: EEA76071-D34E-4283-AD78-4BA7B4C4750C, version: 25, size: 2360x1640
+[JavaLauncher] Beginning JVM launch
+[JavaLauncher] MoltenVK performance tracking + IMMEDIATE present mode requested for VSync diagnosis
+[JavaLauncher] Framerate unlock configuration:
+[JavaLauncher]   video.disable_game_vsync=1
+[JavaLauncher]   POJAV_DISABLE_VSYNC=1
+[JavaLauncher]   UIScreen.maximumFramesPerSecond=60
+[JavaLauncher] Reading custom environment variables
+[JavaLauncher] Warning: skipped empty value custom env variable: 
+[Task67] ===== options.txt keybind dump (pre-sanitize) =====
+[Task67]   toggleCrouch:false (sneak/sprint toggle mode)
+[Task67]   toggleSprint:false (sneak/sprint toggle mode)
+[Task67]   key_key.attack:key.mouse.left
+[Task67]   key_key.use:key.mouse.right
+[Task67]   key_key.forward:key.keyboard.w
+[Task67]   key_key.left:key.keyboard.a
+[Task67]   key_key.back:key.keyboard.s
+[Task67]   key_key.right:key.keyboard.d
+[Task67]   key_key.jump:key.keyboard.space
+[Task67]   key_key.sneak:key.keyboard.left.shift
+[Task67]   key_key.sprint:key.keyboard.left.control
+[Task67]   key_key.drop:key.keyboard.q
+[Task67]   key_key.inventory:key.keyboard.e
+[Task67]   key_key.chat:key.keyboard.t
+[Task67]   key_key.playerlist:key.keyboard.tab
+[Task67]   key_key.pickItem:key.mouse.middle
+[Task67]   key_key.command:key.keyboard.slash
+[Task67]   key_key.friends:key.keyboard.o
+[Task67]   key_key.socialInteractions:key.keyboard.p
+[Task67]   key_key.toggleGui:key.keyboard.f1
+[Task67]   key_key.toggleSpectatorShaderEffects:key.keyboard.f4
+[Task67]   key_key.screenshot:key.keyboard.f2
+[Task67]   key_key.togglePerspective:key.keyboard.f5
+[Task67]   key_key.smoothCamera:key.keyboard.unknown
+[Task67] SUSPICIOUS (unknown-scancode binding, left as-is): key_key.smoothCamera:key.keyboard.unknown
+[Task67]   key_key.fullscreen:key.keyboard.f11
+[Task67]   key_key.spectatorOutlines:key.keyboard.unknown
+[Task67] SUSPICIOUS (unknown-scancode binding, left as-is): key_key.spectatorOutlines:key.keyboard.unknown
+[Task67]   key_key.spectatorHotbar:key.mouse.middle
+[Task67]   key_key.swapOffhand:key.keyboard.f
+[Task67]   key_key.saveToolbarActivator:key.keyboard.c
+[Task67]   key_key.loadToolbarActivator:key.keyboard.x
+[Task67]   key_key.advancements:key.keyboard.l
+[Task67]   key_key.quickActions:key.keyboard.g
+[Task67]   key_key.debug.overlay:key.keyboard.f3
+[Task67]   key_key.debug.modifier:key.keyboard.f3
+[Task67]   key_key.hotbar.1:key.keyboard.1
+[Task67]   key_key.hotbar.2:key.keyboard.2
+[Task67]   key_key.hotbar.3:key.keyboard.3
+[Task67]   key_key.hotbar.4:key.keyboard.4
+[Task67]   key_key.hotbar.5:key.keyboard.5
+[Task67]   key_key.hotbar.6:key.keyboard.6
+[Task67]   key_key.hotbar.7:key.keyboard.7
+[Task67]   key_key.hotbar.8:key.keyboard.8
+[Task67]   key_key.hotbar.9:key.keyboard.9
+[Task67]   key_key.debug.reloadChunk:key.keyboard.a
+[Task67]   key_key.debug.showHitboxes:key.keyboard.b
+[Task67]   key_key.debug.clearChat:key.keyboard.d
+[Task67]   key_key.debug.crash:key.keyboard.c
+[Task67]   key_key.debug.showChunkBorders:key.keyboard.g
+[Task67]   key_key.debug.showAdvancedTooltips:key.keyboard.h
+[Task67]   key_key.debug.copyRecreateCommand:key.keyboard.i
+[Task67]   key_key.debug.spectate:key.keyboard.n
+[Task67]   key_key.debug.switchGameMode:key.keyboard.f4
+[Task67]   key_key.debug.debugOptions:key.keyboard.f6
+[Task67]   key_key.debug.focusPause:key.keyboard.p
+[Task67]   key_key.debug.dumpDynamicTextures:key.keyboard.s
+[Task67]   key_key.debug.reloadResourcePacks:key.keyboard.t
+[Task67]   key_key.debug.profiling:key.keyboard.l
+[Task67]   key_key.debug.copyLocation:key.keyboard.c
+[Task67]   key_key.debug.dumpVersion:key.keyboard.v
+[Task67]   key_key.debug.profilingChart:key.keyboard.1
+[Task67]   key_key.debug.fpsCharts:key.keyboard.2
+[Task67]   key_key.debug.networkCharts:key.keyboard.3
+[Task67]   key_key.debug.lightmapTexture:key.keyboard.4
+[Task67]   key_key.debug.improvedTransparency:key.keyboard.x
+[Task67] ===== keybind sanitize: 0 repairs needed (all canonical / defaults) =====
+[DyldLVBypass] TXM debug JIT mapping active — keeping debugger attached for dyld bypass
+[DyldLVBypass] init
+[DyldLVBypass] Using redirectFunctionMirrored
+[DyldLVBypass] found dyld_mmap at 0x18e347c34
+[DyldLVBypass] hook dyld_mmap succeed!
+[DyldLVBypass] found dyld_fcntl at 0x18e34e910
+[DyldLVBypass] hook dyld_fcntl succeed!
+[JavaLauncher] init_loadMobileGluesConfig: renderer=libMoltenVK.dylib
+[JavaLauncher] Vulkan renderer detected, MobileGlues used as GL fallback. Config will take effect.
+[JavaLauncher]   mobileglues.enable_angle = 1 -> enableANGLE = 3 (3=ForceEnable, 0=DisableIfPossible)
+[JavaLauncher]   ANGLE enabled: override customGLVersion=32 (ANGLE iOS max is GLES 3.0/3.1)
+[JavaLauncher]   mobileglues.enable_no_error = 0 -> enableNoError = 0
+[JavaLauncher]   mobileglues.enable_ext_timer_query = 1 -> enableExtTimerQuery = 1
+[JavaLauncher]   mobileglues.enable_ext_compute_shader = 0 -> enableExtComputeShader = 0
+[JavaLauncher]   mobileglues.enable_ext_direct_state_access = 0 -> enableExtDirectStateAccess = 0
+[JavaLauncher]   mobileglues.max_glsl_cache_size = 64 -> maxGlslCacheSize = 64
+[JavaLauncher]   mobileglues.multidraw_mode = 0 -> multidrawMode = 0
+[JavaLauncher]   mobileglues.angle_depth_clear_fix_mode = 0 -> angleDepthClearFixMode = 0
+[JavaLauncher]   mobileglues.custom_gl_version = 0 (raw)
+[JavaLauncher]   -> customGLVersion = 32 (decimal, MobileGlues Version(int) format)
+[JavaLauncher]   mobileglues.fsr1_setting = 2 -> fsr1Setting = 2
+[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=1, actualVulkanPath=0, stateChanged=0)
+[JavaLauncher] MobileGlues config written to /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/MG/config.json
+[JavaLauncher] config.json content:
+{
+  "multidrawMode" : 0,
+  "fsr1Setting" : 2,
+  "maxGlslCacheSize" : 64,
+  "enableANGLE" : 3,
+  "enableExtDirectStateAccess" : 0,
+  "customGLVersion" : 32,
+  "enableExtTimerQuery" : 1,
+  "enableExtComputeShader" : 0,
+  "enableNoError" : 0,
+  "angleDepthClearFixMode" : 0
+}
+[PLProfiles] Applying javaVersion (25)
+[JavaLauncher] RENDERER is set to libMoltenVK.dylib
+[JavaLauncher] GRAPHICS_API is set to default
+[JavaLauncher] Looking for Java 25 or later
+[JavaLauncher] JAVA_HOME has been set to /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk
+[JavaLauncher] Max RAM allocation is set to 2967 MB
+[JavaLauncher] Task68 GC/safepoint pause logging enabled (-Xlog:gc,safepoint -> stdout)
+[JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/Frameworks
+[JavaLauncher] Published Metallum surface view: 0x11ee06a00 (scale=2)
+[JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
+[JavaLauncher] JVM GC optimization: G1GC + MaxGCPauseMillis=50 + StringDeduplication (Java 17+)
+[JavaLauncher] Caciocavallo: isJava8=0 libs=libs_caciocavallo17 mode=/a
+[JavaLauncher] Reading custom JVM flags
+[Init] Found JLI lib
+[JavaLauncher] Using LWJGL 333 (mcVersion=fabric-loader-0.19.5-26.2)
+[JavaLauncher] Using LWJGL jar at /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/libs/lwjgl-333/lwjgl.jar
+[Init] Calling JLI_Launch
+[PLDisplayLinkTarget] displayLinkTick #2 (configuredVulkan=1, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=1, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=1, actualVulkanPath=0, stateChanged=0)
+OpenJDK 64-Bit Server VM warning: Option UseCompressedClassPointers was deprecated in version 25.0 and will likely be removed in a future release.
+[PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=1, actualVulkanPath=0, stateChanged=0)
+[JIT26] Requesting 64 MB for JIT mapping
+[JIT26] Got JIT mapping 0x161e6c000 from debugger
+[JIT26] mapping at RW=0x165e6c000, RX=0x161e6c000
+[2026-09-13T23:16:30.537+0800][0.187s] Using G1
+WARNING: Unknown module: cpw.mods.bootstraplauncher specified to --add-exports
+WARNING: package sun.security.action not in java.base
+PatchJNAAgent: premain called
+Arc Capes DNS Injector
+Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
+Added DNS cache entry: s.optifine.net/23.95.137.176
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
+WARNING: Please consider reporting this to the maintainers of class com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[2026-09-13T23:16:30.778+0800][0.428s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 26M->18M(128M) 1.708ms
+[2026-09-13T23:16:30.778+0800][0.428s] Safepoint "G1CollectForAllocation", Time since last: 219476667 ns, Reaching safepoint: 3500 ns, At safepoint: 1733500 ns, Leaving safepoint: 3416 ns, Total: 1740416 ns, Threads: 0 runnable, 14 total
+Could not load options.txt
+java.io.FileNotFoundException: /var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/instances/default/custom_gamedir/modrinth_2FC458E8-B75E-4993-97CD-A7FC4D02368F/options.txt (No such file or directory)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(Unknown Source)
+	at java.base/java.io.FileInputStream.<init>(Unknown Source)
+	at java.base/java.io.FileInputStream.<init>(Unknown Source)
+	at java.base/java.io.FileReader.<init>(Unknown Source)
+	at net.kdt.pojavlaunch.utils.MCOptionUtils.load(MCOptionUtils.java:20)
+	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:65)
+	at net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
+[PojavLauncher] VSync disabled, maxFps/maxFramerate/framerateLimit set to 260
+[PojavLauncher]   enableVsync=false
+[PojavLauncher]   maxFps=260
+[PojavLauncher]   maxFramerate=260
+[PojavLauncher]   framerateLimit=260
+[PojavLauncher]   inactivityFpsLimit=minimized
+[PojavLauncher] LWJGL selected by launcher: 333, LWJGL on classpath: 3.4.1
+[PojavLauncher] MC 26.2+ graphicsApi cleared (default)
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by net.kdt.pojavlaunch.value.MinecraftAccount in an unnamed module (file:/private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/libs/launcher.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+java.lang.RuntimeException: java.io.FileNotFoundException: /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/versions/fabric-loader-0.19.5-26.2/fabric-loader-0.19.5-26.2.json (No such file or directory)
+	at net.kdt.pojavlaunch.Tools.getVersionInfo(Tools.java:524)
+	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:255)
+	at net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
+Caused by: java.io.FileNotFoundException: /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/versions/fabric-loader-0.19.5-26.2/fabric-loader-0.19.5-26.2.json (No such file or directory)
+	at java.base/java.io.FileInputStream.open0(Native Method)
+	at java.base/java.io.FileInputStream.open(Unknown Source)
+	at java.base/java.io.FileInputStream.<init>(Unknown Source)
+	at java.base/java.io.FileInputStream.<init>(Unknown Source)
+	at net.kdt.pojavlaunch.Tools.read(Tools.java:600)
+	at net.kdt.pojavlaunch.Tools.getVersionInfo(Tools.java:445)
+	... 2 more
+[RenderDiag] exit(1) snapshot: swapOK=0 swapFail=0
+exit(1) called
+
+===== [Amethyst fatal trace] 2026-09-13 23:16:30.815 =====
+reason: exit(1) called
+thread: (unnamed)
+  #00 0x10b5dbc98  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 64664
+  #01 0x10b5dc494  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 66708
+  #02 0x11bfb02a4  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN2os5_exitEi + 9044644
+  #03 0x11bfb0298  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN25permit_forbidden_function4exitEi + 9044632
+  #04 0x11bbf8e38  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _Z18notify_vm_shutdownv + 5148216
+  #05 0x11c28bcd4  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN7VM_Exit4doitEv + 12041428
+  #06 0x11c28af74  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 12038004
+  #07 0x11c293100  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 12071168
+  #08 0x11c293854  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread13inner_executeEP12VM_Operation + 12073044
+  #09 0x11c292dd8  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 12070360
+  #10 0x11c2043d4  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN6Thread8call_runEv + 11486164
+  #11 0x11bfa8dcc  /private/var/mobile/Containers/Data/Application/03F90258-A152-4F4F-8C8A-F3492DF65F3C/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZL19thread_native_entryP6Thread + 9014732
+  #12 0x1f100a438  /usr/lib/system/libsystem_pthread.dylib  _pthread_start + 17464
+  #13 0x1f10068cc  /usr/lib/system/libsystem_pthread.dylib  thread_start + 2252
+
 [IconLoader] App entered background: cancelled all ongoing downloads
