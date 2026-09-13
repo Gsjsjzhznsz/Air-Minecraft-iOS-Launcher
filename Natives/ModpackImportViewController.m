@@ -413,6 +413,12 @@
 
             if (success) {
                 self.currentImportingModpack = nil;
+                // 关键修复（Task 72，"找不到版本信息"根因）：本地 .mrpack 导入成功后
+                // 同样未发送 ReloadProfileList——localVersionList 快照不含刚写入的唯一化
+                // 版本，用户点"立即启动"回到主界面按启动会弹"找不到版本信息"。
+                // 与 DownloadViewController 在线整合包路径 / 直装路径（issue #61）对齐。
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"ReloadProfileList" object:nil];
+                NSLog(@"[ModpackImport] Task72 ReloadProfileList posted after local modpack import");
                 [self showImportSuccess:modpackInfo];
             } else {
                 // 阶段5修复（参照 FCL）：错误消息中追加失败文件列表（如有），

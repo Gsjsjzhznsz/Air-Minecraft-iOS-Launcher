@@ -512,7 +512,20 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
             }
         }
     }
-    
+
+    // Task 72 修复（防御纵深，"找不到版本信息"）：与 LauncherRootViewController
+    // 同构——远程列表与内存 localVersionList 双双未命中时，扫描磁盘 versions/ 兜底，
+    // 防止快照过期（安装路径漏发 ReloadProfileList）导致启动误报"找不到版本信息"。
+    if (!versionObject && versionId.length > 0) {
+        NSString *versionJsonPath = [NSString stringWithFormat:@"%s/versions/%@/%@.json",
+                                      getenv("POJAV_GAME_DIR"), versionId, versionId];
+        BOOL isDir = NO;
+        if ([[NSFileManager defaultManager] fileExistsAtPath:versionJsonPath isDirectory:&isDir] && !isDir) {
+            versionObject = @{@"id": versionId, @"type": @"custom"};
+            NSLog(@"[LauncherCardLayout] Task72 version found on disk (stale list fallback): %@", versionId);
+        }
+    }
+
     callback(versionObject);
 }
 

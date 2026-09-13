@@ -424,7 +424,24 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
             }
         }
     }
-    
+
+    // Task 72 修复（防御纵深，"找不到版本信息"）：远程列表与内存 localVersionList
+    // 双双未命中时，不直接判死——立即扫描磁盘 versions/ 目录兜底。
+    // localVersionList 是 viewDidLoad / ReloadProfileList 时的快照，任何安装路径
+    // 若漏发 ReloadProfileList（或外部工具刚写入版本），快照即过期；此时启动
+    // 会误弹"找不到版本信息"。磁盘存在 <id>.json 即返回与 localVersionList 同构的
+    // @{id, type=custom}，与既有本地版本启动路径完全一致（downloadVersion 内部的
+    // Task70/71 自愈链会处理 JSON 缺失/损坏等边界）。
+    if (!versionObject && versionId.length > 0) {
+        NSString *versionJsonPath = [NSString stringWithFormat:@"%s/versions/%@/%@.json",
+                                      getenv("POJAV_GAME_DIR"), versionId, versionId];
+        BOOL isDir = NO;
+        if ([[NSFileManager defaultManager] fileExistsAtPath:versionJsonPath isDirectory:&isDir] && !isDir) {
+            versionObject = @{@"id": versionId, @"type": @"custom"};
+            NSLog(@"[LauncherRootVC] Task72 version found on disk (stale list fallback): %@", versionId);
+        }
+    }
+
     callback(versionObject);
 }
 

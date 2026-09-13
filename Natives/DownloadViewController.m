@@ -4734,6 +4734,18 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         DownloadTaskManager *manager = [DownloadTaskManager sharedManager];
         if (success) {
             [manager setTaskWithId:taskId completedWithError:nil];
+            // 关键修复（Task 72，"找不到版本信息"根因）：整合包在线安装成功后
+            // 未发送 ReloadProfileList 通知——LauncherRootViewController /
+            // LauncherCardLayoutViewController 的 localVersionList 仍是应用启动时
+            // （viewDidLoad → initializeVersionLists）扫描的快照，刚写入 versions/ 的
+            // 唯一化版本（如 fabric-loader-0.19.5-26.2-c8cf4f2c）不在其中；
+            // 用户随即点启动 → findVersionInRemoteList 远程+本地内存列表双双未命中
+            // → 弹"找不到版本信息"（i18n_str_432）。重启 app 后列表重扫才能命中，
+            // 这正是用户"装完直接启动报错、重开应用再启动就正常"的完整解释。
+            // 直装路径（finishInstallerProgressWithSuccess，issue #61）早已补发此通知，
+            // 整合包路径是漏网之鱼，此处对齐。
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"ReloadProfileList" object:nil];
+            NSLog(@"[ModpackImport] Task72 ReloadProfileList posted after online modpack install");
             NSString *loader = info[@"loader"];
             NSString *msg = [NSString stringWithFormat:localize(@"i18n_str_261", nil), info[@"name"]];
             if ([loader isEqualToString:@"Forge"] || [loader isEqualToString:@"NeoForge"]) {
