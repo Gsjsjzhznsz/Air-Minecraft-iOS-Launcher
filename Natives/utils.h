@@ -230,3 +230,18 @@ void CallbackBridge_pauseGameIfNeed();
 // 由 KeyboardInput.m 在物理键盘按下/释放事件中调用。
 void CallbackBridge_syncModifiersToMC(int mods);
 void CallbackBridge_queueModifierSync(int mods);
+
+// ============================================================================
+// Task 67（options.txt 移动键位净化 + Task66 状态数组对证）
+// - ame67_sanitizeOptionsKeybinds：launchJVM 早期调用（MC 读 options.txt 前）。
+//   dump 全部 key_key.* 行；把 forward/left/back/right/jump/sneak/sprint
+//   七键中"存在且偏离默认"的行回归规范值（备份 options.txt.amethyst-bak）。
+//   根因假设：输入损坏时代按键设置捕获对话框把垃圾事件写成键位（例如
+//   forward 绑到 Shift），事件层全绿也救不了坏绑定。
+// - Ame66GetKbState/Ame66GetKbNumKeys：暴露 Task66 直写的 SDL 键盘状态
+//   数组指针，供 sdl3_hook 的 SDL_GetKeyboardState 钩子对证 MC 轮询侧
+//   与写入侧是否同一块内存。
+// ============================================================================
+void ame67_sanitizeOptionsKeybinds(void);
+const bool *Ame66GetKbState(void);
+int Ame66GetKbNumKeys(void);

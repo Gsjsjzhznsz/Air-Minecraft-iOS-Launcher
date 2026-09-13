@@ -433,6 +433,10 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     init_loadDefaultEnv();
     init_loadCustomEnv();
 
+    // Task67：MC 读取 options.txt 之前净化移动键位（含全量 dump 诊断）。
+    // 必须在 JLI_Launch 之前——MC 的 Options.load 在 JVM 启动早期执行。
+    ame67_sanitizeOptionsKeybinds();
+
     DeviceGetJITFlags(YES);
     BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
     BOOL jit26AlwaysAttached = getPrefBool(@"debug.debug_always_attached_jit");

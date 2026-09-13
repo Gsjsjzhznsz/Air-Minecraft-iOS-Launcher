@@ -110,6 +110,9 @@ typedef void *(*ame_fn_SDL_GetWindowFromEvent)(const void *event);
 // Task 61：SDL3 尺寸查询（SDL_video.h：返回 bool，出参 int*）
 typedef bool (*ame_fn_SDL_GetWindowSize)(void *window, int *w, int *h);
 typedef bool (*ame_fn_SDL_GetWindowSizeInPixels)(void *window, int *w, int *h);
+// Task 67：SDL_GetKeyboardState（SDL_keyboard.h：const bool *SDL_GetKeyboardState(int *numkeys)）
+// MC 的 InputConstants.isKeyDown/setAll/hasShiftDown 全部经此口轮询键盘态。
+typedef const bool *(*ame_fn_SDL_GetKeyboardState)(int *numkeys);
 
 static ame_fn_SDL_GL_SetAttribute ame_real_GL_SetAttribute = NULL;
 static ame_fn_SDL_CreateWindow ame_real_CreateWindow = NULL;
@@ -141,6 +144,8 @@ static ame_fn_SDL_GetWindowFlags ame_real_GetWindowFlags = NULL;
 static ame_fn_SDL_GetWindowFromEvent ame_real_GetWindowFromEvent = NULL;
 static ame_fn_SDL_GetWindowSize ame_real_GetWindowSize = NULL;
 static ame_fn_SDL_GetWindowSizeInPixels ame_real_GetWindowSizeInPixels = NULL;
+// Task 67：键盘状态数组轮询钩子（实现见 5) 节 Task67 块）
+static ame_fn_SDL_GetKeyboardState ame_real_GetKeyboardState = NULL;
 
 // Task 32 embed：嵌入宿主层级的 SDL 视图（主线程赋值；定义见 "7) Amethyst embed" 一节）
 static UIView *ame_embeddedSDLView = NULL;
@@ -400,6 +405,7 @@ static unsigned int ame_SDL_GetWindowFlags(void *window);   // Task 50（实现�
 static void *ame_SDL_GetWindowFromEvent(const void *event); // Task 65（实现见 5) 节，键盘句柄解析救援）
 static bool ame_SDL_GetWindowSize(void *window, int *w, int *h);            // Task 61（实现见 5) 节）
 static bool ame_SDL_GetWindowSizeInPixels(void *window, int *w, int *h);   // Task 61（实现见 5) 节）
+static const bool *ame_SDL_GetKeyboardState(int *numkeys);                  // Task 67（实现见 5) 节）
 
 // Task 32：当 MC 通过 SDL_LoadFunction（而非 dlsym）解析符号时，同样把
 // 窗口生命周期/事件泵钩子装上（防御性双路覆盖，与 amethyst_sdl3_hook_resolve
@@ -447,6 +453,11 @@ static void ame_maybeWrapWindowHook(const char *name, void **out) {
         if (ame_real_GetWindowSizeInPixels == NULL)
             ame_real_GetWindowSizeInPixels = (ame_fn_SDL_GetWindowSizeInPixels)*out;
         *out = (void *)ame_SDL_GetWindowSizeInPixels;
+    } else if (strcmp(name, "SDL_GetKeyboardState") == 0) {
+        // Task 67：MC 键盘态轮询口观测（指针对证 + 关键键位值采样）
+        if (ame_real_GetKeyboardState == NULL)
+            ame_real_GetKeyboardState = (ame_fn_SDL_GetKeyboardState)*out;
+        *out = (void *)ame_SDL_GetKeyboardState;
     }
 }
 
@@ -610,6 +621,42 @@ static void *ame_SDL_GetWindowFromEvent(const void *event) {
                    (unsigned long)n, (unsigned)type, w, fellBack ? " FALLBACK" : "");
     }
     return w;
+}
+
+// ============================================================================
+// Task 67：SDL_GetKeyboardState 钩子（MC 键盘态轮询口观测）
+//
+// 目的：终结“Task66 数组直写是否被 MC 看到”的不确定性。
+// InputConstants.isKeyDown / KeyMapping.setAll / Minecraft.hasShiftDown
+// 全部经 LWJGL→dlsym→本钩子轮询键盘态。采样记录：
+//   1. MC 侧拿到的数组指针 vs input_bridge 直写指针（Ame66GetKbState）
+//      ——不一致 = 存在两个 SDL 实例/两块数组，Task66 修复失效的实锤；
+//   2. 关键扫描位的即时值（A=4 D=7 S=22 W=26 Space=44 F3=60 F4=61
+//      LCtrl=224 LShift=225）——MC 轮询瞬间虚拟键是否可见。
+// 纯透传零行为变化；isKeyDown 低频调用（事件/换界面触发），采样日志
+// 开销可忽略。
+// ============================================================================
+static const bool *ame_SDL_GetKeyboardState(int *numkeys) {
+    const bool *r = ame_real_GetKeyboardState ? ame_real_GetKeyboardState(numkeys) : NULL;
+    static _Atomic unsigned long s_task67KbPolls = 0;
+    unsigned long n = atomic_fetch_add(&s_task67KbPolls, 1) + 1;
+    if (n <= 10 || n % 2000 == 0) {
+        const bool *ours = Ame66GetKbState();
+        int nk = (numkeys != NULL) ? *numkeys : 0;
+        int vA = 0, vD = 0, vS = 0, vW = 0, vSpc = 0, vF3 = 0, vF4 = 0, vLC = 0, vLS = 0;
+        if (r != NULL && nk >= 256) {
+            vA = r[4] ? 1 : 0;      vD = r[7] ? 1 : 0;
+            vS = r[22] ? 1 : 0;     vW = r[26] ? 1 : 0;
+            vSpc = r[44] ? 1 : 0;   vF3 = r[60] ? 1 : 0;
+            vF4 = r[61] ? 1 : 0;    vLC = r[224] ? 1 : 0;
+            vLS = r[225] ? 1 : 0;
+        }
+        NSDebugLog(@"[SDLHook] Task67 MC kb-state poll #%lu: ptr=%p ours=%p match=%d numkeys=%d | A=%d S=%d D=%d W=%d Spc=%d F3=%d F4=%d LCtrl=%d LShift=%d",
+                   (unsigned long)n, (const void *)r, (const void *)ours,
+                   (r == ours) ? 1 : 0, nk,
+                   vA, vS, vD, vW, vSpc, vF3, vF4, vLC, vLS);
+    }
+    return r;
 }
 
 // ============================================================================
@@ -1470,6 +1517,16 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
         NSLog(@"[SDLHook] hooked SDL_GetWindowSizeInPixels (real=%p, Task61 pinned to launcher px)",
               (void *)ame_real_GetWindowSizeInPixels);
         return (void *)ame_SDL_GetWindowSizeInPixels;
+    }
+    // Task 67：键盘态轮询口观测（MC isKeyDown/setAll/hasShiftDown 的必经
+    // 之路；纯透传 + 指针对证 + 关键键位值采样，见 5) 节 Task67 块注释）。
+    if (strcmp(name, "SDL_GetKeyboardState") == 0) {
+        if (ame_real_GetKeyboardState == NULL) {
+            ame_real_GetKeyboardState = (ame_fn_SDL_GetKeyboardState)amethyst_orig_dlsym(handle, name);
+        }
+        NSLog(@"[SDLHook] hooked SDL_GetKeyboardState (real=%p, Task67 kb-state poll observability)",
+              (void *)ame_real_GetKeyboardState);
+        return (void *)ame_SDL_GetKeyboardState;
     }
     // SDL_GL_SetAttribute 不接管：MC 自己调用它设属性是合法行为，我们只在
     // 建窗前主动调用同一个函数来强制 ES profile（见 ame_forceEglProfileEs）。

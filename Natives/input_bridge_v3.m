@@ -947,6 +947,154 @@ static void refreshGuiScaleNatively(void) {
         guiScale = newScale;
     }
 }
+
+// ============================================================================
+// Task 67：options.txt 移动键位净化器（"按 Shift 才能动"终极根因收网）
+//
+// 证据链（0cc265f 日志，8ce4c18 构建，Task66 修复全生效后症状依旧）：
+//   1. 摇杆 WASD 事件全链绿：sendKey→Task64 consumed→Task65 resolve 1:1
+//      咬合，keyPress 确认执行（resolve 在 lambda 内求值）。
+//   2. F3+F4 游戏模式切换 9 次成功（sendKey #200 key=293→sc=61 实锤）——
+//      F3/F4 是**默认键位**（debugKeys 不经 options.txt 加载路径）。
+//   3. WASD 走的是 Options.load → key_key.* 路径；反编译确认默认
+//      keyUp=Key(26)="key.keyboard.w"（26.3 InputConstants 为 SDL 扫描码
+//      空间：a=4..z=29、space=44、f3=60、f4=61、lctrl=224、lshift=225）。
+//   4. KeyboardHandler.keyPress→KeyMapping.set(Key(26))→KeyboardInput.tick
+//      →LocalPlayer.applyInput 全链反编译复核无瑕疵；无 setAll/releaseAll
+//      高频清键（死区阶段零 grab 翻转）；无焦点事件；无暂停屏。
+//
+// 推论（唯一幸存假设）：用户设备 options.txt 的移动/跳跃/潜行/疾跑键位
+// 已被写坏（最可能场景：输入损坏时代用户打开"按键设置"想自救，绑定捕获
+// 对话框把当时的垃圾事件当成新键位——例如把"前进"绑到了唯一有反应的
+// Shift 上，从此"按住 Shift 才能走"）。键位坏档无法自愈：每次启动 MC
+// 都从 options.txt 加载坏绑定，所有事件层修复对其无效。
+//
+// 修复：launchJVM 早期（MC 读 options.txt 之前）扫描并回归默认值：
+//   key_key.forward→key.keyboard.w   key_key.left→key.keyboard.a
+//   key_key.back→key.keyboard.s      key_key.right→key.keyboard.d
+//   key_key.jump→key.keyboard.space  key_key.sneak→key.keyboard.left.shift
+//   key_key.sprint→key.keyboard.left.ctrl
+// 仅重写"存在且偏离默认"的行；改写前备份 options.txt.amethyst-bak；
+// 幂等（全部正常时零写盘）。同时全量 dump key_key.* 与 toggleCrouch/
+// toggleSprint 行——下轮日志直接实锤或证伪本假设。
+// ============================================================================
+static const struct { const char *opt; const char *defv; } ame67_canonicalKeys[] = {
+    { "key_key.forward", "key.keyboard.w" },
+    { "key_key.left",    "key.keyboard.a" },
+    { "key_key.back",    "key.keyboard.s" },
+    { "key_key.right",   "key.keyboard.d" },
+    { "key_key.jump",    "key.keyboard.space" },
+    { "key_key.sneak",   "key.keyboard.left.shift" },
+    { "key_key.sprint",  "key.keyboard.left.control" },   // 注意：真名是 .control（224），.ctrl 不存在（verify D9 抓获）
+};
+#define AME67_CANONICAL_COUNT (sizeof(ame67_canonicalKeys) / sizeof(ame67_canonicalKeys[0]))
+
+void ame67_sanitizeOptionsKeybinds(void) {
+    const char *gameDir = getenv("POJAV_GAME_DIR");
+    if (gameDir == NULL) {
+        NSLog(@"[Task67] keybind sanitize skipped: POJAV_GAME_DIR not set");
+        return;
+    }
+    char path[PATH_MAX];
+    if (snprintf(path, sizeof(path), "%s/options.txt", gameDir) >= (int)sizeof(path)) return;
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        NSLog(@"[Task67] options.txt absent (first run?) — MC will create defaults, nothing to sanitize");
+        return;
+    }
+    // 读全文（options.txt 通常 < 64KB）
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0 || sz > 4 * 1024 * 1024) { fclose(f); return; }
+    char *buf = (char *)malloc((size_t)sz + 1);
+    if (buf == NULL) { fclose(f); return; }
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[rd] = '\0';
+
+    // 逐行扫描：dump 诊断 + 收集需重写行
+    NSLog(@"[Task67] ===== options.txt keybind dump (pre-sanitize) =====");
+    int repairs = 0;
+    int suspicious = 0;
+    // 重建输出缓冲（重写时用）
+    NSMutableString *out = [NSMutableString stringWithCapacity:(NSUInteger)sz + 256];
+    char *saveptr = NULL;
+    char *line = strtok_r(buf, "\n", &saveptr);
+    BOOL firstLine = YES;
+    while (line != NULL) {
+        NSString *nsline = [NSString stringWithFormat:@"%s", line];
+        if (nsline == nil) {
+            // 非 UTF-8 字节行（损坏档）：跳过该行（appendString:nil 会抛异常）
+            NSLog(@"[Task67] SKIP non-UTF-8 line (corrupted options.txt line dropped)");
+            line = strtok_r(NULL, "\n", &saveptr);
+            continue;
+        }
+        if ([nsline hasPrefix:@"key_key."]) {
+            NSRange colon = [nsline rangeOfString:@":"];
+            if (colon.location != NSNotFound) {
+                NSLog(@"[Task67]   %@", nsline);
+                NSString *name = [nsline substringToIndex:colon.location];
+                NSString *value = [[nsline substringFromIndex:colon.location + 1]
+                                   stringByTrimmingCharactersInSet:
+                                   [NSCharacterSet characterSetWithCharactersInString:@"\r "]];
+                BOOL repaired = NO;
+                for (size_t i = 0; i < AME67_CANONICAL_COUNT; i++) {
+                    if ([name isEqualToString:@(ame67_canonicalKeys[i].opt)]) {
+                        if (![value isEqualToString:@(ame67_canonicalKeys[i].defv)]) {
+                            NSLog(@"[Task67] REPAIR %@: %@ -> %@ (canonical default; was broken-era remap?)",
+                                  name, value, @(ame67_canonicalKeys[i].defv));
+                            nsline = [NSString stringWithFormat:@"%@:%@",
+                                      name, @(ame67_canonicalKeys[i].defv)];
+                            repairs++;
+                            repaired = YES;
+                        }
+                        break;
+                    }
+                }
+                if (!repaired && [value hasPrefix:@"key.keyboard.unknown"]) {
+                    NSLog(@"[Task67] SUSPICIOUS (unknown-scancode binding, left as-is): %@", nsline);
+                    suspicious++;
+                }
+            }
+        } else if ([nsline hasPrefix:@"toggleCrouch:"] || [nsline hasPrefix:@"toggleSprint:"]) {
+            NSLog(@"[Task67]   %@ (sneak/sprint toggle mode)", nsline);
+        }
+        if (!firstLine) [out appendString:@"\n"];
+        [out appendString:nsline];
+        firstLine = NO;
+        line = strtok_r(NULL, "\n", &saveptr);
+    }
+    free(buf);
+
+    if (repairs > 0) {
+        // 备份 + 原子写回
+        NSString *bak = [NSString stringWithFormat:@"%s/options.txt.amethyst-bak", gameDir];
+        NSString *src = [NSString stringWithFormat:@"%s", path];
+        NSError *err = nil;
+        [[NSFileManager defaultManager] removeItemAtPath:bak error:nil];
+        BOOL copied = [[NSFileManager defaultManager] copyItemAtPath:src toPath:bak error:&err];
+        if (!copied) {
+            NSLog(@"[Task67] WARN: backup copy failed (%@), abort repair to avoid data loss",
+                  err.localizedDescription);
+        } else {
+            BOOL ok = [out writeToFile:src atomically:YES
+                             encoding:NSUTF8StringEncoding error:nil];
+            NSLog(@"[Task67] ===== keybind sanitize: %d repaired, %d suspicious, backup=%@, write=%@ =====",
+                  repairs, suspicious, bak, ok ? @"OK" : @"FAILED");
+        }
+    } else {
+        NSLog(@"[Task67] ===== keybind sanitize: 0 repairs needed (all canonical / defaults) =====");
+    }
+}
+
+// Task67：暴露 Task66 状态数组指针给 sdl3_hook 的 GetKeyboardState 钩子对证
+const bool *Ame66GetKbState(void) {
+    return (const bool *)ame66_kbState;
+}
+int Ame66GetKbNumKeys(void) {
+    return ame66_kbNumKeys;
+}
 int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
     // 诊断：物品栏点不动时，靠这段代码一次性定位卡在哪一环。
     // 可能的失败原因互不相关，只看现象无法区分：
