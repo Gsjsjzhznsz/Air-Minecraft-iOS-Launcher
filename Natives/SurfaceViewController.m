@@ -223,18 +223,12 @@ int memorystatus_control(uint32_t command, int32_t pid, uint32_t flags, void *bu
 static int currentHotbarSlot = -1;
 static GameSurfaceView* pojavWindow;
 
-@interface SurfaceViewController ()<UITextFieldDelegate, UIGestureRecognizerDelegate> {
-    // Task 78：MobileGlues FSR 渲染分辨率联动系数（1.0=关闭/非 MG）。
-    // updateSavedResolution 每次重算（旋转/分辨率变更安全）；sendTouchPoint
-    // 等输入换算读取它保持与 MC 窗口信念（windowWidth）同口径。
-    float mgFsrScale;
-}
-@end
-
 // Task 78：FSR 预设 → 渲染缩放系数（与 MobileGlues-cpp FSR1.cpp
 // CalculateTargetResolution 的 scale 表同步：UQ=1.3 / Q=1.5 / B=1.7 / P=2.0）。
 // 仅当当前 profile 渲染器为 MobileGlues 且预设开启时生效；Auto（实际
 // ANGLE）/gl4es/tinygl4angle/zink/Vulkan（含 MoltenVK 自管路径）均返回 1.0。
+// Task 79 修正：本函数必须位于 @interface 之外（文件作用域）——Task 78 曾把
+// @end 提前到属性区之前，令下方整段 @property 脱离类扩展、CI 编译失败。
 static float ame78_fsr_preset_scale(NSInteger preset) {
     switch ((int)preset) {
         case 1: return 1.3f;   // UltraQuality：渲染 77%
@@ -243,6 +237,13 @@ static float ame78_fsr_preset_scale(NSInteger preset) {
         case 4: return 2.0f;   // Performance：渲染 50%
         default: return 1.0f;  // Disabled
     }
+}
+
+@interface SurfaceViewController ()<UITextFieldDelegate, UIGestureRecognizerDelegate> {
+    // Task 78：MobileGlues FSR 渲染分辨率联动系数（1.0=关闭/非 MG）。
+    // updateSavedResolution 每次重算（旋转/分辨率变更安全）；sendTouchPoint
+    // 等输入换算读取它保持与 MC 窗口信念（windowWidth）同口径。
+    float mgFsrScale;
 }
 
 // FPS/内存监控相关（FPS 在 native pojavSwapBuffers 中计数，参照 FCL/ZL2）
