@@ -875,12 +875,18 @@
               @"icon": @"square.grid.3x2",
               @"type": self.typePickField,
               @"enableCondition": whenNotInGame,
-              @"pickKeys": @[@"0", @"1", @"2", @"3"],
+              // Task 78：补齐第 5 档 Performance(4)——旧 UI 只列 0-3，"性能优先"
+              // 标签错贴在 Balanced(3) 上（枚举：0=Disabled/1=UQ/2=Q/3=Balanced/
+              // 4=Performance，见 MobileGlues-cpp config/settings.h）。开启任一档
+              // 即触发渲染分辨率联动（Task78：MC 窗口=表面/档位系数，MG FSR1
+              // 升采样回全表面）。
+              @"pickKeys": @[@"0", @"1", @"2", @"3", @"4"],
               @"pickList": @[
                   localize(@"preference.title.mg_fsr1_setting-0", nil),
                   localize(@"preference.title.mg_fsr1_setting-1", nil),
                   localize(@"preference.title.mg_fsr1_setting-2", nil),
-                  localize(@"preference.title.mg_fsr1_setting-3", nil)
+                  localize(@"preference.title.mg_fsr1_setting-3", nil),
+                  localize(@"preference.title.mg_fsr1_setting-4", nil)
               ]
             },
         ], @[

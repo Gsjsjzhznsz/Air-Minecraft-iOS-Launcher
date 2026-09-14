@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <QuartzCore/QuartzCore.h>
 #import "SurfaceViewController.h"
+#import "LauncherPreferences.h"
 
 #include <dlfcn.h>
 #include <string.h>
@@ -725,9 +726,40 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     // viewport 维度 != surface 维度 → MC 的帧无法铺满后缓冲（1x/2x 尺寸单位
     // 失配或竖横转置——latestlog 53febda 的确切形态）→ 立即启用 geo-heal。
     // 此判定优先于一切 latch：几何不匹配时“FBO 0 有内容”也不等于可见。
+    //
+    // Task 78（FSR 联动豁免）：MG 渲染器 + FSR 预设开启时，启动器把 MC 的
+    // 窗口告知值缩到 surface/fsr_scale（updateSavedResolution），MC viewport
+    // 恒小于 surface 且【两个维度都小】——这是 FSR1 升采样路径的预期形态，
+    // 不是几何事故；补偿链（Task49 geo-heal / Task55 realign / Task51/52
+    // drawable 钉扎）若介入会与 ApplyFSR 的 blit 打架。豁免条件刻意要求
+    // viewport 双维严格小于 surface：转置形态（一维大一维小，如 820x1180 vs
+    // 1180x820）不满足 → 真正的几何事故仍会走自愈链。FSR 关闭或非 MG
+    // 渲染器时 viewport==surface，豁免天然无操作。
+    static int s_task78_fsr_link = -1;
+    if (s_task78_fsr_link < 0) {
+        const char *ame78_renderer = getenv("AMETHYST_RENDERER");
+        NSInteger ame78_fsr = getPrefInt(@"mobileglues.fsr1_setting");
+        s_task78_fsr_link = (ame78_renderer != NULL &&
+                             strcmp(ame78_renderer, RENDERER_NAME_MOBILEGLUES) == 0 &&
+                             ame78_fsr > 0) ? 1 : 0;
+        if (s_task78_fsr_link) {
+            NSLog(@"[GLGeo] Task78 FSR linkage active: renderer=MobileGlues fsr1_setting=%ld -- viewport (render) < surface is the expected upscale geometry, compensation chain exempted", (long)ame78_fsr);
+        }
+    }
     const BOOL geoMismatch = (viewport[2] > 0 && viewport[3] > 0 &&
                               surfW > 0 && surfH > 0 &&
-                              (viewport[2] != surfW || viewport[3] != surfH));
+                              (viewport[2] != surfW || viewport[3] != surfH)) &&
+                             !(s_task78_fsr_link &&
+                               viewport[2] < surfW && viewport[3] < surfH);
+    if (s_task78_fsr_link && viewport[2] > 0 && viewport[2] < surfW &&
+        viewport[3] > 0 && viewport[3] < surfH) {
+        static BOOL s_task78_logged = NO;
+        if (!s_task78_logged) {
+            s_task78_logged = YES;
+            NSLog(@"[GLGeo] Task78 FSR render<surface expected: viewport=%dx%d surface=%dx%d -- geo-heal/realign exempted (MG FSR1 upscale path presents the frame)",
+                  viewport[2], viewport[3], surfW, surfH);
+        }
+    }
     g_ame53_transposed = geoMismatch ? 1 : 0;
     if (!geoMismatch) {
         // Task53：对齐帧重置冷却——下一个失配剧集（几何从对齐转为失配）立即可
@@ -1508,10 +1540,23 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
             }
             if (scale60 <= 0.0) scale60 = UIScreen.mainScreen.scale;
             if (scale60 <= 0.0) scale60 = 1.0;
+            // Task 78：创建时同步应用 resolutionScale（video.resolution）。
+            // 旧行为在 resolutionScale<100% 时把 drawableSize 钉到全物理
+            // 分辨率，随后 updateSavedResolution 写缩小值 → 创建后拉锯（
+            // Task57 冻结补丁下 surface 锁死在创建尺寸，guard 每次把
+            // drawableSize 拉回 surface 全尺寸，用户看到的是"半分辨率
+            // 选项 + 每帧 geo-heal blit"）。创建与旋转两个写者现在同口径
+            // （bounds × screenScale × resolutionScale），单一事实源成立；
+            // resolutionScale=100% 时数值与旧行为完全一致（零回归）。
+            // Task 78 FSR 联动：MC 的告知窗口（=viewport=渲染尺寸）由
+            // updateSavedResolution 单独缩至 surface/fsr_scale，本块只负责
+            // surface/drawable 口径，不受 fsr_scale 影响。
+            CGFloat rs60 = resolutionScale;
+            if (rs60 <= 0.0) rs60 = 1.0;  // 防御：全局未初始化（JavaGUI 等路径）
             oldDrawable50 = ml60.drawableSize;
             oldScale50 = layer.contentsScale;
-            layer.contentsScale = scale60;
-            ml60.drawableSize = CGSizeMake(round(w60 * scale60), round(h60 * scale60));
+            layer.contentsScale = scale60 * rs60;
+            ml60.drawableSize = CGSizeMake(round(w60 * scale60 * rs60), round(h60 * scale60 * rs60));
         };
         if ([NSThread isMainThread]) {
             align60();

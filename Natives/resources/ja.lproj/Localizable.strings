@@ -299,11 +299,12 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Only helps when the game renders below the surface resolution; at fullscreen render resolution FSR would only resample twice, so it is bypassed automatically (see \"FSR1 zero-gain bypass\" in the log).";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 アップスケーリング。プリセットを選ぶと描画解像度が低下し（Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%）、レンダラーがフル解像度へ拡大します。手動で解像度を下げる必要はもうありません。MobileGlues レンダラー使用時のみ有効です。";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";
-"preference.title.mg_fsr1_setting-3" = "Performance";
+"preference.title.mg_fsr1_setting-3" = "バランス";
+"preference.title.mg_fsr1_setting-4" = "パフォーマンス";
 "preference.title.default_gamepad_ctrl" = "Controller configuration";
 "preference.title.hardware_hide" = "Hide controls when hardware is connected";
 "preference.detail.hardware_hide" = "Enable the behaviour of automatically disabling the on-screen control overlay when a mouse or game controller is connected.";

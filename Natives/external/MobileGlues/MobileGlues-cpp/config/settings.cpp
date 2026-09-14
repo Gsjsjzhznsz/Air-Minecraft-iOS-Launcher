@@ -63,6 +63,22 @@ void init_settings() {
     }
     global_settings.max_glsl_cache_size = maxGlslCacheSize > 0 ? maxGlslCacheSize : 30 * 1024 * 1024;
 
+    // Task 78 (Amethyst fork): upstream's Apple branch never read these two keys
+    // from config.json -- the launcher writes both (fsr1Setting,
+    // angleDepthClearFixMode, verified in device logs), but they were silently
+    // discarded on iOS, so the FSR presets could never reach the renderer here
+    // no matter what the config said. Read them with the same range checks as
+    // the Android branch below: absent (-1) or out of range keeps the Disabled
+    // defaults set above.
+    int fsr1Raw = success ? config_get_int((char*)"fsr1Setting") : -1;
+    if (fsr1Raw >= 0 && fsr1Raw < static_cast<int>(FSR1_Quality_Preset::MaxValue)) {
+        global_settings.fsr1_setting = static_cast<FSR1_Quality_Preset>(fsr1Raw);
+    }
+    int depthFixRaw = success ? config_get_int((char*)"angleDepthClearFixMode") : -1;
+    if (depthFixRaw >= 0 && depthFixRaw < static_cast<int>(AngleDepthClearFixMode::MaxValue)) {
+        global_settings.angle_depth_clear_fix_mode = static_cast<AngleDepthClearFixMode>(depthFixRaw);
+    }
+
     LOG_V("MG_DIR_PATH = %s", mg_directory_path ? mg_directory_path : "(null)")
     LOG_V("config.json %s", success ? "loaded successfully" : "not loaded, using defaults")
 

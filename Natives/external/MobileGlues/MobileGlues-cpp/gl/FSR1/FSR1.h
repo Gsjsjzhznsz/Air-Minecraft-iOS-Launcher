@@ -69,6 +69,11 @@ extern bool fsrInitialized;
 void mg_fsr1_bind_context(unsigned long long ctx_id);
 void ApplyFSR();
 void InitFSRResources();
+// Task 78 (Amethyst fork): the render size follows the application's viewport
+// (the glViewport hook latch), not the surface -- the surface dims are only fed
+// in before any viewport was latched (pending == 0). The launcher's FSR linkage
+// tells MC its window is surface/fsr_scale, so the latch IS the render size and
+// the target (render x preset scale) lands on the surface.
 void CheckResolutionChange(EGLDisplay display, EGLSurface surface);
 void OnResize(int width, int height);
 // Task 76 (Amethyst fork): delete the FSR1 render/target objects and zero

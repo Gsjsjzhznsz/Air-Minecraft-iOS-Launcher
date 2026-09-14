@@ -138,8 +138,10 @@ check("A4b 心跳打印 maxGap/avgGap",
 for lang in ["en", "ja", "km", "zh-CN", "zh-Hans", "zh-Hant"]:
     p = os.path.join(ROOT, f"Natives/resources/{lang}.lproj/Localizable.strings")
     s = read(p)
-    check(f"A5 {lang} FSR1 detail 含旁路说明",
-          "zero-gain" in s or "自动旁路" in s or "自動旁路" in s or "bypassed automatically" in s)
+    # Task 78 演化：detail 文案从"零增益自动旁路"改为"选档即联动降渲染分辨率"；
+    # 旁路行为本身仍在（FSR1.cpp TeardownFSR1 日志未动）。
+    check(f"A5 {lang} FSR1 detail 含档位联动说明",
+          "77%" in s and "50%" in s and ("MobileGlues" in s or "渲染分辨率" in s or "描画解像度" in s or "渲染解析度" in s))
 
 # ---------------------------------------------------------------- B. 行为回放
 print("== B. FSR1 零增益判定仿真 ==")

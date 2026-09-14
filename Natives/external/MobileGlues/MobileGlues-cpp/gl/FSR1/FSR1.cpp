@@ -287,6 +287,22 @@ void InitFullscreenQuad() {
 bool fsrInitialized = false;
 void InitFSRResources() {
     fsrInitialized = true;
+    // Task 78 (Amethyst fork): adopt the viewport latch when the application
+    // has already drawn. Before this, the first swap ran on the 960x540
+    // default geometry and the recalc only landed afterwards -- one garbage
+    // frame under the launcher's FSR linkage (MC's window told at
+    // surface/fsr_scale, so its very first viewport IS the render size).
+    // Adopting pending + computing the target here makes the very first
+    // ApplyFSR run on the correct geometry. pending == 0 means no viewport
+    // was latched yet: keep the defaults and let the first swap settle it.
+    if (FSR1_Context::g_pendingWidth > 0 && FSR1_Context::g_pendingHeight > 0) {
+        FSR1_Context::g_renderWidth = FSR1_Context::g_pendingWidth;
+        FSR1_Context::g_renderHeight = FSR1_Context::g_pendingHeight;
+        CalculateTargetResolution(global_settings.fsr1_setting, FSR1_Context::g_pendingWidth,
+                                  FSR1_Context::g_pendingHeight,
+                                  reinterpret_cast<int*>(&FSR1_Context::g_targetWidth),
+                                  reinterpret_cast<int*>(&FSR1_Context::g_targetHeight));
+    }
     // No GUARD_VAO or GUARD_ARRAY_BUFFER: the only thing here that binds either is
     // InitFullscreenQuad, which carries its own guard.
     GLStateGuard state(GUARD_PROGRAM | GUARD_TEXTURE | GUARD_FRAMEBUFFER | GUARD_RENDERBUFFER);
@@ -367,8 +383,14 @@ void RecreateFSRFBO() {
 
     GLES.glGenTextures(1, &FSR1_Context::g_renderTexture);
     GLES.glBindTexture(GL_TEXTURE_2D, FSR1_Context::g_renderTexture);
-    GLES.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight, 0,
-                      GL_RGBA, GL_FLOAT, nullptr);
+    // Task 78 (Amethyst fork): RGBA8, matching InitFSRResources above. Upstream
+    // recreated this texture as RGBA32F -- 2x the bytes per frame of pure
+    // bandwidth for an LDR game upscale, inconsistent with its own init path
+    // and with the render texture the application actually drew into before
+    // the first resize. EASU/RCAS quality on RGBA8 input is what the init path
+    // always used anyway.
+    GLES.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight, 0,
+                      GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     GLES.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -503,7 +525,20 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
     // reach the driver's command stream.
     egl_eglQuerySurface(display, surface, EGL_WIDTH, &width);
     egl_eglQuerySurface(display, surface, EGL_HEIGHT, &height);
-    OnResize(width, height);
+    // Task 78 (Amethyst fork): the render size follows the APPLICATION, not the
+    // surface. Upstream fed the surface dims into OnResize here unconditionally,
+    // which pinned render == surface by construction -- in any launcher that
+    // tells Minecraft its window equals the surface, the upscale was dead on
+    // arrival (Task 76's zero-gain teardown, and before it a double resample).
+    // With the launcher's FSR linkage MC's told window -- and therefore its
+    // glViewport latch -- IS the render size, and the target below lands on the
+    // surface. The surface feed survives only as a pre-first-viewport fallback
+    // (pending == 0): a fullscreen-viewport application then settles on
+    // render == surface -> zero-gain teardown -> direct present, which is the
+    // correct verdict for it.
+    if (FSR1_Context::g_pendingWidth == 0 && FSR1_Context::g_pendingHeight == 0) {
+        OnResize(width, height);
+    }
     // Task 76 (Amethyst fork): keep the surface size visible to the zero-gain
     // branch below under names that cannot be shadowed by the pending-size pair.
     const GLsizei surfaceWidth = width;
@@ -530,8 +565,30 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
         if (width >= surfaceWidth && height >= surfaceHeight) {
             TeardownFSR1();
         } else {
+            // Task 78 (Amethyst fork): one-shot engage log. This branch is the
+            // first time the upscale is actually live under the launcher's
+            // FSR linkage -- render (viewport latch) below the surface, target
+            // = render x preset scale on top of the surface.
+            static bool s_task78_engaged = false;
+            if (!s_task78_engaged) {
+                s_task78_engaged = true;
+                LOG_W_FORCE("[MG] FSR1 upscale engaged (Task78): render %dx%d -> target %dx%d -> surface %dx%d (viewport-latched render, launcher FSR linkage)",
+                            FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight,
+                            FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight,
+                            surfaceWidth, surfaceHeight);
+            }
             RecreateFSRFBO();
         }
+    } else if (FSR1_Context::g_renderFBO != 0 && FSR1_Context::g_renderWidth > 0 &&
+               FSR1_Context::g_renderWidth >= surfaceWidth && FSR1_Context::g_renderHeight >= surfaceHeight) {
+        // Task 78 (Amethyst fork) safety: zero-gain verdict without a pending
+        // change. Reachable when the preset is on but the linkage is inactive
+        // (MC told the full window: the viewport latch equals the surface, or
+        // a legacy init adopted the surface through the fallback feed above).
+        // Without this the oversized target kept paying the triple fullscreen
+        // tax every frame -- exactly the state Task 76 tore down, resurrected
+        // by the init-adoption path.
+        TeardownFSR1();
     }
     // No glViewport here. This runs immediately after ApplyFSR and the swap, and
     // ApplyFSR ends every frame with exactly this call at exactly this size; on the

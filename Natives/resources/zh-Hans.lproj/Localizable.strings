@@ -302,11 +302,12 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 超分辨率";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超分辨率。仅当游戏以低于表面的分辨率渲染时有增益；全屏分辨率渲染下 FSR 只会二次重采样，将被自动旁路（日志可见 FSR1 zero-gain bypass）。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超分辨率。选择档位即自动降低渲染分辨率（超高品质 77%／高品质 67%／均衡 59%／性能优先 50%），再由渲染器放大回全分辨率表面——无需再手动降低分辨率。仅 MobileGlues 渲染器有效。";
 "preference.title.mg_fsr1_setting-0" = "关闭";
 "preference.title.mg_fsr1_setting-1" = "超高品质";
 "preference.title.mg_fsr1_setting-2" = "高品质";
-"preference.title.mg_fsr1_setting-3" = "性能优先";
+"preference.title.mg_fsr1_setting-3" = "均衡";
+"preference.title.mg_fsr1_setting-4" = "性能优先";
 "preference.title.default_gamepad_ctrl" = "手柄配置";
 "preference.title.hardware_hide" = "硬件连接时隐藏控制键";
 "preference.detail.hardware_hide" = "启用连接鼠标或游戏控制器时自动禁用屏幕控制叠加的行为。";

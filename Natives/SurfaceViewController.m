@@ -224,6 +224,25 @@ static int currentHotbarSlot = -1;
 static GameSurfaceView* pojavWindow;
 
 @interface SurfaceViewController ()<UITextFieldDelegate, UIGestureRecognizerDelegate> {
+    // Task 78：MobileGlues FSR 渲染分辨率联动系数（1.0=关闭/非 MG）。
+    // updateSavedResolution 每次重算（旋转/分辨率变更安全）；sendTouchPoint
+    // 等输入换算读取它保持与 MC 窗口信念（windowWidth）同口径。
+    float mgFsrScale;
+}
+@end
+
+// Task 78：FSR 预设 → 渲染缩放系数（与 MobileGlues-cpp FSR1.cpp
+// CalculateTargetResolution 的 scale 表同步：UQ=1.3 / Q=1.5 / B=1.7 / P=2.0）。
+// 仅当当前 profile 渲染器为 MobileGlues 且预设开启时生效；Auto（实际
+// ANGLE）/gl4es/tinygl4angle/zink/Vulkan（含 MoltenVK 自管路径）均返回 1.0。
+static float ame78_fsr_preset_scale(NSInteger preset) {
+    switch ((int)preset) {
+        case 1: return 1.3f;   // UltraQuality：渲染 77%
+        case 2: return 1.5f;   // Quality：渲染 67%
+        case 3: return 1.7f;   // Balanced：渲染 59%
+        case 4: return 2.0f;   // Performance：渲染 50%
+        default: return 1.0f;  // Disabled
+    }
 }
 
 // FPS/内存监控相关（FPS 在 native pojavSwapBuffers 中计数，参照 FCL/ZL2）
@@ -1338,12 +1357,39 @@ static UIView *findSDL_uikitview(UIView *root);
     }
 
     resolutionScale = getPrefFloat(@"video.resolution") / 100.0;
+    // Task 78（FSR 渲染分辨率联动）：MG 渲染器 + FSR 预设开启时，
+    // MG 配置里的 fsr1_setting 终于有真实含义：
+    //   surface/drawable = 物理 × resolutionScale（呈现分辨率，不变）；
+    //   MC 告知窗口 windowWidth×windowHeight = surface / fsr_scale（渲染分辨率）。
+    // MC viewport 锁存渲染尺寸，MobileGlues FSR1（Task78 后跟随 viewport）
+    // 把 EASU/RCAS 升采样到 target = render × fsr_scale ≈ surface 后 blit
+    // 上屏。此前 render 恒被 surface 尺寸覆写 → render==surface → FSR 永远
+    // 零增益（Task76 只能旁路），用户只能手动降 video.resolution 逃生。
+    NSString *ame78_renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    NSInteger ame78_fsr_preset = getPrefInt(@"mobileglues.fsr1_setting");
+    mgFsrScale = [ame78_renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]
+        ? ame78_fsr_preset_scale(ame78_fsr_preset) : 1.0f;
+    if (mgFsrScale > 1.0f) {
+        static BOOL s_task78_logged = NO;
+        if (!s_task78_logged) {
+            s_task78_logged = YES;
+            NSLog(@"[SurfaceVC] Task78 FSR linkage: preset=%ld scale=%.2f -- MC render window = surface/%.2f (MG FSR1 upscales to surface); resolution=%.0f%%",
+                  (long)ame78_fsr_preset, (double)mgFsrScale, (double)mgFsrScale,
+                  (double)(resolutionScale * 100.0));
+        }
+    }
     self.surfaceView.layer.contentsScale = self.screenScale * resolutionScale;
 
     physicalWidth = roundf(self.surfaceView.frame.size.width * self.screenScale);
     physicalHeight = roundf(self.surfaceView.frame.size.height * self.screenScale);
-    windowWidth = roundf(physicalWidth * resolutionScale);
-    windowHeight = roundf(physicalHeight * resolutionScale);
+    // 呈现口径（surface/drawableSize）：物理 × resolutionScale。
+    int surfaceWidth = roundf(physicalWidth * resolutionScale);
+    int surfaceHeight = roundf(physicalHeight * resolutionScale);
+    if ((surfaceWidth % 2) != 0) { --surfaceWidth; }
+    if ((surfaceHeight % 2) != 0) { --surfaceHeight; }
+    // 渲染口径（MC 告知窗口 = viewport = FSR render）：surface / fsr_scale。
+    windowWidth = roundf((float)surfaceWidth / mgFsrScale);
+    windowHeight = roundf((float)surfaceHeight / mgFsrScale);
     if ((windowWidth % 2) != 0) { --windowWidth; }
     if ((windowHeight % 2) != 0) { --windowHeight; }
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
@@ -1358,12 +1404,17 @@ static UIView *findSDL_uikitview(UIView *root);
         // 渲染/输入口径已由 Task58（EGL 查询常量修正）+ Task59（输入像素直通）
         // 定案：启动器像素口径 2360x1640 == launchJVM 告知值 == MC 窗口信念
         // == MC 输入归一化基准。因此 GL 分支与非 GL 分支统一：
-        //   drawableSize = windowWidth x windowHeight（= physical x resolutionScale），
+        //   drawableSize = surfaceWidth x surfaceHeight（= physical x resolutionScale），
         //   contentsScale 维持上方 screenScale x resolutionScale。
         // surface==drawable==物理像素 1:1 呈现零缩放；resolutionScale < 1
         // 时按比例整体缩放（保留用户分辨率偏好的语义）；旋转时 bounds 跟随
         // → 三者同步翻转。本写入与 gl_init_context 的 Task60 创建对齐块
         // 同口径（主线程单一写者纪律不变）。
+        // Task 78：FSR 联动下 windowWidth（MC 窗口/渲染尺寸）< surface，
+        // drawableSize 必须写【呈现口径】surfaceWidth×surfaceHeight 而非
+        // windowWidth；fsr_scale=1 时两值相同（零回归），fsr_scale>1 时
+        // surface 保持全尺寸供 FSR1 升采样 blit。gl_bridge 的 Task78 豁免
+        // 保证此期 geoMismatch 不触发（g_ame53_transposed=0 → 写入畅通）。
         if (ame_gl_surface_owns_layer()) {
             // Task 53（分裂画面根治之一）：surface 与 MC viewport 几何失配
             //（转置锁死、重对齐未治愈/熔断）期间停写 drawableSize——此期
@@ -1372,10 +1423,10 @@ static UIView *findSDL_uikitview(UIView *root);
             // 重对齐成功后 surface==drawable==bounds 像素，本写入变为同值
             // no-op，单一事实源正常恢复。
             if (!ame_gl_surface_transposed()) {
-                metalLayer.drawableSize = CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
+                metalLayer.drawableSize = CGSizeMake(MAX(surfaceWidth, 1), MAX(surfaceHeight, 1));
             }
         } else {
-            metalLayer.drawableSize = CGSizeMake(MAX(windowWidth, 1), MAX(windowHeight, 1));
+            metalLayer.drawableSize = CGSizeMake(MAX(surfaceWidth, 1), MAX(surfaceHeight, 1));
         }
         // 解锁帧率（关闭垂直同步）：三缓冲。
         // 默认 maximumDrawableCount（通常为 2）下，当两个 drawable 都在等待呈现时，
@@ -1821,6 +1872,12 @@ static UIView *findSDL_uikitview(UIView *root);
 - (void)sendTouchPoint:(CGPoint)location withEvent:(int)event
 {
     CGFloat screenScale = self.screenScale;
+    // Task 78（FSR 输入口径）：输入像素空间必须等于 MC 窗口信念
+    // windowWidth×windowHeight（Task59 定案：MC 按告知窗口尺寸归一化）。
+    // view 点 × screenScale（非 grabbing 再 ×resolutionScale）= 物理（×resScale）
+    // 空间；FSR 联动下 windowWidth = surface/fsr_scale，故再除 fsr_scale。
+    // fsr_scale=1（FSR 关/非 MG）时恒等除法，行为与旧版逐位一致。
+    if (mgFsrScale > 0.0f) screenScale /= mgFsrScale;
     if (!isGrabbing) {
         screenScale *= resolutionScale;
         if (virtualMouseEnabled) {
