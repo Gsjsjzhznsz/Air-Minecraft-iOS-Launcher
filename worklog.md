@@ -207,3 +207,29 @@ Stage Summary:
 - 用户即时缓解（无需等修复）：设置中 video.resolution 从 100% 降到 ~75%（GPU/CPU 成本近平方下降）；或继续用 zink
 - 默认控件 custom 已落地：新装出厂即 custom.json；老安装一次性迁移（仅限停在 default.json 的）；"恢复默认控件"复位到 custom
 - 下轮日志预期锚点：[RenderDiag] ... pres=X/Yms build=X/Yms；"[Preferences] Task77 migrated default control layout: default.json -> custom.json"（仅老安装首启一次）
+
+---
+Task ID: 78
+Agent: main (Super Z)
+Task: 用户报"还是卡，降低50%分辨率加fsr"+修 FSR 档位设置；顺带 MG 上游议题调研 + 新日志（e3e0830，Task77 构建）分相归因落地
+
+Work Log:
+- MG 上游议题调研（用户点名）：主仓库 22 条 + MobileGlues-release 211 条全扫；同类卡顿议题 #415（整合包 123→24fps）、#452（2.0.0 性能回归多人复现）、#460（Sodium 转译瓶颈）、#450、#298 全部 closed as not planned / "性能就是这个性能"；#313 官方声明不支持 Sodium/Iris/模组——无可搬修复，结论：上游 wontfix，杠杆在我们侧
+- 用户新 log（e3e0830，Task77 构建 5ab093e 实测，MG + MC 26.2 fabric 无光影）判读——**分相归因定案**：
+  * pres=0/0ms 全程 25 个心跳（present 最大 3ms）→ ANGLE Metal 呈现/GPU 侧完全无罪
+  * build==avgGap 逐心跳吻合（fps=4 → avgGap=346ms build=346/503ms；60fps 好窗 → build=16/17ms）→ 帧间隔 100% 由 CPU 帧构造相位（MC 渲染线程 + MG 转译栈）决定
+  * 深谷 = build 尖峰 200-700ms（区块/上传/转译瞬停），好窗稳态 build 税 ~16ms；与上游 #460 转译瓶颈定性一致；26.3 无模组也卡（用户补充）→ 非 Sodium 专属，是 MG 栈结构性税
+- 顺藤摸瓜发现 **第三重根因（配置传递断裂）**：launcher 写 config.json "fsr1Setting": 1，MG dump 读出 0 —— settings.cpp 的 __APPLE__ 分支硬编码 fsr1_setting=Disabled 且从不读 config（只有 Android 分支读）；angleDepthClearFixMode 同样被丢弃
+- 三重根因全部修复（提交 eb4d248）：
+  1. settings.cpp Apple 分支补读 fsr1Setting/angleDepthClearFixMode（范围校验同 Android 分支）
+  2. FSR1.cpp：render 跟随 viewport 锁存（surface 只作首帧前兜底回灌）；InitFSRResources 采用已锁存 viewport（消除 960x540 首帧瞬态）；surface 缩小于 render 的独立零增益安全网；RecreateFSRFBO 渲染纹理 RGBA32F→RGBA8（与 init 一致，升采样带宽减半）；engage 一次性日志
+  3. 启动器联动：updateSavedResolution 计算 MC 告知窗口= surface/fsr_scale（仅 MG+预设开）；drawableSize 写呈现口径；sendTouchPoint 输入空间除 fsr_scale；gl_bridge geoMismatch 豁免（双维严格小于才豁免，转置仍走自愈链）；Task60 创建对齐应用 resolutionScale（100% 数值不变）
+  4. UI：五档 picker（补 Performance=4）+ Balanced 标签修正 + 6 语言详情文案重写
+- 验证：verify_task78.py 54/54 ALL PASS（指纹/启动器数学回放/FSR1 状态机回放含旋转+安全网/豁免矩阵/括号平衡/settings.cpp 配置回放）；全链回归 64(93)/66(43)/67(47)/68(24)/70(68)/71/72/73/75/76(40)/77(27) 全绿（task66 D9 键数 1832→1833、task76 A5 文案断言按演化适配）
+- 推送 eb4d248 → CI 已触发
+
+Stage Summary:
+- MG 卡顿根因链定案：CPU 帧构造侧（转译栈税，pres=0 铁证）+ FSR 三重失效（配置传递断/render 被 surface 钉死/UI 缺档错标）全部修复
+- FSR 档位现语义：UQ=77% / Q=67% / Balanced=59% / Performance=50% 渲染分辨率 + EASU/RCAS 升采样回全表面；与 video.resolution 滑杆可叠加
+- 下轮设备日志判读锚点："[MobileGlues] Setting: fsr1Setting = 1"（传递修复）；"[SurfaceVC] Task78 FSR linkage"；"[MG] FSR1 upscale engaged (Task78)"；"[GLGeo] Task78 FSR render<surface expected"；心跳 pres/build + fps 好转幅度
+- 遗留：MG 转译栈稳态 ~16ms/帧 build 税为结构性（上游 wontfix）——转译侧优化空间在 multidrawOrder（MG 2.0 新机制，launcher 的 multidraw_mode 旧键已被弃用，值得下轮接入）；深谷 build 尖峰 200-700ms 根因（区块网格重建 vs 纹理上传 vs 转译缓存 miss）待更深 instrumentation
