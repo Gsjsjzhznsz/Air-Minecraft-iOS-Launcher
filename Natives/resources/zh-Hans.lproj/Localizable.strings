@@ -285,7 +285,7 @@
 "preference.title.max_glsl_cache_size" = "GLSL 缓存大小";
 "preference.detail.max_glsl_cache_size" = "已编译 GLSL 着色器的最大缓存数量。0 表示禁用缓存。";
 "preference.title.multidraw_mode" = "多重绘制模式";
-"preference.detail.multidraw_mode" = "多重间接绘制渲染模式，提升 draw call 性能。";
+"preference.detail.multidraw_mode" = "多重绘制后端优先序（MobileGlues multidrawOrder 机制）。自动 = 渲染器默认序（原生/EXT 优先，其后批量间接）；间接 = GPU 间接族优先（转译开销最小）；模拟 = CPU 循环优先（最保守兜底）。仅 MobileGlues 渲染器有效。";
 "preference.title.mg_multidraw_mode-0" = "自动";
 "preference.title.mg_multidraw_mode-1" = "间接";
 "preference.title.mg_multidraw_mode-2" = "模拟";

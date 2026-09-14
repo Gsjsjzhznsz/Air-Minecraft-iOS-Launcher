@@ -282,7 +282,7 @@
 "preference.title.max_glsl_cache_size" = "GLSL Cache Size";
 "preference.detail.max_glsl_cache_size" = "Maximum number of compiled GLSL shaders to cache. 0 disables caching.";
 "preference.title.multidraw_mode" = "Multidraw Mode";
-"preference.detail.multidraw_mode" = "Multi-draw indirect rendering mode for improved draw call performance.";
+"preference.detail.multidraw_mode" = "Multi-draw backend preference order (MobileGlues 'multidrawOrder'). Auto = the renderer's default ladder (native/EXT first, then batched indirect); Indirect = GPU indirect family first (lowest translation overhead); Emulated = CPU unrolled loops first (most conservative fallback). Only effective with the MobileGlues renderer.";
 "preference.title.mg_multidraw_mode-0" = "Auto";
 "preference.title.mg_multidraw_mode-1" = "Indirect";
 "preference.title.mg_multidraw_mode-2" = "Emulated";
