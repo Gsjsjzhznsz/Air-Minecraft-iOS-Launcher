@@ -245,11 +245,36 @@ static void ame_forceEglProfileEs(void) {
 static void *ame_primaryWindow = NULL;
 static unsigned int ame_primaryWindowRefs = 0;
 
+// 前置声明：实现在第 4 节 "SDL GL bridge"（Task 79）。此处只需它的布尔结果。
+static bool ame_glBridgeEnabled(void);
+
 static bool ame_shouldReusePrimaryWindow(void) {
-    // 仅对移动 ES 渲染器生效。zink / OSMesa 目前工作正常，任何窗口行为的改动
-    // 都不能波及它们 —— 这条链路不经过 EGL，本文件的兼容逻辑对它没有意义。
-    if (!ame_sdlGlesCompatEnabled()) return false;
-    return ame_envFlagOn("AMETHYST_SDL_REUSE_WINDOW", true);
+    // 移动 ES 渲染器（MobileGlues / GL4ES / Mithril / MobileGL）——原有判定。
+    if (ame_sdlGlesCompatEnabled()) {
+        return ame_envFlagOn("AMETHYST_SDL_REUSE_WINDOW", true);
+    }
+    // Task 80：GL bridge 接管的渲染器（zink / libOSMesa / gallium_* / vulkan_zink，
+    // 以及 gl4es / ltw 等 EGL 转译层）同样必须复用主窗口。
+    //
+    // 设备证据（0441401，用户上报“zink 在 26.3 仍回退”）：Task 79 的 provider-mirror
+    // 让 LoadLibrary / CreateContext / MakeCurrent 全部通过（log 实锤 zink 上下文
+    // 创建成功、MoltenVK 1.4.2 Vulkan 1.4.357 初始化），但 26.3 renderpearl 的
+    // GlDevice 构造器随后创建第二个 "Hidden Test Window" 探针（创建后立即销毁，
+    // 仅用于验证 GL 环境健康）——iOS UIKit 后端每个显示器只允许一个窗口，
+    // 真实 SDL_CreateWindow 返回 NULL → BackendCreationException: "Failed to
+    // create window for OpenGL after creating context" → 回退原生 Vulkan，
+    // ZinkConfig / stride fix / shaderc 缓存全部空转。
+    //
+    // MobileGlues 路径早已靠复用迈过这道门（0cc265f 实证：reusing primary
+    // window, refs=2 → DestroyWindow skipped, refs=1 → Using graphics backend
+    // OpenGL）。zink 呈现走 osm_swap_buffers → SurfaceViewController.surface.layer，
+    // 不依赖任何 SDL 窗口，复用无副作用；引丹计数（refs）天然消化探针窗口的
+    // 立即销毁。逃生阀不变：AMETHYST_ZINK_GL_BRIDGE=0 → glBridgeEnabled 对 zink
+    // 返回 false → 复用同步关闭，回到 Task 79 之前的旧行为。
+    if (ame_glBridgeEnabled()) {
+        return ame_envFlagOn("AMETHYST_SDL_REUSE_WINDOW", true);
+    }
+    return false;
 }
 
 #pragma mark - 3) EGL 兼容重试

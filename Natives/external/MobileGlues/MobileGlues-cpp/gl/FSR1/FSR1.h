@@ -38,7 +38,10 @@ namespace FSR1_Context {
     // as long as it lives. -1 for a name the linker dropped, which glUniform*
     // ignores.
     extern GLint g_inputTexLoc;
-    extern GLint g_const0Loc;
+    // Task 80 (Amethyst fork): uTargetSize (vec2) replaces upstream's uConst0
+    // (vec4, declared but never read by the shader) -- the EASU constant setup
+    // needs the upscale output size.
+    extern GLint g_targetSizeLoc;
     extern GLint g_viewportSizeLoc;
 
     extern GLuint g_targetFBO;
@@ -50,6 +53,10 @@ namespace FSR1_Context {
     extern GLsizei g_targetHeight;
     extern GLsizei g_renderWidth;
     extern GLsizei g_renderHeight;
+    // Task 80 (Amethyst fork): the surface size as last seen by
+    // CheckResolutionChange; ApplyFSR blits the target to the full surface.
+    extern GLsizei g_surfaceWidth;
+    extern GLsizei g_surfaceHeight;
     extern bool g_dirty;
 
     extern bool g_resolutionChanged;

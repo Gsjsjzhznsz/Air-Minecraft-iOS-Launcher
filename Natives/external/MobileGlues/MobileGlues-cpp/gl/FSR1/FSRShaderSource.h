@@ -3885,61 +3885,90 @@ AF1 sharpness){
 #endif
 
 uniform sampler2D uInputTex;
-uniform vec4 uConst0;
 uniform vec2 uViewportSize;
+uniform vec2 uTargetSize;
 in vec2 vTexCoord;
 out vec4 oFragColor;
 
 AF4 FsrRcasLoadF(ASU2 p) { return texelFetch(uInputTex, ASU2(p), 0); }
 void FsrRcasInputF(inout AF1 r, inout AF1 g, inout AF1 b) {}
-AF4 FsrEasuRF(AF2 p) { AF4 res = textureGather(uInputTex, p, 0); return res; }
-AF4 FsrEasuGF(AF2 p) { AF4 res = textureGather(uInputTex, p, 1); return res; }
-AF4 FsrEasuBF(AF2 p) { AF4 res = textureGather(uInputTex, p, 2); return res; }
+// ---- Task 80 (Amethyst fork): ESSL-300 gather4 emulation -----------------
+// MobileGlues 的转译管线目标是 ESSL 300（spirv-cross），textureGather 在
+// 该目标上不存在（“textureGather requires ESSL 310”），上游回调因此从未
+// 在本栈编译通过：升采样着色器在转换层死亡（0441401 实锤，code=-2 回退
+// RAW 桌面 GLSL 后再死于 “invalid version directive”），ApplyFSR 拿着
+// program 0 每帧把 clear 过的黑色 target blit 上屏 = 全屏黑屏。
+//
+// 用 texelFetch 精确重进 textureGather 的 GLSL 契约：
+//   .x = texel(i0,j1)   .y = texel(i1,j1)
+//   .z = texel(i1,j0)   .w = texel(i0,j0)     （(i0,j0) = floor(坐标-0.5)）
+// 该分量序不是猜测：它是唯一与 FSR 自身的包代数自洽的指派（bczz
+// .x=b .y=c；ijfe .x=i .y=j .z=f .w=e；klhg；zzon .z=o .w=n），并与
+// ffx_fsr1.h 内核里的 tap 偏移交叉验证。CLAMP_TO_EDGE（初始化时设置的
+// wrap 模式）用 min/max 边界钉扎重现；gather 不受 MIN/MAG_FILTER 影响，
+// texelFetch 同样不受 → 行为等价。
+AF4 FsrEasuRF(AF2 p) {
+    ivec2 sz = textureSize(uInputTex, 0);
+    ivec2 b = ivec2(floor(p * vec2(sz) - vec2(0.5)));
+    ivec2 mx = sz - ivec2(1);
+    return AF4(
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(0, 1))), 0).r,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(1, 1))), 0).r,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(1, 0))), 0).r,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(0, 0))), 0).r);
+}
+AF4 FsrEasuGF(AF2 p) {
+    ivec2 sz = textureSize(uInputTex, 0);
+    ivec2 b = ivec2(floor(p * vec2(sz) - vec2(0.5)));
+    ivec2 mx = sz - ivec2(1);
+    return AF4(
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(0, 1))), 0).g,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(1, 1))), 0).g,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(1, 0))), 0).g,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(0, 0))), 0).g);
+}
+AF4 FsrEasuBF(AF2 p) {
+    ivec2 sz = textureSize(uInputTex, 0);
+    ivec2 b = ivec2(floor(p * vec2(sz) - vec2(0.5)));
+    ivec2 mx = sz - ivec2(1);
+    return AF4(
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(0, 1))), 0).b,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(1, 1))), 0).b,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(1, 0))), 0).b,
+        texelFetch(uInputTex, max(ivec2(0), min(mx, b + ivec2(0, 0))), 0).b);
+}
 
 void main() {
-    ivec2 texSize = textureSize(uInputTex, 0);
-    vec2 inputTexCoord = vTexCoord * (vec2(texSize) / uViewportSize);
     AU2 ip = AU2(gl_FragCoord.xy);
-    
-    AF1 inputViewportInPixelsX = uViewportSize.x;
-    AF1 inputViewportInPixelsY = uViewportSize.y;
-    AF1 outputSizeInPixelsX = float(texSize.x);
-    AF1 outputSizeInPixelsY = float(texSize.y);
-    
-    A_STATIC const AF1 sharpness = 0.2; // 0.0-1.0
-    A_STATIC const AF3 lumaWeight = AF3(0.2126, 0.7152, 0.0722);
-    
+
+    // Task 80 (Amethyst fork)：修正 EASU 常数管线。上游把 outputSize 喂成
+    // textureSize(uInputTex)（= 输入尺寸），映射塔缩成单位映射；uConst0
+    // 声明了却从未使用；EASU 结果 color 被丢弃后 RCAS 又用输出空间坐标
+    // 直接 texelFetch 输入纹理（越界）——这个着色器从未真正跑通过（上游
+    // 因此在 __APPLE__ 分支硬编码 fsr1_setting=Disabled）。
+    // 现在：input viewport == input size == uViewportSize（render 尺寸，
+    // ApplyFSR 每帧 glUniform2fv 下发）；output size == uTargetSize（target 尺寸）。
     AU4 const0;
     AU4 const1;
     AU4 const2;
     AU4 const3;
     FsrEasuCon(
         const0, const1, const2, const3,
-        inputViewportInPixelsX, inputViewportInPixelsY,
-        inputViewportInPixelsX, inputViewportInPixelsY,
-        outputSizeInPixelsX, outputSizeInPixelsY
+        uViewportSize.x, uViewportSize.y,
+        uViewportSize.x, uViewportSize.y,
+        uTargetSize.x, uTargetSize.y
     );
-    
+
     AF3 color;
     FsrEasuF(
         color,
         ip,
         const0, const1, const2, const3
     );
-    
-    A_STATIC const AF1 rcasAt = 0.25;
-    AU4 con;
-    FsrRcasCon(con, rcasAt);
-    
-    AF3 sharpenedColor;
-    FsrRcasF(
-        sharpenedColor.r,
-        sharpenedColor.g,
-        sharpenedColor.b,
-        ip,
-        con
-    );
 
-    
-    oFragColor = vec4(sharpenedColor, 1.0);
+    // RCAS 锐化需要升采样结果的 5-tap 十字邻域：单 pass 里它只能重读输入，
+    // 而输入空间≠输出空间，上游的调用方式必然越界。Task 80 先交付正确的
+    // EASU 升采样（视觉主体），RCAS 作为后续独立 pass（读 target 纹理）
+    // 另行接入；上方 RCAS 函数体保留为死代码供建模参考。
+    oFragColor = vec4(color, 1.0);
 })fsr_glsl";

@@ -136,7 +136,11 @@ namespace FSR1_Context {
     // linker dropped, and glUniform* ignores it, so an unresolved location needs no
     // separate "not found" state.
     GLint g_inputTexLoc = -1;
-    GLint g_const0Loc = -1;
+    // Task 80 (Amethyst fork): uConst0 (vec4, declared but never read by the
+    // upstream shader) is replaced by uTargetSize (vec2) -- the EASU constant
+    // setup needs the upscale output size, which used to be fed the INPUT
+    // texture size instead, collapsing the coordinate mapping to identity.
+    GLint g_targetSizeLoc = -1;
     GLint g_viewportSizeLoc = -1;
 
     GLuint g_targetFBO = 0;
@@ -148,6 +152,15 @@ namespace FSR1_Context {
     GLsizei g_targetHeight = 1080;
     GLsizei g_renderWidth = 1200;
     GLsizei g_renderHeight = 540;
+    // Task 80 (Amethyst fork): the surface size as last seen by
+    // CheckResolutionChange. ApplyFSR blits to the full surface so the presented
+    // frame is full-bleed no matter how the preset scale rounds (render 1814 x
+    // 1.30 = 2358 vs surface 2360 would otherwise leave a stale right-hand
+    // column), and so smaller targets (resolution slider stacked on FSR) get
+    // their final stretch from the blit's linear filter. Zero until the first
+    // CheckResolutionChange -- ApplyFSR then falls back to a 1:1 blit.
+    GLsizei g_surfaceWidth = 0;
+    GLsizei g_surfaceHeight = 0;
     bool g_dirty = false;
 
     bool g_resolutionChanged = false;
@@ -308,9 +321,24 @@ void InitFSRResources() {
     GLStateGuard state(GUARD_PROGRAM | GUARD_TEXTURE | GUARD_FRAMEBUFFER | GUARD_RENDERBUFFER);
 
     FSR1_Context::g_fsrProgram = CompileFSRShader();
+    // Task 80 (Amethyst fork): compile-failure safety net. Upstream pressed on
+    // with a dead program: the FBOs below came up, the framebuffer-0 redirect in
+    // gl/framebuffer.cpp activated, and ApplyFSR then cleared the target to
+    // black, drew nothing (program 0), and blitted that black over the whole
+    // surface every frame -- fps and swap counters perfectly healthy, screen
+    // perfectly black (0441401: "Shader 3 conversion FAILED ... textureGather
+    // requires ESSL 310" -> raw fallback -> "invalid version directive").
+    // Returning here leaves g_renderFBO at 0: no redirect (MC keeps drawing
+    // straight into the surface), ApplyFSR's own guard no-ops, and the session
+    // degrades to "no upscale" instead of "no picture". fsrInitialized stays
+    // true so glCreateShader does not re-run this on every shader.
+    if (FSR1_Context::g_fsrProgram == 0) {
+        LOG_W_FORCE("[MG] FSR1 upscale shader failed to compile -- machinery NOT engaged, frames present directly (preset bypassed for this session)");
+        return;
+    }
 
     FSR1_Context::g_inputTexLoc = glGetUniformLocation(FSR1_Context::g_fsrProgram, "uInputTex");
-    FSR1_Context::g_const0Loc = glGetUniformLocation(FSR1_Context::g_fsrProgram, "uConst0");
+    FSR1_Context::g_targetSizeLoc = glGetUniformLocation(FSR1_Context::g_fsrProgram, "uTargetSize");
     FSR1_Context::g_viewportSizeLoc = glGetUniformLocation(FSR1_Context::g_fsrProgram, "uViewportSize");
 
     // GLES.glUseProgram and not this layer's own: the frontend one writes
@@ -475,26 +503,38 @@ void ApplyFSR() {
     // uInputTex was pointed at when the program was linked.
     GLES.glBindTexture(GL_TEXTURE_2D, FSR1_Context::g_renderTexture);
 
-    // Plain arrays rather than a vector type from a maths library: these two are
-    // handed straight to glUniform*fv, and nothing is ever computed with them.
-    const GLfloat const0[4] = {float(FSR1_Context::g_renderWidth) / FSR1_Context::g_targetWidth,
-                               float(FSR1_Context::g_renderHeight) / FSR1_Context::g_targetHeight,
-                               1.0f / FSR1_Context::g_targetWidth,
-                               1.0f / FSR1_Context::g_targetHeight};
-
-    GLES.glUniform4fv(FSR1_Context::g_const0Loc, 1, const0);
-
+    // Task 80 (Amethyst fork): the EASU constant setup runs in the shader from
+    // these two uniforms -- the input (render) size and the upscale output
+    // (target) size. Upstream fed a vec4 nobody read (uConst0) and computed the
+    // constants with outputSize == inputSize, an identity mapping.
     const GLfloat viewportSize[2] = {(float)FSR1_Context::g_renderWidth,
                                      (float)FSR1_Context::g_renderHeight};
     GLES.glUniform2fv(FSR1_Context::g_viewportSizeLoc, 1, viewportSize);
+
+    const GLfloat targetSize[2] = {(float)FSR1_Context::g_targetWidth,
+                                   (float)FSR1_Context::g_targetHeight};
+    GLES.glUniform2fv(FSR1_Context::g_targetSizeLoc, 1, targetSize);
 
     GLES.glBindVertexArray(FSR1_Context::g_quadVAO);
     GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
 
     GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, FSR1_Context::g_targetFBO);
     GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    // Task 80 (Amethyst fork): blit the target into the FULL SURFACE, not a
+    // target-sized corner of it. The preset scale rounds (render 1814 * 1.30 =
+    // 2358 vs surface 2360), the resolution slider can stack with FSR (target
+    // well below surface), and a rotation can change the surface out from under
+    // a still-valid render size -- a 1:1 blit left a stale right-hand column in
+    // every one of those. GL_LINEAR on the blit handles the residual stretch
+    // (an exact copy when the sizes match). Before the first
+    // CheckResolutionChange the surface size is unknown; fall back to 1:1 on
+    // the target for that single frame.
+    const GLsizei dstW = (FSR1_Context::g_surfaceWidth > 0) ? FSR1_Context::g_surfaceWidth
+                                                            : FSR1_Context::g_targetWidth;
+    const GLsizei dstH = (FSR1_Context::g_surfaceHeight > 0) ? FSR1_Context::g_surfaceHeight
+                                                             : FSR1_Context::g_targetHeight;
     GLES.glBlitFramebuffer(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight, 0, 0,
-                           FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+                           dstW, dstH, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
     // The viewport and nothing else. Neither framebuffer binding is worth setting
     // here: the guard restores both on the next line, and what it restores for the
@@ -543,6 +583,11 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
     // branch below under names that cannot be shadowed by the pending-size pair.
     const GLsizei surfaceWidth = width;
     const GLsizei surfaceHeight = height;
+    // Task 80 (Amethyst fork): remember the surface for ApplyFSR's full-bleed
+    // blit. One frame behind the swap it will present into (this runs after
+    // it), which is exactly the freshness the old per-frame code had too.
+    FSR1_Context::g_surfaceWidth = surfaceWidth;
+    FSR1_Context::g_surfaceHeight = surfaceHeight;
 
     if (FSR1_Context::g_resolutionChanged) {
         FSR1_Context::g_resolutionChanged = false;
@@ -554,6 +599,20 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
         CalculateTargetResolution(global_settings.fsr1_setting, width, height,
                                   reinterpret_cast<int*>(&FSR1_Context::g_targetWidth),
                                   reinterpret_cast<int*>(&FSR1_Context::g_targetHeight));
+        // Task 80 (Amethyst fork): clamp the target to the surface when the
+        // preset scale would overshoot it. render x scale lands a pixel or two
+        // past the surface purely from rounding (1814 x 1.30 = 2358.2 on a
+        // 2360-wide surface -- and the launcher derived 1814 FROM 2360), so
+        // an unclamped target allocates an oversized FBO and still cannot
+        // fill the last column. A target genuinely below the surface (the
+        // resolution slider stacked on FSR) is left alone: the blit's linear
+        // filter performs that final stretch by design.
+        if (surfaceWidth > 0 && FSR1_Context::g_targetWidth > surfaceWidth) {
+            FSR1_Context::g_targetWidth = surfaceWidth;
+        }
+        if (surfaceHeight > 0 && FSR1_Context::g_targetHeight > surfaceHeight) {
+            FSR1_Context::g_targetHeight = surfaceHeight;
+        }
         // Task 76 (Amethyst fork): zero-gain bypass. The outer width/height hold
         // the surface size from this swap's eglQuerySurface pair; the local pair
         // shadow them with the pending render size. When the latched render size
@@ -564,6 +623,20 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
         // render size that only ever follows the viewport back up re-tears it.
         if (width >= surfaceWidth && height >= surfaceHeight) {
             TeardownFSR1();
+        } else if (FSR1_Context::g_fsrProgram == 0) {
+            // Task 80 (Amethyst fork): never engage with a dead program -- the
+            // geometry says "upscale" but the pass would clear the target to
+            // black and draw nothing (see InitFSRResources' safety net for the
+            // full failure chain). Unreachable by construction (the init path
+            // creates no FBOs without a program); the teardown is a no-op then
+            // and stays one -- it only bites if some future path arms the FBOs
+            // without a working pass.
+            TeardownFSR1();
+            static bool s_task80_deadprog = false;
+            if (!s_task80_deadprog) {
+                s_task80_deadprog = true;
+                LOG_W_FORCE("[MG] FSR1 upscale NOT engaged: shader program unavailable -- presenting directly (no upscale this session)");
+            }
         } else {
             // Task 78 (Amethyst fork): one-shot engage log. This branch is the
             // first time the upscale is actually live under the launcher's
@@ -692,9 +765,12 @@ struct fsr1_ctx_state_t {
     GLuint quadVAO = 0, quadVBO = 0, fsrProgram = 0;
     // Locations belong to fsrProgram, so they travel with it rather than being
     // re-resolved after a context switch.
-    GLint inputTexLoc = -1, const0Loc = -1, viewportSizeLoc = -1;
+    GLint inputTexLoc = -1, targetSizeLoc = -1, viewportSizeLoc = -1;
     GLuint targetFBO = 0, targetTexture = 0, currentDrawFBO = 0;
     GLsizei targetWidth = 0, targetHeight = 0, renderWidth = 0, renderHeight = 0;
+    // Task 80 (Amethyst fork): surface geometry is per-context state -- a second
+    // context presents to its own surface.
+    GLsizei surfaceWidth = 0, surfaceHeight = 0;
     bool initialised = false;
 };
 
@@ -715,7 +791,7 @@ void store_into(fsr1_ctx_state_t& d) {
     d.quadVBO = FSR1_Context::g_quadVBO;
     d.fsrProgram = FSR1_Context::g_fsrProgram;
     d.inputTexLoc = FSR1_Context::g_inputTexLoc;
-    d.const0Loc = FSR1_Context::g_const0Loc;
+    d.targetSizeLoc = FSR1_Context::g_targetSizeLoc;
     d.viewportSizeLoc = FSR1_Context::g_viewportSizeLoc;
     d.targetFBO = FSR1_Context::g_targetFBO;
     d.targetTexture = FSR1_Context::g_targetTexture;
@@ -724,6 +800,8 @@ void store_into(fsr1_ctx_state_t& d) {
     d.targetHeight = FSR1_Context::g_targetHeight;
     d.renderWidth = FSR1_Context::g_renderWidth;
     d.renderHeight = FSR1_Context::g_renderHeight;
+    d.surfaceWidth = FSR1_Context::g_surfaceWidth;
+    d.surfaceHeight = FSR1_Context::g_surfaceHeight;
     d.initialised = fsrInitialized;
 }
 
@@ -735,7 +813,7 @@ void load_from(const fsr1_ctx_state_t& s) {
     FSR1_Context::g_quadVBO = s.quadVBO;
     FSR1_Context::g_fsrProgram = s.fsrProgram;
     FSR1_Context::g_inputTexLoc = s.inputTexLoc;
-    FSR1_Context::g_const0Loc = s.const0Loc;
+    FSR1_Context::g_targetSizeLoc = s.targetSizeLoc;
     FSR1_Context::g_viewportSizeLoc = s.viewportSizeLoc;
     FSR1_Context::g_targetFBO = s.targetFBO;
     FSR1_Context::g_targetTexture = s.targetTexture;
@@ -744,6 +822,8 @@ void load_from(const fsr1_ctx_state_t& s) {
     FSR1_Context::g_targetHeight = s.targetHeight;
     FSR1_Context::g_renderWidth = s.renderWidth;
     FSR1_Context::g_renderHeight = s.renderHeight;
+    FSR1_Context::g_surfaceWidth = s.surfaceWidth;
+    FSR1_Context::g_surfaceHeight = s.surfaceHeight;
     fsrInitialized = s.initialised;
     // Left alone deliberately: g_dirty, g_resolutionChanged and the pending size
     // describe work queued for the frame in flight, not the context's objects.
