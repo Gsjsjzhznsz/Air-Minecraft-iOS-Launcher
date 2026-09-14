@@ -181,3 +181,29 @@ Stage Summary:
 - MG 卡顿三层根因定案：FSR1 零增益每帧三重全屏税（主因）+ vsync 锁 60 丢拍阶梯（放大器）+ swap 路径取证税（本仓库独有）；GC/JVM 排除（两场一致）
 - 下轮设备日志判读锚点：①"[MG] FSR1 zero-gain bypass: render 2360x1640 >= surface -- FSR machinery torn down"（修复1生效）；②"[gl_bridge] eglSwapInterval(0) ... frontend=1 raw=1"（双路返回值，若 raw=0 则 ANGLE Metal 不吃 interval=0，需另想 vsync 方案）；③[RenderDiag] maxGap 从 100-200ms 量级回落到 ≤50ms 且 fps 谷底不再 <15 = 修复见效；④MG 场 fps 是否能超 60（判断 vsync 是否真被解除）
 - 遗留：ES3.0 转译路径无 GL_ARB_multi_draw_indirect/buffer_storage 全家桶 → Sodium 慢路径 → MG 平均帧率天花板低于 Zink 属结构性（Zink 暴露 GL4.6 全套）；真·FSR 增益需"降分辨率渲染+表面全尺寸"的窗口分辨率联动（工程量大，未做）
+
+---
+Task ID: 77
+Agent: main (Super Z)
+Task: 用户报"还是一样卡，深度研究行吗。上传了2个log。还有默认控件选择custom"（Task76 构建后 MG 仍卡顿）
+
+Work Log:
+- 拉取 66e57f0：用户在 Task76 构建（3041db9）实测后的两份 MG 日志。Task76 修复（FSR1 旁路/探针降频/swapInterval 双保险）均未命中根因——帧节奏依旧崩溃
+- 量化判读（scripts/analyze_task77_timeline.py 时间线关联分析）：
+  * fps 计数在 pojavSwapBuffers 累加 = fps 即真实 swap 率：坏窗口 MC 帧循环真实迭代率 4-8Hz（avgGap 116-252ms，maxGap 至 908ms），好窗口锁 60（avgGap 17-18ms）——"30fps 看得像 10fps"实为震荡均值掩盖
+  * 逐一排除：GC young 暂停全 10-14ms；GC 并发标记与坏窗零相关（会话1 GOOD 窗 2195ms 并发标记仍流畅 / BAD 窗 552ms 照卡，Pearson r=-0.099）；内存好坏窗均稳定 2.5-2.8GB；120 次 shader 转换全部集中在启动期（19:42:42 前）；FSR1=0；Iris 着色器禁用；深度 workaround 8 次一次性分配；swapFail=0
+  * 对照 bef0f08 同日同包 Zink 场次：稳定 37-53fps 无深谷 → 停顿必在 MG 栈（MobileGlues+ANGLE Metal）而非 MC/JVM/输入桥
+- 上游对比（浅克隆 herbrine8403/Amethyst-iOS-MyRemastered @ eb237c0a）：
+  * MobileGlues-cpp gl/ 树与 fork 几乎逐文件 SAME（含 prepareForDraw/深度执法/TBO 仿真——fork 并未自加 draw 税）；唯一实质差异 glsl_for_es.cpp 的 master compile lock（仅影响启动编译期）
+  * ANGLE 二进制 md5 完全一致（2.1.2440，约 2023 构建）
+  * 结论：MG 栈与上游等价，剩余 250ms/帧只能出在 ANGLE Metal 呈现/GPU 侧或 CPU 帧构造侧——需分相计时才能定案
+- 修复一（分相归因仪器，下轮设备日志定案）：gl_bridge.m Task77 帧相位计时——build（上次 present 返回→本次 swap 入口）与 present（eglSwapBuffers 本体）分别累计 μs 粒度 5s 窗口 avg/max，ame_egl_swap_phase_stats 读取即重置，[RenderDiag] 心跳新增 pres=%u/%ums build=%u/%ums。判读法：presAvg≈avgGap→ANGLE Metal 呈现/GPU 侧（降分辨率/换渲染器才有效）；buildAvg≈avgGap→CPU 帧构造侧（转译栈逐 draw 优化才有效）
+- 修复二（默认控件=custom）：PLPreferences 出厂值 default_ctrl→custom.json + 迁移哨兵 default_ctrl_migrated_custom@NO + migrateDefaultControlPref（仅改写仍停在旧出厂值 default.json 的存量安装，用户自选其他布局不动，AppDelegate 早期调用幂等）+ Task64 恢复默认控件复位目标与新出厂值对齐（custom.json 存在时）+ ControlLayout 解析失败回落 default.json 兜底保留 + 手柄默认不受影响
+- 验证脚本维护：verify_task64 A6/A7 断言更新为 ame77RestoreCtrl 新语义；verify_task75 A6f 适配 Task76 探针演化（s_mode!=1）+ C 系列改从 git 4770b53 读崩溃 fixture（用户上传已覆盖工作区日志）
+- 验证：verify_task77 27/27；全链 64(93)/66(43)/67(47)/68(24)/70(68)/71/72/73/75(63)/76(40) 全绿
+
+Stage Summary:
+- 根因画像（未定案的最后一分界）：MG 卡顿 = 渲染线程帧循环内 250ms 级停顿，震荡于内容相关相位；已排除 GC/内存/编译/取证/FSR1；与上游 MG 栈等价 → 停顿在 ANGLE Metal present 或 CPU 帧构造，Task77 分相计时将在下轮设备日志二选一定案
+- 用户即时缓解（无需等修复）：设置中 video.resolution 从 100% 降到 ~75%（GPU/CPU 成本近平方下降）；或继续用 zink
+- 默认控件 custom 已落地：新装出厂即 custom.json；老安装一次性迁移（仅限停在 default.json 的）；"恢复默认控件"复位到 custom
+- 下轮日志预期锚点：[RenderDiag] ... pres=X/Yms build=X/Yms；"[Preferences] Task77 migrated default control layout: default.json -> custom.json"（仅老安装首启一次）

@@ -67,6 +67,37 @@ void migrateDownloadSourcePreferences(void) {
     NSLog(@"[Preferences] Migrated general.download_source(%@) -> %@ for 4 mirror policy keys", legacy, value);
 }
 
+#pragma mark Task 77 default control migration
+
+/// 一次性迁移：默认触控布局出厂值 default.json -> custom.json（用户需求
+/// "默认控件选择 custom"）。
+///
+/// 背景：PLPreferences 的 defaults 只在键缺失时回填，而 preferences plist
+/// 在任意一次保存时会整字典落盘——老安装的 control.default_ctrl 早已以
+/// "default.json" 物化到磁盘，仅改 defaults 无法让存量设备拿到新出厂值。
+///
+/// 迁移规则（哨兵键 control.default_ctrl_migrated_custom 保证一次性）：
+///   当前有效值 == "default.json"（旧出厂值，无论物化还是显式选择）
+///     -> 改写为 "custom.json"（新出厂值；唯一受影响的"显式选择"组合是
+///        刻意选回 default.json 的用户，可在选择器一键改回，符合"改默认"
+///        的语义）
+///   当前有效值 == "custom.json"（全新安装 defaults 或已自选）-> 无事可做
+///   当前有效值为其他布局（用户自建布局名）-> 不动，尊重用户选择
+///
+/// 判定用 getPrefObject 读"合并 defaults 后的有效值"：本函数在 AppDelegate
+/// 启动早期调用，defaults 已就位；新 defaults 出厂值已是 custom.json，故
+/// 读到 default.json 必然来自磁盘存储的旧值。
+void migrateDefaultControlPref(void) {
+    if ([getPrefObject(@"control.default_ctrl_migrated_custom") boolValue]) return;
+
+    NSString *current = getPrefObject(@"control.default_ctrl");
+    if ([current isEqualToString:@"default.json"]) {
+        setPrefObject(@"control.default_ctrl", @"custom.json");
+        NSLog(@"[Preferences] Task77 migrated default control layout: default.json -> custom.json");
+    }
+    setPrefObject(@"control.default_ctrl_migrated_custom", @YES);
+}
+
 id getPrefObject(NSString *key) {
     return [pref getObject:key];
 }

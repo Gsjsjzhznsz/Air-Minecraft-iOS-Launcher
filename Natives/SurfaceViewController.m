@@ -2519,12 +2519,21 @@ static UIView *findSDL_uikitview(UIView *root) {
             // 与 fps 互为倒数校验。MG/FSR1 修复前后对比的硬指标。
             unsigned int maxGap = 0, avgGap = 0;
             ame_egl_swap_framegap(&maxGap, &avgGap);
+            // Task 77（帧相位归因）：render 线程帧循环分相计时（读取即重置）。
+            // pres=avg/max：eglSwapBuffers 本体耗时（ANGLE Metal 提交/
+            // nextDrawable 等待/GPU 追赶）；build=avg/max：上次 present 返回
+            // 到本次 swap 入口（MC tick+事件泵+GL 编码 CPU 税）。
+            // 判读：presAvg≈avgGap→停在呈现/GPU 侧（降分辨率/换渲染器才有效）；
+            // buildAvg≈avgGap→停在 CPU 帧构造侧（转译栈逐 draw 优化才有效）。
+            unsigned int presAvg = 0, presMax = 0, buildAvg = 0, buildMax = 0;
+            ame_egl_swap_phase_stats(&presAvg, &presMax, &buildAvg, &buildMax);
             CALayer *l = self.surfaceView.layer;
             BOOL isMetal = [l isKindOfClass:CAMetalLayer.class];
             CGSize drawable = isMetal ? ((CAMetalLayer *)l).drawableSize : CGSizeZero;
             BOOL inWindow = (self.surfaceView.window != nil);
-            NSLog(@"[RenderDiag] fps=%ld swapOK=%lu swapFail=%lu maxGap=%ums avgGap=%ums mem=%.0fMB layer=%p drawable=%.0fx%.0f scale=%.2f bounds=%.0fx%.0f inWindow=%d",
-                  (long)fps, swapOK, swapFail, maxGap, avgGap, memoryMB, (__bridge void *)l,
+            NSLog(@"[RenderDiag] fps=%ld swapOK=%lu swapFail=%lu maxGap=%ums avgGap=%ums pres=%u/%ums build=%u/%ums mem=%.0fMB layer=%p drawable=%.0fx%.0f scale=%.2f bounds=%.0fx%.0f inWindow=%d",
+                  (long)fps, swapOK, swapFail, maxGap, avgGap,
+                  presAvg, presMax, buildAvg, buildMax, memoryMB, (__bridge void *)l,
                   drawable.width, drawable.height, (double)l.contentsScale,
                   l.bounds.size.width, l.bounds.size.height, (int)inWindow);
         }

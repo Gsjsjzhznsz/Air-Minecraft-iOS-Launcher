@@ -459,20 +459,24 @@ NSString* restoreDefaultCustomControl() {
         NSLog(@"[CustomControls] Task64 restore: default.json regeneration failed");
         return localize(@"custom_controls.restore_default.error.template", nil);
     }
-    // custom.json 复制失败不阻断（默认布局是 default.json，custom 仅作为模板存在）
+    // custom.json 复制失败不阻断：Task 77 起默认布局就是 custom.json，极端情况下
+    // 缺失时 loadControlFile 的 Task64 回落链会退回 default.json 保住可玩性
     if (![fm fileExistsAtPath:customPath]) {
-        NSLog(@"[CustomControls] Task64 restore: custom.json copy failed (non-fatal, default layout unaffected)");
+        NSLog(@"[CustomControls] Task64 restore: custom.json copy failed (parse-fail fallback to default.json still covers playability)");
     }
 
     // 3) 复位激活布局指针（档案感知：与 actionOpenCustomControls 的写入路径一致）
+    //    Task 77：复位目标与出厂默认对齐改为 custom.json（两个出厂文件均刚重建，
+    //    custom.json 此时必然为干净出厂模板）。
+    NSString *ame77RestoreCtrl = [fm fileExistsAtPath:customPath] ? @"custom.json" : @"default.json";
     if (PLProfiles.current.selectedProfile[@"defaultTouchCtrl"]) {
-        PLProfiles.current.selectedProfile[@"defaultTouchCtrl"] = @"default.json";
+        PLProfiles.current.selectedProfile[@"defaultTouchCtrl"] = ame77RestoreCtrl;
         [PLProfiles.current save];
     } else {
-        setPrefObject(@"control.default_ctrl", @"default.json");
+        setPrefObject(@"control.default_ctrl", ame77RestoreCtrl);
     }
 
-    NSLog(@"[CustomControls] Task64 restore default: factory layouts regenerated (default.json + custom.json), active layout reset to default.json");
+    NSLog(@"[CustomControls] Task64 restore default: factory layouts regenerated (default.json + custom.json), active layout reset to %@", ame77RestoreCtrl);
     return nil;
 }
 

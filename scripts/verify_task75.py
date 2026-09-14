@@ -131,8 +131,8 @@ check("A6d Task52 呈现层卫兵保留（swapIndex % 50）",
       "swapIndex % 50 == 0" in code)
 check("A6e Task49 geo-heal blit 调用保留（s_mode == 2 分支）",
       "ame_task49_geo_heal_blit(es, drawFb, readFb," in code)
-check("A6f probe 节奏保留（首5帧 + 每200帧 + 未决态）",
-      "const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode == 0;" in code)
+check("A6f probe 节奏保留（首5帧 + 每200帧 + 非NORMAL态；Task76 演化后形式）",
+      "const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode != 1;" in code)
 check("A6g Task58 官方宏查询保留（EGL_WIDTH/HEIGHT 修正注释）",
       "EGL_WIDTH=0x3057/EGL_HEIGHT=0x3056" in src)
 check("A6h 几何探针 getIntegerv 三查询保留（DRAW/READ/VIEWPORT）",
@@ -240,13 +240,22 @@ r = sim.swap(1, 2360, 1640, 2360, 1640)  # 几何对齐即 NORMAL
 check("B7a 几何对齐会话无内容判据参与（mode=1 直达）", r["mode"] == 1)
 
 # ================================================================ C. 崩溃现场对照
-print("== C. 崩溃现场对照（latestlog 4770b53 签名回放）==")
+print("== C. 崩溃现场对照（latestlog 4770b53 签名回放，自 git 历史读取）==")
 
-log_path = os.path.join(ROOT, "latestlog.txt")
-if not os.path.exists(log_path):
-    check("C0 latestlog.txt 存在", False)
+# Task 77 注：用户后续上传（66e57f0）已用新日志覆盖工作区 latestlog.txt；
+# 本组断言针对 4770b53 时刻的崩溃现场，改为从 git 历史读取固定 fixture，
+# 不受后续日志上传影响。
+import subprocess as _sp
+log = ""
+try:
+    log = _sp.run(["git", "-C", ROOT, "show", "4770b53:latestlog.txt"],
+                  capture_output=True, text=True).stdout
+except Exception:
+    log = ""
+if not log:
+    check("C0 latestlog.txt（git 4770b53）存在", False)
 else:
-    log = read(log_path)
+    check("C0 latestlog.txt（git 4770b53）存在", True)
     # C1. 构建含 Task74（1d99161）
     check("C1a 构建 commit = 1d99161（含 Task74）", "Commit: 1d99161" in log)
     # C2. 崩溃签名：SIGBUS @ CopyBGRA8ToRGBA8，JRE 25，探针帧栈

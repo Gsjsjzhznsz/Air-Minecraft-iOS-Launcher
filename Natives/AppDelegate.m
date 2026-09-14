@@ -20,6 +20,9 @@ extern dispatch_group_t fatalExitGroup;
 - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options {
     // 一次性迁移旧版全局下载源偏好到分类镜像策略键（幂等，早于任何 UI 读取偏好）
     migrateDownloadSourcePreferences();
+    // Task 77：一次性迁移默认触控布局出厂值 default.json -> custom.json
+    //（幂等，哨兵键保证只执行一次；用户自选的其他布局不受影响）
+    migrateDefaultControlPref();
     // Called when a new scene session is being created.
     return [[UISceneConfiguration alloc] initWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];
 }

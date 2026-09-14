@@ -79,7 +79,16 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"graphics_api": @""
         }.mutableCopy,
         @"control": @{
-            @"default_ctrl": @"default.json",
+            // Task 77：默认触控布局改为 custom.json（用户需求“默认控件选择 custom”）。
+            // 出厂保障链：main.m 启动时 generateAndSaveCustomControl() 从 App Bundle
+            // 拷入 controlmap/custom.json（仅当缺失）；若极端情况下文件仍缺失/解析
+            // 失败，ControlLayout.loadControlFile 的 Task64 防御性回落会加载
+            // default.json 保住可玩性。已显式选择过布局的设备不受影响（存储值优先）。
+            @"default_ctrl": @"custom.json",
+            // Task 77 迁移哨兵：YES = default.json -> custom.json 出厂值切换已
+            // 处理过（老安装一次性改写，见 LauncherPreferences.m migrateDefaultControlPref）。
+            // 必须在此注册默认值：setPrefObject 只能写已存在的键。
+            @"default_ctrl_migrated_custom": @NO,
             @"control_safe_area": UIApplication.sharedApplication ? NSStringFromUIEdgeInsets(getDefaultSafeArea()) : @"",
             @"default_gamepad_ctrl": @"default.json",
             @"controller_type": @"xbox",

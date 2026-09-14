@@ -76,6 +76,79 @@ static void ame76_record_swap(uint64_t now_ms) {
 }
 
 // ============================================================================
+// Task 77：帧相位计时（present vs build 分相归因）
+//
+// 背景（66e57f0 双 MG 日志 + 量化关联分析）：MG 场次 avgGap 在 17ms 与
+// 250ms 之间震荡（fps 60↔4），而同日同包 Zink 场次稳定 37-53fps。
+// GC/内存/shader 编译/FSR1/取证探针/深度 workaround 全部排除后，250ms
+// 只能出在渲染线程帧循环的两个相位之一：
+//   build  = 上一次 eglSwapBuffers 返回 → 本次进入 gl_swap_buffers
+//            （MC tick + 事件泵 + GL 编码穿 MobileGlues/ANGLE 的 CPU 税）
+//   present= handle.eglSwapBuffers 内部（ANGLE Metal 编码提交 + nextDrawable
+//            等待 + GPU 追赶；maxDrawableCount=3 耗尽时阻塞）
+// 本计时器按相位分别累计 5 秒窗口的 avg/max，由 [RenderDiag] 心跳上报。
+// 下轮设备日志判读法（二选一，直接定案）：
+//   presAvg/presMax ≈ avgGap   → 停在 ANGLE Metal 呈现/GPU 侧（换渲染器/
+//                                 降 resolutionScale 才有效，CPU 优化无效）
+//   buildAvg/buildMax ≈ avgGap → 停在 MC 帧 CPU 侧（GL 转译税，MobileGlues
+//                                 /ANGLE 逐 draw 开销线才有效）
+// 微秒粒度累计（ms 粒度下 1-2ms 的正常 present 会被舍入噪声淹没），
+// 上报时折算毫秒。只在渲染线程读写，无需原子操作。
+// ============================================================================
+static uint64_t ame77_last_swap_end_us = 0;   // 上次 swap 返回时刻（0=无）
+static uint64_t ame77_present_sum_us = 0;     // 窗口内 present 时长总和
+static uint32_t ame77_present_max_us = 0;     // 窗口内 present 最大时长
+static uint32_t ame77_present_count = 0;      // 窗口内 present 样本数
+static uint64_t ame77_build_sum_us = 0;       // 窗口内 build 时长总和
+static uint32_t ame77_build_max_us = 0;       // 窗口内 build 最大时长
+static uint32_t ame77_build_count = 0;        // 窗口内 build 样本数
+
+static uint64_t ame77_now_us(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000ull;
+}
+
+// Task 77：读取并重置帧相位窗口统计（SurfaceViewController 5 秒心跳调用）。
+// 值一律折算为毫秒（向下取整）；count==0 时对应 avg/max 报 0。
+void ame_egl_swap_phase_stats(uint32_t *presentAvgMs, uint32_t *presentMaxMs,
+                              uint32_t *buildAvgMs, uint32_t *buildMaxMs) {
+    uint32_t pAvg = ame77_present_count ? (uint32_t)(ame77_present_sum_us / ame77_present_count / 1000ull) : 0;
+    uint32_t pMax = ame77_present_count ? ame77_present_max_us / 1000u : 0;
+    uint32_t bAvg = ame77_build_count ? (uint32_t)(ame77_build_sum_us / ame77_build_count / 1000ull) : 0;
+    uint32_t bMax = ame77_build_count ? ame77_build_max_us / 1000u : 0;
+    if (presentAvgMs) *presentAvgMs = pAvg;
+    if (presentMaxMs) *presentMaxMs = pMax;
+    if (buildAvgMs) *buildAvgMs = bAvg;
+    if (buildMaxMs) *buildMaxMs = bMax;
+    ame77_present_sum_us = 0;
+    ame77_present_max_us = 0;
+    ame77_present_count = 0;
+    ame77_build_sum_us = 0;
+    ame77_build_max_us = 0;
+    ame77_build_count = 0;
+}
+
+// Task 77：swap 入口记录 build 相位（上一帧 present 结束 → 本帧进入 swap）。
+static void ame77_record_build(uint64_t now_us) {
+    if (ame77_last_swap_end_us != 0 && now_us > ame77_last_swap_end_us) {
+        uint32_t dur = (uint32_t)(now_us - ame77_last_swap_end_us);
+        if (dur > ame77_build_max_us) ame77_build_max_us = dur;
+        ame77_build_sum_us += dur;
+        ame77_build_count++;
+    }
+}
+
+// Task 77：present 相位计时（eglSwapBuffers 内部时长），成功失败都计
+// （失败的慢 present 同样是归因证据）。
+static void ame77_record_present(uint64_t dur_us, uint64_t now_us) {
+    if (dur_us > ame77_present_max_us) ame77_present_max_us = (uint32_t)dur_us;
+    ame77_present_sum_us += dur_us;
+    ame77_present_count++;
+    ame77_last_swap_end_us = now_us;
+}
+
+// ============================================================================
 // Task 50：GL 呈现层所有权标志（跨线程）。
 //
 // currentBundle（bridge_tbl.h）是 __thread 的——只在渲染线程非空，
@@ -1614,6 +1687,11 @@ void gl_swap_buffers() {
         NSLog(@"EGLBridge: gl_swap_buffers called with no current context, ignored");
         return;
     }
+    // Task 77：build 相位起点——上一次 present 返回至今的全部 MC 帧构造
+    // （tick/事件泵/GL 编码）时长在此刻定格。先于卫兵/取证记录，卫兵与
+    // 探针的耗时归入 neither（Task76 后探针帧极稀，可忽略）。
+    uint64_t ame77_t_entry = ame77_now_us();
+    ame77_record_build(ame77_t_entry);
     // Task 48 呈现几何卫兵：先于一切交换动作执行（可能在内部重建表面，
     // 重建后 currentBundle->gl.surface 已更新，后续探针/交换都作用于新表面）。
     ame48_swap_geometry_guard(currentBundle);
@@ -1624,7 +1702,11 @@ void gl_swap_buffers() {
     // 之后每 100 次打一条，避免日志爆炸。
     ame_task41_swap_forensics(currentBundle->gl.surface,
                               atomic_load(&g_eglSwapOK) + atomic_load(&g_eglSwapFail) + 1);
+    // Task 77：present 相位计时——只包 eglSwapBuffers 本体。
+    uint64_t ame77_t_present0 = ame77_now_us();
     EGLBoolean swapResult = handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface);
+    uint64_t ame77_t_present1 = ame77_now_us();
+    ame77_record_present((uint32_t)(ame77_t_present1 - ame77_t_present0), ame77_t_present1);
     if (!swapResult) {
         unsigned long fails = atomic_fetch_add(&g_eglSwapFail, 1) + 1;
         unsigned int eglErr = (unsigned int)(uintptr_t)handle.eglGetError();

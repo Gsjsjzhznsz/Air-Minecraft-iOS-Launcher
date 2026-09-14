@@ -8,6 +8,12 @@ void toggleIsolatedPref(BOOL forceEnable);
 /// 在 AppDelegate 启动早期调用，幂等（哨兵键 download.sourceMigrated 保证只执行一次）。
 void migrateDownloadSourcePreferences(void);
 
+/// Task 77 一次性迁移：默认触控布局出厂值 default.json -> custom.json。
+/// 在 AppDelegate 启动早期调用，幂等（哨兵键 control.default_ctrl_migrated_custom
+/// 保证只执行一次）。仅迁移仍停在旧出厂值 default.json 的安装；用户自选的
+/// 其他布局（非 default.json）与已选 custom.json 的安装不受影响。
+void migrateDefaultControlPref(void);
+
 id getPrefObject(NSString *key);
 BOOL getPrefBool(NSString *key);
 float getPrefFloat(NSString *key);
