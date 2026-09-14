@@ -2513,12 +2513,18 @@ static UIView *findSDL_uikitview(UIView *root) {
             s_diagTick = 0;
             unsigned long swapOK = 0, swapFail = 0;
             ame_egl_swap_stats(&swapOK, &swapFail);
+            // Task 76（帧节奏诊断）：swap 帧间隔窗口统计（读取即重置）。
+            // maxGap=5 秒窗口内最坏帧间隔——"30fps 看得像 10fps"的直接度量
+            //（vsync 锁 60 下丢拍阶梯 33/50/100/200ms 会把它顶高）；avgGap
+            // 与 fps 互为倒数校验。MG/FSR1 修复前后对比的硬指标。
+            unsigned int maxGap = 0, avgGap = 0;
+            ame_egl_swap_framegap(&maxGap, &avgGap);
             CALayer *l = self.surfaceView.layer;
             BOOL isMetal = [l isKindOfClass:CAMetalLayer.class];
             CGSize drawable = isMetal ? ((CAMetalLayer *)l).drawableSize : CGSizeZero;
             BOOL inWindow = (self.surfaceView.window != nil);
-            NSLog(@"[RenderDiag] fps=%ld swapOK=%lu swapFail=%lu mem=%.0fMB layer=%p drawable=%.0fx%.0f scale=%.2f bounds=%.0fx%.0f inWindow=%d",
-                  (long)fps, swapOK, swapFail, memoryMB, (__bridge void *)l,
+            NSLog(@"[RenderDiag] fps=%ld swapOK=%lu swapFail=%lu maxGap=%ums avgGap=%ums mem=%.0fMB layer=%p drawable=%.0fx%.0f scale=%.2f bounds=%.0fx%.0f inWindow=%d",
+                  (long)fps, swapOK, swapFail, maxGap, avgGap, memoryMB, (__bridge void *)l,
                   drawable.width, drawable.height, (double)l.contentsScale,
                   l.bounds.size.width, l.bounds.size.height, (int)inWindow);
         }

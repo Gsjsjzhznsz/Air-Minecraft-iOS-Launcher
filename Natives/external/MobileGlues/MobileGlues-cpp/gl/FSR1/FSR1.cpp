@@ -430,6 +430,13 @@ void RecreateFSRFBO() {
 std::vector<std::pair<GLsizei, GLsizei>> g_viewportStack;
 
 void ApplyFSR() {
+    // Task 76 (Amethyst fork): guard for the zero-gain teardown below. The
+    // render FBO is 0 when FSR1 has been torn down (render resolution pinned at
+    // or above the surface size -- nothing to upscale for) or before the first
+    // initialization. Running the body in either state would bind target-FBO 0
+    // and issue a fullscreen pass into whatever the driver considers framebuffer
+    // 0, so the early return keeps both the bypass and the init window safe.
+    if (FSR1_Context::g_renderFBO == 0) return;
     // No GUARD_ARRAY_BUFFER or GUARD_RENDERBUFFER: nothing below binds either.
     // GL_ARRAY_BUFFER_BINDING is context state and not vertex array object state, so
     // the glBindVertexArray below cannot disturb it.
@@ -497,6 +504,10 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
     egl_eglQuerySurface(display, surface, EGL_WIDTH, &width);
     egl_eglQuerySurface(display, surface, EGL_HEIGHT, &height);
     OnResize(width, height);
+    // Task 76 (Amethyst fork): keep the surface size visible to the zero-gain
+    // branch below under names that cannot be shadowed by the pending-size pair.
+    const GLsizei surfaceWidth = width;
+    const GLsizei surfaceHeight = height;
 
     if (FSR1_Context::g_resolutionChanged) {
         FSR1_Context::g_resolutionChanged = false;
@@ -508,7 +519,19 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
         CalculateTargetResolution(global_settings.fsr1_setting, width, height,
                                   reinterpret_cast<int*>(&FSR1_Context::g_targetWidth),
                                   reinterpret_cast<int*>(&FSR1_Context::g_targetHeight));
-        RecreateFSRFBO();
+        // Task 76 (Amethyst fork): zero-gain bypass. The outer width/height hold
+        // the surface size from this swap's eglQuerySurface pair; the local pair
+        // shadow them with the pending render size. When the latched render size
+        // covers the surface, an upscale pass can only resample twice at up to
+        // scale^2 the surface area -- tear down instead of recreating. A future
+        // surface that outgrows the render size (window resize up, rotation into
+        // a larger surface) re-arms the machinery through RecreateFSRFBO, but a
+        // render size that only ever follows the viewport back up re-tears it.
+        if (width >= surfaceWidth && height >= surfaceHeight) {
+            TeardownFSR1();
+        } else {
+            RecreateFSRFBO();
+        }
     }
     // No glViewport here. This runs immediately after ApplyFSR and the swap, and
     // ApplyFSR ends every frame with exactly this call at exactly this size; on the
@@ -523,6 +546,71 @@ void OnResize(int width, int height) {
     FSR1_Context::g_pendingWidth = width;
     FSR1_Context::g_pendingHeight = height;
     FSR1_Context::g_resolutionChanged = true;
+}
+
+// Task 76 (Amethyst fork): tear the FSR1 machinery down for this context.
+//
+// FSR1 exists to upscale a LOW render resolution up to the surface size. The
+// application (Minecraft with a fullscreen window) drives its first
+// glViewport at the full window size, the glViewport hook below latches that
+// as the render size, and the render size lands equal to (or above) the EGL
+// surface. From that moment the upscale has nothing to offer:
+//
+//   - the target is render * scale (3540x2460 for a 2360x1640 surface at the
+//     Quality preset, 2.25x the surface's pixel count);
+//   - ApplyFSR pays a fullscreen clear + the EASU/RCAS pass into that oversized
+//     target every frame;
+//   - the closing blit then scales BACK DOWN to the surface, so the presented
+//     image went render -> upscale -> downscale: three fullscreen passes and
+//     a double resample, for image quality strictly WORSE than presenting the
+//     render texture directly, on top of the frame-time cost.
+//
+// Zero gain is detected once the geometry is latched (CheckResolutionChange)
+// and resolved by deleting the render/target objects and zeroing g_renderFBO.
+// gl/framebuffer.cpp keys its framebuffer-0 redirect on g_renderFBO != 0, so
+// the teardown also reverts the application to drawing straight into the
+// surface, and ApplyFSR's guard above makes the per-swap call a no-op.
+// fsrInitialized is deliberately left true so glCreateShader does not rebuild
+// this machinery for a state already judged zero-gain. Per-context state is
+// consistent: mg_fsr1_bind_context stores/loads these globals verbatim, so a
+// torn-down context stays torn down across binds.
+void TeardownFSR1() {
+    if (FSR1_Context::g_renderFBO == 0 && FSR1_Context::g_targetFBO == 0) return;
+    GLStateGuard state(GUARD_FRAMEBUFFER | GUARD_TEXTURE);
+
+    const GLuint deadRenderFBO = FSR1_Context::g_renderFBO;
+    const GLuint deadTargetFBO = FSR1_Context::g_targetFBO;
+    const GLuint deadRenderTex = FSR1_Context::g_renderTexture;
+    const GLuint deadTargetTex = FSR1_Context::g_targetTexture;
+    const GLuint deadRBO = FSR1_Context::g_depthStencilRBO;
+
+    // gl/framebuffer.cpp owns gl_state->current_draw_fbo. If the tracked draw
+    // binding points at a name that is about to die, repoint it at 0 (the real
+    // surface) by hand, and tell any live GLStateGuard that saved one of the
+    // dead names to restore 0 instead -- restoring a deleted name is rejected
+    // and leaves the binding wherever the body left it (the exact failure mode
+    // RecreateFSRFBO's framebuffer_recreated bookkeeping exists to prevent).
+    if (gl_state->current_draw_fbo == deadRenderFBO || gl_state->current_draw_fbo == deadTargetFBO) {
+        set_gl_state_current_draw_fbo(0);
+    }
+    state.framebuffer_recreated(deadRenderFBO, 0);
+    state.framebuffer_recreated(deadTargetFBO, 0);
+
+    GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    GLES.glDeleteFramebuffers(1, &deadRenderFBO);
+    GLES.glDeleteFramebuffers(1, &deadTargetFBO);
+    GLES.glDeleteTextures(1, &deadRenderTex);
+    GLES.glDeleteTextures(1, &deadTargetTex);
+    GLES.glDeleteRenderbuffers(1, &deadRBO);
+
+    FSR1_Context::g_renderFBO = 0;
+    FSR1_Context::g_renderTexture = 0;
+    FSR1_Context::g_targetFBO = 0;
+    FSR1_Context::g_targetTexture = 0;
+    FSR1_Context::g_depthStencilRBO = 0;
+
+    LOG_W_FORCE("[MG] FSR1 zero-gain bypass: render %dx%d >= surface -- FSR machinery torn down, frames presented directly (preset kept for a future sub-surface render size)",
+                FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight);
 }
 
 void glViewport(GLint x, GLint y, GLsizei w, GLsizei h) {

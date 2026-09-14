@@ -71,6 +71,12 @@ void ApplyFSR();
 void InitFSRResources();
 void CheckResolutionChange(EGLDisplay display, EGLSurface surface);
 void OnResize(int width, int height);
+// Task 76 (Amethyst fork): delete the FSR1 render/target objects and zero
+// g_renderFBO for a context whose latched render size covers the surface --
+// the upscale has nothing to offer there, only a double resample and up to
+// scale^2 the surface area in extra fullscreen bandwidth per frame. See the
+// block comment on the definition in FSR1.cpp before touching it.
+void TeardownFSR1();
 
 extern "C"
 {

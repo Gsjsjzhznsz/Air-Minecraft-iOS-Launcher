@@ -197,6 +197,12 @@ void pojavIncrementFpsCounter();
 // 与上面的 FPS 计数器区分：FPS 计 pojavSwapBuffers 入口调用（成功与否都+1），
 // 这两个计数器计 eglSwapBuffers 的真实返回值，用于判断呈现路径是否断裂。
 void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail);
+// Task 76（帧节奏诊断）：读取并重置 5 秒窗口内的 swap 帧间隔统计
+//（gl_bridge.m 实现，渲染线程侧记录）。maxGap=窗口内最大帧间隔（尖峰），
+// avgGap=平均帧间隔。读取即重置，由 [RenderDiag] 心跳（SurfaceViewController
+// updateGameStats 的 5 秒档）调用。帧率均值掩盖节奏问题——vsync 锁 60 下
+// maxGap 的阶梯分布（33/50/100/200ms）才是"30fps 看得像 10fps"的直接度量。
+void ame_egl_swap_framegap(unsigned int *maxGapMs, unsigned int *avgGapMs);
 // Task 50：GL 呈现层所有权（gl_bridge.m 实现）。GL 路径创建 EGL surface
 // 成功后为真——SurfaceViewController.updateSavedResolution 据此把呈现层
 // 对齐到 1x 点数（bounds 跟随旋转），与 MC viewport/ANGLE surface 保持

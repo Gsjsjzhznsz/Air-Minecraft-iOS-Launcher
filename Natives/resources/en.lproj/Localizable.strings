@@ -302,7 +302,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling quality. Improves performance at lower resolutions.";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Only helps when the game renders below the surface resolution; at fullscreen render resolution FSR would only resample twice, so it is bypassed automatically (see \"FSR1 zero-gain bypass\" in the log).";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";

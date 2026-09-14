@@ -302,7 +302,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 超分辨率";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超分辨率质量。在低分辨率下提升性能。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超分辨率。仅当游戏以低于表面的分辨率渲染时有增益；全屏分辨率渲染下 FSR 只会二次重采样，将被自动旁路（日志可见 FSR1 zero-gain bypass）。";
 "preference.title.mg_fsr1_setting-0" = "关闭";
 "preference.title.mg_fsr1_setting-1" = "超高品质";
 "preference.title.mg_fsr1_setting-2" = "高品质";

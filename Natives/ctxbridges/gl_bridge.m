@@ -31,9 +31,48 @@ static egl_library handle;
 static _Atomic unsigned long g_eglSwapOK = 0;
 static _Atomic unsigned long g_eglSwapFail = 0;
 
+// ============================================================================
+// Task 76：swap 帧间隔尖峰跟踪（帧节奏诊断）
+//
+// 背景（bef0f08 双日志对比）：MG/MobileGlues 场次 fps 在 5~60 剧烈震荡而
+// Zink 场次稳定 40-53 —— 用户主观“30fps 看得像 10fps”。帧率均值掩盖了
+// 帧时间尖峰：fps=5 的窗口意味着单帧 200ms，而 vsync 锁 60（MG 场次在
+// max.fps=260 解锁下从未超过 60）把帧到达时间量化到 16.7ms 的整数倍——
+// 丢拍阶梯才是观感卡顿的机理。本计数器在 gl_swap_buffers 成功路径上
+// 记录相邻 swap 的间隔，维护 5 秒窗口（心跳周期）内的 max 与均值，由
+// [RenderDiag] 心跳一并上报，下轮设备日志可直接对比修复前后的帧节奏。
+// 只在渲染线程读写（swap 本就在渲染线程），无需原子操作。
+// ============================================================================
+static uint64_t ame76_last_swap_ms = 0;   // 0 = 尚无首帧
+static uint32_t ame76_max_gap_ms = 0;     // 本窗口最大帧间隔
+static uint64_t ame76_gap_sum_ms = 0;     // 本窗口间隔总和（ms 粒度够用）
+static uint32_t ame76_gap_count = 0;      // 本窗口间隔样本数
+
 void ame_egl_swap_stats(unsigned long *ok, unsigned long *fail) {
     if (ok) *ok = atomic_load(&g_eglSwapOK);
     if (fail) *fail = atomic_load(&g_eglSwapFail);
+}
+
+// Task 76：读取并重置帧间隔窗口统计（SurfaceViewController 5 秒心跳调用）。
+// count==0 时 max/avg 均报告 0。首帧不算间隔（冷启动间隔无意义）。
+void ame_egl_swap_framegap(uint32_t *maxGapMs, uint32_t *avgGapMs) {
+    uint32_t mx = ame76_max_gap_ms;
+    uint32_t avg = ame76_gap_count ? (uint32_t)(ame76_gap_sum_ms / ame76_gap_count) : 0;
+    if (maxGapMs) *maxGapMs = mx;
+    if (avgGapMs) *avgGapMs = avg;
+    ame76_max_gap_ms = 0;
+    ame76_gap_sum_ms = 0;
+    ame76_gap_count = 0;
+}
+
+static void ame76_record_swap(uint64_t now_ms) {
+    if (ame76_last_swap_ms != 0 && now_ms > ame76_last_swap_ms) {
+        uint32_t gap = (uint32_t)(now_ms - ame76_last_swap_ms);
+        if (gap > ame76_max_gap_ms) ame76_max_gap_ms = gap;
+        ame76_gap_sum_ms += gap;
+        ame76_gap_count++;
+    }
+    ame76_last_swap_ms = now_ms;
 }
 
 // ============================================================================
@@ -556,12 +595,31 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     if (es.getIntegerv == NULL || es.bindFramebuffer == NULL) return;
 
     static int s_mode = 0;          // 0 undecided / 1 normal / 2 blit
-    const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode == 0;
+    // Task 76：取证降频 —— 健康 NORMAL 态下 swap 前零 GL/EGL 查询。
+    //
+    // 背景（bef0f08 双日志定案）：本函数自 Task41 起每帧在渲染线程跑
+    //   3 次 glGetIntegerv + while(glGetError) 清错 + 2 次 eglQuerySurface；
+    // 上游 Amethyst 的 swap 路径（ame_geo_check_and_heal）零 GL 状态查询。
+    // MobileGlues 场次下这些查询直达 raw ANGLE，绕过前端状态机：
+    //   1) glGetError 清空底层错误队列 —— MobileGlues 的错误转译依赖该
+    //      队列，清空等于吞掉本应转译给 MC 的 GL 错误（正确性风险）；
+    //   2) 每帧 5 次跨层查询是纯诊断税（Task58 后几何恒 NORMAL，多轮
+    //      设备日志 0 失配）。
+    // 降频策略：前 5 帧、每 200 帧、以及任何非 NORMAL 态（未决/补偿中）
+    // 保持全量取证与执法；稳定 NORMAL 帧直接返回。逐帧几何执法由 Task48
+    // guard（surface vs drawable 漂移检测）继续承担，viewport vs surface
+    // 判定随 probe 帧复核——失配场景（旋转/resize）总会先经过 s_mode!=1
+    // 或最多 200 帧内的 probe 帧，无检测盲区。
+    const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode != 1;
+    if (!probe) return;
+
     int drawFb = 0, readFb = 0, viewport[4] = {0, 0, 0, 0};
     es.getIntegerv(0x8CA9 /*GL_DRAW_FRAMEBUFFER_BINDING*/, &drawFb);
     es.getIntegerv(0x8CAA /*GL_READ_FRAMEBUFFER_BINDING*/, &readFb);
     es.getIntegerv(0x0BA2 /*GL_VIEWPORT*/, viewport);
-    while (es.getError() != 0) {}   // 清残留错误
+    // Task 76：退役 while(es.getError() != 0) 清错循环——它会把底层 ANGLE
+    // 错误队列清空，吞掉 MobileGlues 待转译的错误。getIntegerv 本身不产生
+    // GL 错误，残留错误不影响本探针读数的正确性。
 
     int surfW = 0, surfH = 0;
     if (es.querySurface != NULL && surface != EGL_NO_SURFACE) {
@@ -1048,6 +1106,7 @@ static PFNEGLCREATECONTEXTPROC     ame_raw_create_context = NULL;
 static PFNEGLMAKECURRENTPROC       ame_raw_make_current = NULL;
 static PFNEGLDESTROYCONTEXTPROC    ame_raw_destroy_context = NULL;
 static PFNEGLDESTROYSURFACEPROC    ame_raw_destroy_surface = NULL;
+static PFNEGLSWAPINTERVALPROC      ame_raw_swap_interval = NULL;   // Task 76 双保险
 
 static bool dlsym_EGL() {
     // EGL 符号来源：
@@ -1096,6 +1155,12 @@ static bool dlsym_EGL() {
         ame_raw_make_current     = (PFNEGLMAKECURRENTPROC)load_egl_symbol(dl_handle, "eglMakeCurrent");
         ame_raw_destroy_context  = (PFNEGLDESTROYCONTEXTPROC)load_egl_symbol(dl_handle, "eglDestroyContext");
         ame_raw_destroy_surface  = (PFNEGLDESTROYSURFACEPROC)load_egl_symbol(dl_handle, "eglDestroySurface");
+        // Task 76：raw eglSwapInterval —— POJAV_DISABLE_VSYNC 双保险直调用。
+        // handle.eglSwapInterval 在 bootstrap 后指向 MobileGlues 前端（前端
+        // 理论上透传后端，但 bef0f08 MG 场 33 条心跳在 max.fps=260 解锁下
+        // fps 从未超过 60，vsync 疑似未被 ANGLE Metal 接受）。raw 直调绕过
+        // 前端转译链，两路各设一次（幂等），设备日志双路打印返回值分诊。
+        ame_raw_swap_interval    = (PFNEGLSWAPINTERVALPROC)load_egl_symbol(dl_handle, "eglSwapInterval");
     }
 
     // NOTE: mg_init_gles() is called from gl_make_current() after the
@@ -1518,10 +1583,21 @@ void gl_make_current(gl_render_window_t* bundle) {
         // 这对 ANGLE Metal 后端也有效（ANGLE 在 interval=0 时不等 vsync）。
         if (getenv("POJAV_DISABLE_VSYNC") && strcmp(getenv("POJAV_DISABLE_VSYNC"), "1") == 0) {
             static BOOL s_loggedInitialSwapInterval = NO;
-            handle.eglSwapInterval(g_EglDisplay, 0);
+            EGLBoolean feOk = handle.eglSwapInterval(g_EglDisplay, 0);
+            // Task 76：双保险 —— MobileGlues 前端 + raw ANGLE 各设一次。
+            // 前端的 LOAD_EGL 理论上透传后端，但 MG 场 fps 锁 60（max.fps=260
+            // 解锁下 33 条心跳零超 60）提示 interval=0 未被 ANGLE Metal 采纳。
+            // raw 直调绕过前端转译；两路返回值一并入日志，下轮设备日志据此
+            // 分诊（前端吞掉 vs ANGLE Metal 不支持 interval=0）。
+            EGLBoolean rawOk = EGL_FALSE;
+            if (ame_raw_swap_interval != NULL) {
+                rawOk = ame_raw_swap_interval(g_EglDisplay, 0);
+            }
             if (!s_loggedInitialSwapInterval) {
                 s_loggedInitialSwapInterval = YES;
-                NSLog(@"[gl_bridge] eglSwapInterval(0) set immediately after eglMakeCurrent (POJAV_DISABLE_VSYNC=1, renderer=%s)", getenv("AMETHYST_RENDERER") ?: "<unset>");
+                NSLog(@"[gl_bridge] eglSwapInterval(0) after eglMakeCurrent (POJAV_DISABLE_VSYNC=1, renderer=%s) frontend=%d raw=%d(rawPtr=%p)",
+                      getenv("AMETHYST_RENDERER") ?: "<unset>", (int)feOk, (int)rawOk,
+                      (void *)(uintptr_t)ame_raw_swap_interval);
             }
         }
     } else {
@@ -1563,6 +1639,8 @@ void gl_swap_buffers() {
         NSLog(@"[RenderDiag] first eglSwapBuffers OK surface=%p (presentation path confirmed)",
               (void *)currentBundle->gl.surface);
     }
+    // Task 76：帧间隔尖峰跟踪（见文件头计数器块注释）。
+    ame76_record_swap(ame53_now_ms());
 }
 
 void gl_swap_interval(int swapInterval) {

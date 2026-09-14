@@ -158,3 +158,26 @@ Stage Summary:
 - 画面分裂/输入错位根因定案：gl_bridge.m 三处 EGL_WIDTH(0x3057)/EGL_HEIGHT(0x3056) 常量对调，"转置表面"是探针自造的幻影，可见症状由 geo-heal 补偿链制造
 - 下轮设备日志判读锚点："[GLGeo] Task58 query constants corrected: surface=1180x820 viewport=1180x820" + "Task41 latch: NORMAL present"，且全程零 "geo mismatch ENGAGED"/"geo-heal blit"/"realign" 行 = 修复生效；画面应 1:1 完整、输入对齐
 - 影响分辨率的因素全链（本轮完整测绘）：SDL 窗口点尺寸(1180x820)/物理像素(2360x1640)/contentsScale(1x)/CAMetalLayer.bounds/drawableSize/ANGLE impl mWidth/bounds×scale/EGL 前端 mState(仅 FIXED_SIZE 时生效)/viewport——除最后两项在本案为误读来源外，其余全程自洽
+
+---
+Task ID: 76
+Agent: main (Super Z)
+Task: MG(MobileGlues) 渲染卡顿调查与修复——"30fps 看得像 10fps"（bef0f08 双日志：latestlog.old=MG 场 / latestlog=Zink 场）
+
+Work Log:
+- 拉取 bef0f08 上传（2 个 log）：MG 场（libmobileglues.dylib，构建 729d954）fps 在 5~60 剧烈震荡（ΔswapOK/5s 均值证明 5fps 谷底为真），Zink 场（libOSMesa.8/Mesa25）稳定 40-53；JVM 配置两场一致（2967MB/G1/同样 GC 密度），排除 Java 侧
+- 定位 MG 路径架构：MC desktop GL3.3 → MobileGlues 前端（GL3.3→GLES3.0 转译+FBO redirect，Task36 生命周期路由）→ ANGLE Metal；fps 统计走 pojavGetAndResetFps（渲染线程真实 swap 计数）
+- 根因1（主因·用户设置+集成缺陷）：mobileglues.fsr1_setting=2（Quality，用户在设置开启；PLPreferences 默认 0）+ MobileGlues FSR1 集成从未降低 render 分辨率（CalculateRenderResolution 全库零调用）→ MC 全分辨率 2360x1640 渲染时 render==surface → target=3540x2460（2.25x 表面面积）→ 每帧 3 个全屏 pass（clear+EASU/RCAS+缩小 blit 回 surface）纯带宽税 + 双重重采样（画质反而更差）
+- 根因2（放大器）：vsync 锁 60——33 条心跳在 max.fps=260 解锁下零超 60 → 帧时间尖峰被量化为丢拍阶梯（33/50/100/200ms）→ 观感"10fps"；Zink 场 IMMEDIATE present 无此效应
+- 根因3（本仓库独有税）：gl_swap_buffers 每帧 Task41 取证 3x glGetIntegerv + while(glGetError) 清错（吞 MobileGlues 待转译 GL 错误）+ 2x eglQuerySurface，Task48 guard 再加 2x querySurface + 跨线程 layer 读；上游 Amethyst swap 路径（ame_geo_check_and_heal）零 GL 状态查询（克隆 herbrine8403 上游实证）
+- 修复1 MobileGlues FSR1.cpp/.h（主仓库普通目录，随主仓库提交）：TeardownFSR1()（删 render/target FBO+纹理+RBO，tracked draw fbo 死名簿记 framebuffer_recreated→0，fsrInitialized 保持 true 防重建）+ CheckResolutionChange 零增益判定（latch render≥surface → teardown，否则 RecreateFSRFBO）+ ApplyFSR g_renderFBO==0 早退守卫；OnResize 无条件刷新 pending 保证旋转后 render 跟随 surface → 恒无旁路盲区
+- 修复2 gl_bridge.m：Task41 取证降频——probe 帧（≤5 / %200 / 非 NORMAL 态）才做全量查询与执法，稳定 NORMAL 帧零 GL/EGL 调用（300 帧窗口 300→6 次查询）；退役 while(getError) 清错循环
+- 修复3 gl_bridge.m：POJAV_DISABLE_VSYNC 双保险——MobileGlues 前端 + raw ANGLE（新解析 ame_raw_swap_interval）各设 eglSwapInterval(0)，两路返回值入日志（下轮日志分诊"前端吞 vs ANGLE Metal 不支持"）
+- 修复4 帧节奏诊断：gl_bridge.m 帧间隔窗口统计（ame76_record_swap/ame_egl_swap_framegap）+ utils.h 声明 + SurfaceViewController [RenderDiag] 心搏新增 maxGap/avgGap——修复前后对比的硬指标
+- 6 语言（en/ja/km/zh-CN/zh-Hans/zh-Hant）FSR1 设置详情文案更新：说明全屏分辨率渲染下自动旁路
+- 验证：scripts/verify_task76.py 40/40 PASS（A 源码指纹 29 项 / B FSR1 决策回放含旋转 latch 两阶段 / C probe 语义不变量+量化 / D 括号平衡 4 文件 / E 级联回归 task70+71）；CMake dep_mg 从源码增量构建，FSR1.cpp 时间戳变化必触发重编
+
+Stage Summary:
+- MG 卡顿三层根因定案：FSR1 零增益每帧三重全屏税（主因）+ vsync 锁 60 丢拍阶梯（放大器）+ swap 路径取证税（本仓库独有）；GC/JVM 排除（两场一致）
+- 下轮设备日志判读锚点：①"[MG] FSR1 zero-gain bypass: render 2360x1640 >= surface -- FSR machinery torn down"（修复1生效）；②"[gl_bridge] eglSwapInterval(0) ... frontend=1 raw=1"（双路返回值，若 raw=0 则 ANGLE Metal 不吃 interval=0，需另想 vsync 方案）；③[RenderDiag] maxGap 从 100-200ms 量级回落到 ≤50ms 且 fps 谷底不再 <15 = 修复见效；④MG 场 fps 是否能超 60（判断 vsync 是否真被解除）
+- 遗留：ES3.0 转译路径无 GL_ARB_multi_draw_indirect/buffer_storage 全家桶 → Sodium 慢路径 → MG 平均帧率天花板低于 Zink 属结构性（Zink 暴露 GL4.6 全套）；真·FSR 增益需"降分辨率渲染+表面全尺寸"的窗口分辨率联动（工程量大，未做）
