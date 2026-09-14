@@ -81,6 +81,12 @@ static bool amethyst_SDL_SetWindowMouseGrab(void *window, bool grabbed) {
 // Vulkan（MoltenVK），MobileGL / MobileGlues 这类 GL 转译渲染器完全失效，
 // 最终撞上 RenderPearl 的 shaderc/glslang 路径而崩溃。
 //
+// Task 79 注：本包装器现在只是【兜底】——sdl3_hook.m 的 EGL bridge
+// （ame_glBridgeEnabled，Task 79 起 zink 也包含在内）在 hooked_dlsym 里
+// 优先接管 SDL_GL_LoadLibrary，真实 SDL 从不被调用。仅当 bridge 被禁用
+// （AMETHYST_SDL_GL_BRIDGE=0 / AMETHYST_ZINK_GL_BRIDGE=0 诊断模式）时，
+// MC 才会落到这里，走"真实 SDL 拒载 + 兑装成功"的旧路径。
+//
 // 该错误其实意味着"库已装载且正是我们选中的渲染器"，故视为成功；
 // 其它错误（找不到库等）仍如实返回失败。
 typedef bool (*PFN_SDL_GL_LoadLibrary)(const char *path);

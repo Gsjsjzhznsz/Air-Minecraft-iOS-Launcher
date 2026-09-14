@@ -767,20 +767,51 @@ static void ame_SDL_UnloadObject(void *handle) {
 //   且 gl_init_context() 直接从 SurfaceViewController 的 layer 建 EGL surface，
 //   不依赖 SDL 建了哪个 view —— 所以可以整条搬到 SDL3 路径上复用。
 //
-// 判定复用 ame_sdlGlesCompatEnabled()：它已排除 zink（libOSMesa/gallium_/
-// vulkan_zink）与原生 Vulkan（libMoltenVK），因此 zink 在 26.3 上"回落 Vulkan"
-// 那条已验证可用的路径不会受到任何影响。
+// 判定复用 ame_sdlGlesCompatEnabled() 那套渲染器名单，但语义相反：ES 化豁免
+// ≠ GL bridge 豁免。Task 79 起 zink（libOSMesa/gallium_/vulkan_zink）也走
+// bridge——见下方函数内的 Task 79 注释；ES 强制化（ame_sdlGlesCompatEnabled）
+// 依然排除 zink，两套判定互不牵连。
 static bool ame_glBridgeEnabled(void) {
     if (!ame_envFlagOn("AMETHYST_SDL_GL_BRIDGE", true)) return false;
 
     const char *renderer = getenv("AMETHYST_RENDERER");
     if (renderer == NULL || renderer[0] == '\0') return false;
 
-    // 绝不接管的：zink 在 26.3 上依赖"OpenGL 被隐藏 → 回落 Vulkan"且已验证
-    // 可进世界，是唯一的可用路径，一个字节都不能动。
-    if (strncmp(renderer, "libOSMesa", 9) == 0) return false;    // zink（带版本号）
-    if (strncmp(renderer, "gallium_", 8) == 0) return false;     // OSMesa 系
-    if (strcmp(renderer, "vulkan_zink") == 0) return false;      // zink
+    // Task 79：zink（libOSMesa/gallium_/vulkan_zink）从【绝不接管】改为【接管】。
+    //
+    // 旧排除（c71dcfa，2026-09-01）的语境：当时 renderpearl 的
+    // GlBackend.loadLibrary 指针一致性检查还没被 provider-mirror 机制攻克
+    // （那正是 c71dcfa 为 MobileGlues 引入 ame_SDL_GL_GetProcAddress 镜像链的
+    // 缘由），zink 过不了检查 → 回落 Vulkan 是彼时唯一能进世界的路径，
+    // “一个字节都不能动”是对那个未修复状态的保护，不是 zink 不能用 GL。
+    //
+    // 现在的设备证据（8a31d1b，用户上报“zink 在 26.3 的启动回退”）：
+    //   [SDLGL] SDL_GL_LoadLibrary(.../libOSMesa.8.dylib) -> failed: OpenGL
+    //           library already loaded（main_hook 兑装成功，但真实 SDL 拒载）
+    //   [Render thread/ERROR]: Failed to create backend OpenGL
+    //           BackendCreationException: glGetError mismatch
+    //   → Using graphics backend Vulkan (MoltenVK 1.4.2) —— ZinkConfig 全部
+    //     空转，用户选的 zink 实际跑的是 MC 原生 Vulkan 后端。
+    //
+    // 修法与 MobileGlues 同构：bridge 接管 SDL_GL_LoadLibrary（真实 SDL 从不被
+    // 调 → “already loaded” 无从谈起）+ SDL_GL_GetProcAddress 镜像 LWJGL 解析链
+    // （同一 NOLOAD 句柄 + 同一 eglGetProcAddress/OSMesaGetProcAddress 链 →
+    // 指针一致性按构造成立）→ GL backend 被接受 → 上下文/呈现走与 ≤26.2 完全
+    // 相同的 OSMesa bridge（osm_init_context / osm_make_current / osm_swap_buffers）。
+    // MG 侧已验证的对照日志（2d321fa）：hooked SDL_GL_LoadLibrary -> EGL bridge →
+    // “Using graphics backend OpenGL, using drivers: 4.0.0 MobileGlues 2.0.17”。
+    //
+    // 逃生阀：AMETHYST_ZINK_GL_BRIDGE=0 一行环境变量即回退到旧行为（不接管 →
+    // 回落 Vulkan），供设备上 A/B 对照或万一 GL 路径出问题时应急处置。
+    if (strncmp(renderer, "libOSMesa", 9) == 0) {    // zink（带版本号）
+        return ame_envFlagOn("AMETHYST_ZINK_GL_BRIDGE", true);
+    }
+    if (strncmp(renderer, "gallium_", 8) == 0) {     // OSMesa 系
+        return ame_envFlagOn("AMETHYST_ZINK_GL_BRIDGE", true);
+    }
+    if (strcmp(renderer, "vulkan_zink") == 0) {      // zink
+        return ame_envFlagOn("AMETHYST_ZINK_GL_BRIDGE", true);
+    }
     // 原生 Vulkan 自身走 Vulkan 路径，不需要 GL bridge
     if (strstr(renderer, "libMoltenVK") != NULL) return false;
 
