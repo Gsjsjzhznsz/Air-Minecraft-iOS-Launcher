@@ -233,3 +233,22 @@ Stage Summary:
 - FSR 档位现语义：UQ=77% / Q=67% / Balanced=59% / Performance=50% 渲染分辨率 + EASU/RCAS 升采样回全表面；与 video.resolution 滑杆可叠加
 - 下轮设备日志判读锚点："[MobileGlues] Setting: fsr1Setting = 1"（传递修复）；"[SurfaceVC] Task78 FSR linkage"；"[MG] FSR1 upscale engaged (Task78)"；"[GLGeo] Task78 FSR render<surface expected"；心跳 pres/build + fps 好转幅度
 - 遗留：MG 转译栈稳态 ~16ms/帧 build 税为结构性（上游 wontfix）——转译侧优化空间在 multidrawOrder（MG 2.0 新机制，launcher 的 multidraw_mode 旧键已被弃用，值得下轮接入）；深谷 build 尖峰 200-700ms 根因（区块网格重建 vs 纹理上传 vs 转译缓存 miss）待更深 instrumentation
+
+---
+Task ID: 79
+Agent: main (Super Z)
+Task: 用户三连：①CI 报错修复（Task78 构建失败）；②zink 在 26.3 的启动回退 log（8a31d1b）修复；③朋友（yitenchen123）合并上游的 PR 调研可借鉴点
+
+Work Log:
+- CI 定位：Actions #178/#179 "Build for ios" 步骤 exit 2（fork 仓库日志匿名不可读）→ 排除法锁定：settings.cpp/FSR1.cpp 过 g++ 语法检查（stub 头），逐 hunk 审 .m 改动 → **根因**：Task78 在 SurfaceViewController.m 类扩展 ivar 块后误插 @end，其后 ~70 条 @property 全部脱离 @interface（原扩展横跨到 300 行的 @end）→ clang 编译炸、make exit 2。修复 c0b6f88：ame78_fsr_preset_scale 挪到文件作用域 + ivar 留唯一真扩展 + 回填被吃掉的 FPS 注释行；A1-A7 结构不变量回放全过
+- zink 26.3 回退根因链（新 log 8a31d1b 判读 + 下载 26.3-rc-2 client.jar CFR 反编译 renderpearl）：GlBackend.loadLibrary 要求 LWJGL provider 与 SDL_GL_GetProcAddress 对 "glGetError" 返回同一指针；zink 路径被 ame_glBridgeEnabled 刻意排除（c71dcfa 时代"回落 Vulkan 是唯一可用路径"）→ main_hook [SDLGL] 兜底兑装成功但真实 SDL 保有别的 driver（"already loaded"）→ UIKit_GL_GetProcAddress=dlsym(RTLD_DEFAULT) 与 LWJGL provider 指针不合 → BackendCreationException → 用户选的 zink 实际跑 MC 原生 Vulkan（MoltenVK 1.4.2），ZinkConfig/stride fix/shaderc 缓存全部空转
+- zink 修复 ff7726e：ame_glBridgeEnabled 对 libOSMesa/gallium_/vulkan_zink 翻转为接管（逃生阀 AMETHYST_ZINK_GL_BRIDGE=0 保旧行为）——bridge 接管 SDL_GL_LoadLibrary（真实 SDL 从不被调，"already loaded" 构造性消失）+ SDL_GL_GetProcAddress 镜像 LWJGL 解析链（同一 NOLOAD 句柄：eglGetProcAddress→OSMesaGetProcAddress→dlsym，指针一致性按构造成立）→ GL backend 被接受 → 上下文/呈现走 ≤26.2 同款 OSMesa bridge；ES 强制化仍排除 zink（MC 桌面 GL 3.3 core 请求不动）；MG 侧已验证对照（2d321fa："Using graphics backend OpenGL, MobileGlues 2.0.17"）。SDL 3.4.0 源码核对：UIKit_GL_LoadLibrary(path≠NULL) 必报错、UIKit_GL_GetProcAddress=dlsym(RTLD_DEFAULT)、driver_path 从不赋值——旧路径的死结与修法的构造性豁免都对上了
+- 朋友 PR 调研（herbrine8403/Amethyst #139 已合并，20 commits、vendored MobileGlues 携我方 glslang 双补丁）：lwjgl-333/341 双选、MacosUtil stub、OIT graphicsMode 守卫（含三个查无实据的 renderpearl 属性名）、MoltenVK MVK_CONFIG 神话订正、裸名 libname 修复——**全部本 fork 已有**（方向是他参考我们）；他无 sdl3_hook/main_hook 链（94 行 main_hook vs 我们 1747 行），MG 树为 2.0.17 同代（FSR1 为原生版、无 Task76/78 修复）；他对 MG 上游的 PR #54（iOS 构建/RTLD 自解析）被 Swung0x48 拒并关闭（"不能只测 iOS"）
+- 借鉴落地 26f2dff：**multidrawOrder 迁移**（双方都缺的真空白）——本 fork 的 mobileglues.multidraw_mode 一直写已被 MG 2.0.16+ 弃用的 multidrawMode 整数键（settings.cpp 只警告不读取），UI 三档静默 no-op；现写 multidrawOrder 优先序串（Auto=native,multiindirect,…=MG 默认序逐字一致 / Indirect=间接族优先 / Emulated=CPU 循环优先），六语言 detail 文案重写，旧键停写并留日志；MG 侧闭环核对：md_config_string→parse_multidraw_orders() 在 __APPLE__ 分支同样执行
+- 验证：verify_task79.py 25/25 ALL PASS（A:CI 结构 7 / B:zink bridge 矩阵 12 / C:multidraw 迁移 6）；全链回归 58/59/71/72/73/75/76/77/78 全绿；推送 26f2dff 触发 CI
+
+Stage Summary:
+- CI 失败根因 = Task78 的 @end 手术失误（@property 脱离接口），一行结构修复 + 25 项不变量回放
+- zink 26.3 回退修复 = 同 MG 的 provider-mirror 机制扩展到 zink（bridge 翻转 + 逃生阀）；下轮 zink 会话预期锚点："[SDLHook] SDL_GL_LoadLibrary('...libOSMesa.8.dylib') -> pojavInitOpenGLForSDL3()=0" + "Using graphics backend OpenGL"（而非 Vulkan 回落行）；若 GL 路径万一异常，设备上设 AMETHYST_ZINK_GL_BRIDGE=0 即回旧行为
+- 朋友 PR 结论：无新可搬（他参考我们为主）；唯一真空白 multidrawOrder 已落地——"间接"档是对 MG 转译栈 build 税（Task78 定案 build==avgGap）的直接杠杆，下轮设备日志可对照 multidraw 档位切换前后的 build 分相
+- 遗留：Task77/78 构建实测数据待新一轮设备 log（现在会同时携带 FSR 联动 + zink GL + multidraw 三组锚点）；MG 卡顿深谷 build 尖峰根因待更深 instrumentation
