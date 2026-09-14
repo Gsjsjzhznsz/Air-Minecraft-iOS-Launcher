@@ -252,3 +252,24 @@ Stage Summary:
 - zink 26.3 回退修复 = 同 MG 的 provider-mirror 机制扩展到 zink（bridge 翻转 + 逃生阀）；下轮 zink 会话预期锚点："[SDLHook] SDL_GL_LoadLibrary('...libOSMesa.8.dylib') -> pojavInitOpenGLForSDL3()=0" + "Using graphics backend OpenGL"（而非 Vulkan 回落行）；若 GL 路径万一异常，设备上设 AMETHYST_ZINK_GL_BRIDGE=0 即回旧行为
 - 朋友 PR 结论：无新可搬（他参考我们为主）；唯一真空白 multidrawOrder 已落地——"间接"档是对 MG 转译栈 build 税（Task78 定案 build==avgGap）的直接杠杆，下轮设备日志可对照 multidraw 档位切换前后的 build 分相
 - 遗留：Task77/78 构建实测数据待新一轮设备 log（现在会同时携带 FSR 联动 + zink GL + multidraw 三组锚点）；MG 卡顿深谷 build 尖峰根因待更深 instrumentation
+
+---
+Task ID: 80
+Agent: main (Super Z)
+Task: 用户报"zink还是回退，mg现在开启了fsr黑屏。上传了2个log"（0441401，Task79 构建实测）→ 双日志判读 + 两个根因修复
+
+Work Log:
+- 拉取 0441401（两份日志，均构建 ed1a616）：latestlog.txt = 26.2 fabric MG+FSR 场次（1105 行）；latestlog.old.txt = 26.3-rc-2 zink 场次（6215 行）
+- **zink 回退新失败点定案**（比 Task79 前进一步）：LoadLibrary→EGL bridge ✓、工具窗口创建 ✓、zink EGL/GL 上下文创建 ✓（"zink: MoltenVK 1.4.2 Vulkan 1.4.357" 实锤）、MakeCurrent ✓ → 卡在 renderpearl GlDevice 构造器的第二个 "Hidden Test Window" 探针（创建后立即销毁的健康探针，CFR 反编译 GlDevice.java:109 实锤）→ ame_sdlGlesCompatEnabled 对 libOSMesa 刻意返回 false → 主窗口复用不生效 → 真实 SDL 创建第二个 GL 窗口 → iOS UIKit 后端"每显示器一窗口"拒绝 → 返回 NULL → BackendCreationException → 回退 Vulkan。旁证：26.2 zink 会话（bef0f08）无此探针（renderpearl 26.3 新增）且 "Using graphics backend OpenGL, Mesa 25.0.7" 正常；MG 26.3（0cc265f）靠复用迈过同款门（reusing primary window, refs=2 → DestroyWindow skipped → Using graphics backend OpenGL）
+- **FSR 黑屏根因定案**（链条铁证）："[MG] Shader 3 conversion FAILED (code=-2) — spvc_compiler_compile failed: textureGather requires ESSL 310 → 回退 RAW 桌面 GLSL → invalid version directive / uint syntax error" → 升采样着色器从未编译通过 → ApplyFSR 拿 program 0 每帧 clear 黑色 target + blit 上屏 = 全屏黑屏，而 fps=58-60/swapOK=645/swapFail=0 全部健康（与用户症状完全吻合）。深挖发现上游着色器本体就是死代码：uConst0 声明从未使用、FsrEasuCon 的 outputSize 被喂成输入纹理尺寸（映射坍缩为恒等）、EASU 结果 color 被丢弃、RCAS 用输出空间坐标 texelFetch 输入纹理（必然越界）——解释了上游为何在 __APPLE__ 分支硬编码 fsr1_setting=Disabled（从未在任何平台跑通过）
+- 修复一（zink 窗口复用，sdl3_hook.m）：ame_shouldReusePrimaryWindow 扩展——GLES compat 之外，ame_glBridgeEnabled() 家族（zink/libOSMesa/gallium_/vulkan_zink + gl4es/ltw）也复用主窗口；glBridgeEnabled 前置声明；引丹计数天然消化探针的立即销毁；逃生阀不变（AMETHYST_ZINK_GL_BRIDGE=0 或 AMETHYST_SDL_REUSE_WINDOW=0 一键回旧行为）；zink 呈现走 osm_swap_buffers→SurfaceViewController.surface.layer 不依赖 SDL 窗口，复用无副作用；ES 强制化仍排除 zink（3.3 core 请求不动）
+- 修复二（FSR 着色器 ESSL300 化，FSRShaderSource.h）：textureGather→texelFetch 模拟，分量序 .x=(i0,j1) .y=(i1,j1) .z=(i1,j0) .w=(i0,j0)——由 FSR 自身包代数（bczz .x=b .y=c / ijfe .x=i .y=j .z=f .w=e / klhg / zzon .z=o .w=n）与 ffx_fsr1.h tap 偏移交叉推导自洽；CLAMP_TO_EDGE 用 min/max 钉扎重现；main() 修正为 uViewportSize（render）/uTargetSize（target，新 uniform）喂 FsrEasuCon，EASU 结果直出（RCAS 单 pass 必然越界——留作后续独立 pass）
+- 修复三（FSR1.cpp/.h 配套）：①编译失败安全网——InitFSRResources 检查 program==0 提前返回（不建 FBO、不激活 redirect、会话降级为"无升采样"而非"无画面"）+ engage 分支 program==0 守卫（防死 program 复活黑屏）；②target 超出 surface 时钳制（消除 preset 缩放舍入的超额分配）；③blit 目标改全表面（消除 2px 黑边残留；线性滤波负责末段拉伸；分辨率滑杆叠加 FSR 场景由 blit 统一收尾）；④g_surfaceWidth/Height 每帧记忆 + per-context 存取；⑤uConst0→uTargetSize uniform 全链置换
+- 验证：g++ 语法检查过（真实树头 + ska stub，scripts/gen_task80_gl_stubs.py）；**glslangValidator 真实编译 VS+FS 通过**（Task45 构建件，MG 转译管线第一阶段等价物）；verify_task80.py 44/44 PASS（A zink 复用矩阵/引丹回放 18 + B 着色器 glslang/gather 序数学推导/uniform 契约 9 + C FSR1 行为回放含编译失败安全网/钳制数学/blit 回退 15 + D 括号平衡/级联）；全链回归 64(93)/66(43)/67(47)/68(24)/70(68)/71/72/73/75/76(40)/77(27)/78/79 全绿
+- 推送 175d670 → CI run 34870103337 **SUCCESS**（agent-browser 匿名页图标核验）
+
+Stage Summary:
+- 两个"Task79/78 修复后仍不工作"的问题均已定案根因并修复：zink 差"窗口复用"最后一环（Task79 修了 context 链没修窗口链）；FSR 黑屏是着色器从未编译过（转译层 ESSL300 屏障 + 上游死代码管线）
+- 下轮设备日志判读锚点：zink 场 "[SDLHook] reusing primary window %p, refs=2" + "Using graphics backend OpenGL, using drivers: 4.1 (Compatibility Profile) Mesa 25.0.7"（而非 Vulkan 回落行）；MG+FSR 场 "[MG] Shader N converted OK"（FSR 着色器转译通过）+ 无 "FSR1 upscale shader failed to compile" + 无黑屏 + "[MG] FSR1 upscale engaged (Task78): render 1814x1262 -> target 2358x1640 -> surface 2360x1640"（target 不再超额）+ fps 好转幅度（EASU 1.69x 面积减载的期望收益）
+- FSR 现在的真实语义：MC 以 surface/1.3~2.0 渲染 → EASU 边缘自适应升采样回全表面（RCAS 锐化留作后续独立 pass）；与 video.resolution 滑杆可叠加（滑杆降 render、FSR 升回，双杠杆）
+- 遗留：RCAS 锐化 pass（读 target 纹理的第二 pass + ApplyFSR 双 pass 化）；深谷 build 尖峰根因（Task78 遗留）；multidrawOrder 档位实测对照（Task79 遗留）
