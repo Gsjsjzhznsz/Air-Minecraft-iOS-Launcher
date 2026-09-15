@@ -5,7 +5,20 @@
 #ifndef POJAVLAUNCHER_ENVIRON_H
 #define POJAVLAUNCHER_ENVIRON_H
 
+// Task 83（FSR 独立化）：本头从 Task83 起会被 ObjC++ TU（ctxbridges/
+// osm_bridge.mm）包含。C 的 <stdatomic.h> 在 C++ 模式下会定义
+// atomic_is_lock_free 等函数式宏（Apple clang 15.0.0 stdatomic.h:82），
+// 随后 libc++ <atomic>（经 <string> 等）的同名函数声明被宏展开炸掉
+// （CI run 34990764454：__atomic/atomic.h:144 expected ')'）。
+// C++ 分支改用 <atomic>：std::atomic<size_t> 与 C 的 _Atomic size_t
+// 在 clang ABI 下对象布局一致，链接期同一符号互通；atomic_load/store_
+// explicit 的使用者全部是 C TU（input_bridge_v3.m），不受影响。
+#ifdef __cplusplus
+#include <atomic>
+typedef std::atomic<size_t> atomic_size_t;
+#else
 #include <stdatomic.h>
+#endif
 #include "jni.h"
 
 typedef struct {
