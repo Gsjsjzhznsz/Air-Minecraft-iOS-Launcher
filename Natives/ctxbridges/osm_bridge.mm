@@ -19,19 +19,24 @@
 static osmesa_library handle;
 static void *s_osmDL = NULL;   // libOSMesa 句柄（dlsym_OSMesa 保存，FSR GL 惰性解析用）
 
+// Task 83（ObjC++ 化）：C++ 禁止 void* → 函数指针的隐式转换（C 放行，
+// CI run 34993498502 报 "converts between void pointer and function pointer"）。
+// 用 __typeof__ 显式转型（clang GNU 扩展，C/C++ 双模式可用），零行为变化。
+#define AME83_DLSYM_SLOT(slot, sym) (slot) = (__typeof__(slot))dlsym(dl_handle, (sym))
+
 void dlsym_OSMesa() {
     void* dl_handle = dlopen([NSString stringWithFormat:@"@rpath/%s", getenv("AMETHYST_RENDERER")].UTF8String, RTLD_GLOBAL);
     assert(dl_handle);
     s_osmDL = dl_handle;
-    handle.OSMesaMakeCurrent = dlsym(dl_handle,"OSMesaMakeCurrent");
-    handle.OSMesaGetCurrentContext = dlsym(dl_handle,"OSMesaGetCurrentContext");
-    handle.OSMesaCreateContext = dlsym(dl_handle, "OSMesaCreateContext");
-    handle.OSMesaDestroyContext = dlsym(dl_handle, "OSMesaDestroyContext");
-    handle.OSMesaPixelStore = dlsym(dl_handle,"OSMesaPixelStore");
-    handle.glGetString = dlsym(dl_handle,"glGetString");
-    handle.glClearColor = dlsym(dl_handle, "glClearColor");
-    handle.glClear = dlsym(dl_handle, "glClear");
-    handle.glFinish = dlsym(dl_handle, "glFinish");
+    AME83_DLSYM_SLOT(handle.OSMesaMakeCurrent, "OSMesaMakeCurrent");
+    AME83_DLSYM_SLOT(handle.OSMesaGetCurrentContext, "OSMesaGetCurrentContext");
+    AME83_DLSYM_SLOT(handle.OSMesaCreateContext, "OSMesaCreateContext");
+    AME83_DLSYM_SLOT(handle.OSMesaDestroyContext, "OSMesaDestroyContext");
+    AME83_DLSYM_SLOT(handle.OSMesaPixelStore, "OSMesaPixelStore");
+    AME83_DLSYM_SLOT(handle.glGetString, "glGetString");
+    AME83_DLSYM_SLOT(handle.glClearColor, "glClearColor");
+    AME83_DLSYM_SLOT(handle.glClear, "glClear");
+    AME83_DLSYM_SLOT(handle.glFinish, "glFinish");
 }
 
 bool osm_init() {
@@ -40,7 +45,8 @@ bool osm_init() {
 }
 
 osm_render_window_t* osm_init_context(osm_render_window_t* share) {
-    osm_render_window_t* render_window = calloc(1, sizeof(osm_render_window_t));
+    // Task 83（ObjC++ 化）：calloc 返回 void*，C++ 禁止隐式转结构体指针（显式转型）
+    osm_render_window_t* render_window = (osm_render_window_t*)calloc(1, sizeof(osm_render_window_t));
     OSMesaContext context = handle.OSMesaCreateContext(GL_RGBA, share ? share->context : NULL);
     if(!context) {
         NSLog(@"OSMBridge: FAILED to create context");

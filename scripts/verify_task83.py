@@ -249,8 +249,8 @@ check("E2 osm_bridge.mm ame83 段 g++ 语法", r2.returncode == 0 and "syntax OK
 # E3/E4: CI 修复（run 34987233296 失败教训）——.mm 被当纯 CXX 编译 @interface 炸
 # （工程无 OBJCXX 语言，.m 全走 C+-ObjC 路线）+ C++ mangling 链接断裂
 cml = read("Natives/CMakeLists.txt")
-check("E3 CMake 单文件强制 objective-c++（osm_bridge.mm）",
-      'COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc"' in cml)
+check("E3 CMake 单文件强制 objective-c++ + gnu++17（osm_bridge.mm）",
+      'COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc;-std=gnu++17"' in cml)
 obh = read("Natives/ctxbridges/osm_bridge.h")
 check("E4 osm_bridge.h extern C 防护（C TU 调用 set_osm_bridge_tbl）",
       '#ifdef __cplusplus' in obh and 'extern "C"' in obh
