@@ -23,5 +23,16 @@ typedef struct {
     void* buffer;
 } osm_render_window_t;
 
+// Task 83（FSR 独立化）：osm_bridge 已改为 ObjC++（.mm）——本头的函数声明
+// 被 C TU（egl_bridge.m 等）和唯一 C++ TU（osm_bridge.mm）共同包含。无防护
+// 时 .mm 侧定义走 C++ name mangling，.m 调用方链接 C 符号 → undefined symbol。
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void osm_swap_buffers();
 void set_osm_bridge_tbl();
+
+#ifdef __cplusplus
+}
+#endif

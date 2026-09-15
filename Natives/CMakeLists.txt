@@ -537,6 +537,15 @@ add_executable(AngelAuraAmethyst
   AI/AiInstanceCreator.m
 )
 
+# Task 83（FSR 独立化）：osm_bridge.mm 是唯一的 ObjC++ 源——它同时包含
+# MobileGlues FSRShaderSource.h（C++ raw string 字面量，必须 C++ 方言）与
+# SurfaceViewController.h/UIKit+hook.h（ObjC 世界）。工程未启用 OBJCXX
+# 语言（全部 .m 走 C + "-ObjC" 强制路线），CMake 会把 .mm 当纯 CXX 编译，
+# @interface 直接解析失败（CI run 34987233296，28 errors）。单文件强制
+# objective-c++ 方言 + ARC，与 .m 侧 "-fobjc-arc -ObjC" 口径对齐。
+set_source_files_properties(ctxbridges/osm_bridge.mm PROPERTIES
+  COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc")
+
 # Add ModLoaderIcons PNG files into the app bundle Resources/ModLoaderIcons so they are available at runtime.
 # This will copy all *.png under Natives/ModLoaderIcons into the bundle at Resources/ModLoaderIcons/<name>.png
 set(MODLOADER_ICONS_DIR "${CMAKE_CURRENT_LIST_DIR}/ModLoaderIcons")
