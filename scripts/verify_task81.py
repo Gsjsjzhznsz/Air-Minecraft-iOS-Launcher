@@ -26,13 +26,26 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)  # my-project
-MG = os.path.join(REPO, "Amethyst-iOS-MyRemastered", "Natives", "external",
-                  "MobileGlues", "MobileGlues-cpp")
+
+
+def _first(*paths):
+    for p in paths:
+        if os.path.exists(p):
+            return os.path.abspath(p)
+    return os.path.abspath(paths[-1])
+
+
+# Works both from my-project/scripts and <repo>/scripts.
+MG = _first(
+    os.path.join(HERE, "..", "Amethyst-iOS-MyRemastered", "Natives", "external",
+                 "MobileGlues", "MobileGlues-cpp"),
+    os.path.join(HERE, "..", "Natives", "external", "MobileGlues", "MobileGlues-cpp"),
+)
+REPO_GIT = os.path.abspath(os.path.join(MG, "..", "..", "..", ".."))
 TEX = os.path.join(MG, "gl", "texture.cpp")
 VER = os.path.join(MG, "version.h")
 DRW = os.path.join(MG, "gl", "drawing.cpp")
-LOG_NEW = os.path.join(REPO, "Amethyst-iOS-MyRemastered", "latestlog.old.txt")  # 678e7b5 MG session
+LOG_NEW = os.path.join(REPO_GIT, "latestlog.old.txt")  # 678e7b5 MG session
 
 results = []
 
@@ -233,7 +246,6 @@ else:
     check("C4 regression fixture (log absent)", True, "skipped: log not present locally")
 
 # C5 e3e0830 fixture: enforcement alive pre-FSR (force lines in that build's log).
-REPO_GIT = os.path.join(REPO, "Amethyst-iOS-MyRemastered")
 try:
     old = subprocess.run(["git", "show", "e3e0830:latestlog.txt"], cwd=REPO_GIT,
                          capture_output=True, text=True, timeout=60).stdout
