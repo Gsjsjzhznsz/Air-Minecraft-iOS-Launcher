@@ -16,7 +16,7 @@ extern NSNotificationName UIPresentationControllerPresentationTransitionWillBegi
 @end
 
 // private functions
-@interface UIContextMenuInteraction(private)
+@interface UIContextMenuInteraction(ame_private)
 - (void)_presentMenuAtLocation:(CGPoint)location;
 @end
 @interface _UIContextMenuStyle : NSObject <NSCopying>
@@ -24,20 +24,20 @@ extern NSNotificationName UIPresentationControllerPresentationTransitionWillBegi
 + (instancetype)defaultStyle;
 @end
 
-@interface UIDevice(private)
+@interface UIDevice(ame_private)
 - (NSString *)buildVersion;
 - (void)_setActiveUserInterfaceIdiom:(NSInteger)idiom;
 @end
 
-@interface UIImage(private)
+@interface UIImage(ame_private)
 - (UIImage *)_imageWithSize:(CGSize)size;
 @end
 
-@interface UIScreen(private)
+@interface UIScreen(ame_private)
 - (void)_setUserInterfaceIdiom:(NSInteger)idiom;
 @end
 
-@interface UITextField(private)
+@interface UITextField(ame_private)
 @property(assign, nonatomic) NSInteger nonEditingLinebreakMode;
 @end
 
@@ -50,7 +50,7 @@ extern NSNotificationName UIPresentationControllerPresentationTransitionWillBegi
 @property (assign, nonatomic) UIView *view;
 @end
 
-@interface UIPointerInteraction(private)
+@interface UIPointerInteraction(ame_private)
 - (NSArray <id<_UIPointerInteractionDriver>> *)drivers;
 - (id<_UIPointerInteractionDriver>)driver;
 @end

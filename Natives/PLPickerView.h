@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@interface UIPickerView(private)
+@interface UIPickerView(ame_private)
 - (UITableViewCell * _Nonnull)tableView:(UITableView * _Nonnull)tableView cellForRowAtIndexPath:(NSIndexPath * _Nonnull)indexPath;
 - (UITableView * _Nullable)tableViewForColumn:(NSInteger)column;
 @end

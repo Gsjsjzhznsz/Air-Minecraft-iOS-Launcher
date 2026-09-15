@@ -1,6 +1,6 @@
 #import <UIKit/UIKit.h>
 
-@interface CALayer(private)
+@interface CALayer(ame_private)
 @property(atomic, assign) NSUInteger disableUpdateMask;
 @end
 

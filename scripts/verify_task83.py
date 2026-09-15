@@ -256,6 +256,17 @@ check("E4 osm_bridge.h extern C 防护（C TU 调用 set_osm_bridge_tbl）",
       '#ifdef __cplusplus' in obh and 'extern "C"' in obh
       and "void set_osm_bridge_tbl();" in obh)
 
+# E5: ObjC++ 关键字分类名清零（run 34989106108 教训——private 是 C++ 关键字，
+# ObjC++ 模式下 @interface Foo(private) 解析失败，后续 libc++ 头级联报错）
+import glob as _glob
+_keyword_cats = []
+for _h in _glob.glob(REPO + "/Natives/*.h") + _glob.glob(REPO + "/Natives/customcontrols/*.h"):
+    for _ln, _l in enumerate(open(_h, encoding="utf-8", errors="ignore"), 1):
+        if re.search(r"@interface\s+\w+\((private|public|protected|class|struct|new|delete|template|this|namespace|using|operator|friend|inline|virtual)\)", _l):
+            _keyword_cats.append(f"{_h}:{_ln}")
+check("E5 头文件无 C++ 关键字分类名（ame_private 改名完成）", not _keyword_cats,
+      "; ".join(_keyword_cats[:3]))
+
 # ============================================================================
 print(f"\nRESULT: {PASS}/{PASS + FAIL}")
 sys.exit(0 if FAIL == 0 else 1)
