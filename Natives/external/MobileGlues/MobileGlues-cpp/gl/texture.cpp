@@ -419,16 +419,23 @@ static inline bool driver_active_unit_shadow_trustworthy() { return driver_shado
 //
 // Every internal path that moves a driver texture binding through GLES.* puts it
 // back -- gl/buffer.cpp's glTexBuffer reads unit 15 and rebinds what it read,
-// gl/drawing.cpp only borrows the active unit -- with one exception. FSR1's
-// GLStateGuard saves GL_TEXTURE_BINDING_2D for the unit that was active when it
-// was built, but ApplyFSR then switches to GL_TEXTURE0 and binds the render
-// texture there; the destructor restores the saved unit and rebinds only that
-// one, so with any unit but GL_TEXTURE0 active at swap time unit 0 keeps the FSR1
-// texture and no shadow anywhere records it. That leak is per frame and silent,
-// so while FSR1 is switched on the shadow is declared untrustworthy wholesale
-// rather than for the one pair, which is cheap: the setting is off by default.
+// gl/drawing.cpp only borrows the active unit. FSR1 used to be the one
+// exception: its GLStateGuard saved GL_TEXTURE_BINDING_2D for the unit that was
+// active when it was built, so ApplyFSR's unit-0 bind leaked past the destructor
+// whenever another unit was active at swap time, and no shadow recorded it; the
+// shadow was therefore declared untrustworthy wholesale while FSR1 was on
+// (cheap then: the setting never engaged on iOS, its config never read). FSR1's
+// guard now saves and restores UNIT 0's binding and the active unit separately,
+// so the driver nets to zero per presented frame and this predicate is context
+// identity again. Task 81 (Amethyst fork): the widening matters because the
+// launcher passes fsr1Setting through to the device now -- under the old clause,
+// engaging FSR1 silently killed the depth-sampling filter enforcement in
+// mg_enforce_depth_sampling_nearest, ANGLE Metal answered 0.0 for every
+// composite depth sample, and clouds/weather/particles/item entities went back
+// to rendering through terrain. The enforcement keeps a belt-and-braces driver
+// confirm of every depth hint while FSR1 is on; see the notes at its entry.
 static inline bool driver_texture_shadow_trustworthy() {
-    return driver_shadow_tracks_this_context() && global_settings.fsr1_setting == FSR1_Quality_Preset::Disabled;
+    return driver_shadow_tracks_this_context();
 }
 
 int mg_driver_active_texture_unit(void) {
@@ -624,13 +631,24 @@ void mg_enforce_depth_sampling_nearest(void) {
     // behind our back, which MC does not do -- and a missed force self-
     // corrects on the next draw's re-scan anyway.
     //
-    // FSR1 precondition unchanged: with FSR1 on, the per-unit binding shadow
-    // is declared untrustworthy wholesale (its GLStateGuard leak is exactly a
-    // binding no record knows about), hints could flip a colour sampler, and
-    // a driver-side confirm cannot help because the leak is silent per frame
-    // -- so enforcement stays off. The setting is off by default.
-    const bool tracked = driver_texture_shadow_trustworthy();
-    if (!tracked && global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled) return;
+    // Task 81 (Amethyst fork): the FSR1 kill-switch is retired. It existed because
+    // FSR1's GLStateGuard leaked the render texture onto unit 0 once per presented
+    // frame, no shadow recorded it, and a colour sampler could have been forced off
+    // a stale hint; the guard has since been taught to save and restore unit 0's own
+    // binding, so the leak is gone. With the launcher now passing fsr1Setting
+    // through, the switch had turned into a live regression: FSR1 engaged for the
+    // first time on device and the enforcement silently stopped running, which read
+    // as clouds/weather/particles/item entities rendering through terrain again
+    // (device log 678e7b5: composite dump with sampler 26 at MIN 9986 over six D32F
+    // units and not one force line). Enforcement now always runs. While FSR1 is on,
+    // every depth hint is additionally confirmed against the driver -- the same
+    // borrow-and-restore the untracked mode has always used -- so any future
+    // internal bind that bypasses the shadow can only ever cause a rejected
+    // confirm (a missed force self-corrects on the next draw's re-scan), never a
+    // wrong force on a colour sampler.
+    const bool tracked = driver_shadow_tracks_this_context();
+    const bool fsr1_on = global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled;
+    const bool confirm_hints = !tracked || fsr1_on;
 
     std::lock_guard<std::mutex> lock(g_depth_sampler_mutex);
 
@@ -652,6 +670,13 @@ void mg_enforce_depth_sampling_nearest(void) {
                     "fallback-record hints + driver confirms armed")
     }
 
+    static bool mg_fsr1_scan_logged = false;
+    if (fsr1_on && !mg_fsr1_scan_logged && any_sampler) {
+        mg_fsr1_scan_logged = true;
+        LOG_W_FORCE("[MG] depth filter scan: FSR1 active (Task 81) -- enforcement re-enabled, "
+                    "depth hints driver-confirmed")
+    }
+
     // Pass 1 -- desired state. A sampler must be in the forced state iff at
     // least one of the units it is bound on holds a depth-family image. The
     // two-pass shape exists because the same cache entry is routinely bound on
@@ -669,7 +694,7 @@ void mg_enforce_depth_sampling_nearest(void) {
         if (want) continue;
         const GLuint tex = get_driver_texture_binding(u, TextureTarget::TEXTURE_2D);
         bool holds_depth = tex != 0 && g_depth_textures.count(tex) != 0;
-        if (holds_depth && !tracked) {
+        if (holds_depth && confirm_hints) {
             // Hint came from the shared fallback record -- the driver decides.
             if (!confirm_borrowed) {
                 GLES.glGetIntegerv(GL_ACTIVE_TEXTURE, &saved_active);
@@ -1961,11 +1986,12 @@ void glBindTexture(GLenum target, GLuint texture) {
     // unit on all three of its exits -- zero. gl/drawing.cpp's
     // setupBufferTextureUniforms only reads unit 15 and restores the active unit --
     // zero. This function's own emulation branch is recorded below rather than
-    // left to net out. FSR1's GLStateGuard does not net to zero, which is what
-    // driver_texture_shadow_trustworthy() is for -- as is the shared fallback
-    // record, whose values belong to no context in particular. gl/gl.cpp's
-    // depth-clear triangle and the multidraw backends touch no texture state at
-    // all; bench/ is a separate program.
+    // left to net out. FSR1's GLStateGuard nets to zero as of Task 81 (it saves
+    // and restores unit 0's binding as well as the active unit), so the remaining
+    // reason driver_texture_shadow_trustworthy() can be false is the shared
+    // fallback record, whose values belong to no context in particular.
+    // gl/gl.cpp's depth-clear triangle and the multidraw backends touch no
+    // texture state at all; bench/ is a separate program.
     bool redundant = false;
     if (targetR != TextureTarget::UNKNWON && driver_texture_shadow_trustworthy()) {
         const TextureObject* bound = currentUnit.GetBindingSlot(targetR).GetBoundObject();

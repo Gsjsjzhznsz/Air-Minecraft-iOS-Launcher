@@ -277,6 +277,27 @@
 // entries written by <= 2.0.16 embed the corrupted ESSL and would keep being
 // re-served for identical sources. "MobileGlues 2.0.17" in the runtime
 // Graphics Drivers line identifies the fixed build on device.
+//
+// REVISION 17 addendum (Amethyst Task 81, no bump): gl/texture.cpp's depth-
+// sampling filter enforcement no longer switches itself off while FSR1 is
+// engaged. The kill-switch dated from the era when FSR1's GLStateGuard leaked
+// the render texture onto unit 0 once per presented frame (no shadow recorded
+// it, so a stale hint could have flipped a colour sampler) AND fsr1Setting
+// never engaged on iOS at all (its config was never read), so the switch cost
+// nothing. Two changes invalidated each half: the guard now saves and restores
+// unit 0's own binding (nets to zero), and the launcher passes fsr1Setting
+// through -- so the first device session with FSR1 on (build 678e7b5) ran with
+// the enforcement silently dead: the composite's sampler 26 kept MIN 9986 over
+// six D32F units, every depth sample read 0.0 ("infinitely far" in reversed-z),
+// and clouds/weather/particles/item entities rendered through terrain -- the
+// exact symptom the enforcement was built to cure, back as an FSR1 side effect.
+// Enforcement now always runs, and every depth hint is driver-confirmed while
+// FSR1 is on (the untracked mode's borrow-and-restore, extended to tracked
+// contexts for the duration). REVISION deliberately NOT bumped: the conversion
+// cache key embeds MAJOR.MINOR.REVISION and no converter output changed, so a
+// bump would only burn the on-disk cache (~400 entries) for nothing. The
+// one-shot "[MG] depth filter scan: FSR1 active (Task 81)" log line identifies
+// the fixed build on device, alongside the returning force/restore pairs.
 #define REVISION 17
 #define PATCH 0
 
