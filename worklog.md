@@ -273,3 +273,30 @@ Stage Summary:
 - 下轮设备日志判读锚点：zink 场 "[SDLHook] reusing primary window %p, refs=2" + "Using graphics backend OpenGL, using drivers: 4.1 (Compatibility Profile) Mesa 25.0.7"（而非 Vulkan 回落行）；MG+FSR 场 "[MG] Shader N converted OK"（FSR 着色器转译通过）+ 无 "FSR1 upscale shader failed to compile" + 无黑屏 + "[MG] FSR1 upscale engaged (Task78): render 1814x1262 -> target 2358x1640 -> surface 2360x1640"（target 不再超额）+ fps 好转幅度（EASU 1.69x 面积减载的期望收益）
 - FSR 现在的真实语义：MC 以 surface/1.3~2.0 渲染 → EASU 边缘自适应升采样回全表面（RCAS 锐化留作后续独立 pass）；与 video.resolution 滑杆可叠加（滑杆降 render、FSR 升回，双杠杆）
 - 遗留：RCAS 锐化 pass（读 target 纹理的第二 pass + ApplyFSR 双 pass 化）；深谷 build 尖峰根因（Task78 遗留）；multidrawOrder 档位实测对照（Task79 遗留）
+
+---
+Task ID: 81
+Agent: main (Super Z)
+Task: 用户报"zink正常，但是mg的实体以及云层穿透又回来了（那是我最前面几十次提交修复的内容你怎么删除了），还有mg还是卡"（f50d5ff 双日志，Task80 构建 678e7b5 实测）→ 判读 + 根因 + 修复
+
+Work Log:
+- 拉取 f50d5ff（两份日志，均构建 678e7b5）：latestlog.txt = 26.3-rc-2 zink 场（9394 行）；latestlog.old.txt = 26.2 fabric MG+FSR 场（1536 行）。本地 main 落后 origin 五个提交（Task76-80 已在远端），ff-only 同步后判读
+- zink 场判读——**Task80 窗口复用修复完全生效**："SDL_GL_LoadLibrary('...libOSMesa.8.dylib') -> pojavInitOpenGLForSDL3()=0 (EGL bridge)" + "reusing primary window 0x12b6ee400, refs=2"（Hidden Test Window 探针被引丹计数消化）+ "Using graphics backend OpenGL, using drivers: 4.1 (Compatibility Profile) Mesa 25.0.7"（非 Vulkan 回落行）；游戏内 fps 稳定 46-52、零崩溃——用户"zink正常"属实，此线闭环
+- MG 场判读——FSR 联动链全部生效（Task78/80 战果）："Task78 FSR linkage: preset=1 scale=1.30" + "FSR1 upscale engaged (Task78): render 1814x1262 -> target 2358x1640 -> surface 2360x1640" + 零 shader 转换失败（Task80 ESSL300 化生效，不再黑屏）+ 稳态 fps 56-59 / build 12-13ms（对比 Task78 前稳态 build 税 ~16ms——FSR 降载可见）
+- **穿透回归根因定案（铁证链）**：日志 1149-1167 行 depth-sampling dump——合成器 12 个 sampler2D（Main/Translucent/ItemEntity/Particles/Weather/Clouds 各 colour+depth 对）共用 sampler 26，其 MIN=NEAREST_MIPMAP_LINEAR(9986) 盖在全部六个 D32F 深度纹理上，**全程零 "depth filter force" 行**（对照 e3e0830[FSR关] 2 条 force、4770b53 1 条）。链条：GLES3 深度纹理仅在 MIN=NEAREST/NEAREST_MIPMAP_NEAREST 下 filter-complete → 9986 使六张 D32F 全部 incomplete → ANGLE Metal 采样回 0.0 → reversed-z 读作"无穷远" → 云/天气/粒子/物品实体全部不遮挡 = 用户所见
+- 为什么"回来了"：**旧修复一行都没被删**。mg_enforce_depth_sampling_nearest() 带着一条 FSR1 kill-switch（texture.cpp 633 行 `!tracked && fsr1_setting != Disabled → return`）——它的两个历史前提（①FSR1 GLStateGuard 每帧把 render 纹理漏到 unit 0 无影子记录 ②fsr1Setting 在 iOS 从未生效）分别已被 Task78/80 修掉（guard 现已保存/恢复 unit 0 自身绑定=净值零；配置已透传）。于是 FSR1 首次在设备上真正启用（正是本构建）→ kill-switch 首次被触发 → 整个深度采样执法静默死亡。FSR1.cpp 头部注释早已写明"shadow 可以重新放宽，泄漏已除"——但放宽这半步从未落地，本构建补上
+- 修复（commit e97af69，texture.cpp 4 处 + version.h 1 处 + en.lproj 1 处）：
+  1. driver_texture_shadow_trustworthy() 去掉 FSR 子句（回到纯上下文身份判定；连带 glBindTexture 冗余绑定跳过路径在 FSR 开启时恢复可用=微小降开销）
+  2. 执法入口退役 kill-switch——恒运行；fsr1_on 时每个深度 hint 额外走驱动侧确认（untracked 模式既有 borrow-and-restore 机制扩展到 tracked 模式，防御未来任何绕过影子的内部绑定——过期 hint 只会被拒确认，绝不可能错误强制 colour sampler）
+  3. 一次性布防日志 "[MG] depth filter scan: FSR1 active (Task 81) -- enforcement re-enabled, depth hints driver-confirmed"（设备日志验证锚点）
+  4. version.h REVISION 17 addendum——**刻意不 bump**（转换缓存键嵌入 MAJOR.MINOR.REVISION，本次转换器输出零变化，bump 只会白烧 ~470 条磁盘缓存引发一次 404 转换风暴）
+  5. en.lproj i18n_str_638 治愈（字面量内裸换行——Apple .strings 解析隐患，重跑级联时被 task66 D9 奇偶校验逮到的真实缺陷；修复后 en/zh-Hans 键数 1831==1831）
+- 附带基础设施修复（预先存在的级联红，非本次回归）：/home/z/my-project/scripts 下 verify_task64 A6/A7（Task77 ame77RestoreCtrl 新语义的适配未落盘）与 verify_task66 D9（键数 1832 硬编码→奇偶+下限）同步至现行语义——f50d5ff 上即红的 76→71→67/70 嵌套级联现在全链绿
+- 验证：verify_task81.py 32/32 PASS——A 指纹 13（kill-switch 删除/确认门/布防日志/版本不 bump/force 体原样）+ B 决策矩阵回放 10（tracked×untracked × FSR开/关 四模式、泄漏形态 hint 拒绝、colour-only 恢复、双 pass any-depth、PCF 不动、NEAREST 免强制、空扫 cheap-out）+ C 回归锚 5（drawing.cpp dump 原样、prepareForDraw 调用在位、678e7b5 回归 fixture=零 force 行实锤、e3e0830 fixture=force 行在=FSR 相关性实锤）+ D 级联 4（76:40/40、78、79、80:44/44）；g++ -fsyntax-only 全 TU 零错误（stub 头环境 scripts/task81/stubs/）；宽级联 67/70/71/77 全绿
+- 推送 e97af69 → CI 触发
+
+Stage Summary:
+- 穿透回归一句话定性：不是删除、是"FSR1 首次真正启用"激活了一条沉睡的 kill-switch，把最早的深度遮挡修复整个关掉了；泄漏根因（guard 不还 unit 0）早已修掉，本轮补上"放宽"这半步，执法恒运行 + FSR 期间驱动侧确认兜底
+- 用户装机预期（e97af69 构建，MG+FSR 场）：日志出现 "[MG] depth filter scan: FSR1 active (Task 81)" + 回归的 "[MG] depth filter force: sampler 26 min 9986 / mag 9728 -> NEAREST (depth image sampled)"（前 8 次）+ "[MG] depth filter restore: ..."；游戏内云/天气/粒子/物品实体恢复被地形遮挡；FSR 升采样画质不受影响（合成后最后几笔 colour-only draw 会先恢复 sampler 参数，EASU 采样状态与现状逐位一致）
+- zink 线正式闭环（用户口头确认+日志锚点双实锤）；MG 卡顿终版归因维持：稳态已改善（56-59fps/build 12-13ms），深谷 = 区块流式 × 转译栈逐调用税（本设备 multidrawOrder 全 backend 不可用→unroll；GC 全程 3-10ms 无罪；122 次转换全部在启动期）——模组 26.x 场景建议用 zink（46-52fps），MG 留给轻量/老版本
+- 遗留：深谷 build 尖峰（区块网格重建 vs 纹理上传）待更深 instrumentation（Task78 起遗留）；RCAS 锐化第二 pass（Task80 遗留）；ja/km l10n 深度修复（Task66 遗留）
