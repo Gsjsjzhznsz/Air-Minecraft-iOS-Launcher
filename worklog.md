@@ -300,3 +300,27 @@ Stage Summary:
 - 用户装机预期（e97af69 构建，MG+FSR 场）：日志出现 "[MG] depth filter scan: FSR1 active (Task 81)" + 回归的 "[MG] depth filter force: sampler 26 min 9986 / mag 9728 -> NEAREST (depth image sampled)"（前 8 次）+ "[MG] depth filter restore: ..."；游戏内云/天气/粒子/物品实体恢复被地形遮挡；FSR 升采样画质不受影响（合成后最后几笔 colour-only draw 会先恢复 sampler 参数，EASU 采样状态与现状逐位一致）
 - zink 线正式闭环（用户口头确认+日志锚点双实锤）；MG 卡顿终版归因维持：稳态已改善（56-59fps/build 12-13ms），深谷 = 区块流式 × 转译栈逐调用税（本设备 multidrawOrder 全 backend 不可用→unroll；GC 全程 3-10ms 无罪；122 次转换全部在启动期）——模组 26.x 场景建议用 zink（46-52fps），MG 留给轻量/老版本
 - 遗留：深谷 build 尖峰（区块网格重建 vs 纹理上传）待更深 instrumentation（Task78 起遗留）；RCAS 锐化第二 pass（Task80 遗留）；ja/km l10n 深度修复（Task66 遗留）
+
+---
+Task ID: 82
+Agent: main (Super Z)
+Task: 用户报"fsr疑似没有开启，整个界面缩到左下角；安卓上mg加载区块也卡（所以对不起）；控件左上角那个控件键盘使用不了；mg透视其实是sodium模组'改进透明'开了就会穿透；请在新建一个标签页，添加启动器各种使用问题"（ea27def 日志，Task81 构建实测）→ 三线修复 + FAQ 页
+
+Work Log:
+- 拉取 ea27def 新日志（9285 行，1e85193 构建，MG+FSR 场，18:53 会话）判读：
+  * Task81 穿透修复生效（"depth filter scan: FSR1 active (Task 81)" 在位）——用户澄清透视是 Sodium"改进透明"选项所致（模组行为，非启动器回归，FAQ 录入即可）
+  * FSR"缩到左下角"实锤：唯一一条 engage 行 "render 2048x2048 -> target 2360x1640 -> surface 2360x1640"，而全部 19 次 swap geo-probe 的帧视口恒为 1814x1262（=2360/1.30 正确窗口尺寸）——2048x2048 不是主帧视口
+- FSR 根因：gl/FSR1/FSR1.cpp 的 glViewport 渲染尺寸锁存是 grow-only（w>pendingW || h>pendingH 即整体覆盖）；MC 26.x 的动态图集 pass 以全图集尺寸 glViewport（blocks.png=2048x2048，恰好 2048>1814）污染锁存，此后主视口 1814x1262 因"只增不减"永远无法夺回 → 渲染 FBO 2048x2048 但 MC 只画左下 1814x1262 → EASU 把整张（右上大片未写）铺满表面 → 画面缩在左下 88.6%×61.6%，黑边在右上——与用户描述逐字吻合
+- FSR 修复（commit 248e59a）：锁存候选必须"窗口形状"——①任一维不超过 EGL 表面（窗口=表面/档位系数，构造上≤表面；2048>1640 被拒）②宽高比偏离表面 <3%（窗口对表面等比缩放；方形图集/阴影 pass 被拒，实际窗口 1.4371 vs 表面 1.4390 偏 0.13%）；仅 FSR1 开启时检查（关闭时锁存无人消费，零开销）；表面尺寸取 CheckResolutionChange 缓存、首帧前（正是污染窗口期）直查 EGL（同镜像前端导出符号，surface record 读取无驱动往返）；拒绝一次性日志（防图集每帧刷屏）+ version.h REVISION 17 addendum（不 bump，转换器输出零变化）
+- 键盘控件根因：CallbackBridge_nativeSendChar 只有 GLFW 路径（GLFW_invoke_Char && isInputReady），而 26.3 走 SDL3 该指针恒 NULL → 左上角 Keyboard 按钮唤起的虚拟键盘打字全被静默丢弃（返回 NO，无日志）。反编译实锤消费链（task66_decomp/client.jar，CFR）：SDLEventHandler.pollEvents case 771(0x303 SDL_EVENT_TEXT_INPUT) → handleTextInputEvent → keyboardHandler.textInput → charTyped（handle 匹配 + Screen 打开时进 Screen.charTyped）
+- 键盘修复：input_bridge_v3.m 照 sendKey 的 Path B 模式新增 pushSDLTextInput——UTF-8 编码（1-4 字节）+ UTF-16 代理对合并状态（emoji 不再拆成乱码）+ 1024 槽×8 字节静态环形缓冲承载 text 指针生命周期（SDL3 TextInputEvent.text 是指针非内联数组；MC 每帧排空队列，千槽覆盖周期远超消费周期）+ 事件用 128 字节 SDL3_Event 联合体承载（避免 SDL_PushEvent 拷贝 union 尾部越界读栈）；nativeSendChar 加 Path B（!GLFW_invoke_Char && g_sdlWindow 时推事件），nativeSendCharMods 刻意保持 GLFW-only（TrackedTextField 每字符先 sendCharMods 再 sendChar，双推会重复输入）；SurfaceViewController 键盘按钮补 becomeFirstResponder 结果取证日志
+- FAQ 页（新标签）：Natives/LauncherHelpViewController.h/.m——UITableView inset-grouped 四分类十问答（渲染与性能/输入与控制/安装与数据/故障排除），全部来自 worklog 真实结论：渲染器选型（26.x+模组用 zink、MG 轻量场景）、Sodium"改进透明"穿透、MG 区块卡顿已知特性（安卓同样，已排除 GC/内存/GPU）、FSR 档位用法（分辨率保持 100%、旧黑屏/缩角已修）、键盘打字、摇杆修复史、内存建议、整合包父 JSON 自愈、崩溃反馈（latestlog+环境四要素）、数据目录；语言跟随 AI 模块先例直接中文；SF Symbol 全部用 iOS 13/14 安全符号；接线 = CMakeLists 源注册 + 侧边栏 index 5（questionmark.circle.fill）+ ShowHelpPage 通知 + LauncherRootViewController 内容区切换
+- MG 卡顿线定案：用户确认安卓同样卡顿 = 上游 MobileGlues 转译栈固有开销（26.3 区块管线 3.2x 调用量 × 逐调用翻译税），非本 fork 回归；已排除项（GC/内存/视距/M4）维持结论，FAQ 录入"已知特性+缓解办法"
+- 验证：verify_task82.py 53/53 PASS——A FSR 指纹 8（helper/门控/双规则/一次性日志/growth 保留/直通/version 注记）+ B 锁存行为回放 10（图集两种时序均拒、窗口 0.13% 偏离接受、旋转重锁、大表面方形图集 aspect 拒、方形窗口接受、FSR 关=旧行为、无 EGL 信息=放行）+ C 文本链指纹 9（0x303/结构/环形/定义顺序/Path B/CharMods 不双推/128 字节 union/日志/代理态）+ D 文本行为回放 5（UTF-8 四锚点/代理对合并/孤立低代理 U+FFFD/高代理后 BMP/粘贴整串往返）+ E 键盘取证 2 + F FAQ 接线 9 + G 括号平衡 7（全零位移）+ H ea27def 回归证据 2（2048 污染在场 + 19 探针恒 1814）+ I Task81 级联 32/32；FSR1.cpp g++ -fsyntax-only 全 TU 零错误；宽级联 63/64/65/66/67/70/76/78/79/80/81 全绿
+- 推送 248e59a → CI 触发
+
+Stage Summary:
+- FSR"缩到左下角"一句话定性：不是 FSR 没开（联动全生效），是图集 pass 的 2048x2048 瞬态视口污染了 grow-only 锁存，把渲染 FBO 撑大而 MC 只画左下角；修复后 engage 行应为 "render 1814x1262 -> target 2358x1640"，画面满屏
+- 键盘控件一句话定性：26.3 的 SDL3 路径根本没有文本事件通道（GLFW_invoke_Char 恒 NULL），打字被静默丢弃；修复后虚拟键盘字符经 SDL_EVENT_TEXT_INPUT 直达 charTyped
+- 用户装机预期（248e59a 构建）：①MG+FSR 满屏画面 + 日志锚点 "[MG] FSR1 viewport latch rejected (Task 82): 2048x2048 is not a window viewport (surface 2360x1640)" + engage 1814x1262；②26.3 打开聊天点 Keyboard 打字有效 + "[InputDiag] Task82 SDL text input #N: U+XXXX ..."；③侧边栏新增"使用问题"标签（问号图标）十问答
+- 遗留：图集 pass 若换成非方形尺寸（资源包重缝图集）也已被 aspect 规则覆盖；深谷 build 尖峰 instrumentation（Task78 遗留）；RCAS 锐化第二 pass（Task80 遗留）；ja/km l10n（Task66 遗留）
