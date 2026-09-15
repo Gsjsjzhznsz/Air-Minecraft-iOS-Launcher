@@ -2183,12 +2183,17 @@ static UIView *findSDL_uikitview(UIView *root);
             switch (keycode) {
                 case SPECIALBTN_KEYBOARD:
                     if (held == 0) {
-                        if (self.inputTextField.isFirstResponder) {
+                        // Task 82：键盘控件取证——按钮触发 + becomeFirstResponder 结果
+                        // （26.3 下打字靠 input_bridge_v3 的 SDL_EVENT_TEXT_INPUT 路径）
+                        BOOL wasFirst = self.inputTextField.isFirstResponder;
+                        if (wasFirst) {
                             [self.inputTextField resignFirstResponder];
                             self.inputTextField.alpha = 1.0f;
+                            NSLog(@"[Task82] Keyboard widget: dismissing (was first responder)");
                         } else {
-                            [self.inputTextField becomeFirstResponder];
+                            BOOL ok = [self.inputTextField becomeFirstResponder];
                             self.inputTextField.text = @" ";
+                            NSLog(@"[Task82] Keyboard widget: becomeFirstResponder=%d (on-screen keyboard should appear; typing delivered via SDL text-input on 26.3)", ok);
                         }
                     }
                     break;

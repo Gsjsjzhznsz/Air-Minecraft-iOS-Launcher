@@ -355,6 +355,7 @@ add_executable(AngelAuraAmethyst
   LauncherMenuViewController.m
   LauncherNavigationController.m
   LauncherNewsViewController.m
+  LauncherHelpViewController.m
   HomeCustomizeViewController.m
   LauncherRootViewController.m
   LauncherCardLayoutViewController.m

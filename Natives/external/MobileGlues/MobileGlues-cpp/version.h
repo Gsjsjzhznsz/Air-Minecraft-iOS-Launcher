@@ -298,6 +298,17 @@
 // bump would only burn the on-disk cache (~400 entries) for nothing. The
 // one-shot "[MG] depth filter scan: FSR1 active (Task 81)" log line identifies
 // the fixed build on device, alongside the returning force/restore pairs.
+// REVISION 17 addendum (Task 82): the glViewport render-size latch now refuses
+// viewports that are not window-shaped -- larger than the EGL surface in either
+// axis, or off the surface's aspect ratio by more than 3%. MC 26.x's animated
+// atlas pass drives glViewport at the full blocks-atlas size (2048x2048 on a
+// 2360x1640 surface), which the grow-only latch adopted as the render size and
+// then could never drop: the upscale stretched the mostly-unwritten 2048x2048
+// render texture over the whole surface and the game appeared shrunk into the
+// bottom-left corner (ea27def). No converter output changed, so REVISION stays
+// 17 -- the one-shot "[MG] FSR1 viewport latch rejected (Task 82)" line (plus
+// the engage log now naming 1814x1262 instead of 2048x2048) identifies the
+// fixed build on device.
 #define REVISION 17
 #define PATCH 0
 

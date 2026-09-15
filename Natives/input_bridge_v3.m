@@ -47,6 +47,10 @@ extern void AmeControlJoystickOnGrabChange(BOOL grabbed);
 #define SDL3_EVENT_MOUSE_BUTTON_DOWN 0x401
 #define SDL3_EVENT_MOUSE_BUTTON_UP   0x402
 #define SDL3_EVENT_MOUSE_WHEEL     0x403
+// Task 82：SDL_EVENT_TEXT_INPUT（0x303=771）。MC 26.3 的
+// SDLEventHandler.pollEvents 里 case 771 → handleTextInputEvent →
+// keyboardHandler.textInput → charTyped，虚拟键盘字符的唯一入口。
+#define SDL3_EVENT_TEXT_INPUT      0x303
 
 typedef uint32_t SDL3_WindowID;
 typedef uint32_t SDL3_MouseID;
@@ -107,6 +111,18 @@ typedef struct {
     bool down;
     bool repeat;
 } SDL3_KeyboardEvent;
+
+// Task 82：SDL3 TextInputEvent layout（与 SDL3 ABI 对齐：
+// type@0 reserved@4 timestamp@8 windowID@16 pad@20 text@24，sizeof=32）。
+// text 是指针而非内联数组（SDL3 改动），指向的 UTF-8 字符串必须在
+// MC 轮询该事件时仍然存活——用下方的静态环形槽位保证。
+typedef struct {
+    uint32_t type;
+    uint32_t reserved;
+    uint64_t timestamp;
+    SDL3_WindowID windowID;
+    const char *text;
+} SDL3_TextInputEvent;
 
 // Union large enough to hold any SDL3 event
 typedef union {
@@ -354,6 +370,98 @@ static void pushSDLKeyboardEvent(SDL3_Scancode scancode, bool down) {
     ev.repeat = false;
     pSDL_PushEvent((void*)&ev);
     ame66_syncKeyboardState((int)scancode, down);   // Task66：同步 SDL 内部键盘态
+}
+
+// ============================================================================
+// Task 82：虚拟键盘文本输入（MC 26.3 / SDL3 路径）
+//
+// 根因：CallbackBridge_nativeSendChar 只有 GLFW 路径（GLFW_invoke_Char），
+// 而 26.3 走 SDL3，GLFW_invoke_Char 恒为 NULL → 左上角 Keyboard 控件按钮
+// 唤起的虚拟键盘打字全部被静默丢弃。修法：照 sendKey 的 Path B 模式，
+// 把字符编成 UTF-8 后直接推 SDL_EVENT_TEXT_INPUT 事件，MC 26.3 的
+// SDLEventHandler 会把它送进 keyboardHandler.textInput → charTyped
+// （聊天框/搜索框等 Screen 打开时生效）。
+// ============================================================================
+
+// 每个 codepoint 的 UTF-8 最长 4 字节 + NUL = 5，取 8 对齐。
+// 1024 个槽位：MC 每帧 pollEvents 排空队列，上千字符的积压只可能发生在
+// 帧循环冻结时——那本身已是更大的故障。槽位复用只会覆盖早已被消费的事件。
+#define AME82_TEXT_RING_SLOTS 1024
+static char ame82_textRing[AME82_TEXT_RING_SLOTS][8];
+static uint32_t ame82_textRingIdx = 0;
+// UTF-16 代理对合并状态：TrackedTextField.sendText 按 UTF-16 码元逐个发送，
+// emoji 等增补平面字符会拆成 high/low 两个码元，先记 high 再与 low 合并。
+static uint32_t ame82_pendingHighSurrogate = 0;
+
+static int ame82_utf8_encode(uint32_t cp, char out[8]) {
+    if (cp < 0x80) {
+        out[0] = (char)cp;
+        return 1;
+    }
+    if (cp < 0x800) {
+        out[0] = (char)(0xC0 | (cp >> 6));
+        out[1] = (char)(0x80 | (cp & 0x3F));
+        return 2;
+    }
+    if (cp < 0x10000) {
+        out[0] = (char)(0xE0 | (cp >> 12));
+        out[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        out[2] = (char)(0x80 | (cp & 0x3F));
+        return 3;
+    }
+    out[0] = (char)(0xF0 | (cp >> 18));
+    out[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+    out[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
+    out[3] = (char)(0x80 | (cp & 0x3F));
+    return 4;
+}
+
+// Push a text input event into SDL's event queue (one UTF-16 code unit,
+// surrogate halves are merged into a single codepoint)
+static void pushSDLTextInput(jchar codepoint) {
+    if (!pSDL_PushEvent || !g_sdlWindow) return;
+
+    uint32_t cp;
+    if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+        // 高代理：等配对的低代理一起合成码点，暂不发事件
+        ame82_pendingHighSurrogate = (uint32_t)codepoint;
+        return;
+    }
+    if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+        if (ame82_pendingHighSurrogate != 0) {
+            cp = 0x10000 + ((ame82_pendingHighSurrogate - 0xD800) << 10) + ((uint32_t)codepoint - 0xDC00);
+        } else {
+            cp = 0xFFFD;   // 孤立低代理：替换字符，不向游戏注入乱码
+        }
+        ame82_pendingHighSurrogate = 0;
+    } else {
+        // 普通码元：若之前挂着一个未配对的高代理，就地丢弃（保持 UTF-16 语义）
+        ame82_pendingHighSurrogate = 0;
+        cp = (uint32_t)codepoint;
+    }
+
+    char *slot = ame82_textRing[ame82_textRingIdx];
+    ame82_textRingIdx = (ame82_textRingIdx + 1) % AME82_TEXT_RING_SLOTS;
+    const int len = ame82_utf8_encode(cp, slot);
+    slot[len] = '\0';
+
+    // 用 128 字节的 SDL3_Event 联合体承载，避免 SDL_PushEvent 拷贝整个
+    // union 时读到栈上未初始化的尾部（32 字节的 TextInputEvent 单独声明
+    // 会被越界读）。
+    SDL3_Event ev;
+    memset(&ev, 0, sizeof(ev));
+    SDL3_TextInputEvent *te = (SDL3_TextInputEvent *)&ev;
+    te->type = SDL3_EVENT_TEXT_INPUT;
+    te->windowID = getSDLWindowID();
+    te->text = slot;
+    pSDL_PushEvent((void *)&ev);
+
+    static int s_task82_textPushed = 0;
+    s_task82_textPushed++;
+    if (s_task82_textPushed <= 10 || s_task82_textPushed % 100 == 0) {
+        NSLog(@"[InputDiag] Task82 SDL text input #%d: U+%04X -> \"%s\" (virtual keyboard chars now reach MC 26.3)",
+              s_task82_textPushed, cp, slot);
+    }
 }
 
 // Push a mouse wheel event into SDL's event queue
@@ -1259,6 +1367,13 @@ BOOL CallbackBridge_nativeSendChar(jchar codepoint /* jint codepoint */) {
             GLFW_invoke_Char((void*) showingWindow, (unsigned int) codepoint);
             // return lwjgl2_triggerCharEvent(codepoint);
         }
+        return YES;
+    }
+    // Path B: SDL3 text-input events (MC 26.3+) -- Task 82
+    // 虚拟键盘字符在 26.3 下的唯一通道：GLFW_invoke_Char 为 NULL 时改推
+    // SDL_EVENT_TEXT_INPUT，MC 的 SDLEventHandler.handleTextInputEvent 消费。
+    if (!GLFW_invoke_Char && g_sdlWindow) {
+        pushSDLTextInput(codepoint);
         return YES;
     }
     return NO;

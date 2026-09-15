@@ -743,14 +743,108 @@ void TeardownFSR1() {
                 FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight);
 }
 
+// Task 82 (Amethyst fork): the surface size as seen by this context's last
+// CheckResolutionChange, or -- before the first swap -- straight from EGL.
+// The glViewport latch below needs it to tell a window viewport from an
+// intermediate render pass, and the poisoning it exists to stop happens
+// exactly in the pre-first-swap window where the cache is still empty.
+static void task82_surface_size(GLsizei* outW, GLsizei* outH) {
+    if (FSR1_Context::g_surfaceWidth > 0 && FSR1_Context::g_surfaceHeight > 0) {
+        *outW = FSR1_Context::g_surfaceWidth;
+        *outH = FSR1_Context::g_surfaceHeight;
+        return;
+    }
+    // Same fallback CheckResolutionChange uses. eglGetCurrentDisplay /
+    // eglGetCurrentSurface are this image's own frontend exports (egl/egl.cpp),
+    // and eglQuerySurface reads attributes the surface record already holds --
+    // no driver round trip, no command-stream interaction.
+    EGLDisplay display = eglGetCurrentDisplay();
+    EGLSurface surface = eglGetCurrentSurface(EGL_DRAW);
+    if (display == EGL_NO_DISPLAY || surface == EGL_NO_SURFACE) {
+        *outW = 0;
+        *outH = 0;
+        return;
+    }
+    LOAD_EGL(eglQuerySurface);
+    if (egl_eglQuerySurface == NULL) {
+        *outW = 0;
+        *outH = 0;
+        return;
+    }
+    EGLint w = 0, h = 0;
+    egl_eglQuerySurface(display, surface, EGL_WIDTH, &w);
+    egl_eglQuerySurface(display, surface, EGL_HEIGHT, &h);
+    *outW = w;
+    *outH = h;
+}
+
 void glViewport(GLint x, GLint y, GLsizei w, GLsizei h) {
     LOG()
     LOG_D("glViewport: x=%d, y=%d, w=%d, h=%d", x, y, w, h);
 
     if (w > FSR1_Context::g_pendingWidth || h > FSR1_Context::g_pendingHeight) {
-        FSR1_Context::g_pendingWidth = w;
-        FSR1_Context::g_pendingHeight = h;
-        FSR1_Context::g_resolutionChanged = true;
+        // Task 82 (Amethyst fork): the latch only ever grows, so any
+        // intermediate render pass with a viewport larger than the window's
+        // poisons it for good. MC 26.x renders animated atlas sprites into
+        // the blocks atlas through a glViewport of the full atlas size --
+        // 2048x2048 on a 2360x1640 surface whose window (surface / preset
+        // scale) is 1814x1262. The atlas latch won (2048 > 1814), the main
+        // viewport could never reclaim it (nothing grows past 2048), and the
+        // upscale then stretched the mostly-unwritten 2048x2048 render
+        // texture over the whole surface: the game appeared shrunk into the
+        // bottom-left corner (ea27def: "render 2048x2048 -> target
+        // 2360x1640" while every swap probe showed the real frame viewport
+        // at 1814x1262).
+        //
+        // Two properties separate a window viewport from an intermediate
+        // pass, and a latch candidate has to pass both:
+        //   1. it never exceeds the EGL surface -- the window IS at most the
+        //      surface, the launcher derives it as surface / preset scale;
+        //   2. it carries the surface's aspect ratio -- the window scales the
+        //      surface uniformly, while atlas and shadow-map passes are
+        //      square and post-processing targets are window-shaped and no
+        //      larger. 3% absorbs the preset-scale rounding (1814/1262 =
+        //      1.4371 vs 2360/1640 = 1.4390, a 0.13% drift).
+        // Candidates failing either are refused; the growth rule stays for
+        // the ones that pass, so a rotation (a dimension swap is still a
+        // growth in one axis) keeps re-latching as before. Checked only
+        // while FSR1 is enabled -- with the preset off nothing consumes the
+        // latch and the EGL queries would be pure overhead.
+        bool latch = true;
+        if (global_settings.fsr1_setting != FSR1_Quality_Preset::Disabled) {
+            GLsizei surfaceW = 0, surfaceH = 0;
+            task82_surface_size(&surfaceW, &surfaceH);
+            if (surfaceW > 0 && surfaceH > 0) {
+                if (w > surfaceW || h > surfaceH) {
+                    latch = false;
+                } else {
+                    const float surfaceAspect = (float)surfaceW / (float)surfaceH;
+                    const float vpAspect = (float)w / (float)h;
+                    const float drift =
+                        (vpAspect > surfaceAspect ? vpAspect - surfaceAspect : surfaceAspect - vpAspect) /
+                        surfaceAspect;
+                    if (drift > 0.03f) latch = false;
+                }
+                if (!latch) {
+                    // Once per distinct rejected size: the atlas pass fires
+                    // every frame, and the first refusal is the whole story.
+                    static GLsizei s_task82_rejW = -1;
+                    static GLsizei s_task82_rejH = -1;
+                    if (s_task82_rejW != w || s_task82_rejH != h) {
+                        s_task82_rejW = w;
+                        s_task82_rejH = h;
+                        LOG_W_FORCE("[MG] FSR1 viewport latch rejected (Task 82): %dx%d is not a window viewport "
+                                    "(surface %dx%d) -- intermediate render pass kept out of the upscale geometry",
+                                    w, h, surfaceW, surfaceH);
+                    }
+                }
+            }
+        }
+        if (latch) {
+            FSR1_Context::g_pendingWidth = w;
+            FSR1_Context::g_pendingHeight = h;
+            FSR1_Context::g_resolutionChanged = true;
+        }
     }
 
     GLES.glViewport(x, y, w, h);

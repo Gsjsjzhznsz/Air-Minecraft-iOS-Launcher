@@ -24,6 +24,7 @@
 #import "AccountListViewController.h"
 #import "AI/AIViewController.h"
 #import "AI/AiSessionStore.h"
+#import "LauncherHelpViewController.h"
 
 // 布局常量（iPad 基准值；iPhone 上通过 LauncherRootLayoutWidth 适配后会变窄）
 static const CGFloat kSidebarWidthPad = 70.0;      // iPad 左侧边栏宽度
@@ -341,6 +342,11 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
                                              selector:@selector(showAIPage)
                                                  name:@"ShowAIPage"
                                                object:nil];
+    // 监听显示"使用问题"FAQ 页（Task 82）
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(showHelpPage)
+                                                 name:@"ShowHelpPage"
+                                               object:nil];
     // ZeroTier/Terracotta 联机暂时移除（排查启动崩溃）
     // [[NSNotificationCenter defaultCenter] addObserver:self
     //                                          selector:@selector(showMultiplayer)
@@ -512,6 +518,14 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
     // 从 AiSessionStore 取最近会话，没有则让 AIViewController 新建一个
     AiSession *session = [[AiSessionStore sharedStore] lastActiveSession];
     AIViewController *vc = [[AIViewController alloc] initWithSession:session];
+    UINavigationController *navVC = [[UINavigationController alloc] initWithRootViewController:vc];
+    navVC.navigationBar.prefersLargeTitles = NO;
+    [self setContentViewController:navVC animated:YES];
+}
+
+- (void)showHelpPage {
+    // Task 82："使用问题"FAQ 页（侧边栏新增标签），包在导航控制器里保持标题栏一致
+    LauncherHelpViewController *vc = [[LauncherHelpViewController alloc] init];
     UINavigationController *navVC = [[UINavigationController alloc] initWithRootViewController:vc];
     navVC.navigationBar.prefersLargeTitles = NO;
     [self setContentViewController:navVC animated:YES];

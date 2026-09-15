@@ -47,16 +47,18 @@
     // case 3 为"联机"（陶瓦联机 Terracotta，与 HMCL/FCL/ZL2 互通）
     // case 4 为"ZeroTier 联机"（独立入口，与陶瓦联机并列，便于用户直接进入 ZeroTier 界面）
     // case 5 为"设置"
+    // case 6 为"使用问题"（Task 82：FAQ 标签页，收录渲染/输入/安装/故障排除常见问题）
     // 键位调整界面已移到设置页面中
     self.menuItems = @[
         @{@"icon": @"house.fill", @"title": @" ", @"index": @0},
         @{@"icon": @"arrow.down.circle.fill", @"title": @" ", @"index": @1},
         @{@"icon": @"sparkles", @"title": @" ", @"index": @2},
         @{@"icon": @"puzzlepiece.fill", @"title": @" ", @"index": @3},
-        // 暂时移除两个联机图标，恢复时取消下方两行注释并将设置项 index 改回 @6
+        // 暂时移除两个联机图标，恢复时取消下方两行注释并将设置项 index 顺延
         // @{@"icon": @"antenna.radiowaves.left.and.right", @"title": @" ", @"index": @4},
         // @{@"icon": @"network", @"title": @" ", @"index": @5},
-        @{@"icon": @"gearshape.fill", @"title": @" ", @"index": @4}
+        @{@"icon": @"gearshape.fill", @"title": @" ", @"index": @4},
+        @{@"icon": @"questionmark.circle.fill", @"title": @" ", @"index": @5}
     ];
     
     self.selectedIndex = 0;
@@ -279,6 +281,10 @@
         case 4: // 设置（联机入口暂时移除，恢复时顺延 index）
             [self showSettings];
             break;
+
+        case 5: // 使用问题（Task 82：FAQ 页）
+            [self showHelpPage];
+            break;
     }
 }
 
@@ -301,6 +307,11 @@
 - (void)showSettings {
     // 发送通知让 LauncherRootViewController 在中间内容区显示
     [[NSNotificationCenter defaultCenter] postNotificationName:@"ShowSettings" object:nil];
+}
+
+- (void)showHelpPage {
+    // Task 82：发送通知让 LauncherRootViewController 在中间内容区显示"使用问题"FAQ 页
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"ShowHelpPage" object:nil];
 }
 
 #pragma mark - Data Updates
