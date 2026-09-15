@@ -21,6 +21,17 @@ typedef std::atomic<size_t> atomic_size_t;
 #endif
 #include "jni.h"
 
+// Task 83（ObjC++ 化，CI run 35037109152 教训）：下方全部全局变量在 C TU
+// 里是临时定义（-fcommon 公共符号，多方合并）；C++ TU 里则成为强定义，
+// 与强定义（如 input_bridge_v3.m 的 int guiScale = 1;）在链接期冲突
+// （duplicate symbol _guiScale）。C++ 分支一律 extern 声明化——定义仍由
+// 各 C TU 承担，链接形态与 Task83 之前完全一致（零行为变化）。
+#ifdef __cplusplus
+#define AME_ENVIRON_DECL extern
+#else
+#define AME_ENVIRON_DECL
+#endif
+
 typedef struct {
     short type;
     union {
@@ -46,34 +57,34 @@ typedef void GLFW_invoke_Scroll_func(void* window, double xoffset, double yoffse
 typedef void GLFW_invoke_WindowPos_func(void* window, int x, int y);
 typedef void GLFW_invoke_WindowSize_func(void* window, int width, int height);
 
-jclass class_CTCClipboard;
-jmethodID method_SystemClipboardDataReceived;
+AME_ENVIRON_DECL jclass class_CTCClipboard;
+AME_ENVIRON_DECL jmethodID method_SystemClipboardDataReceived;
 
 //struct pojav_environ_s {
     //render_window_t* mainWindowBundle;
     //BOOL force_vsync;
-    atomic_size_t eventCounter;
-    GLFWInputEvent events[8000];
-    double cursorX, cursorY, cLastX, cLastY;
+    AME_ENVIRON_DECL atomic_size_t eventCounter;
+    AME_ENVIRON_DECL GLFWInputEvent events[8000];
+    AME_ENVIRON_DECL double cursorX, cursorY, cLastX, cLastY;
     //jmethodID method_accessAndroidClipboard;
     //jmethodID method_onGrabStateChanged;
     //jmethodID method_glfwSetWindowAttrib;
-    jmethodID method_internalWindowSizeChanged;
-    jclass bridgeClazz;
-    jclass vmGlfwClass;
-    jboolean isGrabbing;
-    jbyte* keyDownBuffer;
-    JavaVM* runtimeJavaVMPtr;
-    JNIEnv* runtimeJNIEnvPtr;
+    AME_ENVIRON_DECL jmethodID method_internalWindowSizeChanged;
+    AME_ENVIRON_DECL jclass bridgeClazz;
+    AME_ENVIRON_DECL jclass vmGlfwClass;
+    AME_ENVIRON_DECL jboolean isGrabbing;
+    AME_ENVIRON_DECL jbyte* keyDownBuffer;
+    AME_ENVIRON_DECL JavaVM* runtimeJavaVMPtr;
+    AME_ENVIRON_DECL JNIEnv* runtimeJNIEnvPtr;
     //JavaVM* dalvikJavaVMPtr;
     //JNIEnv* dalvikJNIEnvPtr_ANDROID;
-    long showingWindow;
-    bool isInputReady, isCursorEntered, isUseStackQueueCall;
+    AME_ENVIRON_DECL long showingWindow;
+    AME_ENVIRON_DECL bool isInputReady, isCursorEntered, isUseStackQueueCall;
     //int savedWidth, savedHeight;
-    int windowWidth, windowHeight;
-    int physicalWidth, physicalHeight;
+    AME_ENVIRON_DECL int windowWidth, windowHeight;
+    AME_ENVIRON_DECL int physicalWidth, physicalHeight;
 #define ADD_CALLBACK_WWIN(NAME) \
-    GLFW_invoke_##NAME##_func* GLFW_invoke_##NAME;
+    AME_ENVIRON_DECL GLFW_invoke_##NAME##_func* GLFW_invoke_##NAME;
     ADD_CALLBACK_WWIN(Char);
     ADD_CALLBACK_WWIN(CharMods);
     ADD_CALLBACK_WWIN(CursorEnter);
@@ -88,19 +99,19 @@ jmethodID method_SystemClipboardDataReceived;
 #undef ADD_CALLBACK_WWIN
 //};
 
-int guiScale;
-float resolutionScale;
-BOOL virtualMouseEnabled, isControlModifiable;
+AME_ENVIRON_DECL int guiScale;
+AME_ENVIRON_DECL float resolutionScale;
+AME_ENVIRON_DECL BOOL virtualMouseEnabled, isControlModifiable;
 
 // Task 83（FSR 独立化）：呈现表面像素尺寸（= physical × resolutionScale，
 // updateSavedResolution 单点写入）。OSMesa/zink 桥的 FSR 升采样需要"表面
 // 全尺寸"而 windowWidth/windowHeight 是"MC 窗口信念"（FSR 联动下二者
 // 不同：window = surface / fsr_scale）。0 = 尚未初始化（消费者自行回退
 // windowWidth 口径）。
-int ame_surfaceWidth, ame_surfaceHeight;
+AME_ENVIRON_DECL int ame_surfaceWidth, ame_surfaceHeight;
 
 // 硬件断点重定向数组（同步自上游，用于非 TXM 的 iOS 26+ 设备 dlopen 重定向）
 // 由 redirectFunctionHWBreakpoint 填充，由 catch_mach_exception_raise_state 读取
-uint64_t hwRedirectOrig[6], hwRedirectTarget[6];
+AME_ENVIRON_DECL uint64_t hwRedirectOrig[6], hwRedirectTarget[6];
 
 #endif //POJAVLAUNCHER_ENVIRON_H

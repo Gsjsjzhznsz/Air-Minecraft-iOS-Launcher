@@ -266,6 +266,15 @@ _tgt = cml[cml.index("target_link_libraries(AngelAuraAmethyst"):]
 check("E7 CMake 主目标显式链接 Foundation",
       '"-framework Foundation"' in _tgt and '"-framework UIKit"' in _tgt)
 
+# E8: environ.h 全局变量 C++ extern 化（run 35037109152 duplicate _guiScale：
+# C++ 强临时定义 vs input_bridge_v3.m 强定义；其余为 common+strong 静默合并）
+envh = read("Natives/environ.h")
+check("E8 environ.h 全局变量 C++ extern 声明化",
+      "#define AME_ENVIRON_DECL extern" in envh
+      and "AME_ENVIRON_DECL int guiScale;" in envh
+      and "AME_ENVIRON_DECL int windowWidth, windowHeight;" in envh
+      and "AME_ENVIRON_DECL int ame_surfaceWidth, ame_surfaceHeight;" in envh)
+
 # E5: ObjC++ 关键字分类名清零（run 34989106108 教训——private 是 C++ 关键字，
 # ObjC++ 模式下 @interface Foo(private) 解析失败，后续 libc++ 头级联报错）
 import glob as _glob
