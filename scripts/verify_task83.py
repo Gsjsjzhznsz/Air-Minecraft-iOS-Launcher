@@ -256,6 +256,16 @@ check("E4 osm_bridge.h extern C 防护（C TU 调用 set_osm_bridge_tbl）",
       '#ifdef __cplusplus' in obh and 'extern "C"' in obh
       and "void set_osm_bridge_tbl();" in obh)
 
+# E6/E7: 链接期修复（run 35036079381）——CXX 链接器丢 Foundation 自动链接
+# + utils.h 函数声明缺 extern "C" 被 C++ 修饰名引用
+uh = read("Natives/utils.h")
+check("E6 utils.h extern C 整体防护（customNSLog 等 C 符号）",
+      '#ifdef __cplusplus' in uh and 'extern "C"' in uh
+      and "void customNSLog(" in uh)
+_tgt = cml[cml.index("target_link_libraries(AngelAuraAmethyst"):]
+check("E7 CMake 主目标显式链接 Foundation",
+      '"-framework Foundation"' in _tgt and '"-framework UIKit"' in _tgt)
+
 # E5: ObjC++ 关键字分类名清零（run 34989106108 教训——private 是 C++ 关键字，
 # ObjC++ 模式下 @interface Foo(private) 解析失败，后续 libc++ 头级联报错）
 import glob as _glob

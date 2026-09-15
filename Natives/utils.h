@@ -7,6 +7,15 @@
 #include "environ.h"
 #include "jni.h"
 
+// Task 83（FSR 独立化 / ObjC++ 化）：本头自 Task83 起被 C++ TU（ctxbridges/
+// osm_bridge.mm）包含。函数声明无 extern "C" 防护时，C++ 侧按 Itanium ABI
+// 修饰名引用（如 "customNSLog(char const*, int, ...)"），C TU（utils.m 等）
+// 的未修饰定义与之无法会合 → 链接失败（CI run 35036079381）。本头纯 C 声明
+// （函数/宏/变量，无 ObjC 结构），整体包 extern "C" 安全。
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Remove date + time from NSLog, unneeded
 #define NSLog(args...) customNSLog(__FILE__,__LINE__,__PRETTY_FUNCTION__,args);
 
@@ -265,3 +274,7 @@ void CallbackBridge_queueModifierSync(int mods);
 void ame67_sanitizeOptionsKeybinds(void);
 const bool *Ame66GetKbState(void);
 int Ame66GetKbNumKeys(void);
+
+#ifdef __cplusplus
+}
+#endif

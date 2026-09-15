@@ -574,6 +574,11 @@ endif()
 target_link_libraries(AngelAuraAmethyst
   PUBLIC AFNetworking
   lzma
+  # Task 83（FSR 独立化）：目标含 .mm 后 CMake 把链接器从 C 切到 CXX，
+  # C 驱动的链接行曾带 CMAKE_C_FLAGS（-fobjc-arc -ObjC）触发 Foundation
+  # 自动链接，CXX 驱动不带 → NS*/NSURLSession 全体 undefined（run
+  # 35036079381）。显式链接 Foundation（UIKit 的传递依赖不再依赖驱动魔法）。
+  "-framework Foundation"
   "-F'${CMAKE_CURRENT_LIST_DIR}/build'"
   "-F'${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks'"
   # ZeroTier 暂时移除："${ZT_FRAMEWORK_SEARCH_PATH}" "${ZT_FRAMEWORK_LINK}" "${ZT_CXX_LIB}"
