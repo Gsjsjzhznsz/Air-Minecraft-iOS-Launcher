@@ -542,9 +542,11 @@ add_executable(AngelAuraAmethyst
 # SurfaceViewController.h/UIKit+hook.h（ObjC 世界）。工程未启用 OBJCXX
 # 语言（全部 .m 走 C + "-ObjC" 强制路线），CMake 会把 .mm 当纯 CXX 编译，
 # @interface 直接解析失败（CI run 34987233296，28 errors）。单文件强制
-# objective-c++ 方言 + ARC，与 .m 侧 "-fobjc-arc -ObjC" 口径对齐。
+# objective-c++ 方言 + ARC + gnu++17（Apple clang 15 的 clang++ 默认 gnu++98，
+# 不认 C++11 raw string——FSRShaderSource.h 的 R"fsr_glsl(...)" 需要，
+# CI run 34992226284："use of undeclared identifier R"）。与 .m 侧口径对齐。
 set_source_files_properties(ctxbridges/osm_bridge.mm PROPERTIES
-  COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc")
+  COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc;-std=gnu++17")
 
 # Add ModLoaderIcons PNG files into the app bundle Resources/ModLoaderIcons so they are available at runtime.
 # This will copy all *.png under Natives/ModLoaderIcons into the bundle at Resources/ModLoaderIcons/<name>.png
