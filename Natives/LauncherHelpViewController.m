@@ -212,7 +212,7 @@
 
     LauncherHelpFaqItem *stuck = [[LauncherHelpFaqItem alloc] init];
     stuck.iconName = @"questionmark.circle";
-    stuck.question = "\"卡在某个界面/转圈/闪退\"的通用自救步骤？";
+    stuck.question = @"\"卡在某个界面/转圈/闪退\"的通用自救步骤？";
     stuck.answer = @"按顺序尝试（每步后重试）：\n\n"
                    @"1. 完全退出启动器（上划杀进程）再打开——解决大部分瞬时状态问题；\n"
                    @"2. 换一个渲染器试（Zink ↔ MobileGlues）——区分渲染器问题还是环境问题；\n"
