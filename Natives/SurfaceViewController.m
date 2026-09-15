@@ -225,10 +225,7 @@ static GameSurfaceView* pojavWindow;
 
 // Task 78：FSR 预设 → 渲染缩放系数（与 MobileGlues-cpp FSR1.cpp
 // CalculateTargetResolution 的 scale 表同步：UQ=1.3 / Q=1.5 / B=1.7 / P=2.0）。
-// 仅当当前 profile 渲染器为 MobileGlues 且预设开启时生效；Auto（实际
-// ANGLE）/gl4es/tinygl4angle/zink/Vulkan（含 MoltenVK 自管路径）均返回 1.0。
-// Task 79 修正：本函数必须位于 @interface 之外（文件作用域）——Task 78 曾把
-// @end 提前到属性区之前，令下方整段 @property 脱离类扩展、CI 编译失败。
+// Task 83（FSR 独立化）：不再仅限 MobileGlues——见 ame83_fsr_capable_renderer。
 static float ame78_fsr_preset_scale(NSInteger preset) {
     switch ((int)preset) {
         case 1: return 1.3f;   // UltraQuality：渲染 77%
@@ -237,6 +234,25 @@ static float ame78_fsr_preset_scale(NSInteger preset) {
         case 4: return 2.0f;   // Performance：渲染 50%
         default: return 1.0f;  // Disabled
     }
+}
+
+// Task 83（FSR 独立化）：当前渲染器能否吃下 FSR 联动（MC 窗口=表面/档位
+// 系数 + 呈现前升采样）。不能升采样的渲染器若也缩窗口，画面会缩到左下角
+// （Task82 同款症状），所以能力表与升采样实现一一对应：
+//   - MobileGlues：内置 FSR1（egl frontend，Task78-82 已验证）
+//   - zink（libOSMesa）：osm_bridge EASU（GL 4.6 compat，复用 MG 同款
+//     #version 450 EASU shader，本 Task 新增）
+//   - Vulkan 渲染器（libMoltenVK）：不联动。纯 Vulkan 路径无呈现钩子
+//     （vkQueuePresent 由 MC 自管）；而 ≤26.2 的 GL 回退路径走 ANGLE
+//     （非 MG）也无法升采样——两种形态下缩窗口都会得到“画面缩在角落”
+//     （Task82 同款症状）。需要 FSR 请选 MobileGlues 或 Zink。
+//   - auto/gl4es：GLES2 后端（无 VAO/ES3）——暂不接入
+//   - tinygl4angle/LTW/Mithril/MobileGL：gl_bridge 侧接入留待后续
+static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
+    if (renderer.length == 0) return NO;
+    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;
+    if ([renderer hasPrefix:@"libOSMesa"]) return YES;
+    return NO;
 }
 
 @interface SurfaceViewController ()<UITextFieldDelegate, UIGestureRecognizerDelegate> {
@@ -1368,14 +1384,18 @@ static UIView *findSDL_uikitview(UIView *root);
     // 零增益（Task76 只能旁路），用户只能手动降 video.resolution 逃生。
     NSString *ame78_renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
     NSInteger ame78_fsr_preset = getPrefInt(@"mobileglues.fsr1_setting");
-    mgFsrScale = [ame78_renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]
+    // Task 83（FSR 独立化）：联动不再仅限 MG——zink（osm_bridge EASU）与
+    // Vulkan 渲染器的 GL 路径（=MG）同样吃下窗口=表面/档位系数。能力表见
+    // ame83_fsr_capable_renderer；不支持的渲染器维持 1.0（零回归）。
+    mgFsrScale = ame83_fsr_capable_renderer(ame78_renderer)
         ? ame78_fsr_preset_scale(ame78_fsr_preset) : 1.0f;
     if (mgFsrScale > 1.0f) {
         static BOOL s_task78_logged = NO;
         if (!s_task78_logged) {
             s_task78_logged = YES;
-            NSLog(@"[SurfaceVC] Task78 FSR linkage: preset=%ld scale=%.2f -- MC render window = surface/%.2f (MG FSR1 upscales to surface); resolution=%.0f%%",
-                  (long)ame78_fsr_preset, (double)mgFsrScale, (double)mgFsrScale,
+            NSLog(@"[SurfaceVC] Task83 FSR linkage: renderer=%@ preset=%ld scale=%.2f -- MC render window = surface/%.2f (renderer-side upscale: %@); resolution=%.0f%%",
+                  ame78_renderer, (long)ame78_fsr_preset, (double)mgFsrScale, (double)mgFsrScale,
+                  [ame78_renderer hasPrefix:@"libOSMesa"] ? @"zink EASU (Task83)" : @"MobileGlues FSR1",
                   (double)(resolutionScale * 100.0));
         }
     }
@@ -1388,6 +1408,11 @@ static UIView *findSDL_uikitview(UIView *root);
     int surfaceHeight = roundf(physicalHeight * resolutionScale);
     if ((surfaceWidth % 2) != 0) { --surfaceWidth; }
     if ((surfaceHeight % 2) != 0) { --surfaceHeight; }
+    // Task 83（FSR 独立化）：表面像素尺寸单点写入——OSMesa/zink 桥的 FSR
+    // 升采样需要全尺寸表面（其 OSMesa 缓冲与 CGImage 上屏都按它分配），
+    // 而 windowWidth 是 MC 窗口信念（FSR 联动下 = surface/fsr_scale）。
+    ame_surfaceWidth = surfaceWidth;
+    ame_surfaceHeight = surfaceHeight;
     // 渲染口径（MC 告知窗口 = viewport = FSR render）：surface / fsr_scale。
     windowWidth = roundf((float)surfaceWidth / mgFsrScale);
     windowHeight = roundf((float)surfaceHeight / mgFsrScale);
@@ -2232,6 +2257,13 @@ static UIView *findSDL_uikitview(UIView *root);
             }
         } else if (keycode > 0) {
             CallbackBridge_nativeSendKey(keycode, 0, held, 0);
+            // Task83：按钮键盘打字支持。custom 布局"键盘图标"抽屉里的
+            // 字母/数字/符号按钮只发 key 事件，而 MC 1.13+ 聊天框只消费
+            // charTyped（text-input）事件 → 此前完全打不了字。按下时补发
+            // 字符；Ctrl/Alt 按住时由助手抑制（快捷键语义，组合键不灌字符）。
+            if (held) {
+                CallbackBridge_buttonKeySynthesizeText(keycode);
+            }
         }
     }
 }

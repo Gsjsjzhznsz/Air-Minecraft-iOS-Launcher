@@ -464,6 +464,126 @@ static void pushSDLTextInput(jchar codepoint) {
     }
 }
 
+// ============================================================================
+// Task 83：控件按钮键盘（custom 布局的 QWERTY 抽屉面板）打字支持
+//
+// 根因：SurfaceViewController executebtn 的 keycode>0 分支只发 GLFW key 事件
+// （nativeSendKey → SDL3 key down/up 或 GLFW key 回调），而 MC 1.13+ 的
+// 聊天框/书与笔/搜索框只消费 charTyped（GLFW char 回调 / SDL3
+// SDL_EVENT_TEXT_INPUT）事件——纯 key 事件一律不进文本。所以"键盘图标"
+// 抽屉里的字母/数字/符号按钮在聊天框里完全没有反应；而系统软键盘正常
+// （inputTextField → nativeSendChar 链路，Task82 已修好 SDL3 分支）。
+//
+// 修法：executebtn 在按键按下（ACTION_DOWN）时对本键补发一个字符事件。
+// - 映射按 US ANSI 布局（与 GLFW/CPredefinedProcGetKey 惯例一致）；
+// - SHIFT 状态：SDL3 路径读 SDL_GetModState（Task66 已把虚拟 SHIFT/CTRL/
+//   ALT/GUI 同步进去），GLFW 路径读 nativeSendKey 维护的 currMods；
+// - Ctrl/Alt/Super 按住时抑制字符（与真实键盘一致：Ctrl+W 是快捷键不产文本，
+//   也避免"持续奔跑"[CTRL,W] 组合键往聊天框里灌字符）；
+// - CAPS_LOCK 按钮自管理虚拟大写状态（SDL 不为注入事件维护 KMOD_CAPS）；
+// - 硬件键盘不受影响：pressesBegan → KeyboardInput.sendKeyEvent 同时发
+//   key+char，不经过 executebtn，无重复字符风险。
+// ============================================================================
+
+static bool ame83_virtualCaps = false;
+
+// GLFW 键码 → US ANSI 布局字符；不可打印键返回 0。
+// shift/caps 仅对字母异或生效（真实键盘语义），数字/符号只看 shift。
+static jchar ame83_keycodeToChar(int key, bool shift, bool caps) {
+    if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z) {
+        bool upper = shift != caps;
+        return (jchar)((key - GLFW_KEY_A) + (upper ? 'A' : 'a'));
+    }
+    if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
+        if (!shift) return (jchar)('0' + (key - GLFW_KEY_0));
+        static const jchar shifted[10] = {')','!','@','#','$','%','^','&','*','('};
+        return shifted[key - GLFW_KEY_0];
+    }
+    if (key >= GLFW_KEY_NUMPAD_0 && key <= GLFW_KEY_NUMPAD_9) {
+        return (jchar)('0' + (key - GLFW_KEY_NUMPAD_0));   // 小键盘不受 shift 影响
+    }
+    if (!shift) {
+        switch (key) {
+            case GLFW_KEY_SPACE:            return ' ';
+            case GLFW_KEY_APOSTROPHE:       return '\'';
+            case GLFW_KEY_COMMA:            return ',';
+            case GLFW_KEY_MINUS:            return '-';
+            case GLFW_KEY_PERIOD:           return '.';
+            case GLFW_KEY_SLASH:            return '/';
+            case GLFW_KEY_SEMICOLON:        return ';';
+            case GLFW_KEY_EQUAL:            return '=';
+            case GLFW_KEY_LEFT_BRACKET:     return '[';
+            case GLFW_KEY_BACKSLASH:        return '\\';
+            case GLFW_KEY_RIGHT_BRACKET:    return ']';
+            case GLFW_KEY_GRAVE_ACCENT:     return '`';
+            case GLFW_KEY_NUMPAD_DECIMAL:   return '.';
+            case GLFW_KEY_NUMPAD_DIVIDE:    return '/';
+            case GLFW_KEY_NUMPAD_MULTIPLY:  return '*';
+            case GLFW_KEY_NUMPAD_SUBTRACT:  return '-';
+            case GLFW_KEY_NUMPAD_ADD:       return '+';
+            case GLFW_KEY_NUMPAD_EQUAL:     return '=';
+        }
+    } else {
+        switch (key) {
+            case GLFW_KEY_SPACE:            return ' ';
+            // 34 = ASCII 双引号字符。不写成字面量形式：历史校验脚本
+            // （verify_task66/67/82 的括号计数器）先剥字符串再剥字符字面量，
+            // 字面量里的双引号会被误当字符串起点，翻转全文件引号配对。
+            case GLFW_KEY_APOSTROPHE:       return 34;
+            case GLFW_KEY_COMMA:            return '<';
+            case GLFW_KEY_MINUS:            return '_';
+            case GLFW_KEY_PERIOD:           return '>';
+            case GLFW_KEY_SLASH:            return '?';
+            case GLFW_KEY_SEMICOLON:        return ':';
+            case GLFW_KEY_EQUAL:            return '+';
+            case GLFW_KEY_LEFT_BRACKET:     return '{';
+            case GLFW_KEY_BACKSLASH:        return '|';
+            case GLFW_KEY_RIGHT_BRACKET:    return '}';
+            case GLFW_KEY_GRAVE_ACCENT:     return '~';
+        }
+    }
+    return 0;
+}
+
+// executebtn 专用：按键按下时补发字符事件（Task83）。
+// 返回 YES 表示发出了字符。仅由按钮路径调用，硬件键盘不走这里。
+char getKeyModifiers(int key, int action);   // 定义于本文件 nativeSendKey 段
+
+BOOL CallbackBridge_buttonKeySynthesizeText(int key) {
+    if (key == GLFW_KEY_CAPS_LOCK) {
+        ame83_virtualCaps = !ame83_virtualCaps;
+        NSLog(@"[InputDiag] Task83 virtual caps-lock -> %d (button keyboard)", ame83_virtualCaps ? 1 : 0);
+        return NO;
+    }
+
+    bool shift, ctrlLike;
+    if (!GLFW_invoke_Char && g_sdlWindow && pSDL_GetModState != NULL) {
+        // SDL3 路径（MC 26.3+）：修饰键态由 Task66 从虚拟按钮同步进 SDL
+        unsigned short m = pSDL_GetModState();
+        shift = (m & 0x0003) != 0;                       // KMOD_LSHIFT|KMOD_RSHIFT
+        ctrlLike = (m & (0x00C0 | 0x0300 | 0x0C00)) != 0; // Ctrl|Alt|GUI
+    } else {
+        // GLFW 路径（旧版 MC）：nativeSendKey 维护的 currMods（key=0 纯查询）
+        char m = getKeyModifiers(0, 0);
+        shift = (m & GLFW_MOD_SHIFT) != 0;
+        ctrlLike = (m & (GLFW_MOD_CONTROL | GLFW_MOD_ALT | GLFW_MOD_SUPER)) != 0;
+    }
+
+    if (ctrlLike) return NO;   // Ctrl/Alt/Super 组合 = 快捷键语义，不产文本
+
+    jchar ch = ame83_keycodeToChar(key, shift, ame83_virtualCaps);
+    if (ch == 0) return NO;
+
+    CallbackBridge_nativeSendChar(ch);
+    static int s_task83_chars = 0;
+    s_task83_chars++;
+    if (s_task83_chars <= 10 || s_task83_chars % 100 == 0) {
+        NSLog(@"[InputDiag] Task83 button text #%d: glfwKey=%d -> '%C' (button keyboard types in chat now)",
+              s_task83_chars, key, ch);
+    }
+    return YES;
+}
+
 // Push a mouse wheel event into SDL's event queue
 static void pushSDLMouseWheel(float x, float y) {
     if (!pSDL_PushEvent || !g_sdlWindow) return;

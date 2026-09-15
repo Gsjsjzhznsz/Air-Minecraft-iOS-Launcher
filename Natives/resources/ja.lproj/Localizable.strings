@@ -299,7 +299,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 アップスケーリング。プリセットを選ぶと描画解像度が低下し（Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%）、レンダラーがフル解像度へ拡大します。手動で解像度を下げる必要はもうありません。MobileGlues レンダラー使用時のみ有効です。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 アップスケーリング（Task 83 からマルチレンダラー対応）。プリセットを選ぶと描画解像度が低下し（Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%）、レンダラーがフル解像度へ拡大します。対応: MobileGlues（内蔵 FSR1）、Zink（MobileGlues と同一の EASU）。MoltenVK/Auto/gl4es は未対応 -- FSR が必要な場合は MobileGlues か Zink を選んでください。";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";

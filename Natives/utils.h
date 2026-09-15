@@ -234,6 +234,10 @@ bool pojavIsActualVulkanPath();
 void CallbackBridge_nativeSetInputReady(BOOL inputReady);
 BOOL CallbackBridge_nativeSendChar(jchar codepoint /* jint codepoint */);
 BOOL CallbackBridge_nativeSendCharMods(jchar codepoint, int mods);
+// Task83：控件按钮键盘打字支持——executebtn 在按键按下时对本键补发
+// 字符事件（MC 1.13+ 聊天框只认 charTyped/text-input，纯 key 事件不进文本）。
+// 仅由按钮路径调用（SurfaceViewController executebtn），硬件键盘不走这里。
+BOOL CallbackBridge_buttonKeySynthesizeText(int key);
 void CallbackBridge_nativeSendCursorPos(char event, CGFloat x, CGFloat y);
 void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods);
 void CallbackBridge_nativeSendMouseButton(int button, int action, int mods);

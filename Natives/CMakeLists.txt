@@ -288,7 +288,7 @@ add_executable(AngelAuraAmethyst
   authenticator/ThirdPartyAuthenticator.m
 
   ctxbridges/gl_bridge.m
-  ctxbridges/osm_bridge.m
+  ctxbridges/osm_bridge.mm
   ctxbridges/vk_bridge.m
 
   customcontrols/ControlButton.m

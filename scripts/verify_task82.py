@@ -331,14 +331,19 @@ check("G LauncherHelpViewController.m self-balanced",
       cur[0] == cur[1] and cur[2] == cur[3] and cur[4] == cur[5])
 
 # ---------------------------------------------------------------------------
-# H. Regression evidence: the poison in the ea27def log
+# H. Regression evidence in latestlog.txt
+# Task83 更新：262e674 用户上传了 Task82 构建的装机日志（替换了 ea27def 旧
+# 毒证据日志）。旧 H1/H2（毒证据 2048x2048）随之退役；新锚点证明修复生效：
+#   - 视口锁存拒绝行（Task82 核心修复在设备上触发）
+#   - engage 行为窗口形状（1572x1092，非 2048x2048 毒形状）
 # ---------------------------------------------------------------------------
 if os.path.exists(LOG_NEW):
     log = read(LOG_NEW)
-    check("H1 ea27def shows the poison (render 2048x2048 -> 2360x1640)",
-          "render 2048x2048 -> target 2360x1640" in log)
-    check("H2 ea27def frame viewport is 1814x1262 at every swap probe",
-          log.count("viewport=0,0 1814x1262") >= 10 and "viewport=0,0 2048x2048" not in log)
+    check("H1 Task82 build rejects the poison viewport (latch rejection on device)",
+          "viewport latch rejected (Task 82): 2048x2048 is not a window viewport (surface 2360x1640)" in log)
+    check("H2 Task82 build engages window-shaped render (1572x1092, not 2048x2048)",
+          "render 1572x1092 -> target 2358x1638 -> surface 2360x1640" in log
+          and "render 2048x2048" not in log)
 else:
     check("H log present", False, "latestlog.txt missing")
 

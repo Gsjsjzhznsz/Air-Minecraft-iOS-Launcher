@@ -278,6 +278,13 @@
             return nil;
         }
         NSString *keyFull = [NSString stringWithFormat:@"%@.%@", section, key];
+        // Task 83（FSR 独立化）：FSR 行已移入"视频设置"分区（跟随渲染器/
+        // 分辨率），但存储键保持历史键名 mobileglues.fsr1_setting——
+        // JavaLauncher（MG config.json）、SurfaceViewController（Task83 联动）
+        // 等所有读者都读它，改键名会静默丢失用户设置。
+        if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr1_setting"]) {
+            keyFull = @"mobileglues.fsr1_setting";
+        }
         return getPrefObject(keyFull);
     };
     self.setPreference = ^(NSString *section, NSString *key, id value){
@@ -302,6 +309,10 @@
             return;
         }
         NSString *keyFull = [NSString stringWithFormat:@"%@.%@", section, key];
+        // Task 83：同上——video.fsr1_setting 重映射到 mobileglues.fsr1_setting
+        if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr1_setting"]) {
+            keyFull = @"mobileglues.fsr1_setting";
+        }
         setPrefObject(keyFull, value);
     };
     
@@ -736,6 +747,29 @@
               @"min": @(25),
               @"max": @(150)
             },
+            // Task 83（FSR 独立化）：FSR 档位从 MobileGlues 分区移到视频分区
+            // ——它现在是多渲染器功能（MG 内置 FSR1 / zink EASU / Vulkan 渲染器
+            // 的 GL 路径）。存储键经上方 get/set 重映射仍写
+            // mobileglues.fsr1_setting（历史键名兼容）。
+            @{@"key": @"fsr1_setting",
+              @"hasDetail": @YES,
+              @"icon": @"square.grid.3x2",
+              @"type": self.typePickField,
+              @"enableCondition": whenNotInGame,
+              // Task 78：补齐第 5 档 Performance(4)——旧 UI 只列 0-3，"性能优先"
+              // 标签错贴在 Balanced(3) 上（枚举：0=Disabled/1=UQ/2=Q/3=Balanced/
+              // 4=Performance，见 MobileGlues-cpp config/settings.h）。开启任一档
+              // 即触发渲染分辨率联动（Task78/83：MC 窗口=表面/档位系数，
+              // 渲染器侧升采样回全表面）。
+              @"pickKeys": @[@"0", @"1", @"2", @"3", @"4"],
+              @"pickList": @[
+                  localize(@"preference.title.mg_fsr1_setting-0", nil),
+                  localize(@"preference.title.mg_fsr1_setting-1", nil),
+                  localize(@"preference.title.mg_fsr1_setting-2", nil),
+                  localize(@"preference.title.mg_fsr1_setting-3", nil),
+                  localize(@"preference.title.mg_fsr1_setting-4", nil)
+              ]
+            },
             // 帧率限制选项已移除：CADisplayLink 始终采用 30-120Hz 自适应范围，
             // 由屏幕硬件能力决定实际帧率（60Hz 设备仍为 60，120Hz ProMotion 设备可达 120）。
             // 不再提供"最大帧率限制 60FPS"开关，避免用户误关闭导致帧率被人为锁死。
@@ -870,25 +904,8 @@
                   localize(@"preference.title.mg_custom_gl_version-4.6", nil)
               ]
             },
-            @{@"key": @"fsr1_setting",
-              @"hasDetail": @YES,
-              @"icon": @"square.grid.3x2",
-              @"type": self.typePickField,
-              @"enableCondition": whenNotInGame,
-              // Task 78：补齐第 5 档 Performance(4)——旧 UI 只列 0-3，"性能优先"
-              // 标签错贴在 Balanced(3) 上（枚举：0=Disabled/1=UQ/2=Q/3=Balanced/
-              // 4=Performance，见 MobileGlues-cpp config/settings.h）。开启任一档
-              // 即触发渲染分辨率联动（Task78：MC 窗口=表面/档位系数，MG FSR1
-              // 升采样回全表面）。
-              @"pickKeys": @[@"0", @"1", @"2", @"3", @"4"],
-              @"pickList": @[
-                  localize(@"preference.title.mg_fsr1_setting-0", nil),
-                  localize(@"preference.title.mg_fsr1_setting-1", nil),
-                  localize(@"preference.title.mg_fsr1_setting-2", nil),
-                  localize(@"preference.title.mg_fsr1_setting-3", nil),
-                  localize(@"preference.title.mg_fsr1_setting-4", nil)
-              ]
-            },
+            // Task 83：fsr1_setting 行已移入上方"视频设置"分区（多渲染器通用
+            // 化；存储键经重映射保持 mobileglues.fsr1_setting 不变）。
         ], @[
             // Control settings
             @{@"icon": @"gamecontroller"},

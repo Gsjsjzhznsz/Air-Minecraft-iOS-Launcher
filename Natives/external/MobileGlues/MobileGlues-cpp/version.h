@@ -309,6 +309,14 @@
 // 17 -- the one-shot "[MG] FSR1 viewport latch rejected (Task 82)" line (plus
 // the engage log now naming 1814x1262 instead of 2048x2048) identifies the
 // fixed build on device.
+// REVISION 17 addendum (Task 83, no bump): ApplyFSR now draws EASU straight
+// into the surface when the target equals it (the common launcher case after
+// the new <=4px rounding clamp), replacing the old clear + draw + blit triple
+// with a single fullscreen pass; the resolution-slider-stacked sub-surface
+// path keeps the blit. No converter output changed, so REVISION stays 17 --
+// the steady-state per-frame cost drop is identified on device by the absence
+// of the previously-per-frame target-FBO clear, with the engage log line
+// unchanged from Task 82.
 #define REVISION 17
 #define PATCH 0
 

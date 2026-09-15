@@ -2086,7 +2086,7 @@
           "dynamicX": "0.18055846 * ${screen_width} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(60.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(26.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(26.0) / 100.0 * ${preferred_scale}) + ${margin} - ${width} - ${margin}",
           "displayInGame": true,
           "keycodes": [
-            39,
+            44,
             0,
             0,
             0
@@ -2261,7 +2261,7 @@
           "dynamicX": "0.18055846 * ${screen_width} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(60.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(26.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(26.0) / 100.0 * ${preferred_scale}) + ${margin}",
           "displayInGame": true,
           "keycodes": [
-            91,
+            93,
             0,
             0,
             0
@@ -2286,7 +2286,7 @@
           "dynamicX": "0.18055846 * ${screen_width} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(60.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(26.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(26.0) / 100.0 * ${preferred_scale}) + ${margin}",
           "displayInGame": true,
           "keycodes": [
-            93,
+            91,
             0,
             0,
             0

@@ -492,11 +492,6 @@ void ApplyFSR() {
     // the glBindVertexArray below cannot disturb it.
     GLStateGuard state(GUARD_PROGRAM | GUARD_VAO | GUARD_TEXTURE | GUARD_FRAMEBUFFER);
 
-    GLES.glBindFramebuffer(GL_FRAMEBUFFER, FSR1_Context::g_targetFBO);
-    GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
-    GLES.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    GLES.glClear(GL_COLOR_BUFFER_BIT);
-
     GLES.glUseProgram(FSR1_Context::g_fsrProgram);
 
     // Unit 0 is already current -- the guard made it so, and it is the unit
@@ -516,6 +511,48 @@ void ApplyFSR() {
     GLES.glUniform2fv(FSR1_Context::g_targetSizeLoc, 1, targetSize);
 
     GLES.glBindVertexArray(FSR1_Context::g_quadVAO);
+
+    // Task 83 (Amethyst fork) per-frame cost reduction: 3 fullscreen passes -> 1.
+    // The old body paid (a) a clear of the target, (b) the EASU draw, (c) a
+    // full-surface blit -- every frame. (a) was pure waste: the EASU quad
+    // covers the whole target, so the clear only ever survived into a frame
+    // when the pass itself had already failed. (c) is unnecessary whenever the
+    // target matches the surface: draw EASU straight into the surface and skip
+    // the intermediate target FBO entirely. That match is arranged on the
+    // resize path (rounding residue of at most a few pixels is clamped up to
+    // the surface), so the common launcher case runs one fullscreen pass; the
+    // resolution-slider-stacked path (target genuinely below the surface)
+    // keeps the old blit so the linear filter performs that final stretch.
+    const bool directToSurface =
+        FSR1_Context::g_surfaceWidth > 0 && FSR1_Context::g_surfaceHeight > 0 &&
+        FSR1_Context::g_targetWidth == FSR1_Context::g_surfaceWidth &&
+        FSR1_Context::g_targetHeight == FSR1_Context::g_surfaceHeight;
+
+    if (directToSurface) {
+        // Depth/scissor/blend/cull would all silently eat the quad on a default
+        // framebuffer that carries a depth attachment or app-leftover state --
+        // the target FBO never had those, the surface may. MC re-arms its own
+        // state every frame, so leaving these disabled through the swap is the
+        // same stomp the rest of this function already makes.
+        GLES.glDisable(GL_DEPTH_TEST);
+        GLES.glDisable(GL_SCISSOR_TEST);
+        GLES.glDisable(GL_BLEND);
+        GLES.glDisable(GL_CULL_FACE);
+        GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
+        GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
+        // Hand the draw binding back to the render FBO the application's next
+        // frame expects (the guard would restore it too, but the read binding
+        // below is cheap to leave untouched and the explicit bind documents
+        // the handoff).
+        GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FSR1_Context::g_renderFBO);
+        GLES.glViewport(0, 0, FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight);
+        return;
+    }
+
+    GLES.glBindFramebuffer(GL_FRAMEBUFFER, FSR1_Context::g_targetFBO);
+    GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
+
     GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
 
     GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, FSR1_Context::g_targetFBO);
@@ -611,6 +648,23 @@ void CheckResolutionChange(EGLDisplay display, EGLSurface surface) {
             FSR1_Context::g_targetWidth = surfaceWidth;
         }
         if (surfaceHeight > 0 && FSR1_Context::g_targetHeight > surfaceHeight) {
+            FSR1_Context::g_targetHeight = surfaceHeight;
+        }
+        // Task 83 (Amethyst fork): round the target UP to the surface when the
+        // gap is pure rounding residue (<= 4 px per axis). render x preset
+        // regularly lands 1-2 px short of the surface it was derived from
+        // (2360 / 1.5 = 1573.3 -> 1573; 1573 x 1.5 = 2359.5 -> 2359 on a
+        // 2360 surface). A residue-sized gap buys nothing -- the blit's linear
+        // filter stretches those two columns invisibly -- while an exact match
+        // lets ApplyFSR take the direct-to-surface path and skip the blit and
+        // the intermediate target entirely (one fullscreen pass per frame
+        // instead of three). Anything larger than residue is a genuine
+        // sub-surface target (resolution slider stacked on FSR) and keeps the
+        // blit path.
+        if (surfaceWidth > 0 && surfaceWidth - FSR1_Context::g_targetWidth <= 4) {
+            FSR1_Context::g_targetWidth = surfaceWidth;
+        }
+        if (surfaceHeight > 0 && surfaceHeight - FSR1_Context::g_targetHeight <= 4) {
             FSR1_Context::g_targetHeight = surfaceHeight;
         }
         // Task 76 (Amethyst fork): zero-gain bypass. The outer width/height hold

@@ -324,3 +324,33 @@ Stage Summary:
 - 键盘控件一句话定性：26.3 的 SDL3 路径根本没有文本事件通道（GLFW_invoke_Char 恒 NULL），打字被静默丢弃；修复后虚拟键盘字符经 SDL_EVENT_TEXT_INPUT 直达 charTyped
 - 用户装机预期（248e59a 构建）：①MG+FSR 满屏画面 + 日志锚点 "[MG] FSR1 viewport latch rejected (Task 82): 2048x2048 is not a window viewport (surface 2360x1640)" + engage 1814x1262；②26.3 打开聊天点 Keyboard 打字有效 + "[InputDiag] Task82 SDL text input #N: U+XXXX ..."；③侧边栏新增"使用问题"标签（问号图标）十问答
 - 遗留：图集 pass 若换成非方形尺寸（资源包重缝图集）也已被 aspect 规则覆盖；深谷 build 尖峰 instrumentation（Task78 遗留）；RCAS 锐化第二 pass（Task80 遗留）；ja/km l10n（Task66 遗留）
+
+---
+Task ID: 83
+Agent: main (Super Z)
+Task: 用户四线需求——①控件虚拟键盘（"键盘图标 ⌨"抽屉，非"✎ 输入法"按钮）用不了；②FSR 有点卡；③把 FSR 独立出来让所有渲染器（zink/MoltenVK 等）都能用；④问题标签页内容太少需按知识库+网上内容丰富，且 FAQ 修正（MoltenVK 是独立渲染器，zink 用的是系统 Vulkan，两者不是一回事）→ 四线全修
+
+Work Log:
+- 键盘表情(⌨)按钮定位（用户两次纠正方向后）：custom.json 的 mDrawerDataList 里 name="⌨" 的抽屉——keycodes 全 0（展开/收起由 ControlDrawer.touchesEnded→switchButtonVisibility 处理，与按键分发无关），buttonProperties 是一整面 QWERTY+符号+F键子按钮面板（字母 A-Z、0-9、`,` `.` `/` `;` `[` `]` `=` `-、PGUP/PGDW、SHIFT/CTRL/CAPS 等）+一块 404.5x170 无键码背景板。抽屉展开链路（loadControlObject→addButton→addTarget executebtn）为上游稳定行为，Task82 设备日志（普通按钮 ESC/F3/SPACE 全通）佐证
+- ⌨ 面板打字根因：executebtn 的 keycode>0 分支只发 GLFW key 事件（nativeSendKey→SDL3 key down/up），而 MC 1.13+ 聊天框/书与笔/搜索框只消费 charTyped（text-input）事件——面板按键在文本框里完全无反应；系统键盘（✎ 输入法→inputTextField→nativeSendChar）Task82 已修好所以正常
+- 修复①按钮键盘打字（input_bridge_v3.m +117 行）：executebtn ACTION_DOWN 时对 keycode>0 补发 CallbackBridge_buttonKeySynthesizeText(key)——ame83_keycodeToChar 按 US ANSI 布局映射（A-Z/0-9/numpad/符号双表，shift 与 caps 对字母异或）；SHIFT 态 SDL3 路径读 SDL_GetModState（Task66 已同步虚拟修饰键）/GLFW 路径读 currMods；Ctrl/Alt/Super 按住时抑制（快捷键语义，防 [CTRL,W] 持续奔跑组合灌字符）；CAPS_LOCK 按钮自管理虚拟大写（SDL 不为注入事件维护 KMOD_CAPS）；硬件键盘不经此路径（pressesBegan 同时发 key+char）无重复风险
+- Chat 按钮(T)安全性推演（反编译 task66_decomp/KeyboardHandler）：26.3 的 keyChat 走 KeyMapping.click 队列、下一 tick 才 setScreen(ChatScreen)，而 charTyped 在 gui.screen()==null 时直接 return——T 按键的补发字符在开屏前的同一事件突发里到达即被丢弃，不会把 't' 灌进刚打开的聊天框（与桌面端行为一致）
+- 修复②custom.json 键位错配三处：',' 键绑 39（APOSTROPHE 撇号）→44（COMMA）；'[' 与 ']' 键码互换（91/93 对调）
+- 修复③FSR 逐帧开销（FSR1.cpp ApplyFSR）：旧路径每帧三趟全屏——target FBO clear（纯浪费，EASU 四边形全覆盖）+ EASU 绘制 + target→surface 整幅 blit；新路径 target==surface 时（CheckResolutionChange 新增 <=4px 舍入残差钳制：2360/1.5=1573→1573*1.5=2359.5，1-2px 残差直接钳到表面）EASU 直画默认帧缓冲并 return——单趟；分辨率滑条叠加的真子表面路径保留 blit（线性滤镜做最后拉伸）；direct 路径显式关 DEPTH/SCISSOR/BLEND/CULL（默认帧缓冲可能有深度附件/应用残留态，target FBO 从来没有）+ 还原 DRAW_FRAMEBUFFER 绑定
+- 修复④FSR 独立化（渲染器无关）：
+  * 能力表 ame83_fsr_capable_renderer（SurfaceViewController.m）：MobileGlues=YES（内置 FSR1）；zink（libOSMesa 前缀）=YES（本轮新增 osm_bridge EASU）；Vulkan/MoltenVK=NO（纯 Vulkan 路径 vkQueuePresent 由 MC 自管无呈现钩子，≤26.2 GL 回退走 ANGLE 也无法升采样——缩窗口只会得到 Task82 同款"画面缩角"）；auto/gl4es（GLES2 无 VAO/ES3）暂不接入；FSR 联动（MC 窗口=表面/档位系数）从 MG-only 放开到能力表
+  * osm_bridge.m→.mm 改名 + 347 行新增：osm_swap_buffers 的 glFinish 后把 MC 窗口区域（windowWidth×windowHeight，GL 原点左下）EASU 升采样铺满 OSMesa 全尺寸缓冲（ame_surfaceWidth/Height，environ.h 新全局，updateSavedResolution 单点写入）；复用 MobileGlues 的 FSRShaderSource.h（#version 450，zink=Mesa GL 4.6 compat 原生编译；头是纯字符串字面量，每 TU 私有拷贝无符号冲突）；29 个 GL 函数 dlsym 惰性解析（glCreateShader~glGetIntegerv）+ 一次性失败熔断 + 兜底 nativeSendScreenSize 恢复窗口=表面（MC 下帧起全分辨率直渲，不停留在缩角状态）；glCopyTexSubImage2D 帧拷贝（存储尺寸变更才 glCopyTexImage2D 重建）+ 最小状态保存还原（viewport/texture/program/VAO/VBO）；CGImage 上屏尺寸从 windowWidth 改为 bundle.width（FSR 下旧代码会把升采样结果再裁一遍）
+  * 设置迁移：fsr1_setting 行从 MobileGlues 分区移入"视频设置"分区（跟随渲染器/分辨率），存储键经 get/set 重映射保持 mobileglues.fsr1_setting 历史键名（JavaLauncher/MG config.json 等读者零感知）；en/ja/km/zh-CN/zh-Hans/zh-Hant 六语言 detail 文案改多渲染器表述
+- 修复⑤FAQ（LauncherHelpViewController.m）：10→19 条目——修正渲染器原理（Zink=GL→系统 Vulkan 栈转译；MoltenVK=独立渲染器直接 Vulkan→Metal，和 Zink 是两个互相独立的选项；删除旧错误表述"Zink 基于 Vulkan（MoltenVK）"）；新增：帧率上限/垂直同步、画面模糊发虚、光影 Iris/OptiFine 与优化模组版本配对坑、蓝牙鼠标/手柄外设、控件布局编辑与恢复；重写键盘条目（系统键盘=✎ 输入法按钮/双指长按；按钮键盘=⌨ 抽屉面板+SHIFT 大写+大写锁定）；FSR 条目改多渲染器支持说明+设置新路径（设置→视频设置）
+- 验证基建（两次"假红"甄别）：①verify_task83 初版 46/54——B5 脚本字符串口径过严（代码是 `MOBILEGLUES]) return YES` 带中括号）、C3 查错文件（Task81 锚点在 MobileGlues-cpp/gl/texture.cpp 非 gl_bridge.m）、D 系列配对索引 bug（i+3 错配，正确是 (0,1)(2,3)(4,5)）——修脚本后 54/54；②级联红潮根因：`return '"';`（双引号字符字面量）对编译器完全合法，但历史校验脚本（task66/67/82）的计数器先剥 "字符串" 再剥 '字符'，'"' 里的双引号被误当字符串起点翻转全文件引号配对→后续 5238 字符代码区被当字符串吃掉→负括号增量；修法 return 34 + 无 ASCII 引号注释；另 task67 口径先剥字符串后剥注释，注释里奇数个 ASCII 双引号同样翻转配对——注释措辞去 ASCII 引号。方法论入库：给这套校验体系写代码时，字符字面量避免裸双引号、注释避免奇数 ASCII 引号
+- stale 校验同步（沿 Task81 惯例）：verify_task78 linkage log 断言更新（"Task78 FSR linkage: preset=%ld"→"Task83 FSR linkage: renderer=%@"，联动语义不变）；verify_task82 H1/H2 更新（262e674 用户上传了 Task82 构建装机日志替换 ea27def 旧毒证据日志——新日志实锤修复生效："viewport latch rejected (Task 82): 2048x2048 is not a window viewport (surface 2360x1640)" + engage "render 1572x1092 -> target 2358x1638 -> surface 2360x1640" 窗口形状正确 + 55 条 InputDiag）
+- version.h REVISION 17 addendum（Task 83，不 bump）：ApplyFSR 直通单趟化——转换器输出零变化不 bump，装机识别靠 engage 行不变+每帧 target-FBO clear 消失
+- 验证终态：verify_task83.py 54/54（A 指纹 22 + B 行为回放 20 + C Task82 回归锚 4 + D 括号增量 6 + E g++ 语法 2）；宽级联 task67 47/0、task71 全绿、task76 40/40、task80 44/44、task81 32/32、task82 53/53 全绿；verify_task83.py 入库 repo scripts/
+- 提交推送（本次提交）
+
+Stage Summary:
+- ⌨ 按钮键盘一句话定性：面板按键只发 key 事件而 MC 1.13+ 文本框只吃 char 事件，纯 key 永远打不出字；修复后面板字母直接上屏、SHIFT 出大写、CAPS 按钮可切大写锁定，'，' '[' ']' 三键位错配一并纠正
+- FSR 卡顿一句话定性：每帧三趟全屏（clear+EASU+blit）中 clear 纯浪费、blit 在 target==surface 时纯多余——舍入钳制后常路径单趟直画，逐帧开销约砍 2/3；深谷（区块流式 build 500-745ms）与 FSR 无关维持 Task81 结论
+- FSR 独立化：zink 经 osm_bridge EASU（与 MG 逐字同款 shader）接入，MoltenVK 纯 Vulkan 无呈现钩子明确不接（FAQ+设置文案说明，防"画面缩角"回归）；存储键 mobileglues.fsr1_setting 历史兼容
+- 用户装机预期（本构建）：①⌨ 面板聊天打字有效 + "[InputDiag] Task83 button text #N: glfwKey=.. -> 'x'"；②zink+FSR 场 "[OSMBridge] Task83 FSR1 upscale engaged (zink): render ..x.. -> surface ..x.."；③MG+FSR 场 engage 行不变、每帧更轻；④FAQ 19 条目含 MoltenVK/zink 修正表述
+- 遗留：深谷 build 尖峰 instrumentation（Task78 起）；RCAS 锐化第二 pass（Task80）；ja/km l10n 深度（Task66）；Vulkan 渲染器 FSR（需 vkQueuePresent 层钩子，当前架构不适用）

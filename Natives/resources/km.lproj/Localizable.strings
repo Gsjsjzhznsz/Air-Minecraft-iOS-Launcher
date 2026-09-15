@@ -299,7 +299,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Picking a preset now lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales back to the full surface -- no need to lower the resolution slider manually anymore. Only meaningful with the MobileGlues renderer.";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling (multi-renderer since Task 83). Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales back to the full surface. Supported: MobileGlues (built-in FSR1), Zink (EASU, same shader as MobileGlues). MoltenVK/Auto/gl4es are not supported yet -- pick MobileGlues or Zink when you need FSR.";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";

@@ -299,7 +299,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 超分辨率";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超解析度。選擇檔位即自動降低渲染解析度（超高品質 77%／高品質 67%／平衡 59%／效能優先 50%），再由渲染器放大回全解析度表面——無需再手動降低解析度。僅 MobileGlues 渲染器有效。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超解析度（Task 83 起支援多渲染器）。選擇檔位即自動降低渲染解析度（超高品質 77%／高品質 67%／平衡 59%／效能優先 50%），再由渲染器放大回全解析度表面——無需再手動降低解析度。支援：MobileGlues（內建 FSR1）、Zink（EASU 升採樣，與 MobileGlues 同款演算法）。MoltenVK/自動/gl4es 暫不支援（需要 FSR 請選 MobileGlues 或 Zink）。";
 "preference.title.mg_fsr1_setting-0" = "关闭";
 "preference.title.mg_fsr1_setting-1" = "超高品质";
 "preference.title.mg_fsr1_setting-2" = "高品质";

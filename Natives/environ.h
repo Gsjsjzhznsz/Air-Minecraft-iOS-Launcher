@@ -79,6 +79,13 @@ int guiScale;
 float resolutionScale;
 BOOL virtualMouseEnabled, isControlModifiable;
 
+// Task 83（FSR 独立化）：呈现表面像素尺寸（= physical × resolutionScale，
+// updateSavedResolution 单点写入）。OSMesa/zink 桥的 FSR 升采样需要"表面
+// 全尺寸"而 windowWidth/windowHeight 是"MC 窗口信念"（FSR 联动下二者
+// 不同：window = surface / fsr_scale）。0 = 尚未初始化（消费者自行回退
+// windowWidth 口径）。
+int ame_surfaceWidth, ame_surfaceHeight;
+
 // 硬件断点重定向数组（同步自上游，用于非 TXM 的 iOS 26+ 设备 dlopen 重定向）
 // 由 redirectFunctionHWBreakpoint 填充，由 catch_mach_exception_raise_state 读取
 uint64_t hwRedirectOrig[6], hwRedirectTarget[6];
