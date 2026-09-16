@@ -261,10 +261,12 @@ static int ame83_probe_glsl_version(void) {
     if (s_probed != -1) return s_probed;
     s_probed = 0;
     if (handle.glGetString) {
-        const char *v = handle.glGetString(0x8B8C /* GL_SHADING_LANGUAGE_VERSION */);
-        if (v && v[0] >= '0' && v[0] <= '9') {
+        // 真实签名 GLubyte* glGetString(GLenum)（osm_bridge.h）——C++ 下
+        // 不能隐式转 const char*，显式转型后 sscanf。
+        const GLubyte *gv = handle.glGetString(0x8B8C /* GL_SHADING_LANGUAGE_VERSION */);
+        if (gv && gv[0] >= '0' && gv[0] <= '9') {
             int maj = 0, min = 0;
-            if (sscanf(v, "%d.%d", &maj, &min) == 2) {
+            if (sscanf((const char *)gv, "%d.%d", &maj, &min) == 2) {
                 int ver = maj * 100 + (min < 10 ? min * 10 : min);
                 if (ver >= 100 && ver <= 999) s_probed = ver;
             }

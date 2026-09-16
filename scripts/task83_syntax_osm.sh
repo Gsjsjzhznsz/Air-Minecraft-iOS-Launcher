@@ -53,7 +53,9 @@ typedef unsigned int GLbitfield; typedef unsigned char GLubyte;
 static void *s_osmDL = (void*)1;
 // Task 83b：ame83_probe_glsl_version 引用的 osmesa_library 桩（真实定义在
 // 提取区块之外的 osmesa_internal.h，此处只补本段用到的 glGetString 成员）
-static struct ame83_stub_osmesa_library { const char *(*glGetString)(unsigned int); } handle = { 0 };
+static struct ame83_stub_osmesa_library { unsigned char *(*glGetString)(unsigned int); } handle = { 0 };
+// 注：与真实 osm_bridge.h 签名一致（GLubyte* 返回）——CI run 35096621923 教训：
+// 桩写成 const char* 会让本地语法检查漏掉 C++ 的指针类型不兼容错误。
 static int windowWidth = 1572, windowHeight = 1092;
 static void CallbackBridge_nativeSendScreenSize(int w, int h) { (void)w; (void)h; }
 '''
