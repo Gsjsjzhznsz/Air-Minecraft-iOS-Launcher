@@ -2201,6 +2201,22 @@ static UIView *findSDL_uikitview(UIView *root);
 #pragma mark - On-screen button functions
 
 - (void)executebtn:(ControlButton *)sender withAction:(int)action {
+    // Task 83b：入口取证——⌨ 面板问题的日志闭环。此前 sendKey（nativeSendKey）
+    // 与字符合成端（buttonKeySynthesizeText）都有日志，唯独 executebtn 入口
+    // 没有：按钮没触发 / 键位为 0 / 事件被上游吞掉 三种情况在日志里长得
+    // 一模一样（全是零事件）。装机日志判读实锤：用户点字母时零日志零事件，
+    // 真凶是背景板吞触摸（见 CustomControlsUtils Task83b）。前 20 次 + 每
+    // 100 次记录按钮名与四键位，下次反馈可直接定位到层。
+    static int s_task83bEntry = 0;
+    s_task83bEntry++;
+    if (s_task83bEntry <= 20 || s_task83bEntry % 100 == 0) {
+        NSLog(@"[InputDiag] Task83b executebtn #%d: name=%@ action=%d keycodes=[%d,%d,%d,%d]",
+              s_task83bEntry, sender.properties[@"name"], action,
+              [sender.properties[@"keycodes"][0] intValue],
+              [sender.properties[@"keycodes"][1] intValue],
+              [sender.properties[@"keycodes"][2] intValue],
+              [sender.properties[@"keycodes"][3] intValue]);
+    }
     int held = action == ACTION_DOWN;
     for (int i = 0; i < 4; i++) {
         int keycode = ((NSNumber *)sender.properties[@"keycodes"][i]).intValue;

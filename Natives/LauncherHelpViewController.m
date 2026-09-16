@@ -62,11 +62,23 @@
     fsr.answer = @"FSR 1.0 在 设置 → 视频设置 → FSR 1.0 超分辨率 中选择档位（超高品质 77%／高品质 67%／均衡 59%／性能优先 50%）：开启后游戏自动以低分辨率渲染，再由 FSR 的 EASU 算法放大回全屏，帧率明显提升、画质轻微下降。\n\n"
                  @"支持的渲染器（多渲染器支持为近期新增）：\n"
                  @"• MobileGlues：内置 FSR1（推荐，最成熟）；\n"
-                 @"• Zink：同一套 EASU 升采样算法，呈现前放大；\n"
+                 @"• Zink：同一套 EASU 升采样算法，呈现前放大（早期版本在 Zink 上会出现绿色花屏，已修复：着色器已自动适配 Zink 的 GLSL 4.1 上限）；\n"
                  @"• 其它渲染器（MoltenVK/自动/gl4es 等）：暂不支持。MoltenVK 的纯 Vulkan 后端无呈现钩子，需要 FSR 请选 MobileGlues 或 Zink。\n\n"
                  @"注意：\n"
                  @"1. 分辨率滑条保持 100% 即可，不需要再手动降低分辨率（那反而会二次缩放）；\n"
-                 @"2. 早期版本的\"开启后黑屏\"\"画面缩在左下角\"已分别修复（着色器降级修复 + 渲染视口识别修复），如仍出现请上传日志反馈。";
+                 @"2. 早期版本的\"开启后黑屏\"\"画面缩在左下角\"\"Zink 下绿色花屏\"均已分别修复（着色器降级修复 + 渲染视口识别修复 + 着色器版本适配），如仍出现请上传日志反馈。\n"
+                 @"3. FSR 升采样是在游戏画面渲染完成后一次性完成的，开销极小；若感觉\"开了 FSR 反而卡\"，多半是区块加载卡顿（参考 MobileGlues 卡顿一条），与 FSR 无关。";
+
+    LauncherHelpFaqItem *metalFx = [[LauncherHelpFaqItem alloc] init];
+    metalFx.iconName = @"wand.and.stars";
+    metalFx.question = @"能不能用 MetalFX 时域放大（Temporal）代替 FSR？";
+    metalFx.answer = @"短答案：时域（Temporal）版目前做不到，这是引擎层的硬性依赖，不是启动器不想接。\n\n"
+                     @"【为什么做不到】\n"
+                     @"MetalFX 的时域模式需要游戏每帧提供：逐像素运动向量图（Motion Vectors，API 必填）、深度图、相机抖动与重投影矩阵。Minecraft 原版渲染管线不产出运动向量——这需要在游戏的渲染器内部新增一个“速度通道”，属于引擎/模组层级的改造（相当于 Sodium/Iris 级别的工作量）。启动器的呈现桥只能看到最终成品帧，没有任何一帧的深度与相机信息，无法凭空合成出正确的运动向量；强行做纯时域累积会产生严重重影（拖影/鬼影），Apple 的接口也直接要求该输入。\n\n"
+                     @"【空间（Spatial）版呢】\n"
+                     @"MetalFX 空间版和 FSR 1.0 同为单帧升采样，画质同级，接上还需要 iOS 16+／A13+ 的设备门槛与额外的纹理互操作层，收益边际很小，暂不引入。\n\n"
+                     @"【现在的建议】\n"
+                     @"追求帧率：用 FSR 超高品质/高品质档（Zink 或 MobileGlues）；追求画质：关 FSR 用原生化渲染。若未来上游（Sodium 系或 Mojang）产出运动向量，启动器侧接入时域放大会重新评估。";
 
     LauncherHelpFaqItem *fpsUnlock = [[LauncherHelpFaqItem alloc] init];
     fpsUnlock.iconName = @"timer";
@@ -98,14 +110,23 @@
 
     LauncherHelpFaqItem *keyboard = [[LauncherHelpFaqItem alloc] init];
     keyboard.iconName = @"keyboard";
-    keyboard.question = @"游戏里怎么打字（聊天、命令、命名）？";
-    keyboard.answer = @"两种键盘可用：\n\n"
-                      @"【系统键盘】\n"
-                      @"1. 点按控件布局上的\"输入法\"按钮（✎ 图标，再点一次收起）；\n"
+    keyboard.question = @"游戏里怎么打字（聊天、命令、命名）？两个键盘按钮有什么区别？";
+    keyboard.answer = @"先说用法：打字前要先打开文本框（点聊天按钮或按 T 键打开聊天），再打字才会进框。\n\n"
+                      @"两种键盘，两个按钮，作用不同：\n\n"
+                      @"【系统键盘】✎ 图标（\"输入法\"按钮）\n"
+                      @"弹的是 iOS 系统软键盘，支持中文输入法、联想、emoji。触发方式：\n"
+                      @"1. 点按控件布局上的\"✎ 输入法\"按钮（再点一次收起）；\n"
                       @"2. 或双指长按屏幕（需先在 设置 → 控制 → 双指呼出键盘 中开启）。\n\n"
-                      @"【按钮键盘】\n"
-                      @"控件布局里\"键盘图标\"的抽屉展开后是一整面按键面板（QWERTY+符号+F 键）。近期已修复它在 26.x 聊天框打不出字的问题（此前按钮只发按键事件、不发字符事件）：按字母即直接上屏，按住 SHIFT 再按字母出大写，\"大写锁定\"按钮可切换。\n\n"
-                      @"如果某种键盘弹出但游戏里没反应：确认聊天框已打开（点 Chat 按钮或按 T），仍无效请上传日志反馈。";
+                      @"【按钮键盘】⌨ 图标（\"键盘\"抽屉）\n"
+                      @"展开后是一整面按键面板（QWERTY + 符号 + F 键），按字母直接上屏，不弹系统键盘：\n"
+                      @"• 按住 SHIFT 再按字母出大写；\"大写锁定\"按钮可切换大小写状态；\n"
+                      @"• 符号键受 SHIFT 影响（如 SHIFT+, 出 <）；\n"
+                      @"• Ctrl/Alt 按住时按字母是快捷键语义，不进文本（和真实键盘一致）。\n\n"
+                      @"排障：\n"
+                      @"1. 按字母没反应：确认聊天框已打开（T 键或聊天按钮）；\n"
+                      @"2. 早期版本⌨ 面板完全点不动（面板背景板吞掉了触摸，已修复）；老安装升级后第一次进游戏若仍异常，可在键位调整里“恢复默认控件”拿最新出厂布局；\n"
+                      @"3. 某个具体按键行为不对（如符号错位）：可能是自定义布局改过键位，恢复默认控件即可。\n"
+                      @"4. 仍无效请上传日志反馈（日志里能看到每个按钮的触发记录）。";
 
     LauncherHelpFaqItem *joystick = [[LauncherHelpFaqItem alloc] init];
     joystick.iconName = @"gamecontroller";
@@ -200,6 +221,26 @@
                   @"解决方法：游戏内打开 视频设置 → Sodium → 找到\"改进透明\"（Improve transparency / 半透明排序）并关闭，穿透即消失。\n\n"
                   @"此问题与渲染器类型无关，换 Zink 或 MobileGlues 都可能遇到，关闭该选项即可。";
 
+    LauncherHelpFaqItem *greenFx = [[LauncherHelpFaqItem alloc] init];
+    greenFx.iconName = @"paintpalette";
+    greenFx.question = @"开 FSR 后画面出现绿色/花屏区域（尤其 Zink）？";
+    greenFx.answer = @"已修复。原因：Zink 走系统 Vulkan 栈，其着色器语言（GLSL）上限是 4.1，而 FSR 升采样着色器声明的是 4.5——旧版本里编译失败后走了降级路径，但降级没能真正告诉游戏\"恢复全分辨率渲染\"，导致画面只有左下角一块在渲染、其余区域是未初始化的显存内容（表现为绿色/花屏大块区域）。\n\n"
+                     @"新版本做了两层修复：\n"
+                     @"1. 着色器自动适配 Zink 的 GLSL 版本上限（升采样正常启用）；\n"
+                     @"2. 万一升采样仍不可用，游戏会被真正切回全分辨率直接渲染（不再留绿屏）。\n\n"
+                     @"如仍见到绿色区域：请上传 latestlog.txt 反馈（日志里能看出走的是哪条路径）。";
+
+    LauncherHelpFaqItem *background = [[LauncherHelpFaqItem alloc] init];
+    background.iconName = @"rectangle.on.rectangle";
+    background.question = @"切到后台再回来，游戏冻结/黑屏/掉帧异常？";
+    background.answer = @"这是 iOS 对 GPU 后台权限的限制，Zink（Vulkan）路径下尤其明显：App 退到后台时，系统会立刻回收 GPU 提交权限，而游戏渲染线程若还在提交工作，Vulkan 设备就会永久丢失（日志里表现为 VK_ERROR_DEVICE_LOST / zink: DEVICE LOST），回到前台后画面冻结、触摸无响应。\n\n"
+                        @"现状与建议：\n"
+                        @"1. 游戏中尽量别切后台（分屏拉通知栏/控制中心一般没事，完整切换才会触发）；\n"
+                        @"2. 已发生冻结：只能退出游戏重进（Vulkan 设备丢失不可恢复）；\n"
+                        @"3. 需要频繁切后台的场景（查攻略等）：用 MobileGlues 渲染器（Metal 路径对后台切换更宽容）或用其他设备查攻略；\n"
+                        @"4. 短暂回前台后花屏但还能玩：属帧队列残留，多玩几秒会自愈。\n\n"
+                        @"注：这不是内存不足，也不是启动器杀进程——加大内存分配无效。设备丢失的自动恢复需要底层重建 Vulkan 设备，已在路线图上。";
+
     LauncherHelpFaqItem *crash = [[LauncherHelpFaqItem alloc] init];
     crash.iconName = @"exclamationmark.triangle";
     crash.question = @"遇到崩溃/黑屏该怎么反馈？";
@@ -223,10 +264,10 @@
 
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
-        @[ renderer, mgLag, fsr, fpsUnlock, blurry, shader ],
+        @[ renderer, mgLag, fsr, metalFx, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, crash, stuck ]
+        @[ xray, greenFx, background, crash, stuck ]
     ];
 }
 

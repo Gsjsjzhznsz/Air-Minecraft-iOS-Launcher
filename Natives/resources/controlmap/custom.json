@@ -850,6 +850,28 @@
       "buttonProperties": [
         {
           "isToggle": false,
+          "width": 404.5,
+          "displayInMenu": true,
+          "bgColor": 1299214448,
+          "strokeColor": 0,
+          "opacity": 0.17,
+          "dynamicX": "0.167594  * ${screen_width}",
+          "displayInGame": true,
+          "keycodes": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "height": 170,
+          "dynamicY": "0.000000  * ${screen_height}",
+          "passThruEnabled": false,
+          "isSwipeable": false,
+          "cornerRadius": 19,
+          "name": ""
+        },
+        {
+          "isToggle": false,
           "isDynamicBtn": false,
           "strokeWidth": 0,
           "strokeColor": -1,
@@ -2136,7 +2158,7 @@
           "dynamicX": "0.18055846 * ${screen_width} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(28.333334) / 100.0 * ${preferred_scale}) + ${margin} + (px(60.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.0) / 100.0 * ${preferred_scale}) + ${margin} + (px(45.000000) / 101.000000 * ${preferred_scale}) - ${width}",
           "displayInGame": true,
           "keycodes": [
-            44,
+            343,
             0,
             0,
             0
@@ -2347,28 +2369,6 @@
           "cornerRadius": 40,
           "name": "PGDW",
           "isSwipeable": false
-        },
-        {
-          "isToggle": false,
-          "width": 404.5,
-          "displayInMenu": true,
-          "bgColor": 1299214448,
-          "strokeColor": 0,
-          "opacity": 0.17,
-          "dynamicX": "0.167594  * ${screen_width}",
-          "displayInGame": true,
-          "keycodes": [
-            0,
-            0,
-            0,
-            0
-          ],
-          "height": 170,
-          "dynamicY": "0.000000  * ${screen_height}",
-          "passThruEnabled": false,
-          "isSwipeable": false,
-          "cornerRadius": 19,
-          "name": ""
         }
       ],
       "properties": {

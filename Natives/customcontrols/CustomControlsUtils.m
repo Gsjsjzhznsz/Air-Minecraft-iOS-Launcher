@@ -480,6 +480,24 @@ NSString* restoreDefaultCustomControl() {
     return nil;
 }
 
+// Task 83b：装饰板免疫——判断一个按钮属性字典是否"纯装饰"：
+// 四键位全 0、非 toggle、非穿透。这种按钮在 executebtn 里永远空转
+// （keycode<0 特殊键 / keycode>0 普通键都不命中），但作为 UIControl 照样
+// 参与命中测试。若它恰好叠在功能键上方（后加 = z 序更高），会吞掉整片
+// 区域的触摸——出厂 custom.json 的"⌨"抽屉背景板正是这种情况：它排在
+// buttonProperties 数组末尾（addSubview 最后 = 最顶层），全覆盖 58/60
+// 个功能键 = "面板打不了字"的真正根因（be276a0 装机日志零事件实锤）。
+// 修复：纯装饰按钮禁用交互，触摸自然落到下层的功能键上。
+static BOOL ame83b_is_decorative_button(NSMutableDictionary *props) {
+    if ([props[@"passThruEnabled"] boolValue]) return NO;   // 穿透板有自己的转发语义
+    if ([props[@"isToggle"] boolValue]) return NO;          // toggle 板有视觉切换语义
+    NSArray *kcs = props[@"keycodes"];
+    for (int i = 0; i < 4; i++) {
+        if (kcs && i < (int)kcs.count && [kcs[i] intValue] != 0) return NO;
+    }
+    return YES;
+}
+
 void loadControlObject(UIView* targetView, NSMutableDictionary* controlDictionary) {
     NSMutableString *errorString = [[NSMutableString alloc] init];
 
@@ -492,6 +510,11 @@ void loadControlObject(UIView* targetView, NSMutableDictionary* controlDictionar
                 ControlButton *button = [ControlButton buttonWithProperties:buttonDict];
                 [targetView addSubview:button];
                 [button update];
+                // Task 83b：顶层纯装饰板同样免疫（与子按钮同规则）。编辑模式
+                // 保留交互（否则板无法被选中/拖动/删除），仅游戏模式穿透。
+                if (!isControlModifiable && ame83b_is_decorative_button(buttonDict)) {
+                    button.userInteractionEnabled = NO;
+                }
             } @catch (NSException *exception) {
                 [errorString appendFormat:@"%@: %@\n", buttonDict[@"name"], exception.reason];
             }
@@ -514,6 +537,18 @@ void loadControlObject(UIView* targetView, NSMutableDictionary* controlDictionar
                 ControlSubButton *subView = [ControlSubButton buttonWithProperties:subButton];
                 [drawer addButton:subView];
                 [targetView addSubview:subView];
+                // Task 83b：纯装饰子按钮（背景板）禁用交互——否则它在 z 序
+                // 顶层吞掉整面板触摸（⌨ 键盘面板从未能用的根因）。编辑模式
+                // 保留交互（板可被选中编辑），仅游戏模式穿透。
+                if (!isControlModifiable && ame83b_is_decorative_button(subButton)) {
+                    subView.userInteractionEnabled = NO;
+                    static int s_task83b_plates = 0;
+                    s_task83b_plates++;
+                    if (s_task83b_plates <= 5) {
+                        NSLog(@"[CustomControls] Task83b decorative sub-button pass-through enabled #%d (name=%@, touch no longer swallowed)",
+                              s_task83b_plates, subButton[@"name"]);
+                    }
+                }
             }
             [drawer update];
         }

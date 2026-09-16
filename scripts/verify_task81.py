@@ -235,13 +235,17 @@ check("C3 glSamplerParameteri restate drops force",
 
 if os.path.exists(LOG_NEW):
     log = read(LOG_NEW)
-    dump_ok = ("depth-sampling program" in log and "CloudsDepthSampler" in log
-               and "sampler 26 filter NEAREST_MIPMAP_LINEAR/NEAREST" in log)
+    # Task83b 更新（be276a0 装机日志对）：678e7b5 会话的 CloudsDepthSampler
+    # 复合 dump 行已随日志更替消失（那是当次会话的调试 dump）。新 MG 会话
+    # （latestlog.old.txt）的等效证据链：Task81 扫描行在位（FSR1 active +
+    # enforcement re-enabled）+ 全程零 force 行 + fsr1Setting=1。
+    scan_ok = ("depth filter scan: FSR1 active (Task 81)" in log
+               and "enforcement re-enabled" in log)
     zero_force = ("depth filter force" not in log)
     fsr_on = ("fsr1Setting                 = 1" in log) or ('"fsr1Setting" : 1' in log)
-    check("C4 regression fixture present (dump+9986, zero force, fsr on)",
-          dump_ok and zero_force and fsr_on,
-          "678e7b5 MG session: composite dump with sampler 26 MIN 9986 over six D32F units, not one force line")
+    check("C4 regression fixture present (Task81 scan alive, zero force, fsr on)",
+          scan_ok and zero_force and fsr_on,
+          "be276a0 MG session: Task81 scan line + zero force lines + fsr1Setting=1 (678e7b5 dump lines retired with old log)")
 else:
     check("C4 regression fixture (log absent)", True, "skipped: log not present locally")
 

@@ -332,20 +332,31 @@ check("G LauncherHelpViewController.m self-balanced",
 
 # ---------------------------------------------------------------------------
 # H. Regression evidence in latestlog.txt
-# Task83 更新：262e674 用户上传了 Task82 构建的装机日志（替换了 ea27def 旧
-# 毒证据日志）。旧 H1/H2（毒证据 2048x2048）随之退役；新锚点证明修复生效：
-#   - 视口锁存拒绝行（Task82 核心修复在设备上触发）
-#   - engage 行为窗口形状（1572x1092，非 2048x2048 毒形状）
+# Task83b 更新：be276a0 用户上传了新装机日志对——MG 会话（含 Task82 修复
+# 生效证据）现在在 latestlog.old.txt，latestlog.txt 换成了 zink 会话
+# （Task83 FSR linkage + EASU 编译失败证据 = Task83b 版本适配的动机实锤）。
+# 旧锚点（262e674 会话的 render 1572x1092 / 1.50 档）随日志退役；新会话
+# 是 1.30 档（render 1814x1262）。zink 会话另加 H3 佐证 Task83b 动机。
 # ---------------------------------------------------------------------------
-if os.path.exists(LOG_NEW):
-    log = read(LOG_NEW)
+LOG_OLD_MG = os.path.join(REPO, "latestlog.old.txt")  # be276a0 MG session
+if os.path.exists(LOG_OLD_MG):
+    log = read(LOG_OLD_MG)
     check("H1 Task82 build rejects the poison viewport (latch rejection on device)",
           "viewport latch rejected (Task 82): 2048x2048 is not a window viewport (surface 2360x1640)" in log)
-    check("H2 Task82 build engages window-shaped render (1572x1092, not 2048x2048)",
-          "render 1572x1092 -> target 2358x1638 -> surface 2360x1640" in log
+    check("H2 Task82 build engages window-shaped render (1814x1262, not 2048x2048)",
+          "render 1814x1262 -> target 2360x1640 -> surface 2360x1640" in log
           and "render 2048x2048" not in log)
 else:
-    check("H log present", False, "latestlog.txt missing")
+    check("H log present", False, "latestlog.old.txt missing")
+
+if os.path.exists(LOG_NEW):
+    zlog = read(LOG_NEW)
+    check("H3 zink session: Task83 linkage + EASU compile failure (Task83b motivation)",
+          "renderer-side upscale: zink EASU (Task83)" in zlog
+          and "GLSL 4.50 is not supported" in zlog
+          and "restoring MC window to surface" in zlog)
+else:
+    check("H3 zink session log present", False, "latestlog.txt missing")
 
 # ---------------------------------------------------------------------------
 # I. Cascade: Task 81 verification still green

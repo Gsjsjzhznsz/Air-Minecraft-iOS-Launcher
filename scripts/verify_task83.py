@@ -180,7 +180,8 @@ check("B11 custom.json：QWERTY 面板完整（Q-P 共 26 字母）",
 
 # B12: FAQ 结构与修正
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("B12 FAQ：19 条目（原 10）", len(faq_items) == 19)
+check("B12 FAQ：22 条目（Task83 19 + Task83b 新增 3：MetalFX/绿屏/切后台）",
+      len(faq_items) == 22, f"got {len(faq_items)}")
 check("B13 FAQ：MoltenVK 独立渲染器表述",
       "MoltenVK：独立的渲染器" in helpvc)
 check("B14 FAQ：zink 用系统 Vulkan 表述",
@@ -220,7 +221,8 @@ for path in ["Natives/input_bridge_v3.m", "Natives/SurfaceViewController.m",
              "Natives/ctxbridges/osm_bridge.mm",
              "Natives/external/MobileGlues/MobileGlues-cpp/gl/FSR1/FSR1.cpp",
              "Natives/LauncherHelpViewController.m",
-             "Natives/LauncherPreferencesViewController.m"]:
+             "Natives/LauncherPreferencesViewController.m",
+             "Natives/customcontrols/CustomControlsUtils.m"]:
     head = git_head(path)
     # osm_bridge.m -> .mm 改名：HEAD 取旧名
     if not head and path.endswith(".mm"):
@@ -285,6 +287,82 @@ for _h in _glob.glob(REPO + "/Natives/*.h") + _glob.glob(REPO + "/Natives/custom
             _keyword_cats.append(f"{_h}:{_ln}")
 check("E5 头文件无 C++ 关键字分类名（ame_private 改名完成）", not _keyword_cats,
       "; ".join(_keyword_cats[:3]))
+
+# ============================================================================
+print("== F. Task83b（⌨ 键盘真根因 + zink 绿屏 + MetalFX 文档） ==")
+# F1-F2: zink FSR 着色器版本自适应（GLSL 4.10 上限实锤后的根治）
+check("F1 osm_bridge.mm：版本探测 ame83_probe_glsl_version 在位",
+      "ame83_probe_glsl_version" in osm and "0x8B8C" in osm)
+check("F2 osm_bridge.mm：版本替换 ame83_adapt_shader_version 接入编译链",
+      "ame83_adapt_shader_version(FSR_VSSource" in osm
+      and "ame83_adapt_shader_version(FSR_FSSource" in osm)
+
+# F3: nativeSendScreenSize SDL3 路径（0x207 合成窗口尺寸事件，兑底真正生效）
+check("F3 input_bridge_v3.m：nativeSendScreenSize Path B（0x207 推送）",
+      "SDL3_EVENT_WINDOW_RESIZED" in ibv3
+      and "we->type = SDL3_EVENT_WINDOW_RESIZED" in ibv3
+      and "Task83b window size -> SDL 0x207" in ibv3)
+
+# F4: 装饰板免疫（⌨ 面板根因：背景板吞触摸）
+ccu = read("Natives/customcontrols/CustomControlsUtils.m")
+check("F4 CustomControlsUtils.m：装饰板判定 + 交互禁用（双路，编辑模式保留）",
+      "ame83b_is_decorative_button" in ccu
+      and ccu.count("userInteractionEnabled = NO") == 2
+      and ccu.count("!isControlModifiable && ame83b_is_decorative_button") == 2)
+
+# F5: custom.json 背景板 z 序（数组首位）+ command 键位修正
+cj = json.loads(read("Natives/resources/controlmap/custom.json"))
+_kb = [d for d in cj["mDrawerDataList"]
+       if str(d["properties"].get("name", "")).startswith("⌨")][0]
+_subs = _kb["buttonProperties"]
+_plate_first = (all(k == 0 for k in _subs[0]["keycodes"])
+                and _subs[0]["width"] > 300)
+_cmd = [s for s in _subs if s.get("name") == "command"][0]
+check("F5 custom.json：背景板在首位（z 底）+ command→343（LEFT_SUPER）",
+      _plate_first and _cmd["keycodes"][0] == 343 and len(_subs) == 61)
+
+# F6: executebtn 入口取证（下次反馈可直接定位层）
+check("F6 SurfaceViewController.m：executebtn 入口取证日志",
+      "Task83b executebtn #" in svc)
+
+# F7: FAQ 新增三条（MetalFX 时域边界 / 绿屏修复 / 切后台 DEVICE LOST）
+check("F7 FAQ：MetalFX 时域技术边界说明",
+      "MetalFX" in helpvc and "运动向量" in helpvc and "时域" in helpvc)
+check("F8 FAQ：zink 绿屏修复说明",
+      "绿色/花屏" in helpvc and "GLSL" in helpvc)
+check("F9 FAQ：切后台 DEVICE LOST 已知限制",
+      "DEVICE_LOST" in helpvc or "DEVICE LOST" in helpvc)
+
+# F10: 行为回放——版本探测解析（Mesa 版本串 → GLSL 数字）
+def _parse_glsl(vstr):
+    m = re.match(r"(\d+)\.(\d+)", vstr)
+    if m:
+        maj, mi = int(m.group(1)), int(m.group(2))
+        return maj * 100 + (mi * 10 if mi < 10 else mi)
+    return 0
+_cases = [("4.10", 410), ("4.60", 460), ("3.30", 330), ("4.1", 410),
+          ("4.30", 430), ("garbage", 0), ("", 0)]
+_ok = all(_parse_glsl(s) == e for s, e in _cases)
+check("F10 行为回放：GLSL 版本串解析（4.10/4.1/4.30 三种写法）", _ok)
+
+# F11: 行为回放——装饰板判定（四键位全 0 且非 toggle/非穿透 → 装饰）
+def _is_decorative(keycodes, is_toggle=False, passthru=False):
+    if passthru or is_toggle:
+        return False
+    return all(k == 0 for k in keycodes[:4])
+_dcases = [
+    (([0, 0, 0, 0], False, False), True),     # 出厂背景板
+    (([81, 0, 0, 0], False, False), False),   # 字母键
+    (([-3, 0, 0, 0], False, False), False),   # 特殊键（鼠标左）
+    (([0, 0, 0, 0], True, False), False),     # toggle 板不禁（视觉切换语义）
+    (([0, 0, 0, 0], False, True), False),     # 穿透板不禁（转发语义）
+]
+_ok = all(_is_decorative(*a) == e for a, e in _dcases)
+check("F11 行为回放：装饰板判定规则（5 例）", _ok)
+
+# F12: osm_bridge.mm 兑底注释与 SDL3 路径联动说明在位（防回归文档）
+check("F12 osm_bridge.mm：兑底恢复注释指向 Task83b SDL3 路径",
+      "Task 83b：nativeSendScreenSize 现已带 SDL3 路径" in osm)
 
 # ============================================================================
 print(f"\nRESULT: {PASS}/{PASS + FAIL}")

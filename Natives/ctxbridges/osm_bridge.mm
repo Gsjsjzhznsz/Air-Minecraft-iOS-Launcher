@@ -2,6 +2,8 @@
 #import "SurfaceViewController.h"
 
 #include <dlfcn.h>
+#include <stdio.h>
+#include <string.h>
 #include "environ.h"
 #include "utils.h"
 
@@ -10,10 +12,11 @@
 #include "osmesa_internal.h"
 
 // Task 83（FSR 独立化）：复用 MobileGlues 的 FSR1 EASU shader（#version 450，
-// zink = Mesa GL 4.6 compat 原生编译，无需降级）。该头是纯字符串字面量
-// （clang/gcc 的 C/ObjC 模式均接受 raw string 字面量），每个包含它的 TU
-// 各持一份私有拷贝——启动器主二进制与 libmobileglues.dylib 互不可见，
-// 无符号冲突。
+// MG 上下文原生编译）。Task 83b 修正：zink 经 MoltenVK 的 GLSL 上限只有
+// 4.10（装机日志实锤），需版本自适应后才能编过（见 ame83_adapt_shader_version）。
+// 该头是纯字符串字面量（clang/gcc 的 C/ObjC 模式均接受 raw string 字面量），
+// 每个包含它的 TU 各持一份私有拷贝——启动器主二进制与 libmobileglues.dylib
+// 互不可见，无符号冲突。
 #include "../external/MobileGlues/MobileGlues-cpp/gl/FSR1/FSRShaderSource.h"
 
 static osmesa_library handle;
@@ -233,15 +236,74 @@ static unsigned int ame83_compile(ame83_gl_t *g, unsigned int stage, const char 
     return sh;
 }
 
+// Task 83b（zink 绿屏根治）：FSR 着色器版本自适应。
+//
+// 背景（be276a0 装机日志实锤）：zink 经 MoltenVK 只给出 GLSL 4.10 上限
+// （MoltenVK = Vulkan 1.1 → zink 桌面 GL 4.1），而 FSRShaderSource.h 声明
+// #version 450 → 两个 stage 全部编译失败（错误信息为 GLSL 4.50 is not
+// supported，注意此处不引用原文以免 ASCII 引号破坏历史括号校验器）
+// → 兜底路径触发。而旧兜底只在 GLFW 通道下才能把窗口恢复成表面尺寸
+// （26.3 下恒 NULL）→ MC 永远按小窗渲染，全尺寸 OSMesa 缓冲的未写区域
+// = 未初始化堆内存上屏 = 用户看到的"FSR 提升部分绿色"。
+//
+// 着色器主体只需 GLSL 4.00（uintBitsToFloat / packHalf2x16 均为 4.00 内
+// 建，接口声明无 layout(binding)），接口的 layout(location) 是 330+。
+// 因此当上下文版本落在 400 以上、450 以下时，用上下文自己的版本号替换
+// 首行 #version 即可。
+// >= 450 原样；< 400 无法适配（体依赖 4.00 位操作内建），保持原样让它
+// 以明确的版本错误日志失败。
+//
+// 探测：glGetString(GL_SHADING_LANGUAGE_VERSION)（dlsym_OSMesa 已解析，
+// 本函数在 osm_swap_buffers 调用链上，OSMesaMakeCurrent 已生效）。
+// Mesa 桌面版本串形如 "4.10"（十进制两位小数），解析成 410。
+static int ame83_probe_glsl_version(void) {
+    static int s_probed = -1;
+    if (s_probed != -1) return s_probed;
+    s_probed = 0;
+    if (handle.glGetString) {
+        const char *v = handle.glGetString(0x8B8C /* GL_SHADING_LANGUAGE_VERSION */);
+        if (v && v[0] >= '0' && v[0] <= '9') {
+            int maj = 0, min = 0;
+            if (sscanf(v, "%d.%d", &maj, &min) == 2) {
+                int ver = maj * 100 + (min < 10 ? min * 10 : min);
+                if (ver >= 100 && ver <= 999) s_probed = ver;
+            }
+        }
+    }
+    return s_probed;
+}
+
+// 返回适配后的着色器源（首行 #version 替换为上下文版本；不适用则原样）。
+static std::string ame83_adapt_shader_version(const char *src, const char *stageName) {
+    std::string out(src);
+    int ver = ame83_probe_glsl_version();
+    if (ver >= 450 || ver < 400) return out;   // 原样（≥4.5 无需改；<4.0 改了也编不过，保留明确报错）
+    const char *nl = strchr(src, '\n');
+    if (!nl || strncmp(src, "#version", 8) != 0) return out;
+    static bool s_logged = false;
+    if (!s_logged) {
+        s_logged = true;
+        NSLog(@"[OSMBridge] Task83b FSR shader #version adapted: 450 -> %d (context GLSL cap %d, zink/MoltenVK path) -- first %s stage", ver, ver, stageName);
+    }
+    out = "#version ";
+    out += std::to_string(ver);
+    out += '\n';
+    out += (nl + 1);
+    return out;
+}
+
 static bool ame83_fsr_init(void) {
     if (ame83_fsr.ready) return true;
     if (ame83_fsr.initFailed) return false;
     if (!ame83_resolve_gl()) { ame83_fsr.initFailed = true; return false; }
     ame83_gl_t *g = &ame83_fsr.gl;
 
-    unsigned int vs = ame83_compile(g, GL_VERTEX_SHADER, FSR_VSSource);
+    // Task 83b：版本自适应后再缩（zink/GLSL 4.10 上限下也能编过）。
+    std::string vsSrc = ame83_adapt_shader_version(FSR_VSSource, "vertex");
+    std::string fsSrc = ame83_adapt_shader_version(FSR_FSSource, "fragment");
+    unsigned int vs = ame83_compile(g, GL_VERTEX_SHADER, vsSrc.c_str());
     if (vs == 0) { ame83_fsr.initFailed = true; return false; }
-    unsigned int fs = ame83_compile(g, GL_FRAGMENT_SHADER, FSR_FSSource);
+    unsigned int fs = ame83_compile(g, GL_FRAGMENT_SHADER, fsSrc.c_str());
     if (fs == 0) { g->glDeleteShader(vs); ame83_fsr.initFailed = true; return false; }
 
     unsigned int prog = g->glCreateProgram();
@@ -405,6 +467,9 @@ void osm_swap_buffers() {
             ame83_fsr.healed = true;
             NSLog(@"[OSMBridge] Task83 FSR upscale unavailable -- restoring MC window to surface %ux%u (direct full-res render)",
                   currentBundle->osm.width, currentBundle->osm.height);
+            // Task 83b：nativeSendScreenSize 现已带 SDL3 路径（推 0x207 窗口
+            // 尺寸事件）——MC 会真正切回全分辨率渲染，不再出现"小窗渲染 +
+            // 未初始化缓冲区域上屏"的绿色花屏。
             CallbackBridge_nativeSendScreenSize((int)currentBundle->osm.width, (int)currentBundle->osm.height);
         }
     }

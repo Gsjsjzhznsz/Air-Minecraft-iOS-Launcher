@@ -51,6 +51,11 @@ extern void AmeControlJoystickOnGrabChange(BOOL grabbed);
 // SDLEventHandler.pollEvents 里 case 771 → handleTextInputEvent →
 // keyboardHandler.textInput → charTyped，虚拟键盘字符的唯一入口。
 #define SDL3_EVENT_TEXT_INPUT      0x303
+// Task 83b：SDL_EVENT_WINDOW_RESIZED（0x207）。MC 26.3 的窗口尺寸消费
+// 通道——Task61 已实证它直接把 data1/data2 当像素尺寸用（当年 uikit 发的
+// 点制 1180x820 被 MC 按像素消费导致分辨率减半，正是利用此语义改写）。
+// nativeSendScreenSize 的 SDL3 路径用它把窗口信念下发给 MC。
+#define SDL3_EVENT_WINDOW_RESIZED  0x207
 
 typedef uint32_t SDL3_WindowID;
 typedef uint32_t SDL3_MouseID;
@@ -123,6 +128,18 @@ typedef struct {
     SDL3_WindowID windowID;
     const char *text;
 } SDL3_TextInputEvent;
+
+// Task 83b：SDL3 WindowEvent layout（与 Task61 在 sdl3_hook.m 里的布局
+// 注释互证：type@0 reserved@4 timestamp@8 windowID@16 data1@20 data2@24）。
+// sizeof=28，padded 到 32。
+typedef struct {
+    uint32_t type;
+    uint32_t reserved;
+    uint64_t timestamp;
+    SDL3_WindowID windowID;
+    int32_t data1;
+    int32_t data2;
+} SDL3_WindowEvent;
 
 // Union large enough to hold any SDL3 event
 typedef union {
@@ -1795,7 +1812,7 @@ void CallbackBridge_nativeSendMouseButton(int button, int action, int mods) {
 void CallbackBridge_nativeSendScreenSize(int width, int height) {
     windowWidth = width;
     windowHeight = height;
-    
+
     if (isInputReady) {
         if (GLFW_invoke_FramebufferSize) {
             if (isUseStackQueueCall) {
@@ -1812,7 +1829,51 @@ void CallbackBridge_nativeSendScreenSize(int width, int height) {
             }
         }
     }
-    
+
+    // ---------------------------------------------------------------
+    // Task 83b（SDL3 路径窗口尺寸下发，Path B）：
+    //
+    // 根因（zink+FSR 绿屏实锤，be276a0 装机日志）：本函数旧实现只有 GLFW
+    // 回调通道——26.3 走 SDL3 时 GLFW_invoke_* 恒 NULL，且 isInputReady 全程
+    // 为 0，于是"下发尺寸"实际只更新了全局变量，MC 永远不知道。osm_bridge
+    // 的 FSR 兜底（EASU 编译失败时恢复窗口=表面）正是被这条路坑死：MC 继
+    // 续按 1815x1261 小窗渲染，2360x1640 全尺寸 OSMesa 缓冲的未写区域 =
+    // realloc 出来的未初始化堆内存直接上屏 = 用户看到的"FSR 提升部分绿
+    // 色花屏"。
+    //
+    // 修法照 sendKey/sendChar 的 Path B 惯例：GLFW 通道不可用时推合成
+    // SDL_WINDOW_RESIZED(0x207)，data1/data2 携带像素尺寸。Task61 已实证
+    // MC 26.3 把 0x207 的 data1/data2 当像素窗口尺寸直接消费；sdl3_hook
+    // 的 Task61 改写器会把它重写为 windowWidth×windowHeight（本函数刚写
+    // 入的全局值）= 恒等，无拉锯。
+    //
+    // 去重：与上次下发值相同则不推（分辨率滑条拖动会高频触发本函数，
+    // 相同尺寸的重推只会给 MC 塞无意义的重建风暴）。
+    // ---------------------------------------------------------------
+    if (!GLFW_invoke_WindowSize && !GLFW_invoke_FramebufferSize && g_sdlWindow) {
+        static int s_task83b_lastW = -1, s_task83b_lastH = -1;
+        if (width != s_task83b_lastW || height != s_task83b_lastH) {
+            s_task83b_lastW = width;
+            s_task83b_lastH = height;
+            if (pSDL_PushEvent) {
+                SDL3_Event ev;
+                memset(&ev, 0, sizeof(ev));
+                SDL3_WindowEvent *we = (SDL3_WindowEvent *)&ev;
+                we->type = SDL3_EVENT_WINDOW_RESIZED;
+                we->windowID = getSDLWindowID();
+                we->data1 = width;
+                we->data2 = height;
+                pSDL_PushEvent((void *)&ev);
+                static int s_task83b_pushed = 0;
+                s_task83b_pushed++;
+                if (s_task83b_pushed <= 10 || s_task83b_pushed % 50 == 0) {
+                    NSLog(@"[InputDiag] Task83b window size -> SDL 0x207 %dx%d #%d (MC-side resize; FSR fallback now actually restores full-res)",
+                          width, height, s_task83b_pushed);
+                }
+            }
+        }
+    }
+
     // return (isInputReady && (GLFW_invoke_FramebufferSize || GLFW_invoke_WindowSize));
 }
 

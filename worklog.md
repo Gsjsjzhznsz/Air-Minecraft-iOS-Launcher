@@ -376,3 +376,31 @@ Stage Summary:
 - 方法论入库：往纯 C/ObjC 工程塞第一个 .mm 的完整检查单（方言/标准/分类名/stdatomic/指针转换/链接器语言/框架/extern C/临时定义九关）；本地 g++ 语法脚本只能拦住其中 5 关，链接期 4 关只能靠 CI
 - verify_task83 终态 60/60（E3-E8 为 CI 教训指纹）；task82 53/53 级联不破
 - 装机验证锚点不变：⌨ 面板 "[InputDiag] Task83 button text"、zink+FSR "[OSMBridge] Task83 FSR1 upscale engaged (zink)"、FAQ 19 条目
+
+---
+Task ID: 83b
+Agent: main (Super Z)
+Task: 用户四线反馈（be276a0 装机日志对：latestlog.txt=zink 会话 / latestlog.old.txt=MG 会话）——①zink 开 FSR 后提升区域绿色花屏；②⌨ 控件虚拟键盘仍打不了字（第三次报告）；③继续丰富问题库；④能否把 FSR 换成 MetalFX 时域放大（Temporal）→ 四线全处理
+
+Work Log:
+- 拉取 be276a0 日志判读（用户直接上传 latestlog 对，第一手证据）：
+  * zink 会话（latestlog.txt）："[OSMBridge] Task83 FSR shader compile FAILED (stage=35633): GLSL 4.50 is not supported. Supported versions are: 1.10...4.10" → EASU 编译失败 → 兜底 "restoring MC window to surface 2360x1640" 触发；随后整局 isInputReady=0、fps=59 正常渲染（全尺寸）；中途 VK_ERROR_DEVICE_LOST（后台权限回收）后 fps=0 冻死
+  * MG 会话（latestlog.old.txt）：FSR1 正常 engage（render 1814x1262 -> 2360x1640）+ Task82 视口锁存拒绝 2048x2048 + Task81 深度扫描行——Task78/81/82 全部在位生效
+  * 键盘：两份会话均零 "[InputDiag] Task83 button text"、零字母 sendKey/key consumed（MC 只收到 WASD/ESC/F3）——⌨ 面板的触摸从未到达 executebtn
+- ⌨ 键盘真根因（几何取证，scripts/kb_layout_audit.py 复刻 calculateDynamicPos 求值）：出厂 custom.json ⌨ 抽屉的 buttonProperties 数组末尾是一块 404.5x170 无键码背景板（keycodes 全 0），addSubview 按数组顺序执行 → 板在 z 序最顶层；算出板 frame=(198,0,404,170)pt 全覆盖 58/60 个功能键（QWERTY 全字母+F键+符号，仅 PGUP/PGDW 在板外）→ 点任何字母都命中板 → executebtn 四键位全 0 空转 → 零事件零日志。Task83 的字符合成修复本身正确但触摸根本到不了字母按钮——新旧所有出厂模板均此顺序 = 面板从未能用
+- 键盘修复（双层）：①CustomControlsUtils.m loadControlObject 新增 ame83b_is_decorative_button（四键位全 0 && 非 toggle && 非 passThru）→ userInteractionEnabled=NO，触摸穿透到下层功能键——治所有存量安装（设备上旧 custom.json 仅当缺失才拷贝，永不更新，代码层修复是唯一普适路径）；②custom.json 背景板挪到数组首位（z 底，新装卫生）+ 'command' 键位 44（COMMA，打出逗号）→343（LEFT_SUPER）；③executebtn 入口取证日志（前 20+每 100：按钮名/动作/四键位）——下次反馈日志可直接定位层
+- zink 绿屏根因链（两层叠加）：①EASU 着色器声明 #version 450 超出 zink(MoltenVK=VK1.1→桌面 GL 4.1) 的 GLSL 4.10 上限；②兜底调用的 nativeSendScreenSize 在 26.3 SDL3 路径是空转（GLFW_invoke_* 恒 NULL + isInputReady 全程 0）→ MC 永远不知道要恢复全分辨率 → 持续按 1815x1261 小窗渲染 → 2360x1640 全尺寸 OSMesa 缓冲的未写区域 = realloc 未初始化堆内存上屏 = 绿色花屏
+- zink 修复（双层）：①osm_bridge.mm 版本自适应——ame83_probe_glsl_version（glGetString(GL_SHADING_LANGUAGE_VERSION)，Mesa "4.10"→410）+ ame83_adapt_shader_version（首行 #version 替换为上下文版本，区间 400-450；着色器主体仅需 4.00：uintBitsToFloat/packHalf2x16 均为 4.00 内建，接口声明 330+，无 layout(binding)）；②input_bridge_v3.m nativeSendScreenSize 补 Path B——GLFW 通道不可用时推合成 SDL_WINDOW_RESIZED(0x207)（SDL3_WindowEvent 布局与 Task61 注释互证：data1@20/data2@24；MC 26.3 直接消费事件数据为像素窗口尺寸 = Task61 改写器的既有语义）+ 同值去重 → 兜底真正生效，顺带修好 SDL3 路径运行时分辨率调整（此前同样静默失效）
+- MetalFX 时域可行性定案（不实装，技术边界如实入库）：Temporal 需逐像素运动向量图（API 必填）+深度图+抖动/重投影矩阵——MC 原版渲染管线不产出运动向量，需引擎/模组层新增速度通道（Sodium/Iris 级改造）；启动器呈现桥只见成品帧，无深度无相机矩阵，无法合成正确运动向量，强行累积=严重鬼影。Spatial 版与 FSR1 同级单帧+需 iOS16+/A13+ 门槛+纹理互操作层，收益边际。FAQ 详述
+- FAQ 19→22 条：新增 MetalFX 时域边界（渲染分类）、zink 绿屏已修说明（故障分类）、切后台 DEVICE LOST 已知限制（故障分类，含"为什么加内存没用"）；重写键盘条目（两按钮区别图例化：✎ 系统键盘 vs ⌨ 按钮键盘，用法/大小写/排障）；FSR 条目补 zink 绿屏已修+开销说明
+- 校验器踩坑×2（方法论补条目）：①注释里引用错误信息原文的 ASCII 双引号跨行 → 历史计数器引号配对翻转（Task83 同款假红复发，改写注释去引号）；②注释里数学区间 [400, 450) 的半开写法 → 裸字符计数 +1[ -1)（重写为文字表述）。E2 语法脚本补 osmesa_library 桩（ame83_probe_glsl_version 引用的 handle 在提取区块外）
+- 级联日志锚点随 be276a0 更新：task81 C4 的 678e7b5 CloudsDepthSampler dump 行随旧日志退役 → 改查 Task81 扫描行+零 force+fsr1Setting=1；task82 H1/H2 的 MG 证据从 latestlog.txt 搬到 latestlog.old.txt（数字按新会话 1.30 档改 1814x1262）+ 新增 H3（zink 会话 linkage+编译失败+兜底三锚点 = Task83b 动机实锤）
+- 验证终态：verify_task83 73/73（新增 F 段 12 项：版本探测/替换/0x207/装饰板/JSON z序/入口取证/FAQ×3/行为回放×2/注释锚点）；task81 32/32、task82 54/54；全仓 14 个 verify 脚本零失败
+
+Stage Summary:
+- ⌨ 键盘一句话定性：不是字符事件层的问题（Task83 修复正确但从未被触发），是布局模板的背景板以 z 序顶层吞掉了全面板触摸——58/60 个功能键被盖，只有 PGUP/PGDW 幸存。代码层装饰板免疫（userInteractionEnabled=NO）让触摸穿透，存量旧布局安装同样治愈
+- zink 绿屏一句话定性：GLSL 450>4.10 编译失败 + 兜底恢复在 SDL3 路径空转，双因叠加让 MC 永远小窗渲染、未初始化缓冲区上屏。版本自适应让 EASU 在 zink 上真正跑起来（预期装机锚点 "[OSMBridge] Task83b FSR shader #version adapted: 450 -> 410" + "[OSMBridge] Task83 FSR1 upscale engaged (zink)"）
+- MetalFX 时域：不做（缺运动向量是引擎层硬依赖，如实说明）；空间版收益边际。FSR1 继续为默认超分
+- 附带收获：nativeSendScreenSize 的 SDL3 路径打通 = 运行时改分辨率/FSR 兜底在 26.3 下首次真正生效
+- 装机验证锚点：①⌨ 面板（任意旧安装）点字母 → 聊天框出字 + 日志 "[InputDiag] Task83b executebtn #1: name=H ..." → "[InputDiag] Task83 button text #1"；②zink+FSR → 上述版本适配/engage 两行，画面满屏无绿；③切后台冻结为已知限制（FAQ），日志见 VK_ERROR_DEVICE_LOST
+- 遗留：切后台 DEVICE LOST 自动恢复（需 Vulkan 设备重建，路线图）；RCAS 锐化第二 pass（Task80 遗留）；深谷 build 尖峰 instrumentation（Task78 遗留）；ja/km l10n（Task66 遗留）
