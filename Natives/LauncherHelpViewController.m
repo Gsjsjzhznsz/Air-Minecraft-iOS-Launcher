@@ -62,11 +62,11 @@
     fsr.answer = @"FSR 1.0 在 设置 → 视频设置 → FSR 1.0 超分辨率 中选择档位（超高品质 77%／高品质 67%／均衡 59%／性能优先 50%）：开启后游戏自动以低分辨率渲染，再由 FSR 的 EASU 算法放大回全屏，帧率明显提升、画质轻微下降。\n\n"
                  @"支持的渲染器（多渲染器支持为近期新增）：\n"
                  @"• MobileGlues：内置 FSR1（推荐，最成熟）；\n"
-                 @"• Zink：同一套 EASU 升采样算法，呈现前放大（早期版本在 Zink 上会出现绿色花屏，已修复：着色器已自动适配 Zink 的 GLSL 4.1 上限）；\n"
+                 @"• Zink：同一套 EASU 升采样算法，呈现前放大（早期版本在 Zink 上会出现绿色花屏，已修复：Zink 的 GLSL 4.1 上限已全面适配——着色器版本自动降级 + 半精度打包函数补齐，超分可正常启用）；\n"
                  @"• 其它渲染器（MoltenVK/自动/gl4es 等）：暂不支持。MoltenVK 的纯 Vulkan 后端无呈现钩子，需要 FSR 请选 MobileGlues 或 Zink。\n\n"
                  @"注意：\n"
                  @"1. 分辨率滑条保持 100% 即可，不需要再手动降低分辨率（那反而会二次缩放）；\n"
-                 @"2. 早期版本的\"开启后黑屏\"\"画面缩在左下角\"\"Zink 下绿色花屏\"均已分别修复（着色器降级修复 + 渲染视口识别修复 + 着色器版本适配），如仍出现请上传日志反馈。\n"
+                 @"2. 早期版本的\"开启后黑屏\"\"画面缩在左下角\"\"Zink 下绿色花屏\"均已分别修复（着色器降级修复 + 渲染视口识别修复 + 着色器版本适配与半精度函数补齐），如仍出现请上传日志反馈；\n"
                  @"3. FSR 升采样是在游戏画面渲染完成后一次性完成的，开销极小；若感觉\"开了 FSR 反而卡\"，多半是区块加载卡顿（参考 MobileGlues 卡顿一条），与 FSR 无关。";
 
     LauncherHelpFaqItem *metalFx = [[LauncherHelpFaqItem alloc] init];
@@ -79,6 +79,17 @@
                      @"MetalFX 空间版和 FSR 1.0 同为单帧升采样，画质同级，接上还需要 iOS 16+／A13+ 的设备门槛与额外的纹理互操作层，收益边际很小，暂不引入。\n\n"
                      @"【现在的建议】\n"
                      @"追求帧率：用 FSR 超高品质/高品质档（Zink 或 MobileGlues）；追求画质：关 FSR 用原生化渲染。若未来上游（Sodium 系或 Mojang）产出运动向量，启动器侧接入时域放大会重新评估。";
+
+    LauncherHelpFaqItem *armAsr = [[LauncherHelpFaqItem alloc] init];
+    armAsr.iconName = @"speedometer";
+    armAsr.question = @"能不能用 Arm ASR（Arm Accuracy Super Resolution）代替 FSR？";
+    armAsr.answer = @"短答案：现阶段不引入。Arm ASR 与 MetalFX 时域不同，它没有运动向量的硬依赖（和 FSR 1.0 一样是单帧空间超分，本身就是从 FSR1 衍生调优来的），卡点在实现形态与收益两端：\n\n"
+                    @"【为什么接不上】\n"
+                    @"Arm ASR 的官方实现是面向 Vulkan/DX12 的计算着色器（compute shader），而 Zink 走系统 Vulkan 栈时给游戏的 OpenGL 上限是 4.1——不含 4.3 才有的计算着色器，参考实现原样跑不起来；要移植只能把它的算法改写成片元着色器（与启动器内置 FSR 同样的做法）。\n\n"
+                    @"【为什么收益小】\n"
+                    @"Arm ASR 的性能卖点主要来自为 Mali GPU（Arm 自家 GPU）调优的计算着色器分块与共享内存访存；在 Apple GPU 上经片元管线跑，这些优势全部消失，剩下的画质差异相对 FSR1 很小（同为 FSR1 衍生算法）。\n\n"
+                    @"【现在的建议】\n"
+                    @"Zink 上最实际的帧率提升就是把 FSR 用起来：最新版本已补齐 Zink 的 GLSL 4.1 适配（版本自动降级 + 半精度打包函数补齐）。若未来切换到原生 Vulkan/Metal 呈现路径（有计算着色器），ASR 与 MetalFX 空间版会重新评估。";
 
     LauncherHelpFaqItem *fpsUnlock = [[LauncherHelpFaqItem alloc] init];
     fpsUnlock.iconName = @"timer";
@@ -224,10 +235,10 @@
     LauncherHelpFaqItem *greenFx = [[LauncherHelpFaqItem alloc] init];
     greenFx.iconName = @"paintpalette";
     greenFx.question = @"开 FSR 后画面出现绿色/花屏区域（尤其 Zink）？";
-    greenFx.answer = @"已修复。原因：Zink 走系统 Vulkan 栈，其着色器语言（GLSL）上限是 4.1，而 FSR 升采样着色器声明的是 4.5——旧版本里编译失败后走了降级路径，但降级没能真正告诉游戏\"恢复全分辨率渲染\"，导致画面只有左下角一块在渲染、其余区域是未初始化的显存内容（表现为绿色/花屏大块区域）。\n\n"
-                     @"新版本做了两层修复：\n"
-                     @"1. 着色器自动适配 Zink 的 GLSL 版本上限（升采样正常启用）；\n"
-                     @"2. 万一升采样仍不可用，游戏会被真正切回全分辨率直接渲染（不再留绿屏）。\n\n"
+    greenFx.answer = @"已修复（两轮）。原因：Zink 走系统 Vulkan 栈，其着色器语言（GLSL）上限是 4.1，而 FSR 升采样着色器声明的是 4.5——旧版本里编译失败后走了降级路径，但降级没能真正告诉游戏\"恢复全分辨率渲染\"，导致画面只有左下角一块在渲染、其余区域是未初始化的显存内容（表现为绿色/花屏大块区域）。\n\n"
+                     @"修复经历了两轮：\n"
+                     @"1. 第一轮：着色器版本自动适配 Zink 的 GLSL 上限 + 升采样不可用时真正切回全分辨率渲染（不再留绿屏）；\n"
+                     @"2. 第二轮：补齐 4.1 缺失的半精度打包函数、勘误着色器类型常量——Zink 下升采样从此可以正常启用（不再依赖降级）。\n\n"
                      @"如仍见到绿色区域：请上传 latestlog.txt 反馈（日志里能看出走的是哪条路径）。";
 
     LauncherHelpFaqItem *background = [[LauncherHelpFaqItem alloc] init];
@@ -264,7 +275,7 @@
 
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
-        @[ renderer, mgLag, fsr, metalFx, fpsUnlock, blurry, shader ],
+        @[ renderer, mgLag, fsr, metalFx, armAsr, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
         @[ xray, greenFx, background, crash, stuck ]

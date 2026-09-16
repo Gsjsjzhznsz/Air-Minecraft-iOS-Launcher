@@ -317,6 +317,16 @@
 // the steady-state per-frame cost drop is identified on device by the absence
 // of the previously-per-frame target-FBO clear, with the engage log line
 // unchanged from Task 82.
+// REVISION 17 addendum (Task 84, no bump): FSRShaderSource.h now carries a
+// manual packHalf2x16 / unpackHalf2x16 fallback under __VERSION__ < 420 --
+// the builtins are GLSL 4.20 core and the zink/MoltenVK path caps at GLSL
+// 4.10, where the EASU fragment compile previously died at the first packing
+// helper (75c5e14 device log). The fallback is bit-exact against numpy
+// float16 (RNE, subnormals, Inf/NaN) and preprocessed out entirely on 4.20+
+// contexts, so no converter output changed and REVISION stays 17. The fixed
+// build identifies itself on device by the zink engage line now appearing
+// after "Task83b FSR shader #version adapted: 450 -> 410" instead of the
+// "no function with name packHalf2x16" compile failure.
 #define REVISION 17
 #define PATCH 0
 

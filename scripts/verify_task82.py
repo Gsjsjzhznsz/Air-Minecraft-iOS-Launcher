@@ -351,9 +351,10 @@ else:
 
 if os.path.exists(LOG_NEW):
     zlog = read(LOG_NEW)
-    check("H3 zink session: Task83 linkage + EASU compile failure (Task83b motivation)",
+    check("H3 zink session: Task83 linkage + EASU compile chain (83b version-adapt worked on device, 84 packing fallback motivation)",
           "renderer-side upscale: zink EASU (Task83)" in zlog
-          and "GLSL 4.50 is not supported" in zlog
+          and "#version adapted: 450 -> 410" in zlog
+          and "packHalf2x16" in zlog
           and "restoring MC window to surface" in zlog)
 else:
     check("H3 zink session log present", False, "latestlog.txt missing")

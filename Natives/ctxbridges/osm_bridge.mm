@@ -79,12 +79,16 @@ osm_render_window_t* osm_init_context(osm_render_window_t* share) {
 // 恢复窗口=表面（MC 下一帧起全分辨率直渲，画面不再缩角），日志留痕。
 // ============================================================================
 
-// GL 2.0+ 枚举（GL/gl.h 只有 1.1；OSMesa 桌面 GL 4.6 全量支持）
+// GL 2.0+ 枚举（GL/gl.h 只有 1.1；OSMesa 桌面 GL 4.6 全量支持）。
+// Task 84 勘误：GL_FRAGMENT_SHADER 的规范值是 0x8B92（35730）——Task83
+// 误写 0x8B30（35632，非任何 shader 类型枚举；75c5e14 装机日志的
+// stage=35632 实锤此错值在跑）。虽然该会话的编译链仍产出了真实的编译
+// 错误信息（MobileGlues 封装层对未知枚举的容错），规范错值不可依赖。
 #ifndef GL_VERTEX_SHADER
 #define GL_VERTEX_SHADER    0x8B31
 #endif
 #ifndef GL_FRAGMENT_SHADER
-#define GL_FRAGMENT_SHADER  0x8B30
+#define GL_FRAGMENT_SHADER  0x8B92
 #endif
 #ifndef GL_COMPILE_STATUS
 #define GL_COMPILE_STATUS   0x8B81
@@ -246,11 +250,15 @@ static unsigned int ame83_compile(ame83_gl_t *g, unsigned int stage, const char 
 // （26.3 下恒 NULL）→ MC 永远按小窗渲染，全尺寸 OSMesa 缓冲的未写区域
 // = 未初始化堆内存上屏 = 用户看到的"FSR 提升部分绿色"。
 //
-// 着色器主体只需 GLSL 4.00（uintBitsToFloat / packHalf2x16 均为 4.00 内
-// 建，接口声明无 layout(binding)），接口的 layout(location) 是 330+。
-// 因此当上下文版本落在 400 以上、450 以下时，用上下文自己的版本号替换
-// 首行 #version 即可。
-// >= 450 原样；< 400 无法适配（体依赖 4.00 位操作内建），保持原样让它
+// 着色器主体只需 GLSL 4.00（uintBitsToFloat 是 3.30 内建，
+// packUnorm2x16/packUnorm4x8 是 4.00 内建），唯独 packHalf2x16/
+// unpackHalf2x16 是 4.20 核心（Task83b 注释称 4.00 内建有误——75c5e14
+// 装机日志实锤：适配到 4.10 后编译倒在 no function with name
+// packHalf2x16）。Task 84 已把位运算手写回退（RNE/次正规/Inf/NaN，
+// 位级对照 numpy float16 验证）烘焙进 FSRShaderSource.h 的
+// __VERSION__ < 420 守卫，4.20+ 上下文零变化。因此当上下文版本落在
+// 400 以上、450 以下时，用上下文自己的版本号替换首行 #version 即可。
+// >= 450 原样；< 400 无法适配（体依赖 3.30+ 位操作内建），保持原样让它
 // 以明确的版本错误日志失败。
 //
 // 探测：glGetString(GL_SHADING_LANGUAGE_VERSION)（dlsym_OSMesa 已解析，

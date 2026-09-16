@@ -180,8 +180,8 @@ check("B11 custom.json：QWERTY 面板完整（Q-P 共 26 字母）",
 
 # B12: FAQ 结构与修正
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("B12 FAQ：22 条目（Task83 19 + Task83b 新增 3：MetalFX/绿屏/切后台）",
-      len(faq_items) == 22, f"got {len(faq_items)}")
+check("B12 FAQ：23 条目（Task83 19 + Task83b 新增 3：MetalFX/绿屏/切后台 + Task84 新增 1：Arm ASR）",
+      len(faq_items) == 23, f"got {len(faq_items)}")
 check("B13 FAQ：MoltenVK 独立渲染器表述",
       "MoltenVK：独立的渲染器" in helpvc)
 check("B14 FAQ：zink 用系统 Vulkan 表述",

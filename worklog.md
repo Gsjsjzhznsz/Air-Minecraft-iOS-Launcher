@@ -419,3 +419,30 @@ Work Log:
 Stage Summary:
 - Task83b 全部落地：⌨ 键盘背景板根治 + zink FSR 版本自适应/兜底真实恢复 + FAQ 22 条 + MetalFX 技术边界入库
 - 装机验证锚点：①任意旧安装点 ⌨ 面板字母 → 聊天框出字（日志 Task83b executebtn → Task83 button text 链）；②zink+FSR → "[OSMBridge] Task83b FSR shader #version adapted: 450 -> 410" + "[OSMBridge] Task83 FSR1 upscale engaged (zink)"，画面满屏无绿；③切后台冻结=已知限制（FAQ）
+
+---
+Task ID: 84
+Agent: main (Super Z)
+Task: 用户上传 75c5e14 装机日志（Task83b IPA run 35097960207 会话）→ 判读优化点 + 修复 zink FSR 编译新倒在的一关 + Arm ASR 可行性定性 + FAQ
+
+Work Log:
+- 日志判读（zink 全程全分辨率会话，因 FSR 未启用）：
+  * Task83b 双修复真机实证：键盘三级链路全通（Task83b executebtn name=T → Task83 button text glfwKey=84 -> 't' → Task82 SDL text input U+0074，字母/空格连打 ≥8 条）——⌨ 面板彻底治愈；FSR 兜底真实恢复（window size -> SDL 0x207 2360x1640）——绿屏绝迹；无 DEVICE_LOST
+  * zink FSR 编译链：版本自适应生效（#version adapted: 450 -> 410）→ 片元编译倒在 no function with name packHalf2x16（0:626(37) = FSRShaderSource.h L645 的 AU1_AH1_AF1_x，头文件行号-19=字符串行号精确对上）→ Task83b 注释"packHalf2x16 为 4.00 内建"系误判，实为 GLSL 4.20 核心
+  * stage=35632 = 0x8B30：osm_bridge.mm 的 GL_FRAGMENT_SHADER 被误写 0x8B30（规范值 0x8B92=35730，非任何 shader 类型枚举）；日志含真实编译诊断证明设备栈仍产出了编译（MobileGlues 封装层容错），但规范错值不可依赖
+  * 会话性能画像：fps 29-83（世界流式加载期低谷、闲置 76-83），GC 健康 1.7-4.2ms（Task68 调优在位），mem 4.9-5.6GB，-Dmax.fps=260 解锁在位
+- 修复①枚举：osm_bridge.mm GL_FRAGMENT_SHADER 0x8B30 → 0x8B92 + 勘误注释（记录 75c5e14 stage=35632 证据）
+- 修复②半精度打包：FSRShaderSource.h（FSR_FSSource raw string 内、AU1_AH1_AF1_x 之前）烘焙 #if __VERSION__ < 420 守卫的手写 packHalf2x16/unpackHalf2x16（RNE 舍入/次正规/进位/Inf/NaN 全路径，floatBitsToUint/uintBitsToFloat 均 3.30 内建）；算法先在 Python 镜像位级对照 numpy float16 验证（64,060 pack + 50,000 unpack + 4,000 round-trip 全等，scripts/verify_task84_packhalf.py）再转写 GLSL（逐行核对+常量指纹 16 项全对）
+- 内建审计（防 info log 截断漏报）：整个片元着色器 >4.10 的依赖仅 packHalf2x16/unpackHalf2x16 一对（texelFetch 3.30、textureGather 4.00、packUnorm* 4.00、imageLoad 仅注释行）——修复后 4.10 必然编过
+- 4.20+ 零变化保证：守卫在 MG 转换管线（glslang 以 #version 450 解析）预处理期即剔除，SPIRV-Cross 输出不变；ESSL <320 同样受益
+- FAQ 22→23：新增 Arm ASR 条目（渲染分类，MetalFX 之后）——官方实现为 Vulkan/DX12 计算着色器（GL 4.3），zink GL 4.1 上限跑不了；性能卖点为 Mali 调优的 compute 分块/共享内存，Apple GPU 经片元管线优势全失；同为 FSR1 衍生画质差异小——不引入；greenFx 条目改"两轮修复"措辞；fsr 条目 Zink 行更新为"版本自动降级 + 半精度打包函数补齐"
+- version.h REVISION 17 addendum（Task 84, no bump）：转换输出零变化
+- verify_task84.py 31/31（A 枚举×5 / B shader 回退×10 / C 位级验证 / D FAQ×6 / E 日志证据×7 / F 级联×2）；级联 task82 H3 随新日志证据换代（4.50 版本失败 → adapted+packHalf 失败链）、task83 B12 计数 22→23；全仓 15 校验器全绿；E2 语法门通过
+- 提交推送 → CI
+
+Stage Summary:
+- zink FSR 编译三连关闭幕：GLSL 450（83b 修）→ packHalf2x16 4.20 缺失（84 修）→ 枚举 0x8B30（84 修）；装机验证锚点：adapted 行之后直接出现 "[OSMBridge] Task83 FSR1 EASU ready (zink)" + "engaged (zink): render 1814x1262 -> surface 2360x1640"，不再有 packHalf 编译失败
+- 预期收益：FSR 1.30 档启用后渲染像素 3.87M → 2.29M（-41%），配合 83b 的单趟直画
+- Arm ASR 定性（与 MetalFX-T 不同因）：无运动向量依赖（同为 FSR1 衍生空间超分），卡点是 compute shader（GL 4.3 > zink 4.1 上限）+ Mali 专属收益——不引入，FAQ 已录
+- 日志性能结论：fps 波动=世界流式（正常）；GC/内存健康；键盘/绿屏/兜底三项 Task83b 修复全部装机实证
+- 遗留：RCAS 锐化第二 pass（Task80 遗留）、切后台 DEVICE_LOST 自动恢复（路线图）、ja/km l10n

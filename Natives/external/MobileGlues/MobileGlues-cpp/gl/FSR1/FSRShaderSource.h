@@ -642,6 +642,57 @@ const char* FSR_FSSource = R"fsr_glsl(#version 450
  #define AU3_AF3(x) floatBitsToUint(AF3(x))
  #define AU4_AF4(x) floatBitsToUint(AF4(x))
 //------------------------------------------------------------------------------------------------------------------------------
+ // Task 84 (Amethyst fork): packHalf2x16 / unpackHalf2x16 are GLSL 4.20 core
+ // builtins, absent at the zink GLSL 4.10 cap (device log 75c5e14: first
+ // packHalf2x16 use failed to resolve, compile aborted). Below are manual
+ // bit-exact equivalents -- RNE rounding, subnormal paths, Inf/NaN -- verified
+ // bit-for-bit against numpy float16 over 64k pack + 50k unpack patterns
+ // (scripts/verify_task84_packhalf.py). GLSL >= 4.20 contexts keep the core
+ // builtins and preprocess this block out entirely; ESSL < 320 gets it too
+ // (same missing builtins, floatBitsToUint is 3.00 core).
+ #if __VERSION__ < 420
+ uint ame84PackHalf1(float a) {
+     uint x = floatBitsToUint(a);
+     uint s = (x >> 16) & 0x8000u;
+     uint e = (x >> 23) & 0xffu;
+     uint m = x & 0x7fffffu;
+     if (e == 255u) return s | 0x7c00u | (m != 0u ? 0x1ffu : 0u);
+     if (e <= 112u) {
+         if (e < 102u) return s;
+         uint mp = m | 0x800000u;
+         uint shift = 126u - e;
+         uint hsub = mp >> shift;
+         uint rem = mp & ((1u << shift) - 1u);
+         uint halfUlp = 1u << (shift - 1u);
+         if (rem > halfUlp || (rem == halfUlp && (hsub & 1u) != 0u)) hsub += 1u;
+         return s | hsub;
+     }
+     uint he = e - 112u;
+     if (he >= 31u) return s | 0x7c00u;
+     uint hm = m >> 13;
+     uint rem = m & 0x1fffu;
+     if (rem > 0x1000u || (rem == 0x1000u && (hm & 1u) != 0u)) hm += 1u;
+     if (hm == 0x400u) { hm = 0u; he += 1u; if (he >= 31u) return s | 0x7c00u; }
+     return s | (he << 10) | hm;
+ }
+ uint packHalf2x16(vec2 a) { return ame84PackHalf1(a.x) | (ame84PackHalf1(a.y) << 16); }
+ float ame84UnpackHalf1(uint h) {
+     uint s = (h & 0x8000u) << 16;
+     uint e = (h >> 10) & 0x1fu;
+     uint m = h & 0x3ffu;
+     if (e == 0u) {
+         if (m == 0u) return uintBitsToFloat(s);
+         uint n = m;
+         uint adj = 0u;
+         while ((n & 0x400u) == 0u) { n <<= 1; adj += 1u; }
+         return uintBitsToFloat(s | ((113u - adj) << 23) | ((n & 0x3ffu) << 13));
+     }
+     if (e == 31u) return uintBitsToFloat(s | 0x7f800000u | (m << 13));
+     return uintBitsToFloat(s | ((e + 112u) << 23) | (m << 13));
+ }
+ vec2 unpackHalf2x16(uint a) { return vec2(ame84UnpackHalf1(a & 0xffffu), ame84UnpackHalf1(a >> 16)); }
+ #endif
+//------------------------------------------------------------------------------------------------------------------------------
  AU1 AU1_AH1_AF1_x(AF1 a){return packHalf2x16(AF2(a,0.0));}
  #define AU1_AH1_AF1(a) AU1_AH1_AF1_x(AF1(a))
 //------------------------------------------------------------------------------------------------------------------------------
