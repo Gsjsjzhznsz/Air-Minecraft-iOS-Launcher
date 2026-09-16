@@ -117,6 +117,28 @@ osm_render_window_t* osm_init_context(osm_render_window_t* share) {
 #ifndef GL_TEXTURE_MAX_LEVEL
 #define GL_TEXTURE_MAX_LEVEL 0x813D
 #endif
+// Task 85（画面分裂修复）：EASU pass 的封闭性保障——显式绑回默认帧缓冲。
+// MC 26.x+Sodium 在 swap 时通常已绑 fb0（Task 75 取证），但任何模组/路径
+// 留下 FBO 绑定时，拷贝源与绘制目标都必须强制指向即将上屏的默认帧缓冲，
+// 否则升采样写进离屏 FBO，上屏画面维持分裂。
+#ifndef GL_FRAMEBUFFER
+#define GL_FRAMEBUFFER            0x8D40
+#endif
+#ifndef GL_DRAW_FRAMEBUFFER
+#define GL_DRAW_FRAMEBUFFER       0x8CA6
+#endif
+#ifndef GL_READ_FRAMEBUFFER
+#define GL_READ_FRAMEBUFFER       0x8CA9
+#endif
+#ifndef GL_DRAW_FRAMEBUFFER_BINDING
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#endif
+#ifndef GL_READ_FRAMEBUFFER_BINDING
+#define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
+#endif
+#ifndef GL_STENCIL_TEST
+#define GL_STENCIL_TEST           0x0B90
+#endif
 
 typedef unsigned int ame83_gluint;
 typedef int ame83_glint;
@@ -157,6 +179,7 @@ typedef struct {
     void (*glVertexAttribPointer)(unsigned int, int, unsigned int, unsigned char, GLsizei, const void*);
     void (*glEnableVertexAttribArray)(unsigned int);
     // draw/state
+    void (*glBindFramebuffer)(unsigned int, unsigned int);
     void (*glDrawArrays)(unsigned int, int, GLsizei);
     void (*glViewport)(int, int, GLsizei, GLsizei);
     void (*glDisable)(unsigned int);
@@ -208,6 +231,7 @@ static bool ame83_resolve_gl(void) {
         {"glBufferData",              (void**)&ame83_fsr.gl.glBufferData},
         {"glVertexAttribPointer",     (void**)&ame83_fsr.gl.glVertexAttribPointer},
         {"glEnableVertexAttribArray", (void**)&ame83_fsr.gl.glEnableVertexAttribArray},
+        {"glBindFramebuffer",          (void**)&ame83_fsr.gl.glBindFramebuffer},
         {"glDrawArrays",              (void**)&ame83_fsr.gl.glDrawArrays},
         {"glViewport",                (void**)&ame83_fsr.gl.glViewport},
         {"glDisable",                 (void**)&ame83_fsr.gl.glDisable},
@@ -370,18 +394,26 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     if (!ame83_fsr_init()) return false;
     ame83_gl_t *g = &ame83_fsr.gl;
 
-    // 最小状态保存（MC 每帧重设自己的管线状态；这里只还回关键绑定）
+    // 最小状态保存（MC 每帧重设自己的管线状态；这里只还回关键绑定）。
+    // Task 85：新增 draw/read FBO 绑定保存（EASU 强制绑 fb0，见下）。
     GLint saveVp[4] = {0}, saveTex = 0, saveProg = 0, saveVao = 0, saveVbo = 0;
+    GLint saveDrawFbo = 0, saveReadFbo = 0;
     g->glGetIntegerv(GL_VIEWPORT, saveVp);
     g->glGetIntegerv(GL_TEXTURE_BINDING_2D, &saveTex);
     g->glGetIntegerv(GL_CURRENT_PROGRAM, &saveProg);
     g->glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &saveVao);
     g->glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &saveVbo);
+    g->glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &saveDrawFbo);
+    g->glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &saveReadFbo);
 
     g->glDisable(GL_DEPTH_TEST);
     g->glDisable(GL_SCISSOR_TEST);
+    g->glDisable(GL_STENCIL_TEST);
     g->glDisable(GL_BLEND);
     g->glDisable(GL_CULL_FACE);
+
+    // Task 85：拷贝源与绘制目标都锁定默认帧缓冲（读窗口区域、写全幅）。
+    g->glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // (1) 帧的区域 → 纹理（GPU 侧拷贝；存储尺寸变化时重建）
     g->glBindTexture(GL_TEXTURE_2D, ame83_fsr.tex);
@@ -406,7 +438,9 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     g->glViewport(0, 0, dstW, dstH);
     g->glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    // (3) 还原
+    // (3) 还原（FBO 双通道分别还回，模组的非对称 read/draw 绑定不受扰动）
+    g->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (unsigned int)saveDrawFbo);
+    g->glBindFramebuffer(GL_READ_FRAMEBUFFER, (unsigned int)saveReadFbo);
     g->glBindVertexArray((unsigned int)saveVao);
     g->glBindBuffer(GL_ARRAY_BUFFER, (unsigned int)saveVbo);
     g->glUseProgram((unsigned int)saveProg);
@@ -416,7 +450,7 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     ame83_fsr.frames++;
     if (!ame83_fsr.engaged) {
         ame83_fsr.engaged = true;
-        NSLog(@"[OSMBridge] Task83 FSR1 upscale engaged (zink): render %dx%d -> surface %dx%d (EASU, same shader as MobileGlues)",
+        NSLog(@"[OSMBridge] Task83 FSR1 upscale engaged (zink): render %dx%d -> surface %dx%d (EASU pre-readback ordering, Task 85)",
               srcW, srcH, dstW, dstH);
     } else if (ame83_fsr.frames == 600) {
         NSLog(@"[OSMBridge] Task83 FSR1 upscale steady: 600 frames upsampled (zink)");
@@ -464,10 +498,17 @@ void osm_make_current(osm_render_window_t* bundle) {
 
 void osm_swap_buffers() {
     osm_apply_current_ll();
-    handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
-    // Task 83：FSR 联动下 MC 窗口 < 表面缓冲 → EASU 升采样铺满（zink 通用
-    // FSR）。失败兜底：恢复 MC 窗口=表面（下一帧起全分辨率直渲），画面
-    // 不会停留在"缩在角落"的状态。
+    // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
+    //
+    // OSMesa 契约：glFinish 触发 GPU→CPU 回读（zink 下本帧数据在 Vulkan
+    // image 里，须回读进下方 CGImage 包装的 client buffer；swrast 则本就
+    // 同步写入）。Task 83 的旧序是 glFinish → EASU——升采样画在回读之后，
+    // 永远到不了 client buffer。真机视觉 = 画面分裂：左下角窗口区域是
+    // 本帧原始低清画面，其余区域是上一帧 EASU 输出的残影（Task 84 修齐
+    // 编译链后 EASU 首次真跑，本缺陷随之暴露）。
+    //
+    // 正序：EASU 先把窗口区域升采样铺满 GPU 侧帧缓冲 → glFinish 一次性
+    // 回读完整升采样结果 → CGImage 上屏即全幅。
     if (currentBundle->osm.width > 0 && currentBundle->osm.height > 0 &&
         (windowWidth > 0 && windowHeight > 0) &&
         ((uint32_t)windowWidth < currentBundle->osm.width || (uint32_t)windowHeight < currentBundle->osm.height)) {
@@ -483,6 +524,7 @@ void osm_swap_buffers() {
             CallbackBridge_nativeSendScreenSize((int)currentBundle->osm.width, (int)currentBundle->osm.height);
         }
     }
+    handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
     osm_render_window_t bundle = currentBundle->osm;
     dispatch_async(dispatch_get_main_queue(), ^{
     // Task 83：CGImage 尺寸 = 表面缓冲尺寸（旧代码用 windowWidth——FSR

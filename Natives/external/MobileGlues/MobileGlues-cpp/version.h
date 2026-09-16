@@ -327,6 +327,20 @@
 // build identifies itself on device by the zink engage line now appearing
 // after "Task83b FSR shader #version adapted: 450 -> 410" instead of the
 // "no function with name packHalf2x16" compile failure.
+// REVISION 17 addendum (Task 85, no bump): the zink-side EASU pass in
+// osm_bridge.mm now runs BEFORE the glFinish that triggers OSMesa's
+// GPU-to-CPU readback, instead of after it. The Task 83 ordering drew the
+// upscaled frame into the GPU-side image only after the client buffer had
+// already been read back, so the displayed CGImage never contained the
+// upscale result: the bottom-left window region showed the raw low-res
+// frame while the rest showed the previous frame's EASU output -- the
+// on-device "split picture". The pass additionally pins the default
+// framebuffer (saving/restoring draw and read FBO bindings) and disables
+// stencil test, making it hermetic against any FBO state a mod leaves
+// bound at swap. Purely launcher-side presentation code, no converter
+// output changed, so REVISION stays 17. The fixed build identifies itself
+// on device by the zink engage line now ending in "(EASU pre-readback
+// ordering, Task 85)".
 #define REVISION 17
 #define PATCH 0
 

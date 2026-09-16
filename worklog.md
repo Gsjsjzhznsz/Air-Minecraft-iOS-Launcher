@@ -446,3 +446,26 @@ Stage Summary:
 - Arm ASR 定性（与 MetalFX-T 不同因）：无运动向量依赖（同为 FSR1 衍生空间超分），卡点是 compute shader（GL 4.3 > zink 4.1 上限）+ Mali 专属收益——不引入，FAQ 已录
 - 日志性能结论：fps 波动=世界流式（正常）；GC/内存健康；键盘/绿屏/兜底三项 Task83b 修复全部装机实证
 - 遗留：RCAS 锐化第二 pass（Task80 遗留）、切后台 DEVICE_LOST 自动恢复（路线图）、ja/km l10n
+
+---
+Task ID: 85
+Agent: main (Super Z)
+Task: 用户报"画面分裂"（Task84 构建装机，zink FSR 首次真跑）+ 要求搜索 FSR1 替代方案 → 根因修复 + 调研入库
+
+Work Log:
+- 根因定位（osm_swap_buffers 旧序）：glFinish（触发 OSMesa GPU→CPU 回读，zink 下帧数据在 Vulkan image）→ EASU（画进 GPU 侧帧缓冲）——升采样结果永远到不了 CGImage 包装的 client buffer。真机视觉 = 画面分裂：左下角窗口区域为本帧原始低清画面 + 其余区域为上一帧 EASU 输出残影。Task 83 引入该序，Task 84 修齐编译链后 EASU 首次真跑，缺陷随之暴露
+- 修复（osm_bridge.mm，净 +49/-7）：
+  1. 顺序反转：EASU 块移到 handle.glFinish() 之前（回读包含完整升采样结果，CGImage 上屏即全幅）
+  2. 封闭性：glBindFramebuffer(GL_FRAMEBUFFER, 0) 显式锁定拷贝源/绘制目标 + draw/read FBO 双通道保存还原（模组非对称绑定不受扰动）+ GL_STENCIL_TEST 关闭 + glBindFramebuffer 入 dlsym 表（缺失熔断）
+  3. engaged 日志尾缀 "(EASU pre-readback ordering, Task 85)"（装机判读锚点）
+- FSR1 替代方案调研（web 搜索，用户点名要求）：NIS（MIT、单 pass 放大+锐化、画质与 FSR1 同级——唯一值得未来考虑的同级替代）；GSR（BSD-3、Adreno 专属调优在 Apple GPU 落空）；MetalFX Spatial（Digital Foundry 生化危机 Mac 实测画质不如 FSR1）；Anime4K/FSRCNNX（动画内容特化）；时域家族（需运动向量/深度，引擎侧产出）。结论：EASU 已是单帧空间放大第一梯队，且已完成 GL4.1 适配，换同级收益 < 一次适配风险
+- FAQ 23→24：upscalerAlt 条目（五类方案+结论）+ fsr 条目 zink 病史补画面分裂已修（绿屏/分裂双病史闭环）
+- stale 校验同步：task83 B12（23→24）、task84 D1（23→24）/D3（armAsr 后 upscalerAlt）
+- version.h REVISION 17 addendum（Task 85 no bump：纯启动器侧呈现代码，转换缓存零影响）
+- 验证：verify_task85.py 24/24（A 顺序反转 5 指纹 + B 封闭性 9 指纹 + C FAQ 5 + D swap 段 g++ 语法门[dispatch block→lambda/NSLog→printf 变换] + E 括号 + F 级联）；全仓 13 校验器：71(30)/72(42)/75(63)/76(40)/77(27)/78/79/80(44)/81(32)/82(54)/83(73)/84(31)/85(24) 全绿
+- 踩坑：MultiEdit 再证非原子（GL defines 块重复写入）——每次 Edit 后必须 rg 复核现场（Task 70 教训重申）
+
+Stage Summary:
+- 提交推送 → CI；装机验证锚点：zink+FSR 下 "[OSMBridge] Task83 FSR1 upscale engaged (zink): render WxH -> surface WxH (EASU pre-readback ordering, Task 85)" + 画面满屏无分裂
+- zink FSR 四连关闭幕：版本适配（83b）→ packHalf（84）→ 枚举（84）→ 回读顺序（85）
+- NIS 留作未来可选画质模式（单 pass 含锐化，优于当前 EASU-only）；RCAS 锐化与 NIS 二选一，待用户需求驱动

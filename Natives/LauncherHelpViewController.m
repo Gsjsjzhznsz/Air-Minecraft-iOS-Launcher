@@ -62,7 +62,7 @@
     fsr.answer = @"FSR 1.0 在 设置 → 视频设置 → FSR 1.0 超分辨率 中选择档位（超高品质 77%／高品质 67%／均衡 59%／性能优先 50%）：开启后游戏自动以低分辨率渲染，再由 FSR 的 EASU 算法放大回全屏，帧率明显提升、画质轻微下降。\n\n"
                  @"支持的渲染器（多渲染器支持为近期新增）：\n"
                  @"• MobileGlues：内置 FSR1（推荐，最成熟）；\n"
-                 @"• Zink：同一套 EASU 升采样算法，呈现前放大（早期版本在 Zink 上会出现绿色花屏，已修复：Zink 的 GLSL 4.1 上限已全面适配——着色器版本自动降级 + 半精度打包函数补齐，超分可正常启用）；\n"
+                 @"• Zink：同一套 EASU 升采样算法，呈现前放大（早期版本在 Zink 上先后出现过绿色花屏和\"画面分裂\"两种显示异常，均已修复——前者是 GLSL 4.1 上限的版本适配与半精度函数补齐，后者是升采样与画面回读的执行顺序颠倒，现已是回读前放大、显式锁定默认帧缓冲的封闭链路）；\n"
                  @"• 其它渲染器（MoltenVK/自动/gl4es 等）：暂不支持。MoltenVK 的纯 Vulkan 后端无呈现钩子，需要 FSR 请选 MobileGlues 或 Zink。\n\n"
                  @"注意：\n"
                  @"1. 分辨率滑条保持 100% 即可，不需要再手动降低分辨率（那反而会二次缩放）；\n"
@@ -90,6 +90,17 @@
                     @"Arm ASR 的性能卖点主要来自为 Mali GPU（Arm 自家 GPU）调优的计算着色器分块与共享内存访存；在 Apple GPU 上经片元管线跑，这些优势全部消失，剩下的画质差异相对 FSR1 很小（同为 FSR1 衍生算法）。\n\n"
                     @"【现在的建议】\n"
                     @"Zink 上最实际的帧率提升就是把 FSR 用起来：最新版本已补齐 Zink 的 GLSL 4.1 适配（版本自动降级 + 半精度打包函数补齐）。若未来切换到原生 Vulkan/Metal 呈现路径（有计算着色器），ASR 与 MetalFX 空间版会重新评估。";
+
+    LauncherHelpFaqItem *upscalerAlt = [[LauncherHelpFaqItem alloc] init];
+    upscalerAlt.iconName = @"wand.and.stars";
+    upscalerAlt.question = @"FSR 1.0 有哪些替代方案？为什么最后还是选它？";
+    upscalerAlt.answer = @"单帧空间放大这一类算法里，可选方案和结论如下（2024-2025 年公开评测与源码调研）：\n\n"
+                    @"【NVIDIA NIS（Image Scaling）】开源（MIT）、单 pass 放大+锐化合一、跨平台（AMD/Intel 也能用）。公开对比评测的结论是画质与 FSR 1 同级、几乎一致；理论上单 pass 更省带宽。这是唯一值得未来考虑的同级替代——接入需要做一轮 GLSL 版本适配（与我们已完成的 FSR 适配同量级工作量）。\n\n"
+                    @"【Qualcomm GSR（Game Super Resolution）】开源（BSD-3）、单 pass 空间放大。卖点是专为 Adreno GPU 的波占用率调优——Apple GPU 上这些优化全部落空，画质又与 FSR1 同源同级，换它没有收益。\n\n"
+                    @"【Apple MetalFX 空间版】Digital Foundry 在生化危机 Mac 版的实测画质还不如 FSR 1（同一游戏引擎、同为空间放大），且接入需 iOS 16+／A13+ 与额外的纹理互操作层。\n\n"
+                    @"【Anime4K／FSRCNNX 等视频系算法】面向动画内容的边缘重建，通用 3D 场景收益不稳定，计算量也更高，不适合游戏实时全屏放大。\n\n"
+                    @"【时域家族（DLSS／FSR 2-3／XeSS／MetalFX Temporal／Arm ASR）】画质上限确实高一档，但全部依赖游戏引擎输出的运动向量／深度／抖动序列——启动器侧无法凭空合成，详见前两条 Arm ASR 与 MetalFX 的说明。\n\n"
+                    @"结论：FSR 1 的 EASU 在\"单帧空间放大\"类别里本就是第一梯队画质（部分实测还优于 MetalFX 空间版），我们且已完成 Zink 的 GL 4.1 适配；换任何同级算法收益都小于一次适配的风险。真正的画质跃升点在未来时域输入可用之时。";
 
     LauncherHelpFaqItem *fpsUnlock = [[LauncherHelpFaqItem alloc] init];
     fpsUnlock.iconName = @"timer";
@@ -275,7 +286,7 @@
 
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
-        @[ renderer, mgLag, fsr, metalFx, armAsr, fpsUnlock, blurry, shader ],
+        @[ renderer, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
         @[ xray, greenFx, background, crash, stuck ]
