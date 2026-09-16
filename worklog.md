@@ -404,3 +404,18 @@ Stage Summary:
 - 附带收获：nativeSendScreenSize 的 SDL3 路径打通 = 运行时改分辨率/FSR 兜底在 26.3 下首次真正生效
 - 装机验证锚点：①⌨ 面板（任意旧安装）点字母 → 聊天框出字 + 日志 "[InputDiag] Task83b executebtn #1: name=H ..." → "[InputDiag] Task83 button text #1"；②zink+FSR → 上述版本适配/engage 两行，画面满屏无绿；③切后台冻结为已知限制（FAQ），日志见 VK_ERROR_DEVICE_LOST
 - 遗留：切后台 DEVICE LOST 自动恢复（需 Vulkan 设备重建，路线图）；RCAS 锐化第二 pass（Task80 遗留）；深谷 build 尖峰 instrumentation（Task78 遗留）；ja/km l10n（Task66 遗留）
+
+---
+Task ID: 83b-CI
+Agent: main (Super Z)
+Task: Task83b 提交的 CI 修复轮
+
+Work Log:
+- 第一轮 run 35096621923（7d72f82）失败：osm_bridge.mm:264 "cannot initialize a variable of type 'const char *' with an rvalue of type 'GLubyte *'"——本地 E2 语法桩把 glGetString 声明成 const char*(*)(unsigned)，恰好掩盖了 C++ 指针隐式转换错误（真实 osm_bridge.h 签名是 GLubyte* 返回）
+- 修复：代码侧改收 const GLubyte* + 显式 (const char*) 转型后 sscanf；语法桩同步改为真实签名（GLubyte* 返回）+ 注明教训——本地桩签名必须逐字镜像真实头文件，否则语法检查给出虚假信心
+- 过程清理：误把 12k 行 CI 日志 ci_task83b_1.log 提交进仓库（仓库历来不跟踪 ci_*.log）→ 移到仓库外 + .gitignore 补 ci_task83b_*.log + amend 强推
+- 第二轮 run 35097960207（ef74dfb）SUCCESS
+
+Stage Summary:
+- Task83b 全部落地：⌨ 键盘背景板根治 + zink FSR 版本自适应/兜底真实恢复 + FAQ 22 条 + MetalFX 技术边界入库
+- 装机验证锚点：①任意旧安装点 ⌨ 面板字母 → 聊天框出字（日志 Task83b executebtn → Task83 button text 链）；②zink+FSR → "[OSMBridge] Task83b FSR shader #version adapted: 450 -> 410" + "[OSMBridge] Task83 FSR1 upscale engaged (zink)"，画面满屏无绿；③切后台冻结=已知限制（FAQ）
