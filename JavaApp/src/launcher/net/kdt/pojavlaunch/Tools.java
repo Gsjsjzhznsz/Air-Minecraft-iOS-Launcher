@@ -229,6 +229,68 @@ public final class Tools {
         for (int i = 0; i < n; i++) {
             System.out.println("[LaunchWatchdog]   at " + st[i]);
         }
+        // Task 87：桌面弹窗/锁等待阻塞识别（仅提示一次）
+        maybeLogStartupBlockHint(st);
+    }
+
+    /**
+     * Task 87：启动阻塞模式识别——栈顶 Object.wait 直接位于 mod 代码之下。
+     *
+     * 病历（7b88b69，BMC2 537 mods）：missingmodschecker 的 MissingModsWindow.open
+     * 在窗口构建完成后于 Object.wait() 等待用户点击——此时栈上已经没有任何
+     * java.awt/javax.swing 帧（构建已返回），纯 AWT 帧扫描会漏掉这种"弹窗后
+     * 等待"形态。判据：栈顶为 java.lang.Object.wait/wait0，且其下 3 帧内出现
+     * 非 JDK 帧（mod/游戏代码）。vanilla 启动期主线程不用 Object.wait
+     * （future/latch 走 LockSupport.park），命中即为 mod 显式等待。
+     */
+    private static boolean isObjectWaitUnderAppFrames(StackTraceElement[] st) {
+        if (st == null || st.length < 2) {
+            return false;
+        }
+        boolean waiting = "java.lang.Object".equals(st[0].getClassName())
+                && ("wait".equals(st[0].getMethodName()) || "wait0".equals(st[0].getMethodName()));
+        if (!waiting) {
+            return false;
+        }
+        for (int i = 1; i < Math.min(4, st.length); i++) {
+            String cn = st[i].getClassName();
+            if (cn.startsWith("java.") || cn.startsWith("jdk.") || cn.startsWith("sun.")) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /** Task 87：一次性输出启动阻塞的针对性指引（防刷屏）。 */
+    private static boolean task87HintShown = false;
+
+    private static void maybeLogStartupBlockHint(StackTraceElement[] st) {
+        if (task87HintShown || st == null || st.length == 0) {
+            return;
+        }
+        boolean awtInStack = false;
+        int n = Math.min(16, st.length);
+        for (int i = 0; i < n; i++) {
+            String cn = st[i].getClassName();
+            if (cn.startsWith("java.awt.") || cn.startsWith("javax.swing.")) {
+                awtInStack = true;
+                break;
+            }
+        }
+        boolean waitUnderApp = isObjectWaitUnderAppFrames(st);
+        if (!awtInStack && !waitUnderApp) {
+            return;
+        }
+        task87HintShown = true;
+        log("STARTUP BLOCK signature: "
+                + (awtInStack ? "AWT/Swing frames on the game thread"
+                              : "Object.wait held directly by mod code")
+                + ". Desktop-only dialog mods (e.g. missingmodschecker) open a window that can never"
+                + " be shown on iOS and will block startup forever at this point. Remove the mod owning"
+                + " the topmost app frames above from the mods folder (rename its .jar to .jar.disabled);"
+                + " known offenders are auto-disabled before launch (see [ModDialogGuard] Task87 lines)."
+                + " This hint is printed once.");
     }
 
     private static void log(String msg) {

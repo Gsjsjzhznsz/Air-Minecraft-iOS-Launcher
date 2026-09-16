@@ -494,3 +494,28 @@ Stage Summary:
 - BMC2 卡启动定性：mod 层阻塞，非启动器回归；看门狗已布防，等用户下次复现日志点名元凶
 - 装机验证锚点：卡死复现时 "[LaunchWatchdog] Task86 entrypoint-phase sample #N ... at <元凶 mod 类名>"；健康启动时 "launch reached MinecraftClient (window init)" 单行
 - 遗留：元凶 mod 待日志点名（BMC2 嫌疑区间=configureddefaults 之后的 entrypoint 序列）；RenderDiag 的 swapOK/drawable 字段对 zink 路径是盲的（fps 计数有效），诊断盲区留待后续
+
+---
+Task ID: 87
+Agent: main (Super Z)
+Task: 用户上传 7b88b69 日志对（6054498 构建）判读——"第一个 log 是 ltw 渲染器启动崩溃，第二个是大型整合包" → 双根因实锤 + 三层修复
+
+Work Log:
+- 日志判读（均为 6054498 = Task86 IPA，iPad Air M4 / iPadOS 27，**Task86 看门狗一击命中**）：
+  * latestlog.txt = LTW 渲染器 × MC 26.2 崩溃会话：LTW 初始化全绿（first eglSwapBuffers OK、fps 交换正常、27 ticks）→ 资源重载 11.8s 崩溃。根因链：LTW 把桌面 GL 3.3 转译到 Apple 系统 ANGLE 的 **GLES 3.0**（日志实证 "Running on OpenGL ES 3.0 with ESSL 300"、BaseVertex 缺 ES 3.1 不可用），但对外宣告 GL 3.3——MC 26.x 云渲染管线（minecraft:core/rendertype_clouds）按 GL 3.3 核心规范使用 **samplerBuffer**（TBO 自 GL 3.1 起为核心特性），ES 3.0 后端没有 GL_EXT_texture_buffer → "'samplerBuffer' : Illegal use of reserved word" → pipeline/flat_clouds + clouds 缺失 → "Failed to load required shader programs" 硬崩（crash report 落盘）
+  * latestlog.old.txt = BMC2 [FABRIC] 1.20.1（537 mods，zink+FSR）卡死会话：**看门狗两采样实锤元凶**——主线程在 Fabric setupLanguageAdapters 的 Class.forName 阶段卡在 toni.missingmodschecker.MissingModsWindow.open 的 Object.wait()。Web 搜索确证：MissingModsChecker 是 CurseForge/Modrinth 正规桌面工具 mod（1.0.1，检测到缺失依赖时弹 Swing 窗口等确认）；本例 Fabric 依赖解析已完成（仅 2 条 recommends 警告：lambdynlights/yacl3，无硬缺失），弹窗纯属桌面端增强，iOS 上窗口永远无法显示 → 无限阻塞 → 用户 30s 后强制取消（actionForceClose → exit(0)）。fullstackwatchdog 亦为正规 mod（CurseForge 崩溃报告美化工具），非恶意
+- 关键洞察：MobileGlues 2.0.x version.h 揭示其 **REVISION 7+ 已有完整 TBO 模拟层**（glTexBuffer 借道 GL_COPY_WRITE_BUFFER 追踪 + 着色器 samplerBuffer 重写 + 绘制时采样重接，历经 R7→R13 迭代）——这正是 MG 能跑 26.x 而 LTW 不能的根本差异；LTW（tinywrapper，C）无此基础设施，移植属结构性工程 → 列路线图
+- 修复（三层，全启动器侧）：
+  1. **SurfaceViewController.m LTW × 26.x 预检门**：ame87_mcVersionRequiresTextureBuffer（主版本 >= 26，含 26w* 快照与 rc/pre 后缀剥离；25w* 无法精确划界放行）+ launchMinecraft 内拦截（dismissLaunchOverlayOnError + 弹窗指引切 Zink/MobileGlues + return，复用 metadata-nil 校验的既有模式），JVM 未启动即拦——不再白跑必崩启动
+  2. **JavaLauncher.m [ModDialogGuard] Task87**：JVM 启动前扫 gameDir/mods，实证名单（missingmodschecker，小写子串匹配 .jar）自动改名 .jar.disabled（Fabric 忽略非 .jar；改回即恢复）；名单宁缺毋滥——只收真机实证叶子工具 mod，避免破坏依赖解析
+  3. **Tools.java 看门狗阻塞形态识别**：dumpStack 挂 maybeLogStartupBlockHint——(a) 16 帧窗口扫 java.awt./javax.swing. 帧；(b) **Object.wait/wait0 直挂非 JDK 帧（3 帧窗口）**——弹窗后等待的栈上已无 AWT 帧（构建已返回），纯 AWT 扫描必漏，等待形态本身才是判据；命中输出一次性 "STARTUP BLOCK signature" 指引（点名移除/禁用动作 + 呼应 ModDialogGuard），task87HintShown 防刷屏
+- FAQ 25→26：+ltw26（LTW 渲染器玩 MC 26.x 直接崩溃：预检说明 + samplerBuffer 机理 + 日志特征 + 切换指引 + 适用范围 1.21.x 及更早）；renderer 条目补 LTW 适用范围 bullet；bigpack 条目重写（实锤案例 missingmodschecker + 两层防护说明 + .disabled 恢复指引）
+- version.h REVISION 17 addendum (Task 87, no bump)：纯启动器侧（ObjC + launcher.jar Java），MobileGlues 转换器表面零改动
+- stale 校验同步（日志换代 7b88b69 引发）：task86 B 段 e7230da 日志对钉死 git 历史 f17ef7b（B0 fixture 在位检查 + git_show 辅助函数，不再读可变工作区）；task86 C2 bigpack 断言同步重写后内容；task83 B18 "设置 → 视频设置" 计数 2→3（ltw26 新增）；task84 D3 分类数组插入 ltw26；task83 B12/task84 D1/task85 C1/task86 C1 FAQ 计数 25→26
+- 验证：verify_task87.py **47/47**（A 7b88b69 双日志 9 证据锚 + B 预检门 6 + C ModDialogGuard 6 + D 看门狗识别 7 + E FAQ 6 + F version.h 2 + G 版本口径 12 用例单测 + H 括号平衡 5 文件 + I ECJ 编译门 + J 级联 4）；全仓 15 校验器全绿（71/72/75/76/77/78/79/80/81/82/83(73)/84(31)/85/86(33)/87(47)）
+
+Stage Summary:
+- BMC2 整合包卡死正式闭环：元凶 = missingmodschecker 桌面弹窗 mod；下次启动 ModDialogGuard 自动禁用后整合包应能继续（Fabric 无硬缺失依赖）
+- LTW × 26.x 能力边界定案：ES 3.0 后端无 TBO → 必崩；预检门拦截 + 指引切 Zink/MG；LTW 适用 1.21.x 及更早；TBO 模拟移植列路线图
+- 装机验证锚点：整合包重启 → "[ModDialogGuard] Task87: disabled desktop dialog mod ... (renamed to .disabled)" + 启动继续推进（Backend library / Render thread 出现）；LTW×26.x → "Task87 launch gate: LTW renderer + MC 26.x blocked" + 弹窗
+- 遗留：⌨ 虚拟键盘二轮诊断仍缺真机 [InputDiag] button text 证据（本轮两日志均未触及键盘）；BMC2 537 mods 在 A 系 3GB 堆上的运行期表现待装机观察

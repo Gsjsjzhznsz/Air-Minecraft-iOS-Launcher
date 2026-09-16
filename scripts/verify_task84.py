@@ -103,13 +103,13 @@ check("C1 打包/解包算法位级全等（64k pack + 50k unpack + 4k roundtrip
 print("===== D. FAQ（Arm ASR 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("D1 25 条目（Task86 +bigpack 大型整合包首启卡死，Task85 时为 24）", len(faq_items) == 25, f"got {len(faq_items)}")
+check("D1 26 条目（Task86 +bigpack，Task87 +ltw26，Task85 时为 24）", len(faq_items) == 26, f"got {len(faq_items)}")
 check("D2 armAsr 条目在位（问题 + 计算着色器/GL 4.1 边界 + Mali 调优定性）",
       "Arm ASR（Arm Accuracy Super Resolution）代替 FSR" in helpvc
       and "4.3 才有的计算着色器" in helpvc
       and "Mali GPU" in helpvc)
-check("D3 armAsr 注册进渲染与性能分类（MetalFX 之后，Task85 起 upscalerAlt 紧随其后）",
-      re.search(r"@\[ renderer, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock", helpvc) is not None)
+check("D3 armAsr 注册进渲染与性能分类（Task87 起 ltw26 插在 renderer 之后）",
+      re.search(r"@\[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock", helpvc) is not None)
 check("D4 armAsr 与 FSR1 同源定性（空间超分、无运动向量依赖）",
       "单帧空间超分" in helpvc and "从 FSR1 衍生" in helpvc)
 check("D5 greenFx 两轮修复措辞",

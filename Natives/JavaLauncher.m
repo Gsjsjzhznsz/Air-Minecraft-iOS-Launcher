@@ -442,6 +442,64 @@ static NSString *lwjglBareLibName(const char *fileName) {
     return name;
 }
 
+// Task 87：桌面弹窗类 mod 预检 ----------------------------------------------
+// 病历（7b88b69 latestlog.old.txt，6054498 构建，BMC2 [FABRIC] 1.20.1，537 mods）：
+// 整合包主线程在 Fabric setupLanguageAdapters 的 Class.forName 阶段被
+// toni.missingmodschecker.MissingModsWindow.open 的 Object.wait() 硬阻塞
+// （[LaunchWatchdog] Task86 两个采样实证，用户 30s 后强制取消，"卡在启动界面"）。
+// MissingModsChecker 是 CurseForge/Modrinth 上的正规桌面工具 mod：检测到缺失依赖
+// 时弹 Swing 窗口等待用户点击确认。iOS 上该窗口永远无法显示 → 无限阻塞。
+// 而 Fabric 自身的依赖解析此时已完成（本例仅 2 条 recommends 级警告，无硬缺失），
+// 弹窗纯属桌面端体验增强——去掉它整合包照常启动。
+//
+// 对策：JVM 启动前扫描 mods 目录，把实证的"桌面弹窗类"mod 改名为 .jar.disabled
+// （Fabric 只加载 .jar 结尾的文件；想恢复把文件名改回即可）。
+// 名单原则：只收真机实证过的案犯，宁缺毋滥——missingmodschecker 是叶子工具
+// mod（依赖树里没有任何 mod 依赖它），禁用不会破坏依赖解析。
+static int ame87_disableDesktopDialogMods(NSString *gameDir) {
+    if (gameDir.length == 0) {
+        return 0;
+    }
+    NSString *modsDir = [gameDir stringByAppendingPathComponent:@"mods"];
+    BOOL isDir = NO;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm fileExistsAtPath:modsDir isDirectory:&isDir] || !isDir) {
+        return 0;
+    }
+    NSArray<NSString *> *files = [fm contentsOfDirectoryAtPath:modsDir error:nil];
+    if (files.count == 0) {
+        return 0;
+    }
+    // 实证名单（小写子串匹配 .jar 文件名）
+    NSArray<NSString *> *patterns = @[@"missingmodschecker"];
+    int disabled = 0;
+    for (NSString *file in files) {
+        NSString *lower = file.lowercaseString;
+        if (![lower hasSuffix:@".jar"]) {
+            continue; // 已是 .disabled / 非 jar 一律跳过
+        }
+        BOOL matched = NO;
+        for (NSString *pattern in patterns) {
+            if ([lower rangeOfString:pattern].location != NSNotFound) {
+                matched = YES;
+                break;
+            }
+        }
+        if (!matched) {
+            continue;
+        }
+        NSString *srcPath = [modsDir stringByAppendingPathComponent:file];
+        NSString *dstPath = [srcPath stringByAppendingString:@".disabled"];
+        if ([fm moveItemAtPath:srcPath toPath:dstPath error:nil]) {
+            disabled++;
+            NSLog(@"[ModDialogGuard] Task87: disabled desktop dialog mod \"%@\" (renamed to .disabled; rename back to re-enable) -- Swing dialogs can never be shown on iOS and would block startup forever (7b88b69 evidence)", file);
+        } else {
+            NSLog(@"[ModDialogGuard] Task87: FAILED to disable \"%@\" (rename error) -- startup may stall if this mod opens a dialog", file);
+        }
+    }
+    return disabled;
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -653,6 +711,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             getenv("POJAV_HOME"), getPrefObject(@"general.game_directory"),
             [PLProfiles resolveKeyForCurrentProfile:@"gameDir"]]
             .stringByStandardizingPath;
+
+        // Task 87：桌面弹窗类 mod 预检（病历见 ame87_disableDesktopDialogMods 函数头）
+        // ——实证案犯自动禁用（改名 .jar.disabled），Fabric 忽略非 .jar 文件。
+        int ame87_disabledDialogMods = ame87_disableDesktopDialogMods(gameDir);
+        if (ame87_disabledDialogMods > 0) {
+            NSLog(@"[ModDialogGuard] Task87: %d desktop dialog mod(s) auto-disabled in %@/mods (rename .disabled -> .jar to restore)", ame87_disabledDialogMods, gameDir.lastPathComponent);
+        }
     } else {
         defaultJRETag = @"execute_jar";
         gameDir = @(getenv("POJAV_GAME_DIR"));

@@ -42,9 +42,18 @@
     renderer.answer = @"渲染器在 设置 → 视频设置 → 渲染器 中选择（游戏未运行时才能改）：\n\n"
                       @"• Zink：把游戏的 OpenGL 转译到系统 Vulkan 栈上运行（GL→Vulkan→Metal），适合 26.x 新版本和装了模组的场景，区块加载更流畅；\n"
                       @"• MobileGlues：OpenGL→Metal 转译层，兼容性好，适合轻量场景和老版本；加载区块时每帧转译开销较大（安卓设备同样如此，属已知特性）；\n"
+                      @"• LTW：轻量级 OpenGL 3.3→ES 转译层（与安卓端同源），开销小，适合 1.21.x 及更早的轻量版本；不支持 MC 26.x（见下一条）；\n"
                       @"• MoltenVK：独立的渲染器，直接把 Vulkan API 映射到 Metal。MC 26.2+ 可在 游戏内 视频设置 → 图形 切到 Vulkan 后端配合使用（配合帧率解锁可超过屏幕刷新率）；它和 Zink 是两个互相独立的选项——Zink 用的是系统 Vulkan 栈，不等于\"选择 MoltenVK 渲染器\"；\n"
                       @"• 自动：由启动器按版本自动选择。\n\n"
-                      @"简单记法：玩新版本/整合包用 Zink；老版本/轻量场景用 MobileGlues；需要 Vulkan 后端时选 MoltenVK。";
+                      @"简单记法：玩新版本/整合包用 Zink；老版本/轻量场景用 MobileGlues 或 LTW；需要 Vulkan 后端时选 MoltenVK。";
+
+    LauncherHelpFaqItem *ltw26 = [[LauncherHelpFaqItem alloc] init];
+    ltw26.iconName = @"bolt.trianglebadge.exclamationmark";
+    ltw26.question = @"LTW 渲染器玩 MC 26.x 直接崩溃？";
+    ltw26.answer = @"已知能力边界，启动器已内置预检（选 LTW 启动 26.x 时会直接弹出提示并阻止启动，不会让你白跑一趟）。\n\n"
+                   @"原因：LTW 在 iOS 上基于 Apple 系统的 GLES 3.0 后端转译桌面 OpenGL 3.3，而 MC 26.x 的云渲染管线需要\"纹理缓冲\"（samplerBuffer，桌面 GL 3.1 起的核心特性）——ES 3.0 后端没有这个能力，云朵着色器必然编译失败，游戏在标题界面崩溃（日志特征：'samplerBuffer: Illegal use of reserved word' + 'Failed to load required shader programs: pipeline/flat_clouds'）。\n\n"
+                   @"解决办法：设置 → 视频设置 → 渲染器 切换到 Zink 或 MobileGlues（两者都完整支持 26.x：Zink 提供桌面级 GL 4.x，MobileGlues 内置纹理缓冲模拟层）。\n\n"
+                   @"LTW 的适用范围：1.21.x 及更早版本照常可用。给 LTW 补上纹理缓冲模拟属结构性工程，已在路线图上（参照 MobileGlues 同类模拟层的实现历史）。";
 
     LauncherHelpFaqItem *mgLag = [[LauncherHelpFaqItem alloc] init];
     mgLag.iconName = @"speedometer";
@@ -288,16 +297,19 @@
     bigpack.iconName = @"hourglass";
     bigpack.question = @"大型整合包（几百个模组）第一次启动就卡在加载界面？";
     bigpack.answer = @"典型表现：启动浮层/进度画面长时间不动（几分钟以上），但游戏没有闪退。这与渲染器、内存分配都无关——加大内存无效。\n\n"
-                     @"原因：几百个模组会在游戏主线程里逐个初始化，其中某个模组若在等待网络请求、不可用的系统调用或不兼容的本地库，就会把整个启动流程卡死在它那一步（多数是模组在移动环境下的兼容性问题）。\n\n"
-                     @"启动器已内置\"启动看门狗\"：启动阶段主线程超过 15 秒没有进展时，日志（latestlog.txt）会自动记录它正在执行的代码位置，行首标有 [LaunchWatchdog] 字样，其中 \"at xxx.yyy.某模组类名\" 一行直接指出卡在哪个模组。\n\n"
+                     @"已实锤的典型案例（BMC2 整合包，537 mods）：整合包里打包了“桌面弹窗类”工具模组（missingmodschecker——桌面端检测到缺失依赖时弹窗等确认），这类弹窗在 iOS 上永远显示不出来，主线程就无限等下去。日志里 [LaunchWatchdog] 会直接点名卡在哪个模组。\n\n"
+                     @"启动器已内置两层防护：\n"
+                     @"1. 启动前自动禁用已实锤的弹窗类模组（日志可见 [ModDialogGuard] 字样，把 mod 文件改名成了 .disabled；想恢复把文件名改回 .jar 即可）；\n"
+                     @"2. 启动看门狗：主线程超过 15 秒没有进展时，日志（latestlog.txt）自动记录正在执行的代码位置，行首标有 [LaunchWatchdog]，其中 \"at 某模组包名.类名\" 一行直接指出卡在哪个模组。\n\n"
                      @"自救步骤：\n"
                      @"1. 先耐心等 2~3 分钟——部分模组首次初始化确实慢；\n"
                    @"2. 取消后重试一次——首次启动要复制整合包的默认文件，第二次会跳过这些工作；\n"
-                   @"3. 仍卡死：上传 latestlog.txt 反馈，凭看门狗记录可直接定位元凶模组，在 mods 文件夹移除它后整合包其余部分通常照常能玩（工具类模组大多可安全移除）。";
+                   @"3. 仍卡死：看日志里 [LaunchWatchdog] 点名的模组，在 mods 文件夹移除它（工具类模组大多可安全移除）后重试；\n"
+                   @"4. 都看不懂：上传 latestlog.txt 反馈，凭看门狗记录可直接定位。";
 
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
-        @[ renderer, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
+        @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
         @[ xray, greenFx, background, crash, stuck, bigpack ]

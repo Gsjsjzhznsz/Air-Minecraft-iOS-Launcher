@@ -353,6 +353,27 @@
 // "[LaunchWatchdog] Task86" and name the blocking mod's class directly, turning
 // the next reproduction into a one-read diagnosis. Launcher-side Java only;
 // no MobileGlues converter surface touched, so REVISION stays 17.
+// REVISION 17 addendum (Task 87, no bump): the watchdog paid off -- the 7b88b69
+// log pair named the modpack stall AND exposed an LTW capability gap. (1) The
+// 537-mod BMC2 stall is toni.missingmodschecker.MissingModsWindow.open's
+// Object.wait(): a desktop utility mod popping a Swing dialog over missing
+// (recommends-level) dependencies; the window can never be shown on iOS, so
+// the game thread waited forever. JavaLauncher.m now auto-disables evidenced
+// desktop-dialog mods before the JVM starts ([ModDialogGuard] Task87, rename
+// to .jar.disabled -- Fabric ignores non-.jar files), and the watchdog logs a
+// one-shot STARTUP BLOCK hint when it sees AWT/Swing frames or Object.wait
+// held directly under mod code (the post-construction wait carries no AWT
+// frames, so the detector matches the wait pattern itself). (2) The same log
+// pair's LTW session crashed at 11.8s in the title-screen resource reload:
+// MC 26.x's clouds pipeline (minecraft:core/rendertype_clouds) uses
+// samplerBuffer under the desktop GL 3.3 profile LTW advertises, but LTW's
+// iOS backend is Apple's system ANGLE GLES 3.0 (no GL_EXT_texture_buffer) and
+// LTW has no TBO emulation layer -- "samplerBuffer: Illegal use of reserved
+// word" kills pipeline/flat_clouds and the reload aborts. SurfaceViewController
+// now gates LTW x MC >= 26 before launch with a dialog pointing at Zink or
+// MobileGlues (this layer's own TBO emulation, REVISION 7+, is why MG runs
+// 26.x unharmed). Launcher-side only; no MobileGlues converter surface
+// touched, so REVISION stays 17.
 #define REVISION 17
 #define PATCH 0
 

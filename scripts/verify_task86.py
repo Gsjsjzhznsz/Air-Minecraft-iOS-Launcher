@@ -78,9 +78,16 @@ check("A9 病历 javadoc（BMC2/537 mods/configureddefaults 诊断链）",
 check("A10 仅用 java.lang API（无新增 import 依赖）",
       "java.lang.management" not in tools and "javax.management" not in tools)
 
-print("===== B. f17ef7b 日志对证据（可变工作区，退役时按惯例钉 git） =====")
-log_old = read("latestlog.old.txt")
-log_new = read("latestlog.txt")
+print("===== B. f17ef7b 日志对证据（Task87 起钉 git——工作区已被 7b88b69 新对覆盖） =====")
+# Task86 当时验证的 e7230da 日志对已随 7b88b69 上传被覆盖，按 task84 E 段惯例
+# 钉死到 git 历史 f17ef7b（上传提交），不再读可变工作区日志。
+def git_show(ref_path):
+    r = subprocess.run(["git", "-C", REPO, "show", ref_path],
+                       capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+log_old = git_show("f17ef7b:latestlog.old.txt")
+log_new = git_show("f17ef7b:latestlog.txt")
+check("B0 git fixture f17ef7b 日志对在位", len(log_old) > 1000 and len(log_new) > 1000)
 check("B1 两日志均为 e7230da 构建（Task85 IPA）",
       "Commit: e7230da (main)" in log_old and "Commit: e7230da (main)" in log_new)
 check("B2 old.txt：Task85 修复装机锚点（EASU pre-readback ordering 后缀）",
@@ -105,14 +112,15 @@ check("B9 new.txt：JVM/加载器本身健康（2966MB 分配 + Fabric 5s 完成
       "Max RAM allocation is set to 2966 MB" in log_new
       and "Loading Minecraft 1.20.1 with Fabric Loader 0.19.3" in log_new)
 
-print("===== C. FAQ 25 条（bigpack 条目） =====")
+print("===== C. FAQ 26 条（bigpack 条目，Task87 增 ltw26） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 25 条目（Task86 +1）", len(faq_items) == 25, f"got {len(faq_items)}")
-check("C2 bigpack 条目在位（问题 + 看门狗说明 + 自救步骤）",
+check("C1 26 条目（Task86 +1，Task87 +1）", len(faq_items) == 26, f"got {len(faq_items)}")
+check("C2 bigpack 条目在位（Task87 重写：实锤案例 + 两层防护 + 自救步骤）",
       "大型整合包（几百个模组）第一次启动就卡在加载界面" in helpvc
       and "[LaunchWatchdog]" in helpvc
-      and "移除它后整合包其余部分通常照常能玩" in helpvc)
+      and "missingmodschecker" in helpvc
+      and "[ModDialogGuard]" in helpvc)
 check("C3 bigpack 注册进故障排除分类（stuck 之后）",
       re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack \]", helpvc) is not None)
 check("C4 bigpack 与渲染器/内存无关的定性（防误导加内存）",
