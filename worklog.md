@@ -354,3 +354,25 @@ Stage Summary:
 - FSR 独立化：zink 经 osm_bridge EASU（与 MG 逐字同款 shader）接入，MoltenVK 纯 Vulkan 无呈现钩子明确不接（FAQ+设置文案说明，防"画面缩角"回归）；存储键 mobileglues.fsr1_setting 历史兼容
 - 用户装机预期（本构建）：①⌨ 面板聊天打字有效 + "[InputDiag] Task83 button text #N: glfwKey=.. -> 'x'"；②zink+FSR 场 "[OSMBridge] Task83 FSR1 upscale engaged (zink): render ..x.. -> surface ..x.."；③MG+FSR 场 engage 行不变、每帧更轻；④FAQ 19 条目含 MoltenVK/zink 修正表述
 - 遗留：深谷 build 尖峰 instrumentation（Task78 起）；RCAS 锐化第二 pass（Task80）；ja/km l10n 深度（Task66）；Vulkan 渲染器 FSR（需 vkQueuePresent 层钩子，当前架构不适用）
+
+---
+Task ID: 83a
+Agent: main (Super Z)
+Task: Task83 提交后 CI 八连红修复（037a6c1 → c75c77c，run 34987233296 → 35037960566）
+
+Work Log:
+- run1 34987233296（28 errors）：osm_bridge.mm 被当纯 CXX 编译（工程无 OBJCXX 语言，.m 全走 C+-ObjC 路线）→ @interface 全炸。修：set_source_files_properties 单文件 "-x objective-c++ -fobjc-arc"（后补 -std=gnu++17）+ osm_bridge.h extern "C"（set_osm_bridge_tbl 被 egl_bridge.m C TU 调用）
+- run2 34989106108（19 errors）：-x 生效但 C++ 关键字分类名非法——@interface Foo(private) 的 private 是 C++ 关键字，libc++ 头级联报错。修：8 处关键字分类名改名 ame_private（UIKit+hook.h×6/ControlLayout.h/PLPickerView.h；外来类分类名纯装饰零行为变化）
+- run3 34990764454：分类名清了，stdatomic.h 的 C 函数式宏 atomic_is_lock_free 在 C++ 模式炸 libc++ <atomic>。修：environ.h 按 __cplusplus 分支——C++ 用 <atomic>+typedef std::atomic<size_t>（clang ABI 与 _Atomic size_t 布局一致）
+- run4 34992226284：atomic 过了，raw string R"fsr_glsl(...)" 不认——Apple clang 15 的 clang++ 默认 gnu++98。修：COMPILE_OPTIONS 补 -std=gnu++17
+- run5 34993498502：C++ 严格指针转换——dlsym/calloc 返回 void* 赋函数指针/结构体指针是 C 合法 C++ 硬错。修：AME83_DLSYM_SLOT 宏（__typeof__ 转型，双方言通用）×9 + calloc 显式转型；本地语法脚本扩第二段（dlsym 段 C++ 严格指针检查）
+- run6 35035238066：osm 全通！错误移到 LauncherHelpViewController.m:215——NSString 属性赋 C 字符串（缺 @ 前缀；前几轮 make 早死从未编到它）。修：补 @；全修改文件扫描同类（余下全是合法 JNI/dlsym C 字符串）
+- run7 35036079381（链接期）：两类——①Foundation 全家 undefined（.mm 使 CMake 链接器 C→CXX，C 驱动的链接行带 CMAKE_C_FLAGS(-fobjc-arc -ObjC) 自动链 Foundation，CXX 不带）→ 主目标显式 "-framework Foundation"；②customNSLog/CallbackBridge_nativeSendScreenSize 被 C++ 修饰名引用 → utils.h（纯 C 声明头）整体 extern "C" 防护
+- run8 35037109152：duplicate _guiScale——environ.h 全局变量是 C 临时定义（-fcommon 公共符号），C++ TU 里成强定义，与 input_bridge_v3.m 的 int guiScale=1 强定义撞车（其余变量 common+strong 静默合并侥幸）。修：AME_ENVIRON_DECL 宏（C++ 分支 extern，C 分支空）前缀全部 21 行全局声明——.mm 零定义，链接形态逐字节回到 Task83 前
+- run9 35037960566：SUCCESS。产物 com.air-devs.air-ios.ipa 191.4MB + TrollStore tipa + dSYM
+
+Stage Summary:
+- 八轮根因全链：方言缺失 → 关键字分类名 → stdatomic 宏污染 → 默认 C++ 标准 → 严格指针转换 → 本地无法预检的 ObjC 笔误 → 链接器语言切换丢框架/丢 C 链接 → 临时定义强 化撞符号。全部修在"最小侵入"原则：单文件 flags、纯装饰改名、__cplusplus 分支、宏前缀 extern——C TU 侧逐字节零变化
+- 方法论入库：往纯 C/ObjC 工程塞第一个 .mm 的完整检查单（方言/标准/分类名/stdatomic/指针转换/链接器语言/框架/extern C/临时定义九关）；本地 g++ 语法脚本只能拦住其中 5 关，链接期 4 关只能靠 CI
+- verify_task83 终态 60/60（E3-E8 为 CI 教训指纹）；task82 53/53 级联不破
+- 装机验证锚点不变：⌨ 面板 "[InputDiag] Task83 button text"、zink+FSR "[OSMBridge] Task83 FSR1 upscale engaged (zink)"、FAQ 19 条目
