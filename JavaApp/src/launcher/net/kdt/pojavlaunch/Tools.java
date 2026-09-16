@@ -105,7 +105,134 @@ public final class Tools {
             
         Class<?> clazz = loader.loadClass(versionInfo.mainClass);
         Method method = clazz.getMethod("main", String[].class);
+        // Task 86: 启动看门狗——在调用 Minecraft main 之前布防（见 startLaunchWatchdog javadoc 病历）
+        startLaunchWatchdog(Thread.currentThread());
         method.invoke(null, new Object[]{launchArgs});
+    }
+
+    /**
+     * Task 86: 启动看门狗 —— 大型整合包首启卡死诊断。
+     *
+     * 病历（e7230da 装机日志，BMC2 [FABRIC] 1.20.1，537 mods）：主线程在 Fabric 客户端
+     * entrypoint 阶段被硬阻塞——JVM 启动 5.6s 后零 GC、零 JIT 编译、零日志，187s 后
+     * 用户手动取消，启动浮层以 launch error 收场（"卡在启动界面"）。最后一个有日志的
+     * mod 是 configureddefaults（"Applying default files..."），阻塞点在其后的某个
+     * mod 初始化里；无栈采样无法进一步定位。
+     *
+     * 本看门狗在游戏主线程（即调用 Minecraft main 的当前线程）外侧周期采样并打印调用栈，
+     * 下次复现时日志将直接给出阻塞的 mod 与调用点。采样分两阶段：
+     *   阶段 1（entrypoint 期，线程尚未改名为 "Render thread"）：每 15s 一次全量栈转储
+     *           （前 24 帧），最多 10 分钟；连续阻塞时自动压缩为单行心跳避免刷屏。
+     *   阶段 2（窗口建立后，即资源重载/标题屏/进世界期）：每 30s 采样，仅当栈顶 6 帧
+     *           连续 2 次完全一致（疑似冻结 >= 60s）才转储，最多 5 次。
+     * 健康启动的总开销为个位数行日志；线程终止或 JVM 关闭时静默退出。
+     */
+    private static void startLaunchWatchdog(final Thread gameThread) {
+        Thread watchdog = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final String renderThreadName = "Render thread";
+                String lastName = gameThread.getName();
+                String lastDumpSignature = null;
+                try {
+                    // 阶段 1：Fabric entrypoint / 早期启动
+                    for (int i = 1; i <= 40; i++) {
+                        Thread.sleep(15000L);
+                        Thread.State state = gameThread.getState();
+                        if (state == Thread.State.TERMINATED) {
+                            return;
+                        }
+                        String name = gameThread.getName();
+                        if (!name.equals(lastName)) {
+                            log("game thread renamed: " + lastName + " -> " + name);
+                            lastName = name;
+                        }
+                        if (renderThreadName.equals(name)) {
+                            log("launch reached MinecraftClient (window init), sample #" + i);
+                            runPostWindowPhase(gameThread);
+                            return;
+                        }
+                        StackTraceElement[] st = gameThread.getStackTrace();
+                        String signature = stackSignature(st, 6);
+                        if (signature != null && signature.equals(lastDumpSignature)) {
+                            // 连续阻塞在同一位置：压缩为单行心跳
+                            log("entrypoint-phase sample #" + i + " STILL blocked at "
+                                    + (st.length > 0 ? st[0] : "?"));
+                        } else {
+                            dumpStack("entrypoint-phase", i, state, st);
+                            lastDumpSignature = signature;
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    // JVM 正在关闭：静默退出
+                }
+            }
+        }, "Launch-Watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
+    }
+
+    /** 阶段 2：窗口建立后的资源加载/标题屏阶段，冻结检测转储（见 javadoc）。 */
+    private static void runPostWindowPhase(Thread gameThread) {
+        String frozenSignature = null;
+        int frozenCount = 0;
+        int dumps = 0;
+        try {
+            // 20 次 x 30s = 10 分钟
+            for (int i = 1; i <= 20 && dumps < 5; i++) {
+                Thread.sleep(30000L);
+                if (gameThread.getState() == Thread.State.TERMINATED) {
+                    return;
+                }
+                StackTraceElement[] st = gameThread.getStackTrace();
+                String signature = stackSignature(st, 6);
+                if (signature != null && signature.equals(frozenSignature)) {
+                    frozenCount++;
+                    if (frozenCount >= 2) {
+                        dumpStack("post-window-frozen", i, gameThread.getState(), st);
+                        dumps++;
+                        // 要求签名变化后才能再次触发，避免同一次冻结反复转储
+                        frozenSignature = null;
+                        frozenCount = 0;
+                    }
+                } else {
+                    frozenSignature = signature;
+                    frozenCount = 0;
+                }
+            }
+        } catch (InterruptedException e) {
+            // JVM 正在关闭：静默退出
+        }
+    }
+
+    /** 取栈顶 maxFrames 帧拼接为签名字符串（空栈返回 null）。 */
+    private static String stackSignature(StackTraceElement[] st, int maxFrames) {
+        if (st == null || st.length == 0) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(maxFrames, st.length);
+        for (int i = 0; i < n; i++) {
+            sb.append(st[i]).append('|');
+        }
+        return sb.toString();
+    }
+
+    /** 打印一次完整栈转储（前 24 帧），带统一前缀便于日志检索。 */
+    private static void dumpStack(String phase, int sample, Thread.State state, StackTraceElement[] st) {
+        log(phase + " sample #" + sample + " state=" + state
+                + " stack (" + (st == null ? 0 : st.length) + " frames):");
+        if (st == null) {
+            return;
+        }
+        int n = Math.min(24, st.length);
+        for (int i = 0; i < n; i++) {
+            System.out.println("[LaunchWatchdog]   at " + st[i]);
+        }
+    }
+
+    private static void log(String msg) {
+        System.out.println("[LaunchWatchdog] Task86 " + msg);
     }
 
     public static String[] getMinecraftArgs(MinecraftAccount profile, JMinecraftVersionList.Version versionInfo, String serverIp) {

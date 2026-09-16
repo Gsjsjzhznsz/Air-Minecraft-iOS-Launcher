@@ -341,6 +341,18 @@
 // output changed, so REVISION stays 17. The fixed build identifies itself
 // on device by the zink engage line now ending in "(EASU pre-readback
 // ordering, Task 85)".
+// REVISION 17 addendum (Task 86, no bump): Tools.java (launcher.jar) now arms a
+// launch watchdog daemon thread right before invoking Minecraft main. On-device
+// evidence (BMC2 [FABRIC] 1.20.1, 537 mods, zink): the game main thread hard-
+// blocked inside a Fabric client entrypoint ~5.6s after JVM start -- zero GC,
+// zero JIT installs, zero log lines for 187s until the user cancelled, launch
+// overlay stuck ("stuck on the loading screen"). The watchdog samples the game
+// thread's stack every 15s during the entrypoint phase (compacting repeats to
+// one heartbeat line) and, after the thread renames to "Render thread", runs a
+// 30s freeze detector on the top stack frames. Log lines are prefixed with
+// "[LaunchWatchdog] Task86" and name the blocking mod's class directly, turning
+// the next reproduction into a one-read diagnosis. Launcher-side Java only;
+// no MobileGlues converter surface touched, so REVISION stays 17.
 #define REVISION 17
 #define PATCH 0
 

@@ -103,7 +103,7 @@ check("C1 打包/解包算法位级全等（64k pack + 50k unpack + 4k roundtrip
 print("===== D. FAQ（Arm ASR 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("D1 24 条目（Task85 +upscalerAlt，Task84 时为 23）", len(faq_items) == 24, f"got {len(faq_items)}")
+check("D1 25 条目（Task86 +bigpack 大型整合包首启卡死，Task85 时为 24）", len(faq_items) == 25, f"got {len(faq_items)}")
 check("D2 armAsr 条目在位（问题 + 计算着色器/GL 4.1 边界 + Mali 调优定性）",
       "Arm ASR（Arm Accuracy Super Resolution）代替 FSR" in helpvc
       and "4.3 才有的计算着色器" in helpvc
@@ -118,9 +118,12 @@ check("D6 fsr 条目 Zink 全面适配措辞更新",
       "版本自动降级 + 半精度打包函数补齐" in helpvc)
 
 print("===== E. 装机日志证据（75c5e14，Task83b IPA 会话） =====")
-logp = os.path.join(REPO, "latestlog.txt")
-if os.path.exists(logp):
-    log = open(logp, encoding="utf-8", errors="replace").read()
+# Task86 更新：用户上传了新日志对（f17ef7b：BMC2 卡死会话 + 26.3 zink 会话），
+# Task83b IPA 会话证据钉死到 git 历史 75c5e14:latestlog.txt，不再读可变工作区日志。
+_r = subprocess.run(["git", "show", "75c5e14:latestlog.txt"], cwd=REPO,
+                    capture_output=True, text=True, timeout=60)
+log = _r.stdout if _r.returncode == 0 else ""
+if log:
     check("E1 Task83b 版本自适应真机生效（450->410）",
           "#version adapted: 450 -> 410" in log)
     check("E2 编译倒在 packHalf2x16（Task84 动机实锤）",
@@ -139,7 +142,7 @@ if os.path.exists(logp):
     check("E7 会话无 DEVICE_LOST（后台冻结未触发）",
           "DEVICE_LOST" not in log)
 else:
-    check("E log present", False, "latestlog.txt missing")
+    check("E log present", False, "git fixture 75c5e14:latestlog.txt missing")
 
 print("===== F. 级联 =====")
 for casc, name in (("scripts/verify_task83.py", "Task83"),

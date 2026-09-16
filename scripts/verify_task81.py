@@ -233,21 +233,27 @@ check("C3 glSamplerParameteri restate drops force",
       re.search(r"glSamplerParameteri\(GLuint sampler, GLenum pname, GLint param\)\s*\{.*?g_sampler_forced\.erase\(sampler\);", drw, re.S) is not None
       or re.search(r"glSamplerParameteri\(GLuint sampler, GLenum pname, GLint param\)\s*\{.*?g_sampler_forced\.erase\(sampler\);", tex, re.S) is not None)
 
-if os.path.exists(LOG_NEW):
-    log = read(LOG_NEW)
-    # Task83b 更新（be276a0 装机日志对）：678e7b5 会话的 CloudsDepthSampler
-    # 复合 dump 行已随日志更替消失（那是当次会话的调试 dump）。新 MG 会话
-    # （latestlog.old.txt）的等效证据链：Task81 扫描行在位（FSR1 active +
-    # enforcement re-enabled）+ 全程零 force 行 + fsr1Setting=1。
-    scan_ok = ("depth filter scan: FSR1 active (Task 81)" in log
-               and "enforcement re-enabled" in log)
-    zero_force = ("depth filter force" not in log)
-    fsr_on = ("fsr1Setting                 = 1" in log) or ('"fsr1Setting" : 1' in log)
-    check("C4 regression fixture present (Task81 scan alive, zero force, fsr on)",
-          scan_ok and zero_force and fsr_on,
-          "be276a0 MG session: Task81 scan line + zero force lines + fsr1Setting=1 (678e7b5 dump lines retired with old log)")
-else:
-    check("C4 regression fixture (log absent)", True, "skipped: log not present locally")
+if True:
+    # Task86 更新：用户上传了新日志对（f17ef7b），latestlog.old.txt 换成了
+    # e7230da 的 26.3 zink 会话。be276a0 MG 会话证据钉死到 git 历史读取。
+    import subprocess as _sp
+    _r = _sp.run(["git", "show", "be276a0:latestlog.old.txt"], cwd=REPO_GIT,
+                 capture_output=True, text=True, timeout=60)
+    log = _r.stdout if _r.returncode == 0 else ""
+    if log:
+        # Task83b 更新（be276a0 装机日志对）：678e7b5 会话的 CloudsDepthSampler
+        # 复合 dump 行已随日志更替消失（那是当次会话的调试 dump）。新 MG 会话
+        # （be276a0:latestlog.old.txt）的等效证据链：Task81 扫描行在位（FSR1 active +
+        # enforcement re-enabled）+ 全程零 force 行 + fsr1Setting=1。
+        scan_ok = ("depth filter scan: FSR1 active (Task 81)" in log
+                   and "enforcement re-enabled" in log)
+        zero_force = ("depth filter force" not in log)
+        fsr_on = ("fsr1Setting                 = 1" in log) or ('"fsr1Setting" : 1' in log)
+        check("C4 regression fixture present (Task81 scan alive, zero force, fsr on)",
+              scan_ok and zero_force and fsr_on,
+              "be276a0 MG session (git-pinned): Task81 scan line + zero force lines + fsr1Setting=1")
+    else:
+        check("C4 regression fixture (log absent)", True, "skipped: git fixture not present locally")
 
 # C5 e3e0830 fixture: enforcement alive pre-FSR (force lines in that build's log).
 try:

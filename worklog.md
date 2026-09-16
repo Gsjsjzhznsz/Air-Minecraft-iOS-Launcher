@@ -469,3 +469,28 @@ Stage Summary:
 - 提交推送 → CI；装机验证锚点：zink+FSR 下 "[OSMBridge] Task83 FSR1 upscale engaged (zink): render WxH -> surface WxH (EASU pre-readback ordering, Task 85)" + 画面满屏无分裂
 - zink FSR 四连关闭幕：版本适配（83b）→ packHalf（84）→ 枚举（84）→ 回读顺序（85）
 - NIS 留作未来可选画质模式（单 pass 含锐化，优于当前 EASU-only）；RCAS 锐化与 NIS 二选一，待用户需求驱动
+
+---
+Task ID: 86
+Agent: main (Super Z)
+Task: 用户上传 f17ef7b 日志对（e7230da 构建）判读——"看看可以了吗"（Task85 修复验证）+ "大型整合包卡在启动界面"（BMC2）→ 双结论 + 启动看门狗
+
+Work Log:
+- 日志判读（均为 e7230da = Task85 IPA）：
+  * latestlog.old.txt = 26.3-rc-3 zink 会话：**Task85 画面分裂修复装机实证闭环**——engaged 行带 "(EASU pre-readback ordering, Task 85)"、EASU ready program=588、render 1572x1092 -> surface 2360x1640、正常游玩后用户主动退出（Saving chunks + Stopping! + exit(0) 完整链）
+  * latestlog.txt = BMC2 [FABRIC] 1.20.1（Modrinth shFhR8Vx，537 mods）首启卡死会话：JVM 00:32:47 起 → 5.6s 内 Fabric 完成 537 mod 枚举 + configureddefaults 应用默认文件（"Applying default files..."，web 搜索确证该字符串出处）→ 主线程硬阻塞：187s 零 GC/零 safepoint/零 JIT/零日志 → 用户取消 → "Launch overlay dismissed due to launch error"。线程名仍为 [main（未改名 Render thread）→ 卡点在 Fabric 客户端 entrypoint 阶段（configureddefaults 之后的某个 mod），非窗口/GL/渲染层。堆 2966MB 分配正常、无 OOM、无异常——排除内存/崩溃，定性为 mod 在移动环境的阻塞行为（网络/系统调用/native 库）
+  * 历史对照：此前所有装机日志均为 26.3（SDL3 路径）——1.20.1（GLFW 路径 + Java 17）首次上机即触雷；健康 26.3 会话的 JNA→OSHI→Datafixer→Render thread 链在卡死日志中于 entrypoint 处断流
+- 修复（诊断型）：Tools.java startLaunchWatchdog——method.invoke(Minecraft main) 前布防守护线程：
+  * 阶段1（entrypoint 期）：每 15s 采样游戏主线程栈，全量转储前 24 帧；栈顶 6 帧签名重复时压缩为单行 "STILL blocked at" 心跳；上限 40 次（10 分钟）
+  * 阶段2（线程改名 Render thread 后）：每 30s 采样，连续 2 次栈顶签名一致（>=60s 冻结）才转储，上限 5 次
+  * 日志前缀 "[LaunchWatchdog] Task86"——下次复现直接点名阻塞 mod 的类与调用点；仅 java.lang API、零 JNI、零新依赖；ECJ 本地编译门零错误（Tools.class 产出）
+- FAQ 24→25：bigpack 条目（大型整合包首启卡死：定性"与渲染器/内存无关——加大内存无效" + 看门狗日志说明 + 三步自救：等待 2-3 分钟/取消重试（第二次跳过默认文件复制）/上传日志定位元凶 mod 后可安全移除）
+- version.h REVISION 17 addendum（Task 86 no bump：纯 launcher.jar Java 侧，转换器表面零改动）
+- stale 校验同步（日志换代 f17ef7b 引发）：task81 C4、task82 H1/H2/H3、task84 E1-E7 的装机证据全部钉死 git 历史（be276a0:latestlog.old.txt / 75c5e14:latestlog.txt，不再读可变工作区日志）；task83 B12、task84 D1、task85 C1 FAQ 计数 24→25
+- 验证：verify_task86.py 33/33（A 看门狗 10 指纹 + B f17ef7b 双日志 9 证据锚 + C FAQ 4 + D version.h 2 + E 字符串感知括号平衡 3 文件 + F ECJ 编译门 + G 级联）；全仓 14 校验器：71/72/75/76(40)/77(27)/78/79/80(44)/81(32)/82(54)/83(73)/84(31)/85(24)/86(33) 全绿
+
+Stage Summary:
+- Task85 画面分裂正式闭环（装机锚点 + 完整游玩会话实证）；zink FSR 病史全链（绿屏→分裂）收官
+- BMC2 卡启动定性：mod 层阻塞，非启动器回归；看门狗已布防，等用户下次复现日志点名元凶
+- 装机验证锚点：卡死复现时 "[LaunchWatchdog] Task86 entrypoint-phase sample #N ... at <元凶 mod 类名>"；健康启动时 "launch reached MinecraftClient (window init)" 单行
+- 遗留：元凶 mod 待日志点名（BMC2 嫌疑区间=configureddefaults 之后的 entrypoint 序列）；RenderDiag 的 swapOK/drawable 字段对 zink 路径是盲的（fps 计数有效），诊断盲区留待后续

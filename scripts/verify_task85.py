@@ -100,7 +100,7 @@ check("B9 engaged 日志带 Task 85 判读标记",
 print("===== C. FAQ（fsr 病史修订 + upscalerAlt 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 24 条目（+upscalerAlt）", len(faq_items) == 24, f"got {len(faq_items)}")
+check("C1 25 条目（Task86 +bigpack，Task85 时为 24）", len(faq_items) == 25, f"got {len(faq_items)}")
 check("C2 upscalerAlt 条目在位（问题 + 五类方案 + 结论）",
       "FSR 1.0 有哪些替代方案" in helpvc
       and "NVIDIA NIS（Image Scaling）" in helpvc

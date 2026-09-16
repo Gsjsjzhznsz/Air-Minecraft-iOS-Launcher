@@ -284,12 +284,23 @@
                    @"5. 还不行：带着 latestlog.txt 反馈（见上条），说明走到第几步、卡在什么画面。\n\n"
                    @"不要随手\"清除所有数据\"——多数问题与数据无关，清了既丢存档又不解决问题。";
 
+    LauncherHelpFaqItem *bigpack = [[LauncherHelpFaqItem alloc] init];
+    bigpack.iconName = @"hourglass";
+    bigpack.question = @"大型整合包（几百个模组）第一次启动就卡在加载界面？";
+    bigpack.answer = @"典型表现：启动浮层/进度画面长时间不动（几分钟以上），但游戏没有闪退。这与渲染器、内存分配都无关——加大内存无效。\n\n"
+                     @"原因：几百个模组会在游戏主线程里逐个初始化，其中某个模组若在等待网络请求、不可用的系统调用或不兼容的本地库，就会把整个启动流程卡死在它那一步（多数是模组在移动环境下的兼容性问题）。\n\n"
+                     @"启动器已内置\"启动看门狗\"：启动阶段主线程超过 15 秒没有进展时，日志（latestlog.txt）会自动记录它正在执行的代码位置，行首标有 [LaunchWatchdog] 字样，其中 \"at xxx.yyy.某模组类名\" 一行直接指出卡在哪个模组。\n\n"
+                     @"自救步骤：\n"
+                     @"1. 先耐心等 2~3 分钟——部分模组首次初始化确实慢；\n"
+                   @"2. 取消后重试一次——首次启动要复制整合包的默认文件，第二次会跳过这些工作；\n"
+                   @"3. 仍卡死：上传 latestlog.txt 反馈，凭看门狗记录可直接定位元凶模组，在 mods 文件夹移除它后整合包其余部分通常照常能玩（工具类模组大多可安全移除）。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck ]
+        @[ xray, greenFx, background, crash, stuck, bigpack ]
     ];
 }
 

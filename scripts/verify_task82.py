@@ -335,29 +335,38 @@ check("G LauncherHelpViewController.m self-balanced",
 # Task83b 更新：be276a0 用户上传了新装机日志对——MG 会话（含 Task82 修复
 # 生效证据）现在在 latestlog.old.txt，latestlog.txt 换成了 zink 会话
 # （Task83 FSR linkage + EASU 编译失败证据 = Task83b 版本适配的动机实锤）。
-# 旧锚点（262e674 会话的 render 1572x1092 / 1.50 档）随日志退役；新会话
-# 是 1.30 档（render 1814x1262）。zink 会话另加 H3 佐证 Task83b 动机。
+# Task86 更新：f17ef7b 又换了一对日志（BMC2 卡死会话 + 26.3 zink 会话），
+# 上述两组证据分别钉死到 git 历史：be276a0:latestlog.old.txt（MG 会话）
+# 与 75c5e14:latestlog.txt（Task83b IPA zink 会话），不再依赖可变的工作区日志。
 # ---------------------------------------------------------------------------
-LOG_OLD_MG = os.path.join(REPO, "latestlog.old.txt")  # be276a0 MG session
-if os.path.exists(LOG_OLD_MG):
-    log = read(LOG_OLD_MG)
+def _git_show(path):
+    try:
+        r = subprocess.run(["git", "show", path], cwd=REPO,
+                           capture_output=True, text=True, timeout=60)
+        return r.stdout if r.returncode == 0 else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+log = _git_show("be276a0:latestlog.old.txt")  # be276a0 MG session
+if log:
     check("H1 Task82 build rejects the poison viewport (latch rejection on device)",
           "viewport latch rejected (Task 82): 2048x2048 is not a window viewport (surface 2360x1640)" in log)
     check("H2 Task82 build engages window-shaped render (1814x1262, not 2048x2048)",
           "render 1814x1262 -> target 2360x1640 -> surface 2360x1640" in log
           and "render 2048x2048" not in log)
 else:
-    check("H log present", False, "latestlog.old.txt missing")
+    check("H log present", False, "git fixture be276a0:latestlog.old.txt missing")
 
-if os.path.exists(LOG_NEW):
-    zlog = read(LOG_NEW)
+zlog = _git_show("75c5e14:latestlog.txt")  # Task83b IPA zink session
+if zlog:
     check("H3 zink session: Task83 linkage + EASU compile chain (83b version-adapt worked on device, 84 packing fallback motivation)",
           "renderer-side upscale: zink EASU (Task83)" in zlog
           and "#version adapted: 450 -> 410" in zlog
           and "packHalf2x16" in zlog
           and "restoring MC window to surface" in zlog)
 else:
-    check("H3 zink session log present", False, "latestlog.txt missing")
+    check("H3 zink session log present", False, "git fixture 75c5e14:latestlog.txt missing")
 
 # ---------------------------------------------------------------------------
 # I. Cascade: Task 81 verification still green
