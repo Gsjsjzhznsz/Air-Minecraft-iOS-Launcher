@@ -153,22 +153,26 @@ check("B4 CMakeLists 已登记 NeomorphKit",
       "NeomorphKit/NMTheme.m" in read("Natives/CMakeLists.txt")
       and "NeomorphKit/UIView+Neomorph.m" in read("Natives/CMakeLists.txt"))
 sd = read("Natives/SceneDelegate.m")
-check("B5 主题广播接线（UIThemeChanged + traitCollectionDidChange）",
+# Task90 同步：SceneDelegate 最终采用 KVO window.traitCollection 方案
+# （UIWindowSceneDelegate 非 UIResponder，traitCollectionDidChange: 永不触发），
+# 原断言的字面量已不存在。
+check("B5 主题广播接线（NMTheme reloadAndBroadcast + KVO window.traitCollection）",
       "[[NMTheme shared] reloadAndBroadcast];" in sd
-      and "traitCollectionDidChange:(UITraitCollection *)previousTraitCollection" in sd)
+      and 'forKeyPath:@"traitCollection"' in sd
+      and "kNMSceneTraitKVOContext" in sd)
 
 print("== C. 核心屏幕与长尾改造 ==")
 rp = read("Natives/LauncherRightPanelViewController.m")
-check("C1 右侧面板：启动/版本/JAR/下载中心按钮全灰新拟态",
-      all(k in rp for k in ["[self.launchButton nm_convexRadius:12 shadowRadius:7]",
-                            "[self.manageVersionBtn nm_convexRadius:10 shadowRadius:4]",
-                            "[self.executeJarBtn nm_convexRadius:10 shadowRadius:4]",
-                            "[self.downloadCenterButton nm_convexRadius:10 shadowRadius:4]"]))
-check("C1a 启动按钮不再使用 accent 底色（全灰决策）",
-      "self.launchButton.backgroundColor = accentColor();" not in rp)
-check("C2 状态胶囊（JIT/内存×2）nm_pill + 语义色仅保留文字",
-      rp.count("nm_pill];") == 3 and "jitStatusLabel.backgroundColor" not in rp
-      and "memLimitStatusLabel.backgroundColor" not in rp)
+# Task90：用户反馈"全灰新拟态按钮"选择有误，右侧面板按钮恢复原样（7ab2b41）。
+check("C1 右侧面板按钮恢复原样（启动 accent 底 + 版本/JAR/下载中心深灰底）",
+      all(k in rp for k in ["self.launchButton.backgroundColor = accentColor();",
+                            "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];",
+                            "self.manageVersionBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];",
+                            "self.executeJarBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"]))
+check("C1a 右侧面板不再使用新拟态（nm_ 调用与 NeomorphKit 导入已随原样恢复移除）",
+      "NeomorphKit" not in rp and not re.search(r"\bnm_", rp))
+check("C2 状态胶囊（JIT/内存×2）恢复同色 15% 透明度底（原样）",
+      rp.count("colorWithAlphaComponent:0.15]") >= 5 and "nm_pill" not in rp)
 menu = read("Natives/LauncherMenuViewController.m")
 check("C3 左侧菜单：选中凸出面板 / 未选中恢复平贴",
       "[btn nm_convexRadius:12 shadowRadius:5];" in menu
@@ -200,7 +204,9 @@ check("C7 公告/导出/服务器主按钮全灰化",
 mtc = read("Natives/ModTableViewCell.m")
 check("C8 Mod 下载按钮全灰化", "[_downloadButton nm_convexRadius:13.0 shadowRadius:4];" in mtc)
 cl = read("Natives/LauncherCardLayoutViewController.m")
-check("C9 卡片布局：card_color 叠加停用", "neumorph_surfaces_locked_by_task89" in cl)
+# Task90 同步：21a3364 最终实现使用的注释标记为"新拟态下空操作"（C9 原断言的
+# neumorph_surfaces_locked_by_task89 字面量在最终提交中并不存在）。
+check("C9 卡片布局：card_color 叠加停用", "Task89：新拟态下空操作" in cl)
 check("C10 深色占位底色主题化（账户/新闻）",
       "[NMTheme nm_surfaceRaised];" in read("Natives/AccountListViewController.m")
       and read("Natives/LauncherNewsViewController.m").count("[NMTheme nm_surfaceRaised];") >= 2)

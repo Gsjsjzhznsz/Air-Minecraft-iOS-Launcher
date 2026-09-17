@@ -139,6 +139,14 @@ void init_logDeviceAndVer(char *argument) {
     printEntitlementAvailability(@"com.apple.developer.kernel.extended-virtual-addressing");
     printEntitlementAvailability(@"com.apple.developer.kernel.increased-memory-limit");
     printEntitlementAvailability(@"com.apple.private.security.no-sandbox");
+    // Task90：补充"描述文件授权"口径的生效状态。普通侧载下签名里预写的
+    // kernel entitlement 未必真正生效（描述文件未授权），latestlog 需能区分
+    // "签名携带"与"实际生效"两种口径，便于定位主界面标识误报。
+    NSLog(@"[Pre-init] Entitlements effectiveness (profile-granted):");
+    NSLog(@"* %@: %@", @"com.apple.developer.kernel.extended-virtual-addressing",
+          getEffectiveEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing") ? @"YES" : @"NO");
+    NSLog(@"* %@: %@", @"com.apple.developer.kernel.increased-memory-limit",
+          getEffectiveEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit") ? @"YES" : @"NO");
     // JIT-relevant entitlements: TrollStore grants jb.pmap_cs.custom_trust
     // (kernel-level JIT without a debugger), which isJITEnabled() fast-paths
     // on. dynamic-codesigning is the per-app JIT entitlement (iOS 18+).

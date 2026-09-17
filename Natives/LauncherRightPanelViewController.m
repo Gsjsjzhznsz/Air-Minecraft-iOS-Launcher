@@ -1,5 +1,4 @@
 #import "LauncherRightPanelViewController.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 #import "authenticator/BaseAuthenticator.h"
 #import "AccountListViewController.h"
 #import "SurfaceViewController.h"
@@ -268,9 +267,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.downloadCenterButton.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.downloadCenterButton.titleLabel.minimumScaleFactor = 0.7;
     self.downloadCenterButton.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    // Task89：新拟态凸出表面（全灰，替代原深色卡片底）
-    [self.downloadCenterButton nm_convexRadius:10 shadowRadius:4];
-    [self.downloadCenterButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    self.downloadCenterButton.layer.cornerRadius = 10;
+    self.downloadCenterButton.layer.masksToBounds = YES;
     // 左侧下载图标
     UIImage *downloadIcon = [UIImage systemImageNamed:@"arrow.down.circle"];
     [self.downloadCenterButton setImage:downloadIcon forState:UIControlStateNormal];
@@ -321,10 +320,18 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.launchButton.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.launchButton.titleLabel.minimumScaleFactor = 0.6;
     self.launchButton.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    // Task89：新拟态主按钮（用户选定全灰新拟态：与底同色，靠双阴影分层，
-    // 标题用主题主文字色；替代原 accent 底 + 单侧阴影）
-    [self.launchButton nm_convexRadius:12 shadowRadius:7];
-    [self.launchButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    self.launchButton.backgroundColor = accentColor();
+    self.launchButton.layer.cornerRadius = 10;
+    self.launchButton.layer.masksToBounds = YES;
+    // FCL 风格：按钮阴影（elevation 效果），增强层次感
+    self.launchButton.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.launchButton.layer.shadowOffset = CGSizeMake(0, 2);
+    self.launchButton.layer.shadowRadius = 4;
+    self.launchButton.layer.shadowOpacity = 0.3;
+    // masksToBounds 会裁剪阴影，改用 backgroundColor + cornerRadius 不裁剪
+    // 但 masksToBounds=YES 是为了让背景色圆角生效，阴影需要单独的容器视图
+    // 权衡：保留 masksToBounds=YES（圆角更重要），放弃阴影（iOS 上 UIButton 本身有高亮效果）
+    self.launchButton.layer.masksToBounds = YES;
 
     [self.launchButton addTarget:self action:@selector(launchButtonTapped) forControlEvents:UIControlEventTouchUpInside];
     // ZL2 风格按压动画：按下时缩放到 0.95，松开时恢复
@@ -340,8 +347,6 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.jitStatusLabel.layer.cornerRadius = 8;
     self.jitStatusLabel.layer.masksToBounds = YES;
     self.jitStatusLabel.text = localize(@"i18n_str_413", nil);
-    // Task89：新拟态胶囊（凸出）；状态语义色保留在文字上，底色统一表面色
-    [self.jitStatusLabel nm_pill];
     [self.view addSubview:self.jitStatusLabel];
 
     // 内存状态标签（JIT 标识上方，Task88）：样式与 JIT 标识完全一致。
@@ -350,11 +355,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     //   扩展虚拟内存 = com.apple.developer.kernel.extended-virtual-addressing
     // 检测是同步快速操作，创建后立即刷新一次拿到真实状态。
     self.memLimitStatusLabel = [self makeJITStyleStatusLabel];
-    [self.memLimitStatusLabel nm_pill];
     [self.view addSubview:self.memLimitStatusLabel];
 
     self.extVMStatusLabel = [self makeJITStyleStatusLabel];
-    [self.extVMStatusLabel nm_pill];
     [self.view addSubview:self.extVMStatusLabel];
 
     // 选择版本按钮（FCL 风格：右侧版本选择入口；控制设置已挪到左侧菜单 case 3）
@@ -366,10 +369,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.manageVersionBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.manageVersionBtn.titleLabel.minimumScaleFactor = 0.7;
     self.manageVersionBtn.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    // Task89：新拟态凸出表面（全灰）
-    [self.manageVersionBtn nm_convexRadius:10 shadowRadius:4];
-    [self.manageVersionBtn setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    self.manageVersionBtn.backgroundColor = [NMTheme nm_surface];
+    self.manageVersionBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
     self.manageVersionBtn.layer.cornerRadius = 10;
     [self.manageVersionBtn addTarget:self action:@selector(showVersionPicker) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.manageVersionBtn];
@@ -382,10 +382,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.executeJarBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.executeJarBtn.titleLabel.minimumScaleFactor = 0.7;
     self.executeJarBtn.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    // Task89：新拟态凸出表面（全灰）
-    [self.executeJarBtn nm_convexRadius:10 shadowRadius:4];
-    [self.executeJarBtn setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    self.executeJarBtn.backgroundColor = [NMTheme nm_surface];
+    self.executeJarBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
     self.executeJarBtn.layer.cornerRadius = 10;
     [self.executeJarBtn addTarget:self action:@selector(executeJar) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.executeJarBtn];
@@ -754,12 +751,15 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         !JIT26IsLikelyDebuggerKeepAttached()) {
         self.jitStatusLabel.text = localize(@"i18n_str_jit26_pending", nil);
         self.jitStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0];
+        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0] colorWithAlphaComponent:0.15];
     } else if (enabled) {
         self.jitStatusLabel.text = localize(@"i18n_str_421", nil);
         self.jitStatusLabel.textColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0];
+        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
     } else {
         self.jitStatusLabel.text = localize(@"i18n_str_422", nil);
         self.jitStatusLabel.textColor = [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
+        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
     }
 }
 
@@ -778,25 +778,27 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 /// 刷新"扩展内存限制/扩展虚拟内存"两个状态标识。
 /// 检测方式与 MeloNX（Ryujinx iOS 移植）设置页一致：通过 SecTask 私有 API 读取
-/// 本进程 entitlement——即 utils.m 的 getEntitlementValue()（与内存自动分配、
-/// JIT 判定等既有逻辑共用同一入口）：
+/// 本进程 entitlement，并交叉校验描述文件授权：
 ///   - com.apple.developer.kernel.increased-memory-limit      → 扩展内存限制
 ///   - com.apple.developer.kernel.extended-virtual-addressing → 扩展虚拟内存
-/// entitlement 由签名时的 .entitlements 决定，运行期不会变化；这里与 JIT 标识
-/// 保持相同刷新时机，确保每次回到前台都显示最新状态。
+/// Task90 修复误报：仓库 entitlements 模板预写了这两项，普通侧载签名里也带着，
+/// 但描述文件未授权时内核并不真正兑现——故改用 getEffectiveEntitlementValue()
+/// （签名 + embedded.mobileprovision 授权双确认，TrollStore 无描述文件时维持
+/// 签名判定），避免"没开内存权限却显示已开启"。
+/// entitlement 运行期不会变化；这里与 JIT 标识保持相同刷新时机。
 /// 配色沿用 JIT 标识：绿色=已开启，红色=未开启（背景为同色 15% 透明度）。
 - (void)updateMemoryEntitlementStatus {
     if (!self.memLimitStatusLabel || !self.extVMStatusLabel) return;
-    BOOL memLimit = getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
-    BOOL extVM = getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
+    BOOL memLimit = getEffectiveEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
+    BOOL extVM = getEffectiveEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
 
-    // Task89：新拟态胶囊——底色由 nm_pill 统一为表面色，状态语义色仅保留在文字上
     UIColor *memColor = memLimit
         ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
         : [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
     self.memLimitStatusLabel.text =
         localize(memLimit ? @"i18n_str_mem_limit_enabled" : @"i18n_str_mem_limit_disabled", nil);
     self.memLimitStatusLabel.textColor = memColor;
+    self.memLimitStatusLabel.backgroundColor = [memColor colorWithAlphaComponent:0.15];
 
     UIColor *vmColor = extVM
         ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
@@ -804,6 +806,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.extVMStatusLabel.text =
         localize(extVM ? @"i18n_str_ext_vm_enabled" : @"i18n_str_ext_vm_disabled", nil);
     self.extVMStatusLabel.textColor = vmColor;
+    self.extVMStatusLabel.backgroundColor = [vmColor colorWithAlphaComponent:0.15];
 }
 
 #pragma mark - 自定义外观（字体颜色）
@@ -812,24 +815,28 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 /// 卡片背景始终深色（BackgroundManager），用户若设置浅色 card_color 则需同时设置 text_color。
 /// 同时读取 general.accent_color 刷新启动按钮主题色（FCL 风格主题强调色）。
 - (void)applyCustomAppearance {
-    // Task89：新拟态下表面色由 NMTheme 统一管理，启动按钮不再随 accent_color
-    // 变色（全灰新拟态）；text_color 自定义偏好仍作用于普通文字标签，
-    // 状态胶囊（JIT/内存）保持语义色（绿/红）不受自定义颜色干扰。
+    // 主题强调色：刷新启动按钮背景，使用户自选的主题色立即生效
+    self.launchButton.backgroundColor = accentColor();
+
     NSString *hex = getPrefObject(@"general.text_color");
     UIColor *customColor = [self colorFromHexString:hex];
     if (customColor) {
         self.usernameLabel.textColor = customColor;
         self.versionLabel.textColor = [customColor colorWithAlphaComponent:0.75];
         self.progressLabel.textColor = [customColor colorWithAlphaComponent:0.75];
+        self.jitStatusLabel.textColor = customColor;
+        self.memLimitStatusLabel.textColor = customColor;
+        self.extVMStatusLabel.textColor = customColor;
         [self.manageVersionBtn setTitleColor:customColor forState:UIControlStateNormal];
         [self.executeJarBtn setTitleColor:customColor forState:UIControlStateNormal];
     } else {
-        // 未设置自定义字体颜色时，恢复主题自适应颜色
-        self.usernameLabel.textColor = [NMTheme nm_label];
-        self.versionLabel.textColor = [NMTheme nm_secondaryLabel];
-        self.progressLabel.textColor = [NMTheme nm_secondaryLabel];
-        [self.manageVersionBtn setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-        [self.executeJarBtn setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+        // 未设置自定义字体颜色时，恢复系统自适应颜色
+        self.usernameLabel.textColor = [UIColor labelColor];
+        self.versionLabel.textColor = [UIColor secondaryLabelColor];
+        self.progressLabel.textColor = [UIColor secondaryLabelColor];
+        [self.manageVersionBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+        [self.executeJarBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+        // JIT/内存状态标签颜色由 updateJITStatus、updateMemoryEntitlementStatus 单独管理，不在此重置
     }
 }
 
