@@ -462,11 +462,11 @@ static int ame87_disableDesktopDialogMods(NSString *gameDir) {
     }
     NSString *modsDir = [gameDir stringByAppendingPathComponent:@"mods"];
     BOOL isDir = NO;
-    NSFileManager *fm = [NSFileManager defaultManager];
-    if (![fm fileExistsAtPath:modsDir isDirectory:&isDir] || !isDir) {
+    NSFileManager *fileMgr = [NSFileManager defaultManager];
+    if (![fileMgr fileExistsAtPath:modsDir isDirectory:&isDir] || !isDir) {
         return 0;
     }
-    NSArray<NSString *> *files = [fm contentsOfDirectoryAtPath:modsDir error:nil];
+    NSArray<NSString *> *files = [fileMgr contentsOfDirectoryAtPath:modsDir error:nil];
     if (files.count == 0) {
         return 0;
     }
@@ -490,7 +490,7 @@ static int ame87_disableDesktopDialogMods(NSString *gameDir) {
         }
         NSString *srcPath = [modsDir stringByAppendingPathComponent:file];
         NSString *dstPath = [srcPath stringByAppendingString:@".disabled"];
-        if ([fm moveItemAtPath:srcPath toPath:dstPath error:nil]) {
+        if ([fileMgr moveItemAtPath:srcPath toPath:dstPath error:nil]) {
             disabled++;
             NSLog(@"[ModDialogGuard] Task87: disabled desktop dialog mod \"%@\" (renamed to .disabled; rename back to re-enable) -- Swing dialogs can never be shown on iOS and would block startup forever (7b88b69 evidence)", file);
         } else {

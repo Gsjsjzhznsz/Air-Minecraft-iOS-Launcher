@@ -106,9 +106,10 @@ check("C1 预检函数在位（mods 目录扫描 + .jar 后缀过滤）",
       and 'hasSuffix:@".jar"' in jl)
 check("C2 实证名单仅收 missingmodschecker（宁缺毋滥原则）",
       '@[@"missingmodschecker"]' in jl)
-check("C3 禁用动作 = 改名 .disabled（可逆，Fabric 忽略非 .jar）",
+check("C3 禁用动作 = 改名 .disabled（可逆，Fabric 忽略非 .jar；fileMgr 避开 26 行 fm 宏）",
       'stringByAppendingString:@".disabled"' in jl
-      and "[fm moveItemAtPath:srcPath toPath:dstPath error:nil]" in jl)
+      and "[fileMgr moveItemAtPath:srcPath toPath:dstPath error:nil]" in jl
+      and "#define fm " not in jl[jl.index("ame87_disableDesktopDialogMods"):jl.index("int launchJVM(NSString *accountId", jl.index("ame87_disableDesktopDialogMods"))])
 check("C4 日志前缀 [ModDialogGuard] Task87（单文件级 + 汇总级）",
       jl.count("[ModDialogGuard] Task87") >= 3)
 check("C5 调用点在实例分支 gameDir 计算后、JVM 启动前",
