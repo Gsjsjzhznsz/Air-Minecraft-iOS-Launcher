@@ -1268,6 +1268,11 @@
 "i18n_str_421" = "JIT: Enabled";
 "i18n_str_422" = "JIT: Not Enabled";
 "i18n_str_jit26_pending" = "JIT: Enabled (debugger will attach on launch)";
+/* Task88: right-panel memory entitlement status badges */
+"i18n_str_mem_limit_enabled" = "Ext. Memory Limit: Enabled";
+"i18n_str_mem_limit_disabled" = "Ext. Memory Limit: Not Enabled";
+"i18n_str_ext_vm_enabled" = "Ext. Virtual Memory: Enabled";
+"i18n_str_ext_vm_disabled" = "Ext. Virtual Memory: Not Enabled";
 "i18n_str_423" = "No installed versions";
 "i18n_str_424" = "Please install a version in the Downloads page first";
 "i18n_str_426" = "Manage Versions";

@@ -18,14 +18,21 @@ CFTypeRef SecTaskCopyValueForEntitlement(void* task, NSString* entitlement, CFEr
 void* SecTaskCreateFromSelf(CFAllocatorRef allocator);
 
 BOOL getEntitlementValue(NSString *key) {
+    // Task88 修复：原实现 SecTaskCreateFromSelf 被调用了两次（secTask 与内联各一次）
+    // 但只释放其中之一，每次调用泄漏一个 SecTaskRef。主界面状态标签（Task88）会在
+    // 每次回到前台时调用本函数，故顺手收紧：单次创建 + nil 守卫 + 判断后释放。
     void *secTask = SecTaskCreateFromSelf(NULL);
-    CFTypeRef value = SecTaskCopyValueForEntitlement(SecTaskCreateFromSelf(NULL), key, nil);
+    if (!secTask) {
+        return NO;
+    }
+    CFTypeRef value = SecTaskCopyValueForEntitlement(secTask, key, nil);
     CFRelease(secTask);
     if (value == nil) {
         return NO;
     }
+    BOOL result = ![(__bridge id)value isKindOfClass:NSNumber.class] || [(__bridge id)value boolValue];
     CFRelease(value);
-    return ![(__bridge id)value isKindOfClass:NSNumber.class] || [(__bridge id)value boolValue];
+    return result;
 }
 
 #ifndef P_TRACED

@@ -519,3 +519,21 @@ Stage Summary:
 - LTW × 26.x 能力边界定案：ES 3.0 后端无 TBO → 必崩；预检门拦截 + 指引切 Zink/MG；LTW 适用 1.21.x 及更早；TBO 模拟移植列路线图
 - 装机验证锚点：整合包重启 → "[ModDialogGuard] Task87: disabled desktop dialog mod ... (renamed to .disabled)" + 启动继续推进（Backend library / Render thread 出现）；LTW×26.x → "Task87 launch gate: LTW renderer + MC 26.x blocked" + 弹窗
 - 遗留：⌨ 虚拟键盘二轮诊断仍缺真机 [InputDiag] button text 证据（本轮两日志均未触及键盘）；BMC2 537 mods 在 A 系 3GB 堆上的运行期表现待装机观察
+---
+Task ID: 88
+Agent: main (Super Z)
+Task: 参照 MeloNX 在主界面右侧面板 JIT 标识上方新增"扩展内存限制/扩展虚拟内存"两个状态标识
+
+Work Log:
+- 参考源码调研：MeloNX（Ryujinx iOS 移植；官方仓库 melonx-emu/MeloNX 已下架，改用 fork Mi-Yomi/MeloNX@master）的检测与展示实现——Common/EntitlementChecker.swift 的 checkAppEntitlement()（SecTaskCreateFromSelf + SecTaskCopyValueForEntitlement 私有 API 读取本进程 entitlement）与 UI/Main/Settings/SettingsView.swift 的 "Increased Memory Limit / Extended Virtual Addressing" 状态展示；两项 key：com.apple.developer.kernel.increased-memory-limit（扩展内存限制）、com.apple.developer.kernel.extended-virtual-addressing（扩展虚拟内存）
+- 定位本仓库既有 JIT 标识：Natives/LauncherRightPanelViewController.m 的 jitStatusLabel（启动游戏按钮上方；胶囊样式 = 11pt Medium 居中 / 圆角 8 / 绿 rgb(0.2,0.7,0.3)=已开启 / 红 rgb(0.9,0.4,0.3)=未开启 + 同色 15% 透明背景）；确认仓库已有同源检测入口 utils.m getEntitlementValue()（JavaLauncher.m 781/1296/1606 行已在用同两个 key 做内存分配与虚拟地址空间决策）
+- UI 实现（LauncherRightPanelViewController.m）：新增 memLimitStatusLabel/extVMStatusLabel 两属性；makeJITStyleStatusLabel 工厂方法（字号/对齐/圆角与 JIT 标签完全一致）；约束自下而上排列 扩展内存限制 → 扩展虚拟内存 → JIT（间距 4pt，同宽同高 20pt，左右 12pt）；新增 updateMemoryEntitlementStatus 复用 getEntitlementValue 检测两项 entitlement 并按 JIT 配色渲染；刷新时机对齐 updateJITStatus（viewWillAppear + DidBecomeActive 通知 + setupUI 末尾立即刷新）；applyCustomAppearance 与 JIT 标签同策略（用户自定义文字色时覆盖，未设置时不重置）
+- 布局加固：原"进度条 bottom ≤ JIT 标签 top +12"约束默认 required 优先级；状态堆栈加高 48pt 后小屏可能不可满足——改为 999 优先级成为真弱约束（空间不足时优先断开此条允许中间留白，避免约束冲突告警）
+- utils.m 顺手修复：getEntitlementValue 原实现 SecTaskCreateFromSelf 被调用两次（secTask 与内联各一次）但只释放其中之一，每次调用泄漏一个 SecTaskRef——收紧为单次创建 + nil 守卫 + 判断后释放，对外行为完全不变（非 NSNumber 非 nil → YES；NSNumber → boolValue；nil → NO）
+- 本地化：新增 4 个 key（i18n_str_mem_limit_enabled/disabled、i18n_str_ext_vm_enabled/disabled），覆盖 en/zh-CN/zh-Hans/zh-Hant/ja（与 i18n_str_421 覆盖范围一致，其余 45 种语言走 localize() 的英文回退）；zh-Hant 用繁体（擴展記憶體限制/擴展虛擬記憶體/已開啟），ja 用日文（拡張メモリ上限/拡張仮想メモリ/有効/無効）
+- 验证：verify_task88.py 46/46（A UI/检测/刷新时机 18 项 + B utils 收紧 4 项 + C 本地化 21 项 + D key 一致性 3 项 + E git 作用域 1 项；含字符串感知括号平衡与 .strings 引号闭合检查）
+
+Stage Summary:
+- 主界面右侧面板自下而上状态堆栈：扩展内存限制 → 扩展虚拟内存 → JIT，三项均沿用原 JIT 胶囊样式（绿=开启/红=未开启）
+- 展示值来自签名 entitlement（签名后固定）：普通 sideload 签名（无权限）显示红色"未开启"，与 MeloNX 行为一致；TrollStore 安装或带对应权限的签名包显示绿色"已开启"
+- getEntitlementValue 的 SecTaskRef 泄漏已堵，isJITEnabled/memorystatus 等既有调用方同步受益

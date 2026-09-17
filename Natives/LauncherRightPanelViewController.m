@@ -39,6 +39,11 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 @property(nonatomic, strong) UIButton *executeJarBtn;
 // JIT 状态指示标签（启动游戏按钮上方）
 @property(nonatomic, strong) UILabel *jitStatusLabel;
+// 内存 entitlement 状态标签（JIT 标识上方，Task88）：
+// 参照 MeloNX 设置页对 "Increased Memory Limit / Extended Virtual Addressing"
+// 的展示，用与 JIT 标识同款的胶囊样式显示两项系统权限是否签入本应用
+@property(nonatomic, strong) UILabel *memLimitStatusLabel;  // 扩展内存限制
+@property(nonatomic, strong) UILabel *extVMStatusLabel;     // 扩展虚拟内存
 
 // 下载相关属性
 @property(nonatomic, strong) MinecraftResourceDownloadTask *task;
@@ -142,6 +147,14 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                                              selector:@selector(updateJITStatus)
                                                  name:UIApplicationDidBecomeActiveNotification
                                                object:nil];
+
+    // 内存 entitlement 状态与 JIT 标识使用相同刷新时机（Task88）：
+    // entitlement 签名后固定、运行期不会变化，这里仅为保证界面每次回到前台
+    // 都处于最新状态，与 updateJITStatus 的刷新策略保持一致。
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updateMemoryEntitlementStatus)
+                                                 name:UIApplicationDidBecomeActiveNotification
+                                               object:nil];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -150,6 +163,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self updateVersionInfo];
     [self updateLaunchButtonState];
     [self updateJITStatus];
+    [self updateMemoryEntitlementStatus];
     [self applyCustomAppearance];
     [self updateDownloadCenterButton];
 }
@@ -335,6 +349,17 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.jitStatusLabel.text = localize(@"i18n_str_413", nil);
     [self.view addSubview:self.jitStatusLabel];
 
+    // 内存状态标签（JIT 标识上方，Task88）：样式与 JIT 标识完全一致。
+    // 参照 MeloNX：通过 SecTask 读取本进程 entitlement 并以胶囊标签展示——
+    //   扩展内存限制 = com.apple.developer.kernel.increased-memory-limit
+    //   扩展虚拟内存 = com.apple.developer.kernel.extended-virtual-addressing
+    // 检测是同步快速操作，创建后立即刷新一次拿到真实状态。
+    self.memLimitStatusLabel = [self makeJITStyleStatusLabel];
+    [self.view addSubview:self.memLimitStatusLabel];
+
+    self.extVMStatusLabel = [self makeJITStyleStatusLabel];
+    [self.view addSubview:self.extVMStatusLabel];
+
     // 选择版本按钮（FCL 风格：右侧版本选择入口；控制设置已挪到左侧菜单 case 3）
     self.manageVersionBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.manageVersionBtn.translatesAutoresizingMaskIntoConstraints = NO;
@@ -440,16 +465,38 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self.jitStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.jitStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
         [self.jitStatusLabel.heightAnchor constraintEqualToConstant:20],
+
+        // 内存状态标签（JIT 标识上方，Task88）：
+        // 自下而上依次为 扩展内存限制 → 扩展虚拟内存 → JIT，与 JIT 标签同宽同高，
+        // 间距 4pt（比启动按钮上方 8pt 略紧，突出三者同属一组状态堆栈）
+        [self.memLimitStatusLabel.bottomAnchor constraintEqualToAnchor:self.jitStatusLabel.topAnchor constant:-4],
+        [self.memLimitStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
+        [self.memLimitStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
+        [self.memLimitStatusLabel.heightAnchor constraintEqualToConstant:20],
+
+        [self.extVMStatusLabel.bottomAnchor constraintEqualToAnchor:self.memLimitStatusLabel.topAnchor constant:-4],
+        [self.extVMStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
+        [self.extVMStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
+        [self.extVMStatusLabel.heightAnchor constraintEqualToConstant:20],
     ]];
 
-    // 进度条底部需留出空间避免与下方 JIT 标签重叠（弱约束，允许中间留白）
-    [NSLayoutConstraint constraintWithItem:self.jitStatusLabel
-                                attribute:NSLayoutAttributeTop
-                                relatedBy:NSLayoutRelationGreaterThanOrEqual
-                                   toItem:self.progressView
-                                attribute:NSLayoutAttributeBottom
-                               multiplier:1.0
-                                 constant:12].active = YES;
+    // 进度条底部需留出空间避免与下方状态堆栈重叠（Task88 调整）：
+    // 状态堆栈新增两条内存标识后总高 48pt，小屏设备可能放不下——将此条设为
+    // 999 优先级使其成为真正的"弱约束"：空间不足时优先断开此条（允许中间
+    // 留白压缩），避免与底部固定的状态堆栈产生不可满足的约束冲突。
+    NSLayoutConstraint *progressSpacingConstraint =
+        [NSLayoutConstraint constraintWithItem:self.jitStatusLabel
+                                     attribute:NSLayoutAttributeTop
+                                     relatedBy:NSLayoutRelationGreaterThanOrEqual
+                                        toItem:self.progressView
+                                     attribute:NSLayoutAttributeBottom
+                                    multiplier:1.0
+                                      constant:12];
+    progressSpacingConstraint.priority = 999;
+    progressSpacingConstraint.active = YES;
+
+    // 创建后立即刷新一次内存 entitlement 状态（同步快速，无需等 viewWillAppear）
+    [self updateMemoryEntitlementStatus];
 }
 
 #pragma mark - Actions
@@ -716,6 +763,50 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     }
 }
 
+#pragma mark - 内存 entitlement 状态显示（Task88）
+
+/// 生成与 JIT 状态标签同款的胶囊标签（字号/对齐/圆角完全一致）
+- (UILabel *)makeJITStyleStatusLabel {
+    UILabel *label = [[UILabel alloc] init];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    label.textAlignment = NSTextAlignmentCenter;
+    label.layer.cornerRadius = 8;
+    label.layer.masksToBounds = YES;
+    return label;
+}
+
+/// 刷新"扩展内存限制/扩展虚拟内存"两个状态标识。
+/// 检测方式与 MeloNX（Ryujinx iOS 移植）设置页一致：通过 SecTask 私有 API 读取
+/// 本进程 entitlement——即 utils.m 的 getEntitlementValue()（与内存自动分配、
+/// JIT 判定等既有逻辑共用同一入口）：
+///   - com.apple.developer.kernel.increased-memory-limit      → 扩展内存限制
+///   - com.apple.developer.kernel.extended-virtual-addressing → 扩展虚拟内存
+/// entitlement 由签名时的 .entitlements 决定，运行期不会变化；这里与 JIT 标识
+/// 保持相同刷新时机，确保每次回到前台都显示最新状态。
+/// 配色沿用 JIT 标识：绿色=已开启，红色=未开启（背景为同色 15% 透明度）。
+- (void)updateMemoryEntitlementStatus {
+    if (!self.memLimitStatusLabel || !self.extVMStatusLabel) return;
+    BOOL memLimit = getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
+    BOOL extVM = getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
+
+    UIColor *memColor = memLimit
+        ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
+        : [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
+    self.memLimitStatusLabel.text =
+        localize(memLimit ? @"i18n_str_mem_limit_enabled" : @"i18n_str_mem_limit_disabled", nil);
+    self.memLimitStatusLabel.textColor = memColor;
+    self.memLimitStatusLabel.backgroundColor = [memColor colorWithAlphaComponent:0.15];
+
+    UIColor *vmColor = extVM
+        ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
+        : [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
+    self.extVMStatusLabel.text =
+        localize(extVM ? @"i18n_str_ext_vm_enabled" : @"i18n_str_ext_vm_disabled", nil);
+    self.extVMStatusLabel.textColor = vmColor;
+    self.extVMStatusLabel.backgroundColor = [vmColor colorWithAlphaComponent:0.15];
+}
+
 #pragma mark - 自定义外观（字体颜色）
 
 /// 读取 general.text_color 偏好并应用到右侧面板的主要文字。
@@ -732,6 +823,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         self.versionLabel.textColor = [customColor colorWithAlphaComponent:0.75];
         self.progressLabel.textColor = [customColor colorWithAlphaComponent:0.75];
         self.jitStatusLabel.textColor = customColor;
+        self.memLimitStatusLabel.textColor = customColor;
+        self.extVMStatusLabel.textColor = customColor;
         [self.manageVersionBtn setTitleColor:customColor forState:UIControlStateNormal];
         [self.executeJarBtn setTitleColor:customColor forState:UIControlStateNormal];
     } else {
@@ -741,7 +834,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         self.progressLabel.textColor = [UIColor secondaryLabelColor];
         [self.manageVersionBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
         [self.executeJarBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
-        // JIT 状态颜色由 updateJITStatus 单独管理，不在此重置
+        // JIT/内存状态标签颜色由 updateJITStatus、updateMemoryEntitlementStatus 单独管理，不在此重置
     }
 }
 

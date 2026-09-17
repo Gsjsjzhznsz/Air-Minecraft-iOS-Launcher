@@ -1264,6 +1264,11 @@
 "i18n_str_421" = "JIT: 已开启";
 "i18n_str_422" = "JIT: 未开启";
 "i18n_str_jit26_pending" = "JIT: 已啟用（啟動時自動附加）";
+/* Task88: 主界面右侧面板内存 entitlement 状态标识 */
+"i18n_str_mem_limit_enabled" = "擴展記憶體限制: 已開啟";
+"i18n_str_mem_limit_disabled" = "擴展記憶體限制: 未開啟";
+"i18n_str_ext_vm_enabled" = "擴展虛擬記憶體: 已開啟";
+"i18n_str_ext_vm_disabled" = "擴展虛擬記憶體: 未開啟";
 "i18n_str_423" = "暂无已安装的版本";
 "i18n_str_424" = "请先到下载页面安装一个版本";
 "i18n_str_426" = "管理版本";
