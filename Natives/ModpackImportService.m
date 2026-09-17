@@ -1252,6 +1252,90 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
     return YES;
 }
 
+/// Task 95：导入完整性报告持久化 ----------------------------------------------
+///
+/// 病历（96c527f latestlog.txt，1ee7111 构建，BMC2 [FABRIC] 1.20.1，536 mods，
+/// iPad Air M4 / iPadOS 27）：
+///   FTB 全家桶（ftbquests / ftblibrary / ftbteams / ftbbackups）+ balm +
+///   terrablender + kleeslabs 等 8+ 个 jar 缺失于 mods 目录（导入期 404 跳过/
+///   失败未修复），config/fabric-loader.json 的 dependencyOverrides（日志
+///   "Dependencies overridden for ..."）又掩盖了 Fabric 的硬依赖检查，最终
+///   死在 main entrypoint：certain_questing_additions →
+///   NoClassDefFoundError: dev/ftb/mods/ftblibrary/config/ui/EditConfigScreen。
+///   导入完成弹窗只提醒一次，"整合包不完整"这一事实错过即永久丢失。
+///
+/// 对策：导入收尾时把 failed/skipped 清单持久化为实例根目录的
+///   import_report.json，供 JavaLauncher 的 Task95 启动前提醒门与 PLCrashView
+///   的 Task95 缺失 mod 崩溃诊断消费；重新导入会整体重写本文件（含
+///   acknowledged 复位），补齐后清单清空、提醒自然消失。
+- (void)ame95_writeImportReportToModsDir:(NSString *)modsDir
+                                 packName:(NSString *)packName
+                                     total:(NSUInteger)total
+                                   success:(NSUInteger)successCount
+                                   skipped:(NSUInteger)skippedCount
+                                    failed:(NSUInteger)failedCount {
+    if (modsDir.length == 0) {
+        return;
+    }
+    NSString *gameDir = [modsDir stringByDeletingLastPathComponent];
+    if (gameDir.length == 0 || [gameDir isEqualToString:modsDir]) {
+        return; // 非常规路径（modsDir 已是根），宁可不写报告也不写错位置
+    }
+    // 收集失败/跳过条目（封顶 100 条，防极端大整合包把报告写成兆级文件）
+    NSUInteger const kAme95EntryCap = 100;
+    NSArray<NSDictionary *> *failedList = self.failedDownloadFiles;
+    NSArray<NSDictionary *> *skippedList = self.skippedDownloadFiles;
+    NSMutableArray<NSDictionary *> *failedEntries = [NSMutableArray array];
+    for (NSDictionary *f in failedList) {
+        if (failedEntries.count >= kAme95EntryCap) break;
+        [failedEntries addObject:@{
+            @"fileName": f[@"fileName"] ?: @"(unknown)",
+            @"reason": f[@"reason"] ?: @"unknown error",
+            @"format": f[@"format"] ?: @"",
+        }];
+    }
+    NSMutableArray<NSDictionary *> *skippedEntries = [NSMutableArray array];
+    for (NSDictionary *s in skippedList) {
+        if (skippedEntries.count >= kAme95EntryCap) break;
+        [skippedEntries addObject:@{
+            @"fileName": s[@"fileName"] ?: @"(unknown)",
+            @"reason": s[@"reason"] ?: @"404 Not Found",
+            @"format": s[@"format"] ?: @"",
+        }];
+    }
+    NSDictionary *report = @{
+        @"version": @1,
+        @"task": @"95",
+        @"timestamp": @([NSDate date].timeIntervalSince1970),
+        @"packName": packName ?: @"",
+        @"totalFiles": @(total),
+        @"successFiles": @(successCount),
+        @"failedCount": @(MAX(failedCount, failedEntries.count)),
+        @"skippedCount": @(MAX(skippedCount, skippedEntries.count)),
+        @"failed": failedEntries,
+        @"skipped": skippedEntries,
+        @"acknowledged": @NO,
+    };
+    NSError *writeError = nil;
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:report
+                                                       options:NSJSONWritingPrettyPrinted
+                                                         error:&writeError];
+    if (!jsonData || writeError) {
+        NSLog(@"[ModpackImport] Task95: FAILED to write import report: %@",
+              writeError.localizedDescription ?: @"(serialization)");
+        return;
+    }
+    NSString *reportPath = [gameDir stringByAppendingPathComponent:@"import_report.json"];
+    if (![jsonData writeToFile:reportPath options:NSDataWritingAtomic error:&writeError]) {
+        NSLog(@"[ModpackImport] Task95: FAILED to write import report at %@: %@",
+              reportPath, writeError.localizedDescription ?: @"(io)");
+        return;
+    }
+    NSLog(@"[ModpackImport] Task95: import report written to %@ (total=%lu success=%lu failed=%lu skipped=%lu)",
+          reportPath.lastPathComponent, (unsigned long)total, (unsigned long)successCount,
+          (unsigned long)failedCount, (unsigned long)skippedCount);
+}
+
 /// 下载 mod 文件列表（Phase 3 并发改造，spec Task 3.1/3.2/3.3）
 /// Modrinth 格式: files[].downloads 是直接 URL 数组，files[].path 是相对路径，
 ///                files[].hashes.sha1 用于完整性校验（Task 3.2）
@@ -1720,6 +1804,15 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
     NSLog(@"[ModpackImport] Mod download completed: %lu/%lu succeeded, %lu failed, %lu skipped(404), %.2f MB transferred",
           (unsigned long)successCount, (unsigned long)total, (unsigned long)failedCount,
           (unsigned long)skipped404Count, (double)transferredBytes / (1024.0 * 1024.0));
+
+    // Task 95：导入完整性报告持久化（即使全部成功也写——清空旧报告的"未确认缺失"
+    // 状态同样重要：用户重导入修好后，启动提醒门必须自动闭嘴）
+    [self ame95_writeImportReportToModsDir:modsDir
+                                  packName:modpackInfo[@"name"]
+                                      total:total
+                                    success:successCount
+                                    skipped:skipped404Count
+                                     failed:failedCount];
 
     if ([self checkCancelledWithError:error]) {
         // Task 6.1：取消时同步收尾聚合卡片状态

@@ -154,10 +154,10 @@ check("D7 仅用 java.lang API（无新增 import 依赖）",
       "java.awt" not in tools.split("isObjectWaitUnderAppFrames")[0].split("import ")[0]
       or "import java.awt" not in tools)
 
-print("===== E. FAQ 27 条 =====")
+print("===== E. FAQ 28 条 =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("E1 27 条目（Task87 +ltw26，Task94 +sodiumLwjgl）", len(faq_items) == 27, f"got {len(faq_items)}")
+check("E1 28 条目（Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods）", len(faq_items) == 28, f"got {len(faq_items)}")
 check("E2 ltw26 条目在位（预检说明 + samplerBuffer 机理 + 日志特征 + 切换指引）",
       "LTW 渲染器玩 MC 26.x 直接崩溃" in helpvc
       and "samplerBuffer" in helpvc

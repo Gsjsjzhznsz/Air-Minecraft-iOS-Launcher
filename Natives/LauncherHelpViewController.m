@@ -316,12 +316,26 @@
                      @"启动器已修复（动态上报）：启动时自动从游戏版本元数据读取配套的 LWJGL 版本号再上报给 Sodium，各版本各报各的。验证方法：日志里搜 “[Tools] LWJGL report version”，应显示与游戏版本配套的值（1.20.1 → 3.3.1）。\n\n"
                      @"若仍遇到此错误：确认安装的是最新构建（设置→关于看 Commit），然后带着 latestlog.txt 反馈。";
 
+    LauncherHelpFaqItem *missingMods = [[LauncherHelpFaqItem alloc] init];
+    missingMods.iconName = @"exclamationmark.triangle";
+    missingMods.question = @"整合包启动到一半闪退，日志说 Could not execute entrypoint stage？";
+    missingMods.answer = @"典型表现：模组列表都打印出来了、启动推进到 20~30 秒左右突然退出（exit(-1)），换渲染器无效。在 latestlog.txt 里搜 “Could not execute entrypoint stage”，下面跟着 NoClassDefFoundError / ClassNotFoundException 链——这不是渲染器或内存问题，是 mods 文件夹缺模组：某个已安装的模组要引用的类（如 FTB Library、Balm、TerraBlender 提供的）所在的 jar 根本不在。\n\n"
+                     @"实锤案例（BMC2 536 mods）：导入时 FTB 全家桶 + Balm + TerraBlender 等 8+ 个文件下载失败/被跳过，日志早处还有一行 “Dependencies overridden for ...”（来自 config/fabric-loader.json 的 dependencyOverrides）把 Fabric 的缺依赖报错也盖掉了，于是缺失一直潜伏到入口点阶段才爆。\n\n"
+                     @"启动器已内置三层防护：\n"
+                     @"1. 导入收尾会把失败/跳过清单写进实例目录的 import_report.json；\n"
+                     @"2. 下次启动检测到未确认的缺失会弹一次提醒（日志搜 [ImportGuard] Task95）；\n"
+                     @"3. 真崩了，崩溃界面会直接列出缺失的类和推断的组件名（FTB Quests/Balm 等）。\n\n"
+                     @"自救步骤：\n"
+                     @"1. 按崩溃界面/提醒弹窗点名的缺失组件，删实例重新导入（换个下载源），或在 Mod 管理器手动补齐（版本要和整合包要求一致）；\n"
+                     @"2. 若日志有 “Dependencies overridden for ...”：修好后可删掉 config/fabric-loader.json 里的 dependencyOverrides 条目，让缺失依赖恢复快速报错；\n"
+                     @"3. 分享 latestlog.txt 反馈时附上 import_report.json（实例根目录），可直接对账缺了哪些文件。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods ]
     ];
 }
 

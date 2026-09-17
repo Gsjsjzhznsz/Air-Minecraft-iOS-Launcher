@@ -500,6 +500,83 @@ static int ame87_disableDesktopDialogMods(NSString *gameDir) {
     return disabled;
 }
 
+// Task 95：整合包完整性提醒门 ----------------------------------------------
+// 病历（96c527f latestlog.txt，1ee7111 构建，BMC2 [FABRIC] 1.20.1，536 mods）：
+//   实例 mods 目录缺失 FTB 全家桶 + balm + terrablender + kleeslabs 等 8+ 个
+//   jar（导入期 404 跳过/失败未修复），config/fabric-loader.json 的
+//   dependencyOverrides 掩盖了 Fabric 依赖解析的硬缺失报错，游戏死在 main
+//   entrypoint 的 NoClassDefFoundError 链——用户只能看到"启动 24 秒后闪退"。
+// 对策：ModpackImportService Task95 会在实例根目录写 import_report.json；
+//   启动前读取该报告，若有未确认的 failed/skipped 条目则弹一次性提醒
+//   （acknowledged 置位后不再打扰；重新导入会重写报告并复位该标志）。
+//   不做硬阻断：缺失的可能是可选 mod，是否继续由用户决定；崩溃发生时由
+//   PLCrashView Task95 分析器给出精确的缺失类清单与修复指引兜底。
+static void ame95_warnIncompleteImport(NSString *gameDir) {
+    if (gameDir.length == 0) {
+        return;
+    }
+    NSString *reportPath = [gameDir stringByAppendingPathComponent:@"import_report.json"];
+    NSData *data = [NSData dataWithContentsOfFile:reportPath];
+    if (data.length == 0) {
+        return; // 无报告 = 非 Task95 路径导入（老实例/手装 mod），不打扰
+    }
+    NSError *parseError = nil;
+    NSDictionary *report = [NSJSONSerialization JSONObjectWithData:data
+                                                           options:0
+                                                             error:&parseError];
+    if (![report isKindOfClass:[NSDictionary class]]) {
+        NSLog(@"[ImportGuard] Task95: import report unreadable (%@) -- skipping reminder", parseError.localizedDescription ?: @"(bad json)");
+        return;
+    }
+    NSUInteger failedCount = [report[@"failedCount"] unsignedLongValue];
+    NSUInteger skippedCount = [report[@"skippedCount"] unsignedLongValue];
+    if (failedCount == 0 && skippedCount == 0) {
+        return; // 完整导入（或重导入已修复），无需提醒
+    }
+    if ([report[@"acknowledged"] boolValue]) {
+        return; // 用户已确认过本报告，不再重复打扰
+    }
+    // 提醒后立即置位 acknowledged（防多弹）；重新导入会重写报告复位
+    NSMutableDictionary *ack = [report mutableCopy];
+    ack[@"acknowledged"] = @YES;
+    NSError *writeError = nil;
+    NSData *out = [NSJSONSerialization dataWithJSONObject:ack options:0 error:&writeError];
+    if (out && !writeError) {
+        [out writeToFile:reportPath options:NSDataWritingAtomic error:nil];
+    }
+    // 组装提醒文案：计数 + 最多 5 个缺失文件名 + 修复指引
+    NSArray<NSDictionary *> *failed = [report[@"failed"] isKindOfClass:[NSArray class]] ? report[@"failed"] : @[];
+    NSArray<NSDictionary *> *skipped = [report[@"skipped"] isKindOfClass:[NSArray class]] ? report[@"skipped"] : @[];
+    NSMutableArray<NSString *> *names = [NSMutableArray array];
+    for (NSArray<NSDictionary *> *list in @[failed, skipped]) {
+        for (NSDictionary *entry in list) {
+            NSString *n = entry[@"fileName"];
+            if ([n isKindOfClass:[NSString class]] && n.length > 0 && ![names containsObject:n]) {
+                [names addObject:n];
+                if (names.count >= 5) break;
+            }
+        }
+        if (names.count >= 5) break;
+    }
+    NSMutableString *msg = [NSMutableString stringWithFormat:
+        @"该整合包导入时缺失 %lu 个文件（下载失败 %lu / 被跳过 %lu），游戏可能因此崩溃或功能异常。\n\n",
+        (unsigned long)(failedCount + skippedCount), (unsigned long)failedCount, (unsigned long)skippedCount];
+    if (names.count > 0) {
+        for (NSString *n in names) {
+            [msg appendFormat:@"  • %@\n", n];
+        }
+        NSUInteger totalMissing = failedCount + skippedCount;
+        if (totalMissing > names.count) {
+            [msg appendFormat:@"  ……等共 %lu 个\n", (unsigned long)totalMissing];
+        }
+        [msg appendString:@"\n"];
+    }
+    [msg appendString:@"建议：删除该实例并重新导入（可换个下载源），或在 Mod 管理器中补齐缺失文件。\n本次将照常启动，此提醒只显示一次。"];
+    NSLog(@"[ImportGuard] Task95: incomplete import detected (failed=%lu skipped=%lu) -- one-shot reminder shown; launch continues",
+          (unsigned long)failedCount, (unsigned long)skippedCount);
+    showDialog(localize(@"Warning", nil), msg);
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -726,6 +803,10 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         if (ame87_disabledDialogMods > 0) {
             NSLog(@"[ModDialogGuard] Task87: %d desktop dialog mod(s) auto-disabled in %@/mods (rename .disabled -> .jar to restore)", ame87_disabledDialogMods, gameDir.lastPathComponent);
         }
+
+        // Task 95：整合包完整性提醒（病历见 ame95_warnIncompleteImport 函数头）
+        // ——读实例根目录的 import_report.json，有未确认缺失时一次性提醒，不阻断启动。
+        ame95_warnIncompleteImport(gameDir);
     } else {
         defaultJRETag = @"execute_jar";
         gameDir = @(getenv("POJAV_GAME_DIR"));

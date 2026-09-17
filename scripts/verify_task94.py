@@ -61,9 +61,20 @@ def read(path):
         return f.read()
 
 
-print("===== A. 809b847 日志对证据（可变工作区） =====")
-log_zink = read("latestlog.txt")
-log_ltw = read("latestlog.old.txt")
+print("===== A. 809b847 日志对证据（Task95 起钉 git——工作区 latestlog.txt 已被 96c527f 新日志覆盖） =====")
+
+
+def git_show(ref_path):
+    r = subprocess.run(["git", "-C", REPO, "show", ref_path],
+                       capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+
+
+# Task94 当时验证的 809b847 日志对已随 96c527f 上传被覆盖（latestlog.txt 换成了
+# Task94 修复后的新会话），按 task87 A 区惯例钉死到 git 历史 809b847（上传提交）。
+log_zink = git_show("809b847:latestlog.txt")
+log_ltw = git_show("809b847:latestlog.old.txt")
+check("A0 git fixture 809b847 日志对在位", len(log_zink) > 1000 and len(log_ltw) > 1000)
 check("A1 两日志均为 3bc95fa 构建",
       "Commit: 3bc95fa (main)" in log_zink and "Commit: 3bc95fa (main)" in log_ltw)
 check("A2 均为 BMC2 1.20.1（fabric-loader 0.19.3）",
@@ -142,10 +153,10 @@ check("D3 日志输出 reported + metadata 双值",
 check("D4 旧位置无残留的错位 sanity 块",
       pojav_java.count("String activeLwjgl = System.getProperty(\"pojav.lwjgl.version\")") == 1)
 
-print("===== E. FAQ 27 条（+sodiumLwjgl） =====")
+print("===== E. FAQ 28 条（+sodiumLwjgl，Task95 +missingMods） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("E1 27 条目（Task94 +1）", len(faq_items) == 27, f"got {len(faq_items)}")
+check("E1 28 条目（Task94 +1，Task95 +1）", len(faq_items) == 28, f"got {len(faq_items)}")
 check("E2 sodiumLwjgl 条目在位（症状 + Installed/Required 读数 + 机理 + 验证锚点）",
       "LWJGL version is not compatible" in helpvc
       and "Installed version: 3.4.1" in helpvc

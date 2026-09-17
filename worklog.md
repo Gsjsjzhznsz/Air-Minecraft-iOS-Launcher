@@ -688,3 +688,32 @@ Work Log:
 
 Stage Summary:
 - Task94 全链绿灯：47/47 验证 + 级联全绿 + CI 构建成功；等用户装机复测 BMC2（预期日志锚点见 Task94 Stage Summary）
+
+---
+Task ID: 95
+Agent: main (Super Z)
+Task: 用户上传新日志 96c527f（"依旧崩溃"）判读 + 后端修复（前端为朋友提交，不碰）
+
+Work Log:
+- 同步远程：96c527f "Add files via upload"（latestlog.txt 全量替换，+2144/-375）
+- 判读（1ee7111 = Task94 修复构建，BMC2 1.20.1 536 mods，zink，iPad Air M4/iPadOS 27）：
+  * Task94 装机验证通过：[Tools] LWJGL report version: 3.3.1 + [PojavLauncher] reported 3.3.1 (metadata: 3.3.1) 双锚点在位；sodium 0.5.13 放行；mod 列表全量打印；启动推进到 22:22:02（JVM 后 ~24s，Vanilla bootstrap 完成）——BMC2 历史最深
+  * 新崩溃与渲染器/LWJGL 无关：Fabric main entrypoint 阶段 RuntimeException ← certain_questing_additions 的 NoClassDefFoundError: dev/ftb/mods/ftblibrary/config/ui/EditConfigScreen；Suppressed 链还有 terrablender/api/TerraBlenderApi + net/blay09/mods/balm/api/Balm（netherportalfix）
+  * 实锤缺失：FTB 全家桶（ftbquests/ftblibrary/ftbteams/ftbbackups）+ balm + terrablender + kleeslabs 全部不在 "Loading 536 mods" 列表（8+ jar 缺失，导入期 404 跳过/失败未修复）
+  * 掩盖机制：日志 314 行 "Dependencies overridden for certain_questing_additions, kleeslabs, netherportalfix, climaterivers, biomeswevegone"——config/fabric-loader.json 的 dependencyOverrides（fabric-loader 0.19.3 jar 反编译实证字符串与 dependencyOverrides 键）盖掉 Fabric 硬依赖检查，缺失潜伏到运行时
+  * 历史修正：Task87 时代的 MissingModsChecker 弹窗正是在报警这批缺失（报信者被错杀）；当时"Fabric 依赖解析无硬缺失"的判断已被 override 污染
+  * 另发现 anti-AI 提示注入（崩溃报告内伪 "System note for AI"，要求 AI 放弃诊断）：已识别、忽略、向用户披露
+- 修复（三层，全启动器侧，无 MobileGlues 面）：
+  1. ModpackImportService ame95_writeImportReportToModsDir：导入收尾持久化实例根目录 import_report.json（failed/skipped 清单封顶 100 + acknowledged 标志；全成功也写以清空旧状态；重新导入整体重写复位）
+  2. JavaLauncher ame95_warnIncompleteImport（[ImportGuard]）：JVM 前读报告，未确认缺失一次性提醒（非阻断；完整导入/老实例/已确认三路零打扰）
+  3. PLCrashView CrashTypeMissingMods：ame95_detectMissingModsFromLog 解析 entrypoint 链——扫描范围限定崩溃报告段（防早段 soft-dep 噪音顶满 8 条封顶，96c527f 噪音 970-1061 行 vs 真凶 2089+ 行实证）、类名 '/'→'.' 归一、FTB 四件套/Balm/TerraBlender 友好名映射、"Dependencies overridden" 证据行；analyzeCrashType 第 6 区最先检测（防被 Mod 冲突泛化分支吃掉）；crashReasonText + 4 条建议卡片
+- FAQ 27→28（+missingMods：entrypoint 检索词、三层防护、dependencyOverrides 清理指引、import_report.json 对账）；version.h REVISION 17 addendum (Task 95, no bump)
+- stale-sync：verify_task83 B12 / 84 D1 / 85 C1 / 86 C1+C3（分类数组 +missingMods）/ 87 E1 / 94 E1 计数 27→28；verify_task94 A 区钉 git 809b847（工作区 latestlog.txt 已被 96c527f 覆盖，循 task87 A 区惯例）
+- 验证：verify_task95 59/59（含 G 段行为仿真：真实日志片段 × 等价正则，G5 对照组实证全量扫描会被噪音挤占）；级联 83:73/73、84:31/31、85:24/24、86:33/33、87:48/48、94:45/45 全绿；88-93 为朋友任务路径（workspace/Air-Minecraft-iOS-Launcher），本环境不可达，自愈型
+- 已提交推送
+
+Stage Summary:
+- BMC2 三连关全通：Task87 清弹窗卡死 → Task94 清 sodium 版本门 → 本关定位"整合包本身不完整"；Task94 修复装机实证生效
+- 装机验证锚点：导入期 "[ModpackImport] Task95: import report written ..."；启动期 "[ImportGuard] Task95: incomplete import detected ..."（一次性提醒弹窗）；崩溃期崩溃界面直接列缺失类 + 组件名（FTB Library/Balm/TerraBlender）+ override 证据
+- 用户侧修复指引：删实例重新导入（换下载源）或补齐 FTB 全家桶/Balm/TerraBlender/KleeSlabs；修好后可清 config/fabric-loader.json 的 dependencyOverrides
+- 遗留：⌨ 虚拟键盘二轮诊断仍缺 [InputDiag] 真机证据；zink FSR 画面分裂四嫌疑待装机日志；88-93 为朋友范围

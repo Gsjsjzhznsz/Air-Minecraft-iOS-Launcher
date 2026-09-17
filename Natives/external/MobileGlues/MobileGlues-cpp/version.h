@@ -402,6 +402,34 @@
 // version metadata...)" + "[PojavLauncher] LWJGL selected by launcher: 333,
 // reported version: 3.3.1 (metadata: 3.3.1)" -- and by the absence of the
 // sodium "not compatible" exit.
+// REVISION 17 addendum (Task 95, no bump): the 96c527f upload (commit 1ee7111
+// build, BMC2 [FABRIC] 1.20.1, 536 mods, iPad Air M4 / iPadOS 27) verified the
+// Task94 fix on device -- "[Tools] LWJGL report version: 3.3.1" and "[PojavLauncher]
+// LWJGL selected by launcher: 333, reported version: 3.3.1 (metadata: 3.3.1)"
+// both present, Sodium 0.5.13 passed its gate, and startup sailed into full mod
+// init (deepest BMC2 run yet). The new crash is a different layer: the instance's
+// mods folder is missing 8+ jars (the whole FTB suite ftbquests/ftblibrary/
+// ftbteams/ftbbackups, balm, terrablender, kleeslabs -- zero of them in the
+// "Loading 536 mods" list), while config/fabric-loader.json dependencyOverrides
+// ("Dependencies overridden for certain_questing_additions, kleeslabs,
+// netherportalfix, climaterivers, biomeswevegone") masked Fabric's clean missing-
+// dependency rejection, so the pack died at the 'main' entrypoint with
+// NoClassDefFoundError: dev/ftb/mods/ftblibrary/config/ui/EditConfigScreen
+// (certain_questing_additions) + suppressed Balm/TerraBlender chains. Launcher-
+// side hardening, no MobileGlues surface touched, REVISION stays 17:
+// (1) ModpackImportService writes import_report.json into the instance root at
+//     every import finale (failed/skipped lists + acknowledged flag; a clean
+//     re-import rewrites it empty);
+// (2) JavaLauncher's ImportGuard reads it pre-JVM and shows a one-shot reminder
+//     when unacknowledged missing files exist (non-blocking, "[ImportGuard]
+//     Task95" anchor);
+// (3) PLCrashView gains CrashTypeMissingMods: parses "Could not execute
+//     entrypoint stage" + ClassNotFoundException/NoClassDefFoundError chains,
+//     maps dev.ftb.mods.*/net.blay09.mods.balm/terrablender.* to friendly names,
+//     and surfaces the "Dependencies overridden" evidence in the crash UI.
+// FAQ 27->28 (+missingMods entry). On-device anchors: "[ModpackImport] Task95:
+// import report written ...", "[ImportGuard] Task95: incomplete import detected
+// ...", and the crash view's missing-mod class list.
 #define REVISION 17
 #define PATCH 0
 

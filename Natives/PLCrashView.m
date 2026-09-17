@@ -20,6 +20,7 @@ typedef NS_ENUM(NSInteger, CrashType) {
     CrashTypeTerminated,         // 被外部信号终止
     CrashTypeModConflict,        // Mod 冲突
     CrashTypeMissingLibrary,     // 缺失库文件
+    CrashTypeMissingMods,        // Task 95：整合包缺失 mod 文件（entrypoint 阶段类加载失败）
     CrashTypeJavaVersionMismatch,// Java 版本不匹配
     CrashTypeRendererError,      // 渲染器错误
     CrashTypeModLoadingFailure,  // Mod 加载失败
@@ -28,6 +29,9 @@ typedef NS_ENUM(NSInteger, CrashType) {
 };
 @property (nonatomic, assign) CrashType crashType;
 @property (nonatomic, strong, nullable) NSString *crashDetail; // 崩溃详情（从日志提取的关键行）
+// Task 95：缺失 mod 崩溃的解析产物（供建议卡片精确点名）
+@property (nonatomic, strong, nullable) NSArray<NSString *> *ame95_missingModNames; // 推断的缺失 mod/库名单
+@property (nonatomic, copy, nullable) NSString *ame95_overriddenEvidence;           // "Dependencies overridden for ..." 证据行（可为空）
 
 // UI 组件
 @property (nonatomic, strong) UIScrollView *mainScrollView;
@@ -573,6 +577,14 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
             [result addObject:@{@"icon": @"folder", @"text": localize(@"crash.suggestion.missinglib_check", @"检查实例目录中的 libraries 文件夹是否完整")}];
             [result addObject:@{@"icon": @"wifi", @"text": localize(@"crash.suggestion.missinglib_network", @"检查网络连接，确保下载源可访问")}];
             break;
+        case CrashTypeMissingMods:
+            [result addObject:@{@"icon": @"arrow.clockwise.circle", @"text": [NSString stringWithFormat:@"删除该实例并重新导入整合包（建议换个下载源重试）%@", self.ame95_missingModNames.count > 0 ? [NSString stringWithFormat:@"——重点确认：%@", [self.ame95_missingModNames componentsJoinedByString:@"、"]] : @""]}];
+            [result addObject:@{@"icon": @"square.and.pencil", @"text": localize(@"crash.suggestion.missingmods_manual", @"或在 Mod 管理器中手动补齐缺失的 mod（版本需与整合包要求一致）")}];
+            if (self.ame95_overriddenEvidence.length > 0) {
+                [result addObject:@{@"icon": @"eye.slash", @"text": localize(@"crash.suggestion.missingmods_override", @"日志显示依赖检查被覆盖（Dependencies overridden），它会让缺失 mod 逃避报错直到运行时崩溃；修复后可删掉 config/fabric-loader.json 里的 dependencyOverrides 条目")}];
+            }
+            [result addObject:@{@"icon": @"doc.text", @"text": localize(@"crash.suggestion.missingmods_share", @"分享 latestlog.txt 反馈，可凭崩溃报告中的缺失类清单直接定位")}];
+            break;
         case CrashTypeJavaVersionMismatch:
             [result addObject:@{@"icon": @"hammer", @"text": localize(@"crash.suggestion.javaver_change", @"在设置中切换 Java 版本（8/17/21）")}];
             [result addObject:@{@"icon": @"info.circle", @"text": localize(@"crash.suggestion.javaver_check", @"检查游戏版本要求的 Java 版本")}];
@@ -603,6 +615,119 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
 }
 
 #pragma mark - Crash Type Analysis (崩溃类型分析，参照 HMCL)
+
+#pragma mark - Task 95：缺失 mod 崩溃检测（Fabric entrypoint 链）
+
+/// Task 95：整合包缺失 mod 检测（Fabric/NeoForge 入口点阶段的类加载失败）
+///
+/// 病历（96c527f latestlog.txt，1ee7111 构建，BMC2 [FABRIC] 1.20.1，536 mods，
+/// iPad Air M4 / iPadOS 27）：实例 mods 目录缺失 FTB 全家桶 + balm +
+/// terrablender + kleeslabs 等 8+ 个 jar；config/fabric-loader.json 的
+/// dependencyOverrides（日志 "Dependencies overridden for ..."）掩盖了 Fabric
+/// 的硬依赖检查，游戏死在 main entrypoint：
+///   RuntimeException: Could not execute entrypoint stage 'main' due to errors,
+///   provided by 'certain_questing_additions'
+///     Caused by: NoClassDefFoundError: dev/ftb/mods/ftblibrary/config/ui/EditConfigScreen
+///       Caused by: ClassNotFoundException: dev.ftb.mods.ftblibrary.config.ui.EditConfigScreen
+///
+/// 解析产物：
+///   * ame95_missingModNames —— 缺失类包名推断的 mod 名（FTB Library/Balm/TerraBlender 等）
+///   * ame95_overriddenEvidence —— "Dependencies overridden for ..." 证据行（存在时）
+///   * crashDetail —— 面向用户的缺失类清单（封顶 8 条，防撑爆错误卡片）
+/// 返回 YES 表示已识别并定型（analyzeCrashType 直接返回）。
+- (BOOL)ame95_detectMissingModsFromLog:(NSString *)logContent lowerLog:(NSString *)lowerLog {
+    if (logContent.length == 0 || lowerLog.length == 0) {
+        return NO;
+    }
+    // 只认 Fabric 实证形态；Forge/NeoForge 缺失依赖在 resolve 阶段就会被干净拒绝，
+    // 不会以 entrypoint 异常形态出现（宁缺毋滥，避免误报）。
+    NSRange entrypointRange = [lowerLog rangeOfString:@"could not execute entrypoint stage"];
+    if (entrypointRange.location == NSNotFound) {
+        return NO;
+    }
+    // 1) 缺失类清单：ClassNotFoundException / NoClassDefFoundError 后的类名（去重）
+    //    扫描范围限定在崩溃报告段（或 entrypoint 异常邻域）——大型整合包日志早段
+    //    充斥无害的 soft-dependency 警告（KubeJS/EMI/LootJs 的可选类探测），全量
+    //    扫描会把这些噪音顶满 8 条封顶，挤掉崩溃报告里真正的元凶（96c527f 实证：
+    //    噪音在 970-1061 行，真凶在 2089+ 行的崩溃报告内）。
+    NSUInteger scanLoc = 0;
+    NSUInteger scanLen = logContent.length;
+    NSRange reportHeader = [logContent rangeOfString:@"---- Minecraft Crash Report ----"];
+    if (reportHeader.location != NSNotFound && reportHeader.location < entrypointRange.location) {
+        scanLoc = reportHeader.location;
+        NSRange walkthrough = [logContent rangeOfString:@"A detailed walkthrough"
+                                                options:0
+                                                  range:NSMakeRange(scanLoc, logContent.length - scanLoc)];
+        // rangeOfString 返回的 location 是接收者内的绝对坐标（非搜索 range 内相对值）
+        NSUInteger end = (walkthrough.location != NSNotFound) ? walkthrough.location : logContent.length;
+        scanLen = end - scanLoc;
+    } else {
+        // 无正式崩溃报告头：退回 entrypoint 行前后窗口（前 500 字符兜住 Caused by 链头）
+        scanLoc = entrypointRange.location > 500 ? (entrypointRange.location - 500) : 0;
+        scanLen = logContent.length - scanLoc;
+    }
+    NSMutableArray<NSString *> *missingClasses = [NSMutableArray array];
+    NSRegularExpression *classRe = [NSRegularExpression
+        regularExpressionWithPattern:@"(?:ClassNotFoundException|NoClassDefFoundError): ([A-Za-z0-9_.$/]+)"
+                              options:0 error:nil];
+    if (classRe) {
+        [classRe enumerateMatchesInString:logContent options:0
+                                     range:NSMakeRange(scanLoc, scanLen)
+                                usingBlock:^(NSTextCheckingResult *m, NSMatchingFlags flags, BOOL *stop) {
+            NSRange r = [m rangeAtIndex:1];
+            if (r.location == NSNotFound) return;
+            NSString *cls = [logContent substringWithRange:r];
+            // '/' 与 '.' 两种类名形态归一（JVM 内部态用 '/'）
+            cls = [cls stringByReplacingOccurrencesOfString:@"/" withString:@"."];
+            if (cls.length > 0 && ![missingClasses containsObject:cls]) {
+                [missingClasses addObject:cls];
+            }
+            if (missingClasses.count >= 8) *stop = YES; // 封顶，防错误卡片爆版
+        }];
+    }
+    // 2) dependencyOverrides 证据行
+    NSString *overriddenLine = nil;
+    for (NSString *line in [logContent componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
+        if ([line rangeOfString:@"Dependencies overridden for"].location != NSNotFound && line.length < 400) {
+            overriddenLine = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+            break;
+        }
+    }
+    // 3) 类名 → 友好 mod 名映射（实证过的常见家族；兜底用包前两段）
+    NSMutableArray<NSString *> *modNames = [NSMutableArray array];
+    for (NSString *cls in missingClasses) {
+        NSString *name = nil;
+        if ([cls hasPrefix:@"dev.ftb.mods.ftbquests"]) name = @"FTB Quests";
+        else if ([cls hasPrefix:@"dev.ftb.mods.ftblibrary"]) name = @"FTB Library";
+        else if ([cls hasPrefix:@"dev.ftb.mods.ftbteams"]) name = @"FTB Teams";
+        else if ([cls hasPrefix:@"dev.ftb.mods.ftbbackups"]) name = @"FTB Backups";
+        else if ([cls hasPrefix:@"dev.ftb.mods."]) name = @"FTB 组件";
+        else if ([cls hasPrefix:@"net.blay09.mods.balm"]) name = @"Balm";
+        else if ([cls hasPrefix:@"terrablender."]) name = @"TerraBlender";
+        if (name && ![modNames containsObject:name]) {
+            [modNames addObject:name];
+        }
+    }
+    // 4) 定型 + 详情文案
+    self.crashType = CrashTypeMissingMods;
+    self.ame95_missingModNames = [modNames copy];
+    self.ame95_overriddenEvidence = overriddenLine;
+    NSMutableString *detail = [NSMutableString string];
+    if (missingClasses.count > 0) {
+        [detail appendString:@"缺失的类（对应 mod 未安装或版本不符）：\n"];
+        for (NSString *cls in missingClasses) {
+            [detail appendFormat:@"  • %@\n", cls];
+        }
+    }
+    if (modNames.count > 0) {
+        [detail appendFormat:@"\n推断缺失组件：%@", [modNames componentsJoinedByString:@"、"]];
+    }
+    if (overriddenLine.length > 0) {
+        [detail appendFormat:@"\n\n依赖检查被覆盖：%@", overriddenLine];
+    }
+    self.crashDetail = detail.length > 0 ? [detail copy] : nil;
+    return YES;
+}
 
 /// 分析崩溃类型（基于 exitCode 和日志关键词）
 ///
@@ -664,6 +789,13 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     }
 
     // 6. 基于日志关键词分析（其他 exitCode）
+    // Task 95：Fabric entrypoint 缺失 mod 检测必须最先做——entrypoint 崩溃日志里
+    // 常混杂 ClassCastException 等其他 suppressed 异常，交给泛化分支会误分类为
+    // Mod 冲突/缺失库，丢失宝贵的缺失类清单与精确指引。
+    if ([self ame95_detectMissingModsFromLog:logContent lowerLog:lowerLog]) {
+        return;
+    }
+
     // Mod 冲突
     if ([lowerLog containsString:@"nosuchmethoderror"] || [lowerLog containsString:@"classcastexception"] ||
         [lowerLog containsString:@"illegalaccessexception"] || [lowerLog containsString:@"nosuchfielderror"] ||
@@ -1065,6 +1197,9 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
             break;
         case CrashTypeMissingLibrary:
             reason = localize(@"crash.reason.missing_library", @"缺失游戏库文件（UnsatisfiedLinkError/NoClassDefFoundError）");
+            break;
+        case CrashTypeMissingMods:
+            reason = localize(@"crash.reason.missing_mods", @"整合包缺失 mod 文件（入口点阶段类加载失败，常见于导入不完整）");
             break;
         case CrashTypeJavaVersionMismatch:
             reason = localize(@"crash.reason.java_version", @"Java 版本不匹配（UnsupportedClassVersionError）");
