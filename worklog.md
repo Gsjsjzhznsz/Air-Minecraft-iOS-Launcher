@@ -599,3 +599,21 @@ Stage Summary:
 - 浅色模式所有自适应表面文字 #222222、深色 #EEEEEE（彩色语义色/彩色底白字/游戏内不受影响）
 - CI 侧载工件签名不再预写内存权限 → 未开权限用户标识正确显示"未开启"；TrollStore 工件行为不变
 - 普通侧载 JIT 恢复 stikjit 正常流程；TXM brk 无应答时优雅报错替代必死闪退
+---
+Task ID: 92
+Agent: main (Super Z)
+Task: StikDebug JIT26 脚本兼容性加固——调研其 JS 脚本机制并同步上游 Universal 脚本、预启动自动导出、修正过时指引文案
+
+Work Log:
+- 调研用户提供 StikDebug 默认脚本包（attachDetach/screenshot-demo/screenshot-capture/manic/UTM-Dolphin/Geode/maciOS.js）：JS = 调试器端脚本，经 GDB 远程协议（get_pid/send_command/prepare_memory_region/log）应答目标 App 的 brk 陷阱并为其准备可执行内存；各家约定不同——UTM/Dolphin legacy brk 0x69(x0=地址,x1=大小)、manic 死循环版、Geode 0x69/0x70/0x71；用错脚本 = 协议不配 = 崩溃/垃圾返回值
+- 对照本仓库 JIT26 协议：legacy 0x69 = x0 大小/返回值=分配地址（BreakGetJITMapping），Universal 脚本（brk 0xf00d x16 分发 + brk 0x68 运行时注入）+ UniversalJIT26Extension.js（commands 3/4 = SetDetachAfterFirstBr/PrepareRegionForPatching + 0x69 覆写）才是完整实现——结论：Amethyst 必须用"特定 JS"，且早已内置（stikjit:// script-data 自动携带 + LiveContainer LCAppInfo 自动分配）
+- 拉取上游 StikDebug/StikDebug：AutoScriptAssignments.swift 已按应用名（"Amethyst" 与 MeloNX/Manic EMU 等同组）自动分配内置 universal.js；旧侧载版内置名 Amethyst-MeloNX.js（上游已无此字符串，弹窗括号说明过时）
+- 同步 Natives/resources/UniversalJIT26.js 至上游 2026-29-03（字节一致）：唯一差异 = 新增 continuesWithSignal 开关（默认 true，行为不变）+ 信号直通块包裹；协议面（0xf00d x16 分发/0x68 注入/_M,rx/0x69 错误哨兵 E0000069）零变化
+- main.m 新增 init_exportJIT26Script()：每次启动把 bundle 内 UniversalJIT26.js 导出到 $POJAV_HOME（Documents），内容一致跳过写盘；此前副本仅在"检测到 legacy 脚本"失败路径补拷，旧版 StikDebug（无自动分配）用户得先失败一次才能 Assign Script
+- JavaLauncher.m 两处 legacy 脚本报错弹窗更新：优先升级 StikDebug（自动分配）；旧侧载版内置名说明保留；Assign Script → Documents/UniversalJIT26.js（启动时自动导出）
+- 校验：verify_task92.py 40 项（A 脚本同步 9 / B 导出 10 / C 文案 7 / D 协议回归护栏 12 / E 仓库卫生 2，含 D 组 Task88-91 成果全量护栏）；verify_task90 65/65、verify_task91 75/75 不受影响
+
+Stage Summary:
+- 打包脚本与上游 StikDebug universal.js 字节一致；旧版 StikDebug 用户可通过 Documents 预先 Assign Script，避免协议不配
+- JIT26 native 协议（brk 0x69/0xf00d、哨兵 0x690000E0、SIGTRAP 安全网、Extension 注入、stikjit:// script-data 通路）全部零改动
+- 结论落档：Amethyst 开 JIT 无需第三方专用脚本——内置 Universal+Extension 即"特定 JS"本体；UTM-Dolphin/manic/Geode 脚本与本启动器寄存器约定不兼容，不可混用
