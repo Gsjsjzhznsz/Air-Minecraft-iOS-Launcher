@@ -274,6 +274,32 @@ void init_setupAccounts() {
     [fm createDirectoryAtPath:controlPath withIntermediateDirectories:NO attributes:nil error:nil];
 }
 
+// Task92：预启动主动导出 UniversalJIT26.js 到 $POJAV_HOME（Documents）。
+// 背景：StikDebug 侧的 JIT26 脚本必须与本启动器的 brk 协议严格配套
+// （legacy 0x69 = x0 大小/返回地址，Universal + Extension 才是完整实现）。
+// 此前 Documents 副本只在「检测到 legacy 脚本」的启动失败路径里补拷，
+// 用户得先失败一次才能在 StikDebug 的 Assign Script 里选到文件。改为
+// 每次启动导出（内容一致则跳过写盘），旧版 StikDebug（无按应用名自动
+// 分配 universal.js）也能提前手动指派正确脚本，避免协议不配。
+void init_exportJIT26Script(void) {
+    NSString *inBundle = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];
+    if (!inBundle) {
+        NSLog(@"[Pre-init] UniversalJIT26.js missing from bundle — skip export");
+        return;
+    }
+    NSString *dst = [NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("POJAV_HOME")];
+    NSData *bundleData = [NSData dataWithContentsOfFile:inBundle];
+    NSData *existing = [NSData dataWithContentsOfFile:dst];
+    if (bundleData && [bundleData isEqualToData:existing]) {
+        return; // 副本已与 IPA 内置版本一致，避免无谓写盘
+    }
+    if ([fm createFileAtPath:dst contents:bundleData attributes:nil]) {
+        NSLog(@"[Pre-init] Exported Universal JIT script to Documents (StikDebug Assign-Script ready)");
+    } else {
+        NSLog(@"[Pre-init] Failed to export Universal JIT script to %@", dst);
+    }
+}
+
 void init_setupCustomControls() {
     NSString *controlPath = [@(getenv("POJAV_HOME")) stringByAppendingPathComponent:@"controlmap"];
     [fm createDirectoryAtPath:controlPath withIntermediateDirectories:NO attributes:nil error:nil];
@@ -407,6 +433,7 @@ int main(int argc, char *argv[]) {
     [PLProfiles updateCurrent];
     init_setupAccounts();
     init_setupCustomControls();
+    init_exportJIT26Script();
 
     // If sandbox is disabled, W^X JIT can be enabled by Amethyst itself
     if (!isJITEnabled(true) && getEntitlementValue(@"com.apple.private.security.no-sandbox")) {

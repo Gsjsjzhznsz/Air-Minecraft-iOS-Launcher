@@ -563,7 +563,7 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                 }
             }
             [NSFileManager.defaultManager copyItemAtPath:inBundleScriptPath toPath:[NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("POJAV_HOME")] error:nil];
-            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. To import it, long-press on Amethyst when enabling JIT in StikDebug and tap \"Assign Script\", then go to Amethyst's Documents directory and pick it. (on sideloaded StikDebug, the builtin script is named Amethyst-MeloNX.js)");
+            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to the Universal JIT script. On current StikDebug builds it is auto-assigned to Amethyst by app name (older sideloaded builds bundled the same script as Amethyst-MeloNX.js), so updating StikDebug is the easiest fix. To assign it manually: long-press on Amethyst when enabling JIT in StikDebug, tap \"Assign Script\", then pick UniversalJIT26.js from Amethyst's Documents directory (exported automatically at every startup).");
             [PLLogOutputView handleExitCode:1];
             return 1;
         }
@@ -1508,7 +1508,7 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
                 }
             }
             [NSFileManager.defaultManager copyItemAtPath:inBundleScriptPath toPath:[NSString stringWithFormat:@"%s/UniversalJIT26.js", getenv("POJAV_HOME")] error:nil];
-            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to Universal JIT script. To import it, long-press on Amethyst when enabling JIT in StikDebug and tap \"Assign Script\", then go to Amethyst's Documents directory and pick it. (on sideloaded StikDebug, the builtin script is named Amethyst-MeloNX.js)");
+            showDialog(localize(@"Error", nil), @"Support for legacy script has been removed. Please switch to the Universal JIT script. On current StikDebug builds it is auto-assigned to Amethyst by app name (older sideloaded builds bundled the same script as Amethyst-MeloNX.js), so updating StikDebug is the easiest fix. To assign it manually: long-press on Amethyst when enabling JIT in StikDebug, tap \"Assign Script\", then pick UniversalJIT26.js from Amethyst's Documents directory (exported automatically at every startup).");
             return -1;
         }
         // 关键修复（N5）：同 launchJVM，防止 nil 脚本崩溃

@@ -1,4 +1,4 @@
-// Universal JIT Script, last updated 2025-10-10
+// Universal JIT Script, last updated 2026-29-03 (YYYY-DD-MM)
 /*
  // JIT "syscalls"
  __attribute__((noinline,optnone,naked))
@@ -49,6 +49,7 @@ function log_verbose(msg) {
 // To avoid having to re-parse these in each function, we save some registers here
 let tid, x0, x1, x16, pc;
 let detached = false;
+let continuesWithSignal = true;
 let pid = get_pid();
 let attachResponse = send_command(`vAttach;${pid.toString(16)}`);
 
@@ -84,14 +85,16 @@ while (!detached) {
     // check if this is a brk
     if ((instrU32 & 0xFFE0001F)>>>0 != 0xD4200000) {
         log(`Skipping: instruction was not a brk (was 0x${instrU32.toString(16)})`);
-        let signum = /^T(?<sig>[a-z0-9;]{2})/.exec(brkResponse);
-        signum = signum ? signum.groups['sig'] : null;
-        if (!signum) {
-            log(`Failed to extract signal number: ${signum}`);
-            continue;
+        if (continuesWithSignal) {
+            let signum = /^T(?<sig>[a-z0-9;]{2})/.exec(brkResponse);
+            signum = signum ? signum.groups['sig'] : null;
+            if (!signum) {
+                log(`Failed to extract signal number: ${signum}`);
+                continue;
+            }
+            log(`Continuing with signal 0x${signum}`);
+            send_command(`vCont;S${signum}:${tid}`);
         }
-        log(`Continuing with signal 0x${signum}`);
-        send_command(`vCont;S${signum}:${tid}`);
         continue;
     }
     
