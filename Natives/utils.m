@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <string.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <sys/sysctl.h>
 
 #include "utils.h"
@@ -82,6 +84,19 @@ BOOL getEffectiveEntitlementValue(NSString *key) {
         return [value caseInsensitiveCompare:@"true"] == NSOrderedSame || [value isEqualToString:@"1"];
     }
     return YES;
+}
+
+// Task91：TrollStore 真实安装判定——签名标记 AND 磁盘标记（bundle 旁的
+// _TrollStore 目录，与 main.m 的 POJAV_DETECTEDINST 判定同源）。
+// 背景：entitlements.sideload.xml 模板给普通侧载包也预写了
+// jb.pmap_cs.custom_trust 字符串，SecTask 如实报告"有"，导致非 TrollStore
+// 环境的 invokeAfterJITEnabled 误走 apple-magnifier://（TrollStore JIT）
+// 死路——JIT 永远无法自动开启。此处做 AND 确认后该路径只在真实
+// TrollStore 安装上生效，普通侧载回到 stikjit:// 正常流程。
+BOOL isTrollStoreInstall(void) {
+    if (!getEntitlementValue(@"jb.pmap_cs.custom_trust")) return NO;
+    NSString *tsPath = [NSString stringWithFormat:@"%@/../_TrollStore", NSBundle.mainBundle.bundlePath];
+    return access(tsPath.UTF8String, F_OK) == 0;
 }
 
 #ifndef P_TRACED
@@ -353,6 +368,45 @@ void* JIT26CreateRegionLegacy(size_t len) {
     asm("brk #0x69 \n"
         "ret");
 }
+
+// Task91：SIGTRAP 安全网。见 utils.h 注释——brk #0x69 无人应答时裸函数
+// 直接 SIGTRAP 致死（用户实测"开启 JIT 后闪退"），这里在调用窗口内捕获
+// 并返回 NULL，把必死崩溃转成调用方的优雅报错；调试器正常应答时走
+// 调试器例外端口/ptrace，本信号处理器不会被触发，行为不变。
+static sigjmp_buf g_jit26TrapEnv;
+static volatile sig_atomic_t g_jit26TrapArmed = 0;
+
+static void JIT26TrapCatch(int sig) {
+    if (!g_jit26TrapArmed) {
+        // 不属于本安全网的 SIGTRAP：恢复默认语义原样致死，不吞异常
+        signal(sig, SIG_DFL);
+        raise(sig);
+        return;
+    }
+    g_jit26TrapArmed = 0;
+    siglongjmp(g_jit26TrapEnv, 1);
+}
+
+void* JIT26CreateRegionLegacySafe(size_t len) {
+    struct sigaction sa, oldsa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = JIT26TrapCatch;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_NODEFER;
+    sigaction(SIGTRAP, &sa, &oldsa);
+
+    void *result = NULL;
+    if (sigsetjmp(g_jit26TrapEnv, 1) == 0) {
+        g_jit26TrapArmed = 1;
+        result = JIT26CreateRegionLegacy(len);
+        g_jit26TrapArmed = 0;
+    } else {
+        result = NULL;
+    }
+    sigaction(SIGTRAP, &oldsa, NULL);
+    return result;
+}
+
 __attribute__((noinline,optnone,naked))
 void* JIT26PrepareRegion(void *addr, size_t len) {
     asm("mov x16, #1 \n"

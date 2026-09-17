@@ -1324,7 +1324,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 }
 
 - (void)invokeAfterJITEnabled:(void(^)(void))handler {
-    BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust");
+    // Task91：entitlement AND 磁盘标记双确认（同 LauncherNavigationController，
+    // 防止普通侧载包里的预写标记把流程导入 apple-magnifier:// 死路）
+    BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust") && isTrollStoreInstall();
 
     // Diagnostic: full JIT state at decision time (mirrors the other two
     // invokeAfterJITEnabled implementations).

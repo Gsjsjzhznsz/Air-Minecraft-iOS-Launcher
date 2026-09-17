@@ -1273,6 +1273,8 @@
 "i18n_str_mem_limit_disabled" = "Ext. Memory Limit: Not Enabled";
 "i18n_str_ext_vm_enabled" = "Ext. Virtual Memory: Enabled";
 "i18n_str_ext_vm_disabled" = "Ext. Virtual Memory: Not Enabled";
+
+"i18n_str_jit26_not_ready" = "JIT26 debugger is not ready: the JIT breakpoint went unanswered. Please re-enable JIT with the Universal script assigned in StikDebug, then tap Play again.";
 "i18n_str_423" = "No installed versions";
 "i18n_str_424" = "Please install a version in the Downloads page first";
 "i18n_str_426" = "Manage Versions";

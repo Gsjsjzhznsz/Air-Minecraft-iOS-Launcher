@@ -1269,6 +1269,8 @@
 "i18n_str_mem_limit_disabled" = "扩展内存限制: 未开启";
 "i18n_str_ext_vm_enabled" = "扩展虚拟内存: 已开启";
 "i18n_str_ext_vm_disabled" = "扩展虚拟内存: 未开启";
+
+"i18n_str_jit26_not_ready" = "JIT26 调试器未就绪：JIT 断点无人应答。请确认已在 StikDebug 中指定 Universal JIT 脚本并重新开启 JIT，然后再点击启动。";
 "i18n_str_423" = "暂无已安装的版本";
 "i18n_str_424" = "请先到下载页面安装一个版本";
 "i18n_str_426" = "管理版本";

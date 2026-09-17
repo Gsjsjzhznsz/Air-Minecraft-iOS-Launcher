@@ -661,7 +661,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     // 注意：不要在此清空 localVersionList/remoteVersionList
     // 该方法既被 JAR 执行调用，也被正常启动游戏调用；清空会导致用户返回后版本列表为空、
     // buttonInstall 短暂不可用。版本列表的生命周期应由 reloadProfileList 统一管理。
-    BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust");
+    // Task91：entitlement 标记 AND 磁盘标记双确认——entitlements.sideload.xml
+    // 模板给普通侧载包也预写了 jb.pmap_cs.custom_trust 字符串，单看签名会把
+    // 非 TrollStore 环境误导入 apple-magnifier:// 死路（JIT 无法自动开启）
+    BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust") && isTrollStoreInstall();
 
     // Diagnostic: dump the full JIT decision state so device-specific issues
     // can be debugged from latestlog alone (TrollStore vs dynamic-codesigning

@@ -133,6 +133,16 @@ BOOL JIT26DebuggerAttachedViaPtrace(void);
 BOOL JIT26DebuggerViaExceptionPorts(void);
 // legacy method used to check if we're using universal script
 void* JIT26CreateRegionLegacy(size_t len);
+// Task91：JIT26CreateRegionLegacy 的 SIGTRAP 安全网包装。
+// TXM 设备上 brk #0x69 无人应答（JIT26 调试器未就绪/脚本未挂载/调试器提前
+// 脱离）时，裸函数会直接 SIGTRAP 致死（"开启 JIT 后闪退"）。包装器在调用
+// 窗口内捕获 SIGTRAP 并返回 NULL，由调用方走优雅报错路径；调试器正常应答
+// 时行为与裸函数完全一致。
+void* JIT26CreateRegionLegacySafe(size_t len);
+// Task91：TrollStore 真实安装判定（entitlement 标记 AND bundle 旁 _TrollStore
+// 目录）。签名里预写的 jb.pmap_cs.custom_trust 字符串在普通侧载包上同样存在，
+// 单独使用会把非 TrollStore 环境误导入 apple-magnifier:// 死路。
+BOOL isTrollStoreInstall(void);
 // used for large memory regions
 void* JIT26PrepareRegion(void *addr, size_t len);
 // same as JIT26PrepareRegion, but used for smaller memory regions

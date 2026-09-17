@@ -538,7 +538,15 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     }
     if (requiresTXMWorkaround) {
         static void *result;
-        if(!result) result = JIT26CreateRegionLegacy(getpagesize());
+        // Task91：SIGTRAP 安全网——brk 无应答（JIT26 调试器未就绪/脚本未挂载）
+        // 时原裸函数直接 SIGTRAP 致死（用户实测"开启 JIT 后闪退"），改走优雅报错
+        if(!result) result = JIT26CreateRegionLegacySafe(getpagesize());
+        if (!result) {
+            NSLog(@"[JIT26] JIT26CreateRegionLegacy returned NULL — JIT26 debugger not servicing brk; aborting launch gracefully");
+            showDialog(localize(@"Error", nil), localize(@"i18n_str_jit26_not_ready", nil));
+            [PLLogOutputView handleExitCode:1];
+            return 1;
+        }
         if ((uint32_t)result != 0x690000E0) {
             munmap(result, getpagesize());
             // legacy script 只允许调用一次 breakpoint，必须切换到 UniversalJIT26
@@ -1481,7 +1489,13 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
     }
     if (requiresTXMWorkaround) {
         static void *result;
-        if (!result) result = JIT26CreateRegionLegacy(getpagesize());
+        // Task91：同 launchJVM，SIGTRAP 安全网——无应答时优雅报错而非闪退
+        if (!result) result = JIT26CreateRegionLegacySafe(getpagesize());
+        if (!result) {
+            NSLog(@"[JIT26] [Headless] JIT26CreateRegionLegacy returned NULL — JIT26 debugger not servicing brk; aborting gracefully");
+            showDialog(localize(@"Error", nil), localize(@"i18n_str_jit26_not_ready", nil));
+            return -1;
+        }
         if ((uint32_t)result != 0x690000E0) {
             munmap(result, getpagesize());
             NSString *inBundleScriptPath = [NSBundle.mainBundle pathForResource:@"UniversalJIT26" ofType:@"js"];            NSString *lcAppInfoPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"LCAppInfo.plist"];
