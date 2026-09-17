@@ -583,3 +583,19 @@ Stage Summary:
 - 右侧面板按钮/胶囊与 Task88 版本逐字节一致（除内存检测修复），主界面卡片顶部色条全部消失，内存权限标识按"签名+描述文件授权"双口径显示
 - 新增生效判定入口 getEffectiveEntitlementValue 仅用于内存标识与日志，JIT 判定/内存分配等既有 getEntitlementValue 调用方行为不变
 - TrollStore 用户显示逻辑不变（无描述文件→签名口径）；普通侧载且描述文件未授权者现在正确显示红色"未开启"
+---
+Task ID: 91
+Agent: main (Super Z)
+Task: 双主题主文字色统一（浅#222222/深#EEEEEE）+ 内存标识全开启误报根因修复（sideload 模板预写）+ JIT 路径纠正与开启 JIT 闪退修复
+
+Work Log:
+- 字体清扫：NMTheme.label 精确值改为浅 #222222 / 深 #EEEEEE（用户指定，替代原偏蓝灰）；七个写死白色文件主题化——AccountLogin（标题/副标题/卡片标题/描述）、LauncherPreferences（cell/textField/label/header，textField 底色同步 nm_surfaceRaised）、Multiplayer（8 组 cell + 直连字段，CRLF 文件按字节锚点编辑）、VersionManager（titleLabel/subtitle/nameLabel/descLabel）、LauncherPrefManageJRE、BackgroundSettings、CustomControls 编辑器引导文案；副标题类用 nm_secondaryLabel 保持层级。彩色底站点有意保留白字（badge/彩色按钮/chip/pill、游戏内覆盖层 Surface*/GameMenuOverlay、终端 PLLogOutputView/PLCrashView、MD3 helper），图标 tint 一律不动
+- 内存误报根因确认（复核 MeloNX EntitlementChecker.swift：同为 SecTask 机制，无更优方案）：CI 侧载工件预签 entitlements.sideload.xml 预写两项 kernel entitlement，用户重签保留 → SecTask 如实报告 → 标识必然全绿。修复：从 sideload 模板移除 increased-memory-limit / extended-virtual-addressing（普通侧载无描述文件背书本就不生效）；trollstore.xml（TROLLSTORE_JIT_ENT=1 工件，真实生效）与 codesign.xml（描述文件背书）保留；标识逻辑（签名+描述文件双确认）与 main.m 双口径日志不变
+- JIT 闪退修复：①根因 A——sideload 模板同样预写 jb.pmap_cs.custom_trust 假标记，普通侧载误判 TrollStore 走 apple-magnifier:// 死路；新增 utils.isTrollStoreInstall()（签名标记 AND bundle 旁 _TrollStore 磁盘标记，与 main.m POJAV_DETECTEDINST 同源），三处 invokeAfterJITEnabled（LauncherNavigationController/DownloadViewController/RightPanel）hasTrollStoreJIT 全部改双确认；②根因 B——TXM 设备 brk #0x69 无人应答时 JIT26CreateRegionLegacy 裸函数 SIGTRAP 必死（代码注释记载的致命点，用户实测"开启 JIT 后闪退"）；新增 JIT26CreateRegionLegacySafe SIGTRAP 安全网（sigsetjmp/siglongjmp + sigaction 保存恢复 + 非安全网窗口 SIGTRAP 保持默认语义），JavaLauncher 两处调用点改用并在 NULL 时走 i18n_str_jit26_not_ready 优雅报错（不再闪退）；③新 i18n key × 5 语言（en/zh-CN/zh-Hans/zh-Hant/ja）
+- 校验：verify_task91.py 75/75（含 isTrollStoreInstall 决策表对拍 4 例、SIGTRAP 网结构断言、模板三向检查、保留站点抽查）；verify_task90 C6 同步为模板三向断言（65/65）；88/89 仅余 E1 工作区即时检查（提交后自愈）；修复工作区意外批量 644→755 模式位（11690 文件 chmod 还原 + 211 git checkout + 51 合法 755 保留）
+- 工程说明：MultiplayerViewController.m 为整文件 CRLF，import 锚点按 \r\n 编辑；其余文件 LF
+
+Stage Summary:
+- 浅色模式所有自适应表面文字 #222222、深色 #EEEEEE（彩色语义色/彩色底白字/游戏内不受影响）
+- CI 侧载工件签名不再预写内存权限 → 未开权限用户标识正确显示"未开启"；TrollStore 工件行为不变
+- 普通侧载 JIT 恢复 stikjit 正常流程；TXM brk 无应答时优雅报错替代必死闪退
