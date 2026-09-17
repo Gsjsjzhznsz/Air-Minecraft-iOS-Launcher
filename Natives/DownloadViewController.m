@@ -13,6 +13,7 @@
 #import "PLPreferences.h"
 #import "ModService.h"
 #import "ShaderService.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import "ResourcePackService.h"
 #import "DataPackService.h"
 #import "PLProfiles.h"
@@ -94,16 +95,11 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         self.contentView.backgroundColor = [UIColor clearColor];
         self.assetType = ModernAssetTypeMod;
 
-        // FCL view_installer_item.xml 风格：扁平条目，无卡片容器、无阴影、无边框
-        // 仅依赖 BackgroundManager.applyEffectToView: 提供毛玻璃/半透明背景
+        // FCL view_installer_item.xml 风格：扁平条目（Task89：新拟态凸出表面替代半透明底）
         // 行间分隔通过 rowHeight 内的上下 padding 实现（参照 FCL marginBottom 10dp）
         self.contentContainer = [[UIView alloc] init];
         self.contentContainer.translatesAutoresizingMaskIntoConstraints = NO;
-        // FCL bg_container_white_clickable 的等效：浅色半透明背景 + 圆角
-        self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.06];
-        self.contentContainer.layer.cornerRadius = 8;
-        self.contentContainer.layer.cornerCurve = kCACornerCurveContinuous;
-        // 移除阴影/边框（FCL 扁平风格不需要）
+        [self.contentContainer nm_convexRadius:8 shadowRadius:4];
         [self.contentView addSubview:self.contentContainer];
 
         // ----- 左侧图标：26x26（FCL 标准 30dp，紧凑模式略小）-----
@@ -112,7 +108,8 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         self.iconView.layer.cornerRadius = 5;
         self.iconView.layer.cornerCurve = kCACornerCurveContinuous;
         self.iconView.clipsToBounds = YES;
-        self.iconView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.06];
+        // Task89：新拟态嵌套表面色（图标需要裁剪，不用 nm 附件，直接用凸起表面色）
+        self.iconView.backgroundColor = [NMTheme nm_surfaceRaised];
         self.iconView.contentMode = UIViewContentModeScaleAspectFit;
         self.iconView.tintColor = [UIColor systemOrangeColor];
         [self.contentContainer addSubview:self.iconView];
@@ -822,9 +819,10 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                           ?: [UIImage systemImageNamed:@"tray.and.arrow.down"];
     [self.importModpackButton setImage:importIcon forState:UIControlStateNormal];
     [self.importModpackButton setTitle:localize(@"i18n_str_156", nil) forState:UIControlStateNormal];
-    self.importModpackButton.tintColor = [UIColor whiteColor];
-    self.importModpackButton.backgroundColor = [UIColor systemPurpleColor];
-    self.importModpackButton.layer.cornerRadius = 10;
+    // Task89：全灰新拟态主按钮（用户选定：所有按钮与底同色，仅靠阴影分层）
+    self.importModpackButton.tintColor = [NMTheme nm_label];
+    [self.importModpackButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    [self.importModpackButton nm_convexRadius:10 shadowRadius:5];
     self.importModpackButton.titleLabel.font = [UIFont boldSystemFontOfSize:14];
     self.importModpackButton.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
     self.importModpackButton.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
@@ -1340,8 +1338,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     self.sidebarResetButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
     [self.sidebarResetButton setImage:[UIImage systemImageNamed:@"arrow.counterclockwise"] forState:UIControlStateNormal];
     self.sidebarResetButton.tintColor = [UIColor systemRedColor];
-    self.sidebarResetButton.backgroundColor = [UIColor tertiarySystemFillColor];
-    self.sidebarResetButton.layer.cornerRadius = 8;
+    // Task89：新拟态凸出按钮（重置图标保留语义红色）
+    [self.sidebarResetButton nm_convexRadius:8 shadowRadius:3];
+    [self.sidebarResetButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     self.sidebarResetButton.imageEdgeInsets = UIEdgeInsetsMake(0, -2, 0, 2);
     self.sidebarResetButton.titleEdgeInsets = UIEdgeInsetsMake(0, 2, 0, -2);
     [self.sidebarResetButton addTarget:self action:@selector(sidebarResetButtonClicked:) forControlEvents:UIControlEventTouchUpInside];
@@ -1375,8 +1374,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                                          selector:(SEL)selector {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     button.translatesAutoresizingMaskIntoConstraints = NO;
-    button.backgroundColor = [UIColor tertiarySystemFillColor];
-    button.layer.cornerRadius = 8;
+    // Task89：新拟态凸出按钮（全灰）
+    [button nm_convexRadius:8 shadowRadius:3];
+    [button setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     [button addTarget:self action:selector forControlEvents:UIControlEventTouchUpInside];
     button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
     button.contentEdgeInsets = UIEdgeInsetsMake(0, 12, 0, 12);

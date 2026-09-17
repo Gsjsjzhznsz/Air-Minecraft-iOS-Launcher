@@ -281,6 +281,10 @@ add_executable(AngelAuraAmethyst
   external/fishhook/fishhook.c
   UIKit+hook.m
   ScreenUtils.m
+  # Task89：NeomorphKit 新拟态组件库（忠实移植 react-native-neomorph-shadows
+  # 的 Neomorph 凸出算法：HSP 亮度→双阴影透明度、offset=±shadowRadius）
+  NeomorphKit/NMTheme.m
+  NeomorphKit/UIView+Neomorph.m
 
   authenticator/BaseAuthenticator.m
   authenticator/LocalAuthenticator.m

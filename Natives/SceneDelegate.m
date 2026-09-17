@@ -5,6 +5,7 @@
 #import "LauncherCardLayoutViewController.h"
 #import "LauncherPreferences.h"
 #import "BackgroundManager.h"
+#import "NeomorphKit/NMTheme.h"
 // Terracotta 暂时移除（排查启动崩溃）
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
@@ -149,6 +150,19 @@ extern __weak UIWindow *mainWindow;
             self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleUnspecified;
         } else {
             self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+        }
+    }
+    // Task89：新拟态主题跟随有效外观（含 override），切换时广播重绘全部
+    // Neomorph 附件（表面色/阴影透明度按新主题重算）。
+    [[NMTheme shared] reloadAndBroadcast];
+}
+
+// Task89：auto 模式下跟随系统深浅色切换（override 未指定时由系统驱动 trait 变化）
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (@available(iOS 13.0, *)) {
+        if ([self.traitCollection hasDifferentColorAppearanceComparedTo:previousTraitCollection]) {
+            [[NMTheme shared] reloadAndBroadcast];
         }
     }
 }

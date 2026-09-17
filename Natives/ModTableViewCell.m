@@ -9,6 +9,7 @@
 //
 
 #import "ModTableViewCell.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import "ModItem.h"
 #import "ModService.h"
 #import "ModLoaderIconHelper.h"
@@ -142,13 +143,11 @@
         _downloadButton = [UIButton buttonWithType:UIButtonTypeSystem];
         _downloadButton.translatesAutoresizingMaskIntoConstraints = NO;
         [_downloadButton setTitle:localize(@"resman.mods.download", nil) forState:UIControlStateNormal];
-        [_downloadButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        // Task89：全灰新拟态按钮
+        [_downloadButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
         _downloadButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
-        _downloadButton.backgroundColor = accentColor();
         _downloadButton.contentEdgeInsets = UIEdgeInsetsMake(5, 12, 5, 12);
-        _downloadButton.layer.cornerRadius = 13.0;
-        _downloadButton.layer.cornerCurve = kCACornerCurveContinuous;
-        _downloadButton.layer.masksToBounds = YES;
+        [_downloadButton nm_convexRadius:13.0 shadowRadius:4];
         [_downloadButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [_downloadButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [_downloadButton addTarget:self action:@selector(downloadTapped) forControlEvents:UIControlEventTouchUpInside];

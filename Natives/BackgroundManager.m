@@ -7,6 +7,8 @@
 //
 
 #import "BackgroundManager.h"
+#import "NeomorphKit/NMTheme.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import <Photos/Photos.h>
 
 static NSString * const kBackgroundTypeKey = @"background_type";
@@ -180,42 +182,11 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // Remove existing
     [self removeGlobalBackground];
 
-    // For default background, just set the window's background color
-    // No need for container
-    // 修复：使用 systemBackgroundColor 自适应浅色/深色模式。
-    // 之前硬编码深灰（0.08）在浅色模式下导致"中间一片黑"。
-    // systemBackgroundColor 在浅色模式为白、深色模式为黑，自动适配。
-    // 为避免状态栏区域透出纯黑，使用 systemBackground 而非纯黑。
-    if (self.currentType == BackgroundTypeNone) {
-        if (@available(iOS 13.0, *)) {
-            window.backgroundColor = [UIColor systemBackgroundColor];
-        } else {
-            window.backgroundColor = [UIColor colorWithWhite:0.08 alpha:1.0];
-        }
-        return;
-    }
-    
-    // Create container (for custom backgrounds)
-    UIView *container = [[UIView alloc] initWithFrame:window.bounds];
-    container.tag = kGlobalBackgroundTag;
-    container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    container.backgroundColor = [UIColor clearColor];
-    
-    // Insert at index 0 (behind everything)
-    [window insertSubview:container atIndex:0];
-    self.globalBackgroundContainer = container;
-    
-    // Apply content
-    switch (self.currentType) {
-        case BackgroundTypeImage:
-            [self applyImageBackgroundToContainer:container];
-            break;
-        case BackgroundTypeVideo:
-            [self applyVideoBackgroundToContainer:container];
-            break;
-        default:
-            break;
-    }
+    // Task89：新拟态模式强制纯色底（用户选定）。新拟物双阴影只在统一底色上可见，
+    // 背景图/视频/毛玻璃会破坏这一前提，因此无论用户是否设置了自定义背景，
+    // 均应用 NMTheme 主题背景色并返回（背景设置页保留，但新拟态下不再显示；
+    // 原背景容器/图片/视频路径自 Task89 起停用，方法体直接短路）。
+    window.backgroundColor = [NMTheme nm_background];
 }
 
 - (void)applyBackgroundToSplitViewController:(UISplitViewController *)splitVC {
@@ -223,49 +194,15 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         [self removeGlobalBackground];
         return;
     }
-    
+
     self.currentSplitVC = splitVC;
     self.currentWindow = nil;
-    
+
     // Remove existing
     [self removeGlobalBackground];
-    
-    // For default background, just set the view's background color
-    // No need for container or transparency
-    // 修复：使用 systemBackgroundColor 自适应浅色/深色模式
-    if (self.currentType == BackgroundTypeNone) {
-        if (@available(iOS 13.0, *)) {
-            splitVC.view.backgroundColor = [UIColor systemBackgroundColor];
-        } else {
-            splitVC.view.backgroundColor = [UIColor colorWithWhite:0.08 alpha:1.0];
-        }
-        return;
-    }
-    
-    // Create container that covers entire split view (for custom backgrounds)
-    UIView *container = [[UIView alloc] initWithFrame:splitVC.view.bounds];
-    container.tag = kGlobalBackgroundTag;
-    container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    container.backgroundColor = [UIColor clearColor];
-    
-    // Insert at the very bottom
-    [splitVC.view insertSubview:container atIndex:0];
-    self.globalBackgroundContainer = container;
-    
-    // Apply content
-    switch (self.currentType) {
-        case BackgroundTypeImage:
-            [self applyImageBackgroundToContainer:container];
-            break;
-        case BackgroundTypeVideo:
-            [self applyVideoBackgroundToContainer:container];
-            break;
-        default:
-            break;
-    }
-    
-    // Make all child controllers transparent (only for custom backgrounds)
-    [self makeSplitViewControllerTransparent:splitVC];
+
+    // Task89：同 applyBackgroundToWindow，新拟态强制纯色主题底。
+    splitVC.view.backgroundColor = [NMTheme nm_background];
 }
 
 - (void)removeGlobalBackground {
@@ -725,110 +662,49 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 - (void)applyEffectToView:(UIView *)view {
     if (!view) return;
 
-    if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果 - 创建 UIVisualEffectView 作为子视图
-        // 先移除已有的 blur view
-        for (UIView *subview in view.subviews) {
-            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
-                [subview removeFromSuperview];
-            }
-        }
-
-        // 修复：使用 SystemThinMaterial 替代 SystemMaterialDark，使左右侧栏
-        // 在浅色/深色模式下都自适应，且足够通透让背景图透出。
-        // SystemMaterialDark 过于不透明，导致"左右两边完全不透明"。
-        UIBlurEffect *blur;
-        if (@available(iOS 13.0, *)) {
-            blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
-        } else {
-            blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
-        }
-        UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
-        blurView.tag = kBackgroundBlurTag;
-        blurView.frame = view.bounds;
-        blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        blurView.layer.cornerRadius = view.layer.cornerRadius;
-        blurView.layer.masksToBounds = YES;
-
-        // 参照 ZL2 双层透明度控制：
-        // 1. blurIntensity 控制毛玻璃本身的模糊强度（0.3~1.0 范围，避免过低完全透明）
-        // 2. 有自定义背景时降低不透明度让背景透出，无背景时保持较高不透明度
-        // 这样实现了 ZL2 的 influencedByBackgroundColor 效果：
-        // 有背景图/视频时卡片更通透，无背景时卡片更不透明（与系统默认一致）
-        CGFloat effectiveAlpha = 0.3 + (self.blurIntensity * 0.7);  // 0.3~1.0
-        if (![self hasBackground]) {
-            // 无自定义背景时，提高不透明度，使 UI 更清晰
-            effectiveAlpha = MIN(effectiveAlpha + 0.2, 1.0);
-        }
-        blurView.alpha = effectiveAlpha;
-
-        // 毛玻璃本身不响应触摸，让事件穿透到宿主视图（如 UIControl 卡片）。
-        // 否则 blurView 会拦截 touch，导致 AccountLoginViewController 的登录卡片
-        // 点击无反应（UIControlEventTouchUpInside 永远不触发）。
-        blurView.userInteractionEnabled = NO;
-
-        [view insertSubview:blurView atIndex:0];
-        view.backgroundColor = [UIColor clearColor];
-    } else {
-        // 半透明效果 - 移除 blur view，使用半透明背景
-        // 修复：使用 systemBackgroundColor 替代硬编码深灰，自适应浅色/深色模式
-        for (UIView *subview in view.subviews) {
-            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
-                [subview removeFromSuperview];
-            }
-        }
-        if (@available(iOS 13.0, *)) {
-            // 使用 secondarySystemBackgroundColor 作为半透明基底，再叠加 alpha
-            // 参照 ZL2 双层透明度控制：有背景时降低不透明度让背景透出
-            CGFloat effectiveOpacity = self.uiOpacity;
-            if (![self hasBackground]) {
-                // 无自定义背景时，提高不透明度，使 UI 更清晰
-                effectiveOpacity = MIN(effectiveOpacity + 0.3, 1.0);
-            }
-            UIColor *base = [UIColor secondarySystemBackgroundColor];
-            view.backgroundColor = [base colorWithAlphaComponent:effectiveOpacity];
-        } else {
-            view.backgroundColor = [UIColor colorWithWhite:0.08 alpha:self.uiOpacity];
+    // Task89：新拟态改造（用户选定：凸出样式 + 强制纯色底）。
+    // 原毛玻璃/半透明双模式在新拟态下停用：所有卡片统一为凸出新拟物表面
+    // （surface 底色 + 暗/亮双阴影），透明度按表面色亮度自动计算（NMTheme）。
+    // 调用点此前自行设置的 layer.cornerRadius 保留为卡片圆角（未设置时取 12）；
+    // 阴影半径取圆角的一半（上限 8），保持库 demo 的比例感。
+    // 防御性移除历史遗留的 blur 子视图，避免与新拟态表面叠加。
+    for (UIView *subview in [view.subviews copy]) {
+        if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
+            [subview removeFromSuperview];
         }
     }
+    CGFloat radius = view.layer.cornerRadius;
+    if (radius <= 0) radius = 12;
+    CGFloat shadowRadius = MAX(4.0, MIN(8.0, radius * 0.5));
+    [view nm_convexRadius:radius shadowRadius:shadowRadius];
 }
 
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
     if (!cell) return;
-    if (self.uiEffect == BackgroundUIEffectBlur) {
-        // 毛玻璃效果
-        for (UIView *subview in cell.contentView.subviews) {
-            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
-                [subview removeFromSuperview];
-            }
-        }
 
-        UIBlurEffect *blur = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial];
-        UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
-        blurView.tag = kBackgroundBlurTag;
-        blurView.frame = cell.contentView.bounds;
-        blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        blurView.layer.cornerRadius = cell.contentView.layer.cornerRadius;
-        blurView.layer.masksToBounds = YES;
-
-        [cell.contentView insertSubview:blurView atIndex:0];
-        cell.backgroundColor = [UIColor clearColor];
-        cell.contentView.backgroundColor = [UIColor clearColor];
-    } else {
-        // 半透明效果
-        for (UIView *subview in cell.contentView.subviews) {
-            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
-                [subview removeFromSuperview];
-            }
+    // Task89：新拟态改造（同 applyEffectToView）。卡片容器为 contentView 内
+    // 第一个带圆角的子视图（各 cell 的既定结构）；找不到时退回 contentView
+    // 整体（radius 12）。先移除历史遗留 blur 子视图。
+    UIView *target = nil;
+    CGFloat radius = 0;
+    for (UIView *sub in cell.contentView.subviews) {
+        if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
+            [sub removeFromSuperview];
+            continue;
         }
-        // 修复：使用 secondarySystemBackgroundColor 替代硬编码 0.1 黑色
-        if (@available(iOS 13.0, *)) {
-            cell.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
-        } else {
-            cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+        if (!target && sub.layer.cornerRadius > 0) {
+            target = sub;
+            radius = sub.layer.cornerRadius;
         }
-        cell.contentView.backgroundColor = [UIColor clearColor];
     }
+    if (!target) {
+        target = cell.contentView;
+        radius = 12;
+    }
+    cell.backgroundColor = [UIColor clearColor];
+    cell.contentView.backgroundColor = [UIColor clearColor];
+    CGFloat shadowRadius = MAX(4.0, MIN(8.0, radius * 0.5));
+    [target nm_convexRadius:radius shadowRadius:shadowRadius];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

@@ -4,6 +4,7 @@
 //
 
 #import "ServerDetailViewController.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import "BackgroundManager.h"
 #import "InlineMessageView.h"
 #import "PLProfiles.h"
@@ -147,9 +148,9 @@
     self.joinButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.joinButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.joinButton setTitle:localize(@"i18n_str_960", nil) forState:UIControlStateNormal];
-    [self.joinButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.joinButton.backgroundColor = [UIColor systemBlueColor];
-    self.joinButton.layer.cornerRadius = 10;
+    // Task89：全灰新拟态主按钮
+    [self.joinButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    [self.joinButton nm_convexRadius:10 shadowRadius:5];
     self.joinButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.joinButton addTarget:self action:@selector(joinServer) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.joinButton];
@@ -158,9 +159,9 @@
     self.downloadPackButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.downloadPackButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.downloadPackButton setTitle:localize(@"i18n_str_961", nil) forState:UIControlStateNormal];
-    [self.downloadPackButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-    self.downloadPackButton.backgroundColor = [UIColor systemPurpleColor];
-    self.downloadPackButton.layer.cornerRadius = 10;
+    // Task89：全灰新拟态次按钮
+    [self.downloadPackButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    [self.downloadPackButton nm_convexRadius:10 shadowRadius:5];
     self.downloadPackButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.downloadPackButton addTarget:self action:@selector(downloadServerPack) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.downloadPackButton];

@@ -1,4 +1,5 @@
 #import "LauncherRootViewController.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNewsViewController.h"
 #import "LauncherRightPanelViewController.h"
@@ -233,28 +234,27 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 #pragma mark - Setup
 
 - (void)setupContainers {
-    // 左侧边栏容器 - 半透明，仅保留外侧（左上/左下）圆角，避免与中间容器相邻处形成凹槽
+    // 左侧边栏容器 - 新拟态平贴表面（Task89）：surface 底色、仅保留外侧（左上/左下）
+    // 圆角，无阴影（新拟态层级中的"平"面，立体感交给面板内的凸起元素）
     self.sidebarContainer = [[UIView alloc] init];
     self.sidebarContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    self.sidebarContainer.layer.cornerRadius = 16;
+    [self.sidebarContainer nm_flatSurfaceWithRadius:16];
     self.sidebarContainer.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
     self.sidebarContainer.layer.masksToBounds = YES;
-    [[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];
     [self.view addSubview:self.sidebarContainer];
 
-    // 中间内容容器 - 完全透明，四角直角（内部塞入 nav controller + table view，圆角会裁剪内容且无视觉收益）
+    // 中间内容容器 - 完全透明，四角直角（透出 NMTheme 主题背景色）
     self.contentContainer = [[UIView alloc] init];
     self.contentContainer.translatesAutoresizingMaskIntoConstraints = NO;
     self.contentContainer.backgroundColor = [UIColor clearColor];
     [self.view addSubview:self.contentContainer];
 
-    // 右侧面板容器 - 半透明，仅保留外侧（右上/右下）圆角
+    // 右侧面板容器 - 新拟态平贴表面，仅保留外侧（右上/右下）圆角
     self.rightPanelContainer = [[UIView alloc] init];
     self.rightPanelContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    self.rightPanelContainer.layer.cornerRadius = 16;
+    [self.rightPanelContainer nm_flatSurfaceWithRadius:16];
     self.rightPanelContainer.layer.maskedCorners = kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
     self.rightPanelContainer.layer.masksToBounds = YES;
-    [[BackgroundManager sharedManager] applyEffectToView:self.rightPanelContainer];
     [self.view addSubview:self.rightPanelContainer];
     
     // 设置约束
@@ -615,9 +615,12 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 }
 
 - (void)uiEffectChanged:(NSNotification *)notification {
-    // 重新应用毛玻璃/半透明效果到容器视图
-    [[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];
-    [[BackgroundManager sharedManager] applyEffectToView:self.rightPanelContainer];
+    // Task89：新拟态下毛玻璃/半透明效果停用（强制纯色底），重新应用平贴表面
+    // （attachment 幂等重建，表面色随主题）
+    [self.sidebarContainer nm_flatSurfaceWithRadius:16];
+    self.sidebarContainer.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
+    [self.rightPanelContainer nm_flatSurfaceWithRadius:16];
+    self.rightPanelContainer.layer.maskedCorners = kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
 }
 
 - (void)dealloc {
@@ -627,28 +630,9 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 #pragma mark - Custom Appearance（字体颜色 / 卡片颜色，与 Card 布局一致）
 
 - (void)applyCustomAppearance {
-    // 应用自定义卡片颜色（半透明覆盖 BackgroundManager 的毛玻璃，而非完全替换）
-    NSString *cardColor = getPrefObject(@"general.card_color");
-    if (cardColor.length > 0) {
-        UIColor *color = [self colorFromHexString:cardColor];
-        if (color) {
-            // 使用半透明颜色覆盖毛玻璃，alpha 提升到 0.85 增强可见度。
-            // 之前 0.7 太淡，浅色背景几乎看不出效果。
-            // 保留毛玻璃（backgroundColor 叠加在 UIVisualEffectView 之上），
-            // 既显示卡片色调又透出背景图。
-            CGFloat r, g, b, a;
-            if ([color getRed:&r green:&g blue:&b alpha:&a]) {
-                UIColor *semiColor = [UIColor colorWithRed:r green:g blue:b alpha:MIN(a, 0.85)];
-                [self applySemiTransparentColor:semiColor toContainer:self.sidebarContainer];
-                [self applySemiTransparentColor:semiColor toContainer:self.rightPanelContainer];
-            }
-        }
-    } else {
-        // 未设置自定义颜色时，恢复毛玻璃效果
-        [self restoreEffectToContainer:self.sidebarContainer];
-        [self restoreEffectToContainer:self.rightPanelContainer];
-    }
-    // 通知右侧面板、菜单等子 VC 同步刷新外观（text_color / card_color 联动）
+    // Task89：新拟态下表面色由 NMTheme 统一管理（强制纯色底），
+    // general.card_color / 毛玻璃不再作用于容器表面；text_color 偏好
+    // 仍由子 VC 的 LauncherAppearanceApplied 处理。
     [[NSNotificationCenter defaultCenter] postNotificationName:@"LauncherAppearanceApplied" object:nil];
 }
 

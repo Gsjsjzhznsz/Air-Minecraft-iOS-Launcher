@@ -1,4 +1,5 @@
 #import "LauncherMenuViewController.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import "LauncherPreferencesViewController.h"
 #import "LauncherPreferences.h"
 #import "VersionManagerViewController.h"
@@ -150,7 +151,10 @@
 
     // 统一圆角：防御性设置 10pt，避免后续给选中态加背景高亮时出现直角方块
     btn.layer.cornerRadius = 10;
-    btn.layer.masksToBounds = YES;
+    // Task89：新拟态——初始选中项直接应用凸出面板（选中态在 updateButtonColors 维护）
+    if (index == self.selectedIndex) {
+        [btn nm_convexRadius:12 shadowRadius:5];
+    }
 
     return btn;
 }
@@ -203,11 +207,14 @@
             if (index == self.selectedIndex) {
                 btn.tintColor = accent;
                 [btn setTitleColor:accent forState:UIControlStateNormal];
-                // FCL 风格：选中项添加半透明背景高亮
-                btn.backgroundColor = [accent colorWithAlphaComponent:0.15];
+                // Task89：新拟态——选中项为凸出面板（surface 底 + 双阴影），
+                // 替代原半透明 accent 高亮；幂等重刷（重复调用安全）
+                [btn nm_convexRadius:12 shadowRadius:5];
             } else {
                 btn.tintColor = normalColor;
                 [btn setTitleColor:normalColor forState:UIControlStateNormal];
+                // 未选中项恢复平贴（无底色无阴影）
+                [btn nm_removeNeomorph];
                 btn.backgroundColor = [UIColor clearColor];
             }
         }

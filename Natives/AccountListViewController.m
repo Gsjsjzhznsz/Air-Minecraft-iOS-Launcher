@@ -1,4 +1,5 @@
 #import <AuthenticationServices/AuthenticationServices.h>
+#import "NeomorphKit/NMTheme.h"
 
 #import "authenticator/BaseAuthenticator.h"
 #import "authenticator/ThirdPartyAuthenticator.h"
@@ -133,7 +134,8 @@
         badgeLabel.backgroundColor = [UIColor colorWithRed:0.92 green:0.55 blue:0.18 alpha:1.0];
     } else if (accountData[@"xboxGamertag"] == nil) {
         badgeLabel.text = localize(@"login.option.local", @"本地");
-        badgeLabel.backgroundColor = [UIColor colorWithWhite:0.45 alpha:1.0];
+        // Task89：主题占位底色（原硬编码深灰仅适配深色卡片）
+        badgeLabel.backgroundColor = [NMTheme nm_surfaceRaised];
     } else {
         // 微软账户
         badgeLabel.text = @"Microsoft";
@@ -203,7 +205,8 @@
     avatarView.clipsToBounds = YES;
     avatarView.layer.cornerRadius = 24;
     avatarView.layer.cornerCurve = kCACornerCurveContinuous;
-    avatarView.backgroundColor = [UIColor colorWithWhite:0.18 alpha:1.0];
+    // Task89：主题占位底色
+    avatarView.backgroundColor = [NMTheme nm_surfaceRaised];
     avatarView.image = [UIImage imageNamed:@"DefaultAccount"];
     [cardView addSubview:avatarView];
     NSString *picURLStr = [accountData[@"profilePicURL"] stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];

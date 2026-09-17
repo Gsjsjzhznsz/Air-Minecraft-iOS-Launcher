@@ -1,4 +1,5 @@
 #import "LauncherNewsViewController.h"
+#import "NeomorphKit/NMTheme.h"
 #import "HomeCustomizeViewController.h"
 #import "authenticator/BaseAuthenticator.h"
 #import "LauncherPreferences.h"
@@ -419,7 +420,8 @@ static NSString *festivalGreeting(void) {
     self.avatarImageView.layer.masksToBounds = YES;
     self.avatarImageView.layer.borderWidth = 2.5;
     self.avatarImageView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.35].CGColor;
-    self.avatarImageView.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    // Task89：主题占位底色
+    self.avatarImageView.backgroundColor = [NMTheme nm_surfaceRaised];
     self.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
     self.avatarImageView.tintColor = [UIColor systemGrayColor];
     [self.contentContainer addSubview:self.avatarImageView];
@@ -598,9 +600,10 @@ static NSString *festivalGreeting(void) {
     self.thumbnailView.clipsToBounds = YES;
     self.thumbnailView.layer.cornerRadius = 10;
     self.thumbnailView.layer.cornerCurve = kCACornerCurveContinuous;
-    self.thumbnailView.backgroundColor = [UIColor colorWithWhite:0.15 alpha:1.0];
+    // Task89：主题占位底色
+    self.thumbnailView.backgroundColor = [NMTheme nm_surfaceRaised];
     self.thumbnailView.image = [UIImage systemImageNamed:@"newspaper.fill"];
-    self.thumbnailView.tintColor = [UIColor colorWithWhite:0.4 alpha:1.0];
+    self.thumbnailView.tintColor = [NMTheme nm_secondaryLabel];
     [self.contentContainer addSubview:self.thumbnailView];
     
     // 标题

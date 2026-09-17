@@ -1,4 +1,5 @@
 #import "LauncherCardLayoutViewController.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNewsViewController.h"
 #import "LauncherRightPanelViewController.h"
@@ -281,6 +282,11 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
 ///
 /// 现统一为：保留毛玻璃 + 叠加半透明色（与 RootVC 完全一致）
 - (void)applyCustomCardColorToCard:(UIView *)card {
+    // Task89：新拟态下表面色由 NMTheme 统一管理（强制纯色底），
+    // general.card_color 不再叠加到卡片表面。
+    if (getPrefBool(@"neumorph_surfaces_locked_by_task89")) {
+        return;
+    }
     NSString *hex = getPrefObject(@"general.card_color");
     UIColor *color = [self colorFromHexString:hex];
     if (!color) return;

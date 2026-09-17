@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/UIView+Neomorph.h"
 //
 //  AnnouncementDetailViewController.m
 //  Amethyst
@@ -83,9 +84,10 @@
     self.actionButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     self.actionButton.layer.cornerRadius = 10;
     self.actionButton.layer.cornerCurve = kCACornerCurveContinuous;
-    self.actionButton.clipsToBounds = YES;
-    self.actionButton.backgroundColor = [UIColor systemBlueColor];
-    [self.actionButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+    // Task89：全灰新拟态主按钮
+    self.actionButton.clipsToBounds = NO;
+    [self.actionButton nm_convexRadius:10 shadowRadius:5];
+    [self.actionButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     [self.actionButton addTarget:self action:@selector(openActionURL) forControlEvents:UIControlEventTouchUpInside];
     self.actionButton.hidden = YES;
     [self.scrollView addSubview:self.actionButton];

@@ -537,3 +537,25 @@ Stage Summary:
 - 主界面右侧面板自下而上状态堆栈：扩展内存限制 → 扩展虚拟内存 → JIT，三项均沿用原 JIT 胶囊样式（绿=开启/红=未开启）
 - 展示值来自签名 entitlement（签名后固定）：普通 sideload 签名（无权限）显示红色"未开启"，与 MeloNX 行为一致；TrollStore 安装或带对应权限的签名包显示绿色"已开启"
 - getEntitlementValue 的 SecTaskRef 泄漏已堵，isJITEnabled/memorystatus 等既有调用方同步受益
+---
+Task ID: 89
+Agent: main (Super Z)
+Task: 全局自绘 UI 新拟态化——参照 react-native-neomorph-shadows 的 Neomorph/NeomorphFlex 凸出样式（用户选定），替换全部非 iOS 原生 UI
+
+Work Log:
+- 需求澄清（用户逐项确认）：实现方式=ObjC 原生移植（React 系库无法嵌入原生工程，上传的 README=react-native-neomorph-shadows、zip=bigbear-ui 均为 React 系，仅作样式参考）；主题=跟随系统双主题；背景图=新拟态下强制纯色底；节奏=一次全改；主按钮=全灰新拟态（与底同色，仅靠阴影分层）；样式=凸出（outer），非凹陷（inner）
+- 算法取证：拉取 tokkozhin/react-native-neomorph-shadows 源码（Neomorph.js/helpers.js），忠实移植 iOS 原生路径——HSP 亮度 sqrt(0.299r²+0.587g²+0.114b²)、brightnessToOpacity(50^(b/255)/50−1/50)、亮影透明度 0.025+0.975·op / 暗影 0.35·(1−op)、偏移=±shadowRadius 且模糊=shadowRadius、暗=黑/亮=白默认色、圆角夹断 min(r,w/2,h/2)
+- NeomorphKit 新组件库（Natives/NeomorphKit/，CMakeLists 已登记）：
+  * NMTheme：浅 #ECF0F3（库 demo 同款）/深 #262A2F 双主题，surface/surfaceRaised/background/label/secondaryLabel/placeholder；isDark 跟随 currentTraitCollection（兼容 App 的 general.ui_theme override）；NMThemeDidChangeNotification 广播
+  * UIView+Neomorph：凸出引擎=目标 layer 插入暗/亮两个投影承载层（surface 底色+双向阴影，内容浮于其上）；_NMNeomorphAttachment 附件负责 KVO bounds 同步几何 + 主题通知重绘；API：nm_convex/nm_convexRadius:shadowRadius:/nm_convexRaisedRadius/nm_pill（圆角=高/2 随尺寸重算）/nm_flatSurface（面板平贴无阴影，保留 masksToBounds）/nm_removeNeomorph/nm_styleConvexButton；凸出模式自动放开 masksToBounds
+- BackgroundManager 枢纽改造：applyEffectToView/applyEffectToCollectionViewCell 切换为 Neomorph 分发（64 处既有卡片调用点覆盖 31 文件一次性接入新拟态，保留各调用点圆角，阴影半径=圆角/2 上限 8，防御性清除遗留 blur 子视图）；applyBackgroundToWindow/ToSplitViewController 强制 NMTheme 纯色底（背景图/视频路径停用，用户选定）
+- 主题广播接线：SceneDelegate.applyUITheme（设置页切换）+ traitCollectionDidChange（auto 模式跟随系统）→ reloadAndBroadcast
+- 核心屏幕：RootVC 侧栏/右面板改平贴表面（外侧圆角保留，毛玻璃停用）；菜单选中项凸出面板/未选中平贴；右侧面板启动/版本/JAR/下载中心按钮全灰化 + JIT/内存状态胶囊 nm_pill（绿/红语义色仅保留文字）；导航工具栏启动/下载中心按钮全灰化；下载页资源行卡片/筛选面板/导入整合包按钮新拟态；VersionCardCell（截图蓝框版本卡片）底色/边框/旧阴影移交 NeomorphKit
+- 长尾：公告/导出/服务器加入/服务器包下载/Mod 下载等彩色主按钮全灰化；账户/新闻头像与缩略图占位底色主题化；LauncherCardLayoutViewController 的 card_color 叠加停用；红框原则执行——UISegmentedControl/UISearchBar/键盘/系统弹窗零改动，游戏画面覆盖层（GameMenuOverlayView）与图片上浮层（sizeLabel）因脱离纯色表面按红框逻辑排除
+- 验证：verify_task89.py 36/36（A 算法移植 13 项含 Python 独立对拍 #ECF0F3 亮≈0.770/暗≈0.083 + B 枢纽 6 项 + C 屏幕 12 项 + D 红框原则 3 项 + E 作用域 1 项；全部改动文件字符串感知括号平衡 + import 一致性 0 失败）
+
+Stage Summary:
+- 全部自绘 UI 接入新拟态：卡片（64 处枢纽）+ 主按钮（全灰）+ 状态胶囊 + 选中态面板；原生控件/游戏内覆盖层未动
+- 双主题随系统与 App 内外观切换实时重绘（通知驱动），浅色=库 demo 同款 #ECF0F3，深色=#262A2F
+- 背景图/毛玻璃/card_color 在新拟态下停用（强制纯色底，用户选定）；设置页入口保留
+- 后续可调项：凸出强度（nm shadowRadius 参数）、深色表面色阶、按压反馈动画（未做，菜单已有弹跳）
