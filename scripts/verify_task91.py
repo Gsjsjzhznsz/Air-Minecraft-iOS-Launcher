@@ -198,14 +198,15 @@ check("开发者签名模板保留两项（描述文件背书场景）",
 
 print()
 print("=" * 72)
-print("C6. 内存标识检测逻辑保持签名+描述文件双确认（与 MeloNX SecTask 对齐）")
+print("C6. 内存标识检测——Task93 已移除双确认，回归签名口径（与启动日志同源）")
 print("=" * 72)
-check("getEffectiveEntitlementValue 保留（Task90 逻辑不变）",
-      "BOOL getEffectiveEntitlementValue(NSString *key) {" in utils_m)
+check("Task93：getEffectiveEntitlementValue 已整体移除（用户要求抛弃双确认）",
+      "BOOL getEffectiveEntitlementValue(NSString *key) {" not in utils_m)
 check("SecTask 检测仍在（MeloNX EntitlementChecker 同款机制）",
       "SecTaskCopyValueForEntitlement(secTask, key, nil)" in utils_m)
 rp = read("Natives/LauncherRightPanelViewController.m")
-check("内存标识仍用生效判定", rp.count("getEffectiveEntitlementValue(@") == 2)
+check("Task93：内存标识改回签名口径 getEntitlementValue",
+      rp.count('getEntitlementValue(@"com.apple.developer.kernel.') == 2)
 
 print()
 print("=" * 72)

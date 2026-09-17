@@ -107,35 +107,22 @@ print("=" * 72)
 utils = read("Natives/utils.m")
 utils_code = strip_objc_strings_comments(utils)
 check("getEntitlementValue（签名口径）保留且未删除", "BOOL getEntitlementValue(NSString *key) {" in utils_code)
-check("新增 getEffectiveEntitlementValue 实现", "BOOL getEffectiveEntitlementValue(NSString *key) {" in utils_code)
-check("描述文件解析辅助函数存在（static）",
-      "static NSDictionary *CopyEmbeddedProfileEntitlements(void)" in utils_code)
-check("读取 embedded.mobileprovision",
-      'URLForResource:@"embedded" withExtension:@"mobileprovision"' in utils)
-check("按字节定位 plist 载荷（rangeOfData 起止标记）",
-      'rangeOfData:startMarker' in utils and 'rangeOfData:endMarker' in utils)
-check("NSPropertyListSerialization 解析描述文件", "NSPropertyListSerialization" in utils_code)
-check("提取 Entitlements 字典", '[@"Entitlements"]' in utils)
-check("生效判定：签名不含 key → NO",
-      re.search(r"getEffectiveEntitlementValue[\s\S]{0,600}?if \(!getEntitlementValue\(key\)\) return NO;", utils_code))
-check("生效判定：无描述文件 → 回退签名判定",
-      re.search(r"if \(!profileEnts\) return YES;", utils_code))
-check("生效判定：描述文件未列出该 key → NO",
-      "if (value == nil) return NO;" in utils_code)
-check("生效判定：NSNumber → boolValue",
-      re.search(r"NSNumber class\]\]\) return \[value boolValue\]", utils_code))
-check("生效判定：字符串 true/1 容错",
-      "caseInsensitiveCompare:@\"true\"" in utils and '@"1"' in utils)
+check("Task93：getEffectiveEntitlementValue 双确认实现已整体移除",
+      "BOOL getEffectiveEntitlementValue(NSString *key) {" not in utils_code)
+check("Task93：CopyEmbeddedProfileEntitlements 已整体移除",
+      "CopyEmbeddedProfileEntitlements(void)" not in utils_code)
+check("Task93：移除处留有标记注释（双确认方案废弃原因）",
+      "Task93" in utils and "完全同源" in utils)
 check("SecTask 私有 API 声明仍在（SecTaskCopyValueForEntitlement）",
       "SecTaskCopyValueForEntitlement" in utils)
 check("utils.m 花括号配平", bracket_balance(utils_code))
 
 print()
 print("=" * 72)
-print("C2. LauncherPreferences.h：生效判定对外声明")
+print("C2. LauncherPreferences.h：生效判定声明已随 Task93 移除")
 print("=" * 72)
 lph = read("Natives/LauncherPreferences.h")
-check("声明 getEffectiveEntitlementValue", "BOOL getEffectiveEntitlementValue(NSString *key);" in lph)
+check("Task93：getEffectiveEntitlementValue 声明已移除", "BOOL getEffectiveEntitlementValue(NSString *key);" not in lph)
 check("原 getEntitlementValue 声明保留", "BOOL getEntitlementValue(NSString *key);" in lph)
 
 print()
@@ -172,14 +159,17 @@ diff = git_diff_stat("7ab2b41", "Natives/LauncherRightPanelViewController.m")
 changed = [ln for ln in diff.splitlines()
            if (ln.startswith("+") or ln.startswith("-")) and not ln.startswith(("+++", "---"))]
 allowed = re.compile(
-    r"getEntitlementValue|getEffectiveEntitlementValue|Task90|描述文件|双确认|生效|误报|"
+    r"getEntitlementValue|getEffectiveEntitlementValue|Task90|Task93|描述文件|双确认|生效|误报|"
     r"检测方式与 MeloNX|本进程 entitlement|交叉校验|entitlement 运行期不会变化|刷新时机|"
     r"TrollStore 无描述文件|签名判定|避免|预写|内核并不真正兑现|普通侧载签名里也带着|配色沿用|"
-    r"共用同一入口|entitlement 由签名时的|这里与 JIT 标识")
+    r"共用同一入口|entitlement 由签名时的|这里与 JIT 标识|com\.apple\.developer\.kernel|"
+    r"启动日志|同源|同一函数|排查混乱|实测|重签工具|SecTask 私有 API|扩内存限制|扩展虚拟内存")
 suspicious = [ln for ln in changed if not allowed.search(ln)]
 check("相对 7ab2b41 的差异仅限内存检测修复（无其他视觉改动）", not suspicious, str(suspicious[:6]))
-check("updateMemoryEntitlementStatus 两项均改用生效判定",
-      rp_code.count("getEffectiveEntitlementValue(@") == 2)
+check("Task93：两项均改回签名口径 getEntitlementValue（与启动日志同源）",
+      rp.count('getEntitlementValue(@"com.apple.developer.kernel.') == 2)
+check("生效判定调用已无残留",
+      "getEffectiveEntitlementValue(@" not in rp_code)
 check("生效判定调用使用正确的两个 key", MEM_KEY in rp and VM_KEY in rp)
 check("JIT 状态刷新仍用签名口径 getEntitlementValue（不受影响）",
       "BOOL enabled = isJITEnabled(NO);" in rp_code)
@@ -218,12 +208,12 @@ check("花括号配平", bracket_balance(news_code))
 
 print()
 print("=" * 72)
-print("C5. main.m：latestlog 输出生效口径，便于区分签名携带与实际生效")
+print("C5. main.m：生效口径日志块已随 Task93 移除，仅保留签名口径日志")
 print("=" * 72)
 mainm = read("Natives/main.m")
-check("生效口径日志标题存在", "Entitlements effectiveness (profile-granted):" in mainm)
-check("两项 kernel entitlement 均输出生效状态",
-      mainm.count("getEffectiveEntitlementValue(@") == 2)
+check("Task93：生效口径日志标题已移除", "Entitlements effectiveness (profile-granted):" not in mainm)
+check("Task93：main.m 无 getEffectiveEntitlementValue 残留",
+      "getEffectiveEntitlementValue" not in mainm)
 check("签名口径可用性日志保留（printEntitlementAvailability）",
       mainm.count("printEntitlementAvailability(@") == 5)
 check("main.m 已导入 LauncherPreferences.h（声明可见）", '#import "LauncherPreferences.h"' in mainm)
@@ -244,41 +234,10 @@ check("entitlements.codesign.xml 含 extended-virtual-addressing", VM_KEY in cs_
 
 print()
 print("=" * 72)
-print("C7. 生效判定决策表（Python 对拍镜像 ObjC 实现）")
+print("C7. 生效判定决策表——已随 Task93 移除双确认方案而作废")
 print("=" * 72)
-
-
-def effective(sig_has, profile):
-    """镜像 getEffectiveEntitlementValue 的决策逻辑。
-    profile: None（无描述文件）/ dict（Entitlements）"""
-    if not sig_has:
-        return False
-    if profile is None:
-        return True
-    v = profile.get(MEM_KEY)
-    if v is None:
-        return False
-    if isinstance(v, bool):
-        return v
-    if isinstance(v, str):
-        return v.lower() == "true" or v == "1"
-    return True
-
-
-cases = [
-    ("签名无 + 无描述文件（未签名权限）", effective(False, None), False),
-    ("签名有 + 无描述文件（TrollStore）", effective(True, None), True),
-    ("签名有 + 描述文件未授权（普通侧载误报场景）", effective(True, {}), False),
-    ("签名有 + 描述文件 true（已授权）", effective(True, {MEM_KEY: True}), True),
-    ("签名有 + 描述文件 false", effective(True, {MEM_KEY: False}), False),
-    ("签名有 + 描述文件字符串 true", effective(True, {MEM_KEY: "true"}), True),
-    ("签名有 + 描述文件字符串 True", effective(True, {MEM_KEY: "True"}), True),
-    ("签名有 + 描述文件字符串 1", effective(True, {MEM_KEY: "1"}), True),
-    ("签名有 + 描述文件字符串 false", effective(True, {MEM_KEY: "false"}), False),
-    ("签名有 + 描述文件数组类型（列出即授权）", effective(True, {MEM_KEY: ["x"]}), True),
-]
-for name, got, want in cases:
-    check(name, got == want, f"got={got} want={want}")
+check("Task93：决策表镜像的 getEffectiveEntitlementValue 已不存在于 utils.m",
+      "BOOL getEffectiveEntitlementValue(NSString *key) {" not in utils_code)
 
 print()
 print("=" * 72)

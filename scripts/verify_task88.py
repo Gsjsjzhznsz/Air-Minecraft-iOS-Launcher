@@ -124,9 +124,9 @@ check("A4b 两标签与 JIT 标签同宽同高（leading12/trailing-12/height20�
           "self.extVMStatusLabel.heightAnchor constraintEqualToConstant:20"]))
 check("A5 updateMemoryEntitlementStatus 方法存在且唯一",
       rp_code.count("- (void)updateMemoryEntitlementStatus") == 1)
-check("A5a 读取两个内核内存 entitlement key（Task90 升级为签名+描述文件生效判定）",
-      'getEffectiveEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit")' in rp
-      and 'getEffectiveEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing")' in rp)
+check("A5a 读取两个内核内存 entitlement key（Task93 改回签名口径，与启动日志同源）",
+      'getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit")' in rp
+      and 'getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing")' in rp)
 check("A6 复用 utils 的 getEntitlementValue 入口（与 JIT/内存分配共用）",
       rp_code.count("getEntitlementValue") >= 2)
 update_m = rp[rp.find("- (void)updateMemoryEntitlementStatus"):rp.find("#pragma mark - 自定义外观")]

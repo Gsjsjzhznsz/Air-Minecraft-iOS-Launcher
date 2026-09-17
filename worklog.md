@@ -617,3 +617,18 @@ Stage Summary:
 - 打包脚本与上游 StikDebug universal.js 字节一致；旧版 StikDebug 用户可通过 Documents 预先 Assign Script，避免协议不配
 - JIT26 native 协议（brk 0x69/0xf00d、哨兵 0x690000E0、SIGTRAP 安全网、Extension 注入、stikjit:// script-data 通路）全部零改动
 - 结论落档：Amethyst 开 JIT 无需第三方专用脚本——内置 Universal+Extension 即"特定 JS"本体；UTM-Dolphin/manic/Geode 脚本与本启动器寄存器约定不兼容，不可混用
+---
+Task ID: 93
+Agent: main (Super Z)
+Task: 内存标识抛弃 MeloNX 双确认方案，回归启动日志同源的签名口径（用户指示"研究启动器如何检测这两项，显示在原来的地方"）；JIT/JS 方向按用户指示停止
+
+Work Log:
+- 日志溯源：用户认可的结果（extended-virtual-addressing: NO / increased-memory-limit: YES）= latestlog 开头 [Pre-init] Entitlements availability 块 = main.m printEntitlementAvailability() → utils.m getEntitlementValue()（SecTaskCopyValueForEntitlement 签名口径）。右面板 Task90 起用的 getEffectiveEntitlementValue（签名+embedded.mobileprovision 描述文件 Entitlements 交叉校验）比日志多一层——用户设备重签工具把 entitlement 同时写入描述文件时双确认放行，面板依旧"已开启"（且与日志口径不一致造成排查混乱）
+- 修复（用户指示"抛弃"）：LauncherRightPanelViewController.updateMemoryEntitlementStatus 两项改回 getEntitlementValue（与启动日志同一函数、同一口径、原位置原配色原 i18n 键）；整体移除 getEffectiveEntitlementValue + CopyEmbeddedProfileEntitlements（utils.m）、LauncherPreferences.h 声明、main.m 生效口径日志块——全仓库只保留签名口径一种，面板与日志必然一致
+- 保留项：Task91 的 isTrollStoreInstall / JIT26CreateRegionLegacySafe / 模板三向状态（sideload 已清理、trollstore/codesign 保留）全部不动；Task92 的 JIT26 脚本同步与导出保留在库（用户指示 JIT/JS 停止，不再继续开发）
+- 校验器：新建 verify_task93.py 25 项（A 面板改回 8 / B 双确认移除 11 / C 口径一致性 4 / D 仓库卫生 2）；verify_task88 A5a 反转回签名口径断言；verify_task90 C1/C2/C5 反转为"已移除"断言、C3 改签名口径计数 + allowed 白名单补 Task93 词、C7 决策表作废；verify_task91 C6 反转——88:45+1(E1)/89:35+1(E1)/90:49/91:75/92:39+1(E1)/93:23+2(E1、D2 提交后自愈)
+- 版本考古留档：用户设备 latestlog（Commit 6054498 不在本仓库、无 Task90 effectiveness 块）表明其安装的 IPA 并非本仓库 Task90+ 工件；本次修改后需安装最新 CI 工件重签验证
+
+Stage Summary:
+- 右侧面板两枚内存标识与 latestlog 开头 [Pre-init] Entitlements availability 两行完全同源同值；日志显示什么、面板就显示什么
+- 双确认方案（Task90）代码全量退场；签名/描述文件里携带什么 entitlement 面板如实显示什么，不再做交叉猜测
