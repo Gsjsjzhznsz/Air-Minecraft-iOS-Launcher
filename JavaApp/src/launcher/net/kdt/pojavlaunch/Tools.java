@@ -579,6 +579,22 @@ public final class Tools {
                 libItem.name.startsWith("net.java.dev.jna:platform:") ||
                 libItem.name.startsWith("org.lwjgl") ||
                 libItem.name.startsWith("tv.twitch")) {
+                    // Task94: 在丢弃 org.lwjgl 条目前，捕获 version.json 声明的
+                    // LWJGL 核心版本（"org.lwjgl:lwjgl:<ver>"，如 1.20.1 -> 3.3.1，
+                    // 26.x -> 3.4.1）。overlay 的 org.lwjgl.Version.getVersion()
+                    // 优先上报该值，Sodium PreLaunchChecks 的版本门
+                    // （getVersion().startsWith(要求版本)）因此与 Mojang 为该 MC
+                    // 版本配套的 LWJGL 一致。809b847 双日志（zink/LTW 双渲染器
+                    // 同死于 sodium 0.5.13 的 "Installed version: 3.4.1 /
+                    // Required version: 3.3.1"）的根因即旧 overlay 硬编码 3.4.1。
+                    if (libItem.name.startsWith("org.lwjgl:lwjgl:")) {
+                        String[] coord = libItem.name.split(":");
+                        if (coord.length >= 3 && !coord[2].trim().isEmpty()) {
+                            System.setProperty("org.lwjgl.version.report", coord[2].trim());
+                            System.out.println("[Tools] LWJGL report version: " + coord[2].trim()
+                                + " (from version metadata; sodium PreLaunchChecks gate, Task94)");
+                        }
+                    }
                     libItem._skip = true;
                     continue;
             }

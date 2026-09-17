@@ -307,12 +307,21 @@
                    @"3. 仍卡死：看日志里 [LaunchWatchdog] 点名的模组，在 mods 文件夹移除它（工具类模组大多可安全移除）后重试；\n"
                    @"4. 都看不懂：上传 latestlog.txt 反馈，凭看门狗记录可直接定位。";
 
+    LauncherHelpFaqItem *sodiumLwjgl = [[LauncherHelpFaqItem alloc] init];
+    sodiumLwjgl.iconName = @"exclamationmark.triangle";
+    sodiumLwjgl.question = @"整合包启动几秒后闪退，日志说 LWJGL 版本不兼容？";
+    sodiumLwjgl.answer = @"典型表现：不是卡死而是快速退出（几秒内），换任何渲染器都一样。在 latestlog.txt 里搜 “LWJGL version is not compatible” 能看到：\n\n"
+                     @"Installed version: 3.4.1\nRequired version: 3.3.1\n\n"
+                     @"这是 Sodium 的启动前安全检查：它要求 LWJGL 版本与该 Minecraft 版本配套（如 1.20.1 配 3.3.1、26.x 配 3.4.1），不匹配就拒绝启动。旧版启动器为了让 26.x 通过而把版本号硬编码成 3.4.1，结果 1.20.1 的整合包（如 BMC2）被 Sodium 0.5.13 拒之门外。\n\n"
+                     @"启动器已修复（动态上报）：启动时自动从游戏版本元数据读取配套的 LWJGL 版本号再上报给 Sodium，各版本各报各的。验证方法：日志里搜 “[Tools] LWJGL report version”，应显示与游戏版本配套的值（1.20.1 → 3.3.1）。\n\n"
+                     @"若仍遇到此错误：确认安装的是最新构建（设置→关于看 Commit），然后带着 latestlog.txt 反馈。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl ]
     ];
 }
 

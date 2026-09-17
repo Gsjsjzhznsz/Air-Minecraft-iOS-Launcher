@@ -49,9 +49,20 @@ def read(path):
         return f.read()
 
 
-print("===== A. 7b88b69 日志对证据（可变工作区，退役时按惯例钉 git） =====")
-log_ltw = read("latestlog.txt")
-log_pack = read("latestlog.old.txt")
+print("===== A. 7b88b69 日志对证据（Task94 起钉 git——工作区已被 809b847 新对覆盖） =====")
+
+
+def git_show(ref_path):
+    r = subprocess.run(["git", "-C", REPO, "show", ref_path],
+                       capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ""
+
+
+# Task87 当时验证的 7b88b69 日志对已随 809b847 上传被覆盖，按 task84 E 段惯例
+# 钉死到 git 历史 7b88b69（上传提交），不再读可变工作区日志。
+log_ltw = git_show("7b88b69:latestlog.txt")
+log_pack = git_show("7b88b69:latestlog.old.txt")
+check("A0 git fixture 7b88b69 日志对在位", len(log_ltw) > 1000 and len(log_pack) > 1000)
 check("A1 两日志均为 6054498 构建（Task86 IPA）",
       "Commit: 6054498 (main)" in log_ltw and "Commit: 6054498 (main)" in log_pack)
 check("A2 LTW 会话：ES 3.0 后端实证（Running on OpenGL ES 3.0 + BaseVertex 缺 ES 3.1）",
@@ -143,10 +154,10 @@ check("D7 仅用 java.lang API（无新增 import 依赖）",
       "java.awt" not in tools.split("isObjectWaitUnderAppFrames")[0].split("import ")[0]
       or "import java.awt" not in tools)
 
-print("===== E. FAQ 26 条 =====")
+print("===== E. FAQ 27 条 =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("E1 26 条目（Task87 +ltw26）", len(faq_items) == 26, f"got {len(faq_items)}")
+check("E1 27 条目（Task87 +ltw26，Task94 +sodiumLwjgl）", len(faq_items) == 27, f"got {len(faq_items)}")
 check("E2 ltw26 条目在位（预检说明 + samplerBuffer 机理 + 日志特征 + 切换指引）",
       "LTW 渲染器玩 MC 26.x 直接崩溃" in helpvc
       and "samplerBuffer" in helpvc

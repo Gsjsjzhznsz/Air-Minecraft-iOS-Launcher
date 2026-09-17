@@ -112,17 +112,17 @@ check("B9 new.txt：JVM/加载器本身健康（2966MB 分配 + Fabric 5s 完成
       "Max RAM allocation is set to 2966 MB" in log_new
       and "Loading Minecraft 1.20.1 with Fabric Loader 0.19.3" in log_new)
 
-print("===== C. FAQ 26 条（bigpack 条目，Task87 增 ltw26） =====")
+print("===== C. FAQ 27 条（bigpack 条目，Task87 增 ltw26，Task94 增 sodiumLwjgl） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 26 条目（Task86 +1，Task87 +1）", len(faq_items) == 26, f"got {len(faq_items)}")
+check("C1 27 条目（Task86 +1，Task87 +1，Task94 +1）", len(faq_items) == 27, f"got {len(faq_items)}")
 check("C2 bigpack 条目在位（Task87 重写：实锤案例 + 两层防护 + 自救步骤）",
       "大型整合包（几百个模组）第一次启动就卡在加载界面" in helpvc
       and "[LaunchWatchdog]" in helpvc
       and "missingmodschecker" in helpvc
       and "[ModDialogGuard]" in helpvc)
-check("C3 bigpack 注册进故障排除分类（stuck 之后）",
-      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack \]", helpvc) is not None)
+check("C3 bigpack 注册进故障排除分类（stuck 之后，Task94 后 sodiumLwjgl 殿后）",
+      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl \]", helpvc) is not None)
 check("C4 bigpack 与渲染器/内存无关的定性（防误导加内存）",
       "加大内存无效" in helpvc)
 

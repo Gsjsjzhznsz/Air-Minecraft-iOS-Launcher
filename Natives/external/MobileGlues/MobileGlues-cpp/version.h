@@ -374,6 +374,34 @@
 // MobileGlues (this layer's own TBO emulation, REVISION 7+, is why MG runs
 // 26.x unharmed). Launcher-side only; no MobileGlues converter surface
 // touched, so REVISION stays 17.
+// REVISION 17 addendum (Task 94, no bump): the 809b847 log pair (commit 3bc95fa
+// build, both zink and LTW sessions of the 537-mod BMC2 pack on 1.20.1)
+// proved the Task87 fixes engaged -- [ModDialogGuard] disabled
+// missingmodschecker.jar and startup sailed past the old stall -- and then
+// died at the SAME spot in BOTH renderers ~4s after JVM start: Sodium
+// 0.5.13's PreLaunchChecks gate, which requires
+// org.lwjgl.Version.getVersion().startsWith("3.3.1") for MC 1.20.1 and calls
+// System.exit(1) otherwise ("Installed version: 3.4.1 / Required version:
+// 3.3.1"). The launcher's JavaApp overlay Version.java/VersionImpl.java had
+// hardcoded the reported version to "3.4.1" (added for Sodium 0.9+ on 26.x,
+// which requires the 3.4.1 prefix), so every 1.18-1.20.x modpack with sodium
+// 0.4+/0.5+ was rejected. The overlay now reports dynamically: Tools.java's
+// preProcessLibraries captures "org.lwjgl:lwjgl:<ver>" from the instance's
+// version.json (the same value Mojang paired with that MC version, which is
+// exactly what sodium's REQUIRED constant derives from) into the
+// org.lwjgl.version.report system property, and Version.getVersion() reads it
+// live (fallback: -Dpojav.lwjgl.version=341 -> "3.4.1", otherwise "3.3.1").
+// Bytecode-level proof: reflecting into the pack's actual sodium-fabric-
+// 0.5.13+mc1.20.1.jar, isUsingKnownCompatibleLwjglVersion() returns false
+// under the old hardcoded 3.4.1 and true under the fixed 3.3.1 report.
+// PojavLauncher.java's LWJGL sanity log additionally escaped a brace bug that
+// had trapped it inside the vulkan-only branch since introduction (the line
+// never appeared in any device log). Purely launcher-side Java; no MobileGlues
+// converter surface touched, so REVISION stays 17. The fixed build identifies
+// itself on device by the pair "[Tools] LWJGL report version: 3.3.1 (from
+// version metadata...)" + "[PojavLauncher] LWJGL selected by launcher: 333,
+// reported version: 3.3.1 (metadata: 3.3.1)" -- and by the absence of the
+// sodium "not compatible" exit.
 #define REVISION 17
 #define PATCH 0
 

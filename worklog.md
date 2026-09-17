@@ -647,3 +647,34 @@ Work Log:
 Stage Summary:
 - 右侧面板两枚内存标识与 latestlog 开头 [Pre-init] Entitlements availability 两行完全同源同值；日志显示什么、面板就显示什么
 - 双确认方案（Task90）代码全量退场；签名/描述文件里携带什么 entitlement 面板如实显示什么，不再做交叉猜测
+---
+Task ID: 94
+Agent: main (Super Z)
+Task: 809b847 双日志判读（"不同渲染器打开大型整合包依旧错误"）→ Sodium LWJGL 版本门根因实锤 + 动态版本上报修复
+
+Work Log:
+- 拉取用户新上传（809b847，两日志均 Commit 3bc95fa = Task93 构建，iPad Air M4 / iPadOS 27，BMC2 [FABRIC] 1.20.1 整合包 537 mods）：latestlog.txt = zink（libOSMesa.8.dylib + FSR preset2 scale1.5）会话，latestlog.old.txt = LTW 会话
+- 判读一（Task87 修复双双生效确认）：LTW 会话 [ModDialogGuard] Task87 自动禁用 missingmodschecker.jar（rename .disabled）+ 1 desktop dialog mod(s) auto-disabled，启动越过 7b88b69 时代的 Object.wait 卡死点，mixin/config 阶段正常推进；zink 会话 FSR 链路（Task83b 410 适配 + Task85 EASU pre-readback ordering）无异常
+- 判读二（新元凶实锤）：两渲染器在 JVM 启动 ~4s 后死于同一处——sodium 0.5.13（pack 实配 "- sodium 0.5.13+mc1.20.1"，日志 808 行）PreLaunchChecks 版本门："The game failed to start because the currently active LWJGL version is not compatible. Installed version: 3.4.1 / Required version: 3.3.1" + gh-2561 链接 → System.exit(1)（Amethyst fatal trace: reason=exit(1), VM_Exit 栈）。渲染器无关性就此定案：不是 GL 问题，是纯 Java 侧版本字符串问题
+- 根因三层取证：
+  1) Modrinth 下载原版 sodium-fabric-0.5.13+mc1.20.1.jar 反编译（自制 class 解析器+方法级反汇编器 scripts/parse_version_class.py + disasm_method.py）：PreLaunchChecks.REQUIRED_LWJGL_VERSION="3.3.1" 硬编码，isUsingKnownCompatibleLwjglVersion() = Version.getVersion().startsWith("3.3.1") 字节码实锤
+  2) JavaApp/src/lwjgl overlay（Version.java/VersionImpl.java）把上报值硬编码 "3.4.1"（当年为满足 MC 26.x Sodium 0.9+ 的 startsWith("3.4.1")）→ 1.18~1.20.x + sodium 0.4/0.5 系全被拒；注意即便上报真实构建版本 3.3.3 也过不了（"3.3.3".startsWith("3.3.1")=false）
+  3) 启动器选 jar 本身正确（两日志均 "[JavaLauncher] Using LWJGL 333"）——错的只是上报值
+- 修复（动态上报，启动器侧 Java，四文件）：
+  1) Tools.java preProcessLibraries：丢弃 org.lwjgl 条目前捕获 "org.lwjgl:lwjgl:<ver>"（version.json 里 Mojang 为该 MC 配套的 LWJGL 版本 = sodium REQUIRED 常量的同源值），写 org.lwjgl.version.report 属性 + 日志 "[Tools] LWJGL report version: <v> (from version metadata; sodium PreLaunchChecks gate, Task94)"
+  2) overlay Version.java 重写：getVersion() 每次调用动态读属性（不受 clinit 固化影响，属性后写也生效）；回退链 pojav.lwjgl.version=341 → "3.4.1"（26.x 行为不变），否则 "3.3.1"（覆盖 1.18~1.20.x 最大存量）；常量 MAJOR/MINOR/REVISION 从上报值 parseMMR 解析；空白属性视为未设置
+  3) VersionImpl.java：find() 与 Version.getVersion() 同源
+  4) PojavLauncher.java：修括号错位 bug——LWJGL sanity 日志自引入起被困在 vulkan-only if 块内从未执行（任何设备日志均无 "[PojavLauncher] LWJGL selected" 行即实证）；移至 getVersionInfo 之后（属性已写入）并输出 reported+metadata 双值
+- 验证（三层）：
+  1) ECJ 编译门（scripts/task94_compile_check.sh，Linux 桩 eawt + add-exports sun.font）：overlay/Tools/PojavLauncher 三组零错误
+  2) 行为矩阵（scripts/task94_harness/Task94Harness.java）14/14：A 1.20.1 门通过 B 26.x 门通过 C 后写属性动态生效 D 回退矩阵(341→3.4.1/333→3.3.1/双缺→3.3.1) E 常量一致 F 空白属性/3.3.2 原样上报
+  3) 字节码级（Task94SodiumGate.java 反射真实 sodium jar 的私有 isUsingKnownCompatibleLwjglVersion）2/2：旧硬编码 3.4.1 被拒（复现 809b847）/ 修复后 3.3.1 放行
+- 校验器：新建 verify_task94.py 47 项（A 日志锚 10 + B overlay 8 + C 捕获链 5 + D 括号修复 4 + E FAQ 3 + F version.h 3 + G 括号平衡 5 + H 编译/行为/真实门 4 + I 级联 5）；stale-sync：FAQ 计数 26→27 同步 task83 B12/task84 D1/task85 C1/task86 C1/task87 E1；task86 C3 数组正则 +sodiumLwjgl；task87 A 区日志钉 git 7b88b69（工作区已被 809b847 覆盖，task84 E 段惯例）
+- 级联：83(73)/84(31)/85(24)/86(34)/87(49)/94(47) 全绿；88/89/90/91 绿（REPO 环境变量指向本仓）；92 E1/93 D1 为"无未提交改动"检查，提交后自愈
+- FAQ 26→27（+sodiumLwjgl 条目：症状=秒退非卡死、日志搜 "LWJGL version is not compatible"、机理、动态上报修复说明、[Tools] LWJGL report version 验证锚点）；version.h REVISION 17 addendum（Task 94, no bump）
+
+Stage Summary:
+- BMC2 整合包两连关打通：Task87 清掉 missingmodschecker 卡死后，本轮清掉 sodium 0.5.13 LWJGL 版本门；下一个装机验证锚点 = 日志 "[Tools] LWJGL report version: 3.3.1" + "[PojavLauncher] LWJGL selected by launcher: 333, reported version: 3.3.1 (metadata: 3.3.1)" + 不再出现 "not compatible" 退出
+- 上报口径定案：报 version.json 声明值（与 Mojang 配套、与 sodium REQUIRED 同源），而非真实构建版本（3.3.3 会拒）或硬编码（3.4.1 会拒 1.20.x）——各 MC 版本各报各的，26.x 行为不变
+- 顺带修掉 PojavLauncher 括号错位（sanity 日志从未执行过的暗 bug）
+- 遗留观察：sodium 门放行后 BMC2 537 mods 能走多远（内存/GC 压力、后续 mod 初始化）待下一轮装机日志；⌨ 虚拟键盘二轮诊断仍缺真机 [InputDiag] button text 证据

@@ -183,24 +183,6 @@ public class PojavLauncher {
         String renderer = System.getenv("AMETHYST_RENDERER");
         if ("libMoltenVK.dylib".equals(renderer) || "vulkan".equals(renderer)) {
             System.setProperty("org.lwjgl.vulkan.libname", "MoltenVK");
-
-        // Sanity check: the LWJGL jar on the classpath must match the version the
-        // native launcher selected (AndroidLauncher sets -Dpojav.lwjgl.version and
-        // builds the classpath from libs/lwjgl-<version>/). Otherwise the wrong
-        // LWJGL set would be used, e.g. 3.3.3 when 3.4.1 (real SDL3 bindings) is
-        // required by MC 26.3+. org.lwjgl.Version comes from whichever lwjgl jar
-        // the classpath resolved first.
-        String activeLwjgl = System.getProperty("pojav.lwjgl.version");
-        if (activeLwjgl != null) {
-            try {
-                String versionStr = Class.forName("org.lwjgl.Version").getMethod("getVersion").invoke(null).toString();
-                System.out.println("[PojavLauncher] LWJGL selected by launcher: " + activeLwjgl
-                    + ", LWJGL on classpath: " + versionStr);
-            } catch (ReflectiveOperationException e) {
-                System.out.println("[PojavLauncher] LWJGL selected by launcher: " + activeLwjgl
-                    + ", failed to read org.lwjgl.Version: " + e);
-            }
-        }
         }
 
         // MC 26.2+ Graphics API 切换（OpenGL/Vulkan 游戏内图形后端选择）
@@ -254,6 +236,25 @@ public class PojavLauncher {
         MinecraftAccount account = MinecraftAccount.load(args[0]);
         JMinecraftVersionList.Version version = Tools.getVersionInfo(args[1]);
         System.out.println("Launching Minecraft " + version.id);
+
+        // Task94: LWJGL 版本上报链路诊断（原位置的检查被错误地嵌在 vulkan-only 的
+        // if 块里从未执行过——括号错位，本行从未在日志中出现即为实证）。现移到
+        // getVersionInfo 之后：此时 preProcessLibraries 已从实例 version.json 捕获
+        // org.lwjgl:lwjgl:<ver> 并写入 org.lwjgl.version.report，Sodium 的
+        // PreLaunchChecks 版本门据此放行（1.20.1 要求 3.3.1，26.x 要求 3.4.1）。
+        // 同时保留“classpath 集合与 native 选择一致”的原有 sanity 目的。
+        String activeLwjgl = System.getProperty("pojav.lwjgl.version");
+        if (activeLwjgl != null) {
+            try {
+                String versionStr = Class.forName("org.lwjgl.Version").getMethod("getVersion").invoke(null).toString();
+                System.out.println("[PojavLauncher] LWJGL selected by launcher: " + activeLwjgl
+                    + ", reported version: " + versionStr
+                    + " (metadata: " + System.getProperty("org.lwjgl.version.report", "not captured") + ")");
+            } catch (ReflectiveOperationException e) {
+                System.out.println("[PojavLauncher] LWJGL selected by launcher: " + activeLwjgl
+                    + ", failed to read org.lwjgl.Version: " + e);
+            }
+        }
 
         // 第三个参数为服务器地址（FCL 风格）：留空则不自动加入，非空则启动后自动加入
         // 由 JavaLauncher.m 在 NSDictionary 启动分支以 args[2] 传入
