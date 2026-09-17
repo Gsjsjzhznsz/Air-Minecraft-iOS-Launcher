@@ -1,4 +1,5 @@
 #import "VersionManagerViewController.h"
+#import "NeomorphKit/NMTheme.h"
 #import "BackgroundManager.h"
 #import "PLProfiles.h"
 #import "ProfileSettingsViewController.h"
@@ -114,14 +115,14 @@ static NSInteger const kSectionVersions    = 1;
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:titleFont weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = [UIColor whiteColor];
+    self.titleLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
     self.titleLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.titleLabel];
 
     self.subtitleLabel = [[UILabel alloc] init];
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.subtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:10] weight:UIFontWeightRegular];
-    self.subtitleLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.6];
+    self.subtitleLabel.textColor = [NMTheme nm_secondaryLabel]; // Task91
     self.subtitleLabel.numberOfLines = 0;
     self.subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
     self.subtitleLabel.adjustsFontForContentSizeCategory = NO;
@@ -489,7 +490,7 @@ static NSInteger const kSectionVersions    = 1;
     self.nameLabel = [[UILabel alloc] init];
     self.nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.nameLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:13] weight:UIFontWeightSemibold];
-    self.nameLabel.textColor = [UIColor whiteColor];
+    self.nameLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
     self.nameLabel.numberOfLines = 1;
     self.nameLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.nameLabel];
@@ -497,7 +498,7 @@ static NSInteger const kSectionVersions    = 1;
     self.descLabel = [[UILabel alloc] init];
     self.descLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.descLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:10] weight:UIFontWeightRegular];
-    self.descLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.55];
+    self.descLabel.textColor = [NMTheme nm_secondaryLabel]; // Task91
     self.descLabel.numberOfLines = 2;
     self.descLabel.lineBreakMode = NSLineBreakByWordWrapping;
     self.descLabel.adjustsFontForContentSizeCategory = NO;

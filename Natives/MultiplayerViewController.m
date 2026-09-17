@@ -41,6 +41,7 @@
 //
 
 #import "MultiplayerViewController.h"
+#import "NeomorphKit/NMTheme.h"
 #import "MultiplayerManager.h"
 #import "BackgroundManager.h"
 #import "LauncherPreferences.h"
@@ -1908,8 +1909,8 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 
         // 适配自定义背景
         if ([[BackgroundManager sharedManager] hasBackground]) {
-            cell.textLabel.textColor = [UIColor whiteColor];
-            cell.detailTextLabel.textColor = [UIColor whiteColor];
+            cell.textLabel.textColor = [NMTheme nm_label]; // Task91
+            cell.detailTextLabel.textColor = [NMTheme nm_label]; // Task91
         } else {
             cell.textLabel.textColor = [UIColor labelColor];
             cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
@@ -1949,8 +1950,8 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 
         // 适配自定义背景
         if ([[BackgroundManager sharedManager] hasBackground]) {
-            cell.textLabel.textColor = [UIColor whiteColor];
-            cell.detailTextLabel.textColor = [UIColor whiteColor];
+            cell.textLabel.textColor = [NMTheme nm_label]; // Task91
+            cell.detailTextLabel.textColor = [NMTheme nm_label]; // Task91
         } else {
             cell.textLabel.textColor = [UIColor labelColor];
             cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
@@ -1985,8 +1986,8 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 
     // 适配自定义背景
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        cell.textLabel.textColor = [UIColor whiteColor];
-        cell.detailTextLabel.textColor = [UIColor whiteColor];
+        cell.textLabel.textColor = [NMTheme nm_label]; // Task91
+        cell.detailTextLabel.textColor = [NMTheme nm_label]; // Task91
     } else {
         cell.textLabel.textColor = [UIColor labelColor];
         cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
@@ -2008,7 +2009,7 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         cell.textLabel.font = [UIFont systemFontOfSize:14];
         // 适配自定义背景
         if ([[BackgroundManager sharedManager] hasBackground]) {
-            cell.textLabel.textColor = [UIColor whiteColor];
+            cell.textLabel.textColor = [NMTheme nm_label]; // Task91
         } else {
             cell.textLabel.textColor = [UIColor secondaryLabelColor];
         }
@@ -2063,8 +2064,8 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 
     // 适配自定义背景
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        cell.textLabel.textColor = [UIColor whiteColor];
-        cell.detailTextLabel.textColor = [UIColor whiteColor];
+        cell.textLabel.textColor = [NMTheme nm_label]; // Task91
+        cell.detailTextLabel.textColor = [NMTheme nm_label]; // Task91
     } else {
         cell.textLabel.textColor = [UIColor labelColor];
         cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
@@ -2160,9 +2161,9 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         // 适配自定义背景
         BOOL hasBackground = [[BackgroundManager sharedManager] hasBackground];
         if (hasBackground) {
-            self.directIPField.textColor = [UIColor whiteColor];
-            self.directPortField.textColor = [UIColor whiteColor];
-            colonLabel.textColor = [UIColor whiteColor];
+            self.directIPField.textColor = [NMTheme nm_label]; // Task91
+            self.directPortField.textColor = [NMTheme nm_label]; // Task91
+            colonLabel.textColor = [NMTheme nm_label]; // Task91
         } else {
             self.directIPField.textColor = [UIColor labelColor];
             self.directPortField.textColor = [UIColor labelColor];
@@ -2180,7 +2181,7 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
         cell.textLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
         // 适配自定义背景
         if ([[BackgroundManager sharedManager] hasBackground]) {
-            cell.textLabel.textColor = [UIColor whiteColor];
+            cell.textLabel.textColor = [NMTheme nm_label]; // Task91
         } else {
             cell.textLabel.textColor = [UIColor systemBlueColor];
         }
@@ -2246,8 +2247,8 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 
     // 适配自定义背景
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        cell.textLabel.textColor = [UIColor whiteColor];
-        cell.detailTextLabel.textColor = [UIColor whiteColor];
+        cell.textLabel.textColor = [NMTheme nm_label]; // Task91
+        cell.detailTextLabel.textColor = [NMTheme nm_label]; // Task91
     } else {
         cell.textLabel.textColor = [UIColor labelColor];
         cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
@@ -2328,8 +2329,8 @@ NS_INLINE NSString *MPLocalized(NSString *key, NSString *fallback) {
 
     // 适配自定义背景
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        cell.textLabel.textColor = [UIColor whiteColor];
-        cell.detailTextLabel.textColor = [UIColor whiteColor];
+        cell.textLabel.textColor = [NMTheme nm_label]; // Task91
+        cell.detailTextLabel.textColor = [NMTheme nm_label]; // Task91
     } else {
         cell.textLabel.textColor = [UIColor labelColor];
         cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];

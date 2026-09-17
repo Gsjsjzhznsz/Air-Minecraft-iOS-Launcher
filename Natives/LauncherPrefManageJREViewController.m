@@ -1,4 +1,5 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import "NeomorphKit/NMTheme.h"
 #import "LauncherNavigationController.h"
 #import "LauncherPreferences.h"
 #import "LauncherPrefManageJREViewController.h"
@@ -286,7 +287,7 @@ static NSString *currentImportTaskId;
     // 透明背景：不再使用毛玻璃，可看到背景图
     header.backgroundView = nil;
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        header.textLabel.textColor = [UIColor whiteColor];
+        header.textLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
         header.textLabel.shadowColor = [UIColor blackColor];
         header.textLabel.shadowOffset = CGSizeMake(0, 1);
     } else {

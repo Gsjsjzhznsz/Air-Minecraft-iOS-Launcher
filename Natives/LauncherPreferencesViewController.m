@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 
+#import "NeomorphKit/NMTheme.h"
 #import "DBNumberedSlider.h"
 #import "HostManagerBridge.h"
 #import "LauncherNavigationController.h"
@@ -1684,8 +1685,8 @@
         // Set semi-transparent dark background for cells
         [[BackgroundManager sharedManager] applyEffectToCell:cell];
 
-        // Set white text for better visibility on dark background
-        cell.textLabel.textColor = [UIColor whiteColor];
+        // Task91：写死白色改主题主文字色（新拟态表面浅色模式下白字不可读）
+        cell.textLabel.textColor = [NMTheme nm_label];
         cell.textLabel.shadowColor = [UIColor blackColor];
         cell.textLabel.shadowOffset = CGSizeMake(0, 1);
 
@@ -1716,15 +1717,15 @@
             // Style text fields
             if ([subview isKindOfClass:[UITextField class]]) {
                 UITextField *textField = (UITextField *)subview;
-                textField.textColor = [UIColor whiteColor];
-                textField.backgroundColor = [UIColor colorWithWhite:0.2 alpha:0.6];
+                textField.textColor = [NMTheme nm_label]; // Task91：文字与输入框底色同步主题化
+                textField.backgroundColor = [NMTheme nm_surfaceRaised];
                 textField.layer.cornerRadius = 8;
             }
 
             // Style labels
             if ([subview isKindOfClass:[UILabel class]]) {
                 UILabel *label = (UILabel *)subview;
-                label.textColor = [UIColor whiteColor];
+                label.textColor = [NMTheme nm_label]; // Task91
                 label.shadowColor = [UIColor blackColor];
                 label.shadowOffset = CGSizeMake(0, 1);
             }
@@ -1891,7 +1892,7 @@
     if ([[BackgroundManager sharedManager] hasBackground]) {
         if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
             UITableViewHeaderFooterView *header = (UITableViewHeaderFooterView *)view;
-            header.textLabel.textColor = [UIColor whiteColor];
+            header.textLabel.textColor = [NMTheme nm_label]; // Task91
             header.textLabel.shadowColor = [UIColor blackColor];
             header.textLabel.shadowOffset = CGSizeMake(0, 1);
             header.backgroundView = [[UIView alloc] init];

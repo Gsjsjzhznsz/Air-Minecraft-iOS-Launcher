@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 //
 //  BackgroundSettingsViewController.m
 //  Amethyst
@@ -225,7 +226,7 @@
             
             UILabel *valueLabel = [cell.contentView viewWithTag:201];
             valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.uiOpacity * 100];
-            valueLabel.textColor = hasBackground ? [UIColor whiteColor] : [UIColor labelColor];
+            valueLabel.textColor = hasBackground ? [NMTheme nm_label] : [UIColor labelColor]; // Task91
             self.opacityValueLabel = valueLabel;
             
             cell.textLabel.text = nil;
@@ -268,7 +269,7 @@
             
             UILabel *valueLabel = [cell.contentView viewWithTag:301];
             valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.blurIntensity * 100];
-            valueLabel.textColor = hasBackground ? [UIColor whiteColor] : [UIColor labelColor];
+            valueLabel.textColor = hasBackground ? [NMTheme nm_label] : [UIColor labelColor]; // Task91
             
             cell.textLabel.text = nil;
             cell.imageView.image = [UIImage systemImageNamed:@"slider.horizontal.3"];
@@ -322,7 +323,7 @@
 - (void)styleCell:(UITableViewCell *)cell hasBackground:(BOOL)hasBackground {
     if (hasBackground) {
         [[BackgroundManager sharedManager] applyEffectToCell:cell];
-        cell.textLabel.textColor = [UIColor whiteColor];
+        cell.textLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
     } else {
         cell.backgroundColor = [UIColor secondarySystemBackgroundColor];
         cell.textLabel.textColor = [UIColor labelColor];

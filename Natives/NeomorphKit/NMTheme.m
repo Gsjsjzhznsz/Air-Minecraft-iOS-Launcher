@@ -78,8 +78,10 @@ static NSString * const kDarkBackground      = @"#1E2227";
 }
 
 - (UIColor *)label {
-    return self.isDark ? [UIColor colorWithRed:0.92 green:0.94 blue:0.96 alpha:1.0]
-                       : [UIColor colorWithRed:0.22 green:0.25 blue:0.30 alpha:1.0];
+    // Task91：用户指定主文字色精确值——浅色 #222222 / 深色 #EEEEEE
+    // （替代原 rgb(0.22,0.25,0.30)/rgb(0.92,0.94,0.96) 偏蓝灰配色）
+    return self.isDark ? [UIColor colorWithRed:0xEE / 255.0 green:0xEE / 255.0 blue:0xEE / 255.0 alpha:1.0]
+                       : [UIColor colorWithRed:0x22 / 255.0 green:0x22 / 255.0 blue:0x22 / 255.0 alpha:1.0];
 }
 
 - (UIColor *)secondaryLabel {
