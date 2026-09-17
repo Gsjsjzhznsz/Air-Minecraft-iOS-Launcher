@@ -564,3 +564,22 @@ Stage Summary:
 - UIView+Neomorph.m：CGColor * → CGColorRef（ObjC 需 struct tag/typedef）；updateAppearance 内 dark/light 重复声明合并（加 nil 守卫时遗留）
 - SceneDelegate：traitCollectionDidChange: 在 UIWindowSceneDelegate（非 UIResponder）上永远不会被触发，改用 KVO 监听 window.traitCollection（context 区分，sceneDidDisconnect 摘除）——覆盖 auto 模式跟随系统与设置页切换两条路径
 - LauncherCardLayoutViewController：card_color 停用改为干净空操作（原假条件写法逻辑错误）
+---
+Task ID: 90
+Agent: main (Super Z)
+Task: 用户实测反馈修复（截图 IMG_9106）——右侧面板按钮恢复原样、主界面卡片顶部色条移除、内存权限标识误报修复
+
+Work Log:
+- 蓝框（右侧面板按钮）：LauncherRightPanelViewController.m 整体回退到 7ab2b41（Task88 时点），启动按钮恢复 accentColor 底 + 原 elevation 阴影、下载中心/管理版本/执行 Jar 恢复深灰底（colorWithWhite:0.2）、JIT/内存×2 状态胶囊恢复同色 15% 透明度底；git diff 7ab2b41 对拍确认文件差异仅剩内存检测一处（校验器强制）
+- 内存权限误报根因定位：仓库自带 entitlements.codesign/sideload/trollstore.xml 模板均预写 increased-memory-limit / extended-virtual-addressing = true，侧载工具合并模板后签名确实携带，SecTask 如实报告"有"；但普通侧载下描述文件未授权对应能力时内核并不真正兑现——"签名携带"≠"实际生效"
+- utils.m 新增 CopyEmbeddedProfileEntitlements()（按字节定位 embedded.mobileprovision 的 <?xml...</plist> 载荷解析 Entitlements）与 getEffectiveEntitlementValue()（签名 + 描述文件授权双确认；TrollStore 等无描述文件场景回退签名判定）；LauncherPreferences.h 声明
+- LauncherRightPanelViewController.updateMemoryEntitlementStatus 两项改用 getEffectiveEntitlementValue；main.m latestlog 增加"描述文件授权口径"生效状态输出，latestlog 可直接区分"签名携带"与"实际生效"
+- 红框（卡片顶部色条）：LauncherNewsViewController 的 HomeTileBaseCell 移除 accentBar 渐变装饰条（属性/创建/挂载/layoutSubviews frame 全清）；setAccentColor: 保留空操作兼容数据源 6 处调用点，磁贴图标语义色（iconView.tintColor）不受影响；Task89 占位底色（nm_surfaceRaised）保留
+- 面板容器（RootVC）未动：新拟态平贴表面保留（用户仅圈选按钮区域），深灰按钮 + 浅色表面与 Task88 前的浅色毛玻璃面板视觉等价
+- 校验器同步：verify_task90.py 新增 67 项（含生效判定决策表 Python 对拍 10 例：描述文件未授权→NO、TrollStore 无 profile→YES、字符串 true/1 容错等）；verify_task88 A5a 升级为生效判定断言；verify_task89 修复 3 处陈旧断言（B5 改 KVO window.traitCollection 字面量——traitCollectionDidChange: 在 UIWindowSceneDelegate 上永不触发；C9 改实际注释标记；C1/C1a/C2 反转为恢复原样断言）
+- verify_task88 45/46、verify_task89 35/36（各余 1 项 E1 工作区即时检查，提交后工作区干净即恢复全绿）、verify_task90 67/67
+
+Stage Summary:
+- 右侧面板按钮/胶囊与 Task88 版本逐字节一致（除内存检测修复），主界面卡片顶部色条全部消失，内存权限标识按"签名+描述文件授权"双口径显示
+- 新增生效判定入口 getEffectiveEntitlementValue 仅用于内存标识与日志，JIT 判定/内存分配等既有 getEntitlementValue 调用方行为不变
+- TrollStore 用户显示逻辑不变（无描述文件→签名口径）；普通侧载且描述文件未授权者现在正确显示红色"未开启"
