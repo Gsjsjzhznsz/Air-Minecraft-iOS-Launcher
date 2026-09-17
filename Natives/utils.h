@@ -115,6 +115,13 @@ BOOL debugLogEnabled, isJailbroken;
 #define CS_DEBUGGED 0x10000000
 int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
 BOOL isJITEnabled(BOOL checkCSOps);
+// Task96：MeloNX 风格信息卡数据源（右面板「设备」「系统」卡片）。
+// getDeviceMarketingName：hw.machine（如 iPad15,3）→ Apple 营销名
+//（如 "iPad Air 11-inch (M3)"）；未收录机型回退 hw.machine 原始标识，宁缺毋错。
+// getSystemVersionDisplay："iPadOS 18.3.2 (22D2082)"（系统名+版本+构建号，
+// iPhone 上前缀为 iOS；构建号读不到时只显示系统版本）。
+NSString* getDeviceMarketingName(void);
+NSString* getSystemVersionDisplay(void);
 // Check if a debugger is likely still attached (iOS 26+ TXM workaround).
 // When FORCE_MIRRORED + HAS_TXM, brk #0x69 in JavaLauncher requires a
 // debugger to be actively attached.  getppid() returns launchd's PID (1)

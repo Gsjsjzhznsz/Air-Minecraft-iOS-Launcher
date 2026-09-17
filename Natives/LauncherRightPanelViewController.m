@@ -37,13 +37,20 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 @property(nonatomic, strong) UIButton *launchButton;
 @property(nonatomic, strong) UIButton *manageVersionBtn;
 @property(nonatomic, strong) UIButton *executeJarBtn;
-// JIT 状态指示标签（启动游戏按钮上方）
-@property(nonatomic, strong) UILabel *jitStatusLabel;
-// 内存 entitlement 状态标签（JIT 标识上方，Task88）：
-// 参照 MeloNX 设置页对 "Increased Memory Limit / Extended Virtual Addressing"
-// 的展示，用与 JIT 标识同款的胶囊样式显示两项系统权限是否签入本应用
-@property(nonatomic, strong) UILabel *memLimitStatusLabel;  // 扩展内存限制
-@property(nonatomic, strong) UILabel *extVMStatusLabel;     // 扩展虚拟内存
+// ===== Task96：MeloNX 风格信息卡（把 MeloNX 设置页的信息卡搬入右侧面板）=====
+// 卡片纵向滚动区：7 张信息卡 + 下载中心/进度 UI 一起装入 UIStackView，
+// 空间不足时整区上下滚动（用户确认方案）。左右边缘与「登录并启动」对齐。
+@property(nonatomic, strong) UIScrollView *infoScrollView;
+@property(nonatomic, strong) UIStackView *infoStackView;
+// 各卡片的正文标签（MeloNX 卡片结构：小号彩色标题 + 大号正文；按用户要求
+// 不带 "2.6 / JIT Enabled" 之类附带小字）。Task93 起内存两卡与启动日志同源。
+@property(nonatomic, strong) UILabel *launcherVersionCardValue; // 启动器版本
+@property(nonatomic, strong) UILabel *gameVersionCardValue;    // 游戏版本
+@property(nonatomic, strong) UILabel *deviceCardValue;         // 设备
+@property(nonatomic, strong) UILabel *systemCardValue;         // 系统
+@property(nonatomic, strong) UILabel *jitCardValue;            // JIT（兔子图标卡）
+@property(nonatomic, strong) UILabel *memLimitCardValue;       // 内存上限提升
+@property(nonatomic, strong) UILabel *extVMCardValue;          // 扩展虚拟寻址
 
 // 下载相关属性
 @property(nonatomic, strong) MinecraftResourceDownloadTask *task;
@@ -243,13 +250,14 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.progressLabel.textAlignment = NSTextAlignmentCenter;
     self.progressLabel.text = @"";
     self.progressLabel.hidden = YES;
-    [self.view addSubview:self.progressLabel];
+    // Task96：不再直接挂 self.view，改入下方信息卡滚动区的 UIStackView
     
     // 进度条
     self.progressView = [[UIProgressView alloc] initWithProgressViewStyle:UIProgressViewStyleDefault];
     self.progressView.translatesAutoresizingMaskIntoConstraints = NO;
     self.progressView.hidden = YES;
-    [self.view addSubview:self.progressView];
+    // Task96：装入信息卡滚动区（组装见 makeInfoCard... 之后的 stack 组装段）
+    [self.progressView.heightAnchor constraintEqualToConstant:4].active = YES;
 
     // ===== 下载中心入口按钮（参照 FCL/ZL2/HMCL 下载进度弹窗入口）=====
     // 设计理念：FCL 和 ZL2 在启动器主界面提供一个"下载管理"按钮，点击后弹出下载进度对话框；
@@ -280,7 +288,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.downloadCenterButton.contentEdgeInsets = UIEdgeInsetsMake(0, 12, 0, 12);
     [self.downloadCenterButton addTarget:self action:@selector(openDownloadCenter) forControlEvents:UIControlEventTouchUpInside];
     self.downloadCenterButton.hidden = YES; // 默认隐藏，有下载任务时显示
-    [self.view addSubview:self.downloadCenterButton];
+    // Task96：改入信息卡滚动区 UIStackView（见下方 stack 组装段）
 
     // 活动指示器（下载中时旋转，叠加在按钮右侧）
     self.downloadCenterActivityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
@@ -339,37 +347,101 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self.launchButton addTarget:self action:@selector(launchButtonTouchUp) forControlEvents:UIControlEventTouchUpOutside | UIControlEventTouchCancel];
     [self.view addSubview:self.launchButton];
 
-    // JIT 状态指示标签（位于启动游戏按钮上方）
-    self.jitStatusLabel = [[UILabel alloc] init];
-    self.jitStatusLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.jitStatusLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-    self.jitStatusLabel.textAlignment = NSTextAlignmentCenter;
-    self.jitStatusLabel.layer.cornerRadius = 8;
-    self.jitStatusLabel.layer.masksToBounds = YES;
-    self.jitStatusLabel.text = localize(@"i18n_str_413", nil);
-    [self.view addSubview:self.jitStatusLabel];
+    // ===== Task96：MeloNX 风格信息卡（把 MeloNX 设置页的信息卡搬进右侧面板）=====
+    // 结构：7 张信息卡装入纵向 UIScrollView + UIStackView，卡宽与下方
+    // 「登录并启动」按钮同宽（12pt 边距）、同高（46pt）。
+    // 卡片自上而下：启动器版本 → 游戏版本 → 设备 → 系统 → JIT(兔子) →
+    // 内存上限提升 → 扩展虚拟寻址；JIT 卡按用户指定放在 MeloNX 四卡
+    // （设备/系统/内存×2）的正中间，与内存权限卡同色系。
+    // 下载中心/进度 UI 也一并装入 stack 顶部，隐藏时由 UIStackView 自动折叠，
+    // 空间不足时整区上下滚动（用户确认方案）。
+    self.infoScrollView = [[UIScrollView alloc] init];
+    self.infoScrollView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.infoScrollView.showsHorizontalScrollIndicator = NO;
+    self.infoScrollView.alwaysBounceVertical = YES;
+    if (@available(iOS 11.0, *)) {
+        self.infoScrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    }
+    [self.view addSubview:self.infoScrollView];
 
-    // 内存状态标签（JIT 标识上方，Task88）：样式与 JIT 标识完全一致。
-    // 参照 MeloNX：通过 SecTask 读取本进程 entitlement 并以胶囊标签展示——
-    //   扩展内存限制 = com.apple.developer.kernel.increased-memory-limit
-    //   扩展虚拟内存 = com.apple.developer.kernel.extended-virtual-addressing
-    // 检测是同步快速操作，创建后立即刷新一次拿到真实状态。
-    self.memLimitStatusLabel = [self makeJITStyleStatusLabel];
-    [self.view addSubview:self.memLimitStatusLabel];
+    self.infoStackView = [[UIStackView alloc] init];
+    self.infoStackView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.infoStackView.axis = UILayoutConstraintAxisVertical;
+    self.infoStackView.alignment = UIStackViewAlignmentFill;
+    self.infoStackView.distribution = UIStackViewDistributionFill;
+    self.infoStackView.spacing = 8;
+    [self.infoScrollView addSubview:self.infoStackView];
 
-    self.extVMStatusLabel = [self makeJITStyleStatusLabel];
-    [self.view addSubview:self.extVMStatusLabel];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.infoStackView.topAnchor constraintEqualToAnchor:self.infoScrollView.contentLayoutGuide.topAnchor],
+        [self.infoStackView.bottomAnchor constraintEqualToAnchor:self.infoScrollView.contentLayoutGuide.bottomAnchor],
+        [self.infoStackView.leadingAnchor constraintEqualToAnchor:self.infoScrollView.contentLayoutGuide.leadingAnchor],
+        [self.infoStackView.trailingAnchor constraintEqualToAnchor:self.infoScrollView.contentLayoutGuide.trailingAnchor],
+        [self.infoStackView.widthAnchor constraintEqualToAnchor:self.infoScrollView.frameLayoutGuide.widthAnchor],
+    ]];
+
+    // stack 顶部：下载中心入口 / 进度文本 / 进度条（隐藏时自动折叠不占位）
+    [self.infoStackView addArrangedSubview:self.downloadCenterButton];
+    [self.infoStackView addArrangedSubview:self.progressLabel];
+    [self.infoStackView addArrangedSubview:self.progressView];
+    [self.downloadCenterButton.heightAnchor constraintEqualToConstant:36].active = YES;
+
+    // 卡片配色（用户指定）：新卡 #64C466 绿；设备/系统同色（系统蓝）；
+    // JIT 与内存权限卡同色系（橙/黄）。卡片正文之外一律不带小字。
+    UIColor *cardGreen = [UIColor colorWithRed:0x64 / 255.0 green:0xC4 / 255.0 blue:0x66 / 255.0 alpha:1.0];  // #64C466
+    UIColor *cardBlue = [UIColor systemBlueColor];
+    UIColor *cardOrange = [UIColor colorWithRed:1.0 green:0.584 blue:0.0 alpha:1.0];                          // #FF9500
+    UIColor *cardAmber = [UIColor colorWithRed:0.906 green:0.635 blue:0.0 alpha:1.0];                         // #E7A200（黄系加深保可读）
+
+    // 设备图标按机型选 iPad/iPhone 轮廓；系统卡沿用苹果标
+    NSString *deviceIconName = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad
+        ? @"ipad" : @"iphone";
+
+    // 卡片语言按用户指定全部中文；JIT 卡标题即 "JIT"（兔子=速度，替代原 JIT 徽标）
+    UIView *launcherVersionCard = [self makeInfoCardWithIcon:@"cube.transparent" accent:cardGreen title:@"启动器版本" valueLabel:&_launcherVersionCardValue];
+    UIView *gameVersionCard = [self makeInfoCardWithIcon:@"gamecontroller" accent:cardGreen title:@"游戏版本" valueLabel:&_gameVersionCardValue];
+    UIView *deviceCard = [self makeInfoCardWithIcon:deviceIconName accent:cardBlue title:@"设备" valueLabel:&_deviceCardValue];
+    UIView *systemCard = [self makeInfoCardWithIcon:@"applelogo" accent:cardBlue title:@"系统" valueLabel:&_systemCardValue];
+    UIView *jitCard = [self makeInfoCardWithIcon:@"rabbit" accent:cardOrange title:@"JIT" valueLabel:&_jitCardValue];
+    UIView *memLimitCard = [self makeInfoCardWithIcon:@"memorychip" accent:cardOrange title:@"内存上限提升" valueLabel:&_memLimitCardValue];
+    UIView *extVMCard = [self makeInfoCardWithIcon:@"arrow.up.left.and.arrow.down.right" accent:cardAmber title:@"扩展虚拟寻址" valueLabel:&_extVMCardValue];
+
+    [self.infoStackView addArrangedSubview:launcherVersionCard];
+    [self.infoStackView addArrangedSubview:gameVersionCard];
+    [self.infoStackView addArrangedSubview:deviceCard];
+    [self.infoStackView addArrangedSubview:systemCard];
+    [self.infoStackView addArrangedSubview:jitCard];
+    [self.infoStackView addArrangedSubview:memLimitCard];
+    [self.infoStackView addArrangedSubview:extVMCard];
+
+    // 启动器版本卡：App 版本号 + 构建号双读（用户指定 "5.0.0 (build)" 格式；
+    // 两者相同时只显示一个，避免 "5.0.0 (5.0.0)" 冗余）
+    NSString *shortVersion = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"] ?: @"";
+    NSString *buildVersion = [NSBundle mainBundle].infoDictionary[@"CFBundleVersion"] ?: @"";
+    if (shortVersion.length == 0) {
+        shortVersion = @"未知";
+    }
+    if (buildVersion.length > 0 && ![buildVersion isEqualToString:shortVersion]) {
+        self.launcherVersionCardValue.text = [NSString stringWithFormat:@"%@ (%@)", shortVersion, buildVersion];
+    } else {
+        self.launcherVersionCardValue.text = shortVersion;
+    }
+
+    // 设备/系统卡：utils.h Task96 数据源（营销名 + "iPadOS x.x (build)"）
+    self.deviceCardValue.text = getDeviceMarketingName();
+    self.systemCardValue.text = getSystemVersionDisplay();
 
     // 选择版本按钮（FCL 风格：右侧版本选择入口；控制设置已挪到左侧菜单 case 3）
     self.manageVersionBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.manageVersionBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [self.manageVersionBtn setTitle:localize(@"i18n_str_38", nil) forState:UIControlStateNormal];
-    [self.manageVersionBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+    // Task96：与「登录并启动」同款配色（accentColor 底 + 白字）
+    [self.manageVersionBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.manageVersionBtn.titleLabel setFont:[UIFont systemFontOfSize:14 weight:UIFontWeightMedium]];
     self.manageVersionBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.manageVersionBtn.titleLabel.minimumScaleFactor = 0.7;
     self.manageVersionBtn.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    self.manageVersionBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    self.manageVersionBtn.backgroundColor = accentColor();
     self.manageVersionBtn.layer.cornerRadius = 10;
     [self.manageVersionBtn addTarget:self action:@selector(showVersionPicker) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.manageVersionBtn];
@@ -378,19 +450,21 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.executeJarBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     self.executeJarBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [self.executeJarBtn setTitle:localize(@"i18n_str_414", nil) forState:UIControlStateNormal];
-    [self.executeJarBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+    // Task96：按用户要求与「登录并启动」同款配色（accentColor 底 + 白字）
+    [self.executeJarBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.executeJarBtn.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.executeJarBtn.titleLabel.minimumScaleFactor = 0.7;
     self.executeJarBtn.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    self.executeJarBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    self.executeJarBtn.backgroundColor = accentColor();
     self.executeJarBtn.layer.cornerRadius = 10;
     [self.executeJarBtn addTarget:self action:@selector(executeJar) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.executeJarBtn];
     
-    // 约束布局：
-    // - 上半部分（头像/用户名/版本/进度）自上而下锚定在顶部
-    // - 下半部分（执行Jar/选择版本/JIT/启动按钮）自下而上锚定在底部
-    // 这样 JIT 显示和启动游戏按钮位于右侧面板下方，与头像区分离，避免拥挤。
+    // 约束布局（Task96 改版）：
+    // - 顶部：头像/用户名/版本标签 自上而下锚定
+    // - 中部：信息卡滚动区（7 张卡 + 下载中心/进度 UI，空间不足整区上下滚动），
+    //   左右边缘与下方「登录并启动」按钮对齐（同 12pt 边距）
+    // - 底部：启动按钮 + 执行Jar/选择版本一排，自下而上锚定
     [NSLayoutConstraint activateConstraints:@[
         // 头像（顶部）
         [self.avatarImageView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16],
@@ -408,24 +482,15 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self.versionLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.versionLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
 
-        // 进度标签
-        [self.progressLabel.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:8],
-        [self.progressLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.progressLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
+        // ===== 信息卡滚动区（Task96）：版本标签下方 → 启动按钮上方 =====
+        // 进度/下载中心/卡片全部在滚动区内的 stack 里，隐藏时自动折叠；
+        // 空间不足时滚动区内部滚动，不会与顶部/底部产生约束冲突。
+        [self.infoScrollView.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:8],
+        [self.infoScrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
+        [self.infoScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
+        [self.infoScrollView.bottomAnchor constraintEqualToAnchor:self.launchButton.topAnchor constant:-8],
 
-        // 进度条
-        [self.progressView.topAnchor constraintEqualToAnchor:self.progressLabel.bottomAnchor constant:4],
-        [self.progressView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.progressView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
-
-        // ===== 下载中心入口按钮（进度条下方）=====
-        // 当有下载任务时显示，点击弹出 DownloadTasksViewController（参照 FCL/ZL2/HMCL 下载进度弹窗）
-        [self.downloadCenterButton.topAnchor constraintEqualToAnchor:self.progressView.bottomAnchor constant:8],
-        [self.downloadCenterButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.downloadCenterButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
-        [self.downloadCenterButton.heightAnchor constraintEqualToConstant:36],
-
-        // 活动指示器（按钮右侧，垂直居中）
+        // 活动指示器（下载中心按钮右侧，垂直居中；按钮本身在滚动区 stack 内）
         [self.downloadCenterActivityIndicator.trailingAnchor constraintEqualToAnchor:self.downloadCenterButton.trailingAnchor constant:-12],
         [self.downloadCenterActivityIndicator.centerYAnchor constraintEqualToAnchor:self.downloadCenterButton.centerYAnchor],
 
@@ -440,7 +505,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self.downloadCenterBadgeLabel.widthAnchor constraintGreaterThanOrEqualToConstant:16],
 
         // ===== 下方按钮区（自下而上锚定到 safeArea 底部，参照 FCL 两按钮一排）=====
-        // 执行Jar 按钮（最底部，左半区）
+        // 执行Jar 按钮（最底部，左半区；Task96 起与登录并启动同款配色）
         [self.executeJarBtn.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
         [self.executeJarBtn.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.executeJarBtn.heightAnchor constraintEqualToConstant:38],
@@ -459,43 +524,11 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self.launchButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.launchButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
         [self.launchButton.heightAnchor constraintEqualToConstant:46],
-
-        // JIT 状态标签（启动按钮上方）
-        [self.jitStatusLabel.bottomAnchor constraintEqualToAnchor:self.launchButton.topAnchor constant:-8],
-        [self.jitStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.jitStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
-        [self.jitStatusLabel.heightAnchor constraintEqualToConstant:20],
-
-        // 内存状态标签（JIT 标识上方，Task88）：
-        // 自下而上依次为 扩展内存限制 → 扩展虚拟内存 → JIT，与 JIT 标签同宽同高，
-        // 间距 4pt（比启动按钮上方 8pt 略紧，突出三者同属一组状态堆栈）
-        [self.memLimitStatusLabel.bottomAnchor constraintEqualToAnchor:self.jitStatusLabel.topAnchor constant:-4],
-        [self.memLimitStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.memLimitStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
-        [self.memLimitStatusLabel.heightAnchor constraintEqualToConstant:20],
-
-        [self.extVMStatusLabel.bottomAnchor constraintEqualToAnchor:self.memLimitStatusLabel.topAnchor constant:-4],
-        [self.extVMStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.extVMStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
-        [self.extVMStatusLabel.heightAnchor constraintEqualToConstant:20],
     ]];
 
-    // 进度条底部需留出空间避免与下方状态堆栈重叠（Task88 调整）：
-    // 状态堆栈新增两条内存标识后总高 48pt，小屏设备可能放不下——将此条设为
-    // 999 优先级使其成为真正的"弱约束"：空间不足时优先断开此条（允许中间
-    // 留白压缩），避免与底部固定的状态堆栈产生不可满足的约束冲突。
-    NSLayoutConstraint *progressSpacingConstraint =
-        [NSLayoutConstraint constraintWithItem:self.jitStatusLabel
-                                     attribute:NSLayoutAttributeTop
-                                     relatedBy:NSLayoutRelationGreaterThanOrEqual
-                                        toItem:self.progressView
-                                     attribute:NSLayoutAttributeBottom
-                                    multiplier:1.0
-                                      constant:12];
-    progressSpacingConstraint.priority = 999;
-    progressSpacingConstraint.active = YES;
-
-    // 创建后立即刷新一次内存 entitlement 状态（同步快速，无需等 viewWillAppear）
+    // 创建后立即刷新一次状态卡片（同步快速，无需等 viewWillAppear）：
+    // JIT 卡三态 + 内存权限两卡（Task93 起与启动日志同源的签名口径）
+    [self updateJITStatus];
     [self updateMemoryEntitlementStatus];
 }
 
@@ -737,75 +770,124 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     }];
 }
 
-#pragma mark - JIT 状态显示
+#pragma mark - 状态卡片刷新（JIT / 内存权限，Task96 改为 MeloNX 风格信息卡）
 
 - (void)updateJITStatus {
-    if (!self.jitStatusLabel) return;
+    if (!self.jitCardValue) return;
     BOOL enabled = isJITEnabled(NO);
     // Three-state display on TXM devices (iPadOS 26 + M-series): JIT can be
     // "enabled" (CS_DEBUGGED set) while the JIT26 debugger that must service
     // brk #0x69 at launch is gone.  That state is expected and recoverable --
     // invokeAfterJITEnabled re-attaches the script via stikjit:// -- so tell
-    // it apart from plain red "Not Enabled" instead of lying either way.
+    // it apart from plain "Not Enabled" instead of lying either way.
+    // Task96：三态写入 JIT 卡正文（卡片语言按用户指定全部中文）；
+    // 卡片配色固定与内存权限卡同色系（用户指定），状态由正文文字表达。
     if (enabled && DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
         !JIT26IsLikelyDebuggerKeepAttached()) {
-        self.jitStatusLabel.text = localize(@"i18n_str_jit26_pending", nil);
-        self.jitStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0];
-        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.95 green:0.75 blue:0.2 alpha:1.0] colorWithAlphaComponent:0.15];
+        self.jitCardValue.text = @"已启用（启动时附加）";
     } else if (enabled) {
-        self.jitStatusLabel.text = localize(@"i18n_str_421", nil);
-        self.jitStatusLabel.textColor = [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0];
-        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
+        self.jitCardValue.text = @"已开启";
     } else {
-        self.jitStatusLabel.text = localize(@"i18n_str_422", nil);
-        self.jitStatusLabel.textColor = [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
-        self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];
+        self.jitCardValue.text = @"未开启";
     }
 }
 
-#pragma mark - 内存 entitlement 状态显示（Task88）
+#pragma mark - MeloNX 风格信息卡工厂（Task96）
 
-/// 生成与 JIT 状态标签同款的胶囊标签（字号/对齐/圆角完全一致）
-- (UILabel *)makeJITStyleStatusLabel {
-    UILabel *label = [[UILabel alloc] init];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    label.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
-    label.textAlignment = NSTextAlignmentCenter;
-    label.layer.cornerRadius = 8;
-    label.layer.masksToBounds = YES;
-    return label;
+/// 生成 MeloNX 风格信息卡：圆角彩色底 + 左侧 SF 图标 + 小号彩色标题 +
+/// 大号正文。正文随深浅色取 #222222/#EEEEEE（Task91 字色规范），超长时
+/// 自动缩小到不溢出（用户指定）。卡片高度与「登录并启动」按钮一致（46pt），
+/// 宽度撑满 stack（与按钮同宽）。按用户要求不带任何小字副标题。
+- (UIView *)makeInfoCardWithIcon:(NSString *)iconName
+                          accent:(UIColor *)accent
+                           title:(NSString *)title
+                      valueLabel:(UILabel **)outValueLabel {
+    UIView *card = [[UIView alloc] init];
+    card.translatesAutoresizingMaskIntoConstraints = NO;
+    card.backgroundColor = [accent colorWithAlphaComponent:0.15];
+    card.layer.cornerRadius = 12;
+    card.layer.masksToBounds = YES;
+    [card.heightAnchor constraintEqualToConstant:46].active = YES;
+
+    // 左侧图标（与标题同色）
+    UIImageView *iconView = [[UIImageView alloc] initWithImage:[self cardSymbolImageNamed:iconName]];
+    iconView.translatesAutoresizingMaskIntoConstraints = NO;
+    iconView.contentMode = UIViewContentModeScaleAspectFit;
+    iconView.tintColor = accent;
+    [card addSubview:iconView];
+
+    // 小号彩色标题
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
+    titleLabel.textColor = accent;
+    titleLabel.text = title;
+    [card addSubview:titleLabel];
+
+    // 大号正文（Task91 字色规范：浅色 #222222 / 深色 #EEEEEE，动态色自动跟随）
+    UILabel *valueLabel = [[UILabel alloc] init];
+    valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    valueLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    valueLabel.textColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traitCollection) {
+        return traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithRed:0xEE / 255.0 green:0xEE / 255.0 blue:0xEE / 255.0 alpha:1.0]
+            : [UIColor colorWithRed:0x22 / 255.0 green:0x22 / 255.0 blue:0x22 / 255.0 alpha:1.0];
+    }];
+    // 超长正文自动缩小到不溢出（用户指定），极限时截尾
+    valueLabel.adjustsFontSizeToFitWidth = YES;
+    valueLabel.minimumScaleFactor = 0.55;
+    valueLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    [card addSubview:valueLabel];
+
+    if (outValueLabel) {
+        *outValueLabel = valueLabel;
+    }
+
+    [NSLayoutConstraint activateConstraints:@[
+        [iconView.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],
+        [iconView.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [iconView.widthAnchor constraintEqualToConstant:20],
+        [iconView.heightAnchor constraintEqualToConstant:20],
+
+        [titleLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10],
+        [titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:7],
+        [titleLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
+
+        [valueLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10],
+        [valueLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
+        [valueLabel.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-7],
+        [valueLabel.topAnchor constraintGreaterThanOrEqualToAnchor:titleLabel.bottomAnchor constant:0],
+    ]];
+    return card;
 }
 
-/// 刷新"扩展内存限制/扩展虚拟内存"两个状态标识。
-/// Task93：改回与启动日志 [Pre-init] Entitlements availability 完全同源的检测——
+/// SF Symbol 读取（低版本/受限符号缺失时逐级回退，避免 nil 图标）
+- (UIImage *)cardSymbolImageNamed:(NSString *)name {
+    UIImage *image = [UIImage systemImageNamed:name];
+    if (!image) image = [UIImage systemImageNamed:@"circle.grid.2x2"];
+    return image ?: [UIImage systemImageNamed:@"gear"];
+}
+
+#pragma mark - 内存 entitlement 状态显示（Task88 引入；Task96 改为信息卡正文）
+
+/// 刷新「内存上限提升」「扩展虚拟寻址」两张卡片的正文。
+/// Task93：与启动日志 [Pre-init] Entitlements availability 完全同源的检测——
 /// getEntitlementValue()（SecTask 私有 API 读签名 entitlement，与 main.m
 /// printEntitlementAvailability 同一函数）。Task90 引入的"签名+描述文件双确认"
 /// （getEffectiveEntitlementValue）已按用户要求整体移除：实测双确认在重签工具把
 /// entitlement 同时写入描述文件时依然误报，且与日志口径不一致导致排查混乱。
-///   - com.apple.developer.kernel.increased-memory-limit      → 扩展内存限制
-///   - com.apple.developer.kernel.extended-virtual-addressing → 扩展虚拟内存
-/// entitlement 运行期不会变化；这里与 JIT 标识保持相同刷新时机。
-/// 配色沿用 JIT 标识：绿色=已开启，红色=未开启（背景为同色 15% 透明度）。
+///   - 内存上限提升 = com.apple.developer.kernel.increased-memory-limit
+///   - 扩展虚拟寻址 = com.apple.developer.kernel.extended-virtual-addressing
+/// Task96：展示由胶囊标签改为 MeloNX 风格信息卡正文（卡片语言按用户指定
+/// 全部中文，值显示 已开启/未开启）；检测函数与刷新时机不变，
+/// entitlement 运行期不会变化，这里与 JIT 卡保持相同刷新时机。
 - (void)updateMemoryEntitlementStatus {
-    if (!self.memLimitStatusLabel || !self.extVMStatusLabel) return;
+    if (!self.memLimitCardValue || !self.extVMCardValue) return;
     BOOL memLimit = getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
     BOOL extVM = getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
 
-    UIColor *memColor = memLimit
-        ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
-        : [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
-    self.memLimitStatusLabel.text =
-        localize(memLimit ? @"i18n_str_mem_limit_enabled" : @"i18n_str_mem_limit_disabled", nil);
-    self.memLimitStatusLabel.textColor = memColor;
-    self.memLimitStatusLabel.backgroundColor = [memColor colorWithAlphaComponent:0.15];
-
-    UIColor *vmColor = extVM
-        ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
-        : [UIColor colorWithRed:0.9 green:0.4 blue:0.3 alpha:1.0];
-    self.extVMStatusLabel.text =
-        localize(extVM ? @"i18n_str_ext_vm_enabled" : @"i18n_str_ext_vm_disabled", nil);
-    self.extVMStatusLabel.textColor = vmColor;
-    self.extVMStatusLabel.backgroundColor = [vmColor colorWithAlphaComponent:0.15];
+    self.memLimitCardValue.text = memLimit ? @"已开启" : @"未开启";
+    self.extVMCardValue.text = extVM ? @"已开启" : @"未开启";
 }
 
 #pragma mark - 自定义外观（字体颜色）
@@ -814,8 +896,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 /// 卡片背景始终深色（BackgroundManager），用户若设置浅色 card_color 则需同时设置 text_color。
 /// 同时读取 general.accent_color 刷新启动按钮主题色（FCL 风格主题强调色）。
 - (void)applyCustomAppearance {
-    // 主题强调色：刷新启动按钮背景，使用户自选的主题色立即生效
+    // 主题强调色：刷新启动按钮背景，使用户自选的主题色立即生效。
+    // Task96：执行Jar/选择版本与「登录并启动」同款配色（accentColor 底 +
+    // 白字），三枚按钮统一在此刷新。
     self.launchButton.backgroundColor = accentColor();
+    self.executeJarBtn.backgroundColor = accentColor();
+    self.manageVersionBtn.backgroundColor = accentColor();
 
     NSString *hex = getPrefObject(@"general.text_color");
     UIColor *customColor = [self colorFromHexString:hex];
@@ -823,19 +909,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         self.usernameLabel.textColor = customColor;
         self.versionLabel.textColor = [customColor colorWithAlphaComponent:0.75];
         self.progressLabel.textColor = [customColor colorWithAlphaComponent:0.75];
-        self.jitStatusLabel.textColor = customColor;
-        self.memLimitStatusLabel.textColor = customColor;
-        self.extVMStatusLabel.textColor = customColor;
-        [self.manageVersionBtn setTitleColor:customColor forState:UIControlStateNormal];
-        [self.executeJarBtn setTitleColor:customColor forState:UIControlStateNormal];
     } else {
         // 未设置自定义字体颜色时，恢复系统自适应颜色
         self.usernameLabel.textColor = [UIColor labelColor];
         self.versionLabel.textColor = [UIColor secondaryLabelColor];
         self.progressLabel.textColor = [UIColor secondaryLabelColor];
-        [self.manageVersionBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
-        [self.executeJarBtn setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
-        // JIT/内存状态标签颜色由 updateJITStatus、updateMemoryEntitlementStatus 单独管理，不在此重置
+        // 信息卡正文颜色随深浅色自动切换（动态色），不参与自定义文字色
     }
 }
 
@@ -1491,9 +1570,13 @@ static void *ProgressObserverContext = &ProgressObserverContext;
             } else {
                 self.versionLabel.text = versionId;
             }
+            // Task96：游戏版本卡与版本标签同数据源（用户指定"内容跟红框一样"，
+            // 即当前选择的游戏实例版本号，不带隔离后缀）
+            self.gameVersionCardValue.text = versionId;
         }
     } else {
         self.versionLabel.text = localize(@"i18n_str_411", nil);
+        self.gameVersionCardValue.text = @"未选择";
     }
 
     [self updateLaunchButtonState];

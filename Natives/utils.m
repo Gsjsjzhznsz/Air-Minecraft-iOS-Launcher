@@ -42,6 +42,178 @@ BOOL getEntitlementValue(NSString *key) {
 // 依然误报。内存标识现与启动日志 [Pre-init] Entitlements availability 完全同源，
 // 均直接使用上方 getEntitlementValue()（SecTask 签名口径）。
 
+// ============================================================================
+// Task96：MeloNX 风格信息卡数据源（右面板「设备」「系统」卡片）。
+// hw.machine（如 iPad15,3）→ Apple 营销名（如 "iPad Air 11-inch (M3)"）。
+// 未收录机型如实回退原始标识，宁缺毋错（错名比原名更有害）。
+// 标识符对照已联网核实（Apple 支持文档 / 机型选型库，2026-09 核对）：
+//   iPad15,3 / iPad15,4 = iPad Air 11/13-inch (M3)
+//   iPad15,7 / iPad15,8 = iPad (11th generation, A16)
+//   iPad16,1 / iPad16,2 = iPad mini (A17 Pro)
+//   iPad16,3-16,6       = iPad Pro 11/13-inch (M4)
+// ============================================================================
+static NSString *ame96_machineIdentifier(void) {
+    static NSString *cached;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        size_t len = 0;
+        if (sysctlbyname("hw.machine", NULL, &len, NULL, 0) != 0 || len == 0) return;
+        char *buf = malloc(len);
+        if (!buf) return;
+        if (sysctlbyname("hw.machine", buf, &len, NULL, 0) != 0) {
+            free(buf);
+            return;
+        }
+        cached = [NSString stringWithUTF8String:buf];
+        free(buf);
+    });
+    return cached;
+}
+
+NSString *getDeviceMarketingName(void) {
+    NSString *machine = ame96_machineIdentifier();
+    if (machine.length == 0) {
+        return [UIDevice currentDevice].model ?: @"未知设备";
+    }
+    static NSDictionary<NSString *, NSString *> *table;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        table = @{
+            // iPad（新→旧）
+            @"iPad16,1": @"iPad mini (A17 Pro)",
+            @"iPad16,2": @"iPad mini (A17 Pro)",
+            @"iPad16,3": @"iPad Pro 11-inch (M4)",
+            @"iPad16,4": @"iPad Pro 11-inch (M4)",
+            @"iPad16,5": @"iPad Pro 13-inch (M4)",
+            @"iPad16,6": @"iPad Pro 13-inch (M4)",
+            @"iPad15,3": @"iPad Air 11-inch (M3)",
+            @"iPad15,4": @"iPad Air 13-inch (M3)",
+            @"iPad15,7": @"iPad (11th generation)",
+            @"iPad15,8": @"iPad (11th generation)",
+            @"iPad14,8": @"iPad Air 11-inch (M2)",
+            @"iPad14,9": @"iPad Air 13-inch (M2)",
+            @"iPad14,3": @"iPad Pro 11-inch (M2)",
+            @"iPad14,4": @"iPad Pro 11-inch (M2)",
+            @"iPad14,5": @"iPad Pro 12.9-inch (M2)",
+            @"iPad14,6": @"iPad Pro 12.9-inch (M2)",
+            @"iPad14,1": @"iPad mini (6th generation)",
+            @"iPad14,2": @"iPad mini (6th generation)",
+            @"iPad13,16": @"iPad Air (5th generation)",
+            @"iPad13,17": @"iPad Air (5th generation)",
+            @"iPad13,18": @"iPad (10th generation)",
+            @"iPad13,19": @"iPad (10th generation)",
+            @"iPad13,1": @"iPad Air (4th generation)",
+            @"iPad13,2": @"iPad Air (4th generation)",
+            @"iPad13,4": @"iPad Pro 11-inch (M1)",
+            @"iPad13,5": @"iPad Pro 11-inch (M1)",
+            @"iPad13,6": @"iPad Pro 11-inch (M1)",
+            @"iPad13,7": @"iPad Pro 11-inch (M1)",
+            @"iPad13,8": @"iPad Pro 12.9-inch (M1)",
+            @"iPad13,9": @"iPad Pro 12.9-inch (M1)",
+            @"iPad13,10": @"iPad Pro 12.9-inch (M1)",
+            @"iPad13,11": @"iPad Pro 12.9-inch (M1)",
+            @"iPad12,1": @"iPad (9th generation)",
+            @"iPad12,2": @"iPad (9th generation)",
+            @"iPad11,6": @"iPad (8th generation)",
+            @"iPad11,7": @"iPad (8th generation)",
+            @"iPad11,1": @"iPad mini (5th generation)",
+            @"iPad11,2": @"iPad mini (5th generation)",
+            @"iPad8,1": @"iPad Pro 11-inch (1st generation)",
+            @"iPad8,2": @"iPad Pro 11-inch (1st generation)",
+            @"iPad8,3": @"iPad Pro 11-inch (1st generation)",
+            @"iPad8,4": @"iPad Pro 11-inch (1st generation)",
+            @"iPad8,5": @"iPad Pro 12.9-inch (3rd generation)",
+            @"iPad8,6": @"iPad Pro 12.9-inch (3rd generation)",
+            @"iPad8,7": @"iPad Pro 12.9-inch (3rd generation)",
+            @"iPad8,8": @"iPad Pro 12.9-inch (3rd generation)",
+            @"iPad8,9": @"iPad Pro 11-inch (2nd generation)",
+            @"iPad8,10": @"iPad Pro 11-inch (2nd generation)",
+            @"iPad8,11": @"iPad Pro 12.9-inch (4th generation)",
+            @"iPad8,12": @"iPad Pro 12.9-inch (4th generation)",
+            @"iPad7,11": @"iPad (7th generation)",
+            @"iPad7,12": @"iPad (7th generation)",
+            @"iPad6,11": @"iPad (5th generation)",
+            @"iPad6,12": @"iPad (5th generation)",
+            @"iPad5,3": @"iPad Air 2",
+            @"iPad5,4": @"iPad Air 2",
+            @"iPad5,1": @"iPad mini 4",
+            @"iPad5,2": @"iPad mini 4",
+            // iPhone
+            @"iPhone17,1": @"iPhone 16 Pro",
+            @"iPhone17,2": @"iPhone 16 Pro Max",
+            @"iPhone17,3": @"iPhone 16",
+            @"iPhone17,4": @"iPhone 16 Plus",
+            @"iPhone17,5": @"iPhone 16e",
+            @"iPhone16,1": @"iPhone 15 Pro",
+            @"iPhone16,2": @"iPhone 15 Pro Max",
+            @"iPhone15,4": @"iPhone 15",
+            @"iPhone15,5": @"iPhone 15 Plus",
+            @"iPhone15,2": @"iPhone 14 Pro",
+            @"iPhone15,3": @"iPhone 14 Pro Max",
+            @"iPhone14,7": @"iPhone 14",
+            @"iPhone14,8": @"iPhone 14 Plus",
+            @"iPhone14,6": @"iPhone SE (3rd generation)",
+            @"iPhone14,2": @"iPhone 13 Pro",
+            @"iPhone14,3": @"iPhone 13 Pro Max",
+            @"iPhone14,4": @"iPhone 13 mini",
+            @"iPhone14,5": @"iPhone 13",
+            @"iPhone13,1": @"iPhone 12 mini",
+            @"iPhone13,2": @"iPhone 12",
+            @"iPhone13,3": @"iPhone 12 Pro",
+            @"iPhone13,4": @"iPhone 12 Pro Max",
+            @"iPhone12,8": @"iPhone SE (2nd generation)",
+            @"iPhone12,1": @"iPhone 11",
+            @"iPhone12,3": @"iPhone 11 Pro",
+            @"iPhone12,5": @"iPhone 11 Pro Max",
+            @"iPhone11,8": @"iPhone XR",
+            @"iPhone11,2": @"iPhone XS",
+            @"iPhone11,4": @"iPhone XS Max",
+            @"iPhone11,6": @"iPhone XS Max",
+            @"iPhone10,1": @"iPhone 8",
+            @"iPhone10,2": @"iPhone 8 Plus",
+            @"iPhone10,3": @"iPhone X",
+            @"iPhone10,6": @"iPhone X",
+            @"iPhone9,1": @"iPhone 7",
+            @"iPhone9,3": @"iPhone 7",
+            @"iPhone9,2": @"iPhone 7 Plus",
+            @"iPhone9,4": @"iPhone 7 Plus",
+            @"iPhone8,1": @"iPhone 6s",
+            @"iPhone8,2": @"iPhone 6s Plus",
+            @"iPhone8,4": @"iPhone SE (1st generation)",
+        };
+    });
+    NSString *name = table[machine];
+    return name ?: machine;
+}
+
+NSString *getSystemVersionDisplay(void) {
+    static NSString *cached;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        UIDevice *device = [UIDevice currentDevice];
+        NSString *prefix = [device userInterfaceIdiom] == UIUserInterfaceIdiomPad
+            ? @"iPadOS" : @"iOS";
+        // 构建号（如 22D2082）：kern.osbuildversion，读不到时只显示系统版本
+        NSString *build = nil;
+        size_t len = 0;
+        if (sysctlbyname("kern.osbuildversion", NULL, &len, NULL, 0) == 0 && len > 0) {
+            char *buf = malloc(len);
+            if (buf) {
+                if (sysctlbyname("kern.osbuildversion", buf, &len, NULL, 0) == 0) {
+                    build = [NSString stringWithUTF8String:buf];
+                }
+                free(buf);
+            }
+        }
+        if (build.length > 0) {
+            cached = [NSString stringWithFormat:@"%@ %@ (%@)", prefix, device.systemVersion, build];
+        } else {
+            cached = [NSString stringWithFormat:@"%@ %@", prefix, device.systemVersion];
+        }
+    });
+    return cached;
+}
+
 // Task91：TrollStore 真实安装判定——签名标记 AND 磁盘标记（bundle 旁的
 // _TrollStore 目录，与 main.m 的 POJAV_DETECTEDINST 判定同源）。
 // 背景：entitlements.sideload.xml 模板给普通侧载包也预写了
