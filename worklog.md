@@ -678,3 +678,13 @@ Stage Summary:
 - 上报口径定案：报 version.json 声明值（与 Mojang 配套、与 sodium REQUIRED 同源），而非真实构建版本（3.3.3 会拒）或硬编码（3.4.1 会拒 1.20.x）——各 MC 版本各报各的，26.x 行为不变
 - 顺带修掉 PojavLauncher 括号错位（sanity 日志从未执行过的暗 bug）
 - 遗留观察：sodium 门放行后 BMC2 537 mods 能走多远（内存/GC 压力、后续 mod 初始化）待下一轮装机日志；⌨ 虚拟键盘二轮诊断仍缺真机 [InputDiag] button text 证据
+---
+Task ID: 94 (续)
+Agent: main (Super Z)
+Task: CI 构建确认
+
+Work Log:
+- CI run 35227225654（62e2ddb）completed | success——新 IPA 就绪
+
+Stage Summary:
+- Task94 全链绿灯：47/47 验证 + 级联全绿 + CI 构建成功；等用户装机复测 BMC2（预期日志锚点见 Task94 Stage Summary）
