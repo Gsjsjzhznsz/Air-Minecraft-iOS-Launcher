@@ -37,54 +37,10 @@ BOOL getEntitlementValue(NSString *key) {
     return result;
 }
 
-// Task90：解析 embedded.mobileprovision 描述文件中 Entitlements 字典。
-// 描述文件是 CMS(DER) 包装的 plist，载荷为明文 XML，这里按字节定位
-// "<?xml ... </plist>" 片段后交给 NSPropertyListSerialization。
-// 任何一步失败都返回 nil，调用方随之回退为"以签名为准"。
-static NSDictionary *CopyEmbeddedProfileEntitlements(void) {
-    NSURL *url = [[NSBundle mainBundle] URLForResource:@"embedded" withExtension:@"mobileprovision"];
-    if (!url) return nil;
-    NSData *data = [[NSData alloc] initWithContentsOfURL:url];
-    if (data.length == 0) return nil;
-    NSData *startMarker = [@"<?xml" dataUsingEncoding:NSUTF8StringEncoding];
-    NSData *endMarker = [@"</plist>" dataUsingEncoding:NSUTF8StringEncoding];
-    NSRange start = [data rangeOfData:startMarker options:0 range:NSMakeRange(0, data.length)];
-    if (start.location == NSNotFound) return nil;
-    NSRange tail = NSMakeRange(start.location, data.length - start.location);
-    NSRange end = [data rangeOfData:endMarker options:0 range:tail];
-    if (end.location == NSNotFound) return nil;
-    NSRange plistRange = NSMakeRange(start.location, end.location + endMarker.length - start.location);
-    id plist = [NSPropertyListSerialization propertyListWithData:[data subdataWithRange:plistRange]
-                                                         options:0
-                                                          format:NULL
-                                                           error:NULL];
-    if (![plist isKindOfClass:[NSDictionary class]]) return nil;
-    id ents = ((NSDictionary *)plist)[@"Entitlements"];
-    return [ents isKindOfClass:[NSDictionary class]] ? ents : nil;
-}
-
-// Task90：内存权限标识专用的"生效判定"。
-// 背景（用户实测误报）：仓库自带的 entitlements.*.xml 模板把
-// increased-memory-limit / extended-virtual-addressing 预写为 true，侧载工具
-// 合并这些模板后签名里确实带有这两项，SecTask 如实报告"有"；但在描述文件
-// 未授权对应能力的普通侧载环境里，内核并不真正兑现这些权限——标识于是出现
-// "没开却显示已开启"。判定规则：
-//   1. 签名（SecTask）不含该 key → NO；
-//   2. 存在 embedded.mobileprovision → 还需描述文件 Entitlements 明确授权该
-//      key（描述文件是权限真实生效的依据），未列出/值为假 → NO；
-//   3. 无描述文件（TrollStore 等签名即生效的安装方式）→ 维持签名判定。
-BOOL getEffectiveEntitlementValue(NSString *key) {
-    if (!getEntitlementValue(key)) return NO;
-    NSDictionary *profileEnts = CopyEmbeddedProfileEntitlements();
-    if (!profileEnts) return YES;
-    id value = profileEnts[key];
-    if (value == nil) return NO;
-    if ([value isKindOfClass:[NSNumber class]]) return [value boolValue];
-    if ([value isKindOfClass:[NSString class]]) {
-        return [value caseInsensitiveCompare:@"true"] == NSOrderedSame || [value isEqualToString:@"1"];
-    }
-    return YES;
-}
+// Task93：Task90 的"签名+描述文件双确认"方案已整体移除（getEffectiveEntitlementValue /
+// CopyEmbeddedProfileEntitlements）——用户实测双确认在重签工具同时写入描述文件时
+// 依然误报。内存标识现与启动日志 [Pre-init] Entitlements availability 完全同源，
+// 均直接使用上方 getEntitlementValue()（SecTask 签名口径）。
 
 // Task91：TrollStore 真实安装判定——签名标记 AND 磁盘标记（bundle 旁的
 // _TrollStore 目录，与 main.m 的 POJAV_DETECTEDINST 判定同源）。

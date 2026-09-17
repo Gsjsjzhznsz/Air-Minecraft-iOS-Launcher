@@ -39,12 +39,6 @@ UIColor *accentColor(void);
 
 BOOL getEntitlementValue(NSString *key);
 
-/// Task90：内存权限标识专用——在 getEntitlementValue（签名检测）基础上交叉校验
-/// embedded.mobileprovision 描述文件的 Entitlements 授权。普通侧载下签名里预写的
-/// kernel entitlement 未必真正生效，主界面"扩展内存限制/扩展虚拟内存"标识及
-/// latestlog 的生效口径日志均以此为准；无描述文件（TrollStore 等）时等同签名判定。
-BOOL getEffectiveEntitlementValue(NSString *key);
-
 UIEdgeInsets getDefaultSafeArea();
 CGRect getSafeArea(CGRect screenBounds);
 void setSafeArea(CGSize screenSize, CGRect safeArea);

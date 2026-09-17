@@ -777,20 +777,19 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 }
 
 /// 刷新"扩展内存限制/扩展虚拟内存"两个状态标识。
-/// 检测方式与 MeloNX（Ryujinx iOS 移植）设置页一致：通过 SecTask 私有 API 读取
-/// 本进程 entitlement，并交叉校验描述文件授权：
+/// Task93：改回与启动日志 [Pre-init] Entitlements availability 完全同源的检测——
+/// getEntitlementValue()（SecTask 私有 API 读签名 entitlement，与 main.m
+/// printEntitlementAvailability 同一函数）。Task90 引入的"签名+描述文件双确认"
+/// （getEffectiveEntitlementValue）已按用户要求整体移除：实测双确认在重签工具把
+/// entitlement 同时写入描述文件时依然误报，且与日志口径不一致导致排查混乱。
 ///   - com.apple.developer.kernel.increased-memory-limit      → 扩展内存限制
 ///   - com.apple.developer.kernel.extended-virtual-addressing → 扩展虚拟内存
-/// Task90 修复误报：仓库 entitlements 模板预写了这两项，普通侧载签名里也带着，
-/// 但描述文件未授权时内核并不真正兑现——故改用 getEffectiveEntitlementValue()
-/// （签名 + embedded.mobileprovision 授权双确认，TrollStore 无描述文件时维持
-/// 签名判定），避免"没开内存权限却显示已开启"。
 /// entitlement 运行期不会变化；这里与 JIT 标识保持相同刷新时机。
 /// 配色沿用 JIT 标识：绿色=已开启，红色=未开启（背景为同色 15% 透明度）。
 - (void)updateMemoryEntitlementStatus {
     if (!self.memLimitStatusLabel || !self.extVMStatusLabel) return;
-    BOOL memLimit = getEffectiveEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
-    BOOL extVM = getEffectiveEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
+    BOOL memLimit = getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
+    BOOL extVM = getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
 
     UIColor *memColor = memLimit
         ? [UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0]
