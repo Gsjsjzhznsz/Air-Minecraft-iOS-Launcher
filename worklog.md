@@ -769,3 +769,20 @@ Stage Summary:
 - BMC2 四连关：Task87 弹窗卡死 → Task94 sodium 版本门 → Task95 缺失 jar → Task97 CWD 分裂；zink 会话预计越过 paintings/sparsestructures 直达更深处
 - 装机锚点："[CwdAlign] Task97: process CWD aligned to game dir: ..."；负锚点：logs/latest.log ENOENT 消失
 - 遗留：⌨ 虚拟键盘二轮诊断仍缺 [InputDiag] 证据；zink FSR 画面分裂待装机日志（Task85 已实证修复 26.3-rc-3 zink 会话）
+---
+Task ID: 98
+Agent: main (Super Z)
+Task: 用户报告"分析最新上传的 26.3 的 sodium 为什么崩溃"（2af8c45）判读 + 修复；同轮同步朋友两笔新提交（1b7ae22 前端 MeloNX 信息卡 UI / 0bb68fb 其 Task96 校验器，前端不碰、仅确认无后端交集）
+
+Work Log:
+- 判读 2af8c45（6c3d49d 构建，MC 26.3 Fabric 整合包 110 mods：sodium 0.9.2+mc26.3 / iris 1.11.6 / lithium / modernfix / fabric-api 0.160.6，MG 渲染器 libOSMesa.8.dylib，iPad Air M4）：sodium 无罪——Task94 动态上报实证生效（"[Tools] LWJGL report version: 3.4.3" + "[PojavLauncher] reported 3.4.3 (metadata: 3.4.3)"），sodium 0.9.2 版本门放行，110 mods 全量打印，推进 ~2s 进入原版引导
+- 真死因（渲染器无关）：MC 26.3 NativeLibrariesBootstrap 按序加载 OpenAL,OpenGL,spvc,vma,SDL,shaderc,STB,freetype；第五项 SDL 需要 LWJGL SDL3 绑定（org.lwjgl.sdl.SDL/SDLPlatform），启动器错选 LWJGL 333 集合（无 lwjgl-sdl.jar）→ NoClassDefFoundError: org/lwjgl/sdl/SDL → "Loading library SDL" 崩溃；前兆 "Failed to get system info for SDL Platform"（SDLPlatform 同源缺失）
+- 根因：版本 ID 是 Fabric 形态 "fabric-loader-0.19.5-26.3-e4ecd7db"，ResolveLwjglVersion 旧解析按 "." 切分取 parts[0]="fabric-loader-0"（intValue=0）→ 333。历史对照：此前所有 26.3 装机会话（26.3-pre/rc，zink/MG SDL3 基建 c71dcfa 系列）都是原版形态 ID 恰好解析正确；Fabric 整合包首次暴露盲区。lwjgl-341 集合自带 lwjgl-sdl.jar（512 个 org/lwjgl/sdl/ 类，含 SDL.class/SDLPlatform.class），app Frameworks 已有 libSDL3.dylib——物质基础齐备，只差选对集合
+- 修复（三点）：① JavaLauncher.m 新增 ame98_mcMajorFromVersionId（1.x 谱系短路防 "1.20.1-forge-47.3.0" 构建号误读 + 锚定年份正则 "(?:^|[-_])(\d{2})(?=[.w])" 读任意形态 ID 的 MC 主版本；[-_] 锚定 + [.w] 后随排除 loader 版本段与十六进制哈希误命中），ResolveLwjglVersion auto 路径改用之（"[LWJGLSel] Task98" 取证锚点）② JavaLauncher.h 导出共享 ③ SurfaceViewController ame87 LTW×26.x 预检门同修（旧解析在首个 "-" 截断读到 "fabric"，Fabric 26.x 整合包会被放行到 LTW 必崩标题界面——同类盲区一并根除）
+- 验证：verify_task98.py 33 项（A 日志证据钉 git 2af8c45 含吸烟枪 "Using LWJGL 333 (mcVersion=fabric-loader-0.19.5-26.3" / B 实现锚点含旧解析移除断言 / C 头文件导出 + SVC 同修 / D 341 集合 SDL 绑定物质基础 + 333 无 sdl / E FAQ / F version.h / G 18 用例行为矩阵含哈希与 forge 构建号防误伤 / H 卫生）；verify_task87 B1/G1 重锚（G 区 Python 镜像改 mc_major + 18 用例含 loader 前缀形态 + G2/G3 防误伤专项）；FAQ 29→30（+mc26sdl：双日志签名、前缀盲区机理、与 Sodium/渲染器无关澄清、[LWJGLSel] Task98 + Using LWJGL 341 验证锚点、旧构建手动 3.4.1 自救——编辑器 pickKeys 已核实提供 341 选项）并 stale-sync 八校验器（83 B12 / 84 D1 / 85 C1 / 86 C1+C3 / 87 E1 / 94 E1 / 95 E1+E4+F3 / 97 C1+C3）；version.h REVISION 17 addendum (Task 98, no bump)
+- 朋友提交审阅：1b7ae22（右面板 7 张 MeloNX 卡 + utils 设备营销名/系统版本）纯前端，与后端文件零交集；0bb68fb（verify_task96 38 项 + 历史校验器同步 + worklog Task96 条目）其 REPO 环境变量设计可在本机跑通（TASK96_REPO=... 45/45 中 1 失败为"未提交改动"类，提交后自愈）；双方工作流无冲突
+
+Stage Summary:
+- 26.3 Fabric 整合包链路打通预期：选对 341 后 NativeLibrariesBootstrap 第八项全过 → renderpearl GlBackend 走 MG provider mirror（c71dcfa 基建）→ 与 zink 26.3-rc-3 会话同族路径
+- 装机锚点："[LWJGLSel] Task98: MC major 26 extracted from version id ..." + "Using LWJGL 341"；负锚点：无 "Loading library SDL" 崩溃
+- 遗留：⌨ 虚拟键盘二轮诊断仍缺 [InputDiag] 证据；zink FSR 画面分裂待装机日志；FSR 替换方案调研结论（推荐 NVIDIA NIS）待答复用户

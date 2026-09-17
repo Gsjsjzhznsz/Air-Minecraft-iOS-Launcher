@@ -340,12 +340,22 @@
                      @"启动器已修复（Task97）：JVM 启动前把进程工作目录对齐到游戏目录，与桌面完全一致。验证方法：日志搜 [CwdAlign] Task97，应有一行“process CWD aligned to game dir: …”；同时早前每必出现的“Cannot access RandomAccessFile logs/latest.log”报错也会消失（游戏自己的日志从此正常写进实例目录 logs/）。\n\n"
                      @"若更新后仍见上述报错：确认安装的是最新构建（设置→关于看 Commit ≥ Task97 修复提交），然后带 latestlog.txt 反馈。";
 
+    LauncherHelpFaqItem *mc26sdl = [[LauncherHelpFaqItem alloc] init];
+    mc26sdl.iconName = @"gamecontroller.andsparkles";
+    mc26sdl.question = @"26.x 的 Fabric/NeoForge 整合包启动几秒就闪退，日志报 Loading library SDL 或找不到 org/lwjgl/sdl/SDL？";
+    mc26sdl.answer = @"典型表现：整合包（含 Sodium/Iris 的性能包居多）在模组列表打印完、进入原版引导阶段突然退出，换渲染器无效。日志签名：\n\n"
+                     @"1. “Description: Loading library SDL” + “java.lang.NoClassDefFoundError: org/lwjgl/sdl/SDL”；\n"
+                     @"2. 稍早还有一条 “Failed to get system info for SDL Platform”（同类前兆，可忽略严重性）。\n\n"
+                     @"原因：MC 26.3 起窗口与输入从 GLFW 迁到 SDL3，需要 LWJGL 的 SDL 绑定（lwjgl-sdl 模块，仅在启动器的 3.4.1 版本集合里）。旧版启动器按版本号自动挑 LWJGL 时，只认得原版形态的版本号（“26.3”），看不懂整合包的带前缀形态（“fabric-loader-0.19.5-26.3-e4ecd7db”），误挑了 3.3.3 版集合——里面没有 SDL 绑定，于是在加载第五个库（SDL）时必然崩溃。这与渲染器、内存、Sodium 本身都无关（Sodium 的版本检查此时已经通过）。\n\n"
+                     @"启动器已修复（Task98）：版本号提取改为前缀无关的锚定解析，Fabric/NeoForge/Forge 形态的 26.x 都会正确选 3.4.1。验证方法：日志搜 “Using LWJGL 341”，其上一行应有 “[LWJGLSel] Task98: MC major 26 extracted from version id …”；随后 SDL 加载通过，不再出现 Loading library SDL 崩溃。\n\n"
+                     @"若用的是旧构建：更新启动器即可；临时自救可在 设置 → 该实例的编辑页 把 LWJGL 版本手动指定为 3.4.1。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl ]
     ];
 }
 

@@ -396,21 +396,73 @@ BOOL JVMUsedInProcess(void) {
     return gJvmUsedInProcess;
 }
 
+// Task98：从任意形态的版本 ID 提取 MC 主版本号（年份制口径）。
+//
+// 病历（2af8c45 装机日志，6c3d49d 构建，MC 26.3 Fabric 整合包 110 mods，
+// MG/zink 渲染器无关，iPad Air M4）：版本 ID 是 Fabric 形态
+// "fabric-loader-0.19.5-26.3-e4ecd7db"，旧解析按 "." 切分取 parts[0] =
+// "fabric-loader-0"（intValue=0）→ 错选 LWJGL 333 → lwjgl-341 集合里的
+// lwjgl-sdl.jar（org.lwjgl.sdl.*，MC 26.3 的 NativeLibrariesBootstrap 第五个
+// 加载项）不在 classpath → NoClassDefFoundError: org/lwjgl/sdl/SDL →
+// "Loading library SDL" 崩溃。此前所有 26.3 装机会话（26.3-pre/rc、zink/MG
+// SDL3 基建验证）都是原版形态 ID（"26.3-rc2" 以 "26" 开头），旧解析恰好正确，
+// Fabric 整合包首次暴露盲区。
+//
+// 解析口径（两层，与 ForgeDirectInstaller/ModpackImportService 的年份锚定
+// 先例同族，含两处为 LWJGL 选择专门加的防误伤）：
+//   1) 1.x 谱系优先短路（返回 1）：命中 "(?:^|[-_])1\.\d" 即认定 1.x 线。
+//      既覆盖 "1.20.1"，也覆盖 "fabric-loader-0.19.3-1.20.1-9c2ee306"；更重要
+//      的是挡住 "1.20.1-forge-47.3.0" 里 forge 构建号（47.x）被年份正则误读
+//      为 >= 26（旧解析对这类 ID 取 parts[0]="1" 同样回落 333，行为不变）。
+//   2) 年份制主版本：锚定在串首或 [-_] 之后的两位数字，后随 "." 或 "w"+数字
+//      （"(?:^|[-_])(\d{2})(?=[.w])"）：
+//        "26.3" → 26；"26.2-rc1" → 26；"26w14a"（快照）→ 26；
+//        "fabric-loader-0.19.5-26.3-e4ecd7db" → 26（"-26." 命中）；
+//        "25w45a" → 25（<26，放行 333）。
+//      [-_] 锚定 + 后随 [.w] 共同排除两类误伤：loader 版本段 "0.19.5" 的 "19"
+//      前面是 "."（非锚点）；十六进制哈希段（如 "e4ecd7db"、假想的 "26f3a1b2"）
+//      不含 "."，'w' 也绝不出现在十六进制里。
+NSInteger ame98_mcMajorFromVersionId(NSString *versionId) {
+    if (![versionId isKindOfClass:[NSString class]] || versionId.length == 0) {
+        return 0;
+    }
+    // (1) 1.x 谱系短路。
+    NSRegularExpression *legacyRegex = [NSRegularExpression
+        regularExpressionWithPattern:@"(?:^|[-_])1\\.\\d" options:0 error:nil];
+    if ([legacyRegex firstMatchInString:versionId
+                                options:0
+                                  range:NSMakeRange(0, versionId.length)]) {
+        return 1;
+    }
+    // (2) 年份制主版本。
+    NSRegularExpression *yearRegex = [NSRegularExpression
+        regularExpressionWithPattern:@"(?:^|[-_])(\\d{2})(?=[.w])" options:0 error:nil];
+    NSTextCheckingResult *match = [yearRegex firstMatchInString:versionId
+                                                        options:0
+                                                          range:NSMakeRange(0, versionId.length)];
+    if (match && match.numberOfRanges >= 2) {
+        return [[versionId substringWithRange:[match rangeAtIndex:1]] integerValue];
+    }
+    return 0;
+}
+
 // 解析 profile 的 lwjglVersion 设置为具体的 LWJGL 版本：
 //   "333" / "341" -> 原样使用
 //   "auto"        -> MC 26.x 及以上用 3.4.1，其余用 3.3.3
 //
 // MC 26.3 起窗口与键盘系统从 GLFW 迁到 SDL3，只有 3.4.1 带真正的 SDL3 绑定
 // （lwjgl-sdl.jar 加载真实 libSDL3），因此 26.x 及以上必须选 341。
+// Task98：版本号提取改用 ame98_mcMajorFromVersionId（Fabric/NeoForge/Forge
+// 前缀形态的 ID 也能读到真实 MC 主版本，详见其头注释）。
 static NSString *ResolveLwjglVersion(NSString *profileValue, NSString *mcVersionId) {
     if ([profileValue isEqualToString:@"333"] || [profileValue isEqualToString:@"341"]) {
         return profileValue;
     }
-    if (mcVersionId.length > 0) {
-        NSArray *parts = [mcVersionId componentsSeparatedByString:@"."];
-        if (parts.count >= 2 && [parts[0] intValue] >= 26) {
-            return @"341";
-        }
+    NSInteger mcMajor = ame98_mcMajorFromVersionId(mcVersionId);
+    if (mcMajor >= 26) {
+        NSLog(@"[LWJGLSel] Task98: MC major %ld extracted from version id \"%@\" -> LWJGL 341 (SDL3 bindings)",
+              (long)mcMajor, mcVersionId);
+        return @"341";
     }
     return @"333";
 }

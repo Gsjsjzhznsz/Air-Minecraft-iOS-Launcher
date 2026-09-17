@@ -115,14 +115,14 @@ check("B9 new.txt：JVM/加载器本身健康（2966MB 分配 + Fabric 5s 完成
 print("===== C. FAQ 28 条（bigpack 条目，Task87 增 ltw26，Task94 增 sodiumLwjgl，Task95 增 missingMods） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 29 条目（Task86 +1，Task87 +1，Task94 +1，Task95 +1，Task97 +1）", len(faq_items) == 29, f"got {len(faq_items)}")
+check("C1 30 条目（Task86 +1，Task87 +1，Task94 +1，Task95 +1，Task97 +1，Task98 +1）", len(faq_items) == 30, f"got {len(faq_items)}")
 check("C2 bigpack 条目在位（Task87 重写：实锤案例 + 两层防护 + 自救步骤）",
       "大型整合包（几百个模组）第一次启动就卡在加载界面" in helpvc
       and "[LaunchWatchdog]" in helpvc
       and "missingmodschecker" in helpvc
       and "[ModDialogGuard]" in helpvc)
-check("C3 bigpack 注册进故障排除分类（stuck 之后，Task94 后 sodiumLwjgl、Task95 后 missingMods、Task97 后 cwdMismatch 殿后）",
-      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch \]", helpvc) is not None)
+check("C3 bigpack 注册进故障排除分类（stuck 之后，Task94 后 sodiumLwjgl、Task95 后 missingMods、Task97 后 cwdMismatch、Task98 后 mc26sdl 殿后）",
+      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl \]", helpvc) is not None)
 check("C4 bigpack 与渲染器/内存无关的定性（防误导加内存）",
       "加大内存无效" in helpvc)
 

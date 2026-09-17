@@ -1539,24 +1539,22 @@ static UIView *findSDL_uikitview(UIView *root);
 // 拦截 + 明确指引，避免用户白跑一次必崩的启动。
 // 版本口径：主版本号 >= 26（Mojang 年度版本方案 26.1/26.2/...）即不兼容，
 // 含 26w* 快照与 rc/pre 后缀；1.21.x 及更早不受影响。
+// Task98：解析下沉到 ame98_mcMajorFromVersionId（JavaLauncher.h 导出），
+// 修复 Fabric/NeoForge/Forge 前缀形态 ID 的盲区——旧解析在首个 "-" 截断，
+// "fabric-loader-0.19.5-26.3-e4ecd7db" 只读到 "fabric"（0），LTW 门对
+// Fabric 26.x 整合包失效放行。新口径对 rc/pre 后缀天然免疫（锚定正则
+// 不依赖后缀剥离），与 ResolveLwjglVersion 的 LWJGL 选择共用同一实现。
 static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
     if (mcVersionId.length == 0) {
         return NO;
     }
-    // 去掉 "-rc1"/"-pre1" 等后缀
-    NSRange dash = [mcVersionId rangeOfString:@"-"];
-    NSString *base = (dash.location == NSNotFound)
-        ? mcVersionId : [mcVersionId substringToIndex:dash.location];
-    // 形如 "26.2" / "1.20.1" / 快照 "26w13a"：取首段前导数字
-    NSArray *parts = [base componentsSeparatedByString:@"."];
-    if (parts.count > 0) {
-        // "26.2"→26；"26w13a"→26（前导数字）；"1.20.1"→1；"25w45a"→25
-        NSInteger major = [parts[0] integerValue];
-        if (major > 0) {
-            return major >= 26;
-        }
+    // "26.2"→26；"26w13a"→26；"1.20.1"→1；"25w45a"→25；
+    // "fabric-loader-0.19.5-26.3-e4ecd7db"→26（Task98 修复点）
+    NSInteger major = ame98_mcMajorFromVersionId(mcVersionId);
+    if (major <= 0) {
+        return NO;
     }
-    return NO;
+    return major >= 26;
 }
 
 - (void)launchMinecraft {

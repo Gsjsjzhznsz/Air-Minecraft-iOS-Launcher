@@ -92,10 +92,10 @@ check("A9 整合包会话：用户取消收场（User cancelled launch + exit(0)
 
 print("===== B. SurfaceViewController.m：LTW × 26.x 预检门 =====")
 svc = read("Natives/SurfaceViewController.m")
-check("B1 版本判定函数在位（主版本 >= 26 口径 + rc/pre 后缀剥离）",
+check("B1 版本判定函数在位（主版本 >= 26 口径，Task98 起解析下沉共享助手）",
       "static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId)" in svc
       and "return major >= 26;" in svc
-      and 'rangeOfString:@"-"' in svc)
+      and "ame98_mcMajorFromVersionId(mcVersionId)" in svc)
 check("B2 函数定义先于 launchMinecraft 使用（文件级顺序）",
       svc.index("static BOOL ame87_mcVersionRequiresTextureBuffer")
       < svc.index("- (void)launchMinecraft"))
@@ -157,7 +157,7 @@ check("D7 仅用 java.lang API（无新增 import 依赖）",
 print("===== E. FAQ 28 条 =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("E1 29 条目（Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch）", len(faq_items) == 29, f"got {len(faq_items)}")
+check("E1 30 条目（Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl）", len(faq_items) == 30, f"got {len(faq_items)}")
 check("E2 ltw26 条目在位（预检说明 + samplerBuffer 机理 + 日志特征 + 切换指引）",
       "LTW 渲染器玩 MC 26.x 直接崩溃" in helpvc
       and "samplerBuffer" in helpvc
@@ -186,32 +186,46 @@ check("F2 REVISION 不 bump（无转换缓存风暴）",
       re.search(r"#define REVISION 17\b", ver) is not None
       and "REVISION 18" not in ver)
 
-print("===== G. 版本判定口径单测（Python 模拟 ame87_mcVersionRequiresTextureBuffer） =====")
+print("===== G. 版本判定口径单测（Python 模拟 ame98_mcMajorFromVersionId + ame87 门） =====")
+
+
+def mc_major(v):
+    """镜像 JavaLauncher.m ame98_mcMajorFromVersionId（Task98）：
+    1.x 谱系短路 → 1；否则取锚定在串首或 [-_] 后、后随 [.w] 的两位年份。"""
+    if not v or not isinstance(v, str):
+        return 0
+    if re.search(r"(?:^|[-_])1\.\d", v):
+        return 1
+    m = re.search(r"(?:^|[-_])(\d{2})(?=[.w])", v)
+    return int(m.group(1)) if m else 0
 
 
 def requires_tbo(v):
-    if not v:
-        return False
-    base = v.split("-")[0]
-    parts = base.split(".")
-    if parts:
-        m = re.match(r"\d+", parts[0])
-        if m:
-            major = int(m.group())
-            if major > 0:
-                return major >= 26
-    return False
+    major = mc_major(v)
+    return major > 0 and major >= 26
 
 
 cases = [
     ("26.2", True), ("26.1", True), ("27.0", True), ("26.2-rc1", True),
     ("26w13a", True), ("1.20.1", False), ("1.21.9", False), ("1.16.5", False),
     ("25w45a", False), ("", False), ("latest-release", False),
+    # Task98 新增：loader 前缀形态（旧解析在首个 "-" 截断，全读到 "fabric"）
+    ("fabric-loader-0.19.5-26.3-e4ecd7db", True),
+    ("fabric-loader-0.15.11-1.20.1-88955f01", False),
+    ("fabric-loader-0.19.5-26w14a-abcdef12", True),
+    ("1.20.1-forge-47.3.0", False),
+    ("neoforge-26.3-21.0.5", True),
+    ("quilt-loader-0.26.0-1.20.1-abcdef12", False),
 ]
 ok_cases = [v for v, want in cases if requires_tbo(v) == want]
-check("G1 12 个版本口径用例全对（26.x/26w* 拦，1.21.x/25w* 放）",
+check("G1 18 个版本口径用例全对（26.x/26w* 拦，1.21.x/25w* 放，Task98 起含 loader 前缀形态）",
       len(ok_cases) == len(cases),
       str([f"{v}->{requires_tbo(v)}" for v, want in cases if requires_tbo(v) != want]))
+check("G2 Forge 构建号防误伤（1.20.1-forge-47.3.0 的 47 不被年份正则误读）",
+      mc_major("1.20.1-forge-47.3.0") == 1)
+check("G3 十六进制哈希防误伤（哈希段不含 '.' 且无 'w'，不命中锚定）",
+      mc_major("fabric-loader-0.19.3-1.20.1-9c2ee306") == 1
+      and mc_major("fabric-loader-0.19.5-1.21.9-26f3a1b2") == 1)
 
 print("===== H. 括号平衡（字符串感知状态机——task67 教训） =====")
 

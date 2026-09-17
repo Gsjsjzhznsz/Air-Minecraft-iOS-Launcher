@@ -456,6 +456,32 @@
 // "Cannot access RandomAccessFile logs/latest.log" ENOENT (relative path into
 // the old CWD) disappears, and the game writes real logs/ into the instance dir
 // like desktop. FAQ 28->29 (+cwdMismatch). Launcher-side only, REVISION stays 17.
+// REVISION 17 addendum (Task 98, no bump): the 2af8c45 upload (commit 6c3d49d
+// build, MC 26.3 Fabric modpack, 110 mods incl. sodium 0.9.2 + iris 1.11.6, MG
+// renderer, iPad Air M4) crashed renderer-independently at MC's
+// NativeLibrariesBootstrap fifth load item: "Description: Loading library SDL" /
+// NoClassDefFoundError org/lwjgl/sdl/SDL. Sodium's own LWJGL gate PASSED (Task94
+// reporting 3.4.3 worked; the mod list printed and startup ran ~2s deep) -- the
+// failure is the launcher's LWJGL set selection: the version ID was the Fabric
+// form "fabric-loader-0.19.5-26.3-e4ecd7db", and ResolveLwjglVersion's old
+// parser (split by ".", read parts[0]) saw "fabric-loader-0" -> intValue 0 ->
+// LWJGL 333 picked, whose bundled jar set has no lwjgl-sdl classes (only the
+// 341 set ships lwjgl-sdl.jar; MC 26.3 moved windowing/input from GLFW to SDL3
+// and requires the SDL bindings). All previous 26.3 device sessions used
+// vanilla-form IDs ("26.3-rc2" etc.) that the old parser happened to read
+// correctly, so the blind spot only surfaced with the first Fabric modpack.
+// Fix: new shared helper ame98_mcMajorFromVersionId (exported via
+// JavaLauncher.h) -- 1.x-line early-out (protects "1.20.1-forge-47.3.0"'s forge
+// build number 47 from being year-misread), then an anchored year regex
+// "(?:^|[-_])(\d{2})(?=[.w])" that reads the MC major from any ID form
+// ("26.3" / "26w14a" / "fabric-loader-0.19.5-26.3-e4ecd7db" -> 26;
+// "fabric-loader-0.19.3-1.20.1-9c2ee306" -> 1; "25w45a" -> 25). Used by BOTH
+// ResolveLwjglVersion (auto path -> 341 for >=26, "[LWJGLSel] Task98" anchor)
+// and SurfaceViewController's ame87 LTW x 26.x gate (which had the same
+// first-hyphen blind spot and would have let Fabric 26.x packs through to the
+// guaranteed LTW title-screen crash). FAQ 29->30 (+mc26sdl: the log signatures,
+// the prefix-blind selection explanation, the manual 3.4.1 profile override as
+// old-build self-help). Launcher-side only, REVISION stays 17.
 #define REVISION 17
 #define PATCH 0
 

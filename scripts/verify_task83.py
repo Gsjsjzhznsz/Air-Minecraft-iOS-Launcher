@@ -180,8 +180,8 @@ check("B11 custom.json：QWERTY 面板完整（Q-P 共 26 字母）",
 
 # B12: FAQ 结构与修正
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("B12 FAQ：29 条目（Task83 19 + Task83b +3 + Task84 +1 Arm ASR + Task85 +1 替代方案调研 + Task86 +1 大型整合包首启卡死 + Task87 +1 LTW×26.x + Task94 +1 Sodium LWJGL 版本门 + Task95 +1 缺失 mod 闪退 + Task97 +1 CWD 对齐）",
-      len(faq_items) == 29, f"got {len(faq_items)}")
+check("B12 FAQ：30 条目（Task83 19 + Task83b +3 + Task84 +1 Arm ASR + Task85 +1 替代方案调研 + Task86 +1 大型整合包首启卡死 + Task87 +1 LTW×26.x + Task94 +1 Sodium LWJGL 版本门 + Task95 +1 缺失 mod 闪退 + Task97 +1 CWD 对齐 + Task98 +1 26.x SDL）",
+      len(faq_items) == 30, f"got {len(faq_items)}")
 check("B13 FAQ：MoltenVK 独立渲染器表述",
       "MoltenVK：独立的渲染器" in helpvc)
 check("B14 FAQ：zink 用系统 Vulkan 表述",
