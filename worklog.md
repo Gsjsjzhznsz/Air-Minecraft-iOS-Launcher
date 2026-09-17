@@ -717,3 +717,14 @@ Stage Summary:
 - 装机验证锚点：导入期 "[ModpackImport] Task95: import report written ..."；启动期 "[ImportGuard] Task95: incomplete import detected ..."（一次性提醒弹窗）；崩溃期崩溃界面直接列缺失类 + 组件名（FTB Library/Balm/TerraBlender）+ override 证据
 - 用户侧修复指引：删实例重新导入（换下载源）或补齐 FTB 全家桶/Balm/TerraBlender/KleeSlabs；修好后可清 config/fabric-loader.json 的 dependencyOverrides
 - 遗留：⌨ 虚拟键盘二轮诊断仍缺 [InputDiag] 真机证据；zink FSR 画面分裂四嫌疑待装机日志；88-93 为朋友范围
+
+---
+Task ID: 95 (续)
+Agent: main (Super Z)
+Task: CI 确认
+
+Work Log:
+- CI run 35239914500（6c3d49d）completed | success——Task95 新 IPA 就绪
+
+Stage Summary:
+- Task95 全链绿灯（59/59 + 级联全绿 + CI）；装机锚点见 Task95 主条目；等用户重导入 BMC2 验证三层防护
