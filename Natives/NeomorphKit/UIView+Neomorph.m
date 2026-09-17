@@ -104,7 +104,7 @@ typedef NS_ENUM(NSUInteger, NMRadiusMode) {
     if (!dark || !light) return;
     NMTheme *theme = [NMTheme shared];
     UIColor *surface = (self.surfaceStyle == NMSurfaceStyleRaised) ? theme.surfaceRaised : theme.surface;
-    CGColor *surfaceCG = surface.CGColor;
+    CGColorRef surfaceCG = surface.CGColor;
 
     // 视图自身：surface 底色、圆角、不裁剪（阴影由承载层负责）
     host.backgroundColor = surface;
@@ -116,9 +116,6 @@ typedef NS_ENUM(NSUInteger, NMRadiusMode) {
         // 避免侧栏/右面板等内容溢出圆角
         host.layer.masksToBounds = NO;
     }
-
-    CALayer *dark = objc_getAssociatedObject(host, &kNMDarkCasterKey);
-    CALayer *light = objc_getAssociatedObject(host, &kNMLightCasterKey);
 
     CGFloat r = self.shadowRadius;
     if (self.flat || r <= 0) {

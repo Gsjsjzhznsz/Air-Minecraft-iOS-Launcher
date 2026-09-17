@@ -559,3 +559,8 @@ Stage Summary:
 - 双主题随系统与 App 内外观切换实时重绘（通知驱动），浅色=库 demo 同款 #ECF0F3，深色=#262A2F
 - 背景图/毛玻璃/card_color 在新拟态下停用（强制纯色底，用户选定）；设置页入口保留
 - 后续可调项：凸出强度（nm shadowRadius 参数）、深色表面色阶、按压反馈动画（未做，菜单已有弹跳）
+
+### Task 89 补丁（CI 编译修复）
+- UIView+Neomorph.m：CGColor * → CGColorRef（ObjC 需 struct tag/typedef）；updateAppearance 内 dark/light 重复声明合并（加 nil 守卫时遗留）
+- SceneDelegate：traitCollectionDidChange: 在 UIWindowSceneDelegate（非 UIResponder）上永远不会被触发，改用 KVO 监听 window.traitCollection（context 区分，sceneDidDisconnect 摘除）——覆盖 auto 模式跟随系统与设置页切换两条路径
+- LauncherCardLayoutViewController：card_color 停用改为干净空操作（原假条件写法逻辑错误）

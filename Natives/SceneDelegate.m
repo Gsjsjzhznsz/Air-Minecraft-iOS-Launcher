@@ -10,6 +10,9 @@
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
 
+// Task89：window.traitCollection KVO 上下文（见 willConnect 处注释）
+static void *kNMSceneTraitKVOContext = &kNMSceneTraitKVOContext;
+
 extern __weak UIWindow *mainWindow;
 
 @interface SceneDelegate ()
@@ -51,6 +54,15 @@ extern __weak UIWindow *mainWindow;
         rootVC = [[LauncherRootViewController alloc] init];
     }
     self.window.rootViewController = rootVC;
+
+    // Task89：KVO 监听 window.traitCollection——SceneDelegate 遵循
+    // UIWindowSceneDelegate（非 UIResponder），traitCollectionDidChange:
+    // 永远不会被调用，故用 KVO 捕获系统深浅色变化（auto 模式）与
+    // 设置页外观切换（applyUITheme 内也会广播，双重触发幂等无害）。
+    [self.window addObserver:self
+                  forKeyPath:@"traitCollection"
+                     options:NSKeyValueObservingOptionNew
+                     context:kNMSceneTraitKVOContext];
 
     // 外观模式（浅色/深色/跟随系统）：读 general.ui_theme 偏好。
     //   light  -> UIUserInterfaceStyleLight
@@ -157,14 +169,13 @@ extern __weak UIWindow *mainWindow;
     [[NMTheme shared] reloadAndBroadcast];
 }
 
-// Task89：auto 模式下跟随系统深浅色切换（override 未指定时由系统驱动 trait 变化）
-- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
-    [super traitCollectionDidChange:previousTraitCollection];
-    if (@available(iOS 13.0, *)) {
-        if ([self.traitCollection hasDifferentColorAppearanceComparedTo:previousTraitCollection]) {
-            [[NMTheme shared] reloadAndBroadcast];
-        }
+// Task89：auto 模式下跟随系统深浅色切换（KVO window.traitCollection，见 willConnect 处注释）
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context {
+    if (context == kNMSceneTraitKVOContext && [keyPath isEqualToString:@"traitCollection"]) {
+        [[NMTheme shared] reloadAndBroadcast];
+        return;
     }
+    [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
 }
 
 - (void)applyLanguageChange:(NSNotification *)notification {
@@ -184,6 +195,10 @@ extern __weak UIWindow *mainWindow;
 - (void)sceneDidDisconnect:(UIScene *)scene {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"UIThemeChanged" object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AppLanguageChanged" object:nil];
+    // Task89：摘除 window traitCollection KVO
+    if (self.window) {
+        [self.window removeObserver:self forKeyPath:@"traitCollection" context:kNMSceneTraitKVOContext];
+    }
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {

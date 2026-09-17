@@ -269,33 +269,12 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
     return card;
 }
 
-/// 读取 general.card_color 偏好，若已设置则在毛玻璃上叠加半透明色。
-///
-/// 统一参照 ZL2 的 Haze + tint 方案和 RootVC 的 applySemiTransparentColor: 实现：
-/// 保留 BackgroundManager 的毛玻璃 UIVisualEffectView（让背景图能透出），
-/// 在容器背景色上叠加用户自定义的半透明颜色。
-///
-/// 之前 CardVC 的做法是移除毛玻璃用纯色覆盖，导致：
-/// 1. 与 RootVC 行为不一致（RootVC 保留毛玻璃叠加半透明色）
-/// 2. 自定义背景图被完全遮挡，无法透出
-/// 3. 视觉效果与 FCL/ZL2 不符（FCL/ZL2 都保留模糊效果 + 颜色叠加）
-///
-/// 现统一为：保留毛玻璃 + 叠加半透明色（与 RootVC 完全一致）
+/// Task89：新拟态下空操作（表面色由 NMTheme 统一管理，强制纯色底）。
 - (void)applyCustomCardColorToCard:(UIView *)card {
-    // Task89：新拟态下表面色由 NMTheme 统一管理（强制纯色底），
-    // general.card_color 不再叠加到卡片表面。
-    if (getPrefBool(@"neumorph_surfaces_locked_by_task89")) {
-        return;
-    }
-    NSString *hex = getPrefObject(@"general.card_color");
-    UIColor *color = [self colorFromHexString:hex];
-    if (!color) return;
-    // 保留 BackgroundManager 插入的毛玻璃 UIVisualEffectView，仅叠加半透明色
-    // 这样既显示用户自定义的卡片颜色，又能透出背景图（与 RootVC 行为一致）
-    // 使用 0.7 alpha 让背景图能适度透出（参照 ZL2 的 influencedByBackgroundColor 思路）
-    card.backgroundColor = [color colorWithAlphaComponent:0.7];
+    // Task89：新拟态下表面色由 NMTheme 统一管理（用户选定强制纯色底），
+    // general.card_color 不再叠加到卡片表面——整体成为空操作。
+    // 原毛玻璃+半透明色叠加实现见 git 历史（1a135fe 之前版本）。
 }
-
 - (nullable UIColor *)colorFromHexString:(id)hex {
     if (![hex isKindOfClass:[NSString class]] || [(NSString *)hex length] == 0) return nil;
     NSString *clean = [(NSString *)hex stringByReplacingOccurrencesOfString:@"#" withString:@""];
