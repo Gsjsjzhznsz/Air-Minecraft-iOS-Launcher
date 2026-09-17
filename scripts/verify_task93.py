@@ -94,8 +94,8 @@ check("A4  两处判定仍位于 updateMemoryEntitlementStatus（原位置）",
       and rp_code.find("- (void)updateMemoryEntitlementStatus") < rp.find(f'getEntitlementValue(@"{MEM_KEY}")'))
 check("A5  注释标注 Task93 且说明与启动日志同源",
       "Task93" in rp and "Entitlements availability" in rp)
-check("A6  配色与文案键未变（绿/红 + i18n_str_mem_limit/ext_vm）",
-      "i18n_str_mem_limit_enabled" in rp and "i18n_str_ext_vm_enabled" in rp
+check("A6  Task96 同步：卡片中文值（已开启/未开启）+ 15% 透明卡底仍在",
+      rp.count('@"已开启" : @"未开启"') == 2
       and "colorWithAlphaComponent:0.15" in rp)
 check("A7  JIT 状态刷新不受影响（isJITEnabled(NO) 仍在）",
       "BOOL enabled = isJITEnabled(NO);" in rp_code)

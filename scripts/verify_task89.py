@@ -164,15 +164,19 @@ check("B5 主题广播接线（NMTheme reloadAndBroadcast + KVO window.traitColl
 print("== C. 核心屏幕与长尾改造 ==")
 rp = read("Natives/LauncherRightPanelViewController.m")
 # Task90：用户反馈"全灰新拟态按钮"选择有误，右侧面板按钮恢复原样（7ab2b41）。
-check("C1 右侧面板按钮恢复原样（启动 accent 底 + 版本/JAR/下载中心深灰底）",
+# Task96：执行Jar/选择版本与「登录并启动」同款（accent 底 + 白字，用户指定）；
+# 下载中心按钮保持深灰原样；断言随 Task96 改版同步。
+check("C1 右侧面板按钮（Task96 同步：启动/版本/JAR accent 底白字，下载中心深灰）",
       all(k in rp for k in ["self.launchButton.backgroundColor = accentColor();",
                             "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];",
-                            "self.manageVersionBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];",
-                            "self.executeJarBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"]))
+                            "self.manageVersionBtn.backgroundColor = accentColor();",
+                            "self.executeJarBtn.backgroundColor = accentColor();",
+                            "[self.manageVersionBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];",
+                            "[self.executeJarBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];"]))
 check("C1a 右侧面板不再使用新拟态（nm_ 调用与 NeomorphKit 导入已随原样恢复移除）",
       "NeomorphKit" not in rp and not re.search(r"\bnm_", rp))
-check("C2 状态胶囊（JIT/内存×2）恢复同色 15% 透明度底（原样）",
-      rp.count("colorWithAlphaComponent:0.15]") >= 5 and "nm_pill" not in rp)
+check("C2 状态卡片（Task96 同步：胶囊改 MeloNX 卡）15% 透明卡底仍在",
+      rp.count("colorWithAlphaComponent:0.15]") >= 1 and "nm_pill" not in rp)
 menu = read("Natives/LauncherMenuViewController.m")
 check("C3 左侧菜单：选中凸出面板 / 未选中恢复平贴",
       "[btn nm_convexRadius:12 shadowRadius:5];" in menu

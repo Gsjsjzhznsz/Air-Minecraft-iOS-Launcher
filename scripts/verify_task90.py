@@ -127,45 +127,32 @@ check("原 getEntitlementValue 声明保留", "BOOL getEntitlementValue(NSString
 
 print()
 print("=" * 72)
-print("C3. LauncherRightPanelViewController.m：按钮恢复原样（7ab2b41）+ 生效判定")
+print("C3. LauncherRightPanelViewController.m：Task96 MeloNX 信息卡改版（原 7ab2b41 回退断言已随 Task96 退役）")
 print("=" * 72)
 rp = read("Natives/LauncherRightPanelViewController.m")
 rp_code = strip_objc_strings_comments(rp)
-base = git_file_at("7ab2b41", "Natives/LauncherRightPanelViewController.m")
-base_code = strip_objc_strings_comments(base)
 
-# —— 按钮原样（与 7ab2b41 逐项对拍）——
+# —— Task96 同步：右面板改版为 MeloNX 信息卡（用户指定），断言随改版更新 ——
 for tag, needle in [
-    ("下载中心按钮深灰底（原样）", "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"),
-    ("启动按钮 accentColor 底（原样）", "self.launchButton.backgroundColor = accentColor();"),
-    ("启动按钮原圆角+阴影注释（masksToBounds）", "self.launchButton.layer.masksToBounds = YES;"),
-    ("管理版本按钮深灰底（原样）", "self.manageVersionBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"),
-    ("执行 Jar 按钮深灰底（原样）", "self.executeJarBtn.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"),
-    ("applyCustomAppearance 恢复 accentColor 刷新启动按钮", "self.launchButton.backgroundColor = accentColor();"),
+    ("下载中心按钮深灰底（原样保留）", "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"),
+    ("启动按钮 accentColor 底", "self.launchButton.backgroundColor = accentColor();"),
+    ("启动按钮圆角+阴影注释（masksToBounds）", "self.launchButton.layer.masksToBounds = YES;"),
+    ("管理版本按钮 accentColor 底（Task96 与登录并启动同款）", "self.manageVersionBtn.backgroundColor = accentColor();"),
+    ("执行 Jar 按钮 accentColor 底（Task96 与登录并启动同款）", "self.executeJarBtn.backgroundColor = accentColor();"),
+    ("管理版本按钮白字标题", "[self.manageVersionBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];"),
+    ("执行 Jar 按钮白字标题", "[self.executeJarBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];"),
+    ("applyCustomAppearance 刷新三枚按钮 accent", "self.manageVersionBtn.backgroundColor = accentColor();"),
 ]:
     check(tag, needle in rp_code)
-check("启动按钮阴影（Task89 前的 elevation 代码恢复）",
+check("启动按钮阴影保留",
       "self.launchButton.layer.shadowColor = [UIColor blackColor].CGColor;" in rp_code)
-check("三枚胶囊恢复同色 15% 透明度底（JIT）",
-      "self.jitStatusLabel.backgroundColor = [[UIColor colorWithRed:0.2 green:0.7 blue:0.3 alpha:1.0] colorWithAlphaComponent:0.15];" in rp)
-check("胶囊底色三处（memLimit/extVM/jit）与 7ab2b41 一致",
-      rp.count("colorWithAlphaComponent:0.15]") == base.count("colorWithAlphaComponent:0.15]"))
+check("Task96：七张 MeloNX 信息卡经工厂创建",
+      rp_code.count("makeInfoCardWithIcon:") == 8)
+check("Task96：卡片 15% 透明同色底", "colorWithAlphaComponent:0.15" in rp)
+check("Task96：卡片滚动区存在", "UIScrollView *infoScrollView" in rp and "UIStackView *infoStackView" in rp)
 check("文件不含 NeomorphKit 导入（原样）", "NeomorphKit" not in rp)
 check("文件不含任何 nm_ 新拟态调用（原样）", not re.search(r"\bnm_", rp))
 check("未引入 NMTheme（原样）", "NMTheme" not in rp)
-
-# —— 相对 7ab2b41 的增量必须仅限检测修复 ——
-diff = git_diff_stat("7ab2b41", "Natives/LauncherRightPanelViewController.m")
-changed = [ln for ln in diff.splitlines()
-           if (ln.startswith("+") or ln.startswith("-")) and not ln.startswith(("+++", "---"))]
-allowed = re.compile(
-    r"getEntitlementValue|getEffectiveEntitlementValue|Task90|Task93|描述文件|双确认|生效|误报|"
-    r"检测方式与 MeloNX|本进程 entitlement|交叉校验|entitlement 运行期不会变化|刷新时机|"
-    r"TrollStore 无描述文件|签名判定|避免|预写|内核并不真正兑现|普通侧载签名里也带着|配色沿用|"
-    r"共用同一入口|entitlement 由签名时的|这里与 JIT 标识|com\.apple\.developer\.kernel|"
-    r"启动日志|同源|同一函数|排查混乱|实测|重签工具|SecTask 私有 API|扩内存限制|扩展虚拟内存")
-suspicious = [ln for ln in changed if not allowed.search(ln)]
-check("相对 7ab2b41 的差异仅限内存检测修复（无其他视觉改动）", not suspicious, str(suspicious[:6]))
 check("Task93：两项均改回签名口径 getEntitlementValue（与启动日志同源）",
       rp.count('getEntitlementValue(@"com.apple.developer.kernel.') == 2)
 check("生效判定调用已无残留",

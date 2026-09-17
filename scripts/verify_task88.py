@@ -100,28 +100,34 @@ print("== A. LauncherRightPanelViewController.m（UI 标识 + 检测 + 刷新时
 rp = read("Natives/LauncherRightPanelViewController.m")
 rp_code = strip_objc_strings_comments(rp)
 
-check("A1 两个新属性已声明", "UILabel *memLimitStatusLabel" in rp and "UILabel *extVMStatusLabel" in rp)
-check("A2 makeJITStyleStatusLabel 工厂存在", "- (UILabel *)makeJITStyleStatusLabel" in rp_code)
-helper = rp[rp.find("- (UILabel *)makeJITStyleStatusLabel"):rp.find("- (void)updateMemoryEntitlementStatus")]
-check("A2a 工厂样式与 JIT 标签一致（字号11/圆角8/masksToBounds）",
-      all(k in helper for k in ["systemFontOfSize:11 weight:UIFontWeightMedium",
-                                "cornerRadius = 8", "masksToBounds = YES",
-                                "translatesAutoresizingMaskIntoConstraints = NO"]))
-check("A3 两个标签经工厂创建并 addSubview", rp_code.count("makeJITStyleStatusLabel") >= 3
-      and "[self.view addSubview:self.memLimitStatusLabel];" in rp
-      and "[self.view addSubview:self.extVMStatusLabel];" in rp)
-check("A4 内存限制标签锚定在 JIT 标签上方(-4)",
-      "self.memLimitStatusLabel.bottomAnchor constraintEqualToAnchor:self.jitStatusLabel.topAnchor constant:-4" in rp)
-check("A4a 扩展虚拟内存标签锚定在内存限制标签上方(-4)",
-      "self.extVMStatusLabel.bottomAnchor constraintEqualToAnchor:self.memLimitStatusLabel.topAnchor constant:-4" in rp)
-check("A4b 两标签与 JIT 标签同宽同高（leading12/trailing-12/height20）",
+# —— Task96 同步：胶囊标签改为 MeloNX 风格信息卡（滚动区 + 7 卡，用户指定）——
+check("A1 七张卡正文属性 + 滚动区属性已声明",
+      all(k in rp for k in ["UILabel *launcherVersionCardValue", "UILabel *gameVersionCardValue",
+                            "UILabel *deviceCardValue", "UILabel *systemCardValue",
+                            "UILabel *jitCardValue", "UILabel *memLimitCardValue",
+                            "UILabel *extVMCardValue", "UIScrollView *infoScrollView",
+                            "UIStackView *infoStackView"]))
+check("A2 信息卡工厂存在", "- (UIView *)makeInfoCardWithIcon:" in rp_code
+      and "- (UIImage *)cardSymbolImageNamed:" in rp_code)
+factory = rp[rp.find("- (UIView *)makeInfoCardWithIcon:"):rp.find("#pragma mark - 内存 entitlement 状态显示")]
+check("A2a 工厂样式（正文15号semibold/圆角12/卡高46/动态色 #222222/#EEEEEE/超长缩放）",
+      all(k in factory for k in ["systemFontOfSize:15 weight:UIFontWeightSemibold",
+                                 "cornerRadius = 12", "heightAnchor constraintEqualToConstant:46",
+                                 "colorWithDynamicProvider", "0xEE / 255.0", "0x22 / 255.0",
+                                 "adjustsFontSizeToFitWidth", "minimumScaleFactor = 0.55",
+                                 "translatesAutoresizingMaskIntoConstraints = NO"]))
+check("A3 七张卡经工厂创建并装入 stack",
+      rp_code.count("makeInfoCardWithIcon:") == 8
+      and rp_code.count("addArrangedSubview:") >= 10)
+check("A4 滚动区锚定（版本标签下 → 启动按钮上，左右 12pt 与按钮对齐）",
       all(k in rp for k in [
-          "self.memLimitStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12",
-          "self.memLimitStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12",
-          "self.memLimitStatusLabel.heightAnchor constraintEqualToConstant:20",
-          "self.extVMStatusLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12",
-          "self.extVMStatusLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12",
-          "self.extVMStatusLabel.heightAnchor constraintEqualToConstant:20"]))
+          "self.infoScrollView.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:8",
+          "self.infoScrollView.bottomAnchor constraintEqualToAnchor:self.launchButton.topAnchor constant:-8",
+          "self.infoScrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12",
+          "self.infoScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12"]))
+check("A4a stack 与滚动区内容/框架宽度绑定（可滚动不破版）",
+      "self.infoStackView.widthAnchor constraintEqualToAnchor:self.infoScrollView.frameLayoutGuide.widthAnchor" in rp
+      and "self.infoStackView.topAnchor constraintEqualToAnchor:self.infoScrollView.contentLayoutGuide.topAnchor" in rp)
 check("A5 updateMemoryEntitlementStatus 方法存在且唯一",
       rp_code.count("- (void)updateMemoryEntitlementStatus") == 1)
 check("A5a 读取两个内核内存 entitlement key（Task93 改回签名口径，与启动日志同源）",
@@ -130,22 +136,25 @@ check("A5a 读取两个内核内存 entitlement key（Task93 改回签名口径�
 check("A6 复用 utils 的 getEntitlementValue 入口（与 JIT/内存分配共用）",
       rp_code.count("getEntitlementValue") >= 2)
 update_m = rp[rp.find("- (void)updateMemoryEntitlementStatus"):rp.find("#pragma mark - 自定义外观")]
-check("A7 配色沿用 JIT 标识（绿0.2/0.7/0.3 红0.9/0.4/0.3，背景15%透明）",
-      all(k in update_m for k in ["0.2 green:0.7 blue:0.3", "0.9 green:0.4 blue:0.3",
-                                  "colorWithAlphaComponent:0.15"]))
-check("A8 四个新 i18n key 均被引用",
-      all(k in rp for k in ["i18n_str_mem_limit_enabled", "i18n_str_mem_limit_disabled",
-                            "i18n_str_ext_vm_enabled", "i18n_str_ext_vm_disabled"]))
+check("A7 Task96 同步：内存两卡正文=已开启/未开启（检测函数不变）",
+      update_m.count('@"已开启" : @"未开启"') == 2
+      and "getEntitlementValue(@" in update_m)
+check("A8 Task96 同步：卡片标题全中文（用户指定），无 i18n 键依赖",
+      all(k in rp for k in ['@"启动器版本"', '@"游戏版本"', '@"设备"', '@"系统"',
+                            '@"JIT"', '@"内存上限提升"', '@"扩展虚拟寻址"'])
+      and "i18n_str_mem_limit_enabled" not in rp)
 check("A9 viewWillAppear 刷新", "[self updateMemoryEntitlementStatus];" in rp
       and re.search(r"- \(void\)viewWillAppear:[\s\S]*?\[self updateMemoryEntitlementStatus\];[\s\S]*?\[self applyCustomAppearance\];", rp_code))
 check("A9a DidBecomeActive 通知已注册", "selector:@selector(updateMemoryEntitlementStatus)" in rp
       and "UIApplicationDidBecomeActiveNotification" in rp)
-check("A10 applyCustomAppearance 与 JIT 同策略（自定义色覆盖两个新标签）",
-      re.search(r"self\.jitStatusLabel\.textColor = customColor;[\s\S]*?self\.memLimitStatusLabel\.textColor = customColor;[\s\S]*?self\.extVMStatusLabel\.textColor = customColor;", rp))
-check("A11 进度条间距约束设为 999 优先级（真弱约束）",
-      "progressSpacingConstraint.priority = 999" in rp)
-check("A12 setupUI 创建后立即刷新一次", re.search(
-      r"progressSpacingConstraint\.active = YES;[\s\S]{0,200}\[self updateMemoryEntitlementStatus\];", rp))
+check("A10 Task96 同步：applyCustomAppearance 不再覆盖卡片正文色（动态色自管）",
+      "jitCardValue.textColor = customColor" not in rp
+      and "memLimitCardValue.textColor = customColor" not in rp)
+check("A11 Task96 同步：滚动区方案替代 999 弱约束（旧约束已移除）",
+      "progressSpacingConstraint" not in rp
+      and "[self.progressView.heightAnchor constraintEqualToConstant:4].active = YES;" in rp)
+check("A12 setupUI 创建后立即刷新 JIT/内存两卡", re.search(
+      r"\[self updateJITStatus\];\s*\[self updateMemoryEntitlementStatus\];", rp))
 check("A13 括号平衡（字符串感知）", bracket_balance(rp_code))
 
 print("== B. utils.m（getEntitlementValue 泄漏收紧，行为不变）==")
@@ -214,12 +223,14 @@ changed = {ln[3:].strip() for ln in status.splitlines() if ln.strip()}
 expected = {
     "Natives/LauncherRightPanelViewController.m",
     "Natives/utils.m",
+    "Natives/utils.h",
     "Natives/resources/en.lproj/Localizable.strings",
     "Natives/resources/zh-CN.lproj/Localizable.strings",
     "Natives/resources/zh-Hans.lproj/Localizable.strings",
     "Natives/resources/zh-Hant.lproj/Localizable.strings",
     "Natives/resources/ja.lproj/Localizable.strings",
     "scripts/verify_task88.py",
+    "scripts/verify_task94.py",
     "worklog.md",
 }
 check("E1 改动仅限预期文件", changed <= expected, f"extra={changed - expected}")

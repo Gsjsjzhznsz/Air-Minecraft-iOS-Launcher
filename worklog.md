@@ -728,3 +728,26 @@ Work Log:
 
 Stage Summary:
 - Task95 全链绿灯（59/59 + 级联全绿 + CI）；装机锚点见 Task95 主条目；等用户重导入 BMC2 验证三层防护
+---
+
+---
+Task ID: 96
+Agent: main (Super Z)
+Task: 右侧面板搬入 MeloNX 风格信息卡（设备/系统/内存状态），按用户澄清新增启动器版本/游戏版本/JIT 兔子卡共三张，右下角两按钮与「登录并启动」同款配色
+
+Work Log:
+- 编号重排：另一会话已占用 Task 94（LWJGL 版本上报）与 Task 95（整合包导入加固）并已推送远端，本任务重编号为 96，变基其上无源码交集（仅 worklog/校验器文件名）
+- 卡片结构：7 张 MeloNX 风格卡（启动器版本 → 游戏版本 → 设备 → 系统 → JIT → 内存上限提升 → 扩展虚拟寻址）装入 UIScrollView+UIStackView；左右边缘与「登录并启动」对齐（12pt）、卡高 46pt 与按钮一致（用户备注）；下载中心/进度 UI 并入 stack 顶部隐藏自动折叠；空间不足整区上下滚动（用户确认方案）
+- 三张新卡（AskUserQuestion 澄清后定稿）：启动器版本 = #64C466 + cube.transparent + CFBundleShortVersionString/CFBundleVersion 双读（相同去重）；游戏版本 = #64C466 + gamecontroller + 与红框同源（selectedProfile.lastVersionId，未选择兜底）；JIT 卡 = rabbit 线框兔 + 内存权限同色系橙 + 位于 MeloNX 四卡正中间，三态中文（已开启/未开启/已启用（启动时附加））
+- MeloNX 四卡搬入规格：System 配色改与 Device 一致（系统蓝）；卡片语言全部中文（用户选择），值显示 已开启/未开启；按用户要求不带 MeloNX 附带小字（"2.6"/"JIT Enabled"）；正文动态色 #222222/#EEEEEE（Task91 规范）+ minimumScaleFactor 0.55 防溢出
+- 数据源：utils.h/.m 新增 getDeviceMarketingName（hw.machine → Apple 营销名；联网核实 iPad15,3/15,4=Air M3 11/13、iPad15,7/15,8=iPad 11(A16)、iPad16,1/2=mini A17 Pro、iPad16,3-6=Pro M4 11/13；未收录机型回退原始标识宁缺毋错）与 getSystemVersionDisplay（iPadOS x.x (kern.osbuildversion)，iPhone 前缀 iOS）
+- 检测口径零变化（Task93 护栏）：内存两卡仍 getEntitlementValue（SecTask 签名口径，与启动日志 [Pre-init] Entitlements availability 同源），JIT 仍 isJITEnabled(NO) + TXM 三态判定链；刷新时机三件套（setupUI 尾部/viewWillAppear/DidBecomeActive）不变
+- 按钮改色：执行 Jar/选择版本 → accentColor 底 + 白字（与「登录并启动」同款，用户指定），applyCustomAppearance 统一刷新三枚按钮；下载中心按钮保持深灰原样
+- 胶囊方案退役：jitStatusLabel/memLimitStatusLabel/extVMStatusLabel/makeJITStyleStatusLabel/999 弱约束/i18n 状态键引用全部移除（i18n key 本体保留在 strings 文件不破坏其他调用方）
+- 校验器：新建 verify_task96.py 38 项（A 数据源 7 / B 卡片结构 15 / C 同源护栏 6 / D 按钮配色 4 / E 退役清单 3 / F 仓库卫生 3）；同步历史断言——task88 A 区胶囊断言改卡片断言 + E1 增补 utils.h、task89 C1/C2（按钮 accent 化 + 卡底 15%）、task90 C3（7ab2b41 差异门随 Task96 改版退役，改断言新 UI）、task93 A6（中文值 + 15% 卡底）
+- 考古说明：Task 92/93 已于此前完成推送（479f75c/c8d2069/23ba63f/3bc95fa），本次开发直接在其上进行
+
+Stage Summary:
+- 右面板信息区升级为 MeloNX 风格 7 卡滚动列表：版本×2（绿）+ 设备/系统（蓝，同色）+ JIT（橙）+ 内存权限×2（橙/黄），全部中文、无附带小字、高宽与登录并启动对齐、可滚动
+- 右下角执行 Jar/选择版本与「登录并启动」配色统一（accent 底白字）
+- 内存/JIT 检测与启动日志依旧完全同源（Task93 口径未动）；新增设备营销名/系统构建号展示能力
