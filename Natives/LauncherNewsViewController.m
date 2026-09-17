@@ -291,8 +291,10 @@ static NSString *festivalGreeting(void) {
 
 @interface HomeTileBaseCell : UICollectionViewCell
 @property (nonatomic, strong) UIView *contentContainer;
-@property (nonatomic, strong) CAGradientLayer *accentBar;
 - (void)setupBaseViews;
+// Task90：卡片顶部渐变装饰条（accentBar）已按用户反馈移除，保留本方法
+// 仅为兼容子类/数据源既有调用点（现为空操作）；磁贴图标的彩色语义由
+// cellForItemAtIndexPath 直接作用于 iconView.tintColor，不受影响。
 - (void)setAccentColor:(UIColor *)color;
 @end
 
@@ -326,13 +328,8 @@ static NSString *festivalGreeting(void) {
     self.layer.shadowRadius = 10;
     self.layer.masksToBounds = NO;
     
-    // 渐变装饰条
-    self.accentBar = [CAGradientLayer layer];
-    self.accentBar.frame = CGRectMake(0, 0, self.contentView.bounds.size.width, 3);
-    self.accentBar.startPoint = CGPointMake(0, 0.5);
-    self.accentBar.endPoint = CGPointMake(1, 0.5);
-    self.accentBar.cornerRadius = 1.5;
-    [self.contentView.layer addSublayer:self.accentBar];
+    // Task90：卡片顶部渐变装饰条已移除（用户反馈去掉红框色条），
+    // 卡片视觉统一交给新拟态表面 + 图标语义色。
     
     // 内容容器
     self.contentContainer = [[UIView alloc] initWithFrame:self.contentView.bounds];
@@ -352,15 +349,11 @@ static NSString *festivalGreeting(void) {
 }
 
 - (void)setAccentColor:(UIColor *)color {
-    CGFloat h, s, b, a;
-    [color getHue:&h saturation:&s brightness:&b alpha:&a];
-    UIColor *lighter = [UIColor colorWithHue:h saturation:s * 0.7 brightness:MIN(b * 1.3, 1.0) alpha:a];
-    self.accentBar.colors = @[(id)color.CGColor, (id)lighter.CGColor];
+    // Task90：顶部渐变装饰条已移除，空操作保留以兼容调用点
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.accentBar.frame = CGRectMake(0, 0, self.contentView.bounds.size.width, 3);
     self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:16].CGPath;
 }
 
