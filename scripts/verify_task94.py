@@ -156,7 +156,7 @@ check("D4 旧位置无残留的错位 sanity 块",
 print("===== E. FAQ 28 条（+sodiumLwjgl，Task95 +missingMods） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("E1 28 条目（Task94 +1，Task95 +1）", len(faq_items) == 28, f"got {len(faq_items)}")
+check("E1 29 条目（Task94 +1，Task95 +1，Task97 +1）", len(faq_items) == 29, f"got {len(faq_items)}")
 check("E2 sodiumLwjgl 条目在位（症状 + Installed/Required 读数 + 机理 + 验证锚点）",
       "LWJGL version is not compatible" in helpvc
       and "Installed version: 3.4.1" in helpvc

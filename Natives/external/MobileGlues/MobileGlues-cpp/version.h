@@ -430,6 +430,32 @@
 // FAQ 27->28 (+missingMods entry). On-device anchors: "[ModpackImport] Task95:
 // import report written ...", "[ImportGuard] Task95: incomplete import detected
 // ...", and the crash view's missing-mod class list.
+// REVISION 17 addendum (Task 97, no bump): the 2f90d13 upload (commit 6c3d49d
+// build, BMC2 [FABRIC] 1.20.1, 474 mods, zink, iPad Air M4 / iPadOS 27) -- the
+// user partially applied the Task95 advice (removed certain_questing_additions,
+// balm/kleeslabs/terrablender now present, dependencyOverrides line gone), and
+// startup reached the deepest point ever: all mods loaded, window init, resource
+// reload, paintings json parsing -- then died at the 'main' entrypoint on TWO
+// mods whose crashes share one root cause: the launcher passed -Duser.dir=
+// <gameDir> but never chdir()'d, so java.io.File (raw process CWD) and
+// java.nio.Files/Paths (user.dir) resolved relative paths against two DIFFERENT
+// directories. paintings (Paintings++ 11.0.0.1) PaintingPackReader.scanPacks:
+// Files.exists/isDirectory("./resourcepacks") true via user.dir, then
+// folder.toFile().listFiles() NULL via process CWD -> Arrays.stream(null) NPE;
+// sparsestructures 2.1.2: CONFIG_FILE_PATH.toFile().exists() false via CWD
+// (guard passes), Files.createDirectories("config/sparsestructures.json5") hits
+// the pack-shipped file via user.dir -> FileAlreadyExistsException. Desktop
+// launchers always run java with CWD == game dir, which is why the same pack
+// never trips there; both signatures reproduced bit-for-bit on a local JDK
+// (verify_task97 D-section). Fix: JavaLauncher ame97_alignProcessCwdToGameDir
+// chdir()s to the game dir (+ $PWD sync) immediately before both JLI_Launch
+// sites (game + headless); failure is non-fatal with a "[CwdAlign] Task97"
+// forensic anchor. Side-effect audit: latestlog capture is absolute-path pipe
+// based, all dlopens resolve via @rpath/@loader_path, ObjC file IO is
+// NSHomeDirectory/NSBundle-absolute -- no relative-path victims. Bonus: log4j's
+// "Cannot access RandomAccessFile logs/latest.log" ENOENT (relative path into
+// the old CWD) disappears, and the game writes real logs/ into the instance dir
+// like desktop. FAQ 28->29 (+cwdMismatch). Launcher-side only, REVISION stays 17.
 #define REVISION 17
 #define PATCH 0
 

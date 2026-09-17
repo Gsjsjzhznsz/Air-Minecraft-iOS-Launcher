@@ -751,3 +751,21 @@ Stage Summary:
 - 右面板信息区升级为 MeloNX 风格 7 卡滚动列表：版本×2（绿）+ 设备/系统（蓝，同色）+ JIT（橙）+ 内存权限×2（橙/黄），全部中文、无附带小字、高宽与登录并启动对齐、可滚动
 - 右下角执行 Jar/选择版本与「登录并启动」配色统一（accent 底白字）
 - 内存/JIT 检测与启动日志依旧完全同源（Task93 口径未动）；新增设备营销名/系统构建号展示能力
+---
+Task ID: 97
+Agent: main (Super Z)
+Task: 2f90d13 装机日志判读 + 修复：BMC2 深处双 mod 崩溃（paintings NPE + sparsestructures FileAlreadyExistsException）同源于 java.io/java.nio 相对路径解析分裂（上会话中断前完成开发，因朋友前端占用 Task96 编号而改号 97）
+
+Work Log:
+- 判读 2f90d13（6c3d49d 构建，BMC2 [FABRIC] 1.20.1，474 mods，zink，iPad Air M4）：Task95 建议被部分采纳（certain_questing_additions 已移除、balm/kleeslabs/terrablender 已补齐、dependencyOverrides 行消失），启动推进到历史最深（474 mods 全量 + 窗口初始化 + 资源加载 + paintings json 解析），随后死于两个 mod 的 'main' entrypoint，且两崩溃同根同源：
+  * paintings 11.0.0.1 PaintingPackReader.scanPacks：Files.isDirectory("./resourcepacks") 走 nio/user.dir（游戏目录，整合包自带）→ true；folder.toFile().listFiles() 走 io/进程 CWD → NULL → Arrays.stream(null) NPE
+  * sparsestructures 2.1.2：CONFIG_FILE_PATH.toFile().exists() 走 CWD → false 放行；Files.createDirectories 走 user.dir → 命中整合包自带同名「文件」→ FileAlreadyExistsException: config/sparsestructures.json5
+- 根因：启动器只传 -Duser.dir=<gameDir> 从未 chdir；桌面启动器永远 CWD == 游戏目录故同包无恙
+- 修复（JavaLauncher.m ame97_alignProcessCwdToGameDir）：主游戏 + headless 两处 JLI_Launch 前 chdir(gameDir) + setenv PWD；失败仅告警不阻断（[CwdAlign] Task97 取证锚点）；副作用审计（latestlog 绝对路径 pipe 捕获、dlopen 全 @rpath、ObjC IO 全绝对路径）无相对路径受害者；log4j "Cannot access RandomAccessFile logs/latest.log" 一并消失，游戏日志从此正确写进实例目录 logs/
+- 编号说明：上会话内开发时编号 Task96，朋友（前端）已推送 Task96（右面板 MeloNX 信息卡），本任务改号 97；三文件内 96→97 全量改名
+- 验证：verify_task97.py（A 日志证据钉 git 2f90d13 / B 实现锚点 / C FAQ 接线 / D version.h / E 本地 JDK 行为复现：干净 JDK 下分裂场景逐字复现两签名（NPE+Arrays.stream、FileAlreadyExistsException+精确路径），对齐场景双痊愈 / F 卫生）27 项；FAQ 28→29（+cwdMismatch）并 stale-sync 六校验器（83 B12 / 84 D1 / 85 C1 / 86 C1+C3 / 87 E1 / 94 E1 / 95 E1+E4+F3）；version.h REVISION 17 addendum (Task 97, no bump)
+
+Stage Summary:
+- BMC2 四连关：Task87 弹窗卡死 → Task94 sodium 版本门 → Task95 缺失 jar → Task97 CWD 分裂；zink 会话预计越过 paintings/sparsestructures 直达更深处
+- 装机锚点："[CwdAlign] Task97: process CWD aligned to game dir: ..."；负锚点：logs/latest.log ENOENT 消失
+- 遗留：⌨ 虚拟键盘二轮诊断仍缺 [InputDiag] 证据；zink FSR 画面分裂待装机日志（Task85 已实证修复 26.3-rc-3 zink 会话）

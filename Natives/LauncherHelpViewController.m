@@ -330,12 +330,22 @@
                      @"2. 若日志有 “Dependencies overridden for ...”：修好后可删掉 config/fabric-loader.json 里的 dependencyOverrides 条目，让缺失依赖恢复快速报错；\n"
                      @"3. 分享 latestlog.txt 反馈时附上 import_report.json（实例根目录），可直接对账缺了哪些文件。";
 
+    LauncherHelpFaqItem *cwdMismatch = [[LauncherHelpFaqItem alloc] init];
+    cwdMismatch.iconName = @"folder.badge.questionmark";
+    cwdMismatch.question = @"整合包启动深处闪退，日志报 paintings 或 sparsestructures 相关报错（listFiles 空指针 / FileAlreadyExistsException）？";
+    cwdMismatch.answer = @"典型表现：模组全部加载完、启动推进到 30~40 秒（窗口初始化、资源加载阶段）突然退出，换渲染器无效。日志里搜这两类签名：\n\n"
+                     @"1. NullPointerException + Arrays.stream + PaintingPackReader.scanPacks（paintings 模组）；\n"
+                     @"2. FileAlreadyExistsException: config/sparsestructures.json5（sparsestructures 模组）。\n\n"
+                     @"这不是模组坏、也不是缺文件，是历史版本启动器的环境缺陷：Java 有两套相对路径解析——java.io.File 按进程工作目录、java.nio 按 user.dir，旧启动器只设置了后者，两套解析各看各的目录：paintings 检查“资源包文件夹存在”时走的一套、列目录时走的另一套（列了个不存在的位置→空指针）；sparsestructures 判断“配置文件不存在”后去创建时又落到了真目录里的同名文件上（→已存在异常）。同样的整合包在桌面端从不双标（桌面启动器的工作目录永远是游戏目录），所以这两个 mod 在桌面无恙。\n\n"
+                     @"启动器已修复（Task97）：JVM 启动前把进程工作目录对齐到游戏目录，与桌面完全一致。验证方法：日志搜 [CwdAlign] Task97，应有一行“process CWD aligned to game dir: …”；同时早前每必出现的“Cannot access RandomAccessFile logs/latest.log”报错也会消失（游戏自己的日志从此正常写进实例目录 logs/）。\n\n"
+                     @"若更新后仍见上述报错：确认安装的是最新构建（设置→关于看 Commit ≥ Task97 修复提交），然后带 latestlog.txt 反馈。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch ]
     ];
 }
 

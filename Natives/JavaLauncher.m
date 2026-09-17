@@ -577,6 +577,50 @@ static void ame95_warnIncompleteImport(NSString *gameDir) {
     showDialog(localize(@"Warning", nil), msg);
 }
 
+// ============================================================================
+// Task97: 进程 CWD 与 -Duser.dir 对齐（桌面启动器等价行为）
+// ============================================================================
+// 2f90d13 装机日志实锤（BMC2 [FABRIC] 1.20.1, 474 mods, 6c3d49d 构建, zink,
+// iPad Air M4 / iPadOS 27）：启动史上最深推进（474 mods 全量加载、窗口初始化、
+// 资源加载），随后死在两个 mod 的 'main' entrypoint，且两类崩溃同根同源：
+//   * paintings (Paintings++ 11.0.0.1) PaintingPackReader.scanPacks:
+//       filter Files.exists/isDirectory("./resourcepacks") == true（java.nio
+//       按 user.dir 解析 → 游戏目录，整合包自带 resourcepacks/），随后
+//       folder.toFile().listFiles() 返回 NULL（java.io.File 按进程 CWD 解析，
+//       CWD 里没有该目录）→ Arrays.stream(null) → NPE；
+//   * sparsestructures 2.1.2 onInitialize:
+//       CONFIG_FILE_PATH.toFile().exists() == false（进程 CWD，守卫放行）→
+//       Files.createDirectories("config/sparsestructures.json5")（user.dir =
+//       游戏目录）命中整合包自带同名「文件」→ FileAlreadyExistsException。
+// 根因：本启动器只传 -Duser.dir=<gameDir> 而从未 chdir，java.io（进程 CWD）
+// 与 java.nio（user.dir）两套相对路径解析各看各的目录；桌面启动器永远以
+// CWD == 游戏目录启动 java，故同样的 mod 在桌面无恙。
+// 本地 JDK 行为复现（scripts/verify_task97.py D 区）：listFiles()==NULL 与
+// FileAlreadyExistsException 两签名与真机崩溃逐字一致。
+// 副作用审计（Task97, 2026-09）：latestlog.txt 走绝对路径 pipe 捕获（main.m）；
+// 全部 dlopen 经 @rpath/@loader_path 解析；ObjC 侧文件 IO 均
+// NSHomeDirectory/NSBundle 绝对路径——chdir 无相对路径受害者。对齐后 log4j
+// 的 logs/latest.log 也会正确落进实例目录（桌面等价行为），早前
+// "Cannot access RandomAccessFile logs/latest.log" ENOENT 一并消失。
+// 失败策略：chdir 失败仅告警不阻断（维持旧行为，日志留 [CwdAlign] 取证）。
+static void ame97_alignProcessCwdToGameDir(NSString *gameDir) {
+    if (gameDir.length == 0) {
+        NSLog(@"[CwdAlign] Task97: gameDir empty, skipping CWD alignment");
+        return;
+    }
+    const char *dir = gameDir.fileSystemRepresentation;
+    if (chdir(dir) != 0) {
+        int savedErrno = errno;
+        NSLog(@"[CwdAlign] Task97: FAILED to chdir(%@) errno=%d -- continuing with unaligned CWD "
+              "(mods mixing java.io/java.nio relative paths may misbehave)", gameDir, savedErrno);
+        return;
+    }
+    setenv("PWD", dir, 1);
+    // 权威取证：chdir 后回读 getcwd（NSFileManager currentDirectoryPath 内部即 getcwd）
+    NSString *nowCwd = [[NSFileManager defaultManager] currentDirectoryPath];
+    NSLog(@"[CwdAlign] Task97: process CWD aligned to game dir: %@", nowCwd);
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -1490,6 +1534,11 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         return -2;
     }
 
+    // Task97：JLI_Launch 前对齐进程 CWD 到游戏目录（桌面启动器等价行为；详见
+    // ame97_alignProcessCwdToGameDir 注释：2f90d13 两 mod 崩溃同源于
+    // java.io[进程 CWD] 与 java.nio[user.dir] 的相对路径解析分裂）。
+    ame97_alignProcessCwdToGameDir(gameDir);
+
     NSLog(@"[Init] Calling JLI_Launch");
 
     // Cr4shed known issue: exit after crash dump,
@@ -1744,6 +1793,10 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
     signal(SIGBUS, SIG_DFL);
     signal(SIGILL, SIG_DFL);
     signal(SIGFPE, SIG_DFL);
+
+    // Task97：headless 路径同样对齐 CWD（Forge/NeoForge 安装期 processors 与
+    // 主游戏共用 -Duser.dir=<gameDir> 语义，桌面端安装器也总以 CWD == 游戏目录运行）。
+    ame97_alignProcessCwdToGameDir(gameDir);
 
     NSLog(@"[JavaLauncher] Calling JLI_Launch (headless, %d args)", margc + 1);
 
