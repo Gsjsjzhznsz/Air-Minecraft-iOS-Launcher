@@ -519,6 +519,21 @@ Stage Summary:
 - LTW × 26.x 能力边界定案：ES 3.0 后端无 TBO → 必崩；预检门拦截 + 指引切 Zink/MG；LTW 适用 1.21.x 及更早；TBO 模拟移植列路线图
 - 装机验证锚点：整合包重启 → "[ModDialogGuard] Task87: disabled desktop dialog mod ... (renamed to .disabled)" + 启动继续推进（Backend library / Render thread 出现）；LTW×26.x → "Task87 launch gate: LTW renderer + MC 26.x blocked" + 弹窗
 - 遗留：⌨ 虚拟键盘二轮诊断仍缺真机 [InputDiag] button text 证据（本轮两日志均未触及键盘）；BMC2 537 mods 在 A 系 3GB 堆上的运行期表现待装机观察
+
+---
+Task ID: 87 (续)
+Agent: main (Super Z)
+Task: CI 构建 + 宏冲突修复
+
+Work Log:
+- 首推 697667e CI 失败（run 35163736029）：JavaLauncher.m:465 编译错误——**第 26 行既有宏 `#define fm NSFileManager.defaultManager` 与 ModDialogGuard 局部变量名 fm 冲突**（`NSFileManager *fm` 被展开成 `NSFileManager *NSFileManager.defaultManager` → expected ';' at end of declaration ×1 + class property 误诊 ×3）
+- 修复（6d4d68c）：函数体内 fm → fileMgr（仅 4 处，词边界正则替换，函数体外零改动）；verify_task87 C3 同步加"函数体无 fm 宏使用"断言防复发；全仓宏冲突扫描（fileMgr/isDir/modsDir/srcPath/dstPath/patterns/ame87_* 均无碰撞）
+- CI run 35164771799（6d4d68c）completed | success——新 IPA 就绪
+
+Stage Summary:
+- Task87 三层修复全链绿灯：47/47 验证 + 15 校验器级联 + CI 构建成功
+- 教训入库：该仓库 ObjC 文件有短名宏（fm），新局部变量命名前需 grep `^#define`——C3 断言已固化此检查
+
 ---
 Task ID: 88
 Agent: main (Super Z)
