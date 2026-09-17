@@ -798,10 +798,18 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 /// 大号正文。正文随深浅色取 #222222/#EEEEEE（Task91 字色规范），超长时
 /// 自动缩小到不溢出（用户指定）。卡片高度与「登录并启动」按钮一致（46pt），
 /// 宽度撑满 stack（与按钮同宽）。按用户要求不带任何小字副标题。
+// Task98 CI 解堵：参数从裸 UILabel **（ARC 下默认 __autoreleasing）改为
+// UILabel * __strong *——调用点传入的是属性 ivar 的地址（&_xxxCardValue，
+// strong 存储），对 __autoreleasing 出参做写回是编译错误
+// （"passing address of non-local object to __autoreleasing parameter for
+// write-back"，Xcode 15.4 实测 7 处全崩在 401-407 行，2af8c45 CI 失败根因）。
+// 改为 __strong * 后类型严格匹配，单次 *out = value 赋值由编译器生成标准
+// strong store（先 release 旧值再 retain 新值），运行期语义与原设计完全一致。
+// 功能代码（卡片结构/配色/层级）零改动，仅所有权限定符修正。
 - (UIView *)makeInfoCardWithIcon:(NSString *)iconName
                           accent:(UIColor *)accent
                            title:(NSString *)title
-                      valueLabel:(UILabel **)outValueLabel {
+                      valueLabel:(UILabel * __strong *)outValueLabel {
     UIView *card = [[UIView alloc] init];
     card.translatesAutoresizingMaskIntoConstraints = NO;
     card.backgroundColor = [accent colorWithAlphaComponent:0.15];

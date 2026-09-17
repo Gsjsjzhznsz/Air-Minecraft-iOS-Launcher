@@ -786,3 +786,18 @@ Stage Summary:
 - 26.3 Fabric 整合包链路打通预期：选对 341 后 NativeLibrariesBootstrap 第八项全过 → renderpearl GlBackend 走 MG provider mirror（c71dcfa 基建）→ 与 zink 26.3-rc-3 会话同族路径
 - 装机锚点："[LWJGLSel] Task98: MC major 26 extracted from version id ..." + "Using LWJGL 341"；负锚点：无 "Loading library SDL" 崩溃
 - 遗留：⌨ 虚拟键盘二轮诊断仍缺 [InputDiag] 证据；zink FSR 画面分裂待装机日志；FSR 替换方案调研结论（推荐 NVIDIA NIS）待答复用户
+---
+Task ID: 98 (续)
+Agent: main (Super Z)
+Task: CI 解堵——朋友前端提交 1b7ae22 的 ARC 编译错误修复（build-blocking，卡住 26.3 修复的新 IPA 产出）
+
+Work Log:
+- a808999 推送后查 CI 历史：2af8c45（用户上传提交）的 run 35246975514 = failure，失败步骤 "Build for ios"；0bb68fb（朋友校验器提交）的 run 被 cancel；首个编译朋友前端代码的 run 即失败
+- 下载失败日志取证（run 35246975514）：恰好 7 个编译错误，全部同类——Natives/LauncherRightPanelViewController.m:401-407 "passing address of non-local object to __autoreleasing parameter for write-back"：MeloNX 卡片工厂方法 makeInfoCardWithIcon:accent:title:valueLabel: 的参数是裸 UILabel **（ARC 默认 __autoreleasing 出参），而 7 个调用点传的是属性 ivar 地址（&_launcherVersionCardValue 等，strong 存储）
+- 修复（一处签名，零功能改动）：参数改为 (UILabel * __strong *)outValueLabel——类型严格匹配 strong ivar 地址；方法体内单次 *out = value 写回由编译器生成标准 strong store（先 release 旧值再 retain 新值），运行期语义与原设计一致；方法头注释记录病历与理由
+- 边界说明：该文件属朋友前端职责范围，但编译错误卡住整个 IPA 产出（26.3 修复无法装机验证），属"通知即修"的机械解堵；改动仅所有权限定符，卡片结构/配色/层级零触碰；已向用户披露，可转告朋友
+- 验证：朋友 verify_task96 38 项中仅剩"无未提交改动"类失败（提交后自愈，其断言只钉调用点不钉签名）；我的 task98 35/35、task87 50/50 不受影响
+
+Stage Summary:
+- CI 链路恢复：a808999 的在飞 run 会因同样 7 错失败（叠加朋友代码），本修复提交后的新 run 为最终有效构建
+- 协作披露：朋友的两笔提交中 0bb68fb 无害（校验器），1b7ae22 功能正常但有 ARC 编译错误，已最小化修复
