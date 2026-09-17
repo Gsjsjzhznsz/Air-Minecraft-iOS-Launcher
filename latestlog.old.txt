@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 5.0.0
-[Pre-Init] Commit: 6054498 (main)
+[Pre-Init] Commit: 3bc95fa (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -18,6 +18,8 @@
 [SceneDelegate] Terracotta temporarily disabled for crash investigation
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Library/Caches/IconLoader, mirror enabled: YES
 [LauncherRootVC] Loaded 917 remote versions
+[IconLoader] App entered background: cancelled all ongoing downloads
+[IconLoader] App entered background: cancelled all ongoing downloads
 [MCDL] SHA1 passed for 1.20.1.json
 [MCDL] insertSafety: how to insert assetIndex?
 [MCDL] insertSafety: how to insert assets?
@@ -87,15 +89,16 @@
 [MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/net/fabricmc/intermediary/1.20.1/intermediary-1.20.1.jar, have to assume it's good.
 [MCDL] Unknown artifact object for net.fabricmc:fabric-loader:0.19.3, attempting to generate one
 [MCDL] Warning: couldn't find SHA for /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application Support/minecraft/libraries/net/fabricmc/fabric-loader/0.19.3/fabric-loader-0.19.3.jar, have to assume it's good.
-[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=0 trollStore=0 CS_DEBUGGED=0 ppid=1 traced=0 exn=0 JIT_FLAGS=0x7
+[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=0 trollStore=0 CS_DEBUGGED=1 ppid=1 traced=0 exn=0 JIT_FLAGS=0x7
+[JIT] [RightPanel] CS_DEBUGGED set but no live JIT26 debugger (ppid=1 traced=0 exn=0) — re-attaching script via stikjit://
 sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [IconLoader] App entered background: cancelled all ongoing downloads
-[SurfaceViewController] FPS counter setup: profileRenderer=libOSMesa.8.dylib, envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
-[SurfaceVC] Task83 FSR linkage: renderer=libOSMesa.8.dylib preset=2 scale=1.50 -- MC render window = surface/1.50 (renderer-side upscale: zink EASU (Task83)); resolution=100%
+[SurfaceViewController] FPS counter setup: profileRenderer=libltw.dylib, envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
+[SurfaceVC] CAMetalLayer configured: drawableSize=2360x1640, maximumDrawableCount=3, presentsWithTransaction=0, drawsAsynchronously=1, contentsScale=2.00
 [CustomControls] Task83b decorative sub-button pass-through enabled #1 (name=, touch no longer swallowed)
 [CustomControls] Task83b decorative sub-button pass-through enabled #2 (name=, touch no longer swallowed)
 [TouchController] Sender ready on port 12450
-[SurfaceViewController] Launching Minecraft with accountId: EEA76071-D34E-4283-AD78-4BA7B4C4750C, version: 17, size: 1572x1092
+[SurfaceViewController] Launching Minecraft with accountId: EEA76071-D34E-4283-AD78-4BA7B4C4750C, version: 17, size: 2360x1640
 [JavaLauncher] Beginning JVM launch
 [JavaLauncher] MoltenVK performance tracking + IMMEDIATE present mode requested for VSync diagnosis
 [JavaLauncher] Framerate unlock configuration:
@@ -170,7 +173,6 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [Task67]   key_key.debug.fpsCharts:key.keyboard.2
 [Task67]   key_key.debug.networkCharts:key.keyboard.3
 [Task67]   key_key.debug.lightmapTexture:key.keyboard.4
-[Task67]   key_key.debug.improvedTransparency:key.keyboard.x
 [Task67] ===== keybind sanitize: 0 repairs needed (all canonical / defaults) =====
 [DyldLVBypass] TXM debug JIT mapping active — keeping debugger attached for dyld bypass
 [DyldLVBypass] init
@@ -179,49 +181,23 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [DyldLVBypass] hook dyld_mmap succeed!
 [DyldLVBypass] found dyld_fcntl at 0x1a00d56cc
 [DyldLVBypass] hook dyld_fcntl succeed!
-[JavaLauncher] init_loadMobileGluesConfig: renderer=libOSMesa.8.dylib
+[JavaLauncher] init_loadMobileGluesConfig: renderer=libltw.dylib
 [JavaLauncher] MobileGlues config not written (renderer is not mobileglues/auto/vulkan)
 [PLProfiles] Applying javaVersion (17)
-[JavaLauncher] RENDERER is set to libOSMesa.8.dylib
-[PLPreferences] Getter could not find preference zink.optimization_level
-[PLPreferences] Getter could not find preference zink.optimization_level
-[PLPreferences] Getter could not find preference zink.gl_override
-[PLPreferences] Getter could not find preference zink.enable_gl_thread
-[PLPreferences] Getter could not find preference zink.glsl_cache_size
-[PLPreferences] Getter could not find preference zink.api_features
-[ZinkConfig] [Zink Config]
-Renderer: libOSMesa.8.dylib
-GPU: A12 (recommended: A12 GPU → Recommended: Medium (3))
-Setting / Resolved: Auto / Medium (3)
-GL: 4.1 (from level) / GL Thread: YES
-Cache: 32 MB / API: Full (default)
-[PLPreferences] Getter could not find preference zink.gl_override
-[PLPreferences] Getter could not find preference zink.enable_gl_thread
-[PLPreferences] Getter could not find preference zink.glsl_cache_size
-[PLPreferences] Getter could not find preference zink.api_features
-[PLPreferences] Getter could not find preference zink.optimization_level
-[PLPreferences] Getter could not find preference zink.gl_override
-[PLPreferences] Getter could not find preference zink.enable_gl_thread
-[PLPreferences] Getter could not find preference zink.glsl_cache_size
-[PLPreferences] Getter could not find preference zink.api_features
-[ZinkConfig] ========== Zink Renderer Active (Mesa 25) ==========
-[ZinkConfig] [Zink Config]
-Renderer: libOSMesa.8.dylib
-GPU: A12 (recommended: A12 GPU → Recommended: Medium (3))
-Setting / Resolved: Auto / Medium (3)
-GL: 4.1 (from level) / GL Thread: YES
-Cache: 32 MB / API: Full (default)
-[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
-[ZinkStrideFix] Installed vertex stride alignment hooks for zink (Mesa 25.0.7 + MoltenVK)
+[JavaLauncher] RENDERER is set to libltw.dylib
+[JavaLauncher] LTW renderer active: using LTW defaults (same as Android)
 [JavaLauncher] GRAPHICS_API is set to default
+[ModDialogGuard] Task87: disabled desktop dialog mod "missingmodschecker.jar" (renamed to .disabled; rename back to re-enable) -- Swing dialogs can never be shown on iOS and would block startup forever (7b88b69 evidence)
+[ModDialogGuard] Task87: 1 desktop dialog mod(s) auto-disabled in modrinth_801EE61F-E278-4A2E-8F71-39ABFC9E860E/mods (rename .disabled -> .jar to restore)
 [JavaLauncher] Looking for Java 17 or later
 [JavaLauncher] JAVA_HOME has been set to /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk
 [JavaLauncher] Max RAM allocation is set to 2966 MB
 [JavaLauncher] Task68 GC/safepoint pause logging enabled (-Xlog:gc,safepoint -> stdout)
 [JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/Frameworks
-[JavaLauncher] Published Metallum surface view: 0x15a5608c0 (scale=2)
+[JavaLauncher] Published Metallum surface view: 0x12dec9500 (scale=2)
 [JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
 [JavaLauncher] JVM GC optimization: G1GC + MaxGCPauseMillis=50 + StringDeduplication (Java 17+)
+[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [JavaLauncher] Caciocavallo: isJava8=0 libs=libs_caciocavallo17 mode=/a
 [JavaLauncher] Reading custom JVM flags
 [Init] Found JLI lib
@@ -233,16 +209,16 @@ Cache: 32 MB / API: Full (default)
 [PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [JIT26] Requesting 64 MB for JIT mapping
-[JIT26] Got JIT mapping 0x167c00000 from debugger
-[JIT26] mapping at RW=0x16fab4000, RX=0x167c00000
-[2026-09-17T07:12:41.618+0800][0.250s] Using G1
+[JIT26] Got JIT mapping 0x165628000 from debugger
+[JIT26] mapping at RW=0x16d738000, RX=0x165628000
+[2026-09-17T20:23:59.664+0800][0.254s] Using G1
 WARNING: Unknown module: cpw.mods.bootstraplauncher specified to --add-exports
 PatchJNAAgent: premain called
 Arc Capes DNS Injector
 Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
 Added DNS cache entry: s.optifine.net/23.95.137.176
-[2026-09-17T07:12:41.800+0800][0.432s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 14M->9M(128M) 1.037ms
-[2026-09-17T07:12:41.800+0800][0.432s] Safepoint "G1CollectForAllocation", Time since last: 158826417 ns, Reaching safepoint: 1708 ns, Cleanup: 19209 ns, At safepoint: 1063000 ns, Total: 1083917 ns
+[2026-09-17T20:23:59.852+0800][0.441s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 22M->17M(128M) 0.960ms
+[2026-09-17T20:23:59.852+0800][0.441s] Safepoint "G1CollectForAllocation", Time since last: 163812834 ns, Reaching safepoint: 1125 ns, Cleanup: 18875 ns, At safepoint: 983166 ns, Total: 1003166 ns
 [PojavLauncher] VSync disabled, maxFps/maxFramerate/framerateLimit set to 260
 [PojavLauncher]   enableVsync=false
 [PojavLauncher]   maxFps=260
@@ -250,97 +226,91 @@ Added DNS cache entry: s.optifine.net/23.95.137.176
 [PojavLauncher]   framerateLimit=260
 [PojavLauncher]   inactivityFpsLimit=minimized
 [PojavLauncher] MC 26.2+ graphicsApi cleared (default)
-[2026-09-17T07:12:41.834+0800][0.466s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 13M->10M(128M) 1.147ms
-[2026-09-17T07:12:41.834+0800][0.466s] Safepoint "G1CollectForAllocation", Time since last: 33092333 ns, Reaching safepoint: 21458 ns, Cleanup: 17959 ns, At safepoint: 1174125 ns, Total: 1213542 ns
+[2026-09-17T20:23:59.885+0800][0.475s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 21M->17M(128M) 0.915ms
+[2026-09-17T20:23:59.885+0800][0.475s] Safepoint "G1CollectForAllocation", Time since last: 32734959 ns, Reaching safepoint: 3000 ns, Cleanup: 30916 ns, At safepoint: 932250 ns, Total: 966166 ns
 [Tools] Replacing JNA 5.12.1 with 5.13.0 for iOS compatibility
 Launching Minecraft fabric-loader-0.19.3-1.20.1-9c2ee306
 Args init finished. Now starting game
-[2026-09-17T07:12:41.872+0800][0.505s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 22M->14M(128M) 0.589ms
-[2026-09-17T07:12:41.872+0800][0.505s] Safepoint "G1CollectForAllocation", Time since last: 37722000 ns, Reaching safepoint: 1750 ns, Cleanup: 18833 ns, At safepoint: 609458 ns, Total: 630041 ns
-[2026-09-17T07:12:42.061+0800][0.694s] Safepoint "ICBufferFull", Time since last: 188906459 ns, Reaching safepoint: 34500 ns, Cleanup: 65458 ns, At safepoint: 2750 ns, Total: 102708 ns
-[2026-09-17T07:12:42.114+0800][0.746s] Safepoint "ICBufferFull", Time since last: 52692958 ns, Reaching safepoint: 2959 ns, Cleanup: 50583 ns, At safepoint: 2208 ns, Total: 55750 ns
-[2026-09-17T07:12:42.152+0800][0.784s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 100M->49M(136M) 9.625ms
-[2026-09-17T07:12:42.152+0800][0.784s] Safepoint "G1CollectForAllocation", Time since last: 28271375 ns, Reaching safepoint: 3292 ns, Cleanup: 21417 ns, At safepoint: 9648291 ns, Total: 9673000 ns
-[2026-09-17T07:12:42.239+0800][0.871s] Safepoint "ICBufferFull", Time since last: 86546417 ns, Reaching safepoint: 3208 ns, Cleanup: 51334 ns, At safepoint: 3875 ns, Total: 58417 ns
-[2026-09-17T07:12:42.278+0800][0.911s] GC(4) Pause Young (Concurrent Start) (Metadata GC Threshold) 66M->52M(136M) 4.330ms
-[2026-09-17T07:12:42.278+0800][0.911s] Safepoint "CollectForMetadataAllocation", Time since last: 35187666 ns, Reaching safepoint: 1459 ns, Cleanup: 16625 ns, At safepoint: 4359333 ns, Total: 4377417 ns
-[2026-09-17T07:12:42.278+0800][0.911s] GC(5) Concurrent Mark Cycle
-[2026-09-17T07:12:42.286+0800][0.918s] Safepoint "CollectForMetadataAllocation", Time since last: 7836375 ns, Reaching safepoint: 24542 ns, Cleanup: 12500 ns, At safepoint: 8958 ns, Total: 46000 ns
-[2026-09-17T07:12:42.294+0800][0.927s] GC(6) Pause Young (Normal) (G1 Evacuation Pause) 54M->54M(170M) 1.355ms
-[2026-09-17T07:12:42.294+0800][0.927s] Safepoint "G1CollectForAllocation", Time since last: 6737833 ns, Reaching safepoint: 19000 ns, Cleanup: 10709 ns, At safepoint: 1384916 ns, Total: 1414625 ns
-[07:12:42] [main/INFO]: Loading Minecraft 1.20.1 with Fabric Loader 0.19.3
-[2026-09-17T07:12:42.297+0800][0.929s] GC(5) Pause Remark 58M->58M(170M) 0.877ms
-[2026-09-17T07:12:42.297+0800][0.929s] Safepoint "G1PauseRemark", Time since last: 1831875 ns, Reaching safepoint: 3584 ns, Cleanup: 625 ns, At safepoint: 891666 ns, Total: 895875 ns
-[2026-09-17T07:12:42.298+0800][0.930s] GC(5) Pause Cleanup 58M->58M(170M) 0.003ms
-[2026-09-17T07:12:42.298+0800][0.930s] Safepoint "G1PauseCleanup", Time since last: 30417 ns, Reaching safepoint: 737250 ns, Cleanup: 5250 ns, At safepoint: 20458 ns, Total: 762958 ns
-[2026-09-17T07:12:42.298+0800][0.930s] GC(5) Concurrent Mark Cycle 19.863ms
-[2026-09-17T07:12:42.334+0800][0.966s] GC(7) Pause Young (Concurrent Start) (G1 Evacuation Pause) 64M->60M(170M) 1.460ms
-[2026-09-17T07:12:42.334+0800][0.966s] Safepoint "G1CollectForAllocation", Time since last: 34291584 ns, Reaching safepoint: 2541 ns, Cleanup: 15875 ns, At safepoint: 1489167 ns, Total: 1507583 ns
-[2026-09-17T07:12:42.334+0800][0.966s] GC(8) Concurrent Mark Cycle
-[2026-09-17T07:12:42.347+0800][0.979s] GC(8) Pause Remark 62M->62M(170M) 0.616ms
-[2026-09-17T07:12:42.347+0800][0.979s] Safepoint "G1PauseRemark", Time since last: 12438042 ns, Reaching safepoint: 79791 ns, Cleanup: 11875 ns, At safepoint: 635542 ns, Total: 727208 ns
-[2026-09-17T07:12:42.356+0800][0.989s] GC(8) Pause Cleanup 68M->68M(170M) 0.037ms
-[2026-09-17T07:12:42.356+0800][0.989s] Safepoint "G1PauseCleanup", Time since last: 9360833 ns, Reaching safepoint: 8459 ns, Cleanup: 14708 ns, At safepoint: 58667 ns, Total: 81834 ns
-[2026-09-17T07:12:42.357+0800][0.989s] GC(8) Concurrent Mark Cycle 22.982ms
-[07:12:42] [ForkJoinPool-1-worker-2/WARN]: Mod stfu uses the version 2.8.1b which isn't compatible with Loader's extended semantic version format (Could not parse version number component '1b'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[2026-09-17T07:12:42.385+0800][1.018s] Safepoint "G1CollectForAllocation", Time since last: 29150083 ns, Reaching safepoint: 3875 ns, Cleanup: 19250 ns, At safepoint: 5125 ns, Total: 28250 ns
-[2026-09-17T07:12:42.387+0800][1.019s] GC(9) Pause Young (Normal) (GCLocker Initiated GC) 82M->67M(170M) 1.573ms
-[2026-09-17T07:12:42.387+0800][1.019s] Safepoint "G1CollectForAllocation", Time since last: 54708 ns, Reaching safepoint: 1334 ns, Cleanup: 1166 ns, At safepoint: 1633667 ns, Total: 1636167 ns
-[07:12:42] [ForkJoinPool-1-worker-3/WARN]: The mod "betterstats" contains invalid entries in its mod json:
+[2026-09-17T20:23:59.925+0800][0.514s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 29M->22M(128M) 0.624ms
+[2026-09-17T20:23:59.925+0800][0.515s] Safepoint "G1CollectForAllocation", Time since last: 38672750 ns, Reaching safepoint: 1459 ns, Cleanup: 21250 ns, At safepoint: 640875 ns, Total: 663584 ns
+[2026-09-17T20:24:00.100+0800][0.690s] Safepoint "ICBufferFull", Time since last: 175459458 ns, Reaching safepoint: 1625 ns, Cleanup: 40958 ns, At safepoint: 2209 ns, Total: 44792 ns
+[2026-09-17T20:24:00.162+0800][0.751s] Safepoint "ICBufferFull", Time since last: 61342208 ns, Reaching safepoint: 19292 ns, Cleanup: 41833 ns, At safepoint: 3333 ns, Total: 64458 ns
+[2026-09-17T20:24:00.202+0800][0.792s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 108M->56M(144M) 10.457ms
+[2026-09-17T20:24:00.202+0800][0.792s] Safepoint "G1CollectForAllocation", Time since last: 29607625 ns, Reaching safepoint: 1334 ns, Cleanup: 17375 ns, At safepoint: 10481833 ns, Total: 10500542 ns
+[2026-09-17T20:24:00.311+0800][0.900s] Safepoint "ICBufferFull", Time since last: 108886625 ns, Reaching safepoint: 1333 ns, Cleanup: 59584 ns, At safepoint: 583 ns, Total: 61500 ns
+[2026-09-17T20:24:00.328+0800][0.918s] GC(4) Pause Young (Concurrent Start) (Metadata GC Threshold) 74M->61M(144M) 4.740ms
+[2026-09-17T20:24:00.328+0800][0.918s] GC(5) Concurrent Mark Cycle
+[2026-09-17T20:24:00.328+0800][0.918s] Safepoint "CollectForMetadataAllocation", Time since last: 12892833 ns, Reaching safepoint: 1292 ns, Cleanup: 7042 ns, At safepoint: 4771583 ns, Total: 4779917 ns
+[2026-09-17T20:24:00.337+0800][0.926s] Safepoint "CollectForMetadataAllocation", Time since last: 8259625 ns, Reaching safepoint: 28167 ns, Cleanup: 12875 ns, At safepoint: 9416 ns, Total: 50458 ns
+[20:24:00] [main/INFO]: Loading Minecraft 1.20.1 with Fabric Loader 0.19.3
+[2026-09-17T20:24:00.343+0800][0.933s] GC(5) Pause Remark 63M->63M(144M) 0.905ms
+[2026-09-17T20:24:00.343+0800][0.933s] Safepoint "G1PauseRemark", Time since last: 5276000 ns, Reaching safepoint: 12250 ns, Cleanup: 22125 ns, At safepoint: 920000 ns, Total: 954375 ns
+[2026-09-17T20:24:00.349+0800][0.939s] GC(6) Pause Young (Normal) (G1 Evacuation Pause) 67M->66M(192M) 1.460ms
+[2026-09-17T20:24:00.349+0800][0.939s] Safepoint "G1CollectForAllocation", Time since last: 4242542 ns, Reaching safepoint: 128417 ns, Cleanup: 2791 ns, At safepoint: 1525959 ns, Total: 1657167 ns
+[2026-09-17T20:24:00.357+0800][0.947s] GC(5) Pause Cleanup 66M->66M(192M) 0.019ms
+[2026-09-17T20:24:00.357+0800][0.947s] Safepoint "G1PauseCleanup", Time since last: 2173041 ns, Reaching safepoint: 5890084 ns, Cleanup: 1833 ns, At safepoint: 30208 ns, Total: 5922125 ns
+[2026-09-17T20:24:00.357+0800][0.947s] GC(5) Concurrent Mark Cycle 28.842ms
+[2026-09-17T20:24:00.383+0800][0.973s] GC(7) Pause Young (Concurrent Start) (G1 Evacuation Pause) 72M->68M(192M) 1.442ms
+[2026-09-17T20:24:00.383+0800][0.973s] Safepoint "G1CollectForAllocation", Time since last: 25084375 ns, Reaching safepoint: 1250 ns, Cleanup: 6750 ns, At safepoint: 1467042 ns, Total: 1475042 ns
+[2026-09-17T20:24:00.383+0800][0.973s] GC(8) Concurrent Mark Cycle
+[2026-09-17T20:24:00.398+0800][0.988s] GC(8) Pause Remark 72M->72M(192M) 0.782ms
+[2026-09-17T20:24:00.398+0800][0.988s] Safepoint "G1PauseRemark", Time since last: 13592375 ns, Reaching safepoint: 36833 ns, Cleanup: 18417 ns, At safepoint: 810333 ns, Total: 865583 ns
+[20:24:00] [ForkJoinPool-1-worker-3/WARN]: Mod stfu uses the version 2.8.1b which isn't compatible with Loader's extended semantic version format (Could not parse version number component '1b'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[2026-09-17T20:24:00.409+0800][0.999s] GC(8) Pause Cleanup 79M->79M(192M) 0.028ms
+[2026-09-17T20:24:00.409+0800][0.999s] Safepoint "G1PauseCleanup", Time since last: 10998459 ns, Reaching safepoint: 3666 ns, Cleanup: 26750 ns, At safepoint: 48167 ns, Total: 78583 ns
+[2026-09-17T20:24:00.409+0800][0.999s] GC(8) Concurrent Mark Cycle 25.814ms
+[2026-09-17T20:24:00.435+0800][1.025s] GC(9) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 92M->77M(192M) 1.434ms
+[2026-09-17T20:24:00.435+0800][1.025s] Safepoint "G1CollectForAllocation", Time since last: 24770750 ns, Reaching safepoint: 53250 ns, Cleanup: 16167 ns, At safepoint: 1455750 ns, Total: 1525167 ns
+[2026-09-17T20:24:00.443+0800][1.033s] Safepoint "G1CollectForAllocation", Time since last: 7882166 ns, Reaching safepoint: 22000 ns, Cleanup: 8667 ns, At safepoint: 4792 ns, Total: 35459 ns
+[2026-09-17T20:24:00.445+0800][1.035s] GC(10) Pause Young (Mixed) (GCLocker Initiated GC) 85M->83M(192M) 1.545ms
+[2026-09-17T20:24:00.445+0800][1.035s] Safepoint "G1CollectForAllocation", Time since last: 51875 ns, Reaching safepoint: 2083 ns, Cleanup: 2000 ns, At safepoint: 1569417 ns, Total: 1573500 ns
+[20:24:00] [ForkJoinPool-1-worker-8/WARN]: The mod "betterstats" contains invalid entries in its mod json:
 - Unsupported root entry "" at line 26 column 4
 - Unsupported root entry "" at line 26 column 92
 - Unsupported root entry "" at line 28 column 4
 - Unsupported root entry "" at line 28 column 24
-[07:12:42] [ForkJoinPool-1-worker-7/WARN]: Mod charm uses the version forked-6.0.25 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'forked'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[07:12:42] [ForkJoinPool-1-worker-2/WARN]: Mod oceansdelight uses the version fdrf-fabric-1.0.2-1.20 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'fdrf'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[07:12:42] [ForkJoinPool-1-worker-7/WARN]: The mod "luna_minecraft" contains invalid entries in its mod json:
+[20:24:00] [ForkJoinPool-1-worker-4/WARN]: Mod charm uses the version forked-6.0.25 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'forked'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[20:24:00] [ForkJoinPool-1-worker-1/WARN]: Mod oceansdelight uses the version fdrf-fabric-1.0.2-1.20 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'fdrf'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[20:24:00] [ForkJoinPool-1-worker-1/WARN]: The mod "luna_minecraft" contains invalid entries in its mod json:
 - Unsupported root entry "credits" at line 10 column 12
-[2026-09-17T07:12:42.442+0800][1.074s] Safepoint "G1CollectForAllocation", Time since last: 54454958 ns, Reaching safepoint: 25250 ns, Cleanup: 20750 ns, At safepoint: 3334 ns, Total: 49334 ns
-[2026-09-17T07:12:42.443+0800][1.075s] GC(10) Pause Young (Normal) (GCLocker Initiated GC) 105M->89M(170M) 1.276ms
-[2026-09-17T07:12:42.443+0800][1.075s] Safepoint "G1CollectForAllocation", Time since last: 59083 ns, Reaching safepoint: 38667 ns, Cleanup: 416 ns, At safepoint: 1293459 ns, Total: 1332542 ns
-[2026-09-17T07:12:42.457+0800][1.089s] Safepoint "G1TryInitiateConcMark", Time since last: 14140333 ns, Reaching safepoint: 1583 ns, Cleanup: 3584 ns, At safepoint: 1833 ns, Total: 7000 ns
-[2026-09-17T07:12:42.458+0800][1.091s] GC(11) Pause Young (Concurrent Start) (G1 Humongous Allocation) 103M->93M(170M) 1.051ms
-[2026-09-17T07:12:42.458+0800][1.091s] Safepoint "G1TryInitiateConcMark", Time since last: 26250 ns, Reaching safepoint: 667 ns, Cleanup: 416 ns, At safepoint: 1079334 ns, Total: 1080417 ns
-[2026-09-17T07:12:42.458+0800][1.091s] GC(12) Concurrent Mark Cycle
-[2026-09-17T07:12:42.475+0800][1.107s] GC(12) Pause Remark 107M->107M(188M) 0.907ms
-[2026-09-17T07:12:42.475+0800][1.107s] Safepoint "G1PauseRemark", Time since last: 15710666 ns, Reaching safepoint: 22292 ns, Cleanup: 4708 ns, At safepoint: 923750 ns, Total: 950750 ns
-[07:12:42] [ForkJoinPool-1-worker-2/WARN]: The mod "tcdcommons" contains invalid entries in its mod json:
+[2026-09-17T20:24:00.506+0800][1.095s] Safepoint "G1TryInitiateConcMark", Time since last: 60678958 ns, Reaching safepoint: 19167 ns, Cleanup: 10500 ns, At safepoint: 5083 ns, Total: 34750 ns
+[2026-09-17T20:24:00.507+0800][1.097s] GC(11) Pause Young (Concurrent Start) (G1 Humongous Allocation) 127M->102M(192M) 1.380ms
+[2026-09-17T20:24:00.507+0800][1.097s] Safepoint "G1TryInitiateConcMark", Time since last: 75792 ns, Reaching safepoint: 750 ns, Cleanup: 416 ns, At safepoint: 1397584 ns, Total: 1398750 ns
+[2026-09-17T20:24:00.507+0800][1.097s] GC(12) Concurrent Mark Cycle
+[2026-09-17T20:24:00.525+0800][1.115s] GC(12) Pause Remark 112M->112M(192M) 0.852ms
+[2026-09-17T20:24:00.525+0800][1.115s] Safepoint "G1PauseRemark", Time since last: 17325333 ns, Reaching safepoint: 17583 ns, Cleanup: 5875 ns, At safepoint: 885250 ns, Total: 908708 ns
+[20:24:00] [ForkJoinPool-1-worker-1/WARN]: The mod "tcdcommons" contains invalid entries in its mod json:
 - Unsupported root entry "" at line 27 column 4
 - Unsupported root entry "" at line 27 column 198
 - Unsupported root entry "" at line 29 column 4
 - Unsupported root entry "" at line 29 column 24
-[2026-09-17T07:12:42.488+0800][1.121s] GC(12) Pause Cleanup 113M->113M(188M) 0.036ms
-[2026-09-17T07:12:42.488+0800][1.121s] Safepoint "G1PauseCleanup", Time since last: 13386209 ns, Reaching safepoint: 20916 ns, Cleanup: 9042 ns, At safepoint: 49458 ns, Total: 79416 ns
-[2026-09-17T07:12:42.489+0800][1.121s] GC(12) Concurrent Mark Cycle 30.495ms
-[07:12:42] [ForkJoinPool-1-worker-3/WARN]: Mod com_github_rtyley_animated-gif-lib-for-java uses the version animated-gif-lib-1.7 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'animated'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[07:12:42] [ForkJoinPool-1-worker-4/WARN]: Mod com_github_jagrosh_discordipc uses the version a8d6631cc9 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'a8d6631cc9'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[2026-09-17T07:12:42.512+0800][1.144s] Safepoint "G1CollectForAllocation", Time since last: 23301459 ns, Reaching safepoint: 25208 ns, Cleanup: 12167 ns, At safepoint: 4666 ns, Total: 42041 ns
-[2026-09-17T07:12:42.513+0800][1.145s] GC(13) Pause Young (Prepare Mixed) (GCLocker Initiated GC) 127M->110M(188M) 1.215ms
-[2026-09-17T07:12:42.513+0800][1.145s] Safepoint "G1CollectForAllocation", Time since last: 35334 ns, Reaching safepoint: 2791 ns, Cleanup: 2084 ns, At safepoint: 1235666 ns, Total: 1240541 ns
-[2026-09-17T07:12:42.514+0800][1.147s] Safepoint "G1CollectForAllocation", Time since last: 1369417 ns, Reaching safepoint: 958 ns, Cleanup: 1167 ns, At safepoint: 875 ns, Total: 3000 ns
-[2026-09-17T07:12:42.515+0800][1.147s] GC(14) Pause Young (Mixed) (GCLocker Initiated GC) 112M->111M(188M) 0.633ms
-[2026-09-17T07:12:42.515+0800][1.147s] Safepoint "G1CollectForAllocation", Time since last: 49458 ns, Reaching safepoint: 542 ns, Cleanup: 333 ns, At safepoint: 649417 ns, Total: 650292 ns
-[2026-09-17T07:12:42.520+0800][1.152s] Safepoint "G1TryInitiateConcMark", Time since last: 4990583 ns, Reaching safepoint: 17042 ns, Cleanup: 2083 ns, At safepoint: 5334 ns, Total: 24459 ns
-[2026-09-17T07:12:42.521+0800][1.153s] GC(15) Pause Young (Concurrent Start) (GCLocker Initiated GC) 113M->112M(376M) 0.787ms
-[2026-09-17T07:12:42.521+0800][1.153s] GC(16) Concurrent Mark Cycle
-[2026-09-17T07:12:42.521+0800][1.153s] Safepoint "G1CollectForAllocation", Time since last: 48208 ns, Reaching safepoint: 625 ns, Cleanup: 292 ns, At safepoint: 800750 ns, Total: 801667 ns
-[2026-09-17T07:12:42.536+0800][1.169s] GC(16) Pause Remark 126M->126M(376M) 0.755ms
-[2026-09-17T07:12:42.536+0800][1.169s] Safepoint "G1PauseRemark", Time since last: 14542458 ns, Reaching safepoint: 1667 ns, Cleanup: 7583 ns, At safepoint: 773250 ns, Total: 782500 ns
-[2026-09-17T07:12:42.545+0800][1.177s] GC(16) Pause Cleanup 128M->128M(376M) 0.029ms
-[2026-09-17T07:12:42.545+0800][1.177s] Safepoint "G1PauseCleanup", Time since last: 8446333 ns, Reaching safepoint: 1292 ns, Cleanup: 2583 ns, At safepoint: 36500 ns, Total: 40375 ns
-[2026-09-17T07:12:42.545+0800][1.177s] GC(16) Concurrent Mark Cycle 24.074ms
-[07:12:42] [ForkJoinPool-1-worker-7/WARN]: The mod "dungeons_arise" contains invalid entries in its mod json:
+[2026-09-17T20:24:00.537+0800][1.127s] GC(12) Pause Cleanup 118M->118M(192M) 0.036ms
+[2026-09-17T20:24:00.537+0800][1.127s] Safepoint "G1PauseCleanup", Time since last: 11912000 ns, Reaching safepoint: 3750 ns, Cleanup: 11042 ns, At safepoint: 46458 ns, Total: 61250 ns
+[2026-09-17T20:24:00.537+0800][1.127s] GC(12) Concurrent Mark Cycle 30.352ms
+[20:24:00] [ForkJoinPool-1-worker-5/WARN]: Mod com_github_jagrosh_discordipc uses the version a8d6631cc9 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'a8d6631cc9'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[20:24:00] [ForkJoinPool-1-worker-1/WARN]: Mod com_github_rtyley_animated-gif-lib-for-java uses the version animated-gif-lib-1.7 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'animated'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[2026-09-17T20:24:00.566+0800][1.156s] Safepoint "G1CollectForAllocation", Time since last: 29072167 ns, Reaching safepoint: 2042 ns, Cleanup: 12041 ns, At safepoint: 4125 ns, Total: 18208 ns
+[2026-09-17T20:24:00.568+0800][1.158s] GC(13) Pause Young (Prepare Mixed) (GCLocker Initiated GC) 140M->122M(192M) 1.451ms
+[2026-09-17T20:24:00.568+0800][1.158s] Safepoint "G1CollectForAllocation", Time since last: 39042 ns, Reaching safepoint: 583 ns, Cleanup: 500 ns, At safepoint: 1465542 ns, Total: 1466625 ns
+[2026-09-17T20:24:00.574+0800][1.164s] Safepoint "G1CollectForAllocation", Time since last: 6032792 ns, Reaching safepoint: 22458 ns, Cleanup: 4417 ns, At safepoint: 5083 ns, Total: 31958 ns
+[2026-09-17T20:24:00.575+0800][1.165s] GC(14) Pause Young (Mixed) (GCLocker Initiated GC) 128M->125M(192M) 0.899ms
+[2026-09-17T20:24:00.575+0800][1.165s] Safepoint "G1CollectForAllocation", Time since last: 43625 ns, Reaching safepoint: 792 ns, Cleanup: 291 ns, At safepoint: 924834 ns, Total: 925917 ns
+[2026-09-17T20:24:00.582+0800][1.172s] Safepoint "G1TryInitiateConcMark", Time since last: 7152750 ns, Reaching safepoint: 3541 ns, Cleanup: 8875 ns, At safepoint: 3459 ns, Total: 15875 ns
+[2026-09-17T20:24:00.583+0800][1.173s] GC(15) Pause Young (Concurrent Start) (G1 Humongous Allocation) 128M->122M(384M) 0.893ms
+[2026-09-17T20:24:00.583+0800][1.173s] Safepoint "G1TryInitiateConcMark", Time since last: 36541 ns, Reaching safepoint: 21167 ns, Cleanup: 1208 ns, At safepoint: 911084 ns, Total: 933459 ns
+[2026-09-17T20:24:00.583+0800][1.173s] GC(16) Concurrent Undo Cycle
+[2026-09-17T20:24:00.583+0800][1.173s] GC(16) Concurrent Undo Cycle 0.450ms
+[20:24:00] [ForkJoinPool-1-worker-3/WARN]: The mod "dungeons_arise" contains invalid entries in its mod json:
 - Unsupported root entry "credits" at line 12 column 12
-[07:12:42] [main/INFO]: Dependencies overridden for certain_questing_additions, kleeslabs, netherportalfix, climaterivers, biomeswevegone
-[2026-09-17T07:12:42.668+0800][1.300s] Safepoint "ICBufferFull", Time since last: 122915875 ns, Reaching safepoint: 18250 ns, Cleanup: 40292 ns, At safepoint: 2042 ns, Total: 60584 ns
-[2026-09-17T07:12:42.678+0800][1.310s] Safepoint "ICBufferFull", Time since last: 9939166 ns, Reaching safepoint: 19000 ns, Cleanup: 46917 ns, At safepoint: 2375 ns, Total: 68292 ns
-[2026-09-17T07:12:42.678+0800][1.310s] Safepoint "ICBufferFull", Time since last: 28083 ns, Reaching safepoint: 18667 ns, Cleanup: 2208 ns, At safepoint: 4334 ns, Total: 25209 ns
-[07:12:42] [main/WARN]: Warnings were found!
+[20:24:00] [main/INFO]: Dependencies overridden for certain_questing_additions, kleeslabs, netherportalfix, climaterivers, biomeswevegone
+[2026-09-17T20:24:00.708+0800][1.298s] Safepoint "ICBufferFull", Time since last: 124833500 ns, Reaching safepoint: 16041 ns, Cleanup: 45209 ns, At safepoint: 1916 ns, Total: 63166 ns
+[2026-09-17T20:24:00.720+0800][1.310s] Safepoint "ICBufferFull", Time since last: 12573250 ns, Reaching safepoint: 1042 ns, Cleanup: 26250 ns, At safepoint: 417 ns, Total: 27709 ns
+[20:24:00] [main/WARN]: Warnings were found!
  - Mod 'Accessorify' (accessorify) 2.4.0-beta.5 recommends any version of lambdynlights, which is missing!
 	 - You should install any version of lambdynlights for the optimal experience.
  - Mod 'Debugify' (debugify) 1.20.1+2.0 recommends any 3.x version of yet-another-config-lib, which is missing!
 	 - You should install any 3.x version of yet-another-config-lib for the optimal experience.
-[07:12:42] [main/INFO]: Loading 537 mods:
+[20:24:00] [main/INFO]: Loading 536 mods:
 	- abridged 2.0.0
 	- accessories 1.0.0-beta.48+1.20.1
 	   |-- io_wispforest_endec 0.1.8
@@ -705,8 +675,6 @@ Args init finished. Now starting game
 	- miningspeedtooltips 1.0.0
 	- misctweaks 1.2.9
 	   \-- mixson 1.4.0.4
-	- missingmodschecker 1.0.1
-	   \-- conditional-mixin 0.6.4
 	- mixintrace 1.1.1+1.17
 	- mmv 2.0.0
 	- mns 2.0.3
@@ -904,94 +872,295 @@ Args init finished. Now starting game
 	- yungsapi 1.20-Fabric-4.0.6
 	   \-- org_javassist_javassist 3.29.2-GA
 	- yungsmenutweaks 1.20.1-Fabric-1.0.2
-[2026-09-17T07:12:43.176+0800][1.809s] Safepoint "ICBufferFull", Time since last: 498489708 ns, Reaching safepoint: 23417 ns, Cleanup: 43958 ns, At safepoint: 3167 ns, Total: 70542 ns
-[2026-09-17T07:12:43.180+0800][1.813s] GC(17) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 260M->184M(376M) 3.383ms
-[2026-09-17T07:12:43.180+0800][1.813s] Safepoint "G1CollectForAllocation", Time since last: 872750 ns, Reaching safepoint: 541 ns, Cleanup: 2500 ns, At safepoint: 3402292 ns, Total: 3405333 ns
-[07:12:43] [main/INFO]: Applying default files...
-[2026-09-17T07:12:43.190+0800][1.823s] GC(18) Pause Young (Mixed) (G1 Evacuation Pause) 186M->182M(376M) 1.367ms
-[2026-09-17T07:12:43.190+0800][1.823s] Safepoint "G1CollectForAllocation", Time since last: 8241583 ns, Reaching safepoint: 28709 ns, Cleanup: 7750 ns, At safepoint: 1385541 ns, Total: 1422000 ns
-[2026-09-17T07:12:43.236+0800][1.868s] GC(19) Pause Young (Concurrent Start) (G1 Humongous Allocation) 196M->182M(376M) 0.792ms
-[2026-09-17T07:12:43.236+0800][1.868s] Safepoint "G1TryInitiateConcMark", Time since last: 45039584 ns, Reaching safepoint: 1166 ns, Cleanup: 13625 ns, At safepoint: 817250 ns, Total: 832041 ns
-[2026-09-17T07:12:43.236+0800][1.869s] GC(20) Concurrent Mark Cycle
-[2026-09-17T07:12:43.252+0800][1.884s] GC(20) Pause Remark 191M->159M(376M) 0.722ms
-[2026-09-17T07:12:43.252+0800][1.884s] Safepoint "G1PauseRemark", Time since last: 15158250 ns, Reaching safepoint: 38417 ns, Cleanup: 12542 ns, At safepoint: 736333 ns, Total: 787292 ns
-[2026-09-17T07:12:43.262+0800][1.894s] GC(20) Pause Cleanup 160M->160M(376M) 0.051ms
-[2026-09-17T07:12:43.262+0800][1.894s] Safepoint "G1PauseCleanup", Time since last: 9831042 ns, Reaching safepoint: 958 ns, Cleanup: 10208 ns, At safepoint: 71375 ns, Total: 82541 ns
-[2026-09-17T07:12:43.262+0800][1.895s] GC(20) Concurrent Mark Cycle 26.140ms
-[2026-09-17T07:12:43.343+0800][1.975s] Safepoint "ICBufferFull", Time since last: 80733292 ns, Reaching safepoint: 19792 ns, Cleanup: 54666 ns, At safepoint: 3042 ns, Total: 77500 ns
-[2026-09-17T07:12:43.411+0800][2.043s] Safepoint "ICBufferFull", Time since last: 67956167 ns, Reaching safepoint: 1541 ns, Cleanup: 38959 ns, At safepoint: 333 ns, Total: 40833 ns
-[2026-09-17T07:12:44.414+0800][3.046s] Safepoint "Cleanup", Time since last: 1003207833 ns, Reaching safepoint: 4625 ns, Cleanup: 21834 ns, At safepoint: 833 ns, Total: 27292 ns
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=528MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=526MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=521MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
-[2026-09-17T07:12:56.920+0800][15.552s] Safepoint "ThreadDump", Time since last: 12505984208 ns, Reaching safepoint: 3459 ns, Cleanup: 2250 ns, At safepoint: 22375 ns, Total: 28084 ns
-[LaunchWatchdog] Task86 entrypoint-phase sample #1 state=TIMED_WAITING stack (19 frames):
-[LaunchWatchdog]   at java.base@17.0.20-internal/java.lang.Object.wait(Native Method)
-[LaunchWatchdog]   at knot//toni.missingmodschecker.MissingModsWindow.open(MissingModsWindow.java:47)
-[LaunchWatchdog]   at knot//toni.missingmodschecker.MissingModsChecker.launch(MissingModsChecker.java:62)
-[LaunchWatchdog]   at knot//toni.missingmodschecker.Bootstrap.<clinit>(Bootstrap.java:17)
-[LaunchWatchdog]   at java.base@17.0.20-internal/java.lang.Class.forName0(Native Method)
-[LaunchWatchdog]   at java.base@17.0.20-internal/java.lang.Class.forName(Unknown Source)
-[LaunchWatchdog]   at net.fabricmc.loader.impl.FabricLoaderImpl.setupLanguageAdapters(FabricLoaderImpl.java:497)
-[LaunchWatchdog]   at net.fabricmc.loader.impl.FabricLoaderImpl.finishModLoading(FabricLoaderImpl.java:377)
-[LaunchWatchdog]   at net.fabricmc.loader.impl.FabricLoaderImpl.freeze(FabricLoaderImpl.java:117)
-[LaunchWatchdog]   at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:143)
-[LaunchWatchdog]   at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66)
-[LaunchWatchdog]   at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-[LaunchWatchdog]   at java.base@17.0.20-internal/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-[LaunchWatchdog]   at java.base@17.0.20-internal/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(Unknown Source)
-[LaunchWatchdog]   at java.base@17.0.20-internal/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(Unknown Source)
-[LaunchWatchdog]   at java.base@17.0.20-internal/java.lang.reflect.Method.invoke(Unknown Source)
-[LaunchWatchdog]   at app//net.kdt.pojavlaunch.Tools.launchMinecraft(Tools.java:110)
-[LaunchWatchdog]   at app//net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:293)
-[LaunchWatchdog]   at app//net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=521MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
-[HotbarDiag] REJECT isGrabbing=0 | x=1013.0 y=1483.0 | phys=2360x1640 guiScale=1 resScale=1.00 sdlWin=0x0
-[InputDiag] sendCursorPos #1: event=0 x=675.3 y=988.7 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #2: event=1 x=675.3 y=988.7 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #3: event=0 x=685.3 y=1050.0 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #4: event=1 x=676.0 y=1032.7 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #5: event=0 x=732.7 y=970.7 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #6: event=1 x=732.7 y=970.7 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #7: event=0 x=765.3 y=1041.3 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #8: event=1 x=765.3 y=1041.3 GLFW_invoke_CursorPos=0x0 isInputReady=0 g_sdlWindow=0x0 isGrabbing=0
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=520MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
-[SurfaceViewController] User cancelled launch
-[SurfaceViewController] Launch overlay dismissed due to launch error
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=521MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
-[2026-09-17T07:13:11.920+0800][30.553s] Safepoint "ThreadDump", Time since last: 15000544000 ns, Reaching safepoint: 4083 ns, Cleanup: 40500 ns, At safepoint: 25958 ns, Total: 70541 ns
-[LaunchWatchdog] Task86 entrypoint-phase sample #2 STILL blocked at java.base@17.0.20-internal/java.lang.Object.wait(Native Method)
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=522MB layer=0x1594f8a50 drawable=0x0 scale=2.00 bounds=1180x820 inWindow=1
+[2026-09-17T20:24:00.956+0800][1.545s] Safepoint "ICBufferFull", Time since last: 235136208 ns, Reaching safepoint: 1333 ns, Cleanup: 36125 ns, At safepoint: 625 ns, Total: 38083 ns
+[20:24:01] [main/INFO]: Applying default files...
+[2026-09-17T20:24:01.226+0800][1.816s] Safepoint "ICBufferFull", Time since last: 270614500 ns, Reaching safepoint: 8542 ns, Cleanup: 55917 ns, At safepoint: 2750 ns, Total: 67209 ns
+[2026-09-17T20:24:01.344+0800][1.933s] Safepoint "ICBufferFull", Time since last: 117277958 ns, Reaching safepoint: 1833 ns, Cleanup: 43584 ns, At safepoint: 1375 ns, Total: 46792 ns
+[2026-09-17T20:24:01.358+0800][1.948s] GC(17) Pause Young (Normal) (G1 Evacuation Pause) 280M->207M(384M) 7.107ms
+[2026-09-17T20:24:01.358+0800][1.948s] Safepoint "G1CollectForAllocation", Time since last: 7278750 ns, Reaching safepoint: 375 ns, Cleanup: 2375 ns, At safepoint: 7126750 ns, Total: 7129500 ns
+[20:24:01] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Data/Application/268C2EAA-8575-494C-AA16-0BF535209BE8/Documents/Library/Application%20Support/minecraft/libraries/net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[20:24:01] [main/INFO]: Compatibility level set to JAVA_17
+[2026-09-17T20:24:01.537+0800][2.127s] Safepoint "ICBufferFull", Time since last: 179272416 ns, Reaching safepoint: 2667 ns, Cleanup: 87042 ns, At safepoint: 1875 ns, Total: 91584 ns
+[2026-09-17T20:24:01.611+0800][2.201s] Safepoint "ICBufferFull", Time since last: 73250000 ns, Reaching safepoint: 1708 ns, Cleanup: 42375 ns, At safepoint: 1875 ns, Total: 45958 ns
+[2026-09-17T20:24:01.636+0800][2.226s] GC(18) Pause Young (Concurrent Start) (G1 Evacuation Pause) 271M->225M(384M) 4.099ms
+[2026-09-17T20:24:01.636+0800][2.226s] Safepoint "G1CollectForAllocation", Time since last: 20903750 ns, Reaching safepoint: 3583 ns, Cleanup: 17542 ns, At safepoint: 4127250 ns, Total: 4148375 ns
+[2026-09-17T20:24:01.636+0800][2.226s] GC(19) Concurrent Mark Cycle
+[2026-09-17T20:24:01.656+0800][2.246s] GC(19) Pause Remark 232M->232M(390M) 0.855ms
+[2026-09-17T20:24:01.656+0800][2.246s] Safepoint "G1PauseRemark", Time since last: 19533000 ns, Reaching safepoint: 21625 ns, Cleanup: 15375 ns, At safepoint: 879417 ns, Total: 916417 ns
+[2026-09-17T20:24:01.670+0800][2.260s] GC(19) Pause Cleanup 236M->236M(390M) 0.051ms
+[2026-09-17T20:24:01.670+0800][2.260s] Safepoint "G1PauseCleanup", Time since last: 13916291 ns, Reaching safepoint: 20875 ns, Cleanup: 16500 ns, At safepoint: 63084 ns, Total: 100459 ns
+[2026-09-17T20:24:01.671+0800][2.260s] GC(19) Concurrent Mark Cycle 34.863ms
+[20:24:01] [main/INFO]: Config version: 6
+[20:24:01] [main/INFO]: BadOptimizations config dump:
+[20:24:01] [main/INFO]: enable_toast_optimizations: true
+[20:24:01] [main/INFO]: ignore_mod_incompatibilities: false
+[20:24:01] [main/INFO]: lightmap_time_change_needed_for_update: 80
+[20:24:01] [main/INFO]: enable_lightmap_caching: true
+[20:24:01] [main/INFO]: enable_particle_manager_optimization: true
+[20:24:01] [main/INFO]: enable_entity_renderer_caching: true
+[20:24:01] [main/INFO]: log_config: true
+[20:24:01] [main/INFO]: enable_remove_redundant_fov_calculations: true
+[20:24:01] [main/INFO]: config_version: 6
+[20:24:01] [main/INFO]: enable_sky_angle_caching_in_worldrenderer: true
+[20:24:01] [main/INFO]: enable_block_entity_renderer_caching: true
+[20:24:01] [main/INFO]: skycolor_time_change_needed_for_update: 3
+[20:24:01] [main/INFO]: enable_entity_flag_caching: true
+[20:24:01] [main/INFO]: ignore_mod_cache_hooks: false
+[20:24:01] [main/INFO]: enable_debug_renderer_disable_if_not_needed: true
+[20:24:01] [main/INFO]: enable_sky_color_caching: true
+[20:24:01] [main/INFO]: enable_remove_tutorial_if_not_demo: true
+[20:24:01] [main/INFO]: show_f3_text: true
+[20:24:01] [main/INFO]: Disabling enable_entity_flag_caching because mod "biomeswevegone" is incompatible with it (built-in)
+[20:24:01] [main/WARN]: Reference map 'certain_questing_additions-forge-1.20.1-forge-refmap.json' for certain_questing_additions.mixins.json could not be read. If this is a development environment you can ignore this message
+[2026-09-17T20:24:01.756+0800][2.346s] Safepoint "ICBufferFull", Time since last: 85762791 ns, Reaching safepoint: 1709 ns, Cleanup: 59916 ns, At safepoint: 250 ns, Total: 61875 ns
+[20:24:01] [main/WARN]: Reference map 'climaterivers.fabric.refmap.json' for climaterivers.fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'coroutil.refmap.json' for coroutil_fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/INFO]: Preloading Debugify
+[2026-09-17T20:24:01.786+0800][2.375s] GC(20) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 287M->240M(390M) 2.684ms
+[2026-09-17T20:24:01.786+0800][2.375s] Safepoint "G1CollectForAllocation", Time since last: 26855084 ns, Reaching safepoint: 3375 ns, Cleanup: 43958 ns, At safepoint: 2705750 ns, Total: 2753083 ns
+[20:24:01] [main/WARN]: Reference map 'fastitemframes.fabric.refmap.json' for fastitemframes.fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'formationsnether.mixins.refmap.json' for formationsnether.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'formationsoverworld.mixins.refmap.json' for formationsoverworld.mixins.json could not be read. If this is a development environment you can ignore this message
+[2026-09-17T20:24:01.815+0800][2.405s] GC(21) Pause Young (Mixed) (G1 Evacuation Pause) 250M->240M(390M) 2.522ms
+[2026-09-17T20:24:01.815+0800][2.405s] Safepoint "G1CollectForAllocation", Time since last: 27120375 ns, Reaching safepoint: 19500 ns, Cleanup: 36542 ns, At safepoint: 2543666 ns, Total: 2599708 ns
+[20:24:01] [main/INFO]: Loaded configuration file for Lithium: 131 options available, 4 override(s) found
+[20:24:01] [main/INFO]: Started MM (shedaniel's fork) at me/shedaniel/gen/mixin/
+[20:24:01] [main/WARN]: Reference map 'Manningham Mills-refmap.json' for mixins.mm_shedaniel.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/INFO]: Loaded configuration file for ModernFix 5.24.4+mc1.20.1: 70 options available, 0 override(s) found
+[20:24:01] [main/INFO]: Applying Nashorn fix
+[20:24:01] [main/WARN]: Reference map 'nitrogen_internals-refmap.json' for nitrogen_internals.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'oceansdelight-refmap.json' for oceansdelight.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/INFO]: Packet Fixer fabric 1.19.3-1.20.1 has been applied successfully.
+[20:24:01] [main/WARN]: Reference map 'particle_effects.refmap.json' for particle_effects.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'puzzlesaccessapi.common.refmap.json' for puzzlesaccessapi.common.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'puzzlesaccessapi.fabric.refmap.json' for puzzlesaccessapi.fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'repurposed_structures.refmap.json' for repurposed_structures-fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'repurposed_structures.refmap.json' for repurposed_structures-common.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: [Satin] Iris is present, custom block renders will not work
+[20:24:01] [main/WARN]: Reference map 'SimpleDiscordRichPresence-fabric-refmap.json' for sdrp.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'skeletonaifix.common.refmap.json' for skeletonaifix.common.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/WARN]: Reference map 'skeletonaifix.fabric.refmap.json' for skeletonaifix.fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[20:24:01] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 3 override(s) found
+[20:24:01] [main/INFO]: Loaded configuration file for Sodium Extra: 35 options available, 0 override(s) found
+[20:24:01] [main/WARN]: Reference map 'structure_layout_optimizer.refmap.json' for structure_layout_optimizer.mixins.json could not be read. If this is a development environment you can ignore this message
+[2026-09-17T20:24:01.987+0800][2.577s] Safepoint "ICBufferFull", Time since last: 171715625 ns, Reaching safepoint: 1500 ns, Cleanup: 58167 ns, At safepoint: 250 ns, Total: 59917 ns
+[2026-09-17T20:24:02.007+0800][2.597s] GC(22) Pause Young (Concurrent Start) (G1 Evacuation Pause) 296M->248M(390M) 2.214ms
+[2026-09-17T20:24:02.007+0800][2.597s] GC(23) Concurrent Mark Cycle
+[2026-09-17T20:24:02.007+0800][2.597s] Safepoint "G1CollectForAllocation", Time since last: 17870583 ns, Reaching safepoint: 1209 ns, Cleanup: 51500 ns, At safepoint: 2248791 ns, Total: 2301500 ns
+[2026-09-17T20:24:02.035+0800][2.625s] GC(23) Pause Remark 264M->232M(390M) 1.102ms
+[2026-09-17T20:24:02.035+0800][2.625s] Safepoint "G1PauseRemark", Time since last: 26572750 ns, Reaching safepoint: 20625 ns, Cleanup: 162125 ns, At safepoint: 1121750 ns, Total: 1304500 ns
+[2026-09-17T20:24:02.051+0800][2.641s] GC(23) Pause Cleanup 239M->239M(390M) 0.075ms
+[2026-09-17T20:24:02.051+0800][2.641s] Safepoint "G1PauseCleanup", Time since last: 15718334 ns, Reaching safepoint: 21708 ns, Cleanup: 26417 ns, At safepoint: 95166 ns, Total: 143291 ns
+[2026-09-17T20:24:02.051+0800][2.641s] GC(23) Concurrent Mark Cycle 44.048ms
+[2026-09-17T20:24:02.102+0800][2.692s] GC(24) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 272M->221M(390M) 2.434ms
+[2026-09-17T20:24:02.102+0800][2.692s] Safepoint "G1CollectForAllocation", Time since last: 48431792 ns, Reaching safepoint: 3042 ns, Cleanup: 57041 ns, At safepoint: 2453834 ns, Total: 2513917 ns
+[2026-09-17T20:24:02.121+0800][2.711s] GC(25) Pause Young (Mixed) (G1 Evacuation Pause) 233M->184M(618M) 1.979ms
+[2026-09-17T20:24:02.121+0800][2.711s] Safepoint "G1CollectForAllocation", Time since last: 16857291 ns, Reaching safepoint: 1750 ns, Cleanup: 6209 ns, At safepoint: 1996708 ns, Total: 2004667 ns
+[2026-09-17T20:24:02.166+0800][2.756s] GC(26) Pause Young (Mixed) (G1 Evacuation Pause) 212M->173M(618M) 2.025ms
+[2026-09-17T20:24:02.166+0800][2.756s] Safepoint "G1CollectForAllocation", Time since last: 43261333 ns, Reaching safepoint: 3375 ns, Cleanup: 41792 ns, At safepoint: 2043708 ns, Total: 2088875 ns
+[20:24:02] [main/WARN]: Error loading class: io/vram/frex/base/renderer/context/render/EntityBlockRenderContext (java.lang.ClassNotFoundException: io/vram/frex/base/renderer/context/render/EntityBlockRenderContext)
+[20:24:02] [main/WARN]: @Mixin target io.vram.frex.base.renderer.context.render.EntityBlockRenderContext was not found porting_lib_base.mixins.json:client.frex.EntityBlockRenderContextMixin from mod porting_lib_base
+[20:24:02] [main/WARN]: Error loading class: dev/emi/emi/screen/RecipeScreen (java.lang.ClassNotFoundException: dev/emi/emi/screen/RecipeScreen)
+[20:24:02] [main/WARN]: @Mixin target dev.emi.emi.screen.RecipeScreen was not found ali.emi.mixins.json:MixinRecipeScreen from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/core/AbstractLootModification (java.lang.ClassNotFoundException: com/almostreliable/lootjs/core/AbstractLootModification)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.core.AbstractLootModification was not found ali.lootjs.mixins.json:MixinAbstractLootModification from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/AddLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/AddLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.AddLootAction was not found ali.lootjs.mixins.json:MixinAddLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/AndCondition (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/AndCondition)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.AndCondition was not found ali.lootjs.mixins.json:MixinAndCondition from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/AnyDimension (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/AnyDimension)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.AnyDimension was not found ali.lootjs.mixins.json:MixinAnyDimension from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/AnyStructure (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/AnyStructure)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.AnyStructure was not found ali.lootjs.mixins.json:MixinAnyStructure from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/BiomeCheck (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/BiomeCheck)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.BiomeCheck was not found ali.lootjs.mixins.json:MixinBiomeCheck from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/CompositeLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/CompositeLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.CompositeLootAction was not found ali.lootjs.mixins.json:MixinCompositeLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/ContainsLootCondition (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/ContainsLootCondition)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.ContainsLootCondition was not found ali.lootjs.mixins.json:MixinContainsLootCondition from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/CustomParamPredicate (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/CustomParamPredicate)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.CustomParamPredicate was not found ali.lootjs.mixins.json:MixinCustomParamPredicate from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/DropExperienceAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/DropExperienceAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.DropExperienceAction was not found ali.lootjs.mixins.json:MixinDropExperienceAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/ExplodeAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/ExplodeAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.ExplodeAction was not found ali.lootjs.mixins.json:MixinExplodeAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/GroupedLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/GroupedLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.GroupedLootAction was not found ali.lootjs.mixins.json:MixinGroupedLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/IsLightLevel (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/IsLightLevel)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.IsLightLevel was not found ali.lootjs.mixins.json:MixinIsLightLevel from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/LightningStrikeAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/LightningStrikeAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.LightningStrikeAction was not found ali.lootjs.mixins.json:MixinLightningStrikeAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/core/LootEntry (java.lang.ClassNotFoundException: com/almostreliable/lootjs/core/LootEntry)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.core.LootEntry was not found ali.lootjs.mixins.json:MixinLootEntry from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/LootItemConditionWrapper (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/LootItemConditionWrapper)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.LootItemConditionWrapper was not found ali.lootjs.mixins.json:MixinLootItemConditionWrapper from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/LootItemFunctionWrapperAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/LootItemFunctionWrapperAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.LootItemFunctionWrapperAction was not found ali.lootjs.mixins.json:MixinLootItemFunctionWrapperAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/core/LootModificationByBlock (java.lang.ClassNotFoundException: com/almostreliable/lootjs/core/LootModificationByBlock)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.core.LootModificationByBlock was not found ali.lootjs.mixins.json:MixinLootModificationByBlock from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/core/LootModificationByEntity (java.lang.ClassNotFoundException: com/almostreliable/lootjs/core/LootModificationByEntity)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.core.LootModificationByEntity was not found ali.lootjs.mixins.json:MixinLootModificationByEntity from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/core/LootModificationByTable (java.lang.ClassNotFoundException: com/almostreliable/lootjs/core/LootModificationByTable)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.core.LootModificationByTable was not found ali.lootjs.mixins.json:MixinLootModificationByTable from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/core/LootModificationByType (java.lang.ClassNotFoundException: com/almostreliable/lootjs/core/LootModificationByType)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.core.LootModificationByType was not found ali.lootjs.mixins.json:MixinLootModificationByType from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/LootModificationsAPI (java.lang.ClassNotFoundException: com/almostreliable/lootjs/LootModificationsAPI)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.LootModificationsAPI was not found ali.lootjs.mixins.json:MixinLootModificationsAPI from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/MainHandTableBonus (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/MainHandTableBonus)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.MainHandTableBonus was not found ali.lootjs.mixins.json:MixinMainHandTableBonus from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/MatchEquipmentSlot (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/MatchEquipmentSlot)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.MatchEquipmentSlot was not found ali.lootjs.mixins.json:MixinMatchEquipmentSlot from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/MatchFluid (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/MatchFluid)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.MatchFluid was not found ali.lootjs.mixins.json:MixinMatchFluid from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/MatchKillerDistance (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/MatchKillerDistance)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.MatchKillerDistance was not found ali.lootjs.mixins.json:MixinMatchKillerDistance from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/MatchPlayer (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/MatchPlayer)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.MatchPlayer was not found ali.lootjs.mixins.json:MixinMatchPlayer from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/ModifyLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/ModifyLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.ModifyLootAction was not found ali.lootjs.mixins.json:MixinModifyLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/NotCondition (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/NotCondition)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.NotCondition was not found ali.lootjs.mixins.json:MixinNotCondition from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/OrCondition (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/OrCondition)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.OrCondition was not found ali.lootjs.mixins.json:MixinOrCondition from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/PlayerParamPredicate (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/PlayerParamPredicate)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.PlayerParamPredicate was not found ali.lootjs.mixins.json:MixinPlayerParamPredicate from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/RemoveLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/RemoveLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.RemoveLootAction was not found ali.lootjs.mixins.json:MixinRemoveLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/ReplaceLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/ReplaceLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.ReplaceLootAction was not found ali.lootjs.mixins.json:MixinReplaceLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/action/WeightedAddLootAction (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/action/WeightedAddLootAction)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.action.WeightedAddLootAction was not found ali.lootjs.mixins.json:MixinWeightedAddLootAction from mod ali
+[20:24:02] [main/WARN]: Error loading class: com/almostreliable/lootjs/loot/condition/WrappedDamageSourceCondition (java.lang.ClassNotFoundException: com/almostreliable/lootjs/loot/condition/WrappedDamageSourceCondition)
+[20:24:02] [main/WARN]: @Mixin target com.almostreliable.lootjs.loot.condition.WrappedDamageSourceCondition was not found ali.lootjs.mixins.json:MixinWrappedDamageSourceCondition from mod ali
+[2026-09-17T20:24:02.328+0800][2.918s] Safepoint "ICBufferFull", Time since last: 161474959 ns, Reaching safepoint: 1750 ns, Cleanup: 67833 ns, At safepoint: 667 ns, Total: 70250 ns
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.ChapterPanel was not found certain_questing_additions.mixins.json:ChapterPanelAccessor from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel$ChapterButton (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel$ChapterButton)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.ChapterPanel$ChapterButton was not found certain_questing_additions.mixins.json:ChapterPanelChapterButtonMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel$ChapterGroupButton (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel$ChapterGroupButton)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.ChapterPanel$ChapterGroupButton was not found certain_questing_additions.mixins.json:ChapterPanelGroupButtonMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.ChapterPanel was not found certain_questing_additions.mixins.json:ChapterPanelMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel$ModpackButton (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/ChapterPanel$ModpackButton)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.ChapterPanel$ModpackButton was not found certain_questing_additions.mixins.json:ChapterPanelModpackButtonMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/QuestButton (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/QuestButton)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.QuestButton was not found certain_questing_additions.mixins.json:QuestButtonAccessor from mod certain_questing_additions
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.QuestButton was not found certain_questing_additions.mixins.json:QuestButtonMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/QuestPanel (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/QuestPanel)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.QuestPanel was not found certain_questing_additions.mixins.json:QuestPanelAccessor from mod certain_questing_additions
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.QuestPanel was not found certain_questing_additions.mixins.json:QuestPanelMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/QuestScreen (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/QuestScreen)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen was not found certain_questing_additions.mixins.json:QuestScreenAccessor from mod certain_questing_additions
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.QuestScreen was not found certain_questing_additions.mixins.json:QuestScreenMixin from mod certain_questing_additions
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/gui/quests/ViewQuestPanel (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/gui/quests/ViewQuestPanel)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.gui.quests.ViewQuestPanel was not found certain_questing_additions.mixins.json:ViewQuestPanelMixin from mod certain_questing_additions
+[2026-09-17T20:24:02.452+0800][3.042s] Safepoint "ICBufferFull", Time since last: 124560250 ns, Reaching safepoint: 21000 ns, Cleanup: 92041 ns, At safepoint: 1917 ns, Total: 114958 ns
+[2026-09-17T20:24:02.458+0800][3.048s] GC(27) Pause Young (Normal) (G1 Evacuation Pause) 405M->193M(618M) 4.942ms
+[2026-09-17T20:24:02.458+0800][3.048s] Safepoint "G1CollectForAllocation", Time since last: 562958 ns, Reaching safepoint: 19542 ns, Cleanup: 4458 ns, At safepoint: 4961542 ns, Total: 4985542 ns
+[20:24:02] [main/WARN]: Blacklisted mixin svenhjol.charm.mixin.pigs_find_mushrooms.PigMixin
+[20:24:02] [main/WARN]: Blacklisted mixin svenhjol.charm.mixin.pigs_find_mushrooms.PigModelMixin
+[20:24:02] [main/WARN]: Error loading class: me/jellysquid/mods/sodium/client/model/quad/blender/LinearColorBlender (java.lang.ClassNotFoundException: me/jellysquid/mods/sodium/client/model/quad/blender/LinearColorBlender)
+[20:24:02] [main/WARN]: Force disabled MC-122477 because it only applies to OS: LINUX
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbchunks/data/ClaimedChunkManagerImpl (java.lang.ClassNotFoundException: dev/ftb/mods/ftbchunks/data/ClaimedChunkManagerImpl)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbchunks.data.ClaimedChunkManagerImpl was not found mixins.does_it_tick.json:ClaimedChunkManagerAccessor from mod does_it_tick
+[2026-09-17T20:24:02.719+0800][3.309s] GC(28) Pause Young (Normal) (G1 Evacuation Pause) 433M->221M(618M) 7.767ms
+[2026-09-17T20:24:02.719+0800][3.309s] Safepoint "G1CollectForAllocation", Time since last: 253049000 ns, Reaching safepoint: 1625 ns, Cleanup: 149083 ns, At safepoint: 7792709 ns, Total: 7943417 ns
+[20:24:02] [main/WARN]: Faster Random was unable to load!
+WARNING: Your Java Virtual Machine (JVM) does not implement RandomGeneratorFactory and/or L64X128MixRandom, which Faster Random requires to run.
+Please use a supported JVM such as Azul Zulu (https://www.azul.com/downloads/#zulu) or GraalVM (https://www.graalvm.org/downloads/).
+Your JVM, OpenJDK 64-Bit Server VM version 17.0.20-internal+0-adhoc.ci.openjdk-17, is not suitable for Faster Random. Faster Random will disable itself.
+
+[20:24:02] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/client/ClientQuestFile (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/client/ClientQuestFile)
+[20:24:02] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.client.ClientQuestFile was not found mixins.foolproof.json:ftb.QuestsOpenMixin from mod foolproof
+[20:24:02] [main/WARN]: Error loading class: com/simibubi/create/content/equipment/armor/BacktankBlockEntity (java.lang.ClassNotFoundException: com/simibubi/create/content/equipment/armor/BacktankBlockEntity)
+[20:24:02] [main/WARN]: @Mixin target com.simibubi.create.content.equipment.armor.BacktankBlockEntity was not found jadeaddons.mixins.json:create.BacktankBlockEntityAccess from mod jadeaddons
+[20:24:02] [main/WARN]: Error loading class: com/simibubi/create/content/equipment/blueprint/BlueprintOverlayRenderer (java.lang.ClassNotFoundException: com/simibubi/create/content/equipment/blueprint/BlueprintOverlayRenderer)
+[20:24:02] [main/WARN]: @Mixin target com.simibubi.create.content.equipment.blueprint.BlueprintOverlayRenderer was not found jadeaddons.mixins.json:create.BlueprintOverlayRendererAccess from mod jadeaddons
+[20:24:02] [main/WARN]: Error loading class: com/simibubi/create/content/logistics/filter/FilterItem (java.lang.ClassNotFoundException: com/simibubi/create/content/logistics/filter/FilterItem)
+[20:24:02] [main/WARN]: @Mixin target com.simibubi.create.content.logistics.filter.FilterItem was not found jadeaddons.mixins.json:create.FilterItemAccess from mod jadeaddons
+[20:24:02] [main/WARN]: Error loading class: com/simibubi/create/content/equipment/goggles/GoggleOverlayRenderer (java.lang.ClassNotFoundException: com/simibubi/create/content/equipment/goggles/GoggleOverlayRenderer)
+[20:24:02] [main/WARN]: @Mixin target com.simibubi.create.content.equipment.goggles.GoggleOverlayRenderer was not found jadeaddons.mixins.json:create.GoggleOverlayRendererMixin from mod jadeaddons
+[20:24:02] [main/WARN]: Error loading class: net/createmod/ponder/foundation/PonderTooltipHandler (java.lang.ClassNotFoundException: net/createmod/ponder/foundation/PonderTooltipHandler)
+[20:24:02] [main/WARN]: @Mixin target net.createmod.ponder.foundation.PonderTooltipHandler was not found jadeaddons.mixins.json:create.PonderTooltipHandlerMixin from mod jadeaddons
+[20:24:02] [main/WARN]: Force-disabling mixin 'alloc.blockstate.StateMixin' as rule 'mixin.alloc.blockstate' (added by mods [ferritecore]) disables it and children
+[20:24:02] [main/WARN]: Force-disabling mixin 'block.moving_block_shapes.PistonBlockEntityMixin' as rule 'mixin.block.moving_block_shapes' (added by mods [supplementaries]) disables it and children
+[20:24:02] [main/WARN]: Force-disabling mixin 'block.moving_block_shapes.VoxelShapeMixin' as rule 'mixin.block.moving_block_shapes' (added by mods [supplementaries]) disables it and children
+[20:24:02] [main/WARN]: Force-disabling mixin 'chunk.palette.PalettedContainerMixin' as rule 'mixin.chunk.palette' (added by mods [xaeroplus]) disables it and children
+[20:24:02] [main/WARN]: Force-disabling mixin 'world.player_chunk_tick.ThreadedAnvilChunkStorageMixin' as rule 'mixin.world.player_chunk_tick' (added by mods [krypton]) disables it and children
+[20:24:02] [main/WARN]: Error loading class: net/minecraft/class_3494$class_3495 (java.lang.ClassNotFoundException: net/minecraft/class_3494$class_3495)
+[20:24:02] [main/WARN]: Error loading class: fr/catcore/server/translations/api/resource/language/SystemDelegatedLanguage (java.lang.ClassNotFoundException: fr/catcore/server/translations/api/resource/language/SystemDelegatedLanguage)
+[2026-09-17T20:24:02.998+0800][3.588s] GC(29) Pause Young (Normal) (G1 Evacuation Pause) 449M->262M(618M) 10.592ms
+[2026-09-17T20:24:02.998+0800][3.588s] Safepoint "G1CollectForAllocation", Time since last: 268151000 ns, Reaching safepoint: 1833 ns, Cleanup: 61542 ns, At safepoint: 10615166 ns, Total: 10678541 ns
+[20:24:03] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/FTBQuestsEventHandler (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/FTBQuestsEventHandler)
+[20:24:03] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.FTBQuestsEventHandler was not found questkilltask.fabric.mixins.json:FTBQuestsEventHandlerMixin from mod questkilltask
+[20:24:03] [main/WARN]: Error loading class: dev/ftb/mods/ftbquests/quest/BaseQuestFile (java.lang.ClassNotFoundException: dev/ftb/mods/ftbquests/quest/BaseQuestFile)
+[20:24:03] [main/WARN]: @Mixin target dev.ftb.mods.ftbquests.quest.BaseQuestFile was not found questkilltask.fabric.mixins.json:BaseQuestFileMixin from mod questkilltask
+[20:24:03] [main/INFO]: Loaded config for: recipeessentials.json
+[20:24:03] [main/WARN]: Error loading class: com/nhoryzon/mc/farmersdelight/block/BuddingBushBlock (java.lang.ClassNotFoundException: com/nhoryzon/mc/farmersdelight/block/BuddingBushBlock)
+[20:24:03] [main/WARN]: @Mixin target com.nhoryzon.mc.farmersdelight.block.BuddingBushBlock was not found seasonsdelightcompat.mixins.json:BuddingBushBlockMixin from mod seasonsdelightcompat
+[20:24:03] [main/WARN]: Error loading class: com/nhoryzon/mc/farmersdelight/block/BuddingTomatoBlock (java.lang.ClassNotFoundException: com/nhoryzon/mc/farmersdelight/block/BuddingTomatoBlock)
+[20:24:03] [main/WARN]: @Mixin target com.nhoryzon.mc.farmersdelight.block.BuddingTomatoBlock was not found seasonsdelightcompat.mixins.json:BuddingTomatoBlockMixin from mod seasonsdelightcompat
+[20:24:03] [main/WARN]: Error loading class: com/nhoryzon/mc/farmersdelight/block/MushroomColonyBlock (java.lang.ClassNotFoundException: com/nhoryzon/mc/farmersdelight/block/MushroomColonyBlock)
+[20:24:03] [main/WARN]: @Mixin target com.nhoryzon.mc.farmersdelight.block.MushroomColonyBlock was not found seasonsdelightcompat.mixins.json:MushroomColonyBlockMixin from mod seasonsdelightcompat
+[20:24:03] [main/WARN]: Error loading class: com/nhoryzon/mc/farmersdelight/block/RiceCropBlock (java.lang.ClassNotFoundException: com/nhoryzon/mc/farmersdelight/block/RiceCropBlock)
+[20:24:03] [main/WARN]: @Mixin target com.nhoryzon.mc.farmersdelight.block.RiceCropBlock was not found seasonsdelightcompat.mixins.json:RiceCropBlockMixin from mod seasonsdelightcompat
+[20:24:03] [main/WARN]: Error loading class: com/nhoryzon/mc/farmersdelight/block/TomatoVineBlock (java.lang.ClassNotFoundException: com/nhoryzon/mc/farmersdelight/block/TomatoVineBlock)
+[20:24:03] [main/WARN]: @Mixin target com.nhoryzon.mc.farmersdelight.block.TomatoVineBlock was not found seasonsdelightcompat.mixins.json:TomatoVineBlockMixin from mod seasonsdelightcompat
+[20:24:03] [main/WARN]: Error loading class: sereneseasons/season/RandomUpdateHandler (java.lang.ClassNotFoundException: sereneseasons/season/RandomUpdateHandler)
+[20:24:03] [main/WARN]: @Mixin target sereneseasons.season.RandomUpdateHandler was not found snowrealmagic.mixins.json:sereneseasons.RandomUpdateHandlerMixin from mod snowrealmagic
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.entity.CuboidMixin' as rule 'mixin.features.render.entity' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.entity.ModelPartMixin' as rule 'mixin.features.render.entity' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.entity.cull.EntityRendererMixin' as rule 'mixin.features.render.entity' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.entity.shadows.EntityRenderDispatcherMixin' as rule 'mixin.features.render.entity' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.gui.font.GlyphRendererMixin' as rule 'mixin.features.render.gui.font' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.world.sky.BackgroundRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientWorldMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Force-disabling mixin 'features.render.world.sky.WorldRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[20:24:03] [main/WARN]: Error loading class: net/caffeinemc/mods/sodium/client/model/light/data/ArrayLightDataCache (java.lang.ClassNotFoundException: net/caffeinemc/mods/sodium/client/model/light/data/ArrayLightDataCache)
+[20:24:03] [main/WARN]: Error loading class: net/caffeinemc/mods/sodium/client/model/light/flat/FlatLightPipeline (java.lang.ClassNotFoundException: net/caffeinemc/mods/sodium/client/model/light/flat/FlatLightPipeline)
+[20:24:03] [main/WARN]: Error loading class: net/caffeinemc/mods/sodium/client/model/light/data/LightDataAccess (java.lang.ClassNotFoundException: net/caffeinemc/mods/sodium/client/model/light/data/LightDataAccess)
+[20:24:03] [main/INFO]: Loaded config for: structureessentials.json
+[20:24:03] [main/WARN]: Error loading class: com/anthonyhilyard/itemborders/ItemBordersConfig (java.lang.ClassNotFoundException: com/anthonyhilyard/itemborders/ItemBordersConfig)
+[20:24:03] [main/WARN]: @Mixin target com.anthonyhilyard.itemborders.ItemBordersConfig was not found subtle_effects.mixins.json:client.ItemBordersConfigAccessor from mod subtle_effects
+[20:24:03] [main/WARN]: Error loading class: eu/midnightdust/lib/config/MidnightConfig$MidnightConfigScreen (java.lang.ClassNotFoundException: eu/midnightdust/lib/config/MidnightConfig$MidnightConfigScreen)
+[20:24:03] [main/WARN]: @Mixin target eu.midnightdust.lib.config.MidnightConfig$MidnightConfigScreen was not found the_bumblezone-fabric-base.mixins.json:mods.MidnightConfigScreenMixin from mod the_bumblezone
+[20:24:03] [main/WARN]: Error loading class: com/simibubi/create/content/kinetics/base/BlockBreakingKineticBlockEntity (java.lang.ClassNotFoundException: com/simibubi/create/content/kinetics/base/BlockBreakingKineticBlockEntity)
+[2026-09-17T20:24:03.252+0800][3.842s] GC(30) Pause Young (Normal) (G1 Evacuation Pause) 458M->300M(618M) 12.429ms
+[2026-09-17T20:24:03.252+0800][3.842s] Safepoint "G1CollectForAllocation", Time since last: 242026500 ns, Reaching safepoint: 1375 ns, Cleanup: 40542 ns, At safepoint: 12452208 ns, Total: 12494125 ns
+[2026-09-17T20:24:03.390+0800][3.979s] GC(31) Pause Young (Normal) (G1 Evacuation Pause) 470M->312M(782M) 6.295ms
+[2026-09-17T20:24:03.390+0800][3.980s] Safepoint "G1CollectForAllocation", Time since last: 130956125 ns, Reaching safepoint: 29375 ns, Cleanup: 50459 ns, At safepoint: 6337166 ns, Total: 6417000 ns
+[20:24:03] [main/INFO]: I used the json to destroy the json
+[2026-09-17T20:24:03.528+0800][4.118s] Safepoint "ICBufferFull", Time since last: 138445792 ns, Reaching safepoint: 1667 ns, Cleanup: 80708 ns, At safepoint: 2417 ns, Total: 84792 ns
+[2026-09-17T20:24:03.784+0800][4.374s] GC(32) Pause Young (Normal) (G1 Evacuation Pause) 598M->343M(782M) 6.183ms
+[2026-09-17T20:24:03.784+0800][4.374s] Safepoint "G1CollectForAllocation", Time since last: 249609333 ns, Reaching safepoint: 2208 ns, Cleanup: 20959 ns, At safepoint: 6208708 ns, Total: 6231875 ns
+[2026-09-17T20:24:03.984+0800][4.574s] Safepoint "ICBufferFull", Time since last: 199706417 ns, Reaching safepoint: 1000 ns, Cleanup: 68541 ns, At safepoint: 1542 ns, Total: 71083 ns
+[20:24:03] [main/ERROR]: The game failed to start because the currently active LWJGL version is not compatible.
+
+Installed version: 3.4.1
+Required version: 3.3.1
+
+You must change the LWJGL version in your launcher to continue. This is usually controlled by the settings for a profile or instance in your launcher.
+
+For more information, please see: https://link.caffeinemc.net/help/sodium/runtime-issue/lwjgl3/gh-2561
+[RenderDiag] exit(1) snapshot: swapOK=0 swapFail=0
+exit(1) called
+
+===== [Amethyst fatal trace] 2026-09-17 20:24:04.013 =====
+reason: exit(1) called
+thread: (unnamed)
+  #00 0x10d727edc  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 65244
+  #01 0x10d7286d8  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 67288
+  #02 0x132bbc07c  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN2os25build_agent_function_nameEPKcS1_b + 8110204
+  #03 0x132e1ecf0  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN7VM_Exit4doitEv + 10611952
+  #04 0x132e1e070  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 10608752
+  #05 0x132e203f8  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 10617848
+  #06 0x132e20ad4  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN8VMThread13inner_executeEP12VM_Operation + 10619604
+  #07 0x132e200e8  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 10617064
+  #08 0x132dad7ec  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZN6Thread8call_runEv + 10147820
+  #09 0x132bb4f2c  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/server/libjvm.dylib  _ZL19thread_native_entryP6Thread + 8081196
+  #10 0x1a0186038  /usr/lib/system/libsystem_pthread.dylib  _pthread_start + 16440
+  #11 0x1a018291c  /usr/lib/system/libsystem_pthread.dylib  thread_start + 2332
+
+[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=1039MB layer=0x1185f3740 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
+[PLCrashView] User tapped exit launcher, exiting process directly
 [RenderDiag] exit(0) snapshot: swapOK=0 swapFail=0
 exit(0) called
-
-===== [Amethyst fatal trace] 2026-09-17 07:13:17.616 =====
-reason: exit(0) backtrace (Task 48, black-screen-era silent exit)
-thread: (unnamed)
-  #00 0x10a0f3c98  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 64664
-  #01 0x10a0f4444  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 66628
-  #02 0x10a31ad18  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  __53-[SurfaceViewController(Navigation) actionForceClose]_block_invoke + 2321688
-  #03 0x1a4d922b4  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 9372340
-  #04 0x1a4d92afc  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 9374460
-  #05 0x1a4647bc0  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 1727424
-  #06 0x1a4fe49b0  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 11807152
-  #07 0x1a461e3a8  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 1557416
-  #08 0x1a455d1a4  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  __UIVIEW_IS_EXECUTING_ANIMATION_COMPLETION_BLOCK__ + 766372
-  #09 0x1a44d1b00  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 195328
-  #10 0x1a44d1c40  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 195648
-  #11 0x1a455ccf4  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 765172
-  #12 0x1a455cd64  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  <redacted> + 765284
-  #13 0x1a414da84  /System/Library/Frameworks/QuartzCore.framework/QuartzCore  <redacted> + 1174148
-  #14 0x1ce751fb4  /usr/lib/system/libdispatch.dylib  <redacted> + 114612
-  #15 0x1ce747374  /usr/lib/system/libdispatch.dylib  <redacted> + 70516
-  #16 0x1ce747044  /usr/lib/system/libdispatch.dylib  _dispatch_main_queue_callback_4CF + 69700
-  #17 0x1a028c7a0  /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation  <redacted> + 300960
-  #18 0x1a027d88c  /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation  <redacted> + 239756
-  #19 0x1a027e7f4  /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation  <redacted> + 243700
-  #20 0x24a693f24  /System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices  GSEventRunModal + 3876
-  #21 0x1a455c1cc  /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore  UIApplicationMain + 762316
-  #22 0x10a0f394c  /private/var/mobile/Containers/Data/Application/E6205F04-FA28-486B-879B-6A46823CDBDE/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  main + 63820
-  #23 0x102c7f0f8  /private/var/containers/Bundle/Application/BFF67C3B-1CD6-4FE5-9285-C4361C906381/App.app/Frameworks/LiveContainerShared.framework/LiveContainerShared  invokeAppMain + 45304
-  #24 0x102c7cb50  /private/var/containers/Bundle/Application/BFF67C3B-1CD6-4FE5-9285-C4361C906381/App.app/Frameworks/LiveContainerShared.framework/LiveContainerShared  LiveContainerMain + 35664
-  #25 0x1a00cf5b8  /usr/lib/dyld  <redacted> + 21944
-
