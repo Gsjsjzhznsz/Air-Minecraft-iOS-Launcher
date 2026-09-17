@@ -230,12 +230,17 @@ check("main.m 已导入 LauncherPreferences.h（声明可见）", '#import "Laun
 
 print()
 print("=" * 72)
-print("C6. 根因留档：entitlements 模板仍预写两项（TrollStore 需要它们，修复在检测侧）")
+print("C6. 根因留档：entitlements 模板（Task91 同步——sideload 模板预写已移除）")
 print("=" * 72)
-for tpl in ["entitlements.codesign.xml", "entitlements.sideload.xml", "entitlements.trollstore.xml"]:
-    t = read(tpl)
-    check(f"{tpl} 含 increased-memory-limit", MEM_KEY in t)
-    check(f"{tpl} 含 extended-virtual-addressing", VM_KEY in t)
+# Task91：sideload 工件的签名即用户最终签名，预写的 kernel entitlement 使
+# 内存标识对所有人显示"已开启"，已从 sideload 模板移除；
+# TrollStore 工件（真实生效）与开发者签名模板（描述文件背书）保留。
+ts_tpl = read("entitlements.trollstore.xml")
+cs_tpl = read("entitlements.codesign.xml")
+check("entitlements.trollstore.xml 含 increased-memory-limit（真实生效场景）", MEM_KEY in ts_tpl)
+check("entitlements.trollstore.xml 含 extended-virtual-addressing", VM_KEY in ts_tpl)
+check("entitlements.codesign.xml 含 increased-memory-limit（描述文件背书场景）", MEM_KEY in cs_tpl)
+check("entitlements.codesign.xml 含 extended-virtual-addressing", VM_KEY in cs_tpl)
 
 print()
 print("=" * 72)

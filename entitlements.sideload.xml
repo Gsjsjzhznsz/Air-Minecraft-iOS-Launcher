@@ -1,17 +1,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>application-identifier</key>
-	<string>com.air-devs.air</string>
+        <key>application-identifier</key>
+        <string>com.air-devs.air</string>
 <key>com.apple.private.security.container-required</key>
-	<string>com.air-devs.air</string>
+        <string>com.air-devs.air</string>
     <key>get-task-allow</key>
     <true/>
 
-    <key>com.apple.developer.kernel.extended-virtual-addressing</key>
-    <true/>
-    <key>com.apple.developer.kernel.increased-memory-limit</key>
-    <true/>
+    <!-- Task91：removed com.apple.developer.kernel.increased-memory-limit /
+         extended-virtual-addressing prewrites.  On a normal sideload these
+         kernel entitlements are never honored without a provisioning-profile
+         grant, but their presence made the in-app memory status pills report
+         "Enabled" for everyone (SecTask reads the signature truthfully).
+         TrollStore builds keep them via entitlements.trollstore.xml
+         (TROLLSTORE_JIT_ENT=1), where they are actually honored. -->
 
     <!-- Give ability to change Jetsam task limit by itself -->
     <key>com.apple.private.memorystatus</key>
