@@ -189,6 +189,7 @@ typedef struct {
     ame83_glint (*glGetUniformLocation)(unsigned int, const char*);
     void (*glUseProgram)(unsigned int);
     void (*glUniform2f)(unsigned int, float, float);
+    void (*glUniform1f)(int, float); // Task 103：哨兵 uniform（markerCode/255.0f）
     void (*glUniform1i)(int, int);
     // texture
     void (*glGenTextures)(GLsizei, unsigned int*);
@@ -224,6 +225,9 @@ static struct {
     bool ready;         // program+VAO+texture 就绪
     unsigned int program, vao, vbo, tex;
     int uViewportSize, uTargetSize, uInputTex;
+    int uMarker;                    // Task 103：地面真值哨兵 uniform（-1 = 未注入/被优化）
+    unsigned markerCode;            // 本帧哨兵字节（1..254；0 = 未启用）
+    bool markerArmed;               // 哨兵已成功注入着色器源
     int texW, texH;     // 当前纹理存储尺寸（变更时重建）
     bool engaged;       // 至少跑过一次升采样（一次性日志用）
     bool healed;        // 兜底窗口恢复已触发
@@ -241,7 +245,14 @@ static struct {
     int probeHits, probeFrames;
     int verdict;        // 0 未判决 / 1 落地 / -1 兜底
     bool gpuProbed;
-} ame99_fsrdiag = {0, 0, 0, 0, false};
+    // Task 103：哨兵票（地面真值）。mkState：0 未决 / 1 落地 / -1 兜底；
+    // mkConsecM/mkConsecMiss 为连中/连失计数——哨兵是确定性机制，3 连即
+    // 定性，无需 90 帧统计（旧非零探针保留为回退与取证双重用途）。
+    // Task 103：哨兵票需要持续运行（判决可翻转：标题界面哨兵匹配、进世
+    // 界后 EASU 断掉的场景需要能切到 CG 拉伸；反向同理）。
+    int mkHits, mkState, mkConsecM, mkConsecMiss;
+    bool final90Logged;   // 旧 90 帧统计日志一次性门（markerArmed 时仅取证不断 overwrite 判决）
+} ame99_fsrdiag = {0, 0, 0, 0, false, 0, 0, 0, 0, false};
 #define kAme99ProbeFrames 90
 
 static bool ame83_resolve_gl(void) {
@@ -263,6 +274,7 @@ static bool ame83_resolve_gl(void) {
         {"glGetUniformLocation",      (void**)&ame83_fsr.gl.glGetUniformLocation},
         {"glUseProgram",              (void**)&ame83_fsr.gl.glUseProgram},
         {"glUniform2f",               (void**)&ame83_fsr.gl.glUniform2f},
+        {"glUniform1f",               (void**)&ame83_fsr.gl.glUniform1f},
         {"glUniform1i",               (void**)&ame83_fsr.gl.glUniform1i},
         {"glGenTextures",             (void**)&ame83_fsr.gl.glGenTextures},
         {"glDeleteTextures",          (void**)&ame83_fsr.gl.glDeleteTextures},
@@ -385,6 +397,32 @@ static bool ame83_fsr_init(void) {
     // Task 83b：版本自适应后再缩（zink/GLSL 4.10 上限下也能编过）。
     std::string vsSrc = ame83_adapt_shader_version(FSR_VSSource, "vertex");
     std::string fsSrc = ame83_adapt_shader_version(FSR_FSSource, "fragment");
+    // Task 103：地面真值哨兵注入（字符串手术，只改本桥编译的源；
+    // MobileGlues 共享头零改动，MG 自身 FSR 路径不受影响）。着色器在输出
+    // 像素 (0,0)（GL 左下角；present 翻转后 = 屏幕左下角）的 alpha 通道
+    // 写入每帧变化的哨兵 k/255：
+    //   · CGImage 用 kCGImageAlphaNoneSkipLast，alpha 不参与显示——零视觉影响
+    //   · 呈现路径 glReadPixels 后核对该字节：匹配 = EASU 绘制落地且回读
+    //     诚实；不匹配 = pre-EASU/陈旧传输或绘制未落地 → CG 拉伸兜底。
+    //     Task 99/100 的非零探针分不清残影与新鲜 EASU——446b2a0 装机日志
+    //     实证其误报 verdict=1（fb/driver 双探针 89/90 非零，屏幕仍蜷角）。
+    //   · 哨兵字节取 1..254（255 是常规不透明帧 alpha，0 是 uniform 默认值）
+    //   · 注入失败（上游源结构变化）→ markerArmed=false，回退旧逻辑
+    ame83_fsr.markerArmed = false;
+    do {
+        static const char kDeclAnchor[] = "out vec4 oFragColor;";
+        static const char kWriteAnchor[] = "oFragColor = vec4(color, 1.0);";
+        size_t declAt = fsSrc.find(kDeclAnchor);
+        size_t writeAt = fsSrc.find(kWriteAnchor);
+        if (declAt == std::string::npos || writeAt == std::string::npos) break;
+        fsSrc.insert(declAt + (sizeof(kDeclAnchor) - 1),
+                     "\nuniform float uMarker; // Task 103: per-frame sentinel (k/255)");
+        writeAt = fsSrc.find(kWriteAnchor); // insert 可能重分配，重新定位
+        if (writeAt == std::string::npos) break;
+        fsSrc.insert(writeAt + (sizeof(kWriteAnchor) - 1),
+                     "\n    if (ip.x == 0u && ip.y == 0u) oFragColor.a = uMarker; // Task 103: bottom-left pixel alpha carries the sentinel");
+        ame83_fsr.markerArmed = true;
+    } while (false);
     unsigned int vs = ame83_compile(g, GL_VERTEX_SHADER, vsSrc.c_str());
     if (vs == 0) { ame83_fsr.initFailed = true; return false; }
     unsigned int fs = ame83_compile(g, GL_FRAGMENT_SHADER, fsSrc.c_str());
@@ -433,9 +471,14 @@ static bool ame83_fsr_init(void) {
     ame83_fsr.uTargetSize = g->glGetUniformLocation(prog, "uTargetSize");
     // Task 99：采样器 uniform 显式钉到单元 0（防御 MC/模组留下非 0 活动单元）
     ame83_fsr.uInputTex = g->glGetUniformLocation(prog, "uInputTex");
+    // Task 103：哨兵 uniform（注入失败/被优化掉 → 关闭哨兵，回退旧逻辑）
+    ame83_fsr.uMarker = ame83_fsr.markerArmed ? g->glGetUniformLocation(prog, "uMarker") : -1;
+    if (ame83_fsr.markerArmed && ame83_fsr.uMarker < 0) ame83_fsr.markerArmed = false;
+    ame83_fsr.markerCode = 0;
     ame83_fsr.ready = true;
-    NSLog(@"[OSMBridge] Task83 FSR1 EASU ready (zink): program=%u uViewportSize=%d uTargetSize=%d -- same EASU shader as MobileGlues",
-          ame83_fsr.program, ame83_fsr.uViewportSize, ame83_fsr.uTargetSize);
+    NSLog(@"[OSMBridge] Task83 FSR1 EASU ready (zink): program=%u uViewportSize=%d uTargetSize=%d marker=%d -- same EASU shader as MobileGlues",
+          ame83_fsr.program, ame83_fsr.uViewportSize, ame83_fsr.uTargetSize,
+          ame83_fsr.markerArmed ? 1 : 0);
     return true;
 }
 
@@ -495,6 +538,12 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     if (ame83_fsr.uInputTex >= 0) g->glUniform1i(ame83_fsr.uInputTex, 0);
     g->glUniform2f(ame83_fsr.uViewportSize, (float)srcW, (float)srcH);
     g->glUniform2f(ame83_fsr.uTargetSize, (float)dstW, (float)dstH);
+    // Task 103：本帧哨兵（在绘制前设置；present 路径回读后核对）。
+    if (ame83_fsr.markerArmed) {
+        unsigned code = 1u + (unsigned)(ame83_fsr.frames % 254u);
+        g->glUniform1f(ame83_fsr.uMarker, (float)code / 255.0f);
+        ame83_fsr.markerCode = code;
+    }
     g->glBindVertexArray(ame83_fsr.vao);
     g->glViewport(0, 0, dstW, dstH);
     g->glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -509,10 +558,21 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
         if (g->glReadPixels) {
             g->glReadPixels(dstW - 8, dstH - 4, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
         }
+        // Task 103：哨兵像素单次直读（glFinish 之前的地面真值：此刻若哨兵
+        // 已可读回，说明绘制与直读均健康，后续若屏幕仍蜷角则断会在
+        // glFinish 之后的传输层；若此刻哨兵缺失，则绘制未落地或直读
+        // 已被劫持——与 90 帧哨兵票交叉定位断层层级）。
+        unsigned char mk[4] = {0, 0, 0, 0};
+        if (g->glReadPixels && ame83_fsr.markerArmed) {
+            g->glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, mk);
+        }
         unsigned int glerr = g->glGetError ? g->glGetError() : 0;
-        NSLog(@"[OSMBridge] Task99 GPU probe: fb0 top-strip pixel (x=%d,y=%d) rgba=%02x%02x%02x%02x glErr=0x%04x "
-              "(zero pixel = EASU draw did not land GPU-side; nonzero + still corner-shrunk on screen = readback layer issue)",
-              dstW - 8, dstH - 4, px[0], px[1], px[2], px[3], glerr);
+        NSLog(@"[OSMBridge] Task99 GPU probe: fb0 top-strip pixel (x=%d,y=%d) rgba=%02x%02x%02x%02x glErr=0x%04x; Task103 sentinel pixel (0,0) alpha=%02x expect=%02x %s",
+              dstW - 8, dstH - 4, px[0], px[1], px[2], px[3], glerr,
+              mk[3], (unsigned)(ame83_fsr.markerCode & 0xffu),
+              (ame83_fsr.markerArmed && mk[3] == (unsigned char)ame83_fsr.markerCode)
+                  ? "MATCH (draw + direct readback healthy pre-glFinish)"
+                  : "MISMATCH (draw did not land, or direct readback already stale)");
     }
 
     // (3) 还原（FBO 双通道分别还回，模组的非对称 read/draw 绑定不受扰动；
@@ -691,13 +751,14 @@ void osm_swap_buffers() {
     // （尺寸/捆绑层故障）。
     ++ame99_fsrdiag.swaps;
     if ((ame99_fsrdiag.swaps % 120) == 0) {
-        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d",
+        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d",
               ame99_fsrdiag.swaps, windowWidth, windowHeight,
               currentBundle ? currentBundle->osm.width : 0,
               currentBundle ? currentBundle->osm.height : 0,
               (void *)currentBundle, ame83_fsr.frames,
               ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict,
-              (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames);
+              (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames,
+              ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames);
     }
     // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
     //
@@ -755,7 +816,7 @@ void osm_swap_buffers() {
     // ------------------------------------------------------------------
     bool cgStretchThisFrame = false;
     int gameW = windowWidth, gameH = windowHeight;
-    if (fsrActiveThisFrame && ame99_fsrdiag.verdict == 0 &&
+    if (fsrActiveThisFrame && (ame99_fsrdiag.verdict == 0 || ame83_fsr.markerArmed) &&
         gameW > 0 && gameH > 0 &&
         (uint32_t)gameW < bundle.width && (uint32_t)gameH < bundle.height) {
         size_t stride = (size_t)bundle.width * 4;
@@ -772,6 +833,53 @@ void osm_swap_buffers() {
             }
             ++ame99_fsrdiag.probeFrames;
             if (nz > 0) ++ame99_fsrdiag.probeHits;
+            // Task 103：哨兵票（地面真值，机制详见 ame83_fsr_init 注释）。
+            // scratch[3] = GL(0,0) 像素的 alpha = 本帧哨兵字节（present 全幅
+            // 回读已含它，零额外 GL 调用）。初始 3 连即定性；后续 10 连反向
+            // 可翻转判决（跨阶段状态变化：标题界面→进世界）。
+            if (ame83_fsr.markerArmed && ame83_fsr.markerCode != 0) {
+                unsigned char got = ame100_present.scratch[3];
+                bool mkHit = (got == (unsigned char)ame83_fsr.markerCode);
+                if (mkHit) {
+                    ++ame99_fsrdiag.mkHits;
+                    ++ame99_fsrdiag.mkConsecM;
+                    ame99_fsrdiag.mkConsecMiss = 0;
+                } else {
+                    ++ame99_fsrdiag.mkConsecMiss;
+                    ame99_fsrdiag.mkConsecM = 0;
+                }
+                int newState = ame99_fsrdiag.mkState;
+                if (newState == 0) {
+                    if (ame99_fsrdiag.mkConsecM >= 3) newState = 1;
+                    else if (ame99_fsrdiag.mkConsecMiss >= 3) newState = -1;
+                } else if (newState == 1 && ame99_fsrdiag.mkConsecMiss >= 10) {
+                    newState = -1;
+                } else if (newState == -1 && ame99_fsrdiag.mkConsecM >= 10) {
+                    newState = 1;
+                }
+                if (newState != ame99_fsrdiag.mkState) {
+                    ame99_fsrdiag.mkState = newState;
+                    ame99_fsrdiag.verdict = newState;
+                    // 状态迁移一次性取证：present 与 bundle 全幅 memcmp
+                    //（相等 = glReadPixels 与驱动回读同源；不等 = 独立传输）
+                    bool sameAsBundle =
+                        (bundle.width > 0 && bundle.height > 0 &&
+                         ame100_present.present != NULL && bundle.buffer != NULL &&
+                         memcmp(ame100_present.present, bundle.buffer,
+                                (size_t)bundle.width * (size_t)bundle.height * 4) == 0);
+                    NSLog(@"[OSMBridge] Task103 EASU sentinel verdict: %s (marker %d/%d probe frames, %d consecutive %s); present buffer %s bundle.buffer -- %s",
+                          newState == 1
+                              ? "LANDED -- full-surface EASU present"
+                              : "NOT LANDED -- CG stretch fallback engaged (raw game region stretched full-screen by CoreAnimation)",
+                          ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
+                          newState == 1 ? ame99_fsrdiag.mkConsecM : ame99_fsrdiag.mkConsecMiss,
+                          newState == 1 ? "matches" : "mismatches",
+                          sameAsBundle ? "byte-identical to" : "differs from",
+                          newState == 1
+                              ? "end-to-end verified: draw landed + readback honest"
+                              : "pre-EASU/stale transport or draw not landing; geometry still corrected via CG stretch");
+                }
+            }
         }
         // —— 探针 B：bundle.buffer（驱动传输取证，top-down 顶带）——
         const unsigned char *base = (const unsigned char *)bundle.buffer;
@@ -786,9 +894,15 @@ void osm_swap_buffers() {
             ++ame100_present.drvFrames;
             if (nz > 0) ++ame100_present.drvHits;
         }
-        if (ame99_fsrdiag.probeFrames >= kAme99ProbeFrames) {
-            ame99_fsrdiag.verdict =
-                (ame99_fsrdiag.probeHits * 3 >= kAme99ProbeFrames) ? 1 : -1;
+        // Task 103：旧 90 帧非零统计——markerArmed 时仅作取证日志，不
+        // overwrite 哨兵判决；未注入哨兵时仍是唯一判决机制（零回归）。
+        if (ame99_fsrdiag.probeFrames >= kAme99ProbeFrames &&
+            !ame99_fsrdiag.final90Logged) {
+            ame99_fsrdiag.final90Logged = true;
+            if (!ame83_fsr.markerArmed) {
+                ame99_fsrdiag.verdict =
+                    (ame99_fsrdiag.probeHits * 3 >= kAme99ProbeFrames) ? 1 : -1;
+            }
             if (ame99_fsrdiag.verdict == 1) {
                 NSLog(@"[OSMBridge] Task100 EASU landing verified in fb0: top-strip nonzero %d/%d frames (authoritative readback); "
                       "driver transport check: %d/%d -- driver readback %s",

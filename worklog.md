@@ -978,3 +978,25 @@ Stage Summary:
   滚动、按钮配色全部保持；ARC 出参签名（Task98）不被回退
 - 用户预期：七卡整组居右栏中部（内容仍左对齐紧凑排布）；主界面按钮首启即显示（4s 自愈窗口覆盖冷启动
   符号注册竞态）；头像与执行Jar等宽、正圆、顶距=按钮底距
+
+---
+Task ID: 103
+Agent: main (Super Z)
+Task: 用户上传三日志（a605099/c241276/446b2a0，d37670e 构建）判读——26.3 进存档崩溃 + BMC2 蜷角依旧（Task100 后）→ 双根因实证 + 双修复；附带确认 zl2（ZalithLauncher2）线索 = LWJGL 版本检测关闭（Task94 已覆盖，装机实证 sodium 0.9.2 过门）
+
+Work Log:
+- 日志判读（latestlog.old.txt = 26.3 Fabric 110 mods：Task97/98/99/100 全部装机生效——LWJGL 341、[CwdAlign]、AppKitStub 桩、windowsMenu 补齐；游戏完整跑到进存档；latestlog.txt = BMC2 1.20.1 zink+FSR：Task100 权威呈现已 engaged、fb/driver 双探针 89/90 非零、1680+ swaps 稳定会话）
+- 26.3 崩溃根因（字节级闭环）：进世界瞬间 compile#406 sodium:blocks/block_layer_opaque（vertex 2394B）展开 3 include（2394→5741）后 glslang 报 "preprocessor directive cannot be preceded by another token" → solid_terrain 管线缺失 → Render Frame 崩溃。下载 Modrinth sodium-fabric-0.9.2+mc26.3.jar（bAZQdGpg，与 Remarkably Optimized 1.15.61 整合包钉的同文件）od -c 实锤：globals.glsl 尾 '};'、fog.glsl 尾 '}'、chunk_vertex.glsl 尾 '#endif'——三个 include 全部不以换行结尾；shaderc_include.c 的 ame_expand_text 在内容后直接拼 "#line N\n" → 指令粘行。对照：client.jar 原版 17 个 include 全部 '\n' 收尾（405 个原版编译全过）——bug 自 Task47 潜伏，等第一个无尾换行 mod 着色器触发。本地复现（scripts/../task103_include_repro/repro.c + 真实 jar 着色器走真实展开器）：修复前 3 处粘行（};#line 5 / }#line 6 / #endif#line 7），修复后 0
+- 修复 A（Natives/shaderc_include.c）：#line 拼接前保证输出以 '\n' 收尾（o->len>0 && buf[o->len-1]!='\n' → 补一个换行）；行号语义由紧随的 #line 全权重置，合成换行零影响；原版着色器不触发补行（零回归）
+- BMC2 蜷角根因推理收敛：屏幕显示 present.present（fb0 glReadPixels 全幅）却仍是裸游戏蜷角 + 顶带非零 → glReadPixels 与驱动回读同走一条 pre-EASU/陈旧传输——Task99/100 的非零探针无法区分残影与新鲜 EASU（装机实证误报 verdict=1）。armchair 无法再分辨"绘制未落地"与"回读撒谎"，转为闭环修复
+- 修复 B（Natives/ctxbridges/osm_bridge.mm，哨兵闭环）：EASU 片元着色器（字符串手术注入，仅本桥编译的源；MobileGlues 共享头零改动，MG 自身 FSR 路径不受影响）在输出像素 (0,0) 的 alpha 通道写每帧哨兵 k/255（k=1..254，避开 0=uniform 默认与 255=常规不透明 alpha）；CGImage 用 AlphaNoneSkipLast——零视觉影响。present 回读后核对 scratch[3]：3 连中=绘制落地+回读诚实→全幅上屏；3 连失=无论断在哪层→裁剪裸游戏区域交 CoreAnimation 拉伸全屏（几何恒全屏，画质双线性稍软）；10 连反向可翻转判决（标题界面↔进世界跨阶段）；旧 90 帧非零统计降级为取证（armed 时不 overwrite 判决）；状态迁移时一次性 present vs bundle 全幅 memcmp（同源性取证：相等=glReadPixels 被客户端缓冲劫持）；GPU 单次探针扩展 glFinish 前哨兵直读（MATCH/MISMATCH 判读）；心跳加 mk=N/M；gl 表补 glUniform1f
+- 判读辅助：确认 26.3 会话 zink 路径无 Vulkan 尝试（MDCL 跳过 lwjgl-vulkan；26.2+ 的 PreferredGraphicsApi/graphicsBackend 参数为 MC 原生能力，启动器渲染器选择已覆盖；zl2 提示的 LWJGL 检测关闭与 Task94 动态上报等效且已装机实证）
+- 审阅朋友 Task101/102（d37670e/25930aa）：纯前端（右面板卡片布局/SF Symbols 图标修正/图标自愈），零后端文件交集
+- 验证：verify_task103 57/57（A git 钉 446b2a0 证据；B 展开器修复文本锚点 + 合成着色器行为测试——真编译真展开，无尾换行 include 零粘行、内容保序、行号指令成对；C 哨兵注入锚点 + 共享头零改动断言；D 票/翻转/取证锚点；E 判决状态机 Python 镜像 6 用例；F FAQ+version.h；G 语法门（新增 scripts/task103_syntax_swap.py——osm_swap_buffers 呈现/投票段独立 g++ 门，D1 变换约定）+ 级联 + NSLog %@ 禁令）
+- 级联 stale-sync：FAQ 32→33（+sodiumGlsl 故障排除；fsrCorner 重锚 Task103 哨兵语义）×11 校验器（83 B12/84 D1/85 C1/86 C1+C3/87 E1/94 E1/95 E1+E4+F3/97 C1+C3/98 E1+E4/99 E1+E3+E4/100 E+F3）；task85 D1 语法门桩扩 markerArmed/markerCode/mk 字段 + cstring
+- 终态：83:73/73、84:31/31、85:24/24、86:33/33、87:50/50、94:45/45、95:59/59、97:30/30、98:35/35、99:55/55、100:57/57、103:57/57 全绿
+
+Stage Summary:
+- 26.3：sodium 着色器粘行崩溃根治（对全 mod 生态的同类问题通用）；装机锚点：[amethyst-include] expanded 后无 GLSL 解析错误 + 进世界正常
+- BMC2：哨兵闭环——两种传输状态几何都全屏；装机锚点："[OSMBridge] Task103 EASU sentinel verdict: LANDED/NOT LANDED ..."（一行含 mk 命中率 + present/bundle 同源性）+ 心跳 mk=N/M + GPU 探针 "Task103 sentinel pixel (0,0) ... MATCH/MISMATCH"
+- 遗留：哨兵判决为 NOT LANDED 时下一轮可凭 memcmp 同源结论定位断层层级（glReadPixels 劫持 vs 绘制未落地）；2394 与 2124 字节差（设备 vsh +270B 注入来源）未定位但不影响修复

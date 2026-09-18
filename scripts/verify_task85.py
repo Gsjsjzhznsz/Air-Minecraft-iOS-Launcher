@@ -100,7 +100,7 @@ check("B9 engaged 日志带 Task 85 判读标记",
 print("===== C. FAQ（fsr 病史修订 + upscalerAlt 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 32 条目（Task99 +2 macMenuStub/fsrCorner；Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task85 时为 24）", len(faq_items) == 32, f"got {len(faq_items)}")
+check("C1 33 条目（Task99 +2 macMenuStub/fsrCorner；Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task103 +sodiumGlsl，Task85 时为 24）", len(faq_items) == 33, f"got {len(faq_items)}")
 check("C2 upscalerAlt 条目在位（问题 + 五类方案 + 结论）",
       "FSR 1.0 有哪些替代方案" in helpvc
       and "NVIDIA NIS（Image Scaling）" in helpvc
@@ -123,6 +123,7 @@ header = r'''
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <cstring>
 typedef unsigned int GLenum; typedef unsigned char GLboolean; typedef int GLint;
 typedef int GLsizei; typedef float GLfloat; typedef unsigned int GLbitfield;
 typedef unsigned char GLubyte; typedef unsigned int GLuint;
@@ -145,10 +146,11 @@ static osmesa_library handle;
 static void CallbackBridge_nativeSendScreenSize(int w, int h) { (void)w; (void)h; }
 // —— ame83 段桩（本门只编 swap/apply 段；真实实现经指纹断言覆盖）——
 static bool ame83_fsr_upscale(int a, int b, int c, int d) { (void)a;(void)b;(void)c;(void)d; return true; }
-struct ame85_fsr_stub { bool healed; long frames; };
+struct ame85_fsr_stub { bool healed; long frames; bool markerArmed; unsigned markerCode; };
 static struct ame85_fsr_stub ame83_fsr;
 // —— Task99 段桩（swap 段引用 ame99_fsrdiag / kAme99ProbeFrames；真实定义在文件前部）——
-static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed; } ame99_fsrdiag = {0,0,0,0,false};
+static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed;
+  int mkHits, mkState, mkConsecM, mkConsecMiss; bool final90Logged; } ame99_fsrdiag = {0,0,0,0,false,0,0,0,0,false};
 #define kAme99ProbeFrames 90
 // —— Task100 段桩（swap 段引用 ame100_present / ame100_present_frame；真实定义在文件前部，Task 100 权威呈现路径）——
 static struct { unsigned char *scratch, *present; int bufW, bufH; bool engaged, broken; int drvHits, drvFrames; } ame100_present = {0,0,0,0,false,false,0,0};

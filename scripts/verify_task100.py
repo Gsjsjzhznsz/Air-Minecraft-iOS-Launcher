@@ -186,14 +186,15 @@ print("===== F. FAQ + version.h + 级联 =====")
 faq = read("Natives/LauncherHelpViewController.m")
 items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[\[LauncherHelpFaqItem alloc\] init\];", faq)
 check("F1 FAQ 计数不变（32——Task100 只刷新内容不加条目）",
-      len(items) == 32, f"got {len(items)}")
+      len(items) == 33, f"got {len(items)}")
 check("F2 macMenuStub 已并入二层 NPE 病历与 Task100 锚点",
       any(i == "macMenuStub" for i in items) and
       "because \\\"windowsMenu\\\" is null" in faq and
       "[AppKitStub] Task100: windowsMenu requested" in faq)
-check("F3 fsrCorner 已更新为权威呈现语义（Task100 + present path engaged）",
+check("F3 fsrCorner 已更新为哨兵闭环语义（Task103 + sentinel verdict；Task100 权威呈现措辞保留）",
       any(i == "fsrCorner" for i in items) and
-      "[OSMBridge] Task100" in faq and "present path engaged" in faq)
+      "Task103 地面真值闭环" in faq and "Task103 EASU sentinel verdict" in faq
+      and "Task100 权威呈现" in faq)
 vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("F4 version.h REVISION 17 addendum (Task 100, no bump)",
       "REVISION 17 addendum (Task 100, no bump)" in vh and "#define REVISION 17" in vh)
@@ -205,7 +206,7 @@ for fn in ("verify_task83.py", "verify_task84.py", "verify_task85.py", "verify_t
            "verify_task98.py", "verify_task99.py"):
     content = read(f"scripts/{fn}")
     check(f"F6 {fn} FAQ 计数 32 同步未破坏",
-          "len(faq_items) == 32" in content or "32 条目" in content or "len(items) == 32" in content)
+          "len(faq_items) == 33" in content or "32 条目" in content or "len(items) == 33" in content)
 
 print("===== G. 卫生 =====")
 def _jl_delta_balanced():

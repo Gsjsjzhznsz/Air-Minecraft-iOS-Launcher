@@ -539,3 +539,32 @@
 #define MOBILEGLUES_VERSION_H
 
 #endif // MOBILEGLUES_VERSION_H
+// REVISION 17 addendum (Task 103, no bump): two fixes from the a605099/
+// c241276/446b2a0 device-log triple (d37670e build = Task100 IPA). (A) 26.3
+// modpack world-entry crash: sodium 0.9.2+mc26.3's block_layer_opaque.vsh
+// died in GLSL preprocessing ("preprocessor directive cannot be preceded by
+// another token") -> solid_terrain pipeline missing -> Render Frame crash.
+// Root cause byte-level proven: sodium's three include files (globals.glsl
+// ends '};', fog.glsl ends '}', chunk_vertex.glsl ends '#endif') all lack a
+// trailing newline, and Natives/shaderc_include.c appended the '#line'
+// fixup directly after the content -> the directive glued onto the last
+// token line. All 17 vanilla includes end with '\n', which is why only the
+// first sodium shader of the session died (compile#406, 405 vanilla
+// compiles passed). Fixed by guaranteeing a newline before the '#line'
+// append (repo-local repro with the real Modrinth jar shaders: 3 glued
+// sites -> 0). (B) BMC2 corner-shrink: the Task100 present path still
+// showed the raw game in the corner while BOTH probes read 89/90 nonzero --
+// glReadPixels itself serves pre-EASU/stale content on this path, so the
+// "authoritative readback" inherited the same untrustworthy transport. The
+// EASU fragment shader (osm_bridge string surgery only, shared header
+// untouched) now stamps a per-frame sentinel byte (1..254) into the alpha
+// channel of output pixel (0,0) -- display ignores alpha
+// (kCGImageAlphaNoneSkipLast), the swap path reads it back: 3 consecutive
+// matches = EASU landed -> full-surface present; 3 consecutive misses =
+// pre-EASU/stale transport or draw not landing -> CG stretch of the raw
+// game region (full-screen geometry either way); 10 consecutive opposite
+// votes flip the verdict across game-phase changes. GPU probe extended
+// with a pre-glFinish sentinel read; verdict logs add a one-shot
+// present-vs-bundle memcmp (same-source transport forensics); heartbeat
+// gains mk=N/M. FAQ 32->33 (+sodiumGlsl, fsrCorner refreshed). Launcher
+// side + shaderc_include.c only, REVISION stays 17.

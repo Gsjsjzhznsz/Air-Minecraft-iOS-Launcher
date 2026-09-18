@@ -364,15 +364,23 @@
     fsrCorner.question = @"1.20.x 整合包 + Zink + FSR 开启时，游戏画面蜷缩在屏幕左下角（右上/下方大片空白）？";
     fsrCorner.answer = @"典型表现：选了 Zink 渲染器并开启 FSR 超分档位后，游戏能正常进入与操作，但整个画面只占屏幕左下约三分之二，其余区域空白。\n\n"
                      @"机制：FSR 开启时游戏以低分辨率（屏幕÷档位系数）渲染进全尺寸缓冲的左下角，再由升采样 pass 放大铺满全屏。26.3 会话此链路已验证正常；个别 1.20.x 整合包（BMC2 等）路径上升采样结果没有进入最终上屏的回读缓冲，裸低清帧直接上屏＝蜷角。\n\n"
-                     @"启动器已修复（Task99 探测 + Task100 根治）：Task100 起上屏不再依赖驱动的 glFinish 回读——每帧由启动器自己从帧缓冲直读权威画面并独立上屏，1.20.x 整合包路径上驱动回读滞后/残影的问题被整体绕过；另保留兜底：万一升采样在本路径无法落地，自动把游戏区域交 CoreAnimation 拉伸到全屏（几何立即正确，画质为双线性、略软于 FSR）。验证方法：日志搜 “[OSMBridge] Task100”——“present path engaged”表示权威呈现已接管上屏；“EASU landing verified in fb0 … driver transport check”一行可看到绘制层与驱动传输层各自的体检结论；“swap#N”心跳行可见 win/osm 尺寸、present 与运行状态。\n\n"
+                     @"启动器已修复（Task99 探测 + Task100 权威呈现 + Task103 地面真值闭环）：上屏不再依赖驱动的 glFinish 回读——每帧由启动器自己从帧缓冲直读权威画面并独立上屏。Task103 进一步给升采样着色器植入每帧变化的隐形哨兵（藏在屏幕角落一个像素的 alpha 通道，不影响显示）：回读后自动核对哨兵，命中＝升采样真实落地，全幅上屏；未命中＝无论断在哪一层（绘制未落地/回读陈旧），立即改把游戏原始画面交 CoreAnimation 拉伸到全屏——两种情况几何都是全屏，区别只是清晰度；判决还能跨阶段自动翻转（标题界面与进世界后分别体检）。验证方法：日志搜 “[OSMBridge] Task103 EASU sentinel verdict”——LANDED 表示 EASU 全幅上屏，NOT LANDED 表示已启用拉伸兜底（画面即刻全屏）；一行之内还有 present 与 bundle 缓冲是否同源的取证结论，swap 心跳行尾部的 mk=N/M 即哨兵命中率。\n\n"
                      @"不想等更新的临时自救：设置 → 视频设置 → FSR 1.0 超分辨率 选择“关闭”（画面以原生全分辨率渲染，帧率会相应降低）。";
+
+    LauncherHelpFaqItem *sodiumGlsl = [[LauncherHelpFaqItem alloc] init];
+    sodiumGlsl.iconName = @"chevron.left.forwardslash.chevron.right";
+    sodiumGlsl.question = @"26.3 整合包进存档/进世界瞬间崩溃，日志报 sodium 管线编译失败、preprocessor directive cannot be preceded by another token？";
+    sodiumGlsl.answer = @"典型表现：主菜单一切正常，点进存档加载世界的一瞬间闪退；崩溃报告 Description 为 Render Frame，直接原因是 Failed to find or load pipeline sodium:pipeline/solid_terrain。\n\n"
+                     @"机制：26.x 的渲染前端把 GLSL 统一编译为 SPIR-V，Sodium 的地形着色器用 #include 引用公共片段（globals/fog/chunk_vertex）。Sodium 打包的这三个片段文件实测都不以换行符结尾——启动器的 #include 展开器在片段末尾直接拼接行号恢复指令（#line），指令被粘在最后一个有效字符后面，形成非法 GLSL（正是日志里的 preprocessor directive 报错）。原版片段全部规范收尾，所以同一会话里几百个原版着色器全部编译通过、第一个 Sodium 着色器即崩——这也是它与渲染器、内存、LWJGL 都无关的原因。\n\n"
+                     @"启动器已修复（Task103）：展开器在拼接 #line 前保证输出以换行收尾，粘行不可能再发生；对原版着色器零影响（原本就规范收尾，不触发补换行）。验证方法：日志搜 “[amethyst-include] expanded”——Sodium 着色器（如 sodium:blocks/block_layer_opaque）展开后不再紧跟 GLSL 解析错误，进世界正常。\n\n"
+                     @"旧构建临时自救：整合包里移除 Sodium / Sodium Extra / Reese's Sodium Options（地形渲染回退原版管线，帧率会下降）。";
 
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader, fsrCorner ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl ]
     ];
 }
 

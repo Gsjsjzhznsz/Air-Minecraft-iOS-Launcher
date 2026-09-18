@@ -264,6 +264,17 @@ static int ame_expand_text(ame_out_t *o, const char *src, size_t len,
                 return rc; // 输出溢出等硬失败，整链放弃
             }
         }
+        // Task 103 修复：include 内容可能不以换行结尾（sodium 0.9.2 实测：
+        // globals.glsl 尾部 '};'、fog.glsl 尾部 '}'、chunk_vertex.glsl 尾部
+        // '#endif'，均无 \n）。#line 直接拼在其后会把预处理指令粘到上一个
+        // token 行尾，glslang 报 "preprocessor directive cannot be preceded
+        // by another token"——正是 26.3 进存档时 sodium block_layer_opaque
+        // 编译失败→Render Frame 崩溃的形态（本地真实 jar 着色器复现：3 处
+        // 粘行）。先确保输出以换行收尾，#line 落在新行首；合成换行只终结
+        // 内容最后一行，行号语义由紧随的 #line 全权重置，不受影响。
+        if (o->len > 0 && o->buf[o->len - 1] != '\n') {
+            ame_out_append_str(o, "\n");
+        }
         // 行号恢复：本 include 行消耗后，外层下一行 = line_no + 1
         {
             char linefix[48];
