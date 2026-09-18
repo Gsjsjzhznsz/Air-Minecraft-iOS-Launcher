@@ -150,6 +150,21 @@ osm_render_window_t* osm_init_context(osm_render_window_t* share) {
 #ifndef GL_UNSIGNED_BYTE
 #define GL_UNSIGNED_BYTE          0x1401
 #endif
+// Task 100（权威呈现）：glReadPixels 全幅回读需锁 pack 像素存储状态
+//（ROW_LENGTH 非零时行距会错位；SKIP_* 偏移同理；dstW*4 恒为 4 的倍数，
+// 对齐无实际影响，但一并归零保证确定性）。
+#ifndef GL_PACK_ROW_LENGTH
+#define GL_PACK_ROW_LENGTH        0x0D02
+#endif
+#ifndef GL_PACK_SKIP_ROWS
+#define GL_PACK_SKIP_ROWS         0x0D03
+#endif
+#ifndef GL_PACK_SKIP_PIXELS
+#define GL_PACK_SKIP_PIXELS       0x0D04
+#endif
+#ifndef GL_PACK_ALIGNMENT
+#define GL_PACK_ALIGNMENT          0x0D05
+#endif
 
 typedef unsigned int ame83_gluint;
 typedef int ame83_glint;
@@ -198,6 +213,7 @@ typedef struct {
     void (*glDisable)(unsigned int);
     void (*glGetIntegerv)(unsigned int, int*);
     void (*glReadPixels)(int, int, int, int, unsigned int, unsigned int, void*);
+    void (*glPixelStorei)(unsigned int, int);
     unsigned int (*glGetError)(void);
 } ame83_gl_t;
 
@@ -268,6 +284,7 @@ static bool ame83_resolve_gl(void) {
         {"glDisable",                 (void**)&ame83_fsr.gl.glDisable},
         {"glGetIntegerv",             (void**)&ame83_fsr.gl.glGetIntegerv},
         {"glReadPixels",              (void**)&ame83_fsr.gl.glReadPixels},
+        {"glPixelStorei",              (void**)&ame83_fsr.gl.glPixelStorei},
         {"glGetError",                (void**)&ame83_fsr.gl.glGetError},
     };
     int missing = 0;
@@ -520,6 +537,113 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     return true;
 }
 
+// ============================================================================
+// Task 100（修复 B 续）：权威呈现路径（authoritative present path）。
+//
+// 病灶（7a30912 装机日志，BMC2 1.20.1 + zink + FSR preset2，ccabe82 构建）：
+//   Task99 三件套全部给出"绿灯"证据，用户看到的却是活的低清游戏蜷在
+//   左下角（60fps、还能在角落里打字）：
+//     · GPU 探针：EASU 绘制后 fb0 顶带像素 000000ff（alpha 已写入，非全零）
+//     · CPU 探针：bundle.buffer 顶带 88/90 帧非零 → verdict=1（判"已落地"）
+//     · 心跳：easuFrames 每帧递增、win=1572x1092 osm=2360x1640 恒稳、
+//       会话 1080 swaps 到退出为止全程稳定
+//   唯一自洽的解释：屏幕显示的 bundle.buffer 里，左下角落 = 驱动 glFinish
+//   回读写入的 EASU 之前（或来源错误）的裸游戏帧；顶带 = 滞后/陈旧内容
+//   ——探针只验"非零"，分不清新鲜 EASU 与一帧残影，因此误报 verdict=1。
+//   结论：自定义 libOSMesa 的 glFinish 回读在 GLFW/1.20.1 路径上不可信
+//   （对照组 26.3-rc-3/SDL3 路径正常——断层在 MC 版本路径的 GL 终态，
+//   驱动侧黑盒无法再深挖，也不必再挖）。
+//
+// 修复（理论免疫，不再依赖任何驱动侧假设）：FSR 帧由本桥自己完成呈现——
+//   glFinish 之后显式绑定 fb0、glReadPixels 全幅权威回读到 scratch，
+//   行序翻转（GL 底起 → OSMESA_Y_UP=0 顶起）拷入独立 present 缓冲，
+//   CGImage 改包 present 缓冲。驱动回读写什么、何时写、写到哪，从此
+//   无所谓——present 缓冲驱动永不触碰，不存在任何被覆盖的时序窗口。
+//   bundle.buffer 保留纯取证用途：driver 探针继续采样它，下一轮装机日志
+//   与 fb 探针（scratch = fb0 直读）对照，即可一眼定位断层层级。
+//
+// 探针双轨化（90 帧多数表决，verdict 仍由顶带着陆探针驱动）：
+//   · fb 探针（scratch 顶带，GL 行序：行 gameH 到 bufH）——EASU 绘制层
+//     健康。verdict=1 → present 全幅上屏；verdict=-1 → CG 拉伸兜底。
+//   · driver 探针（bundle.buffer 顶带，top-down 行 1 到 bufH-gameH）
+//     ——驱动传输层取证，仅记录，不影响控制流。
+// ============================================================================
+static struct {
+    unsigned char *scratch;      // glReadPixels 目标（GL 行序：行 0 = GL y=0 = 底行）
+    unsigned char *present;      // 翻转后的 top-down 呈现缓冲（CGImage 数据源）
+    int bufW, bufH;              // 已分配尺寸（变更时重分配）
+    bool engaged;                // 首帧一次性日志
+    bool broken;                 // glReadPixels 出错/分配失败 → 本会话停用，回退驱动路径
+    int drvHits, drvFrames;      // driver 探针（bundle.buffer 顶带）——纯取证
+} ame100_present = {0};
+
+static bool ame100_present_frame(int dstW, int dstH) {
+    if (ame100_present.broken) return false;
+    ame83_gl_t *g = &ame83_fsr.gl;
+    if (!g->glReadPixels || !g->glPixelStorei || !g->glGetIntegerv) return false;
+    if (dstW <= 0 || dstH <= 0) return false;
+    // 惰性分配（尺寸变更时重分配；失败一次性熔断回驱动路径）
+    if (ame100_present.bufW != dstW || ame100_present.bufH != dstH) {
+        free(ame100_present.scratch);
+        free(ame100_present.present);
+        size_t sz = (size_t)dstW * (size_t)dstH * 4;
+        ame100_present.scratch = (unsigned char *)malloc(sz);
+        ame100_present.present = (unsigned char *)malloc(sz);
+        if (ame100_present.scratch == NULL || ame100_present.present == NULL) {
+            free(ame100_present.scratch);
+            free(ame100_present.present);
+            ame100_present.scratch = ame100_present.present = NULL;
+            ame100_present.broken = true;
+            NSLog(@"[OSMBridge] Task100 present: alloc %dx%d failed -- driver readback path retained", dstW, dstH);
+            return false;
+        }
+        ame100_present.bufW = dstW;
+        ame100_present.bufH = dstH;
+    }
+    // GL 状态最小侵占：读/绘 FBO 绑定 + 四项 pack 像素存储。其余状态
+    //（program/viewport/纹理）与 glReadPixels 无关，不必触碰。
+    int saveDrawFbo = 0, saveReadFbo = 0;
+    int saveRowLen = 0, saveAlign = 4, saveSkipPx = 0, saveSkipRows = 0;
+    g->glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &saveDrawFbo);
+    g->glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &saveReadFbo);
+    g->glGetIntegerv(GL_PACK_ROW_LENGTH, &saveRowLen);
+    g->glGetIntegerv(GL_PACK_ALIGNMENT, &saveAlign);
+    g->glGetIntegerv(GL_PACK_SKIP_PIXELS, &saveSkipPx);
+    g->glGetIntegerv(GL_PACK_SKIP_ROWS, &saveSkipRows);
+    g->glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    g->glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+    g->glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    g->glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+    g->glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+    g->glReadPixels(0, 0, dstW, dstH, GL_RGBA, GL_UNSIGNED_BYTE, ame100_present.scratch);
+    unsigned int glerr = g->glGetError ? g->glGetError() : 0;
+    // 还原（FBO 双通道分别还回，与 ame83_fsr_upscale 同款纪律）
+    g->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (unsigned int)saveDrawFbo);
+    g->glBindFramebuffer(GL_READ_FRAMEBUFFER, (unsigned int)saveReadFbo);
+    g->glPixelStorei(GL_PACK_ROW_LENGTH, saveRowLen);
+    g->glPixelStorei(GL_PACK_ALIGNMENT, saveAlign);
+    g->glPixelStorei(GL_PACK_SKIP_PIXELS, saveSkipPx);
+    g->glPixelStorei(GL_PACK_SKIP_ROWS, saveSkipRows);
+    if (glerr != 0) {
+        ame100_present.broken = true;
+        NSLog(@"[OSMBridge] Task100 present readback FAILED: glErr=0x%04x -- reverting to driver readback path", glerr);
+        return false;
+    }
+    // 行序翻转：scratch 行 r = GL y=r（底起）；present 行 0 = 图像顶行
+    //（OSMESA_Y_UP=0 语义，与驱动回读/CGImage 布局一致）。
+    size_t stride = (size_t)dstW * 4;
+    for (int row = 0; row < dstH; ++row) {
+        memcpy(ame100_present.present + (size_t)row * stride,
+               ame100_present.scratch + (size_t)(dstH - 1 - row) * stride, stride);
+    }
+    if (!ame100_present.engaged) {
+        ame100_present.engaged = true;
+        NSLog(@"[OSMBridge] Task100 present path engaged: authoritative fb0 readback %dx%d -> present buffer "
+              "(driver glFinish readback bypassed for display; bundle.buffer kept for transport forensics)", dstW, dstH);
+    }
+    return true;
+}
+
 void osm_apply_current_ll() {
     // Task 83：缓冲 = 全尺寸表面（FSR 联动下 MC 窗口 < 表面，MC 把帧画进
     // 区域，osm_swap_buffers 再 EASU 铺满）。ame_surfaceWidth==0（启动极早期/
@@ -567,12 +691,13 @@ void osm_swap_buffers() {
     // （尺寸/捆绑层故障）。
     ++ame99_fsrdiag.swaps;
     if ((ame99_fsrdiag.swaps % 120) == 0) {
-        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d",
+        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d",
               ame99_fsrdiag.swaps, windowWidth, windowHeight,
               currentBundle ? currentBundle->osm.width : 0,
               currentBundle ? currentBundle->osm.height : 0,
               (void *)currentBundle, ame83_fsr.frames,
-              ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict);
+              ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict,
+              (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames);
     }
     // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
     //
@@ -606,35 +731,50 @@ void osm_swap_buffers() {
     osm_render_window_t bundle = currentBundle->osm;
 
     // ------------------------------------------------------------------
-    // Task 99（修复 B）：EASU 落地探针 + CG 拉伸兜底。
+    // Task 100（修复 B 续）：权威呈现。FSR 帧不再信任驱动 glFinish 回读——
+    // EASU 已在上方画进 fb0，glFinish 已同步完成，此刻显式绑 fb0 全幅
+    // glReadPixels 即得权威画面；present 缓冲驱动永不触碰，上屏内容
+    // 与驱动回读行为彻底解耦（病历详见 ame100_present_frame 头注）。
+    // ------------------------------------------------------------------
+    bool presentThisFrame = false;
+    if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0) {
+        presentThisFrame = ame100_present_frame((int)bundle.width, (int)bundle.height);
+    }
+
+    // ------------------------------------------------------------------
+    // Task 99/100：EASU 落地探针（双轨）+ CG 拉伸兜底。
     //
-    // 病灶（b919e0f 装机日志，BMC2 1.20.1 + zink + FSR preset2）：
-    //   MC 窗口 1572x1092 渲染进 2360x1640 OSMesa 缓冲的左下角区域，
-    //   EASU engaged 且条件恒成立，但用户看到"游戏界面蜷缩在左下角"——
-    //   即升采样输出没有落到回读 client buffer，上屏的是裸游戏帧。
-    //   对照组 f17ef7b（26.3-rc-3 + zink + FSR，同一代码）满屏正常：
-    //   差异在 MC 版本路径（GLFW 1.20.1 vs SDL3 26.3）的 GL 终态/回读
-    //   行为，具体断层待本轮 GPU/CPU 双探针日志定位。
-    //
-    // 探针（CPU 侧，回读完成后读 client buffer 本体，零 GL 开销）：
-    //   顶带 = buffer 行 0 至 bufH-gameH（OSMESA_Y_UP=0：GL 的 y 从 gameH
-    //   到 bufH 映射到 buffer 顶部条带）——游戏视口永不写这里，EASU 全幅视口
-    //   必写。采 16 点，任一非零记"命中"。
-    // 判决：90 帧多数表决。命中 < 1/3 → 判"EASU 未落地"，切换 CG 拉伸
-    //   兜底并把 EASU 判为无增益（本会话内不再依赖其输出）。
-    // 兜底呈现：把 buffer 的游戏区域（左下 gameW×gameH，行距 = 全宽
-    //   stride）包成 CGImage，CoreAnimation 拉伸到 layer bounds——几何
-    //   立即全屏正确（双线性，软于 EASU 但远好于蜷角）。
+    // 探针 A（fb，驱动判决）：scratch = fb0 直读，采样 GL 行序顶带
+    //   （行 gameH+1 到 bufH-1——游戏视口永不写、EASU 全幅视口必写）。
+    //   16 点任一非零记命中；90 帧多数表决 → verdict=1/-1。
+    // 探针 B（driver，纯取证）：bundle.buffer 顶带（top-down 行 1 到
+    //   bufH-gameH，与 Task99 旧口径一致）。若 A 命中而 B 未命中，
+    //   即实锤驱动传输层断裂（下一轮装机日志可一眼定位）。
+    // 判决：verdict=1 → present 全幅上屏（EASU 画面）；verdict=-1 →
+    //   CG 拉伸兜底（present/bundle 游戏区域裁剪 → CoreAnimation 全屏）。
     // ------------------------------------------------------------------
     bool cgStretchThisFrame = false;
     int gameW = windowWidth, gameH = windowHeight;
     if (fsrActiveThisFrame && ame99_fsrdiag.verdict == 0 &&
         gameW > 0 && gameH > 0 &&
         (uint32_t)gameW < bundle.width && (uint32_t)gameH < bundle.height) {
-        // 顶带探针
-        const unsigned char *base = (const unsigned char *)bundle.buffer;
         size_t stride = (size_t)bundle.width * 4;
         int stripRows = (int)bundle.height - gameH;
+        // —— 探针 A：scratch（fb0 直读，GL 行序：高行 = 图像顶带）——
+        if (presentThisFrame && stripRows > 2) {
+            const unsigned char *fb = ame100_present.scratch;
+            int nz = 0;
+            for (int i = 0; i < 16; ++i) {
+                int row = gameH + 1 + (i * (stripRows - 2)) / 15;   // GL y 从 gameH+1 到 bufH-1
+                int col = (int)(((i * 577u) % 1000u) * (bundle.width - 1)) / 999;
+                const unsigned char *px = fb + (size_t)row * stride + (size_t)col * 4;
+                if (px[0] | px[1] | px[2]) ++nz;
+            }
+            ++ame99_fsrdiag.probeFrames;
+            if (nz > 0) ++ame99_fsrdiag.probeHits;
+        }
+        // —— 探针 B：bundle.buffer（驱动传输取证，top-down 顶带）——
+        const unsigned char *base = (const unsigned char *)bundle.buffer;
         if (stripRows > 0 && base != NULL) {
             int nz = 0;
             for (int i = 0; i < 16; ++i) {
@@ -643,21 +783,26 @@ void osm_swap_buffers() {
                 const unsigned char *px = base + (size_t)row * stride + (size_t)col * 4;
                 if (px[0] | px[1] | px[2]) ++nz;
             }
-            ++ame99_fsrdiag.probeFrames;
-            if (nz > 0) ++ame99_fsrdiag.probeHits;
-            if (ame99_fsrdiag.probeFrames >= kAme99ProbeFrames) {
-                ame99_fsrdiag.verdict =
-                    (ame99_fsrdiag.probeHits * 3 >= kAme99ProbeFrames) ? 1 : -1;
-                if (ame99_fsrdiag.verdict == 1) {
-                    NSLog(@"[OSMBridge] Task99 FSR landing verified: top-strip nonzero in %d/%d frames -- EASU output reaches the readback buffer",
-                          ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames);
-                } else {
-                    NSLog(@"[OSMBridge] Task99 FSR NOT landing: top-strip nonzero in only %d/%d frames -- "
-                          "EASU draw never reaches the readback buffer on this path; engaging CG stretch fallback "
-                          "(game region %dx%d presented full-screen via CoreAnimation; geometry correct, bilinear soft). "
-                          "Pair with the Task99 GPU probe line above to locate the broken layer (draw vs readback).",
-                          ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, gameW, gameH);
-                }
+            ++ame100_present.drvFrames;
+            if (nz > 0) ++ame100_present.drvHits;
+        }
+        if (ame99_fsrdiag.probeFrames >= kAme99ProbeFrames) {
+            ame99_fsrdiag.verdict =
+                (ame99_fsrdiag.probeHits * 3 >= kAme99ProbeFrames) ? 1 : -1;
+            if (ame99_fsrdiag.verdict == 1) {
+                NSLog(@"[OSMBridge] Task100 EASU landing verified in fb0: top-strip nonzero %d/%d frames (authoritative readback); "
+                      "driver transport check: %d/%d -- driver readback %s",
+                      ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames,
+                      ame100_present.drvHits, ame100_present.drvFrames,
+                      (ame100_present.drvHits * 3 >= kAme99ProbeFrames)
+                          ? "consistent (Task99 misdiagnosis ruled out)"
+                          : "stale/partial on this path (present path bypasses it)");
+            } else {
+                NSLog(@"[OSMBridge] Task100 EASU NOT landing in fb0: top-strip nonzero only %d/%d -- "
+                      "engaging CG stretch fallback (game region %dx%d presented full-screen via CoreAnimation; "
+                      "geometry correct, bilinear soft); driver transport check: %d/%d",
+                      ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, gameW, gameH,
+                      ame100_present.drvHits, ame100_present.drvFrames);
             }
         }
     }
@@ -673,10 +818,14 @@ void osm_swap_buffers() {
     if (cgStretchThisFrame) {
         // Task 99 兜底：只包游戏区域（左下 gameW×gameH），bytesPerRow =
         // 全宽 stride；CoreAnimation 把它拉伸到 layer bounds = 几何全屏。
+        // Task 100：数据源优先 present 缓冲（fb0 直读权威内容，EASU 未
+        // 落地时其角落 = 本帧裸游戏帧）；present 熔断时回退 bundle.buffer。
         size_t stride = (size_t)bundle.width * 4;
         int topRow = (int)bundle.height - gameH;   // OSMESA_Y_UP=0：GL 的 y 从 0 到 gameH → 底部行区间
+        const unsigned char *cropSrc = presentThisFrame ? ame100_present.present
+                                                        : (const unsigned char *)bundle.buffer;
         CGDataProviderRef regionProvider = CGDataProviderCreateWithData(
-            NULL, (const uint8_t *)bundle.buffer + (size_t)topRow * stride,
+            NULL, cropSrc + (size_t)topRow * stride,
             (size_t)gameH * stride, NULL);
         CGImageRef region = CGImageCreate(gameW, gameH, 8, 32, stride, bundle.color_space,
                                           kCGImageAlphaNoneSkipLast | kCGBitmapByteOrderDefault,
@@ -684,6 +833,21 @@ void osm_swap_buffers() {
         SurfaceViewController.surface.layer.contents = (__bridge id)region;
         CGImageRelease(region);
         CGDataProviderRelease(regionProvider);
+        return;
+    }
+    if (presentThisFrame) {
+        // Task 100 权威呈现：CGImage 包 present 缓冲（fb0 直读 + 行序翻转，
+        // 全幅 EASU 升采样画面）。驱动回读何时/如何写 bundle.buffer 与
+        // 上屏无关；非 FSR 会话与 present 熔断会话走下方旧路径（零回归）。
+        CGDataProviderRef presentProvider = CGDataProviderCreateWithData(
+            NULL, ame100_present.present, (size_t)bundle.width * bundle.height * 4, NULL);
+        CGImageRef presentImg = CGImageCreate(bundle.width, bundle.height, 8, 32, 4 * bundle.width,
+                                              bundle.color_space,
+                                              kCGImageAlphaNoneSkipLast | kCGBitmapByteOrderDefault,
+                                              presentProvider, NULL, FALSE, kCGRenderingIntentDefault);
+        SurfaceViewController.surface.layer.contents = (__bridge id)presentImg;
+        CGImageRelease(presentImg);
+        CGDataProviderRelease(presentProvider);
         return;
     }
     CGDataProviderRef bitmapProvider = CGDataProviderCreateWithData(NULL, bundle.buffer, bundle.width * bundle.height * 4, NULL);

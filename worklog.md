@@ -868,3 +868,34 @@ Work Log:
 
 Stage Summary:
 - 新 IPA 可装机验证；判读锚点见 Task 99 主段（[AppKitStub] Task99 / [OSMBridge] Task99 三件套）
+
+---
+Task ID: 100
+Agent: main (Super Z)
+Task: f6352dc/7a30912 日志对判读 + 双修复二轮——(A) 26.3 windowsMenu 桩出口（Task99 桩生效后暴露的第二层）；(B) BMC2 蜷角根因实锤（Task99 探针全绿却依旧蜷缩 = 驱动回读残影误诊）→ 权威呈现路径
+
+Work Log:
+- 拉取用户两个新上传提交（f6352dc=latestlog.txt、7a30912=latestlog.old.txt，均为 ccabe82 构建 = Task99 IPA，装机后两问题依旧）
+- 日志一判读（26.3 fabric-loader-0.19.5-26.3，110 mods，zink）：
+  * Task97/98/99 全部生效：[LWJGLSel] 341 ✓ / [CwdAlign] ✓ / [AppKitStub] installed ✓，安全网还捕获了 javaPeer/windowsMenu 两个未预期选择子（留痕生效）
+  * MacosUtil 旧崩溃（NoSuchMethodException）消失，推进一层后死于新签名：NullPointerException "Cannot invoke Proxy.sendInt because windowsMenu is null" @ MacosUtil.java:27 ← Window.<init>
+  * 根因：NSApplication 桩无 windowsMenu 出口 → resolveInstanceMethod 通用兜底返回 nil → jna-objc 包装成 Java null → 首句 sendInt NPE。即 Task99 修掉"类不存在"层，暴露"菜单出口缺失"层
+- 日志二判读（BMC2 1.20.1，zink+FSR preset2）——诊断大反转：
+  * Task99 三件套全绿：GPU 探针 000000ff（alpha 已写非全零）、CPU 探针 88/90 非零 → verdict=1、心跳稳定到 swap#1080、60fps、用户在角落里打字（[InputDiag] sendKey/sendCursorPos 活跃）
+  * 但画面依旧蜷缩左下角 → 唯一自洽解释：驱动 glFinish 回读把滞后/回读前的裸游戏帧写进 client buffer 角落，顶带残留旧内容（非零）→ 探针误诊"已落地"（探针只验非零，分不清新鲜 EASU 与残影）
+  * 结论：自定义 libOSMesa 的 glFinish 回读在 GLFW/1.20.1 路径不可信；驱动黑盒不再深挖，改由启动器自己呈现
+- 修复 A（JavaLauncher.m）：NSApplication 桩补 windowsMenu/appleMenu/helpMenu/servicesMenu 四菜单出口（全部返回共享 NSMenu 桩，numberOfItems=0 巡游零次）；"[AppKitStub] Task100: windowsMenu requested" 一次性锚点；病历注释钉 7a30912 NPE 签名
+- 修复 B（osm_bridge.mm ame100_present_frame 权威呈现）：
+  * glFinish 后显式绑 fb0 + glReadPixels 全幅入 scratch（pack 四项锁定还原：ROW_LENGTH/ALIGNMENT/SKIP_PIXELS/SKIP_ROWS；读/绘 FBO 双通道保存还原）
+  * 行序翻转（GL 底起 → OSMESA_Y_UP=0 顶起）拷入 present 缓冲——驱动永不触碰的独立上屏源，CGImage 改包 present；熔断语义（glErr/分配失败 → broken 永久回退旧路径，零回归）
+  * 探针双轨：fb 探针（scratch=fb0 直读）驱动 verdict；driver 探针（bundle.buffer 旧口径）纯取证——下一轮日志"fb 命中而 driver 未命中"即实锤传输层断裂
+  * CG 兜底数据源优先 present；心跳追加 present/drvProbe 字段；理论免疫：无论驱动回读滞后/残影/错源/缺失，上屏恒为 fb0 直读画面
+- 惯性修偏：kCGImageRenderingIntentDefault→kCGRenderingIntentDefault 三处；NSLog 去掉 %@（保 task85 门 @" 变换正则不被击穿）；半开区间注释改中文写法（保括号平衡校验）
+- 校验与级联：verify_task100.py 新增 57 项全绿（A/B git 钉日志证据、C/D 实现锚点、E 行为矩阵、F FAQ+version+级联、G 卫生）；task85 D1 门扩 ame100 桩+第三处 contents 变换（24/24）；task99 D7/E3 重锚 Task100 措辞（55/55）；FAQ 两条目内容刷新计数不变 32（零计数级联）；version.h REVISION 17 addendum (Task 100, no bump)
+- 全量级联：83:73/73、84:31/31、85:24/24、86:33/33、87:50/50、94:45/45、95:59/59、97:30/30、98:35/35、99:55/55、100:57/57；语法门 task99_syntax OK；前端 verify_task96 37/38（唯一失败 = 未提交改动类，提交后自愈）
+
+Stage Summary:
+- 26.3 预期链路：windowsMenu 出桩 → numberOfItems=0 → Window.<init> 继续 → 与 rc-3 同族完整会话
+- BMC2 预期：present path engaged → 上屏 = fb0 直读全幅 EASU；蜷角无论根因是驱动回读哪一层都被整体绕过
+- 装机锚点：26.3 会话 "[AppKitStub] Task100: windowsMenu requested" 后不再有 MacosUtil NPE（若再见 unexpected selector 行 = 26.3+ 又调新接口需扩桩）；BMC2 会话 "[OSMBridge] Task100 present path engaged" + "EASU landing verified in fb0 ... driver transport check: N/90 -- driver readback consistent/stale"（一行同时看两层体检）+ 心跳 "present=1 drvProbe=..."
+- 遗留：⌨ 虚拟键盘二轮诊断仍缺新证据（本轮 [InputDiag] 显示 sendKey/sendCursorPos/button text 全链在工作）；FSR 替换方案调研结论（推荐 NVIDIA NIS）待答复用户

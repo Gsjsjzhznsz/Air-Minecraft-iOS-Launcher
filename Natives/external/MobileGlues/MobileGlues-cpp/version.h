@@ -497,6 +497,27 @@
 // presenting the game region full-screen via CoreAnimation when EASU is
 // verified not landing ("[OSMBridge] Task99" anchors). FAQ 30->32
 // (+macMenuStub, +fsrCorner). Launcher-side only, REVISION stays 17.
+// REVISION 17 addendum (Task 100, no bump): two follow-ups from the
+// f6352dc/7a30912 device-log pair (ccabe82 build = Task99 IPA, both problems
+// still present on device). (A) 26.3: the Task99 stubs worked
+// (sharedApplication returned the stub app) but MC 26.3's MacosUtil then
+// fetched "windowsMenu" which hit the generic nil no-op -> jna-objc returned
+// Java null -> NPE "because windowsMenu is null" at MacosUtil.java:27;
+// NSApplication stub now answers windowsMenu/appleMenu/helpMenu/servicesMenu
+// with the shared NSMenu stub ("[AppKitStub] Task100: windowsMenu requested"
+// anchor). (B) BMC2 1.20.1 + zink + FSR: Task99's probes were all green (GPU
+// probe alpha-stamped, CPU probe 88/90 nonzero -> verdict=1, heartbeat stable
+// to swap#1080) yet the screen still showed the live game shrunk bottom-left
+// -- proof the driver's glFinish readback fills the client buffer with a
+// stale/pre-EASU image (nonzero top-strip = residue, misread as landing);
+// osm_bridge now performs an authoritative present: after glFinish it binds
+// fb0, glReadPixels the full surface into a scratch buffer, row-flips it into
+// a driver-untouched present buffer, and the CGImage wraps THAT (the driver
+// readback is bypassed for display entirely; bundle.buffer kept only for a
+// forensic dual-track probe -- fb probe drives the verdict, driver probe
+// reports transport health) ("[OSMBridge] Task100" anchors). FAQ content
+// refreshed in place (macMenuStub/fsrCorner, count stays 32). Launcher-side
+// only, REVISION stays 17.
 #define REVISION 17
 #define PATCH 0
 

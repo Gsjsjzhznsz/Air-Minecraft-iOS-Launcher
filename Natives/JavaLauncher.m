@@ -725,6 +725,25 @@ static id ame99_shared_menu_stub(void);
 // —— IMP 实现（类型编码与 AppKit 真实声明一致，jna-objc 按编码选 marshaller）
 static id ame99_app_sharedApplication(id self, SEL _cmd) { return ame99_shared_app_stub(); }
 static id ame99_app_mainMenu(id self, SEL _cmd) { return ame99_shared_menu_stub(); }
+// Task 100（修复 A 续）：NSApplication 的全部菜单出口都返回共享菜单桩。
+// 病历（7a30912 装机日志，ccabe82 构建）：Task99 桩让 sharedApplication 成功
+// 返回桩实例后，MC 26.3 的 MacosUtil 继续取 windowsMenu——该选择子当时未
+// 显式实现，resolveInstanceMethod 兜底返回 nil，jna-objc 把 nil 包装成 Java
+// null 返回，MacosUtil.java:27 第一句 windowsMenu.sendInt(...) 即 NPE：
+//   java.lang.NullPointerException: Cannot invoke "ca.weblite.objc.Proxy.sendInt"
+//     because "windowsMenu" is null  at MacosUtil.disableCloseWindowMenuItem(:27)
+// 修复：windowsMenu 显式返回 NSMenu 桩（numberOfItems=0 → 巡游零次返回），
+// appleMenu/helpMenu/servicesMenu 同批补齐（同一菜单访问器家族，防下一层
+// 踩空；宁可多补不可再 NPE）。
+static id ame99_app_windowsMenu(id self, SEL _cmd) {
+    static bool s_logged = false;
+    if (!s_logged) {
+        s_logged = true;
+        NSLog(@"[AppKitStub] Task100: windowsMenu requested -> NSMenu stub returned "
+              @"(7a30912 NPE at MacosUtil.java:27 fixed; menu walk no-ops)");
+    }
+    return ame99_shared_menu_stub();
+}
 static NSArray *ame99_app_windows(id self, SEL _cmd) { return @[]; }
 static long ame99_menu_numberOfItems(id self, SEL _cmd) { return 0; }          // NSInteger
 static id ame99_menu_itemAtIndex(id self, SEL _cmd, long index) { return nil; }
@@ -816,6 +835,12 @@ static void ame99_installAppKitMenuStubs(void) {
         class_addMethod(object_getClass(appCls), @selector(sharedApplication),
                         (IMP)ame99_app_sharedApplication, "@@:");
         class_addMethod(appCls, @selector(mainMenu), (IMP)ame99_app_mainMenu, "@@:");
+        // Task 100（修复 A 续）：菜单访问器全家族（windowsMenu 是 7a30912 实锤
+        // 崩溃点；appleMenu/helpMenu/servicesMenu 为同族预防性补齐）
+        class_addMethod(appCls, @selector(windowsMenu), (IMP)ame99_app_windowsMenu, "@@:");
+        class_addMethod(appCls, @selector(appleMenu), (IMP)ame99_app_windowsMenu, "@@:");
+        class_addMethod(appCls, @selector(helpMenu), (IMP)ame99_app_windowsMenu, "@@:");
+        class_addMethod(appCls, @selector(servicesMenu), (IMP)ame99_app_windowsMenu, "@@:");
         class_addMethod(appCls, @selector(setMainMenu:), (IMP)ame99_noop_v_id, "v@:@");
         class_addMethod(appCls, @selector(windows), (IMP)ame99_app_windows, "@@:");
         class_addMethod(appCls, @selector(delegate), (IMP)ame99_generic_nil, "@@:");

@@ -150,6 +150,9 @@ static struct ame85_fsr_stub ame83_fsr;
 // —— Task99 段桩（swap 段引用 ame99_fsrdiag / kAme99ProbeFrames；真实定义在文件前部）——
 static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed; } ame99_fsrdiag = {0,0,0,0,false};
 #define kAme99ProbeFrames 90
+// —— Task100 段桩（swap 段引用 ame100_present / ame100_present_frame；真实定义在文件前部，Task 100 权威呈现路径）——
+static struct { unsigned char *scratch, *present; int bufW, bufH; bool engaged, broken; int drvHits, drvFrames; } ame100_present = {0,0,0,0,false,false,0,0};
+static bool ame100_present_frame(int w, int h) { (void)w; (void)h; return true; }
 // —— ObjC 桩（真实 TU 为 ObjC++；此处 C 变换验证 C 语义段）——
 typedef void *CGColorSpaceRef; typedef void *CGDataProviderRef; typedef void *CGImageRef;
 typedef void *dispatch_queue_t;
@@ -179,6 +182,9 @@ block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge 
 # Task99 兜底分支的第二处 contents 赋值（region 版）同款变换
 block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge id)region;",
                       "SurfaceViewController_surface_layer_contents_set(region);")
+# Task100 权威呈现分支的第三处 contents 赋值（presentImg 版）同款变换
+block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge id)presentImg;",
+                      "SurfaceViewController_surface_layer_contents_set(presentImg);")
 # dispatch 尾随闭包 → 引用捕获 lambda（ObjC block 隐式捕获局部变量 bundle；
 # g++ 无捕获 lambda 引用它编不过，[&] 等价还原语义）
 block = block.replace("dispatch_async(dispatch_get_main_queue(), ^{",

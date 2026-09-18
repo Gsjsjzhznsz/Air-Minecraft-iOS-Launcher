@@ -134,8 +134,9 @@ check("D5 120-swap 心跳（条件变量全可见）",
       "Task99 swap#%ld" in ob and "ame99_fsrdiag.swaps % 120" in ob)
 check("D6 CPU 顶带探针 90 帧多数表决",
       "kAme99ProbeFrames 90" in ob and "probeHits" in ob and "probeFrames >= kAme99ProbeFrames" in ob)
-check("D7 判决双通道日志（landing verified / NOT landing）",
-      "Task99 FSR landing verified" in ob and "Task99 FSR NOT landing" in ob)
+check("D7 判决双通道日志（Task100 重锚：verdict 改由 fb0 直读探针驱动；旧 Task99 措辞随 7a30912 误诊退役）",
+      "Task100 EASU landing verified in fb0" in ob and "Task100 EASU NOT landing in fb0" in ob and
+      "driver transport check" in ob)
 check("D8 CG 拉伸兜底（游戏区域 region CGImage + stride 行距）",
       "cgStretchThisFrame" in ob and "regionProvider" in ob and
       "CGImageCreate(gameW, gameH, 8, 32, stride" in ob)
@@ -156,9 +157,9 @@ check("E1 FAQ 32 条目（Task98 30 + Task99 +2 macMenuStub/fsrCorner）",
 check("E2 macMenuStub 条目内容（签名 + Task99 验证锚点 + 旧构建指引）",
       any(i == "macMenuStub" for i in items) and
       "MacosUtil" in faq and "[AppKitStub] Task99" in faq)
-check("E3 fsrCorner 条目内容（症状 + CG 兜底说明 + 临时自救）",
+check("E3 fsrCorner 条目内容（Task100 重锚：症状关键词保留 + 权威呈现语义 + 临时自救）",
       any(i == "fsrCorner" for i in items) and
-      "蜷缩在屏幕左下角" in faq and "CG stretch fallback" in faq and "FSR 1.0 超分辨率" in faq)
+      "蜷缩在屏幕左下角" in faq and "[OSMBridge] Task100" in faq and "FSR 1.0 超分辨率" in faq)
 check("E4 类目归位（fsrCorner 在渲染与性能；macMenuStub 在故障排除）",
       "shader, fsrCorner ]" in faq.replace("  ", " ") and "mc26sdl, macMenuStub ]" in faq.replace("  ", " "))
 
