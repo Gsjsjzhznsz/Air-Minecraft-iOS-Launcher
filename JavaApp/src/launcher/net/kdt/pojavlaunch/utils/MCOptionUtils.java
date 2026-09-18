@@ -30,15 +30,28 @@ public class MCOptionUtils
     }
     
     public static void set(String key, String value) {
-        for (int i = 0; i < mLineList.size(); i++) {
-            String line = mLineList.get(i);
-            if (line.startsWith(key + ":")) {
-                mLineList.set(i, key + ":" + value);
-                return;
+        // Task 104：去重写入。MC 的 Options.load 逐行 putString —— 同 key
+        // 多行时【后出现的行覆盖先前的行】。旧实现对重复行只改第一处，
+        // 残留的后续旧行会在 MC 侧覆盖我们的值（例：历史遗留的
+        // inactivityFpsLimit:afk 会让写入的 minimized 失效 → 26.3 的
+        // SHORT_AFK 限帧 30fps）。现在第一处替换、后续重复全部删除。
+        String prefix = key + ":";
+        boolean replaced = false;
+        ListIterator<String> it = mLineList.listIterator();
+        while (it.hasNext()) {
+            String line = it.next();
+            if (line.startsWith(prefix)) {
+                if (!replaced) {
+                    it.set(key + ":" + value);
+                    replaced = true;
+                } else {
+                    it.remove(); // 重复行：MC 侧后行覆盖前行，必须清除
+                }
             }
         }
-        
-        mLineList.add(key + ":" + value);
+        if (!replaced) {
+            mLineList.add(key + ":" + value);
+        }
     }
 
     public static void setDefault(String key, String value) {
@@ -93,5 +106,34 @@ public class MCOptionUtils
             e.printStackTrace();
         }
         mLineList = null;
+    }
+
+    /**
+     * Task 104：从磁盘【重新读取】指定 key 的值（绕过内存链表）。
+     * 用途：save() 后的落盘校验——内存 get() 只能证明内存态，不能证明
+     * MC 即将读取的文件内容（写入路径错位/写入失败/重复行残留都会让
+     * 内存态与磁盘态分叉，26.3 的 30fps 限帧正是这种分叉的实锤现场）。
+     */
+    public static String getFromFile(String key) {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader(Tools.DIR_GAME_PROFILE + "/options.txt"));
+            String line;
+            String last = null;
+            int occurrences = 0;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith(key + ":")) {
+                    last = line.substring(line.indexOf(":") + 1);
+                    occurrences++;
+                }
+            }
+            reader.close();
+            if (occurrences > 1) {
+                System.out.println("[MCOptionUtils] Task104 WARNING: '" + key + "' appears " + occurrences
+                    + " times in options.txt (last-wins at MC side): " + last);
+            }
+            return last;
+        } catch (IOException e) {
+            return "<read-failed: " + e.getClass().getSimpleName() + ">";
+        }
     }
 }

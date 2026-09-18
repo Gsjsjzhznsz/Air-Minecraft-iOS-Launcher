@@ -150,6 +150,18 @@ public class PojavLauncher {
         
         MCOptionUtils.save();
 
+        // Task 104（26.3 30fps 取证闭环）：落盘校验。上面内存 get() 的回显
+        // 只能证明内存态；这里从磁盘重读 MC 即将加载的 options.txt，下一轮
+        // 装机日志即可一锤定音"写入是否真的落到了 MC 读的文件"。
+        // 已知异常现场：26.3 运行期以 AFK 模式跑（SHORT_AFK=30fps 实锤），
+        // 而启动器明明写了 minimized —— 分叉点就在这层。
+        if ("1".equals(System.getenv("POJAV_DISABLE_VSYNC"))) {
+            System.out.println("[PojavLauncher] Task104 on-disk verification: "
+                + "inactivityFpsLimit=" + MCOptionUtils.getFromFile("inactivityFpsLimit")
+                + " maxFps=" + MCOptionUtils.getFromFile("maxFps")
+                + " enableVsync=" + MCOptionUtils.getFromFile("enableVsync"));
+        }
+
         // 提示 renderpearl 跳过 OIT 管线编译
         System.setProperty("com.mojang.renderpearl.disableOIT", "true");
         System.setProperty("com.mojang.renderpearl.skipOIT", "true");

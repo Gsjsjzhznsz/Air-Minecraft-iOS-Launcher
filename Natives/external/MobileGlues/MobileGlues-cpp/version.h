@@ -568,3 +568,28 @@
 // present-vs-bundle memcmp (same-source transport forensics); heartbeat
 // gains mk=N/M. FAQ 32->33 (+sodiumGlsl, fsrCorner refreshed). Launcher
 // side + shaderc_include.c only, REVISION stays 17.
+
+// REVISION 17 addendum (Task 104, no bump): two fixes from the 341c110
+// log pair (d00d695 build). (A) 26.3 FSR stuck at 30fps: MC 26.3's
+// FramerateLimitTracker runs SHORT_AFK (min(maxFps,30)) when
+// inactivityFpsLimit==AFK (26.3 default) and no MC-visible input for 60s
+// -- modpack loading takes minutes -> the whole load + idle phases were
+// capped at 30 (watchdog caught the render thread parked in
+// FramerateLimiter.limitDisplayFPS). Fix layers: MCOptionUtils dedup
+// (last-line-wins at MC load made our minimized write fragile) + on-disk
+// post-save verification log; input_bridge_v3 AFK heartbeat pushes a
+// (0,0) SDL_MOUSEWHEEL every 45s -> MouseHandler.onScroll calls
+// onInputReceived unconditionally after the handle check, so the 60s
+// clock can never expire while the game runs. Zero side effects:
+// overlay!=null skips the body, in-game (0,0) wheel early-returns.
+// (B) BMC2 corner-shrink round 3: the (0,0) sentinel proved only that
+// SOME EASU fragment ran in the corner -- coverage remained unproven.
+// The EASU fragment shader now stamps the same per-frame marker at the
+// FAR corner too (top-right 4x4 block); the vote requires BOTH markers
+// -> corner-only coverage flips the verdict to NOT LANDED and the CG
+// stretch fallback takes over (geometry full-screen either way; fallback
+// upgrades layer filters to Linear, LANDED restores Nearest). One-shot
+// Task104 viewport check logs what the driver actually holds after
+// glViewport. Desktop anchor lines: '[InputDiag] Task104 AFK heartbeat',
+// '[PojavLauncher] Task104 on-disk verification', '[OSMBridge] Task104
+// EASU viewport check', 'far=N/M' in the swap heartbeat.

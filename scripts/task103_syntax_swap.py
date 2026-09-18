@@ -61,7 +61,7 @@ struct ame83_stub {
 static ame83_stub ame83_fsr;
 struct ame99_stub {
     long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed;
-    int mkHits, mkState, mkConsecM, mkConsecMiss; bool final90Logged;
+    int mkHits, mkState, mkConsecM, mkConsecMiss; int mkFarHits; bool final90Logged;
 };
 static ame99_stub ame99_fsrdiag;
 #define kAme99ProbeFrames 90
@@ -69,6 +69,7 @@ static struct {
     unsigned char *scratch; unsigned char *present;
     int bufW, bufH; bool engaged, broken; int drvHits, drvFrames;
 } ame100_present;
+static bool ame104_filters_linear = false;   // Task104：呈现层滤镜状态（swap 两个分支共享）
 struct osm_bundle_t { uint32_t width, height; void *buffer; void *color_space; };
 // ---- 桩：CG / Surface / dispatch ----
 static void *dispatch_get_main_queue(void) { return (void *)1; }
@@ -77,7 +78,9 @@ static CGDataProviderRef CGDataProviderCreateWithData(void *, const void *, size
 static CGImageRef CGImageCreate(uint32_t, uint32_t, int, int, size_t, void *, int, CGDataProviderRef, void *, int, int) { return 0; }
 static void CGImageRelease(CGImageRef) {}
 static void CGDataProviderRelease(CGDataProviderRef) {}
-static struct { struct { struct { id contents; } layer; } surface; } SurfaceViewController;
+static struct { struct { struct { id contents; id magnificationFilter; id minificationFilter; } layer; } surface; } SurfaceViewController;
+#define kCAFilterLinear ((id)1)
+#define kCAFilterNearest ((id)2)
 // ---- osm_apply_current_ll / ame83_fsr_upscale / ame100_present_frame 桩 ----
 static void osm_apply_current_ll(void) {}
 static bool ame83_fsr_upscale(int, int, int, int) { return true; }

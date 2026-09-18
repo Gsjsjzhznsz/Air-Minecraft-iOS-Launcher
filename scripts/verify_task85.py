@@ -150,7 +150,7 @@ struct ame85_fsr_stub { bool healed; long frames; bool markerArmed; unsigned mar
 static struct ame85_fsr_stub ame83_fsr;
 // —— Task99 段桩（swap 段引用 ame99_fsrdiag / kAme99ProbeFrames；真实定义在文件前部）——
 static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed;
-  int mkHits, mkState, mkConsecM, mkConsecMiss; bool final90Logged; } ame99_fsrdiag = {0,0,0,0,false,0,0,0,0,false};
+  int mkHits, mkState, mkConsecM, mkConsecMiss; int mkFarHits; bool final90Logged; } ame99_fsrdiag = {0,0,0,0,false,0,0,0,0,0,false};
 #define kAme99ProbeFrames 90
 // —— Task100 段桩（swap 段引用 ame100_present / ame100_present_frame；真实定义在文件前部，Task 100 权威呈现路径）——
 static struct { unsigned char *scratch, *present; int bufW, bufH; bool engaged, broken; int drvHits, drvFrames; } ame100_present = {0,0,0,0,false,false,0,0};
@@ -170,6 +170,9 @@ static CGColorSpaceRef CGColorSpaceCreateDeviceRGB(void) { return NULL; }
 static void CGColorSpaceRelease(CGColorSpaceRef a) { (void)a; }
 static void *reallocf(void *p, size_t s) { (void)p; (void)s; return NULL; }
 static void *SurfaceViewController_surface_layer_contents_set(void *v) { (void)v; return NULL; }
+// Task104：滤镜属性赋值变换桩（kCAFilter* 归一为 set 调用）
+static void SurfaceViewController_surface_layer_filter_set(int which) { (void)which; }
+static bool ame104_filters_linear = false;   // Task104：块外定义的文件级旗标桩
 struct ame85_surf_stub { struct { void *layer; } *surface; };
 static struct ame85_surf_stub SurfaceViewController = { NULL };
 #define kCGImageAlphaNoneSkipLast 0
@@ -187,6 +190,15 @@ block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge 
 # Task100 权威呈现分支的第三处 contents 赋值（presentImg 版）同款变换
 block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge id)presentImg;",
                       "SurfaceViewController_surface_layer_contents_set(presentImg);")
+# Task104：兜底/全幅分支的 layer 滤镜赋值（Linear/Nearest 四处）同款变换
+block = block.replace("SurfaceViewController.surface.layer.magnificationFilter = kCAFilterLinear;",
+                      "SurfaceViewController_surface_layer_filter_set(1);")
+block = block.replace("SurfaceViewController.surface.layer.minificationFilter = kCAFilterLinear;",
+                      "SurfaceViewController_surface_layer_filter_set(1);")
+block = block.replace("SurfaceViewController.surface.layer.magnificationFilter = kCAFilterNearest;",
+                      "SurfaceViewController_surface_layer_filter_set(2);")
+block = block.replace("SurfaceViewController.surface.layer.minificationFilter = kCAFilterNearest;",
+                      "SurfaceViewController_surface_layer_filter_set(2);")
 # dispatch 尾随闭包 → 引用捕获 lambda（ObjC block 隐式捕获局部变量 bundle；
 # g++ 无捕获 lambda 引用它编不过，[&] 等价还原语义）
 block = block.replace("dispatch_async(dispatch_get_main_queue(), ^{",

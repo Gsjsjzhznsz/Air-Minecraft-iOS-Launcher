@@ -251,8 +251,9 @@ static struct {
     // Task 103：哨兵票需要持续运行（判决可翻转：标题界面哨兵匹配、进世
     // 界后 EASU 断掉的场景需要能切到 CG 拉伸；反向同理）。
     int mkHits, mkState, mkConsecM, mkConsecMiss;
+    int mkFarHits;      // Task 104：远角哨兵命中数（全幅覆盖证据；票为双哨兵 AND）
     bool final90Logged;   // 旧 90 帧统计日志一次性门（markerArmed 时仅取证不断 overwrite 判决）
-} ame99_fsrdiag = {0, 0, 0, 0, false, 0, 0, 0, 0, false};
+} ame99_fsrdiag = {0, 0, 0, 0, false, 0, 0, 0, 0, 0, false};
 #define kAme99ProbeFrames 90
 
 static bool ame83_resolve_gl(void) {
@@ -420,7 +421,8 @@ static bool ame83_fsr_init(void) {
         writeAt = fsSrc.find(kWriteAnchor); // insert 可能重分配，重新定位
         if (writeAt == std::string::npos) break;
         fsSrc.insert(writeAt + (sizeof(kWriteAnchor) - 1),
-                     "\n    if (ip.x == 0u && ip.y == 0u) oFragColor.a = uMarker; // Task 103: bottom-left pixel alpha carries the sentinel");
+                     "\n    if (ip.x == 0u && ip.y == 0u) oFragColor.a = uMarker; // Task 103: bottom-left pixel alpha carries the sentinel"
+                     "\n    if (float(ip.x) >= uTargetSize.x - 4.0 && float(ip.y) >= uTargetSize.y - 4.0) oFragColor.a = uMarker; // Task 104: far-corner sentinel -- full-surface rasterization proof (corner-only coverage fails here)");
         ame83_fsr.markerArmed = true;
     } while (false);
     unsigned int vs = ame83_compile(g, GL_VERTEX_SHADER, vsSrc.c_str());
@@ -546,6 +548,23 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     }
     g->glBindVertexArray(ame83_fsr.vao);
     g->glViewport(0, 0, dstW, dstH);
+    // Task 104（蜷缩闭环取证）：视口验证——341c110 装机日志实锤 BMC2
+    //（1.20.1/GLFW）会话哨兵在 (0,0) 连中（mk=2519/2519）但 fb0 顶带首帧
+    // 全黑、屏幕蜷角：EASU 光栅化只覆盖了游戏尺寸区域。此处读回驱动
+    // 实际持有的视口，与请求值分叉即一眼定位（clamp/忽略/别的写入者）。
+    {
+        static bool s_ame104_vpLogged = false;
+        if (!s_ame104_vpLogged) {
+            s_ame104_vpLogged = true;
+            GLint vpNow[4] = {0, 0, 0, 0};
+            g->glGetIntegerv(GL_VIEWPORT, vpNow);
+            NSLog(@"[OSMBridge] Task104 EASU viewport check: requested 0,0 %dx%d -> driver holds %d,%d %dx%d%s",
+                  dstW, dstH, vpNow[0], vpNow[1], vpNow[2], vpNow[3],
+                  (vpNow[2] == dstW && vpNow[3] == dstH)
+                      ? " (intact)"
+                      : " (CLAMPED/MISMATCH -- rasterization coverage suspect; far-corner sentinel gates the verdict)");
+        }
+    }
     g->glDrawArrays(GL_TRIANGLES, 0, 6);
 
     // (2b) Task 99（修复 B）：GPU 侧单次探针 + 错误清扫——读回默认帧缓冲
@@ -566,13 +585,23 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
         if (g->glReadPixels && ame83_fsr.markerArmed) {
             g->glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, mk);
         }
+        // Task 104：远角哨兵单次直读（GL 右上 = 全幅光栅化的必经之地；
+        // BMC2 型“只覆盖游戏区域”的绘制在此处必缺）。
+        unsigned char mkFar[4] = {0, 0, 0, 0};
+        if (g->glReadPixels && ame83_fsr.markerArmed && dstW >= 8 && dstH >= 8) {
+            g->glReadPixels(dstW - 2, dstH - 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, mkFar);
+        }
         unsigned int glerr = g->glGetError ? g->glGetError() : 0;
-        NSLog(@"[OSMBridge] Task99 GPU probe: fb0 top-strip pixel (x=%d,y=%d) rgba=%02x%02x%02x%02x glErr=0x%04x; Task103 sentinel pixel (0,0) alpha=%02x expect=%02x %s",
+        NSLog(@"[OSMBridge] Task99 GPU probe: fb0 top-strip pixel (x=%d,y=%d) rgba=%02x%02x%02x%02x glErr=0x%04x; Task103 sentinel pixel (0,0) alpha=%02x expect=%02x %s; Task104 far-corner (%d,%d) alpha=%02x %s",
               dstW - 8, dstH - 4, px[0], px[1], px[2], px[3], glerr,
               mk[3], (unsigned)(ame83_fsr.markerCode & 0xffu),
               (ame83_fsr.markerArmed && mk[3] == (unsigned char)ame83_fsr.markerCode)
                   ? "MATCH (draw + direct readback healthy pre-glFinish)"
-                  : "MISMATCH (draw did not land, or direct readback already stale)");
+                  : "MISMATCH (draw did not land, or direct readback already stale)",
+              dstW - 2, dstH - 2, mkFar[3],
+              (ame83_fsr.markerArmed && mkFar[3] == (unsigned char)ame83_fsr.markerCode)
+                  ? "MATCH (full-surface coverage)"
+                  : "MISS (coverage limited to game region -- CG stretch fallback will engage)");
     }
 
     // (3) 还原（FBO 双通道分别还回，模组的非对称 read/draw 绑定不受扰动；
@@ -636,6 +665,10 @@ static struct {
     bool broken;                 // glReadPixels 出错/分配失败 → 本会话停用，回退驱动路径
     int drvHits, drvFrames;      // driver 探针（bundle.buffer 顶带）——纯取证
 } ame100_present = {0};
+
+// Task 104：呈现层滤镜状态（CG 拉伸兜底期 Linear，EASU 落地还原 Nearest）。
+// 文件级单一事实源：swap 的两个分支（兜底/全幅）读写同一旗标。
+static bool ame104_filters_linear = false;
 
 static bool ame100_present_frame(int dstW, int dstH) {
     if (ame100_present.broken) return false;
@@ -751,14 +784,15 @@ void osm_swap_buffers() {
     // （尺寸/捆绑层故障）。
     ++ame99_fsrdiag.swaps;
     if ((ame99_fsrdiag.swaps % 120) == 0) {
-        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d",
+        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d far=%d/%d",
               ame99_fsrdiag.swaps, windowWidth, windowHeight,
               currentBundle ? currentBundle->osm.width : 0,
               currentBundle ? currentBundle->osm.height : 0,
               (void *)currentBundle, ame83_fsr.frames,
               ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict,
               (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames,
-              ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames);
+              ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
+              ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames);
     }
     // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
     //
@@ -839,9 +873,28 @@ void osm_swap_buffers() {
             // 可翻转判决（跨阶段状态变化：标题界面→进世界）。
             if (ame83_fsr.markerArmed && ame83_fsr.markerCode != 0) {
                 unsigned char got = ame100_present.scratch[3];
-                bool mkHit = (got == (unsigned char)ame83_fsr.markerCode);
+                // Task 104（蜷缩根治）：远角哨兵——341c110 装机日志实锤
+                // BMC2（1.20.1/GLFW/zink）会话 (0,0) 哨兵连中 2519/2519 但
+                // 屏幕仍蜷角：单左下哨兵只能证明“角落里有 EASU 片元”，
+                // 证不了全幅覆盖。远角（GL 右上，present 行序翻转后仍为
+                // 屏幕右上）是全幅光栅化的必经之地——只覆盖游戏区域的
+                // 绘制在此必缺。票改为双哨兵 AND：任一缺失 = 未落地 →
+                // CG 拉伸兜底接管（几何恒全屏）。
+                unsigned char gotFar = 0;
+                {
+                    size_t stride104 = (size_t)bundle.width * 4;
+                    size_t farIdx = (size_t)(bundle.height - 2) * stride104
+                                    + (size_t)(bundle.width - 2) * 4 + 3;
+                    size_t total104 = (size_t)bundle.width * (size_t)bundle.height * 4;
+                    if (bundle.width >= 8 && bundle.height >= 8 && farIdx < total104) {
+                        gotFar = ame100_present.scratch[farIdx];
+                    }
+                }
+                bool mkHit = (got == (unsigned char)ame83_fsr.markerCode)
+                          && (gotFar == (unsigned char)ame83_fsr.markerCode);
                 if (mkHit) {
                     ++ame99_fsrdiag.mkHits;
+                    ++ame99_fsrdiag.mkFarHits;
                     ++ame99_fsrdiag.mkConsecM;
                     ame99_fsrdiag.mkConsecMiss = 0;
                 } else {
@@ -867,7 +920,7 @@ void osm_swap_buffers() {
                          ame100_present.present != NULL && bundle.buffer != NULL &&
                          memcmp(ame100_present.present, bundle.buffer,
                                 (size_t)bundle.width * (size_t)bundle.height * 4) == 0);
-                    NSLog(@"[OSMBridge] Task103 EASU sentinel verdict: %s (marker %d/%d probe frames, %d consecutive %s); present buffer %s bundle.buffer -- %s",
+                    NSLog(@"[OSMBridge] Task103 EASU sentinel verdict: %s (marker %d/%d probe frames, %d consecutive %s); present buffer %s bundle.buffer -- %s; Task104 far-corner hits %d/%d (both sentinels required for LANDED)",
                           newState == 1
                               ? "LANDED -- full-surface EASU present"
                               : "NOT LANDED -- CG stretch fallback engaged (raw game region stretched full-screen by CoreAnimation)",
@@ -877,7 +930,8 @@ void osm_swap_buffers() {
                           sameAsBundle ? "byte-identical to" : "differs from",
                           newState == 1
                               ? "end-to-end verified: draw landed + readback honest"
-                              : "pre-EASU/stale transport or draw not landing; geometry still corrected via CG stretch");
+                              : "pre-EASU/stale transport or draw not landing; geometry still corrected via CG stretch",
+                          ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames);
                 }
             }
         }
@@ -934,6 +988,16 @@ void osm_swap_buffers() {
         // 全宽 stride；CoreAnimation 把它拉伸到 layer bounds = 几何全屏。
         // Task 100：数据源优先 present 缓冲（fb0 直读权威内容，EASU 未
         // 落地时其角落 = 本帧裸游戏帧）；present 熔断时回退 bundle.buffer。
+        // Task 104：兜底拉伸用双线性——layer 默认 Nearest，2x 拉伸会呈
+        // 明显块状；Linear 让兜底画质接近 EASU（几何本就全屏）。
+        {
+            if (!ame104_filters_linear) {
+                ame104_filters_linear = true;
+                SurfaceViewController.surface.layer.magnificationFilter = kCAFilterLinear;
+                SurfaceViewController.surface.layer.minificationFilter = kCAFilterLinear;
+                NSLog(@"[OSMBridge] Task104 CG stretch fallback: layer filters Nearest -> Linear (bilinear upscale while EASU coverage is limited)");
+            }
+        }
         size_t stride = (size_t)bundle.width * 4;
         int topRow = (int)bundle.height - gameH;   // OSMESA_Y_UP=0：GL 的 y 从 0 到 gameH → 底部行区间
         const unsigned char *cropSrc = presentThisFrame ? ame100_present.present
@@ -953,6 +1017,17 @@ void osm_swap_buffers() {
         // Task 100 权威呈现：CGImage 包 present 缓冲（fb0 直读 + 行序翻转，
         // 全幅 EASU 升采样画面）。驱动回读何时/如何写 bundle.buffer 与
         // 上屏无关；非 FSR 会话与 present 熔断会话走下方旧路径（零回归）。
+        // Task 104：EASU 落地时若先前进过兜底（Linear），还原 Nearest——
+        // 全幅 1:1 像素映射下 Nearest 是零插值正确选择。状态用本地旗标
+        // 跟踪（避免 ObjC 消息发送，兼容 D1 语法门变换）。
+        {
+            if (ame104_filters_linear) {
+                ame104_filters_linear = false;
+                SurfaceViewController.surface.layer.magnificationFilter = kCAFilterNearest;
+                SurfaceViewController.surface.layer.minificationFilter = kCAFilterNearest;
+                NSLog(@"[OSMBridge] Task104 EASU LANDED: layer filters restored to Nearest (full-surface 1:1 present)");
+            }
+        }
         CGDataProviderRef presentProvider = CGDataProviderCreateWithData(
             NULL, ame100_present.present, (size_t)bundle.width * bundle.height * 4, NULL);
         CGImageRef presentImg = CGImageCreate(bundle.width, bundle.height, 8, 32, 4 * bundle.width,
