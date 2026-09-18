@@ -855,3 +855,16 @@ Stage Summary:
   * BMC2 zink+FSR 会话："[OSMBridge] Task99 GPU probe: fb0 top-strip pixel ... rgba=..."（零=绘制层故障/非零=回读层故障）+ "FSR landing verified"（EASU 正常）或 "FSR NOT landing ... engaging CG stretch fallback"（自动兜底，画面即刻全屏）+ "swap#N" 心跳（win=1572x1092 osm=2360x1640 easuFrames 递增=条件恒成立）
   * 若 GPU 探针非零而 CPU 探针全零 → 下一轮修回读层（自定义 libOSMesa 的 glFinish 读回源）；若 GPU 探针也零 → 修绘制层（GL 终态）
 - 26.3 soudim 结论（对用户）：sodium 无罪，两连崩分别是 Task98 已修的 LWJGL 错选与本轮 AppKit 层
+
+---
+Task ID: 99 (续)
+Agent: main (Super Z)
+Task: CI 构建 + 产物验证
+
+Work Log:
+- CI run 35291812637（3df80a8）构建成功（约 10 分钟）
+- 产物齐备：com.air-devs.air-ios.ipa（200.7MB）+ trollstore tipa（200.7MB）+ dSYM
+- 双修复均入包：JavaLauncher AppKit 桩（修复 A）+ osm_bridge FSR 加固/兜底（修复 B）
+
+Stage Summary:
+- 新 IPA 可装机验证；判读锚点见 Task 99 主段（[AppKitStub] Task99 / [OSMBridge] Task99 三件套）
