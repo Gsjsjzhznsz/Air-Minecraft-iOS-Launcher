@@ -911,3 +911,28 @@ Work Log:
 
 Stage Summary:
 - 新 IPA 可装机验证；判读锚点见 Task 100 主段（[AppKitStub] Task100: windowsMenu requested / [OSMBridge] Task100 present path engaged + EASU landing verified in fb0 ... driver transport check / 心跳 present=1 drvProbe=N/M）
+
+---
+Task ID: 101
+Agent: main (Super Z)
+Task: 用户实测截图（IMG_9133）五项 UI 反馈修正：三卡图标/标题更正、七卡内容居中、灰字游戏版本标签退场、侧栏图标与新拟物高亮对齐、主界面图标偶发消失自愈
+
+Work Log:
+- 联网核实（pat-in-a-hat/sf-symbols-reference 全表 9476 符号，SF 1.0→8.0）：SF Symbols 不存在名为 "rabbit" 的符号——Task 96 所写 JIT 卡图标 systemImageNamed:@"rabbit" 必返 nil 走兜底点阵，用户截图证实（JIT 卡显示 circle.grid.2x2）。兔子真名 = hare（SF 1.0，线框兔）；memorychip=SF 2.0、memorychip.fill=SF 3.0
+- LauncherRightPanelViewController.m：JIT 卡 rabbit→hare；内存上限提升→「扩展内存限制」+memorychip.fill（实心 ROM）；扩展虚拟寻址→「扩展虚拟内存」+memorychip（空心 ROM）；更新检测注释与 Task101 留档
+- 卡片工厂重构居中：title/value 竖排 textContentStack + icon 横排 contentStack，内容组 centerX/Y 居中于卡片，leading≥14/trailing≤-12 不等式兜底；标题正文 textAlignment 居中；46pt/圆角12/15% 底/动态字色/缩放全保留；旧左上角锚定约束退役
+- versionLabel（头像下灰字游戏版本 26.3）整体退场：属性/创建/约束/外观分支/updateVersionInfo 引用全清；滚动区上锚改 usernameLabel.bottom+8；游戏版本卡成为该数据唯一出口；版本选择入口（manageVersionBtn）不受影响
+- LauncherMenuViewController.m：去掉空白标题（" "）与 titleEdgeInsets/imageEdgeInsets（原 imageEdgeInsets(-10,0,0,0) 使图标上移偏离 50×50 新拟物高亮中心）；图标内容双居中；nm_convexRadius 选中态原样（task89 C3 兼容）
+- 主界面 house.fill 图标偶发消失自愈：新增 refreshMenuIconImages（幂等，仅补 imageForState 为空者），viewWillAppear + updateButtonColors 双入口；越界防御；root cause 判定为启动早期 systemImageNamed: 时序型 nil（二次启动自愈的用户观察与此吻合）
+- 校验：verify_task101.py 新增 38 项；verify_task96 同步 B2/B4/B10 与文档（38 项）；verify_task88 同步 A4/A8；全量回归见下
+
+Stage Summary:
+- UI 语义零删减：七卡信息、配色、滚动、按钮配色、检测口径（getEntitlementValue×2 / isJITEnabled+TXM / 刷新三件套）全部保持；仅图标/标题/居中/冗余标签/侧栏对齐/自愈六处按用户反馈变化
+- 用户预期：JIT 卡显示橙色线框兔（hare）；两内存卡显示实心/空心 ROM 芯片且更名；卡片内容居中；头像下 26.3 消失；侧栏图标在高亮面板正中且启动后不再消失
+- 校验器协同：verify_task88 E1/verify_task89 E1 预期文件集扩容（Task101 合法改动面）；
+  verify_task95 REPO 改 TASK95_REPO 环境变量可覆盖（默认值保留，原硬编码克隆路径已不存在，
+  TASK95_REPO 指向本仓库实测 59/59）
+- 全量回归（未提交态）：task101 39/40、task96 37/38、task92 39/40、task93 24/25
+  （各差 1 项均为「无未提交改动」卫生类，提交后自愈）；task88 45/45、task89 36/36、
+  task90 51/51、task91 75/75、task95 59/59 全绿；task83-87/94/97-100 指向另一会话
+  克隆路径为环境性失败，与本提交无关

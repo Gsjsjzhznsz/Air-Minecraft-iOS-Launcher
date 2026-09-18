@@ -121,7 +121,8 @@
     btn.translatesAutoresizingMaskIntoConstraints = NO;
     btn.tag = index;
 
-    // 设置图标
+    // 设置图标（Task101：仅图标按钮，无文字；图标在 50×50 按钮内居中，
+    // 与新拟物高亮面板几何中心对齐）
     UIImage *icon = [UIImage systemImageNamed:item[@"icon"]];
     [btn setImage:icon forState:UIControlStateNormal];
 
@@ -136,16 +137,11 @@
         btn.tintColor = normalColor;
     }
 
-    // 设置标题（在图标下方）
-    btn.titleLabel.font = [UIFont systemFontOfSize:10];
-    [btn setTitle:item[@"title"] forState:UIControlStateNormal];
-    [btn setTitleColor:(index == self.selectedIndex) ? accent : normalColor forState:UIControlStateNormal];
-    
-    // 垂直布局：图标在上，文字在下
+    // 图标居中（Task101：原 imageEdgeInsets(-10,0,0,0)+空白标题的
+    // 图标在上文字在下布局退役——菜单项标题本就是空格 " "，
+    // 原偏移让图标偏离高亮面板中心，用户实测"高亮和图标有点偏差"）
     btn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
     btn.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
-    btn.titleEdgeInsets = UIEdgeInsetsMake(30, -30, 0, 0);
-    btn.imageEdgeInsets = UIEdgeInsetsMake(-10, 0, 0, 0);
     
     [btn addTarget:self action:@selector(menuButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
 
@@ -160,6 +156,29 @@
 }
 
 #pragma mark - Actions
+
+// Task101：菜单图标自愈——启动早期偶发 systemImageNamed: 拿到 nil
+// （用户实测：左上角主界面 house.fill 图标有时刚打开软件时消失，
+// 二次启动恢复正常，典型时序型 nil）。这里对 image 为空的按钮
+// 幂等重取符号，viewWillAppear 与外观刷新路径都会调用。
+- (void)refreshMenuIconImages {
+    for (UIView *view in self.menuStackView.arrangedSubviews) {
+        if (![view isKindOfClass:[UIButton class]]) continue;
+        UIButton *btn = (UIButton *)view;
+        NSInteger idx = btn.tag;
+        if (idx < 0 || idx >= (NSInteger)self.menuItems.count) continue;
+        if ([btn imageForState:UIControlStateNormal]) continue;
+        UIImage *icon = [UIImage systemImageNamed:self.menuItems[idx][@"icon"]];
+        if (icon) {
+            [btn setImage:icon forState:UIControlStateNormal];
+        }
+    }
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self refreshMenuIconImages];
+}
 
 - (void)menuButtonTapped:(UIButton *)sender {
     NSInteger index = sender.tag;
@@ -198,6 +217,8 @@
 - (void)updateButtonColors {
     UIColor *normalColor = [self menuNormalColor];
     UIColor *accent = accentColor();
+    // Task101：顺手补拉缺失图标（幂等，仅填 nil）
+    [self refreshMenuIconImages];
     // 按钮现在在 menuStackView.arrangedSubviews 中（UIStackView 重构后）
     for (UIView *view in self.menuStackView.arrangedSubviews) {
         if ([view isKindOfClass:[UIButton class]]) {
@@ -206,13 +227,12 @@
 
             if (index == self.selectedIndex) {
                 btn.tintColor = accent;
-                [btn setTitleColor:accent forState:UIControlStateNormal];
+                // Task101：按钮无标题（纯图标），仅剩图标着色，原 setTitleColor 分支退场
                 // Task89：新拟态——选中项为凸出面板（surface 底 + 双阴影），
                 // 替代原半透明 accent 高亮；幂等重刷（重复调用安全）
                 [btn nm_convexRadius:12 shadowRadius:5];
             } else {
                 btn.tintColor = normalColor;
-                [btn setTitleColor:normalColor forState:UIControlStateNormal];
                 // 未选中项恢复平贴（无底色无阴影）
                 [btn nm_removeNeomorph];
                 btn.backgroundColor = [UIColor clearColor];

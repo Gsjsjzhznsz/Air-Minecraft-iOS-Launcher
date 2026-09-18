@@ -9,13 +9,22 @@ Task 96 验证器：右面板搬入 MeloNX 风格信息卡（用户指定 UI 改
   - 新增 3 张卡：启动器版本（#64C466，空心立方体 cube.transparent，正文=
     App 版本号，双读 CFBundleShortVersionString + CFBundleVersion，超长缩放）、
     游戏版本（#64C466，空心手柄 gamecontroller，正文=当前选择实例版本，
-    与红框同源）、JIT 兔子卡（SF rabbit 线框兔，颜色与内存权限卡同色系，
-    位于 MeloNX 四卡正中间，值 已开启/未开启）。
+    与红框同源）、JIT 兔子卡（Task101 更正：SF Symbols 全库无 "rabbit"，
+    兔子真名 hare（SF 1.0 线框兔，联网核实 9476 符号全表）；颜色与内存
+    权限卡同色系，位于 MeloNX 四卡正中间，值 已开启/未开启）。
   - System 卡配色改成与 Device 一样（系统蓝）。
   - 卡片语言全部中文（用户选择），值显示 已开启/未开启。
   - 卡片高度/宽度与「登录并启动」一致（46pt / 12pt 边距）；右下角执行 Jar、
     选择版本两按钮改为与「登录并启动」同款（accentColor 底 + 白字）。
   - 卡片增加到 7 张后空间紧张：面板允许上下滚动（用户确认）。
+
+Task101 增补（用户实测反馈）:
+  - 三卡图标/标题更正：JIT=hare（兔）；内存上限提升→扩展内存限制
+    （实心 memorychip.fill）；扩展虚拟寻址→扩展虚拟内存（空心 memorychip）。
+  - 七卡内容在卡内水平居中（工厂改双 stack 内容组 + centerX/Y）。
+  - 头像下灰字游戏版本标签（versionLabel，如 26.3）退场，滚动区上接用户名。
+  - 左侧菜单按钮：去空白标题与 insets，图标在新拟物高亮面板内居中；
+    新增 refreshMenuIconImages 自愈启动早期偶发 nil 图标。
 
 检测口径（Task93 回归护栏，不变）：
   内存两卡仍用 utils.m getEntitlementValue()（SecTask 签名口径，与启动日志
@@ -130,16 +139,16 @@ check("B1  七张卡正文属性 + 滚动区/stack 属性",
                             "UILabel *jitCardValue", "UILabel *memLimitCardValue",
                             "UILabel *extVMCardValue", "UIScrollView *infoScrollView",
                             "UIStackView *infoStackView"]))
-check("B2  七张卡按用户指定顺序与图标创建",
+check("B2  七张卡按用户指定顺序与图标创建（Task101 更正：hare/memorychip.fill/memorychip）",
       rp.find('makeInfoCardWithIcon:@"cube.transparent"') < rp.find('makeInfoCardWithIcon:@"gamecontroller"') <
       rp.find("makeInfoCardWithIcon:deviceIconName") < rp.find('makeInfoCardWithIcon:@"applelogo"') <
-      rp.find('makeInfoCardWithIcon:@"rabbit"') < rp.find('makeInfoCardWithIcon:@"memorychip"') <
-      rp.find('makeInfoCardWithIcon:@"arrow.up.left.and.arrow.down.right"'))
+      rp.find('makeInfoCardWithIcon:@"hare"') < rp.find('makeInfoCardWithIcon:@"memorychip.fill"') <
+      rp.find('makeInfoCardWithIcon:@"memorychip"'))
 check("B3  设备图标按机型选 ipad/iphone",
       '? @"ipad" : @"iphone";' in rp)
-check("B4  卡片标题全中文（用户指定），JIT 卡标题即 JIT",
+check("B4  卡片标题全中文（用户指定），JIT 卡标题即 JIT（Task101 更名：扩展内存限制/扩展虚拟内存）",
       all(k in rp for k in ['@"启动器版本"', '@"游戏版本"', '@"设备"', '@"系统"',
-                            'title:@"JIT"', '@"内存上限提升"', '@"扩展虚拟寻址"']))
+                            'title:@"JIT"', '@"扩展内存限制"', '@"扩展虚拟内存"']))
 check("B5  新卡配色 #64C466（用户指定）",
       "0x64 / 255.0" in rp and "0xC4 / 255.0" in rp and "0x66 / 255.0" in rp)
 check("B6  JIT 卡与内存上限卡同橙 #FF9500；扩展虚拟寻址黄系 #E7A200；设备/系统系统蓝",
@@ -158,8 +167,8 @@ check("B9  卡片正文动态色 #222222/#EEEEEE（Task91 规范）+ 超长自�
       "0xEE / 255.0" in rp and "0x22 / 255.0" in rp
       and "colorWithDynamicProvider" in rp_code
       and "adjustsFontSizeToFitWidth" in rp_code and "minimumScaleFactor = 0.55" in rp_code)
-check("B10 滚动区与「登录并启动」左右对齐（12pt），上接版本标签下接启动按钮",
-      "self.infoScrollView.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:8" in rp
+check("B10 滚动区与「登录并启动」左右对齐（12pt），上接用户名标签（Task101：灰字版本标签退场）下接启动按钮",
+      "self.infoScrollView.topAnchor constraintEqualToAnchor:self.usernameLabel.bottomAnchor constant:8" in rp
       and "self.infoScrollView.bottomAnchor constraintEqualToAnchor:self.launchButton.topAnchor constant:-8" in rp
       and "self.infoScrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12" in rp
       and "self.infoScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12" in rp)
@@ -177,7 +186,7 @@ check("B13 启动器版本双读 App 版本号+构建号（相同则去重，用
 check("B14 设备/系统卡接入 Task96 数据源",
       "self.deviceCardValue.text = getDeviceMarketingName();" in rp
       and "self.systemCardValue.text = getSystemVersionDisplay();" in rp)
-check("B15 游戏版本卡与版本标签同数据源（红框同款），无实例时显示未选择",
+check("B15 游戏版本卡与原版本标签同数据源（红框同款），无实例时显示未选择",
       "self.gameVersionCardValue.text = versionId;" in rp
       and 'self.gameVersionCardValue.text = @"未选择";' in rp)
 

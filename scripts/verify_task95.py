@@ -38,7 +38,9 @@ import re
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+# Task101：路径改为环境变量可覆盖（与 verify_task96 的 TASK96_REPO 同款约定），
+# 默认值保留原克隆路径——该克隆已不存在，本仓库环境下用 TASK95_REPO 指向共享主仓库即可
+REPO = os.environ.get("TASK95_REPO", "/home/z/my-project/Amethyst-iOS-MyRemastered")
 PASS, FAIL = 0, 0
 
 

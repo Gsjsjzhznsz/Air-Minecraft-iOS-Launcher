@@ -33,7 +33,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 @property(nonatomic, strong) UIImageView *avatarImageView;
 @property(nonatomic, strong) UILabel *usernameLabel;
-@property(nonatomic, strong) UILabel *versionLabel;
+// Task101：原灰字游戏版本标签（versionLabel）已退场——游戏版本由绿色
+// 游戏版本卡显示（同一数据源），顶部冗余灰字按用户要求去除。
 @property(nonatomic, strong) UIButton *launchButton;
 @property(nonatomic, strong) UIButton *manageVersionBtn;
 @property(nonatomic, strong) UIButton *executeJarBtn;
@@ -227,21 +228,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.usernameLabel.text = localize(@"i18n_str_357", nil);
     [self.view addSubview:self.usernameLabel];
 
-    // 版本标签
-    self.versionLabel = [[UILabel alloc] init];
-    self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.versionLabel.font = [UIFont systemFontOfSize:13];
-    self.versionLabel.textColor = [UIColor secondaryLabelColor];
-    self.versionLabel.textAlignment = NSTextAlignmentCenter;
-    self.versionLabel.adjustsFontSizeToFitWidth = YES;
-    self.versionLabel.minimumScaleFactor = 0.7;
-    self.versionLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    self.versionLabel.text = localize(@"i18n_str_411", nil);
-    // FCL 风格：点击版本标签也能弹出选择器
-    self.versionLabel.userInteractionEnabled = YES;
-    [self.versionLabel addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(showVersionPicker)]];
-    [self.view addSubview:self.versionLabel];
-    
+    // Task101：原灰字游戏版本标签（versionLabel，头像下方的 26.3）整体退场：
+    // 游戏版本卡（绿色）与它同数据源（updateVersionInfo），顶部不再重复显示。
+
     // 进度标签
     self.progressLabel = [[UILabel alloc] init];
     self.progressLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -397,14 +386,20 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     NSString *deviceIconName = [UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad
         ? @"ipad" : @"iphone";
 
-    // 卡片语言按用户指定全部中文；JIT 卡标题即 "JIT"（兔子=速度，替代原 JIT 徽标）
+    // 卡片语言按用户指定全部中文；JIT 卡标题即 "JIT"（兔子=速度，替代原 JIT 徽标）。
+    // Task101 图标修正（用户实测 JIT 卡回退成 circle.grid.2x2 点阵）：SF Symbols
+    // 全库（1.0→8.0 共 9476 符号，联网核实 sf-symbols-reference 全表）中不存在
+    // 名为 "rabbit" 的符号——兔子的真名是 hare（SF Symbols 1.0 起就有，线框兔）。
+    // 内存两卡改用 ROM 芯片符号：扩展内存限制=实心 memorychip.fill（SF 3.0），
+    // 扩展虚拟内存=空心 memorychip（SF 2.0，即原内存上限提升卡同款图标），
+    // 均按用户指定；原名 arrow.up.left.and.arrow.down.right 退场。
     UIView *launcherVersionCard = [self makeInfoCardWithIcon:@"cube.transparent" accent:cardGreen title:@"启动器版本" valueLabel:&_launcherVersionCardValue];
     UIView *gameVersionCard = [self makeInfoCardWithIcon:@"gamecontroller" accent:cardGreen title:@"游戏版本" valueLabel:&_gameVersionCardValue];
     UIView *deviceCard = [self makeInfoCardWithIcon:deviceIconName accent:cardBlue title:@"设备" valueLabel:&_deviceCardValue];
     UIView *systemCard = [self makeInfoCardWithIcon:@"applelogo" accent:cardBlue title:@"系统" valueLabel:&_systemCardValue];
-    UIView *jitCard = [self makeInfoCardWithIcon:@"rabbit" accent:cardOrange title:@"JIT" valueLabel:&_jitCardValue];
-    UIView *memLimitCard = [self makeInfoCardWithIcon:@"memorychip" accent:cardOrange title:@"内存上限提升" valueLabel:&_memLimitCardValue];
-    UIView *extVMCard = [self makeInfoCardWithIcon:@"arrow.up.left.and.arrow.down.right" accent:cardAmber title:@"扩展虚拟寻址" valueLabel:&_extVMCardValue];
+    UIView *jitCard = [self makeInfoCardWithIcon:@"hare" accent:cardOrange title:@"JIT" valueLabel:&_jitCardValue];
+    UIView *memLimitCard = [self makeInfoCardWithIcon:@"memorychip.fill" accent:cardOrange title:@"扩展内存限制" valueLabel:&_memLimitCardValue];
+    UIView *extVMCard = [self makeInfoCardWithIcon:@"memorychip" accent:cardAmber title:@"扩展虚拟内存" valueLabel:&_extVMCardValue];
 
     [self.infoStackView addArrangedSubview:launcherVersionCard];
     [self.infoStackView addArrangedSubview:gameVersionCard];
@@ -477,15 +472,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self.usernameLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.usernameLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
 
-        // 版本
-        [self.versionLabel.topAnchor constraintEqualToAnchor:self.usernameLabel.bottomAnchor constant:4],
-        [self.versionLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
-        [self.versionLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
-
-        // ===== 信息卡滚动区（Task96）：版本标签下方 → 启动按钮上方 =====
+        // ===== 信息卡滚动区（Task96；Task101 上接用户名标签）=====
         // 进度/下载中心/卡片全部在滚动区内的 stack 里，隐藏时自动折叠；
         // 空间不足时滚动区内部滚动，不会与顶部/底部产生约束冲突。
-        [self.infoScrollView.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:8],
+        [self.infoScrollView.topAnchor constraintEqualToAnchor:self.usernameLabel.bottomAnchor constant:8],
         [self.infoScrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.infoScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
         [self.infoScrollView.bottomAnchor constraintEqualToAnchor:self.launchButton.topAnchor constant:-8],
@@ -794,8 +784,9 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 #pragma mark - MeloNX 风格信息卡工厂（Task96）
 
-/// 生成 MeloNX 风格信息卡：圆角彩色底 + 左侧 SF 图标 + 小号彩色标题 +
-/// 大号正文。正文随深浅色取 #222222/#EEEEEE（Task91 字色规范），超长时
+/// 生成 MeloNX 风格信息卡：圆角彩色底 + SF 图标 + 小号彩色标题 +
+/// 大号正文，内容整体在卡片内水平居中（Task101 用户指定：七卡居中）。
+/// 正文随深浅色取 #222222/#EEEEEE（Task91 字色规范），超长时
 /// 自动缩小到不溢出（用户指定）。卡片高度与「登录并启动」按钮一致（46pt），
 /// 宽度撑满 stack（与按钮同宽）。按用户要求不带任何小字副标题。
 // Task98 CI 解堵：参数从裸 UILabel **（ARC 下默认 __autoreleasing）改为
@@ -817,12 +808,11 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     card.layer.masksToBounds = YES;
     [card.heightAnchor constraintEqualToConstant:46].active = YES;
 
-    // 左侧图标（与标题同色）
+    // 左侧图标（与标题同色；Task101 起随内容组整体居中）
     UIImageView *iconView = [[UIImageView alloc] initWithImage:[self cardSymbolImageNamed:iconName]];
     iconView.translatesAutoresizingMaskIntoConstraints = NO;
     iconView.contentMode = UIViewContentModeScaleAspectFit;
     iconView.tintColor = accent;
-    [card addSubview:iconView];
 
     // 小号彩色标题
     UILabel *titleLabel = [[UILabel alloc] init];
@@ -830,7 +820,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
     titleLabel.textColor = accent;
     titleLabel.text = title;
-    [card addSubview:titleLabel];
+    titleLabel.textAlignment = NSTextAlignmentCenter;
 
     // 大号正文（Task91 字色规范：浅色 #222222 / 深色 #EEEEEE，动态色自动跟随）
     UILabel *valueLabel = [[UILabel alloc] init];
@@ -845,26 +835,37 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     valueLabel.adjustsFontSizeToFitWidth = YES;
     valueLabel.minimumScaleFactor = 0.55;
     valueLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    [card addSubview:valueLabel];
+    valueLabel.textAlignment = NSTextAlignmentCenter;
 
     if (outValueLabel) {
         *outValueLabel = valueLabel;
     }
 
+    // Task101 内容居中：标题/正文竖排成组，与图标横排成内容组，
+    // 内容组整体在卡片内水平+垂直居中（短值如 JIT/未开启 视觉居中，
+    // 长值如 iPad Air 11-inch (M3) 时组宽自然撑开、超出可缩不溢出）。
+    // 上下边距不等式保证极端缩放时也不出卡片。
+    UIStackView *textContentStack = [[UIStackView alloc] initWithArrangedSubviews:@[titleLabel, valueLabel]];
+    textContentStack.translatesAutoresizingMaskIntoConstraints = NO;
+    textContentStack.axis = UILayoutConstraintAxisVertical;
+    textContentStack.alignment = UIStackViewAlignmentFill;
+    textContentStack.spacing = 2;
+
+    UIStackView *contentStack = [[UIStackView alloc] initWithArrangedSubviews:@[iconView, textContentStack]];
+    contentStack.translatesAutoresizingMaskIntoConstraints = NO;
+    contentStack.axis = UILayoutConstraintAxisHorizontal;
+    contentStack.alignment = UIStackViewAlignmentCenter;
+    contentStack.spacing = 10;
+    [card addSubview:contentStack];
+
     [NSLayoutConstraint activateConstraints:@[
-        [iconView.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],
-        [iconView.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
         [iconView.widthAnchor constraintEqualToConstant:20],
         [iconView.heightAnchor constraintEqualToConstant:20],
 
-        [titleLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10],
-        [titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:7],
-        [titleLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
-
-        [valueLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10],
-        [valueLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
-        [valueLabel.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-7],
-        [valueLabel.topAnchor constraintGreaterThanOrEqualToAnchor:titleLabel.bottomAnchor constant:0],
+        [contentStack.centerXAnchor constraintEqualToAnchor:card.centerXAnchor],
+        [contentStack.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
+        [contentStack.leadingAnchor constraintGreaterThanOrEqualToAnchor:card.leadingAnchor constant:14],
+        [contentStack.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor constant:-12],
     ]];
     return card;
 }
@@ -878,17 +879,19 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 #pragma mark - 内存 entitlement 状态显示（Task88 引入；Task96 改为信息卡正文）
 
-/// 刷新「内存上限提升」「扩展虚拟寻址」两张卡片的正文。
+/// 刷新「扩展内存限制」「扩展虚拟内存」两张卡片的正文。
 /// Task93：与启动日志 [Pre-init] Entitlements availability 完全同源的检测——
 /// getEntitlementValue()（SecTask 私有 API 读签名 entitlement，与 main.m
 /// printEntitlementAvailability 同一函数）。Task90 引入的"签名+描述文件双确认"
 /// （getEffectiveEntitlementValue）已按用户要求整体移除：实测双确认在重签工具把
 /// entitlement 同时写入描述文件时依然误报，且与日志口径不一致导致排查混乱。
-///   - 内存上限提升 = com.apple.developer.kernel.increased-memory-limit
-///   - 扩展虚拟寻址 = com.apple.developer.kernel.extended-virtual-addressing
+///   - 扩展内存限制 = com.apple.developer.kernel.increased-memory-limit
+///   - 扩展虚拟内存 = com.apple.developer.kernel.extended-virtual-addressing
 /// Task96：展示由胶囊标签改为 MeloNX 风格信息卡正文（卡片语言按用户指定
 /// 全部中文，值显示 已开启/未开启）；检测函数与刷新时机不变，
 /// entitlement 运行期不会变化，这里与 JIT 卡保持相同刷新时机。
+/// Task101：卡名随用户指定更名（原 内存上限提升/扩展虚拟寻址），
+/// 检测口径继续零变化。
 - (void)updateMemoryEntitlementStatus {
     if (!self.memLimitCardValue || !self.extVMCardValue) return;
     BOOL memLimit = getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
@@ -915,12 +918,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     UIColor *customColor = [self colorFromHexString:hex];
     if (customColor) {
         self.usernameLabel.textColor = customColor;
-        self.versionLabel.textColor = [customColor colorWithAlphaComponent:0.75];
         self.progressLabel.textColor = [customColor colorWithAlphaComponent:0.75];
     } else {
         // 未设置自定义字体颜色时，恢复系统自适应颜色
         self.usernameLabel.textColor = [UIColor labelColor];
-        self.versionLabel.textColor = [UIColor secondaryLabelColor];
         self.progressLabel.textColor = [UIColor secondaryLabelColor];
         // 信息卡正文颜色随深浅色自动切换（动态色），不参与自定义文字色
     }
@@ -1570,20 +1571,11 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         NSDictionary *profile = PLProfiles.current.profiles[selectedProfile];
         if (profile) {
             NSString *versionId = profile[@"lastVersionId"] ?: @"unknown";
-            // 显示版本隔离状态：gameDir != "." 表示已隔离
-            NSString *gameDir = profile[@"gameDir"] ?: @".";
-            BOOL isolated = ![gameDir isEqualToString:@"."];
-            if (isolated) {
-                self.versionLabel.text = [NSString stringWithFormat:localize(@"i18n_str_440", nil), versionId];
-            } else {
-                self.versionLabel.text = versionId;
-            }
-            // Task96：游戏版本卡与版本标签同数据源（用户指定"内容跟红框一样"，
-            // 即当前选择的游戏实例版本号，不带隔离后缀）
+            // Task96：游戏版本卡显示当前选择实例版本号（不带隔离后缀）。
+            // Task101：原灰字版本标签退场后，这里是该数据的唯一展示出口。
             self.gameVersionCardValue.text = versionId;
         }
     } else {
-        self.versionLabel.text = localize(@"i18n_str_411", nil);
         self.gameVersionCardValue.text = @"未选择";
     }
 

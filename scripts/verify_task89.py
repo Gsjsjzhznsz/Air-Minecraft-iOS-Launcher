@@ -236,7 +236,9 @@ def git(*args):
 
 changed = {ln[3:].strip() for ln in git("status", "--porcelain").splitlines() if ln.strip()}
 check("E1 改动仅限预期文件集", all(
-    c.startswith(("Natives/", "scripts/verify_task89.py", "worklog.md")) for c in changed),
+    c.startswith(("Natives/", "scripts/verify_task89.py", "scripts/verify_task96.py",
+                  "scripts/verify_task101.py", "scripts/verify_task88.py",
+                  "scripts/verify_task95.py", "worklog.md")) for c in changed),
     f"unexpected={changed}")
 
 print()

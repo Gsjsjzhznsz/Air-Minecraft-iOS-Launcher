@@ -119,9 +119,9 @@ check("A2a 工厂样式（正文15号semibold/圆角12/卡高46/动态色 #22222
 check("A3 七张卡经工厂创建并装入 stack",
       rp_code.count("makeInfoCardWithIcon:") == 8
       and rp_code.count("addArrangedSubview:") >= 10)
-check("A4 滚动区锚定（版本标签下 → 启动按钮上，左右 12pt 与按钮对齐）",
+check("A4 滚动区锚定（Task101：上接用户名标签 → 启动按钮上，左右 12pt 与按钮对齐）",
       all(k in rp for k in [
-          "self.infoScrollView.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:8",
+          "self.infoScrollView.topAnchor constraintEqualToAnchor:self.usernameLabel.bottomAnchor constant:8",
           "self.infoScrollView.bottomAnchor constraintEqualToAnchor:self.launchButton.topAnchor constant:-8",
           "self.infoScrollView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12",
           "self.infoScrollView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12"]))
@@ -139,9 +139,9 @@ update_m = rp[rp.find("- (void)updateMemoryEntitlementStatus"):rp.find("#pragma 
 check("A7 Task96 同步：内存两卡正文=已开启/未开启（检测函数不变）",
       update_m.count('@"已开启" : @"未开启"') == 2
       and "getEntitlementValue(@" in update_m)
-check("A8 Task96 同步：卡片标题全中文（用户指定），无 i18n 键依赖",
+check("A8 Task96 同步：卡片标题全中文（用户指定），无 i18n 键依赖（Task101 更名：扩展内存限制/扩展虚拟内存）",
       all(k in rp for k in ['@"启动器版本"', '@"游戏版本"', '@"设备"', '@"系统"',
-                            '@"JIT"', '@"内存上限提升"', '@"扩展虚拟寻址"'])
+                            '@"JIT"', '@"扩展内存限制"', '@"扩展虚拟内存"'])
       and "i18n_str_mem_limit_enabled" not in rp)
 check("A9 viewWillAppear 刷新", "[self updateMemoryEntitlementStatus];" in rp
       and re.search(r"- \(void\)viewWillAppear:[\s\S]*?\[self updateMemoryEntitlementStatus\];[\s\S]*?\[self applyCustomAppearance\];", rp_code))
@@ -232,6 +232,12 @@ expected = {
     "scripts/verify_task88.py",
     "scripts/verify_task94.py",
     "worklog.md",
+    # Task96 编号重排 + Task101 增补遗留的合法改动面
+    "scripts/verify_task96.py",
+    "scripts/verify_task101.py",
+    "scripts/verify_task89.py",
+    "scripts/verify_task95.py",
+    "Natives/LauncherMenuViewController.m",
 }
 check("E1 改动仅限预期文件", changed <= expected, f"extra={changed - expected}")
 
