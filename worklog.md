@@ -1022,3 +1022,14 @@ Stage Summary:
 - BMC2 建档闪退根治（spark 签名库重标签致死，双层修复）；装机锚点："[Amethyst] Task106: blocked dlopen of signed macOS profiler lib" + 建档继续推进 + spark Java 采样器照常
 - 26.3 30fps 第 1 轮优化（bundle-direct 跳过重复回读+行翻）+ 相位计时取证；装机锚点："[OSMBridge] Task106 bundle-direct present engaged" + 心跳 "bd=N/M t=swap ... MC-side=...ms"（若 glFinish/readback 仍占大头 → 下轮 CA 直呈提速模式；若 MC-side 占大头 → 降视距/换渲染器指引）
 - 遗留：26.3 剩余帧预算的精确分布待装机日志相位计时；若 bundle-direct 后仍 <35fps，候选方案 = OSMesa 表面缩窗 + CA 双线性直呈（消灭全幅回读，画质换速度，需 UI 档位配合）
+
+---
+Task ID: 106 (续)
+Agent: main (Super Z)
+Task: CI 确认
+
+Work Log:
+- CI run 35389188736（6a81ba5）completed | success（API 限流解除后轮询确认）
+
+Stage Summary:
+- Task106 全链绿灯；新 IPA 就绪，装机锚点见 Task106 主条目
