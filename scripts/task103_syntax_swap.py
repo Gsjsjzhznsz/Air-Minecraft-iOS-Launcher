@@ -57,8 +57,11 @@ static void CallbackBridge_nativeSendScreenSize(int, int) {}
 // ---- 桩：Task 83/99/100/103 状态（真实定义在文件前段的语法等价物）----
 struct ame83_stub {
     bool markerArmed; unsigned markerCode; long frames; bool healed;
+    struct { void (*glGetIntegerv)(unsigned int, int *); } gl;   // Task105：视口自适应读取
 };
 static ame83_stub ame83_fsr;
+static bool ame83_resolve_gl(void) { return true; }   // Task105：真实实现幂等（resolved 旗标）
+#define GL_VIEWPORT 0x0BA2   // Task105：桩枚举（真实 TU 由 Mesa 头提供）
 struct ame99_stub {
     long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed;
     int mkHits, mkState, mkConsecM, mkConsecMiss; int mkFarHits; bool final90Logged;

@@ -146,8 +146,11 @@ static osmesa_library handle;
 static void CallbackBridge_nativeSendScreenSize(int w, int h) { (void)w; (void)h; }
 // —— ame83 段桩（本门只编 swap/apply 段；真实实现经指纹断言覆盖）——
 static bool ame83_fsr_upscale(int a, int b, int c, int d) { (void)a;(void)b;(void)c;(void)d; return true; }
-struct ame85_fsr_stub { bool healed; long frames; bool markerArmed; unsigned markerCode; };
+struct ame85_fsr_stub { bool healed; long frames; bool markerArmed; unsigned markerCode;
+  struct { void (*glGetIntegerv)(unsigned int, int *); } gl; };   // Task105：视口自适应读取
 static struct ame85_fsr_stub ame83_fsr;
+static bool ame83_resolve_gl(void) { return true; }   // Task105：真实实现幂等（resolved 旗标）
+#define GL_VIEWPORT 0x0BA2   // Task105：桩枚举（真实 TU 由 Mesa 头提供）
 // —— Task99 段桩（swap 段引用 ame99_fsrdiag / kAme99ProbeFrames；真实定义在文件前部）——
 static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed;
   int mkHits, mkState, mkConsecM, mkConsecMiss; int mkFarHits; bool final90Logged; } ame99_fsrdiag = {0,0,0,0,false,0,0,0,0,0,false};

@@ -162,7 +162,7 @@ check("D13 非 FSR 零回归（present 仅在 fsrActiveThisFrame 时调用；FSR
       "if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0) {" in ob and
       re.search(r"bool presentThisFrame = false;\n    if \(fsrActiveThisFrame", ob) is not None)
 check("D14 EASU 顺序不变（upscale 在 glFinish 前，Task85 根治保持）",
-      ob.index("ame83_fsr_upscale(windowWidth") < ob.index("handle.glFinish();"))
+      ob.index("ame83_fsr_upscale(effW") < ob.index("handle.glFinish();"))
 check("D15 GL_PACK 枚举守卫 + glPixelStorei 符号表项",
       "#define GL_PACK_ROW_LENGTH        0x0D02" in ob and
       '{"glPixelStorei",              (void**)&ame83_fsr.gl.glPixelStorei},' in ob)

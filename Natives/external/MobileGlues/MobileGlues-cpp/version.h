@@ -593,3 +593,38 @@
 // glViewport. Desktop anchor lines: '[InputDiag] Task104 AFK heartbeat',
 // '[PojavLauncher] Task104 on-disk verification', '[OSMBridge] Task104
 // EASU viewport check', 'far=N/M' in the swap heartbeat.
+
+// REVISION 17 addendum (Task 105, no bump): the c947464 log pair (bacbf1e
+// build) closed both open questions. (A) 26.3 FSR "stuck at 30fps" is
+// fixed-and-load: the AFK cap never engaged (no FramerateLimiter watchdog
+// hits, inactivityFpsLimit=minimized verified on disk, heartbeat #1 seen);
+// fps fluctuated 19-44 with memory peaking 5.4GB at view distance 32 and
+// recovered 30->44+ still climbing after the user dropped to 16 -- pure
+// GPU/CPU load, FAQ fpsUnlock now carries the guidance. (B) BMC2 1.20.1
+// corner-shrink root layer finally isolated: dual sentinels LANDED (EASU
+// pass covers the full surface, present==bundle byte-identical, 60fps)
+// yet the GPU probe top-strip RGB read 000000 -- the EASU input region
+// itself held a shrunk MC frame with black padding. i.e. MC-1.20.1/GLFW
+// + BMC2's mod set presents into fb0 at a smaller region than the
+// launcher-told window belief (vanilla 1.20.1 decompiled clean: blit uses
+// glfwGetFramebufferSize == shim 1814x1262). Fix (renderer-side, immune
+// to the upstream mod cause): osm_swap_buffers now reads the live GL
+// viewport at swap time -- MC 1.20.1's final present blit sets
+// _viewport(0,0,w,h) immediately before RenderSystem.flipFrame, so the
+// query returns exactly what MC painted into fb0 this frame. The EASU
+// input region, the landing probes, and the CG-stretch crop all follow
+// this effective size. Gates: origin must be (0,0), positive dims that
+// fit the surface, and area >= 1/4 of the window belief (aux/shadow
+// viewports rejected -> fall back to the belief = old behavior). Viewport
+// == belief (26.3/SDL path) -> byte-identical behavior; viewport ==
+// surface (healed full-res path) -> EASU correctly skipped. Forensics:
+// one-shot '[OSMBridge] Task105 viewport evidence: MC present viewport
+// 0,0 WxH vs launcher window belief WxH -- match/DIVERGED/gated' per new
+// size (pins the upstream mod number next round), and the Task99 swap
+// heartbeat gains 'vp=WxH (adaptive)'. Desktop anchor lines:
+// '[OSMBridge] Task105 viewport evidence ... DIVERGED: EASU input follows
+// MC (adaptive) -- geometry restored' + 'vp=' in the swap heartbeat.
+// Verifier maintenance: verify_task100 D14 anchor follows the code
+// (upscale call now passes effW/effH); verify_task103 F3 re-anchored to
+// the Task104 FAQ wording (far=N/M); task103_syntax_swap + verify_task85
+// D1 stubs gain ame83_resolve_gl + gl.glGetIntegerv + GL_VIEWPORT.

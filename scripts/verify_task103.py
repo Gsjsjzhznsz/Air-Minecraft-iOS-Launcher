@@ -181,8 +181,8 @@ check('F2 sodiumGlsl 条目（签名 + 机制 + 验证锚点 + 旧构建自救�
       any(i == 'sodiumGlsl' for i in items) and
       'preprocessor directive cannot be preceded by another token' in faq and
       'solid_terrain' in faq and '[amethyst-include] expanded' in faq)
-check('F3 fsrCorner 重锚（Task103 哨兵语义 + mk=N/M + LANDED/NOT LANDED）',
-      'Task103 地面真值闭环' in faq and 'mk=N/M' in faq and
+check('F3 fsrCorner 重锚（Task103 哨兵语义 + far=N/M + LANDED/NOT LANDED）',
+      'Task103 地面真值闭环' in faq and 'far=N/M' in faq and
       'Task103 EASU sentinel verdict' in faq)
 vh = read('Natives/external/MobileGlues/MobileGlues-cpp/version.h')
 check('F4 version.h REVISION 17 addendum (Task 103, no bump)',

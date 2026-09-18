@@ -777,14 +777,78 @@ void osm_make_current(osm_render_window_t* bundle) {
 
 void osm_swap_buffers() {
     osm_apply_current_ll();
+    // ------------------------------------------------------------------
+    // Task 105（蜷缩根治第 4 轮）：视口自适应 EASU 输入区域。
+    //
+    // c947464 装机日志（bacbf1e 构建）实锤分叉点：BMC2（1.20.1/GLFW/
+    // zink+FSR）双哨兵 LANDED（EASU pass 全幅覆盖、present==bundle 字节
+    // 一致、fps=60）但 GPU 探针顶带 (2352,1636) RGB=000000——EASU 忠实
+    // 放大了输入区域，问题是输入区域内 MC 画的内容本身没填满（其余是黑
+    // + 反馈残影）。对照组 26.3（SDL 路径、同构建）同探针 c85e84ff 活色
+    // 全屏正常。即：MC 1.20.1/GLFW 路径下 MC 实际铺进 fb0 的区域小于启
+    // 动器告知的 windowWidth×windowHeight 信仰，根因在 mod 尺寸链上游
+    // （vanilla 1.20.1 已反编译核对：framebuffer 取 glfwGetFramebufferSize
+    // = shim 1814×1262，blitToScreen 用同值——非 vanilla 行为）。
+    //
+    // 修复（理论免疫，不依赖上游根因）：MC 1.20.1 的最终呈现 blit
+    // （RenderTarget.a(w,h,..) → _viewport(0,0,w,h) + setOrtho + 全屏四边
+    // 形）恰好在 RenderSystem.flipFrame（=本函数）之前把 GL 视口设成 blit
+    // 目标尺寸；swap 时刻读 glGetIntegerv(GL_VIEWPORT) 拿到的就是 MC 本帧
+    // 实际铺进 fb0 的区域。EASU 输入区域改为跟随它：
+    //   · 视口 == 信仰（26.3/正常路径）→ 行为与旧代码完全一致（零回归）；
+    //   · 视口 < 信仰（BMC2 型）→ EASU 放大 MC 真实区域 → 几何全屏；
+    //   · 视口 == 表面（恢复全分辨率路径）→ 跳过 EASU，直呈（正确）。
+    // 闸门（防 aux 视口/异常态误采）：原点必须 (0,0)、尺寸必须为正且不超
+    // 表面、面积 ≥ 信仰的 1/4（907×631 型折半命中；阴影/图标等小视口一律
+    // 拒绝回退信仰值 = 现行为）。任一不满足 → 维持 windowWidth 信仰 +
+    // 证据日志（下轮装机日志可凭 vp= 一眼钉死上游根因的具体数值）。
+    // ------------------------------------------------------------------
+    int effW = windowWidth, effH = windowHeight;   // EASU 实际输入区域
+    int vp105W = 0, vp105H = 0;                    // MC 真实视口（证据/心跳）
+    bool vp105Adapted = false;
+    if (ame83_resolve_gl() && ame83_fsr.gl.glGetIntegerv &&
+        currentBundle != NULL &&
+        currentBundle->osm.width > 0 && currentBundle->osm.height > 0) {
+        int vp105[4] = {0, 0, 0, 0};
+        ame83_fsr.gl.glGetIntegerv(GL_VIEWPORT, vp105);
+        vp105W = vp105[2]; vp105H = vp105[3];
+        bool anchored105 = (vp105[0] == 0 && vp105[1] == 0);
+        bool fits105 = (vp105[2] > 0 && vp105[3] > 0 &&
+                        (uint32_t)vp105[2] <= currentBundle->osm.width &&
+                        (uint32_t)vp105[3] <= currentBundle->osm.height);
+        bool area105 = (windowWidth > 0 && windowHeight > 0 &&
+                        (long long)vp105[2] * (long long)vp105[3] * 4ll
+                            >= (long long)windowWidth * (long long)windowHeight);
+        if (anchored105 && fits105 && area105 &&
+            (vp105[2] != windowWidth || vp105[3] != windowHeight)) {
+            effW = vp105[2];
+            effH = vp105[3];
+            vp105Adapted = true;
+        }
+    }
+    // 证据行：每个新视口尺寸只打一次（避免高频刷屏；尺寸回切也会再打）
+    {
+        static int s_vp105W = -1, s_vp105H = -1;
+        if (vp105W > 0 && vp105H > 0 && (vp105W != s_vp105W || vp105H != s_vp105H)) {
+            s_vp105W = vp105W;
+            s_vp105H = vp105H;
+            NSLog(@"[OSMBridge] Task105 viewport evidence: MC present viewport 0,0 %dx%d vs launcher window belief %dx%d -- %s",
+                  vp105W, vp105H, windowWidth, windowHeight,
+                  (vp105W == windowWidth && vp105H == windowHeight)
+                      ? "match (vanilla path, no adaptation)"
+                      : (vp105Adapted
+                             ? "DIVERGED: EASU input follows MC (adaptive) -- geometry restored"
+                             : "diverged but gated (origin/area); EASU keeps launcher belief"));
+        }
+    }
     // Task 99（修复 B）心跳取证：EASU 触发条件变量全可见。b919e0f 装机
     // 日志只有 engaged 一行（会话总帧数 361 < steady 门槛 600，无法证明
     // EASU 是否持续在跑）；本心跳每 120 次交换打一行，一次日志即可判读
     // “条件恒成立但输出未上屏”（绘制/回读层故障）还是“条件中途失效”
-    // （尺寸/捆绑层故障）。
+    // （尺寸/捆绑层故障）。Task 105 追加 vp=WxH（MC 真实呈现视口）。
     ++ame99_fsrdiag.swaps;
     if ((ame99_fsrdiag.swaps % 120) == 0) {
-        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d far=%d/%d",
+        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d far=%d/%d vp=%dx%d%s",
               ame99_fsrdiag.swaps, windowWidth, windowHeight,
               currentBundle ? currentBundle->osm.width : 0,
               currentBundle ? currentBundle->osm.height : 0,
@@ -792,7 +856,8 @@ void osm_swap_buffers() {
               ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict,
               (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames,
               ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
-              ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames);
+              ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames,
+              vp105W, vp105H, vp105Adapted ? " (adaptive)" : "");
     }
     // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
     //
@@ -807,9 +872,12 @@ void osm_swap_buffers() {
     // 回读完整升采样结果 → CGImage 上屏即全幅。
     bool fsrActiveThisFrame = false;
     if (currentBundle->osm.width > 0 && currentBundle->osm.height > 0 &&
-        (windowWidth > 0 && windowHeight > 0) &&
-        ((uint32_t)windowWidth < currentBundle->osm.width || (uint32_t)windowHeight < currentBundle->osm.height)) {
-        bool ok = ame83_fsr_upscale(windowWidth, windowHeight,
+        (effW > 0 && effH > 0) &&
+        ((uint32_t)effW < currentBundle->osm.width || (uint32_t)effH < currentBundle->osm.height)) {
+        // Task 105：输入区域 = effW×effH（自适应 MC 真实呈现视口；正常
+        // 路径 == windowWidth 信仰，零回归）。upscale 内部 glCopyTexSubImage2D
+        // 从 fb0 (0,0) 取同区域——正是 MC 本帧 blit 的落点。
+        bool ok = ame83_fsr_upscale(effW, effH,
                                     (int)currentBundle->osm.width, (int)currentBundle->osm.height);
         if (ok) fsrActiveThisFrame = true;
         if (!ok && !ame83_fsr.healed) {
@@ -849,7 +917,8 @@ void osm_swap_buffers() {
     //   CG 拉伸兜底（present/bundle 游戏区域裁剪 → CoreAnimation 全屏）。
     // ------------------------------------------------------------------
     bool cgStretchThisFrame = false;
-    int gameW = windowWidth, gameH = windowHeight;
+    // Task 105：探针/兜底裁剪区域同样跟随 effW/effH（MC 真实内容区域）。
+    int gameW = effW, gameH = effH;
     if (fsrActiveThisFrame && (ame99_fsrdiag.verdict == 0 || ame83_fsr.markerArmed) &&
         gameW > 0 && gameH > 0 &&
         (uint32_t)gameW < bundle.width && (uint32_t)gameH < bundle.height) {
