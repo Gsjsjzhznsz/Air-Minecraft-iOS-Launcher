@@ -899,3 +899,15 @@ Stage Summary:
 - BMC2 预期：present path engaged → 上屏 = fb0 直读全幅 EASU；蜷角无论根因是驱动回读哪一层都被整体绕过
 - 装机锚点：26.3 会话 "[AppKitStub] Task100: windowsMenu requested" 后不再有 MacosUtil NPE（若再见 unexpected selector 行 = 26.3+ 又调新接口需扩桩）；BMC2 会话 "[OSMBridge] Task100 present path engaged" + "EASU landing verified in fb0 ... driver transport check: N/90 -- driver readback consistent/stale"（一行同时看两层体检）+ 心跳 "present=1 drvProbe=..."
 - 遗留：⌨ 虚拟键盘二轮诊断仍缺新证据（本轮 [InputDiag] 显示 sendKey/sendCursorPos/button text 全链在工作）；FSR 替换方案调研结论（推荐 NVIDIA NIS）待答复用户
+
+---
+Task ID: 100 (续)
+Agent: main (Super Z)
+Task: CI 构建 + 产物验证
+
+Work Log:
+- CI run 35300632602（17bcc52）completed success（约 10 分钟）
+- 产物齐备（ipa + trollstore tipa + dSYM），双修复均入包：JavaLauncher windowsMenu 桩出口（修复 A）+ osm_bridge 权威呈现路径（修复 B）
+
+Stage Summary:
+- 新 IPA 可装机验证；判读锚点见 Task 100 主段（[AppKitStub] Task100: windowsMenu requested / [OSMBridge] Task100 present path engaged + EASU landing verified in fb0 ... driver transport check / 心跳 present=1 drvProbe=N/M）
