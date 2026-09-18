@@ -103,7 +103,7 @@ check("C1 打包/解包算法位级全等（64k pack + 50k unpack + 4k roundtrip
 print("===== D. FAQ（Arm ASR 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("D1 30 条目（Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task85 时为 24）", len(faq_items) == 30, f"got {len(faq_items)}")
+check("D1 32 条目（Task99 +2 macMenuStub/fsrCorner；Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task85 时为 24）", len(faq_items) == 32, f"got {len(faq_items)}")
 check("D2 armAsr 条目在位（问题 + 计算着色器/GL 4.1 边界 + Mali 调优定性）",
       "Arm ASR（Arm Accuracy Super Resolution）代替 FSR" in helpvc
       and "4.3 才有的计算着色器" in helpvc

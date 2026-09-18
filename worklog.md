@@ -812,3 +812,46 @@ Work Log:
 
 Stage Summary:
 - Task97 + Task98 + CI 解堵三合一构建产出；装机验证锚点见各主条目（[CwdAlign] Task97 / [LWJGLSel] Task98 + Using LWJGL 341 / 无 Loading library SDL）
+
+---
+Task ID: 99
+Agent: main (Super Z)
+Task: b919e0f/2253a10 日志对判读 + 双修复——(A) MC 26.3 正式版 AppKit 菜单集成崩溃；(B) BMC2 1.20.1 + zink + FSR 画面蜷缩左下角
+
+Work Log:
+- 拉取用户两个新上传提交（b919e0f=latestlog.txt、2253a10=latestlog.old.txt，均为 7ed3d01 构建 = Task97/98 修复后 IPA）
+- 日志二判读（fabric-loader-0.19.5-26.3-e4ecd7db，110 mods，zink，iPad Air M4）：
+  * Task97/98 双双生效：[LWJGLSel] Task98 正确提取 MC major 26 → "Using LWJGL 341"（对照 2af8c45 错选 333）；[CwdAlign] Task97 对齐成功
+  * SDL/EGL 桥、zink/MoltenVK 1.4.2、主窗口 "Minecraft* 26.3 1572x1092"、GL 4.1 Mesa 全就绪，渲染线程推进到 Minecraft.<init>
+  * 崩溃：NoSuchMethodException "Method cannot be found for signature 8958362280" @ ca.weblite.objc.RuntimeUtils.msg/Client.sendProxy ← MacosUtil.disableCloseWindowMenuItem(MacosUtil.java:25) ← Window.<init>(Window.java:121)，Description: Initializing game
+  * 根因：os.name 伪装 macOS（LWJGL/JNA 必需）→ MC 26.3 正式版走 macOS 专属 AppKit 菜单集成（jna-objc 桥找 NSApplication/NSMenu）→ iOS 无 AppKit → 类查找落空崩溃。与 sodium/渲染器无关；26.3-rc-3（f17ef7b）同代码完整游玩实证 rc-3→正式版之间 Mojang 新增了该调用层
+- 日志一判读（BMC2 fabric-loader-0.15.11-1.20.1，zink + FSR preset2）：
+  * Task97 CWD 修复让 BMC2 首次真正渲染（Game took 46.79s、fps 41→60、mem 5GB 峰值）
+  * 症状"游戏界面蜷缩在左下角"= MC 窗口 1572x1092 渲染进 2360x1640 OSMesa 缓冲左下区域（1572/2360=66.6%），EASU 输出未进入回读 client buffer
+  * 关键澄清：会话总帧数 ~361 < steady 日志门槛 600——"无 steady 行"不能证明 EASU 停跑；EASU engaged 且条件变量全程成立（无恢复兜底日志、无 glfwSetWindowSize、windowWidth 写入点全排查稳定 1572）
+  * 对照组 f17ef7b（26.3-rc-3 + zink + FSR 同代码）满屏正常 + steady 600 帧实证——断层在 GLFW 1.20.1 路径的 GL 终态/回读行为 vs SDL3 26.3 路径，需双探针日志定位精确层
+- 修复 A（JavaLauncher.m，ame99_installAppKitMenuStubs）：
+  * JLI_Launch 前（ame97 同段）用 ObjC 运行时公开 API 注册 NSApplication/NSMenu/NSMenuItem 三桩类（继承 NSObject，metaclass 上 +sharedApplication，numberOfItems→0 使菜单巡游零次返回）
+  * 守卫：objc_getClass("NSApplication") 非 NULL（真 macOS）绝不插桩；幂等 static 标志
+  * 安全网：三桩类 +resolveInstanceMethod:——未预期选择子动态补返回 nil 的无操作 IMP + NSLog 留痕（优于 doesNotRecognizeSelector 硬崩）
+  * 类型编码与 AppKit 真实声明一致（q@: 的 NSInteger numberOfItems、@@:q 的 itemAtIndex: 等），jna-objc 按编码选 marshaller
+- 修复 B（osm_bridge.mm）：
+  * EASU pass 加固：glActiveTexture 显式锁 GL_TEXTURE0 + uInputTex uniform 钉 0 + 单元 0 旧绑定保存还原（旧代码把 FSR 纹理绑到"当时活动"单元、采样器默认读单元 0——模组留非 0 单元时采样错纹理的潜在缺陷一并消除）
+  * GPU 单次探针：首次 EASU 帧后 glReadPixels 读 fb0 顶带像素 + glGetError 清扫——区分"绘制未落地 GPU"vs"回读未携带"
+  * 120-swap 心跳：win/osm/bundle/easuFrames/probe/verdict 全变量可见（修复 <600 帧盲区）
+  * CPU 顶带探针：回读后采 buffer 顶部条带（游戏视口永不写、EASU 必写区域）16 点 × 90 帧多数表决
+  * CG 拉伸兜底：verdict=-1 时把 buffer 游戏区域（bytesPerRow=全宽 stride）包 CGImage，CoreAnimation 拉伸到 layer bounds——几何立即全屏正确（双线性软于 EASU 但远好于蜷角），用户当轮 IPA 即得可用画面
+- FAQ 30→32（+macMenuStub 故障排除 / +fsrCorner 渲染与性能）；version.h REVISION 17 addendum (Task 99, no bump)
+- verify_task99.py 新增 55 检查（A/B 区 git 钉日志证据、C/D 区实现锚点、E/F FAQ+version、G 级联同步、H 行为矩阵、I 卫生）
+- 级联 stale-sync：FAQ 计数 30→32 同步 verify_task83/84/85/86/87/94/95/97/98；verify_task85 D1 语法门扩展（region 版 bridge 变换 + ame99_fsrdiag/kAme99ProbeFrames 桩 + healed{frames} 字段）；verify_task83 B18 设置→视频设置 3→4 处；分类顺序断言 mc26sdl 殿后 → macMenuStub 殿后（86/95/97/98）
+- 语法门：scripts/task99_syntax_ame99.py 对 ame99 段独立 g++ 编译通过（ObjC→C 变换同 D1 惯例）
+- 级联全绿：83:73/73、84:31/31、85:24/24、86:33/33、87:50/50、94:45/45、95:59/59、97:30/30、98:35/35、99:55/55；前端 88-93/96 剩余失败均为已知"未提交改动"类（提交后自愈）
+- 朋友提交状态核查：本轮 origin 无新前端提交（最后仍是 1b7ae22/0bb68fb/2af8c45/2f90d13 上传）；7ed3d01 的 44a101a unblock（MeloNX 卡片 ARC 修复）已含在装机构建中
+
+Stage Summary:
+- 双修复已提交推送，等 CI（约 8-12 分钟）
+- 下轮设备日志判读锚点：
+  * 26.3 会话："[AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed" 后不再有 MacosUtil 崩溃；若见 "unexpected selector <...>" 需扩桩
+  * BMC2 zink+FSR 会话："[OSMBridge] Task99 GPU probe: fb0 top-strip pixel ... rgba=..."（零=绘制层故障/非零=回读层故障）+ "FSR landing verified"（EASU 正常）或 "FSR NOT landing ... engaging CG stretch fallback"（自动兜底，画面即刻全屏）+ "swap#N" 心跳（win=1572x1092 osm=2360x1640 easuFrames 递增=条件恒成立）
+  * 若 GPU 探针非零而 CPU 探针全零 → 下一轮修回读层（自定义 libOSMesa 的 glFinish 读回源）；若 GPU 探针也零 → 修绘制层（GL 终态）
+- 26.3 soudim 结论（对用户）：sodium 无罪，两连崩分别是 Task98 已修的 LWJGL 错选与本轮 AppKit 层

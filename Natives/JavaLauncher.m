@@ -673,6 +673,162 @@ static void ame97_alignProcessCwdToGameDir(NSString *gameDir) {
     NSLog(@"[CwdAlign] Task97: process CWD aligned to game dir: %@", nowCwd);
 }
 
+// ============================================================================
+// Task 99（修复 A）：MC 26.3 Window 初始化的 AppKit 菜单集成崩溃
+//
+// 证据链（b919e0f/2253a10 上传日志对，7ed3d01 构建，fabric-loader-0.19.5-
+// 26.3-e4ecd7db，110 mods，zink，iPad Air M4）：
+//   * Task97/98 修复双双生效——[LWJGLSel] Task98 正确选出 LWJGL 341（对照
+//     2af8c45 的错选 333），[CwdAlign] Task97 对齐成功，SDL/EGL 桥、zink/
+//     MoltenVK、主窗口 "Minecraft* 26.3 1572x1092"、GL 4.1 Mesa 全部就绪，
+//     渲染线程跑到 Minecraft.<init>；
+//   * 然后死于：
+//       java.lang.RuntimeException: java.lang.NoSuchMethodException:
+//         Method cannot be found for signature 8958362280
+//         at ca.weblite.objc.RuntimeUtils.msg / Client.sendProxy
+//         at com.mojang.blaze3d.platform.MacosUtil.disableCloseWindowMenuItem
+//         at com.mojang.blaze3d.platform.Window.<init>(Window.java:121)
+//       Description: Initializing game
+//   * 26.3-rc-3（f17ef7b，同一代码路径）完整游玩无恙——Mojang 在 rc-3 之后
+//     到 26.3 正式版之间改动了 Window 构造里的 macOS 集成调用（正式版新增/
+//     改为 disableCloseWindowMenuItem），首次暴露本层。
+//
+// 根因：启动器为了让 LWJGL/JNA 在 iOS 上工作而伪装 os.name=Mac OS X，
+// MC 26.3 的 Window.<init> 因此认定自己跑在 macOS 上，调用 MacosUtil 的
+// AppKit 集成（经 jna-objc 桥 ca.weblite.objc.Client.sendProxy
+// ("NSApplication","sharedApplication") 起步，随后走 mainMenu →
+// numberOfItems → itemAtIndex: → submenu → title → setEnabled: 的标准菜单
+// 巡游）。iOS 只有 UIKit，没有 AppKit——objc_getClass("NSApplication")
+// 落空，jna-objc 的方法解析随之抛 NoSuchMethodException，MC 以
+// "Initializing game" 崩溃。与渲染器无关（崩在任何 GL 呈现之前）。
+//
+// 修复：在 JLI_Launch 之前用 ObjC 运行时公开 API 注册三个最小桩类
+// （objc_allocateClassPair + class_addMethod + objc_registerClassPair）：
+//   NSApplication : +sharedApplication → 单例；-mainMenu → 单例桩菜单；
+//                   -windows → 真 NSArray @[]（Foundation 在 iOS 存在）
+//   NSMenu       : -numberOfItems → 0（MC 的巡游循环零次即返回），
+//                   -itemAtIndex: → nil，-title → @""
+//   NSMenuItem   : -title → @""，-submenu → nil，-setEnabled: → 无操作
+// 守卫：仅当 objc_getClass("NSApplication") == NULL 时注册（真 macOS 永不
+// 触碰；iOS 恒触发；绝不覆盖真实类）。
+// 安全网：三个桩类都装 +resolveInstanceMethod: —— 若 26.3+ 的菜单巡游
+// 触到未实现选择子，动态补一个返回 nil 的无操作 IMP 并响亮留痕（优于
+// doesNotRecognizeSelector 的硬崩溃；MC 侧巡游代码对 null 返回有守卫）。
+// 幂等：静态标志，重复调用零副作用。
+// ============================================================================
+#include <objc/runtime.h>
+#include <objc/message.h>
+
+static id ame99_shared_app_stub(void);
+static id ame99_shared_menu_stub(void);
+
+// —— IMP 实现（类型编码与 AppKit 真实声明一致，jna-objc 按编码选 marshaller）
+static id ame99_app_sharedApplication(id self, SEL _cmd) { return ame99_shared_app_stub(); }
+static id ame99_app_mainMenu(id self, SEL _cmd) { return ame99_shared_menu_stub(); }
+static NSArray *ame99_app_windows(id self, SEL _cmd) { return @[]; }
+static long ame99_menu_numberOfItems(id self, SEL _cmd) { return 0; }          // NSInteger
+static id ame99_menu_itemAtIndex(id self, SEL _cmd, long index) { return nil; }
+static NSString *ame99_any_title(id self, SEL _cmd) { return @""; }
+static BOOL ame99_item_isEnabled(id self, SEL _cmd) { return NO; }
+static id ame99_item_submenu(id self, SEL _cmd) { return nil; }
+static void ame99_noop_vBB(id self, SEL _cmd, BOOL b) {}
+static void ame99_noop_vq(id self, SEL _cmd, long q) {}
+static void ame99_noop_v_id(id self, SEL _cmd, id o) {}
+
+// 兜底 IMP：任何未预期选择子 → 返回 nil（配合 resolveInstanceMethod:）
+static id ame99_generic_nil(id self, SEL _cmd) { return nil; }
+
+// 安全网：未实现选择子 → 动态补无操作 IMP（返回 nil）+ 留痕
+static BOOL ame99_resolveInstanceMethod(Class self, SEL _cmd, SEL name) {
+    NSLog(@"[AppKitStub] Task99: unexpected selector <%s> on %s -- generic nil no-op installed "
+          "(extend the stub if MC misbehaves)", sel_getName(name), class_getName(self));
+    if (!class_addMethod(self, name, (IMP)ame99_generic_nil, "@@:")) return NO;
+    return YES;
+}
+
+static id ame99_shared_app_stub(void) {
+    static id sApp = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Class cls = objc_getClass("NSApplication");
+        if (cls) sApp = class_createInstance(cls, 0);   // 桩类自身
+    });
+    return sApp;
+}
+
+static id ame99_shared_menu_stub(void) {
+    static id sMenu = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Class cls = objc_getClass("NSMenu");
+        if (cls) sMenu = class_createInstance(cls, 0);
+    });
+    return sMenu;
+}
+
+static void ame99_installAppKitMenuStubs(void) {
+    static bool installed = false;
+    if (installed) return;
+    installed = true;
+
+    // 守卫：真实 AppKit 存在（真 macOS）则绝不插桩。iOS 上恒 NULL。
+    if (objc_getClass("NSObject") == NULL) {
+        NSLog(@"[AppKitStub] Task99: ObjC runtime unavailable, skipping");
+        return;
+    }
+    if (objc_getClass("NSApplication") != NULL) {
+        NSLog(@"[AppKitStub] Task99: real AppKit present, stubs not needed");
+        return;
+    }
+
+    // —— NSMenu（先建：NSApplication.mainMenu 要返回它）
+    Class menuCls = objc_allocateClassPair(objc_getClass("NSObject"), "NSMenu", 0);
+    if (menuCls) {
+        class_addMethod(menuCls, @selector(numberOfItems), (IMP)ame99_menu_numberOfItems, "q@:");
+        class_addMethod(menuCls, @selector(itemAtIndex:), (IMP)ame99_menu_itemAtIndex, "@@:q");
+        class_addMethod(menuCls, @selector(title), (IMP)ame99_any_title, "@@:");
+        class_addMethod(menuCls, @selector(setTitle:), (IMP)ame99_noop_v_id, "v@:@");
+        class_addMethod(menuCls, @selector(setAutoenablesItems:), (IMP)ame99_noop_vBB, "v@:B");
+        class_addMethod(menuCls, @selector(removeItemAtIndex:), (IMP)ame99_noop_vq, "v@:q");
+        class_addMethod(menuCls, @selector(addItem:), (IMP)ame99_noop_v_id, "v@:@");
+        class_addMethod(object_getClass(menuCls), @selector(resolveInstanceMethod:),
+                        (IMP)ame99_resolveInstanceMethod, "B@::");
+        objc_registerClassPair(menuCls);
+    }
+
+    // —— NSMenuItem
+    Class itemCls = objc_allocateClassPair(objc_getClass("NSObject"), "NSMenuItem", 0);
+    if (itemCls) {
+        class_addMethod(itemCls, @selector(title), (IMP)ame99_any_title, "@@:");
+        class_addMethod(itemCls, @selector(setTitle:), (IMP)ame99_noop_v_id, "v@:@");
+        class_addMethod(itemCls, @selector(setEnabled:), (IMP)ame99_noop_vBB, "v@:B");
+        class_addMethod(itemCls, @selector(isEnabled), (IMP)ame99_item_isEnabled, "B@:");
+        class_addMethod(itemCls, @selector(submenu), (IMP)ame99_item_submenu, "@@:");
+        class_addMethod(itemCls, @selector(setSubmenu:), (IMP)ame99_noop_v_id, "v@:@");
+        class_addMethod(object_getClass(itemCls), @selector(resolveInstanceMethod:),
+                        (IMP)ame99_resolveInstanceMethod, "B@::");
+        objc_registerClassPair(itemCls);
+    }
+
+    // —— NSApplication
+    Class appCls = objc_allocateClassPair(objc_getClass("NSObject"), "NSApplication", 0);
+    if (appCls) {
+        class_addMethod(object_getClass(appCls), @selector(sharedApplication),
+                        (IMP)ame99_app_sharedApplication, "@@:");
+        class_addMethod(appCls, @selector(mainMenu), (IMP)ame99_app_mainMenu, "@@:");
+        class_addMethod(appCls, @selector(setMainMenu:), (IMP)ame99_noop_v_id, "v@:@");
+        class_addMethod(appCls, @selector(windows), (IMP)ame99_app_windows, "@@:");
+        class_addMethod(appCls, @selector(delegate), (IMP)ame99_generic_nil, "@@:");
+        class_addMethod(appCls, @selector(setDelegate:), (IMP)ame99_noop_v_id, "v@:@");
+        class_addMethod(object_getClass(appCls), @selector(resolveInstanceMethod:),
+                        (IMP)ame99_resolveInstanceMethod, "B@::");
+        objc_registerClassPair(appCls);
+    }
+
+    NSLog(@"[AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed "
+          "(iOS has no AppKit; MC 26.3 MacosUtil menu walk no-ops, numberOfItems=0)");
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -1590,6 +1746,12 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     // ame97_alignProcessCwdToGameDir 注释：2f90d13 两 mod 崩溃同源于
     // java.io[进程 CWD] 与 java.nio[user.dir] 的相对路径解析分裂）。
     ame97_alignProcessCwdToGameDir(gameDir);
+
+    // Task99（修复 A）：JLI_Launch 前注册 AppKit 菜单桩。必须在 MC
+    // Window.<init>（其内 MacosUtil 经 jna-objc 找 NSApplication）之前——
+    // JVM 启动早期装好即可；幂等。iOS 无 AppKit，不装则 26.3 正式版
+    // "Initializing game" 必崩（b919e0f 实锤）。
+    ame99_installAppKitMenuStubs();
 
     NSLog(@"[Init] Calling JLI_Launch");
 

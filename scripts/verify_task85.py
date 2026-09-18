@@ -100,7 +100,7 @@ check("B9 engaged 日志带 Task 85 判读标记",
 print("===== C. FAQ（fsr 病史修订 + upscalerAlt 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 30 条目（Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task85 时为 24）", len(faq_items) == 30, f"got {len(faq_items)}")
+check("C1 32 条目（Task99 +2 macMenuStub/fsrCorner；Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task85 时为 24）", len(faq_items) == 32, f"got {len(faq_items)}")
 check("C2 upscalerAlt 条目在位（问题 + 五类方案 + 结论）",
       "FSR 1.0 有哪些替代方案" in helpvc
       and "NVIDIA NIS（Image Scaling）" in helpvc
@@ -145,8 +145,11 @@ static osmesa_library handle;
 static void CallbackBridge_nativeSendScreenSize(int w, int h) { (void)w; (void)h; }
 // —— ame83 段桩（本门只编 swap/apply 段；真实实现经指纹断言覆盖）——
 static bool ame83_fsr_upscale(int a, int b, int c, int d) { (void)a;(void)b;(void)c;(void)d; return true; }
-struct ame85_fsr_stub { bool healed; };
+struct ame85_fsr_stub { bool healed; long frames; };
 static struct ame85_fsr_stub ame83_fsr;
+// —— Task99 段桩（swap 段引用 ame99_fsrdiag / kAme99ProbeFrames；真实定义在文件前部）——
+static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuProbed; } ame99_fsrdiag = {0,0,0,0,false};
+#define kAme99ProbeFrames 90
 // —— ObjC 桩（真实 TU 为 ObjC++；此处 C 变换验证 C 语义段）——
 typedef void *CGColorSpaceRef; typedef void *CGDataProviderRef; typedef void *CGImageRef;
 typedef void *dispatch_queue_t;
@@ -173,6 +176,9 @@ block = osm[osm.index("void osm_apply_current_ll() {"):osm.index("void osm_swap_
 # ObjC → C 变换（dispatch block 尾随闭包改普通调用桩 + 属性访问展开）
 block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge id)bitmap;",
                       "SurfaceViewController_surface_layer_contents_set(bitmap);")
+# Task99 兜底分支的第二处 contents 赋值（region 版）同款变换
+block = block.replace("SurfaceViewController.surface.layer.contents = (__bridge id)region;",
+                      "SurfaceViewController_surface_layer_contents_set(region);")
 # dispatch 尾随闭包 → 引用捕获 lambda（ObjC block 隐式捕获局部变量 bundle；
 # g++ 无捕获 lambda 引用它编不过，[&] 等价还原语义）
 block = block.replace("dispatch_async(dispatch_get_main_queue(), ^{",

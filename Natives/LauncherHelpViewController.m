@@ -350,12 +350,29 @@
                      @"启动器已修复（Task98）：版本号提取改为前缀无关的锚定解析，Fabric/NeoForge/Forge 形态的 26.x 都会正确选 3.4.1。验证方法：日志搜 “Using LWJGL 341”，其上一行应有 “[LWJGLSel] Task98: MC major 26 extracted from version id …”；随后 SDL 加载通过，不再出现 Loading library SDL 崩溃。\n\n"
                      @"若用的是旧构建：更新启动器即可；临时自救可在 设置 → 该实例的编辑页 把 LWJGL 版本手动指定为 3.4.1。";
 
+    LauncherHelpFaqItem *macMenuStub = [[LauncherHelpFaqItem alloc] init];
+    macMenuStub.iconName = @"menubar.rectangle";
+    macMenuStub.question = @"MC 26.3 正式版启动到一半闪退，崩溃报告写 Initializing game，堆栈里有 MacosUtil 或 NSApplication？";
+    macMenuStub.answer = @"典型表现：26.3 正式版（含整合包）模组加载完、主窗口都建好了，眼看要进游戏突然退出。日志签名：\n\n"
+                     @"“java.lang.NoSuchMethodException: Method cannot be found for signature …” + 堆栈 ca.weblite.objc.Client.sendProxy → MacosUtil.disableCloseWindowMenuItem → Window.<init>，Description: Initializing game。\n\n"
+                     @"原因：启动器为了在 iOS 上跑 LWJGL/JNA 而伪装成 macOS，MC 26.3 正式版信以为真，在窗口初始化时去调用 macOS 专有的 AppKit 菜单集成（禁用“关闭窗口”菜单项——通过 NSApplication/NSMenu 这些 macOS 才有的类）。iOS 只有 UIKit 没有 AppKit，类查找落空即崩溃。这与渲染器、Sodium、内存都无关（26.3-rc-3 及更早版本没有这层调用，所以同一启动器此前不崩）。\n\n"
+                     @"启动器已修复（Task99）：JVM 启动前在 Objective-C 运行时注册三个最小桩类（NSApplication/NSMenu/NSMenuItem），菜单巡游零项即安全返回。验证方法：日志搜 “[AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed”；若出现 “unexpected selector” 行请连同 latestlog.txt 一起反馈（说明 26.3+ 又调用了新的菜单接口，需要扩桩）。\n\n"
+                     @"若用的是旧构建：更新启动器即可，无需改任何游戏内设置。";
+
+    LauncherHelpFaqItem *fsrCorner = [[LauncherHelpFaqItem alloc] init];
+    fsrCorner.iconName = @"rectangle.inset.bottomleft";
+    fsrCorner.question = @"1.20.x 整合包 + Zink + FSR 开启时，游戏画面蜷缩在屏幕左下角（右上/下方大片空白）？";
+    fsrCorner.answer = @"典型表现：选了 Zink 渲染器并开启 FSR 超分档位后，游戏能正常进入与操作，但整个画面只占屏幕左下约三分之二，其余区域空白。\n\n"
+                     @"机制：FSR 开启时游戏以低分辨率（屏幕÷档位系数）渲染进全尺寸缓冲的左下角，再由升采样 pass 放大铺满全屏。26.3 会话此链路已验证正常；个别 1.20.x 整合包（BMC2 等）路径上升采样结果没有进入最终上屏的回读缓冲，裸低清帧直接上屏＝蜷角。\n\n"
+                     @"启动器已加固（Task99）：①升采样 pass 显式锁定纹理单元与采样器（消除 MC/模组残留状态干扰）；②每帧自动探测升采样结果是否真的落到上屏缓冲，连续未命中即自动切换兜底呈现——把游戏区域交 CoreAnimation 拉伸到全屏（几何立即正确，画质为双线性、略软于 FSR，帧率不受影响）。验证方法：日志搜 “[OSMBridge] Task99”——“FSR landing verified”表示升采样正常在跑；“FSR NOT landing …engaging CG stretch fallback”表示已自动切兜底（同时带 GPU 探针一行，用于下轮精确修复）；“swap#N”心跳行可见 win/osm 尺寸与运行状态。\n\n"
+                     @"不想等更新的临时自救：设置 → 视频设置 → FSR 1.0 超分辨率 选择“关闭”（画面以原生全分辨率渲染，帧率会相应降低）。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
-        @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader ],
+        @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader, fsrCorner ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub ]
     ];
 }
 

@@ -98,15 +98,15 @@ check("B6 注释链完整（根因 + 桌面等价 + 副作用审计 + 失败策�
 print("===== C. FAQ 接线（LauncherHelpViewController.m） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 FAQ 30 条目（Task97 29 + Task98 +1 mc26sdl）",
-      len(faq_items) == 30, f"got {len(faq_items)}")
+check("C1 FAQ 32 条目（Task99 30 +2 macMenuStub/fsrCorner；Task97 29 + Task98 +1 mc26sdl）",
+      len(faq_items) == 32, f"got {len(faq_items)}")
 check("C2 cwdMismatch 条目在位（两大签名 + [CwdAlign] 验证锚点 + 桌面对照）",
       re.search(r"cwdMismatch\.question.*paintings.*sparsestructures", helpvc, re.S) is not None
       and "listFiles 空指针" in helpvc
       and "[CwdAlign] Task97" in helpvc
       and "桌面端从不双标" in helpvc)
-check("C3 注册在故障排除分类（missingMods 之后，Task98 后 mc26sdl 殿后）",
-      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl \]", helpvc) is not None)
+check("C3 注册在故障排除分类（missingMods 之后，Task99 后 macMenuStub 殿后）",
+      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub \]", helpvc) is not None)
 
 print("===== D. version.h addendum =====")
 vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")

@@ -482,6 +482,21 @@
 // guaranteed LTW title-screen crash). FAQ 29->30 (+mc26sdl: the log signatures,
 // the prefix-blind selection explanation, the manual 3.4.1 profile override as
 // old-build self-help). Launcher-side only, REVISION stays 17.
+// REVISION 17 addendum (Task 99, no bump): two launcher-side fixes, both from
+// the b919e0f/2253a10 device-log pair (7ed3d01 build). (A) MC 26.3 release's
+// Window.<init> -> MacosUtil.disableCloseWindowMenuItem walks AppKit via
+// jna-objc (NSApplication/NSMenu) which iOS does not have -> NoSuchMethodException
+// "Initializing game" crash; JavaLauncher now registers minimal ObjC stub classes
+// before JLI_Launch ("[AppKitStub] Task99" anchor, resolveInstanceMethod safety
+// net). (B) 1.20.x modpack (BMC2) + zink + FSR: game image shrunk to the
+// bottom-left corner -- the EASU upscale output does not reach the readback
+// client buffer on this path (26.3-rc-3 same code renders full-screen);
+// osm_bridge EASU pass now pins texture unit 0 + uInputTex, carries a one-shot
+// GPU probe (glReadPixels top-strip pixel), a 120-swap condition heartbeat, a
+// 90-frame CPU top-strip landing probe, and an automatic CG-stretch fallback
+// presenting the game region full-screen via CoreAnimation when EASU is
+// verified not landing ("[OSMBridge] Task99" anchors). FAQ 30->32
+// (+macMenuStub, +fsrCorner). Launcher-side only, REVISION stays 17.
 #define REVISION 17
 #define PATCH 0
 

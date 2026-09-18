@@ -139,6 +139,17 @@ osm_render_window_t* osm_init_context(osm_render_window_t* share) {
 #ifndef GL_STENCIL_TEST
 #define GL_STENCIL_TEST           0x0B90
 #endif
+// Task 99（修复 B）：EASU pass 加固所需枚举——显式锁定纹理单元 0 +
+// 单次 glReadPixels GPU 侧探针 + glGetError 清扫。
+#ifndef GL_ACTIVE_TEXTURE
+#define GL_ACTIVE_TEXTURE        0x84B0
+#endif
+#ifndef GL_TEXTURE0
+#define GL_TEXTURE0              0x84C0
+#endif
+#ifndef GL_UNSIGNED_BYTE
+#define GL_UNSIGNED_BYTE          0x1401
+#endif
 
 typedef unsigned int ame83_gluint;
 typedef int ame83_glint;
@@ -163,6 +174,7 @@ typedef struct {
     ame83_glint (*glGetUniformLocation)(unsigned int, const char*);
     void (*glUseProgram)(unsigned int);
     void (*glUniform2f)(unsigned int, float, float);
+    void (*glUniform1i)(int, int);
     // texture
     void (*glGenTextures)(GLsizei, unsigned int*);
     void (*glDeleteTextures)(GLsizei, const unsigned int*);
@@ -170,6 +182,7 @@ typedef struct {
     void (*glTexParameteri)(unsigned int, unsigned int, int);
     void (*glCopyTexImage2D)(unsigned int, int, unsigned int, int, int, GLsizei, GLsizei, int);
     void (*glCopyTexSubImage2D)(unsigned int, int, int, int, int, int, GLsizei, GLsizei);
+    void (*glActiveTexture)(unsigned int);
     // vertex
     void (*glGenVertexArrays)(GLsizei, unsigned int*);
     void (*glBindVertexArray)(unsigned int);
@@ -184,6 +197,8 @@ typedef struct {
     void (*glViewport)(int, int, GLsizei, GLsizei);
     void (*glDisable)(unsigned int);
     void (*glGetIntegerv)(unsigned int, int*);
+    void (*glReadPixels)(int, int, int, int, unsigned int, unsigned int, void*);
+    unsigned int (*glGetError)(void);
 } ame83_gl_t;
 
 static struct {
@@ -192,12 +207,26 @@ static struct {
     bool initFailed;    // shader/program 初始化失败（不再每帧重试编译）
     bool ready;         // program+VAO+texture 就绪
     unsigned int program, vao, vbo, tex;
-    int uViewportSize, uTargetSize;
+    int uViewportSize, uTargetSize, uInputTex;
     int texW, texH;     // 当前纹理存储尺寸（变更时重建）
     bool engaged;       // 至少跑过一次升采样（一次性日志用）
     bool healed;        // 兜底窗口恢复已触发
     long frames;        // 升采样帧计数（低频日志用）
 } ame83_fsr = {0};
+
+// Task 99（修复 B）：zink FSR 上屏诊断与兜底状态。
+//   swaps       —— osm_swap_buffers 总次数（心跳取证：EASU 条件变量可见）
+//   probeHits   —— CPU 侧顶带探针命中（EASU 输出确实落到回读缓冲）帧数
+//   probeFrames —— 探针帧数（达到 kAme99ProbeFrames 判决）
+//   verdict     —— 0=未判决 1=EASU 落地 -1=未落地→CG 拉伸兜底
+//   gpuProbed   —— GPU 侧单次探针（glReadPixels 顶带像素）是否已做
+static struct {
+    long swaps;
+    int probeHits, probeFrames;
+    int verdict;        // 0 未判决 / 1 落地 / -1 兜底
+    bool gpuProbed;
+} ame99_fsrdiag = {0, 0, 0, 0, false};
+#define kAme99ProbeFrames 90
 
 static bool ame83_resolve_gl(void) {
     if (ame83_fsr.resolved) return ame83_fsr.gl.glCreateShader != NULL;
@@ -218,12 +247,14 @@ static bool ame83_resolve_gl(void) {
         {"glGetUniformLocation",      (void**)&ame83_fsr.gl.glGetUniformLocation},
         {"glUseProgram",              (void**)&ame83_fsr.gl.glUseProgram},
         {"glUniform2f",               (void**)&ame83_fsr.gl.glUniform2f},
+        {"glUniform1i",               (void**)&ame83_fsr.gl.glUniform1i},
         {"glGenTextures",             (void**)&ame83_fsr.gl.glGenTextures},
         {"glDeleteTextures",          (void**)&ame83_fsr.gl.glDeleteTextures},
         {"glBindTexture",             (void**)&ame83_fsr.gl.glBindTexture},
         {"glTexParameteri",           (void**)&ame83_fsr.gl.glTexParameteri},
         {"glCopyTexImage2D",          (void**)&ame83_fsr.gl.glCopyTexImage2D},
         {"glCopyTexSubImage2D",       (void**)&ame83_fsr.gl.glCopyTexSubImage2D},
+        {"glActiveTexture",           (void**)&ame83_fsr.gl.glActiveTexture},
         {"glGenVertexArrays",         (void**)&ame83_fsr.gl.glGenVertexArrays},
         {"glBindVertexArray",         (void**)&ame83_fsr.gl.glBindVertexArray},
         {"glGenBuffers",              (void**)&ame83_fsr.gl.glGenBuffers},
@@ -236,6 +267,8 @@ static bool ame83_resolve_gl(void) {
         {"glViewport",                (void**)&ame83_fsr.gl.glViewport},
         {"glDisable",                 (void**)&ame83_fsr.gl.glDisable},
         {"glGetIntegerv",             (void**)&ame83_fsr.gl.glGetIntegerv},
+        {"glReadPixels",              (void**)&ame83_fsr.gl.glReadPixels},
+        {"glGetError",                (void**)&ame83_fsr.gl.glGetError},
     };
     int missing = 0;
     for (size_t i = 0; i < sizeof(kSyms)/sizeof(kSyms[0]); ++i) {
@@ -381,6 +414,8 @@ static bool ame83_fsr_init(void) {
     ame83_fsr.program = prog;
     ame83_fsr.uViewportSize = g->glGetUniformLocation(prog, "uViewportSize");
     ame83_fsr.uTargetSize = g->glGetUniformLocation(prog, "uTargetSize");
+    // Task 99：采样器 uniform 显式钉到单元 0（防御 MC/模组留下非 0 活动单元）
+    ame83_fsr.uInputTex = g->glGetUniformLocation(prog, "uInputTex");
     ame83_fsr.ready = true;
     NSLog(@"[OSMBridge] Task83 FSR1 EASU ready (zink): program=%u uViewportSize=%d uTargetSize=%d -- same EASU shader as MobileGlues",
           ame83_fsr.program, ame83_fsr.uViewportSize, ame83_fsr.uTargetSize);
@@ -396,15 +431,21 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
 
     // 最小状态保存（MC 每帧重设自己的管线状态；这里只还回关键绑定）。
     // Task 85：新增 draw/read FBO 绑定保存（EASU 强制绑 fb0，见下）。
-    GLint saveVp[4] = {0}, saveTex = 0, saveProg = 0, saveVao = 0, saveVbo = 0;
-    GLint saveDrawFbo = 0, saveReadFbo = 0;
+    // Task 99（修复 B）：新增活动纹理单元保存——旧代码把 FSR 纹理绑到
+    // “当时活动”的单元（MC/模组可留在任意单元），而着色器采样器默认读
+    // 单元 0：若活动单元非 0，纹理进错单元，采样密不可料。现在显式
+    // 切到单元 0 绑定/采样，还回时恢复原单元与单元 0 的旧绑定。
+    GLint saveVp[4] = {0}, saveProg = 0, saveVao = 0, saveVbo = 0;
+    GLint saveDrawFbo = 0, saveReadFbo = 0, saveActiveTex = 0, saveTexUnit0 = 0;
     g->glGetIntegerv(GL_VIEWPORT, saveVp);
-    g->glGetIntegerv(GL_TEXTURE_BINDING_2D, &saveTex);
     g->glGetIntegerv(GL_CURRENT_PROGRAM, &saveProg);
     g->glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &saveVao);
     g->glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &saveVbo);
     g->glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &saveDrawFbo);
     g->glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &saveReadFbo);
+    g->glGetIntegerv(GL_ACTIVE_TEXTURE, &saveActiveTex);
+    g->glActiveTexture(GL_TEXTURE0);
+    g->glGetIntegerv(GL_TEXTURE_BINDING_2D, &saveTexUnit0);
 
     g->glDisable(GL_DEPTH_TEST);
     g->glDisable(GL_SCISSOR_TEST);
@@ -432,19 +473,40 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
 
     // (2) EASU 全屏绘制 → 默认帧缓冲全幅
     g->glUseProgram(ame83_fsr.program);
+    // Task 99：uInputTex 显式钉单元 0（若着色器把该 uniform 优化掉，
+    // glGetUniformLocation 返回 -1，glUniform1i(-1,..) 是合法空操作——零回归）
+    if (ame83_fsr.uInputTex >= 0) g->glUniform1i(ame83_fsr.uInputTex, 0);
     g->glUniform2f(ame83_fsr.uViewportSize, (float)srcW, (float)srcH);
     g->glUniform2f(ame83_fsr.uTargetSize, (float)dstW, (float)dstH);
     g->glBindVertexArray(ame83_fsr.vao);
     g->glViewport(0, 0, dstW, dstH);
     g->glDrawArrays(GL_TRIANGLES, 0, 6);
 
-    // (3) 还原（FBO 双通道分别还回，模组的非对称 read/draw 绑定不受扰动）
+    // (2b) Task 99（修复 B）：GPU 侧单次探针 + 错误清扫——读回默认帧缓冲
+    // 顶带（GL y≈dstH，即 EASU 输出覆盖、游戏窗口区域之外的条带）的
+    // 一个像素。若此处非零而回读缓冲顶带全零，则“绘制已落地 GPU、
+    // 回读未携带”一眼分晓（区分绘制层故障 vs 回读层故障）。
+    if (!ame99_fsrdiag.gpuProbed) {
+        ame99_fsrdiag.gpuProbed = true;
+        unsigned char px[4] = {0, 0, 0, 0};
+        if (g->glReadPixels) {
+            g->glReadPixels(dstW - 8, dstH - 4, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+        }
+        unsigned int glerr = g->glGetError ? g->glGetError() : 0;
+        NSLog(@"[OSMBridge] Task99 GPU probe: fb0 top-strip pixel (x=%d,y=%d) rgba=%02x%02x%02x%02x glErr=0x%04x "
+              "(zero pixel = EASU draw did not land GPU-side; nonzero + still corner-shrunk on screen = readback layer issue)",
+              dstW - 8, dstH - 4, px[0], px[1], px[2], px[3], glerr);
+    }
+
+    // (3) 还原（FBO 双通道分别还回，模组的非对称 read/draw 绑定不受扰动；
+    //     纹理：先还单元 0 的旧绑定，再还原活动单元）
     g->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (unsigned int)saveDrawFbo);
     g->glBindFramebuffer(GL_READ_FRAMEBUFFER, (unsigned int)saveReadFbo);
     g->glBindVertexArray((unsigned int)saveVao);
     g->glBindBuffer(GL_ARRAY_BUFFER, (unsigned int)saveVbo);
     g->glUseProgram((unsigned int)saveProg);
-    g->glBindTexture(GL_TEXTURE_2D, (unsigned int)saveTex);
+    g->glBindTexture(GL_TEXTURE_2D, (unsigned int)saveTexUnit0);
+    g->glActiveTexture((unsigned int)saveActiveTex);
     g->glViewport(saveVp[0], saveVp[1], saveVp[2], saveVp[3]);
 
     ame83_fsr.frames++;
@@ -498,6 +560,20 @@ void osm_make_current(osm_render_window_t* bundle) {
 
 void osm_swap_buffers() {
     osm_apply_current_ll();
+    // Task 99（修复 B）心跳取证：EASU 触发条件变量全可见。b919e0f 装机
+    // 日志只有 engaged 一行（会话总帧数 361 < steady 门槛 600，无法证明
+    // EASU 是否持续在跑）；本心跳每 120 次交换打一行，一次日志即可判读
+    // “条件恒成立但输出未上屏”（绘制/回读层故障）还是“条件中途失效”
+    // （尺寸/捆绑层故障）。
+    ++ame99_fsrdiag.swaps;
+    if ((ame99_fsrdiag.swaps % 120) == 0) {
+        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d",
+              ame99_fsrdiag.swaps, windowWidth, windowHeight,
+              currentBundle ? currentBundle->osm.width : 0,
+              currentBundle ? currentBundle->osm.height : 0,
+              (void *)currentBundle, ame83_fsr.frames,
+              ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict);
+    }
     // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
     //
     // OSMesa 契约：glFinish 触发 GPU→CPU 回读（zink 下本帧数据在 Vulkan
@@ -509,11 +585,13 @@ void osm_swap_buffers() {
     //
     // 正序：EASU 先把窗口区域升采样铺满 GPU 侧帧缓冲 → glFinish 一次性
     // 回读完整升采样结果 → CGImage 上屏即全幅。
+    bool fsrActiveThisFrame = false;
     if (currentBundle->osm.width > 0 && currentBundle->osm.height > 0 &&
         (windowWidth > 0 && windowHeight > 0) &&
         ((uint32_t)windowWidth < currentBundle->osm.width || (uint32_t)windowHeight < currentBundle->osm.height)) {
         bool ok = ame83_fsr_upscale(windowWidth, windowHeight,
                                     (int)currentBundle->osm.width, (int)currentBundle->osm.height);
+        if (ok) fsrActiveThisFrame = true;
         if (!ok && !ame83_fsr.healed) {
             ame83_fsr.healed = true;
             NSLog(@"[OSMBridge] Task83 FSR upscale unavailable -- restoring MC window to surface %ux%u (direct full-res render)",
@@ -526,9 +604,88 @@ void osm_swap_buffers() {
     }
     handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
     osm_render_window_t bundle = currentBundle->osm;
+
+    // ------------------------------------------------------------------
+    // Task 99（修复 B）：EASU 落地探针 + CG 拉伸兜底。
+    //
+    // 病灶（b919e0f 装机日志，BMC2 1.20.1 + zink + FSR preset2）：
+    //   MC 窗口 1572x1092 渲染进 2360x1640 OSMesa 缓冲的左下角区域，
+    //   EASU engaged 且条件恒成立，但用户看到"游戏界面蜷缩在左下角"——
+    //   即升采样输出没有落到回读 client buffer，上屏的是裸游戏帧。
+    //   对照组 f17ef7b（26.3-rc-3 + zink + FSR，同一代码）满屏正常：
+    //   差异在 MC 版本路径（GLFW 1.20.1 vs SDL3 26.3）的 GL 终态/回读
+    //   行为，具体断层待本轮 GPU/CPU 双探针日志定位。
+    //
+    // 探针（CPU 侧，回读完成后读 client buffer 本体，零 GL 开销）：
+    //   顶带 = buffer 行 0 至 bufH-gameH（OSMESA_Y_UP=0：GL 的 y 从 gameH
+    //   到 bufH 映射到 buffer 顶部条带）——游戏视口永不写这里，EASU 全幅视口
+    //   必写。采 16 点，任一非零记"命中"。
+    // 判决：90 帧多数表决。命中 < 1/3 → 判"EASU 未落地"，切换 CG 拉伸
+    //   兜底并把 EASU 判为无增益（本会话内不再依赖其输出）。
+    // 兜底呈现：把 buffer 的游戏区域（左下 gameW×gameH，行距 = 全宽
+    //   stride）包成 CGImage，CoreAnimation 拉伸到 layer bounds——几何
+    //   立即全屏正确（双线性，软于 EASU 但远好于蜷角）。
+    // ------------------------------------------------------------------
+    bool cgStretchThisFrame = false;
+    int gameW = windowWidth, gameH = windowHeight;
+    if (fsrActiveThisFrame && ame99_fsrdiag.verdict == 0 &&
+        gameW > 0 && gameH > 0 &&
+        (uint32_t)gameW < bundle.width && (uint32_t)gameH < bundle.height) {
+        // 顶带探针
+        const unsigned char *base = (const unsigned char *)bundle.buffer;
+        size_t stride = (size_t)bundle.width * 4;
+        int stripRows = (int)bundle.height - gameH;
+        if (stripRows > 0 && base != NULL) {
+            int nz = 0;
+            for (int i = 0; i < 16; ++i) {
+                int row = 1 + (i * (stripRows - 2)) / 15;      // 顶带内均匀 16 行
+                int col = (int)(((i * 577u) % 1000u) * (bundle.width - 1)) / 999; // 伪随机列
+                const unsigned char *px = base + (size_t)row * stride + (size_t)col * 4;
+                if (px[0] | px[1] | px[2]) ++nz;
+            }
+            ++ame99_fsrdiag.probeFrames;
+            if (nz > 0) ++ame99_fsrdiag.probeHits;
+            if (ame99_fsrdiag.probeFrames >= kAme99ProbeFrames) {
+                ame99_fsrdiag.verdict =
+                    (ame99_fsrdiag.probeHits * 3 >= kAme99ProbeFrames) ? 1 : -1;
+                if (ame99_fsrdiag.verdict == 1) {
+                    NSLog(@"[OSMBridge] Task99 FSR landing verified: top-strip nonzero in %d/%d frames -- EASU output reaches the readback buffer",
+                          ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames);
+                } else {
+                    NSLog(@"[OSMBridge] Task99 FSR NOT landing: top-strip nonzero in only %d/%d frames -- "
+                          "EASU draw never reaches the readback buffer on this path; engaging CG stretch fallback "
+                          "(game region %dx%d presented full-screen via CoreAnimation; geometry correct, bilinear soft). "
+                          "Pair with the Task99 GPU probe line above to locate the broken layer (draw vs readback).",
+                          ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, gameW, gameH);
+                }
+            }
+        }
+    }
+    if (ame99_fsrdiag.verdict == -1 &&
+        gameW > 0 && gameH > 0 &&
+        (uint32_t)gameW < bundle.width && (uint32_t)gameH < bundle.height) {
+        cgStretchThisFrame = true;
+    }
+
     dispatch_async(dispatch_get_main_queue(), ^{
     // Task 83：CGImage 尺寸 = 表面缓冲尺寸（旧代码用 windowWidth——FSR
     // 联动下窗口<表面，会把整幅升采样结果再裁一遍）。
+    if (cgStretchThisFrame) {
+        // Task 99 兜底：只包游戏区域（左下 gameW×gameH），bytesPerRow =
+        // 全宽 stride；CoreAnimation 把它拉伸到 layer bounds = 几何全屏。
+        size_t stride = (size_t)bundle.width * 4;
+        int topRow = (int)bundle.height - gameH;   // OSMESA_Y_UP=0：GL 的 y 从 0 到 gameH → 底部行区间
+        CGDataProviderRef regionProvider = CGDataProviderCreateWithData(
+            NULL, (const uint8_t *)bundle.buffer + (size_t)topRow * stride,
+            (size_t)gameH * stride, NULL);
+        CGImageRef region = CGImageCreate(gameW, gameH, 8, 32, stride, bundle.color_space,
+                                          kCGImageAlphaNoneSkipLast | kCGBitmapByteOrderDefault,
+                                          regionProvider, NULL, FALSE, kCGRenderingIntentDefault);
+        SurfaceViewController.surface.layer.contents = (__bridge id)region;
+        CGImageRelease(region);
+        CGDataProviderRelease(regionProvider);
+        return;
+    }
     CGDataProviderRef bitmapProvider = CGDataProviderCreateWithData(NULL, bundle.buffer, bundle.width * bundle.height * 4, NULL);
     CGImageRef bitmap = CGImageCreate(bundle.width, bundle.height, 8, 32, 4 * bundle.width, bundle.color_space, kCGImageAlphaNoneSkipLast | kCGBitmapByteOrderDefault, bitmapProvider, NULL, FALSE, kCGRenderingIntentDefault);
     SurfaceViewController.surface.layer.contents = (__bridge id)bitmap;
