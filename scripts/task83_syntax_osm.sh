@@ -58,6 +58,12 @@ static struct ame83_stub_osmesa_library { unsigned char *(*glGetString)(unsigned
 // 桩写成 const char* 会让本地语法检查漏掉 C++ 的指针类型不兼容错误。
 static int windowWidth = 1572, windowHeight = 1092;
 static void CallbackBridge_nativeSendScreenSize(int w, int h) { (void)w; (void)h; }
+// Task 106 桩：提取区块内的 ame103_marker_vote 形参类型 + ame106_us 的
+// mach 计时（真实来自 osm_bridge.h / <mach/mach_time.h>，Linux 语法门等价物）
+typedef struct { uint32_t width, height; void *buffer; void *color_space; void *context; } osm_render_window_t;
+typedef struct { uint32_t numer, denom; } mach_timebase_info_data_t;
+typedef int kern_return_t_ignored;
+static int mach_timebase_info(mach_timebase_info_data_t *t) { t->numer = 1; t->denom = 1; return 0; }
 '''
 # 真实 shader 字符串（raw string literal，gcc C 模式接受）
 shader_h = '/home/z/my-project/Amethyst-iOS-MyRemastered/Natives/external/MobileGlues/MobileGlues-cpp/gl/FSR1/FSRShaderSource.h'

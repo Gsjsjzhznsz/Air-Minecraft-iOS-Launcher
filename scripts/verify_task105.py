@@ -148,8 +148,8 @@ print('===== E. FAQ + version.h =====')
 check('E1 fsrCorner 补 Task105 视口自适应机制',
       'Task105 视口自适应' in faq and 'Task105 viewport evidence' in faq and
       'DIVERGED = 已自适应接管' in faq)
-check('E2 fpsUnlock 补负载判读实证（视距 32→16 的 fps 恢复）',
-      '实测（Task105 判读）视距 32' in faq and '重整合包建议视距 ≤16' in faq)
+check('E2 fpsUnlock 负载判读（Task106 修正：呈现常数 + bundle-direct + 相位计时）',
+      'Task106 判读修正' in faq and '重整合包建议视距 ≤16' in faq and 'bundle-direct present engaged' in faq)
 check('E3 version.h REVISION 17 addendum (Task 105, no bump)',
       'REVISION 17 addendum (Task 105, no bump)' in vh)
 

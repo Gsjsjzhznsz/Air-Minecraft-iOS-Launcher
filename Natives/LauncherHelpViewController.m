@@ -116,7 +116,8 @@
     fpsUnlock.question = @"帧率上限 / 垂直同步怎么调？";
     fpsUnlock.answer = @"• 帧率上限：游戏内 视频设置 → 最大帧率（也可在启动器 Java 参数里看到 -Dmax.fps 解锁层）。设为\"无限制\"或高数值即靠上限；\n"
                        @"• 垂直同步：游戏内 视频设置 → 垂直同步 关闭后，各渲染器的呈现模式会切到立即呈现（不再等待刷新率），高刷设备收益明显；\n"
-                       @"• 26.x 整合包加载中/不操作时被压在 30fps（曾误以为 FSR 问题）：MC 26.3 新增“不活动限帧”——默认 AFK 模式下 60 秒无输入自动降到 30fps（10 分钟降到 10fps），整合包加载期无触摸正好触发。启动器已修复（Task104）：写入 inactivityFpsLimit=minimized + 每阻 45s 注入零增量滚轮心跳重置计时；日志锚点 [InputDiag] Task104 AFK heartbeat。若修复后重负载游玩仍只有 ~30fps，那是真实 GPU 负载（FSR 档位调低/降视距即可）——实测（Task105 判读）视距 32 时 26.3 加载期 19-30fps、视距降到 16 后回升至 44+ 且持续爬升，内存 5.4GB 顶格；重整合包建议视距 ≤16；\n"
+                       @"• 26.x 整合包加载中/不操作时被压在 30fps（曾误以为 FSR 问题）：MC 26.3 新增“不活动限帧”——默认 AFK 模式下 60 秒无输入自动降到 30fps（10 分钟降到 10fps），整合包加载期无触摸正好触发。启动器已修复（Task104）：写入 inactivityFpsLimit=minimized + 每阻 45s 注入零增量滚轮心跳重置计时；日志锚点 [InputDiag] Task104 AFK heartbeat。若修复后重负载游玩仍只有 ~30fps，优先降视距（重整合包建议视距 ≤16）并调低 FSR 档位；\n"
+                       @"• 26.x Zink+FSR 游玩期稳定 29-30fps（Task106 判读修正）：实测把 FSR 档位从 1.3x 调到 2.0x（渲染像素 -58%）帧率纹丝不动——瓶颈不是游戏渲染负载，而是每帧两次全幅 GPU→CPU 回读（驱动回读 + 权威回读）+ 行翻转拷贝的呈现常数。启动器已优化（Task106 bundle-direct）：双哨兵逐帧证明驱动缓冲持有当帧全幅画面后，跳过重复回读与行翻，直接上屏驱动缓冲；日志锚点 [OSMBridge] Task106 bundle-direct present engaged。心跳行新增相位计时可自证瓶颈分布：t=swap（启动器总耗时）、[pre+easu / glFinish / readback]（分相）、frame（完整帧周期）、MC-side = frame - swap（游戏自身耗时）——若 MC-side 占大头则只能靠降视距/换渲染器，若 glFinish/readback 占大头请反馈日志（下一轮继续压缩呈现常数）；\n"
                        @"• 帧率仍上不去时先分辨瓶颈：GPU 满载（降视距/开 FSR）还是区块加载卡（换 Zink/降视距）；\n"
                        @"• 帧率波动大但平均不低：多为区块流式风暴，参考 MobileGlues 卡顿一条。";
 
@@ -376,12 +377,20 @@
                      @"启动器已修复（Task103）：展开器在拼接 #line 前保证输出以换行收尾，粘行不可能再发生；对原版着色器零影响（原本就规范收尾，不触发补换行）。验证方法：日志搜 “[amethyst-include] expanded”——Sodium 着色器（如 sodium:blocks/block_layer_opaque）展开后不再紧跟 GLSL 解析错误，进世界正常。\n\n"
                      @"旧构建临时自救：整合包里移除 Sodium / Sodium Extra / Reese's Sodium Options（地形渲染回退原版管线，帧率会下降）。";
 
+    LauncherHelpFaqItem *sparkProfiler = [[LauncherHelpFaqItem alloc] init];
+    sparkProfiler.iconName = @"waveform.path.ecg";
+    sparkProfiler.question = @"整合包创建新世界时闪退（无崩溃报告、日志戛然而止）？";
+    sparkProfiler.answer = @"典型表现：主菜单/标题界面一切正常，点“创建新的世界”后画面卡住或直接闪退；latestlog.txt 最后一行戛然而止（无 exit、无崩溃堆栈、无 hs_err），常见结尾是 spark 的 Starting background profiler... 或 [Amethyst] Patching ...libasyncProfiler.so.tmp。\n\n"
+                         @"机制：spark 分析器在首次开启服务器（创建/进入世界）时会把自己内置的原生库 libasyncProfiler 解包到 config/spark/tmp 并加载。这个库是 macOS 平台且带代码签名——启动器把它的平台标签改写为 iOS 后，签名哈希不再匹配，系统加载器直接杀进程（静默闪退，无法捕获）。这是“已签名库改平台必死”：未签名库重标签无害，已签名库重标签必死。\n\n"
+                         @"启动器已修复（Task106 双层）：①拦截该库加载——spark 检测到加载失败会自动回退到纯 Java 采样器（分析功能照常可用，游戏继续）；②通用防护——平台重标签时同步把签名中和掉（改为未签名状态），其他带签名的 macOS 原生库也能安全加载。验证方法：日志搜 “[Amethyst] Task106: blocked dlopen”——出现后建档继续推进即修复生效；旧构建临时自救：整合包里移除 spark。\n\n"
+                         @"仍闪退且最后一行不是 spark 相关：留意内存——创建世界是内存峰值阶段（实测 537 mods 包建档前已 5.1GB），设备内存告急时系统也会静默杀进程；可适当调低启动器的最大内存或减少视距。";
+
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
     self.itemsByCategory = @[
         @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader, fsrCorner ],
         @[ keyboard, joystick, peripheral, layout ],
         @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl ]
+        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl, sparkProfiler ]
     ];
 }
 

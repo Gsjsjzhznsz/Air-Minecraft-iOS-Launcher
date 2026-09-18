@@ -177,13 +177,13 @@ check("D15 扫描范围限定崩溃报告段（防早段 soft-dep 噪音顶满 8
 print("===== E. FAQ 27→28（+missingMods） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("E1 33 条目（Task99 +2 macMenuStub/fsrCorner；Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task103 +sodiumGlsl）", len(faq_items) == 33, f"got {len(faq_items)}")
+check("E1 34 条目（Task99 +2 macMenuStub/fsrCorner；Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task103 +sodiumGlsl，Task106 +sparkProfiler）", len(faq_items) == 34, f"got {len(faq_items)}")
 check("E2 missingMods 条目在位（问题句含 entrypoint 检索词）",
       "missingMods.question = @\"整合包启动到一半闪退，日志说 Could not execute entrypoint stage？\"" in helpvc)
 check("E3 条目三层防护 + 自救步骤齐备（import_report.json / ImportGuard / dependencyOverrides）",
       all(k in helpvc for k in ("import_report.json", "[ImportGuard] Task95", "dependencyOverrides 条目", "FTB Library、Balm、TerraBlender")))
-check("E4 注册在故障排除分类（sodiumLwjgl 之后，cwdMismatch/mc26sdl 之前；Task99 后 macMenuStub 殿后）",
-      re.search(r"bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl \]", helpvc) is not None)
+check("E4 注册在故障排除分类（sodiumLwjgl 之后，cwdMismatch/mc26sdl 之前；Task106 后 sparkProfiler 殿后）",
+      re.search(r"bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl, sparkProfiler \]", helpvc) is not None)
 
 print("===== F. version.h + 级联 stale-sync =====")
 vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
@@ -193,15 +193,15 @@ check("F2 addendum 记录三层修复与装机锚点（ImportGuard / import repo
       all(k in vh for k in ("ImportGuard", "import_report.json", "CrashTypeMissingMods")))
 cascade = {
     "scripts/verify_task83.py": "32 条目",
-    "scripts/verify_task84.py": "len(faq_items) == 33",
-    "scripts/verify_task85.py": "len(faq_items) == 33",
-    "scripts/verify_task86.py": "len(faq_items) == 33",
-    "scripts/verify_task87.py": "len(faq_items) == 33",
-    "scripts/verify_task94.py": "len(faq_items) == 33",
+    "scripts/verify_task84.py": "len(faq_items) == 34",
+    "scripts/verify_task85.py": "len(faq_items) == 34",
+    "scripts/verify_task86.py": "len(faq_items) == 34",
+    "scripts/verify_task87.py": "len(faq_items) == 34",
+    "scripts/verify_task94.py": "len(faq_items) == 34",
 }
 for path, marker in cascade.items():
     content = read(path)
-    check(f"F3 {os.path.basename(path)} FAQ 计数已 sync 33", marker in content)
+    check(f"F3 {os.path.basename(path)} FAQ 计数已 sync 34", marker in content)
 v94 = read("scripts/verify_task94.py")
 check("F4 verify_task94 A 区已钉 git 809b847（工作区日志被 96c527f 覆盖）",
       'git_show("809b847:latestlog.txt")' in v94 and 'git_show("809b847:latestlog.old.txt")' in v94)

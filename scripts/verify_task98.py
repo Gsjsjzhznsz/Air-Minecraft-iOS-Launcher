@@ -137,7 +137,7 @@ print("===== E. FAQ 接线（LauncherHelpViewController.m） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
 check("E1 FAQ 32 条目（Task99 30 +2 macMenuStub/fsrCorner；Task97 29 + Task98 +1 mc26sdl）",
-      len(faq_items) == 33, f"got {len(faq_items)}")
+      len(faq_items) == 34, f"got {len(faq_items)}")
 check("E2 mc26sdl 条目在位（两签名 + 前缀盲区机理 + 与 Sodium 无关澄清）",
       re.search(r"mc26sdl\.question.*26\.x 的 Fabric/NeoForge 整合包", helpvc, re.S) is not None
       and "Loading library SDL" in helpvc
@@ -147,8 +147,8 @@ check("E3 修复验证锚点 + 旧构建自救（LWJGLSel / Using LWJGL 341 / �
       "[LWJGLSel] Task98" in helpvc
       and "Using LWJGL 341" in helpvc
       and "手动指定为 3.4.1" in helpvc)
-check("E4 注册在故障排除分类（cwdMismatch 之后；Task99 后 macMenuStub 殿后）",
-      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl \]", helpvc) is not None)
+check("E4 注册在故障排除分类（cwdMismatch 之后；Task106 后 sparkProfiler 殿后）",
+      re.search(r"@\[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl, sparkProfiler \]", helpvc) is not None)
 
 print("===== F. version.h addendum =====")
 vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")

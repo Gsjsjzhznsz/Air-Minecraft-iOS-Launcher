@@ -1000,3 +1000,25 @@ Stage Summary:
 - 26.3：sodium 着色器粘行崩溃根治（对全 mod 生态的同类问题通用）；装机锚点：[amethyst-include] expanded 后无 GLSL 解析错误 + 进世界正常
 - BMC2：哨兵闭环——两种传输状态几何都全屏；装机锚点："[OSMBridge] Task103 EASU sentinel verdict: LANDED/NOT LANDED ..."（一行含 mk 命中率 + present/bundle 同源性）+ 心跳 mk=N/M + GPU 探针 "Task103 sentinel pixel (0,0) ... MATCH/MISMATCH"
 - 遗留：哨兵判决为 NOT LANDED 时下一轮可凭 memcmp 同源结论定位断层层级（glReadPixels 劫持 vs 绘制未落地）；2394 与 2124 字节差（设备 vsh +270B 注入来源）未定位但不影响修复
+---
+Task ID: 106
+Agent: main (Super Z)
+Task: 用户报"一个创建存档崩溃，一个还是锁30"→ 41cdff0 双日志判读（2e1ea09 构建）+ 双根因修复 + 提交推送
+
+Work Log:
+- 日志判读：latestlog.old.txt = BMC2 1.20.1 zink+FSR（首次走到"创建新世界"，server bootstrap 到 spark "Starting background profiler..."，最后一行戛然而止 = [Amethyst] Patching spark libasyncProfiler.so.tmp，无 exit/hs_err/fatal trace = SIGKILL 静默死）；latestlog.txt = 26.3 zink+FSR preset=4 scale=2.00（干净会话：建档→游玩→FastQuit→exit(0)，fps 恒 28-30）。附带实证：BMC2 蜷缩已被 Task105 修复（vp=907x631 adaptive + 60fps 全屏几何）
+- 崩溃根因（二进制级闭环）：下载 Modrinth spark-1.10.53-fabric.jar 解包其内置 spark/macos/libasyncProfiler.so——FAT(x86_64+arm64)，arm64 切片 LC_BUILD_VERSION platform=1(macos) + LC_CODE_SIGNATURE 20960B（真签名，blob 恰为切片尾）。spark 1.10.53 字节码：AsyncProfilerAccess.load 解包到 config/spark/tmp/*.tmp 直接 System.load。本设备历史所有会话 "[Amethyst] Patching" 0 次——spark 库是第一个走进 PLPatchMachOPlatformForFile 重标签路径的库；平台重标签改写 mach header → 签名哈希失效 → dyld CS 校验失败 → 杀进程。未签名库重标签无害（其余全部 home 目录库如此），已签名库重标签必死。内存假说排除：崩溃时刻在 chunk 重分配开始前，且早前曾存活 5982MB（崩溃前 5155MB）
+- 修复 A（双层）：① main_hook.m hooked_dlopen 顶部拦截 libasyncProfiler（return NULL → JVM UnsatisfiedLinkError → spark 字节码实证 catch 后降级 Java 采样器，建档继续）；② dyld_patch_platform.m 签名中和——重标签发生时把 LC_CODE_SIGNATURE 原位改写为等尺寸 LC_SOURCE_VERSION(0x2A) 并清零签名 blob（dyld 视为未签名而非签名失效；未签名 home 库本设备历来可加载）；platform 已匹配的早退路径零扰动；其余切片不受影响
+- 30fps 根因（判读修正）：Task105 的"真实负载"定性被推翻——该会话的 44fps 实为暂停菜单瞬时读数；本轮 preset 1→4（渲染像素 -58%）帧率纹丝不动 28-30 = 分辨率无关常数主导。26.3 decomp 复核：FramerateLimitTracker 唯一 30 路径 SHORT_AFK 需 inactivityFpsLimit==AFK，而 Task104 落盘验证 minimized 生效（键名与 Options.process 反编译核对一致）+ 会话全程有输入 + 软件限帧器仅 framerateLimit<260 时运行；vsync 路径排除（osm_swap_interval no-op + POJAV_DISABLE_VSYNC=1）。真凶 = zink 路径每帧两次全幅 GPU→CPU 传输（驱动 glFinish 回读 + Task100 权威 glReadPixels）+ 15.5MB 行翻 memcpy
+- 修复 B（bundle-direct）：Task103 双哨兵（markerCode 每帧 1..254 轮换）提供逐帧地面真值——glFinish 后 bundle.buffer 若同时持有本帧近角（top-down 行 H-1 列 0）+远角（行 1 列 W-2）哨兵即持有本帧全幅 EASU 输出。warmup 30 连中（期间权威路径照跑交叉验证）→ 激活：跳过权威回读+行翻，CGImage 直接包 bundle.buffer（OSMESA_Y_UP=0 本就 top-down）；2 连失 → 立即退回权威路径重新 warmup；verdict==-1 ⟺ 哨兵缺失 ⟺ 自动退出（自稳定）。哨兵票核心抽取为 ame103_marker_vote（scratch/bundle 双票源同一状态机，Task103/104 日志锚点原文保留 + bundle-direct 尾注）
+- 取证（相位计时）：osm_swap_buffers 四相计时（t0 入口/t1 EASU 后/t2 glFinish 后/t3 回读后/末段）+ 帧间隔 gap；心跳新增 "bd=N/M t=swap X.X(max X.X) [pre+easu X.X glFinish X.X readback X.X]ms frame=X.X MC-side=X.Xms"——下一轮装机日志把帧预算精确分解到 MC 渲染/驱动回读/我们的重复劳动
+- FAQ 33→34（+sparkProfiler：建档闪退双根因指引）；fpsUnlock 判读修正（呈现常数 + bundle-direct + 相位计时报文读法）；fsrCorner 机制描述维持；version.h REVISION 17 addendum (Task 106, no bump)
+- 验证：verify_task106 59/59（A git 钉 41cdff0 证据 9 锚；B 真实 spark 二进制法证 5 锚——FAT/签名/blob 位置；C 拦截+中和锚点 7 锚；D bundle-direct 锚点 13 锚；E 行为镜像——状态机 5 用例 + 哨兵位置数学 4 用例 + 签名中和 Mach-O 不变量 6 用例（Python 镜像：重标签/等尺寸改写/blob 全零/x86 零扰动/尺寸不变/早退零扰动）；F FAQ/version/语法门/级联）
+- 级联 stale-sync：FAQ 计数 33→34 ×12 校验器（task106_faq_sync.py：83/84/85/86/87/94/95×3/97/98/99×4/100×2/103×2）+ 类目序锚 5 处（86 C3/95 E4/97 C3/98 E4/99 E4 追加 sparkProfiler 殿后）+ verify_task100 D13 重锚（present 调用门加 !ame106.active）+ verify_task105 E2 重锚（Task106 判读句取代 Task105 实证句）；语法门桩扩 3 处（task83_syntax_osm.sh：osm_render_window_t/mach_timebase；task103_syntax_swap.py + verify_task85 D1：ame106/ame106_us/ame106_bundle_sentinels/ame103_marker_vote/mach_absolute_time）；外层 scripts/ 同步副本 3 件
+- 终态：58/59/71/72/73/75/76/77/78/79/80/81/82/83:73/84:31/85:24/86:33/87:50/94:45/95:59/97:30/98:35/99:55/100:57/103:57/104:20/105:36/106:59 全绿
+- 踩坑：LC_BUILD_VERSION=0x32（0x2D 是 LC_LINKER_OPTION、0x19 是 LC_SEGMENT_64）——Python 手解析两次翻车，macholib 交叉验证纠偏；外层 /home/z/my-project/scripts 与仓库 scripts 双副本（verify_task83 等按外层路径调 .sh 门），改门必须双侧同步
+
+Stage Summary:
+- BMC2 建档闪退根治（spark 签名库重标签致死，双层修复）；装机锚点："[Amethyst] Task106: blocked dlopen of signed macOS profiler lib" + 建档继续推进 + spark Java 采样器照常
+- 26.3 30fps 第 1 轮优化（bundle-direct 跳过重复回读+行翻）+ 相位计时取证；装机锚点："[OSMBridge] Task106 bundle-direct present engaged" + 心跳 "bd=N/M t=swap ... MC-side=...ms"（若 glFinish/readback 仍占大头 → 下轮 CA 直呈提速模式；若 MC-side 占大头 → 降视距/换渲染器指引）
+- 遗留：26.3 剩余帧预算的精确分布待装机日志相位计时；若 bundle-direct 后仍 <35fps，候选方案 = OSMesa 表面缩窗 + CA 双线性直呈（消灭全幅回读，画质换速度，需 UI 档位配合）

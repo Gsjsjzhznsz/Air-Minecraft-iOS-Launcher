@@ -5,6 +5,11 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+// Task 106：LC_SOURCE_VERSION（cmd 0x2A，struct {cmd,cmdsize,version,-sdk}）
+// 恰好 16 字节，与 linkedit_data_command（LC_CODE_SIGNATURE）同尺寸。
+// dyld 对它只做元数据记录、无任何校验语义——是中和签名的等尺寸安全替身。
+#define kAme106LCSourceVersion 0x2A
+
 extern int dyld_get_active_platform();
 
 // Rewrite an LC_(LOAD|WEAK)_DYLIB install name in place. The replacement must
@@ -20,6 +25,8 @@ static void PLRewriteDylibName(struct dylib_command *dylib, const char *newName)
 
 static BOOL PLPatchMachOPlatformForSlice(const char *path, struct mach_header_64 *header) {
     uint8_t *imageHeaderPtr = (uint8_t*)header + sizeof(struct mach_header_64);
+    BOOL retagged = NO;
+    struct linkedit_data_command *sigCmd = NULL;
 
     struct load_command *command = (struct load_command *)imageHeaderPtr;
     for(int i = 0; i < header->ncmds; i++) {
@@ -28,6 +35,7 @@ static BOOL PLPatchMachOPlatformForSlice(const char *path, struct mach_header_64
             int activePlatform = dyld_get_active_platform();
             if (buildver->platform == activePlatform) return NO; // it is already set, stop
             buildver->platform = activePlatform; // set to current platform
+            retagged = YES;
         } else if (command->cmd == LC_LOAD_DYLIB || command->cmd == LC_LOAD_WEAK_DYLIB) {
             struct dylib_command *dylib = (struct dylib_command *)command;
             char *dylibName = (void *)dylib + dylib->dylib.name.offset;
@@ -49,8 +57,26 @@ static BOOL PLPatchMachOPlatformForSlice(const char *path, struct mach_header_64
             if (strstr(dylibName, "Cocoa.framework") || strstr(dylibName, "AppKit.framework")) {
                 PLRewriteDylibName(dylib, "/System/Library/Frameworks/UIKit.framework/UIKit");
             }
+        } else if (command->cmd == LC_CODE_SIGNATURE) {
+            // Task 106：记录签名命令——平台重标签后签名哈希必然失效，
+            // 已签名库会被 dyld 直接杀进程（spark libasyncProfiler 实锤）。
+            sigCmd = (struct linkedit_data_command *)command;
         }
         command = (struct load_command *)((void *)command + command->cmdsize);
+    }
+
+    // Task 106（签名中和）：仅在本切片确实发生了平台重标签时执行——
+    // 把 LC_CODE_SIGNATURE 原位改写为等尺寸的 LC_SOURCE_VERSION，并把
+    // 指向的签名字节块清零。dyld 由此把该库视为“未签名”而不是“签名失效”：
+    // 本设备/越狱环境的未签名 home 目录库历来可正常加载（进程的宽松
+    // 代码签名策略），而签名失效 = 必死。零字节块留在 __LINKEDIT 尾部
+    // 无引用无害；其余切片（x86_64）不受影响。
+    if (retagged && sigCmd != NULL) {
+        uint8_t *sliceBase = (uint8_t *)header;
+        sigCmd->cmd = kAme106LCSourceVersion;
+        if (sigCmd->dataoff != 0 && sigCmd->datasize != 0) {
+            memset(sliceBase + sigCmd->dataoff, 0, sigCmd->datasize);
+        }
     }
     return YES;
 }

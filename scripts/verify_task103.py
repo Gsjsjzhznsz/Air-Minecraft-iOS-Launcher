@@ -5,7 +5,7 @@ B. shaderc_include.c 粘行修复（文本锚点 + 合成着色器行为测试�
 C. EASU 哨兵注入（字符串手术锚点 + MobileGlues 共享头零改动断言）
 D. 哨兵票/翻转判决/取证（osm_bridge.mm 锚点）
 E. 判决状态机行为矩阵（Python 镜像仿真）
-F. FAQ 33 条目 + version.h 附录
+F. FAQ 34 条目 + version.h 附录
 G. 卫生（语法门 + 级联 + NSLog %@ 禁令）
 """
 import os, re, subprocess, sys, tempfile
@@ -176,7 +176,7 @@ check('E6 状态机镜像与 C 常量一致（3/10）', '>= 3' in ob and '>= 10'
 print('===== F. FAQ + version.h =====')
 faq = read('Natives/LauncherHelpViewController.m')
 items = re.findall(r'LauncherHelpFaqItem \*(\w+) = \[\[LauncherHelpFaqItem alloc\] init\];', faq)
-check('F1 FAQ 33 条目（Task100 32 + Task103 sodiumGlsl）', len(items) == 33, f'got {len(items)}')
+check('F1 FAQ 34 条目（Task103 33 + Task106 sparkProfiler）', len(items) == 34, f'got {len(items)}')
 check('F2 sodiumGlsl 条目（签名 + 机制 + 验证锚点 + 旧构建自救）',
       any(i == 'sodiumGlsl' for i in items) and
       'preprocessor directive cannot be preceded by another token' in faq and

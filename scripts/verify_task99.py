@@ -152,8 +152,8 @@ check("D12 verdict=-1 时才走 CG 兜底（EASU 落地则维持全幅 CGImage�
 print("===== E. FAQ =====")
 faq = read("Natives/LauncherHelpViewController.m")
 items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[\[LauncherHelpFaqItem alloc\] init\];", faq)
-check("E1 FAQ 33 条目（Task98 30 + Task99 +2 macMenuStub/fsrCorner）",
-      len(items) == 33, f"got {len(items)}")
+check("E1 FAQ 34 条目（Task98 30 + Task99 +2 macMenuStub/fsrCorner）",
+      len(items) == 34, f"got {len(items)}")
 check("E2 macMenuStub 条目内容（签名 + Task99 验证锚点 + 旧构建指引）",
       any(i == "macMenuStub" for i in items) and
       "MacosUtil" in faq and "[AppKitStub] Task99" in faq)
@@ -161,7 +161,7 @@ check("E3 fsrCorner 条目内容（Task103 重锚：症状关键词保留 + 哨�
       any(i == "fsrCorner" for i in items) and
       "蜷缩在屏幕左下角" in faq and "Task103 EASU sentinel verdict" in faq and "FSR 1.0 超分辨率" in faq)
 check("E4 类目归位（fsrCorner 在渲染与性能；macMenuStub 在故障排除）",
-      "shader, fsrCorner ]" in faq.replace("  ", " ") and "mc26sdl, macMenuStub, sodiumGlsl ]" in faq.replace("  ", " "))
+      "shader, fsrCorner ]" in faq.replace("  ", " ") and "mc26sdl, macMenuStub, sodiumGlsl, sparkProfiler ]" in faq.replace("  ", " "))
 
 print("===== F. version.h addendum =====")
 vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
@@ -176,7 +176,7 @@ for fn in ("verify_task83.py", "verify_task84.py", "verify_task85.py", "verify_t
            "verify_task87.py", "verify_task94.py", "verify_task95.py", "verify_task97.py",
            "verify_task98.py"):
     content = read(f"scripts/{fn}")
-    check(f"G {fn} 计数已 sync 33", "len(faq_items) == 33" in content or "32 条目" in content)
+    check(f"G {fn} 计数已 sync 34", "len(faq_items) == 34" in content or "32 条目" in content)
 
 print("===== H. 行为矩阵（纯逻辑推演，无设备依赖） =====")
 # H1: 真 macOS（AppKit 存在）→ 守卫分支 → 不插桩（本启动器不在 mac 跑，防御性语义）

@@ -310,6 +310,31 @@ void hooked_exit(int code) {
 }
 
 void* hooked_dlopen(const char* path, int mode) {
+    // ------------------------------------------------------------------
+    // Task 106（BMC2 创建存档闪退根治）：拦截 spark 的原生分析器。
+    //
+    // 41cdff0 装机日志（2e1ea09 构建）：BMC2 1.20.1 首次走到"创建新世界"，
+    // server 线程 bootstrap 到 spark 的 "Starting background profiler..."，
+    // spark 把 jar 内置的 spark/macos/libasyncProfiler.so（FAT: x86_64+arm64，
+    // arm64 切片带 20960 字节 LC_CODE_SIGNATURE，platform=macOS）解包到
+    // config/spark/tmp/spark-*.tmp 并 System.load——这是本设备历史上第一个
+    // 走进 PLPatchMachOPlatformForFile 重标签路径的库（此前所有会话 0 次）。
+    // 平台重标签改写了 mach header → 签名哈希不再匹配 → dyld 代码签名校验
+    // 失败 → 进程被杀（SIGKILL，无 hs_err 无 fatal trace——日志最后一行
+    // 正是 "[Amethyst] Patching ...libasyncProfiler.so.tmp"）。
+    // 未签名库（本设备其余全部 home 目录库）重标签无害；已签名库重标签
+    // 必死。spark 的 Java 侧对 UnsatisfiedLinkError 有完整降级（1.10.53
+    // 字节码实证：AsyncProfilerAccess.load catch UnsatisfiedLinkError →
+    // NativeLoadingException → getInstance catch Exception → 分析器禁用，
+    // 游戏继续），拦截是零风险选择：spark 回退 Java 采样器，建档照常进行。
+    if (path != NULL && strstr(path, "libasyncProfiler") != NULL) {
+        static int s_ame106_blocked = 0;
+        if (s_ame106_blocked < 3) {
+            ++s_ame106_blocked;
+            NSLog(@"[Amethyst] Task106: blocked dlopen of signed macOS profiler lib (%s) -- platform retag would invalidate its code signature and dyld would kill the process; spark falls back to its Java sampler (world creation proceeds)", path);
+        }
+        return NULL;
+    }
     // 同步自上游：非 TXM 的 iOS 26+ 设备需要硬件断点重定向（hooked_dlopen_26_ppl）
     BOOL shouldUseDyldBypass26PPL = NO;
     if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED)) {

@@ -100,7 +100,7 @@ check("B9 engaged 日志带 Task 85 判读标记",
 print("===== C. FAQ（fsr 病史修订 + upscalerAlt 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")
 faq_items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[", helpvc)
-check("C1 33 条目（Task99 +2 macMenuStub/fsrCorner；Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task103 +sodiumGlsl，Task85 时为 24）", len(faq_items) == 33, f"got {len(faq_items)}")
+check("C1 34 条目（Task99 +2 macMenuStub/fsrCorner；Task86 +bigpack，Task87 +ltw26，Task94 +sodiumLwjgl，Task95 +missingMods，Task97 +cwdMismatch，Task98 +mc26sdl，Task103 +sodiumGlsl，Task106 +sparkProfiler，Task85 时为 24）", len(faq_items) == 34, f"got {len(faq_items)}")
 check("C2 upscalerAlt 条目在位（问题 + 五类方案 + 结论）",
       "FSR 1.0 有哪些替代方案" in helpvc
       and "NVIDIA NIS（Image Scaling）" in helpvc
@@ -158,6 +158,14 @@ static struct { long swaps; int probeHits, probeFrames; int verdict; bool gpuPro
 // —— Task100 段桩（swap 段引用 ame100_present / ame100_present_frame；真实定义在文件前部，Task 100 权威呈现路径）——
 static struct { unsigned char *scratch, *present; int bufW, bufH; bool engaged, broken; int drvHits, drvFrames; } ame100_present = {0,0,0,0,false,false,0,0};
 static bool ame100_present_frame(int w, int h) { (void)w; (void)h; return true; }
+// —— Task106 段桩（真实定义在文件前部：bundle-direct 状态/计时/哨兵 + 哨兵票核心）——
+static struct { bool active; int warm, misses; long frames, hits; bool engagedLogged, fallbackLogged;
+  double tPreUs, tFinUs, tReadUs, tSwapUs, tPreMax, tFinMax, tReadMax, tSwapMax;
+  double lastEntryUs, gapSumUs, gapMaxUs; int gapN, winN; } ame106 = {0};
+static double ame106_us(uint64_t m) { (void)m; return 0; }
+static bool ame106_bundle_sentinels(const unsigned char *b, uint32_t w, uint32_t h, unsigned char c) { (void)b;(void)w;(void)h;(void)c; return false; }
+static void ame103_marker_vote(bool hit, osm_render_window_t b) { (void)hit; (void)b; }
+static uint64_t mach_absolute_time(void) { return 0; }
 // —— ObjC 桩（真实 TU 为 ObjC++；此处 C 变换验证 C 语义段）——
 typedef void *CGColorSpaceRef; typedef void *CGDataProviderRef; typedef void *CGImageRef;
 typedef void *dispatch_queue_t;

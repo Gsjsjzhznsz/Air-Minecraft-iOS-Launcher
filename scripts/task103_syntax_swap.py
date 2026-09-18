@@ -73,6 +73,16 @@ static struct {
     int bufW, bufH; bool engaged, broken; int drvHits, drvFrames;
 } ame100_present;
 static bool ame104_filters_linear = false;   // Task104：呈现层滤镜状态（swap 两个分支共享）
+// ---- Task106 桩（真实定义在文件前段：bundle-direct 状态/计时/哨兵 + 票核心）----
+static struct {
+    bool active; int warm, misses; long frames, hits; bool engagedLogged, fallbackLogged;
+    double tPreUs, tFinUs, tReadUs, tSwapUs, tPreMax, tFinMax, tReadMax, tSwapMax;
+    double lastEntryUs, gapSumUs, gapMaxUs; int gapN, winN;
+} ame106;
+static double ame106_us(uint64_t m) { (void)m; return 0; }
+static bool ame106_bundle_sentinels(const unsigned char *b, uint32_t w, uint32_t h, unsigned char c) { (void)b;(void)w;(void)h;(void)c; return false; }
+static void ame103_marker_vote(bool hit, osm_render_window_t b) { (void)hit; (void)b; }
+static uint64_t mach_absolute_time(void) { return 0; }
 struct osm_bundle_t { uint32_t width, height; void *buffer; void *color_space; };
 // ---- 桩：CG / Surface / dispatch ----
 static void *dispatch_get_main_queue(void) { return (void *)1; }

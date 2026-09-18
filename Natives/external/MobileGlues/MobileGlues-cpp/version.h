@@ -628,3 +628,54 @@
 // (upscale call now passes effW/effH); verify_task103 F3 re-anchored to
 // the Task104 FAQ wording (far=N/M); task103_syntax_swap + verify_task85
 // D1 stubs gain ame83_resolve_gl + gl.glGetIntegerv + GL_VIEWPORT.
+
+// REVISION 17 addendum (Task 106, no bump): the 41cdff0 log pair (2e1ea09
+// build) resolved both open issues. (A) BMC2 1.20.1 "crash on creating a
+// world": the session reached world creation for the first time (previous
+// sessions never got past the title screen), the server bootstrap hit
+// spark's "Starting background profiler...", spark extracted its bundled
+// spark/macos/libasyncProfiler.so (FAT x86_64+arm64, arm64 slice carries a
+// real LC_CODE_SIGNATURE, platform=macOS) into config/spark/tmp/*.tmp and
+// System.load()ed it -- the FIRST library ever to hit the
+// PLPatchMachOPlatformForFile retag path on this device (0 occurrences in
+// all prior logs). The macOS->iOS platform retag mutates the mach header,
+// invalidating the code signature; dyld's signature validation then kills
+// the process (silent SIGKILL -- no hs_err, no fatal trace; the log's last
+// line is literally the "[Amethyst] Patching ...libasyncProfiler.so.tmp").
+// Unsigned home-dir libs retag harmlessly (that is why every other lib
+// works); signed ones die. Fix (two layers): hooked_dlopen blocks
+// libasyncProfiler loads outright -- spark's own bytecode (1.10.53
+// AsyncProfilerAccess.load) catches UnsatisfiedLinkError and degrades to
+// its Java sampler, so world creation proceeds; and the retag path now
+// neutralizes LC_CODE_SIGNATURE (in-place rewrite to the same-size benign
+// LC_SOURCE_VERSION + zeroed blob) so any OTHER signed macOS dylib a mod
+// extracts loads as unsigned instead of badly-signed. Desktop anchor:
+// '[Amethyst] Task106: blocked dlopen of signed macOS profiler lib'.
+// (B) 26.3 zink+FSR "still locked at 30fps": verdict REVISED -- Task105's
+// "pure load" closure was wrong (its 44fps reading was the pause-menu
+// moment, and in this session the user doubled the FSR scale (preset 1 ->
+// 4, render pixels -58%) with fps unchanged at 28-30 -- a
+// resolution-independent constant dominates the frame budget). The zink
+// path was doing TWO full-surface GPU->CPU readbacks per frame (the
+// driver's glFinish readback + Task100's authoritative glReadPixels) plus
+// a 15.5MB row-flip memcpy. Fix: bundle-direct present -- the Task103
+// dual sentinels (markerCode cycles 1..254 per frame) give per-frame
+// ground truth that bundle.buffer holds THIS frame's full-surface EASU
+// output; after 30 consecutive fresh frames the launcher skips the
+// duplicate readback + row-flip and presents the driver buffer directly
+// (OSMESA_Y_UP=0 is already top-down). Two consecutive sentinel misses
+// revert to the authoritative path; the marker vote state machine is
+// shared (ame103_marker_vote) between the scratch and bundle feeds.
+// Plus per-phase timing instrumentation in the swap heartbeat (t=swap /
+// [pre+easu glFinish readback] / frame / MC-side) so the next log
+// decomposes the remaining frame budget exactly. Desktop anchors:
+// '[OSMBridge] Task106 bundle-direct present engaged' + heartbeat
+// 'bd=N/M t=swap ... MC-side=...ms'. Good news pinned by the same log:
+// the BMC2 corner-shrink is FIXED on device by Task105 (vp=907x631
+// adaptive, 60fps, full-screen geometry). FAQ 33->34 (+sparkProfiler);
+// fpsUnlock carries the corrected verdict + timing-field guide; stale
+// sync: FAQ count 33->34 across 12 verifiers (task106_faq_sync.py),
+// verify_task100 D13 re-anchored to the bundle-direct present gate,
+// verify_task105 E2 re-anchored to the Task106 wording; syntax gates
+// (task83_syntax_osm.sh / task103_syntax_swap.py / verify_task85 D1)
+// gain ame106/mach/vote-helper stubs.

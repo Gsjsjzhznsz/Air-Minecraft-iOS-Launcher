@@ -4,6 +4,7 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <string.h>
+#include <mach/mach_time.h>
 #include "environ.h"
 #include "utils.h"
 
@@ -670,6 +671,113 @@ static struct {
 // 文件级单一事实源：swap 的两个分支（兜底/全幅）读写同一旗标。
 static bool ame104_filters_linear = false;
 
+// ============================================================================
+// Task 106（26.3 30fps 第 1 轮）：bundle-direct 呈现 + 相位计时
+// ============================================================================
+// 41cdff0 装机日志判读（2e1ea09 构建）：preset=1（1814×1262）与 preset=4
+// （1180×820，渲染像素 -58%）帧率同为 28-30——帧耗时的主导项是分辨率无关
+// 的呈现常数。zink 路径每帧实际做了两次全幅 GPU→CPU 传输：驱动 glFinish
+// 回读（15.5MB，OSMesa 契约，不可避免）+ Task100 权威 glReadPixels（15.5MB）
+// + 15.5MB 行翻 memcpy。Task100 不信任驱动回读的历史原因（BMC2 蜷角年代
+// 的 stale 传输）现在有了逐帧地面真值：Task103 双哨兵（markerCode 每帧
+// 1..254 轮换，近角+远角 AND）——bundle.buffer 若同时持有本帧双哨兵，即
+// 持有本帧全幅 EASU 输出，可直接上屏（OSMESA_Y_UP=0 本就是 top-down，
+// 行翻也一并省去）。
+//
+// 协议（保守激活、快速退出）：
+//   · warmup：连续 30 帧双哨兵命中（期间权威路径照跑，交叉验证）→ 激活；
+//   · 激活后：跳过权威回读+行翻，CGImage 直接包 bundle.buffer（复用既有
+//     legacy 全幅包装分支）；mk 票改由 bundle 哨兵供养（同一状态机）；
+//   · 2 连失（EASU 停摆/驱动传输劣化）→ 立即退回权威路径重新 warmup；
+//   · fsrActiveThisFrame 为 false 的帧不参与（healed/非 FSR 会话零影响）。
+//
+// 相位计时（心跳窗口累计）：pre+easu / glFinish / 权威回读 / swap 全段
+// 四相 + 帧间隔（gap）。gap - swap = MC 侧帧耗时——下一次装机日志可把
+// ~33ms 帧预算精确分解到 MC 渲染 / 驱动回读 / 我们的重复劳动。
+static struct {
+    bool active;          // bundle-direct 呈现中
+    int  warm;            // warmup 连中计数
+    int  misses;          // 激活态连失计数
+    long frames, hits;    // 激活态帧数 / 哨兵命中数（心跳取证）
+    bool engagedLogged, fallbackLogged;
+    // 相位计时（μs，心跳窗口累计 + 峰值；心跳打印后清零）
+    double tPreUs, tFinUs, tReadUs, tSwapUs;
+    double tPreMax, tFinMax, tReadMax, tSwapMax;
+    double lastEntryUs, gapSumUs, gapMaxUs;
+    int    gapN, winN;
+} ame106 = {0};
+
+static double ame106_us(uint64_t mach) {
+    static mach_timebase_info_data_t tb;
+    if (tb.denom == 0) mach_timebase_info(&tb);
+    return (double)mach * (double)tb.numer / (double)tb.denom / 1000.0;
+}
+
+// Task 106：bundle.buffer（OSMESA_Y_UP=0，top-down）双哨兵核对。
+// GL(0,0)（底左）→ top-down 行 H-1 列 0；GL(W-2,H-2)（顶右）→ 行 1 列 W-2。
+static bool ame106_bundle_sentinels(const unsigned char *buf, uint32_t w, uint32_t h,
+                                    unsigned char code) {
+    if (buf == NULL || w < 8 || h < 8) return false;
+    size_t stride = (size_t)w * 4;
+    size_t nearIdx = (size_t)(h - 1) * stride + 3;
+    size_t farIdx = stride + (size_t)(w - 2) * 4 + 3;
+    size_t total = (size_t)w * (size_t)h * 4;
+    if (nearIdx >= total || farIdx >= total) return false;
+    return buf[nearIdx] == code && buf[farIdx] == code;
+}
+
+// Task 103/106：哨兵票核心（计数 + 状态迁移 + 迁移取证日志）。
+// 原实现内联在 scratch 探针分支；Task106 bundle-direct 分支复用同一状态机
+// （票源不同：scratch = 权威回读，bundle = 驱动回读；状态语义完全一致）。
+// 迁移时的 present-vs-bundle memcmp 取证：bundle-direct 票时 present 缓冲
+// 有意滞后（按设计不再每帧回读），"differs" 属预期，尾注说明。
+static void ame103_marker_vote(bool mkHit, osm_render_window_t bundle) {
+    if (mkHit) {
+        ++ame99_fsrdiag.mkHits;
+        ++ame99_fsrdiag.mkFarHits;
+        ++ame99_fsrdiag.mkConsecM;
+        ame99_fsrdiag.mkConsecMiss = 0;
+    } else {
+        ++ame99_fsrdiag.mkConsecMiss;
+        ame99_fsrdiag.mkConsecM = 0;
+    }
+    int newState = ame99_fsrdiag.mkState;
+    if (newState == 0) {
+        if (ame99_fsrdiag.mkConsecM >= 3) newState = 1;
+        else if (ame99_fsrdiag.mkConsecMiss >= 3) newState = -1;
+    } else if (newState == 1 && ame99_fsrdiag.mkConsecMiss >= 10) {
+        newState = -1;
+    } else if (newState == -1 && ame99_fsrdiag.mkConsecM >= 10) {
+        newState = 1;
+    }
+    if (newState != ame99_fsrdiag.mkState) {
+        ame99_fsrdiag.mkState = newState;
+        ame99_fsrdiag.verdict = newState;
+        // 状态迁移一次性取证：present 与 bundle 全幅 memcmp
+        //（相等 = glReadPixels 与驱动回读同源；不等 = 独立传输）
+        bool sameAsBundle =
+            (bundle.width > 0 && bundle.height > 0 &&
+             ame100_present.present != NULL && bundle.buffer != NULL &&
+             memcmp(ame100_present.present, bundle.buffer,
+                    (size_t)bundle.width * (size_t)bundle.height * 4) == 0);
+        NSLog(@"[OSMBridge] Task103 EASU sentinel verdict: %s (marker %d/%d probe frames, %d consecutive %s); present buffer %s bundle.buffer -- %s; Task104 far-corner hits %d/%d (both sentinels required for LANDED)%s",
+              newState == 1
+                  ? "LANDED -- full-surface EASU present"
+                  : "NOT LANDED -- CG stretch fallback engaged (raw game region stretched full-screen by CoreAnimation)",
+              ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
+              newState == 1 ? ame99_fsrdiag.mkConsecM : ame99_fsrdiag.mkConsecMiss,
+              newState == 1 ? "matches" : "mismatches",
+              sameAsBundle ? "byte-identical to" : "differs from",
+              newState == 1
+                  ? "end-to-end verified: draw landed + readback honest"
+                  : "pre-EASU/stale transport or draw not landing; geometry still corrected via CG stretch",
+              ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames,
+              ame106.active
+                  ? "; Task106 note: vote fed by driver buffer (present buffer intentionally stale in bundle-direct mode)"
+                  : "");
+    }
+}
+
 static bool ame100_present_frame(int dstW, int dstH) {
     if (ame100_present.broken) return false;
     ame83_gl_t *g = &ame83_fsr.gl;
@@ -776,6 +884,17 @@ void osm_make_current(osm_render_window_t* bundle) {
 }
 
 void osm_swap_buffers() {
+    // Task 106：相位计时 t0。gap = 本入口与上次入口之差 = MC 完整帧周期
+    //（含 MC 渲染 + 我们的全段）；心跳里 frame - swap = MC 侧帧耗时。
+    double t106_0 = ame106_us(mach_absolute_time());
+    if (ame106.lastEntryUs > 0.0) {
+        double gap106 = t106_0 - ame106.lastEntryUs;
+        ame106.gapSumUs += gap106;
+        if (gap106 > ame106.gapMaxUs) ame106.gapMaxUs = gap106;
+        ++ame106.gapN;
+    }
+    ame106.lastEntryUs = t106_0;
+    ++ame106.winN;
     osm_apply_current_ll();
     // ------------------------------------------------------------------
     // Task 105（蜷缩根治第 4 轮）：视口自适应 EASU 输入区域。
@@ -848,7 +967,15 @@ void osm_swap_buffers() {
     // （尺寸/捆绑层故障）。Task 105 追加 vp=WxH（MC 真实呈现视口）。
     ++ame99_fsrdiag.swaps;
     if ((ame99_fsrdiag.swaps % 120) == 0) {
-        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d far=%d/%d vp=%dx%d%s",
+        // Task 106：相位计时心跳（上一个 120-swap 窗口的均值/峰值）。
+        // t=swap 全段（我们的总耗时）/ [pre+easu | glFinish（含驱动回读）|
+        // readback（权威回读+行翻；bundle-direct 激活后趋 0）] / frame 帧周期
+        // / MC-side = frame - swap。下一轮装机日志据此把帧预算分解到具体层。
+        int n106 = ame106.winN > 0 ? ame106.winN : 1;
+        int g106 = ame106.gapN > 0 ? ame106.gapN : 1;
+        double swapAvg106 = ame106.tSwapUs / (double)n106 / 1000.0;
+        double gapAvg106 = ame106.gapSumUs / (double)g106 / 1000.0;
+        NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d far=%d/%d vp=%dx%d%s bd=%ld/%ld t=swap %.1f(max %.1f) [pre+easu %.1f glFinish %.1f readback %.1f]ms frame=%.1f MC-side=%.1fms",
               ame99_fsrdiag.swaps, windowWidth, windowHeight,
               currentBundle ? currentBundle->osm.width : 0,
               currentBundle ? currentBundle->osm.height : 0,
@@ -857,7 +984,19 @@ void osm_swap_buffers() {
               (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames,
               ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
               ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames,
-              vp105W, vp105H, vp105Adapted ? " (adaptive)" : "");
+              vp105W, vp105H, vp105Adapted ? " (adaptive)" : "",
+              ame106.hits, ame106.frames,
+              swapAvg106, ame106.tSwapMax / 1000.0,
+              ame106.tPreUs / (double)n106 / 1000.0,
+              ame106.tFinUs / (double)n106 / 1000.0,
+              ame106.tReadUs / (double)n106 / 1000.0,
+              gapAvg106,
+              gapAvg106 > swapAvg106 ? gapAvg106 - swapAvg106 : 0.0);
+        // 窗口复位（当前帧的相位尚未累计，归入下一窗口——off-by-one 无诊断意义）
+        ame106.winN = ame106.gapN = 0;
+        ame106.tPreUs = ame106.tFinUs = ame106.tReadUs = ame106.tSwapUs = 0.0;
+        ame106.tPreMax = ame106.tFinMax = ame106.tReadMax = ame106.tSwapMax = 0.0;
+        ame106.gapSumUs = ame106.gapMaxUs = 0.0;
     }
     // Task 85（画面分裂根治）：EASU 必须在 glFinish 之前执行。
     //
@@ -890,8 +1029,52 @@ void osm_swap_buffers() {
             CallbackBridge_nativeSendScreenSize((int)currentBundle->osm.width, (int)currentBundle->osm.height);
         }
     }
+    // Task 106 相位计时：t1 = pre+easu 完成（glFinish 前）；
+    // t2 = glFinish（含驱动回读）完成。
+    double t106_1 = ame106_us(mach_absolute_time());
     handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
     osm_render_window_t bundle = currentBundle->osm;
+    double t106_2 = ame106_us(mach_absolute_time());
+    ame106.tPreUs += t106_1 - t106_0;
+    if (t106_1 - t106_0 > ame106.tPreMax) ame106.tPreMax = t106_1 - t106_0;
+    ame106.tFinUs += t106_2 - t106_1;
+    if (t106_2 - t106_1 > ame106.tFinMax) ame106.tFinMax = t106_2 - t106_1;
+
+    // ------------------------------------------------------------------
+    // Task 106（bundle-direct 判定）：glFinish 已把本帧写进 bundle.buffer。
+    // 双哨兵（markerCode 每帧 1..254 轮换）同时命中 = 驱动缓冲持有本帧
+    // 全幅 EASU 输出——可跳过权威回读+行翻直接上屏（详见文件前段注释）。
+    // ------------------------------------------------------------------
+    bool bundleFresh106 = fsrActiveThisFrame && ame83_fsr.markerArmed &&
+                          ame83_fsr.markerCode != 0 &&
+                          ame106_bundle_sentinels((const unsigned char *)bundle.buffer,
+                                                  bundle.width, bundle.height,
+                                                  (unsigned char)ame83_fsr.markerCode);
+    if (ame106.active) {
+        ++ame106.frames;
+        if (bundleFresh106) {
+            ame106.misses = 0;
+            ++ame106.hits;
+        } else if (++ame106.misses >= 2) {
+            ame106.active = false;
+            ame106.warm = 0;
+            if (!ame106.fallbackLogged) {
+                ame106.fallbackLogged = true;
+                NSLog(@"[OSMBridge] Task106 bundle-direct fallback: driver buffer lost per-frame sentinels (stale/pre-EASU transport) -- reverting to authoritative readback path");
+            }
+        }
+    } else if (bundleFresh106) {
+        if (++ame106.warm >= 30) {
+            ame106.active = true;
+            ame106.misses = 0;
+            if (!ame106.engagedLogged) {
+                ame106.engagedLogged = true;
+                NSLog(@"[OSMBridge] Task106 bundle-direct present engaged: 30 consecutive fresh full-surface EASU frames in the driver buffer -- duplicate readback + row-flip skipped per frame");
+            }
+        }
+    } else {
+        ame106.warm = 0;
+    }
 
     // ------------------------------------------------------------------
     // Task 100（修复 B 续）：权威呈现。FSR 帧不再信任驱动 glFinish 回读——
@@ -900,8 +1083,14 @@ void osm_swap_buffers() {
     // 与驱动回读行为彻底解耦（病历详见 ame100_present_frame 头注）。
     // ------------------------------------------------------------------
     bool presentThisFrame = false;
-    if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0) {
+    if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0 && !ame106.active) {
         presentThisFrame = ame100_present_frame((int)bundle.width, (int)bundle.height);
+    }
+    // Task 106 相位计时：权威回读+行翻（bundle-direct 激活时本段为空，趋 0）
+    {
+        double t106_3 = ame106_us(mach_absolute_time());
+        ame106.tReadUs += t106_3 - t106_2;
+        if (t106_3 - t106_2 > ame106.tReadMax) ame106.tReadMax = t106_3 - t106_2;
     }
 
     // ------------------------------------------------------------------
@@ -961,48 +1150,32 @@ void osm_swap_buffers() {
                 }
                 bool mkHit = (got == (unsigned char)ame83_fsr.markerCode)
                           && (gotFar == (unsigned char)ame83_fsr.markerCode);
-                if (mkHit) {
-                    ++ame99_fsrdiag.mkHits;
-                    ++ame99_fsrdiag.mkFarHits;
-                    ++ame99_fsrdiag.mkConsecM;
-                    ame99_fsrdiag.mkConsecMiss = 0;
-                } else {
-                    ++ame99_fsrdiag.mkConsecMiss;
-                    ame99_fsrdiag.mkConsecM = 0;
-                }
-                int newState = ame99_fsrdiag.mkState;
-                if (newState == 0) {
-                    if (ame99_fsrdiag.mkConsecM >= 3) newState = 1;
-                    else if (ame99_fsrdiag.mkConsecMiss >= 3) newState = -1;
-                } else if (newState == 1 && ame99_fsrdiag.mkConsecMiss >= 10) {
-                    newState = -1;
-                } else if (newState == -1 && ame99_fsrdiag.mkConsecM >= 10) {
-                    newState = 1;
-                }
-                if (newState != ame99_fsrdiag.mkState) {
-                    ame99_fsrdiag.mkState = newState;
-                    ame99_fsrdiag.verdict = newState;
-                    // 状态迁移一次性取证：present 与 bundle 全幅 memcmp
-                    //（相等 = glReadPixels 与驱动回读同源；不等 = 独立传输）
-                    bool sameAsBundle =
-                        (bundle.width > 0 && bundle.height > 0 &&
-                         ame100_present.present != NULL && bundle.buffer != NULL &&
-                         memcmp(ame100_present.present, bundle.buffer,
-                                (size_t)bundle.width * (size_t)bundle.height * 4) == 0);
-                    NSLog(@"[OSMBridge] Task103 EASU sentinel verdict: %s (marker %d/%d probe frames, %d consecutive %s); present buffer %s bundle.buffer -- %s; Task104 far-corner hits %d/%d (both sentinels required for LANDED)",
-                          newState == 1
-                              ? "LANDED -- full-surface EASU present"
-                              : "NOT LANDED -- CG stretch fallback engaged (raw game region stretched full-screen by CoreAnimation)",
-                          ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
-                          newState == 1 ? ame99_fsrdiag.mkConsecM : ame99_fsrdiag.mkConsecMiss,
-                          newState == 1 ? "matches" : "mismatches",
-                          sameAsBundle ? "byte-identical to" : "differs from",
-                          newState == 1
-                              ? "end-to-end verified: draw landed + readback honest"
-                              : "pre-EASU/stale transport or draw not landing; geometry still corrected via CG stretch",
-                          ame99_fsrdiag.mkFarHits, ame99_fsrdiag.probeFrames);
-                }
+                // Task 106：票核心（计数+状态迁移+取证日志）抽取为共享助手，
+                // bundle-direct 分支复用同一状态机（票源不同、语义一致）。
+                ame103_marker_vote(mkHit, bundle);
             }
+        }
+        // —— Task 106：bundle-direct 票源（bundle.buffer 双哨兵，top-down 布局：
+        //    近角 = 行 H-1 列 0，远角 = 行 1 列 W-2；位置推导见
+        //    ame106_bundle_sentinels 注释）。激活期间 scratch 不再回读，
+        //    mk 票由此分支供养，判决/翻转语义与权威分支完全一致 ——
+        else if (ame106.active && stripRows > 2 && ame83_fsr.markerArmed &&
+                 ame83_fsr.markerCode != 0 && bundle.buffer != NULL) {
+            ++ame99_fsrdiag.probeFrames;
+            size_t stride106 = (size_t)bundle.width * 4;
+            size_t nearIdx106 = (size_t)(bundle.height - 1) * stride106 + 3;
+            size_t farIdx106 = stride106 + (size_t)(bundle.width - 2) * 4 + 3;
+            size_t total106 = (size_t)bundle.width * (size_t)bundle.height * 4;
+            unsigned char got106 = 0, gotFar106 = 0;
+            if (bundle.width >= 8 && bundle.height >= 8 &&
+                nearIdx106 < total106 && farIdx106 < total106) {
+                const unsigned char *base106 = (const unsigned char *)bundle.buffer;
+                got106 = base106[nearIdx106];
+                gotFar106 = base106[farIdx106];
+            }
+            bool mkHit = (got106 == (unsigned char)ame83_fsr.markerCode)
+                      && (gotFar106 == (unsigned char)ame83_fsr.markerCode);
+            ame103_marker_vote(mkHit, bundle);
         }
         // —— 探针 B：bundle.buffer（驱动传输取证，top-down 顶带）——
         const unsigned char *base = (const unsigned char *)bundle.buffer;
@@ -1047,6 +1220,14 @@ void osm_swap_buffers() {
         gameW > 0 && gameH > 0 &&
         (uint32_t)gameW < bundle.width && (uint32_t)gameH < bundle.height) {
         cgStretchThisFrame = true;
+    }
+
+    // Task 106：swap 全段计时（dispatch 为异步，不计入；分配/探针/CROP
+    // 决策等全部计入 tSwap）。
+    {
+        double t106_end = ame106_us(mach_absolute_time());
+        ame106.tSwapUs += t106_end - t106_0;
+        if (t106_end - t106_0 > ame106.tSwapMax) ame106.tSwapMax = t106_end - t106_0;
     }
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1107,6 +1288,17 @@ void osm_swap_buffers() {
         CGImageRelease(presentImg);
         CGDataProviderRelease(presentProvider);
         return;
+    }
+    // Task 106（bundle-direct 全幅呈现）：激活期间 presentThisFrame 恒为
+    // false，上方两个分支都不命中，落到此处 legacy 全幅包装 bundle.buffer
+    //（双哨兵已证明它持有本帧全幅 EASU 输出；OSMESA_Y_UP=0 本就 top-down）。
+    // 滤镜还原纪律与 present 分支同款：从兜底（Linear）切回落地时还原
+    // Nearest（全幅 1:1 像素映射零插值）。
+    if (ame106.active && fsrActiveThisFrame && ame104_filters_linear) {
+        ame104_filters_linear = false;
+        SurfaceViewController.surface.layer.magnificationFilter = kCAFilterNearest;
+        SurfaceViewController.surface.layer.minificationFilter = kCAFilterNearest;
+        NSLog(@"[OSMBridge] Task104 EASU LANDED: layer filters restored to Nearest (full-surface 1:1 present)");
     }
     CGDataProviderRef bitmapProvider = CGDataProviderCreateWithData(NULL, bundle.buffer, bundle.width * bundle.height * 4, NULL);
     CGImageRef bitmap = CGImageCreate(bundle.width, bundle.height, 8, 32, 4 * bundle.width, bundle.color_space, kCGImageAlphaNoneSkipLast | kCGBitmapByteOrderDefault, bitmapProvider, NULL, FALSE, kCGRenderingIntentDefault);

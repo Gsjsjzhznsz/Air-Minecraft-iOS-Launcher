@@ -158,8 +158,8 @@ check("D11 dispatch 三分支（兜底裁剪 present 优先 / present 全幅 / �
       "CGDataProviderRef bitmapProvider = CGDataProviderCreateWithData(NULL, bundle.buffer" in ob)
 check("D12 心跳扩展（present=%d drvProbe=%d/%d 追加在 Task99 swap 行尾）",
       "verdict=%d present=%d drvProbe=%d/%d" in ob)
-check("D13 非 FSR 零回归（present 仅在 fsrActiveThisFrame 时调用；FSR 关闭走旧路径）",
-      "if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0) {" in ob and
+check("D13 非 FSR 零回归（present 仅在 fsrActiveThisFrame 时调用；FSR 关闭走旧路径；Task106 bundle-direct 激活时跳过权威回读）",
+      "if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0 && !ame106.active) {" in ob and
       re.search(r"bool presentThisFrame = false;\n    if \(fsrActiveThisFrame", ob) is not None)
 check("D14 EASU 顺序不变（upscale 在 glFinish 前，Task85 根治保持）",
       ob.index("ame83_fsr_upscale(effW") < ob.index("handle.glFinish();"))
@@ -186,7 +186,7 @@ print("===== F. FAQ + version.h + 级联 =====")
 faq = read("Natives/LauncherHelpViewController.m")
 items = re.findall(r"LauncherHelpFaqItem \*(\w+) = \[\[LauncherHelpFaqItem alloc\] init\];", faq)
 check("F1 FAQ 计数不变（32——Task100 只刷新内容不加条目）",
-      len(items) == 33, f"got {len(items)}")
+      len(items) == 34, f"got {len(items)}")
 check("F2 macMenuStub 已并入二层 NPE 病历与 Task100 锚点",
       any(i == "macMenuStub" for i in items) and
       "because \\\"windowsMenu\\\" is null" in faq and
@@ -206,7 +206,7 @@ for fn in ("verify_task83.py", "verify_task84.py", "verify_task85.py", "verify_t
            "verify_task98.py", "verify_task99.py"):
     content = read(f"scripts/{fn}")
     check(f"F6 {fn} FAQ 计数 32 同步未破坏",
-          "len(faq_items) == 33" in content or "32 条目" in content or "len(items) == 33" in content)
+          "len(faq_items) == 34" in content or "32 条目" in content or "len(items) == 34" in content)
 
 print("===== G. 卫生 =====")
 def _jl_delta_balanced():
