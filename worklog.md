@@ -936,3 +936,45 @@ Stage Summary:
   （各差 1 项均为「无未提交改动」卫生类，提交后自愈）；task88 45/45、task89 36/36、
   task90 51/51、task91 75/75、task95 59/59 全绿；task83-87/94/97-100 指向另一会话
   克隆路径为环境性失败，与本提交无关
+
+---
+Task ID: 102
+Agent: main (Super Z)
+Task: 用户 Task 101 IPA 实测三项反馈——七卡并列位置整体居中（回退内容居中误解）、主界面按钮首启不显示根治、头像宽度/顶距对齐执行Jar按钮
+
+Work Log:
+- 七卡居中语义澄清（用户："把七个卡片的并列位置放在右侧栏的中间，而不是把七个卡片的内容居中"）：
+  卡工厂整体回退 Task101 内容居中（contentStack/textContentStack/双 Center 退役），恢复 Task96 左锚定
+  （图标 leading 14+卡内垂直居中 20×20，标题贴顶 7，正文贴底 -7，trailing -12 缩放截尾）；
+  新增 updateInfoContentInset——滚动区内容（下载中心+7 卡）不足视口时上下均分 contentInset 使整组
+  垂直居中于右侧栏中部，内容超高归零恢复普通滚动（Task96 可滚动能力不破）；幂等护栏（inset 相等不写回）
+  +偏移钳制（小内容落位 -inset，isDragging/isDecelerating 中不干预）；触发双通道：
+  viewDidLayoutSubviews（首布局/旋转/视口变化）+ contentSize KVO（AmeInfoContentSizeContext，
+  与下载进度 KVO context 区分；下载 UI 展开折叠只改 contentSize 不一定触发根视图重布局）；
+  dealloc @try 移除；math.h 显式导入（fabs）
+- 主界面按钮首启不显示根治（Task101 单次 viewWillAppear 补拉实测无效）：根因收窄——主界面按钮是
+  setupSidebar 循环里第一个调 systemImageNamed: 的控件，进程冷启动首调用存在 CoreUI 符号注册竞态，
+  首调用偶发 nil 而后续调用全部正常（完美解释"只有主界面消失、其他按钮都在"+点其他菜单项后
+  updateButtonColors→refreshMenuIconImages 补拉成功即"恢复"+二次启动正常）；Task101 补拉与
+  viewDidLoad 几乎同刻执行仍在竞态窗口内。升级 beginMenuIconSelfHeal：0.25s×16 次（约 4s）重试，
+  allMenuIconsLoaded 全就绪即停、定时器已跑不叠加；入口 viewWillAppear + viewDidLayoutSubviews
+  （首布局晚一拍再多给一次）；menuIconSelfHealTimer 属性 + dealloc invalidate（block 弱引用无环，
+  runloop 强持有显式解除）；updateButtonColors 直补路径原样保留
+- 头像对齐执行Jar按钮（用户：宽度改一致[原固定 72pt 偏差]、距屏幕顶部间距=执行Jar按钮距底部间距）：
+  avatarImageView.widthAnchor = executeJarBtn.widthAnchor（iPad 220pt 面板 → 94pt、iPhone 168pt → 68pt
+  自动随面板）；heightAnchor = 自身宽度（正方形随动）；viewDidLayoutSubviews 动态 cornerRadius=宽/2
+  保持正圆（写死 36 在等宽后会变椭圆圆角）；新共享常量 AmePanelVerticalEdgeInset=12——头像顶部
+  +12 与执行Jar/管理版本底部 -12 共用，对称关系由常量锁死，后续只改一处
+- 校验：verify_task102.py 新增 38 项（A 居中/B 工厂回退/C 头像/D 自愈升级/E 护栏/F 卫生）；
+  verify_task101 B 区重锚（B1-B5 内容居中→回退后左锚定，B6-B9 原样）+E2 重锚（自愈入口链）+文档注记，
+  保持 40 项
+- 全量回归（未提交态）：task102 36/38、task101 39/40、task96 37/38、task92 39/40、task93 24/25
+  （各项差 1-2 项均为 worklog/未提交改动卫生类，提交后自愈）；task88 44/45、task89 35/36（E1 预期文件
+  集按未提交视图告警，提交后自愈）；task90 51/51、task91 75/75、task95 59/59（TASK95_REPO 覆盖）全绿；
+  task83-87/94/97-100 硬编码另一会话克隆路径为既有环境性失败（grep 证实零引用本次改动文件，域无交集）
+
+Stage Summary:
+- 检测口径零变化（getEntitlementValue×2 / isJITEnabled+TXM / 刷新三件套）；七卡信息、图标、标题、配色、
+  滚动、按钮配色全部保持；ARC 出参签名（Task98）不被回退
+- 用户预期：七卡整组居右栏中部（内容仍左对齐紧凑排布）；主界面按钮首启即显示（4s 自愈窗口覆盖冷启动
+  符号注册竞态）；头像与执行Jar等宽、正圆、顶距=按钮底距

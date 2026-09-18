@@ -14,6 +14,8 @@
 @property(nonatomic, strong) UIStackView *menuStackView;
 @property(nonatomic, strong) NSArray<NSDictionary *> *menuItems;
 @property(nonatomic, assign) NSInteger selectedIndex;
+// Task102：主界面图标首启自愈重试定时器（全部图标就绪或达上限即停）
+@property(nonatomic, strong) NSTimer *menuIconSelfHealTimer;
 
 @end
 
@@ -175,9 +177,56 @@
     }
 }
 
+// Task102：根因收窄——主界面按钮是 setupSidebar 循环里第一个调
+// systemImageNamed: 的控件，进程冷启动首调用存在 CoreUI 符号注册竞态：
+// 首调用偶尔拿到 nil，后续调用全部正常，所以症状总是“只有主界面消失，
+// 其他按钮都在”。Task101 的单次 viewWillAppear 补拉仍在同一竞态窗口内
+// （viewDidLoad 与 viewWillAppear 几乎同刻执行），用户实测仍能复现。
+// 升级为短周期重试：0.25s×16 次（约 4s）内反复补拉，全部就绪即刻停止；
+// 竞态结束后首次重试即可恢复，用户无感。
+- (BOOL)allMenuIconsLoaded {
+    for (UIView *view in self.menuStackView.arrangedSubviews) {
+        if (![view isKindOfClass:[UIButton class]]) continue;
+        UIButton *btn = (UIButton *)view;
+        NSInteger idx = btn.tag;
+        if (idx < 0 || idx >= (NSInteger)self.menuItems.count) continue;
+        if (![btn imageForState:UIControlStateNormal]) return NO;
+    }
+    return YES;
+}
+
+- (void)beginMenuIconSelfHeal {
+    // 先立即补拉一次（绝大多数情况到这一步就已恢复）
+    [self refreshMenuIconImages];
+    if ([self allMenuIconsLoaded]) return;
+    if (self.menuIconSelfHealTimer) return; // 重试已在跑，不叠加
+    __weak typeof(self) weakSelf = self;
+    __block NSInteger attempts = 0;
+    NSTimer *timer = [NSTimer timerWithTimeInterval:0.25 repeats:YES block:^(NSTimer *t) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) { [t invalidate]; return; }
+        [strongSelf refreshMenuIconImages];
+        attempts += 1;
+        if ([strongSelf allMenuIconsLoaded] || attempts >= 16) {
+            [strongSelf.menuIconSelfHealTimer invalidate];
+            strongSelf.menuIconSelfHealTimer = nil;
+        }
+    }];
+    self.menuIconSelfHealTimer = timer;
+    // CommonModes：滚动/追踪时也照常触发，不遗漏
+    [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self refreshMenuIconImages];
+    [self beginMenuIconSelfHeal];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // Task102：首布局比 viewWillAppear 更晚一拍，再多给一次自愈入口；
+    // 全部就绪时 beginMenuIconSelfHeal 内部直接返回，零开销
+    [self beginMenuIconSelfHeal];
 }
 
 - (void)menuButtonTapped:(UIButton *)sender {
@@ -254,6 +303,9 @@
 }
 
 - (void)dealloc {
+    // Task102：自愈重试定时器随控制器释放而停止（block 弱引用 self，无循环持有，
+    // 但 runloop 对已调度 timer 的强持有需要显式 invalidate）
+    [self.menuIconSelfHealTimer invalidate];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 

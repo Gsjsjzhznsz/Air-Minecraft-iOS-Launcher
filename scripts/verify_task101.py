@@ -16,10 +16,13 @@ Task 101 验证器：三卡图标/标题更正 + 七卡居中 + 灰字版本标�
   2. 左上角主界面（house.fill）图标有时刚打开软件时消失：启动早期偶发
      systemImageNamed: 拿到 nil 的时序问题，新增 refreshMenuIconImages
      幂等自愈（viewWillAppear + 外观刷新路径双入口，仅补 image 为空的按钮）。
+     （Task102 注：单次补拉仍在竞态窗口内，已升级为重试自愈，见 verify_task102）
   3. 左侧菜单按钮新拟物高亮与图标偏差：原 imageEdgeInsets(-10,0,0,0) +
      空白标题（" "）布局把图标上移 10pt，而高亮面板是整个 50×50 按钮——
      图标偏离高亮中心。去空白标题与 insets，图标几何居中。
   4. 七张信息卡内容在卡内水平居中（原左侧贴边）。
+     （Task102 注：此项系理解偏差已回退——用户要居中的是七卡并列位置而非卡片
+     内容；本验证器 B 区已重锚为回退后的 Task96 左锚定布局）
   5. 头像下方灰字游戏版本（versionLabel，如 26.3）退场：与绿色游戏版本卡
      同数据源重复展示；滚动区上锚改接用户名标签。
 
@@ -113,25 +116,33 @@ check("A7  内存检测注释同步更名且口径说明保留（Task93 同源�
 
 print()
 print("=" * 72)
-print("B. 七张信息卡内容居中（工厂重构：双 stack 内容组 + centerX/Y）")
+print("B. 七张信息卡布局（Task102 重锚：内容居中系误解已回退，恢复 Task96 左锚定；")
+print("   居中的是七卡并列位置——updateInfoContentInset，见 verify_task102 A 区）")
 print("=" * 72)
 factory = rp[rp.find("- (UIView *)makeInfoCardWithIcon:"):rp.find("- (UIImage *)cardSymbolImageNamed:")]
-check("B1  内容组双 stack：标题/正文竖排 + 图标横排",
-      factory.count("UIStackView alloc") == 2
-      and "UILayoutConstraintAxisVertical" in factory
-      and "UILayoutConstraintAxisHorizontal" in factory)
-check("B2  内容组水平+垂直居中（centerX/centerY 对卡片）",
-      "contentStack.centerXAnchor constraintEqualToAnchor:card.centerXAnchor" in factory
-      and "contentStack.centerYAnchor constraintEqualToAnchor:card.centerYAnchor" in factory)
-check("B3  极端长值不出卡片（leading ≥14 / trailing ≤-12 不等式兜底）",
-      "contentStack.leadingAnchor constraintGreaterThanOrEqualToAnchor:card.leadingAnchor constant:14" in factory
-      and "contentStack.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor constant:-12" in factory)
-check("B4  标题/正文文字居中对齐（textAlignment Center）",
-      factory.count("textAlignment = NSTextAlignmentCenter;") == 2)
-check("B5  原左上角锚定布局退役（iconView leading 14 硬锚/title top 7/value bottom -7 已移除）",
-      "iconView.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14]" not in factory
-      and "titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:7" not in factory
-      and "valueLabel.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-7" not in factory)
+check("B1  工厂无 stack 嵌套（Task101 内容组退役，图标/标题/正文直接挂卡片）",
+      factory.count("UIStackView alloc") == 0
+      and factory.count("[card addSubview:iconView]") == 1
+      and factory.count("[card addSubview:titleLabel]") == 1
+      and factory.count("[card addSubview:valueLabel]") == 1)
+check("B2  Task96 左锚定回归：图标 leading 14 + 卡内垂直居中（20×20）",
+      "iconView.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14" in factory
+      and "iconView.centerYAnchor constraintEqualToAnchor:card.centerYAnchor" in factory
+      and "iconView.widthAnchor constraintEqualToConstant:20" in factory
+      and "iconView.heightAnchor constraintEqualToConstant:20" in factory)
+check("B3  标题/正文接图标右侧（间距 10），trailing -12 内缩放截尾",
+      "titleLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10" in factory
+      and "valueLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10" in factory
+      and "titleLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12" in factory
+      and "valueLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12" in factory)
+check("B4  标题贴顶 7 / 正文贴底 -7（原版紧凑排布；文字左对齐，工厂内无 Center）",
+      "titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:7" in factory
+      and "valueLabel.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-7" in factory
+      and "NSTextAlignmentCenter" not in factory)
+check("B5  Task101 内容组零残留（contentStack/textContentStack/居中不等式全退场）",
+      "contentStack" not in factory
+      and "textContentStack" not in factory
+      and "contentStack.leadingAnchor constraintGreaterThanOrEqualToAnchor:card.leadingAnchor constant:14" not in factory)
 check("B6  卡片基础样式保持：46pt 高 / 圆角 12 / 15% 透明同色底",
       "heightAnchor constraintEqualToConstant:46" in factory
       and "cornerRadius = 12" in factory
@@ -197,8 +208,9 @@ check("E1  refreshMenuIconImages 方法存在且幂等（仅补 image 为空的�
       "- (void)refreshMenuIconImages {" in menu_code
       and "[btn imageForState:UIControlStateNormal]" in menu
       and menu_code.count("- (void)refreshMenuIconImages") == 1)
-check("E2  双入口调用：viewWillAppear + updateButtonColors",
-      re.search(r"- \(void\)viewWillAppear:[\s\S]*?\[self refreshMenuIconImages\];", menu_code)
+check("E2  自愈入口链（Task102 重锚）：viewWillAppear/viewDidLayoutSubviews → beginMenuIconSelfHeal，updateButtonColors 直补仍保留",
+      re.search(r"- \(void\)viewWillAppear:[\s\S]{0,300}?\[self beginMenuIconSelfHeal\];", menu_code)
+      and re.search(r"- \(void\)viewDidLayoutSubviews \{[\s\S]{0,600}?\[self beginMenuIconSelfHeal\];", menu_code)
       and menu.count("[self refreshMenuIconImages];") >= 2)
 check("E3  viewWillAppear 正确调用 super",
       "- (void)viewWillAppear:(BOOL)animated {" in menu

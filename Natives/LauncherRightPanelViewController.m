@@ -22,12 +22,21 @@
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include <sys/time.h>
+#include <math.h> // Task102：fabs（居中偏移钳制比较）
 
 // 添加 C 函数声明 - 这些函数在 LauncherPreferences.m 或其他地方定义
 extern void setPrefString(NSString *key, NSString *value);
 extern void setPrefInt(NSString *key, NSInteger value);
 
 static void *ProgressObserverContext = &ProgressObserverContext;
+// Task102：滚动区 contentSize KVO 上下文——卡片组整体居中的 contentInset 联动
+// （下载中心/进度 UI 展开折叠只改 contentSize，不一定触发 VC 根视图重布局，
+//   靠 KVO 才能精确跟上内容增减）。
+static void *AmeInfoContentSizeContext = &AmeInfoContentSizeContext;
+// Task102：面板纵向安全边距——头像距面板顶部间距与执行Jar/管理版本按钮
+// 距面板底部间距共用同一常量（用户指定对称关系：头像顶部间距 = 按钮底部
+// 间距），后续调整只改这一处，对称关系不会再被破坏。
+static const CGFloat AmePanelVerticalEdgeInset = 12;
 
 @interface LauncherRightPanelViewController () <UIDocumentPickerDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 
@@ -176,6 +185,42 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self updateDownloadCenterButton];
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // Task102：头像宽度跟随执行Jar按钮（等宽约束），圆角动态取宽/2 保持正圆
+    // （原固定 72pt→36 圆角，改等宽后尺寸随面板变化，写死会变成椭圆圆角）
+    CGFloat avatarSide = self.avatarImageView.bounds.size.width;
+    if (avatarSide > 0) {
+        self.avatarImageView.layer.cornerRadius = avatarSide / 2.0;
+    }
+    // Task102：卡片组整体居中——视口尺寸变化（首布局/旋转/面板宽度切换）时
+    // 重算 contentInset；内容增减由 contentSize KVO 单独跟上
+    [self updateInfoContentInset];
+}
+
+/// Task102：七卡并列位置整体居中（用户澄清：居中的是卡片的并列位置，
+/// 不是卡片内容——Task101 的内容居中已回退为左对齐布局）。
+/// 实现：滚动区内容（下载中心 + 7 张信息卡）总高不足视口时，上下均分
+/// contentInset，让整组落在右侧栏中部；内容超高（下载 UI 展开/小屏）时
+/// inset 归零，恢复普通滚动，不破 Task96 的可滚动能力。
+/// 幂等：inset 未变化时不写回，避免无谓的布局抖动。
+- (void)updateInfoContentInset {
+    UIScrollView *scrollView = self.infoScrollView;
+    if (!scrollView || scrollView.bounds.size.height <= 0 || scrollView.contentSize.height <= 0) return;
+    CGFloat inset = (scrollView.bounds.size.height - scrollView.contentSize.height) / 2.0;
+    if (inset < 0) inset = 0;
+    UIEdgeInsets target = UIEdgeInsetsMake(inset, 0, inset, 0);
+    if (!UIEdgeInsetsEqualToEdgeInsets(scrollView.contentInset, target)) {
+        scrollView.contentInset = target;
+    }
+    // 偏移钳制：内容变小时有效偏移区间收拢到唯一点 -inset，主动落位到居中
+    // 位置，不依赖系统迟到的补偿；拖拽/减速中不干预，避免抢手势
+    if (inset > 0 && !scrollView.isDragging && !scrollView.isDecelerating
+        && fabs(scrollView.contentOffset.y - (-inset)) > 0.5) {
+        scrollView.contentOffset = CGPointMake(scrollView.contentOffset.x, -inset);
+    }
+}
+
 /// 重新应用背景效果：当 BackgroundUIEffectChanged 通知到达时调用，
 /// 通过 BackgroundManager 重新设置当前视图控制器的透明度/毛玻璃效果，
 /// 确保全局背景能够正常透出。
@@ -185,6 +230,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    // Task102：卡片组居中联动 KVO 同步移除（setupUI 必然注册，直接移除安全）
+    @try {
+        [self.infoScrollView removeObserver:self
+                                 forKeyPath:@"contentSize"
+                                    context:AmeInfoContentSizeContext];
+    } @catch (NSException *e) {}
     // 关键修复（UI 累积异常）：KVO 兜底移除，防止 task 仍在进行中时 VC 被释放导致野指针。
     if (self.task && self.task.progress) {
         @try {
@@ -369,6 +420,15 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         [self.infoStackView.widthAnchor constraintEqualToAnchor:self.infoScrollView.frameLayoutGuide.widthAnchor],
     ]];
 
+    // Task102：卡片组整体居中——监听 contentSize 变化，内容不足视口时上下
+    // 均分 contentInset 使七卡并列位置落在右侧栏中部（用户指定：居中的是
+    // 卡片的并列位置，不是卡片内容）；内容超高时 inset 归零恢复普通滚动。
+    // 首布局/旋转由 viewDidLayoutSubviews 兜底，下载 UI 展开折叠由本 KVO 跟上。
+    [self.infoScrollView addObserver:self
+                          forKeyPath:@"contentSize"
+                             options:NSKeyValueObservingOptionNew
+                             context:AmeInfoContentSizeContext];
+
     // stack 顶部：下载中心入口 / 进度文本 / 进度条（隐藏时自动折叠不占位）
     [self.infoStackView addArrangedSubview:self.downloadCenterButton];
     [self.infoStackView addArrangedSubview:self.progressLabel];
@@ -455,17 +515,21 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self.executeJarBtn addTarget:self action:@selector(executeJar) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.executeJarBtn];
     
-    // 约束布局（Task96 改版）：
-    // - 顶部：头像/用户名/版本标签 自上而下锚定
-    // - 中部：信息卡滚动区（7 张卡 + 下载中心/进度 UI，空间不足整区上下滚动），
+    // 约束布局（Task96 改版；Task102 头像等宽执行Jar按钮 + 顶/底间距对称）：
+    // - 顶部：头像（宽=执行Jar按钮，距顶=按钮距底）/用户名 自上而下锚定
+    // - 中部：信息卡滚动区（7 张卡 + 下载中心/进度 UI，空间不足整区上下滚动，
+    //   内容不足视口时整组垂直居中——Task102 updateInfoContentInset），
     //   左右边缘与下方「登录并启动」按钮对齐（同 12pt 边距）
     // - 底部：启动按钮 + 执行Jar/选择版本一排，自下而上锚定
     [NSLayoutConstraint activateConstraints:@[
-        // 头像（顶部）
-        [self.avatarImageView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:16],
+        // 头像（顶部）——Task102：宽度与执行Jar按钮等宽（用户指定；原固定
+        // 72pt 与按钮宽度不一致），高度跟随宽度保持正方形头像，正圆效果由
+        // viewDidLayoutSubviews 动态圆角（宽/2）保证；距面板顶部间距与
+        // 执行Jar按钮距面板底部间距共用 AmePanelVerticalEdgeInset（对称）
+        [self.avatarImageView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:AmePanelVerticalEdgeInset],
         [self.avatarImageView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.avatarImageView.widthAnchor constraintEqualToConstant:72],
-        [self.avatarImageView.heightAnchor constraintEqualToConstant:72],
+        [self.avatarImageView.widthAnchor constraintEqualToAnchor:self.executeJarBtn.widthAnchor],
+        [self.avatarImageView.heightAnchor constraintEqualToAnchor:self.avatarImageView.widthAnchor],
 
         // 用户名
         [self.usernameLabel.topAnchor constraintEqualToAnchor:self.avatarImageView.bottomAnchor constant:8],
@@ -496,12 +560,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
         // ===== 下方按钮区（自下而上锚定到 safeArea 底部，参照 FCL 两按钮一排）=====
         // 执行Jar 按钮（最底部，左半区；Task96 起与登录并启动同款配色）
-        [self.executeJarBtn.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
+        [self.executeJarBtn.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-AmePanelVerticalEdgeInset],
         [self.executeJarBtn.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:12],
         [self.executeJarBtn.heightAnchor constraintEqualToConstant:38],
 
         // 管理版本按钮（最底部，右半区，与执行Jar 同一排）
-        [self.manageVersionBtn.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
+        [self.manageVersionBtn.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-AmePanelVerticalEdgeInset],
         [self.manageVersionBtn.leadingAnchor constraintEqualToAnchor:self.executeJarBtn.trailingAnchor constant:8],
         [self.manageVersionBtn.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-12],
         [self.manageVersionBtn.heightAnchor constraintEqualToConstant:38],
@@ -808,11 +872,13 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     card.layer.masksToBounds = YES;
     [card.heightAnchor constraintEqualToConstant:46].active = YES;
 
-    // 左侧图标（与标题同色；Task101 起随内容组整体居中）
+    // 左侧图标（与标题同色；Task102 回退 Task101 内容居中误解，恢复 Task96
+    // 左锢定布局——用户澄清：居中的是七卡并列位置，不是卡片内容）
     UIImageView *iconView = [[UIImageView alloc] initWithImage:[self cardSymbolImageNamed:iconName]];
     iconView.translatesAutoresizingMaskIntoConstraints = NO;
     iconView.contentMode = UIViewContentModeScaleAspectFit;
     iconView.tintColor = accent;
+    [card addSubview:iconView];
 
     // 小号彩色标题
     UILabel *titleLabel = [[UILabel alloc] init];
@@ -820,7 +886,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     titleLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightMedium];
     titleLabel.textColor = accent;
     titleLabel.text = title;
-    titleLabel.textAlignment = NSTextAlignmentCenter;
+    [card addSubview:titleLabel];
 
     // 大号正文（Task91 字色规范：浅色 #222222 / 深色 #EEEEEE，动态色自动跟随）
     UILabel *valueLabel = [[UILabel alloc] init];
@@ -835,37 +901,29 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     valueLabel.adjustsFontSizeToFitWidth = YES;
     valueLabel.minimumScaleFactor = 0.55;
     valueLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    valueLabel.textAlignment = NSTextAlignmentCenter;
+    [card addSubview:valueLabel];
 
     if (outValueLabel) {
         *outValueLabel = valueLabel;
     }
 
-    // Task101 内容居中：标题/正文竖排成组，与图标横排成内容组，
-    // 内容组整体在卡片内水平+垂直居中（短值如 JIT/未开启 视觉居中，
-    // 长值如 iPad Air 11-inch (M3) 时组宽自然撑开、超出可缩不溢出）。
-    // 上下边距不等式保证极端缩放时也不出卡片。
-    UIStackView *textContentStack = [[UIStackView alloc] initWithArrangedSubviews:@[titleLabel, valueLabel]];
-    textContentStack.translatesAutoresizingMaskIntoConstraints = NO;
-    textContentStack.axis = UILayoutConstraintAxisVertical;
-    textContentStack.alignment = UIStackViewAlignmentFill;
-    textContentStack.spacing = 2;
-
-    UIStackView *contentStack = [[UIStackView alloc] initWithArrangedSubviews:@[iconView, textContentStack]];
-    contentStack.translatesAutoresizingMaskIntoConstraints = NO;
-    contentStack.axis = UILayoutConstraintAxisHorizontal;
-    contentStack.alignment = UIStackViewAlignmentCenter;
-    contentStack.spacing = 10;
-    [card addSubview:contentStack];
-
+    // Task96 原版左锢定布局（Task102 回退后与初版一致，仅留档注释更新）：
+    // 图标 20×20 垂直居中于卡左侧（leading 14），标题/正文排在图标右侧
+    // （间距 10），标题贴顶 7 / 正文贴底 -7，超长时 trailing -12 内缩放截尾
     [NSLayoutConstraint activateConstraints:@[
+        [iconView.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],
+        [iconView.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
         [iconView.widthAnchor constraintEqualToConstant:20],
         [iconView.heightAnchor constraintEqualToConstant:20],
 
-        [contentStack.centerXAnchor constraintEqualToAnchor:card.centerXAnchor],
-        [contentStack.centerYAnchor constraintEqualToAnchor:card.centerYAnchor],
-        [contentStack.leadingAnchor constraintGreaterThanOrEqualToAnchor:card.leadingAnchor constant:14],
-        [contentStack.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor constant:-12],
+        [titleLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10],
+        [titleLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:7],
+        [titleLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
+
+        [valueLabel.leadingAnchor constraintEqualToAnchor:iconView.trailingAnchor constant:10],
+        [valueLabel.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
+        [valueLabel.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-7],
+        [valueLabel.topAnchor constraintGreaterThanOrEqualToAnchor:titleLabel.bottomAnchor constant:0],
     ]];
     return card;
 }
@@ -1298,6 +1356,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 }
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
+    // Task102：滚动区 contentSize 变化（下载中心/进度 UI 展开折叠）→ 重算
+    // 卡片组居中 inset；与下载进度 KVO 互不干扰（context 区分）
+    if (context == AmeInfoContentSizeContext) {
+        [self updateInfoContentInset];
+        return;
+    }
     if (context != ProgressObserverContext) {
         [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
         return;
