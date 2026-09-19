@@ -527,17 +527,23 @@
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:message
                                                                        message:nil
                                                                 preferredStyle:UIAlertControllerStyleActionSheet];
+        // Task 121：✓ 选中标记改按【存储值】比较——Task120 起 pick 行右侧
+        // 显示本地化标签而非原始存储值，按 cell 文本比较会永远失配。
+        id ame121_cur = self.getPreference(self.prefSections[indexPath.section], item[@"key"]);
+        NSString *ame121_curs = [ame121_cur isKindOfClass:NSString.class]
+            ? ame121_cur : [ame121_cur stringValue];
         for (int i = 0; i < pickList.count; i++) {
             NSString *title = pickList[i];
             NSString *value = pickKeys[i];
             // 在标题前加 ✓ 标记当前选中项，让用户能直观看到当前值
-            if ([cell.detailTextLabel.text isEqualToString:value]) {
+            if ([ame121_curs isEqualToString:value]) {
                 title = [NSString stringWithFormat:@"✓ %@", title];
             }
             UIAlertAction *action = [UIAlertAction actionWithTitle:title
                                                               style:UIAlertActionStyleDefault
                                                             handler:^(UIAlertAction *a) {
-                cell.detailTextLabel.text = value;
+                // Task 121：选中后 cell 右侧显示本地化标签（存储值不变）。
+                cell.detailTextLabel.text = pickList[i];
                 self.setPreference(self.prefSections[indexPath.section], item[@"key"], value);
                 void(^invokeAction)(NSString *) = item[@"action"];
                 if (invokeAction) {
@@ -559,19 +565,24 @@
 
     // iPad：保留 UIContextMenuInteraction 紧凑菜单
     NSMutableArray<UIAction *> *menuItems = [[NSMutableArray alloc] init];
+    // Task 121：✓ 同款按存储值比较（见上方 iPhone 分支注释）。
+    id ame121_curPad = self.getPreference(self.prefSections[indexPath.section], item[@"key"]);
+    NSString *ame121_curPads = [ame121_curPad isKindOfClass:NSString.class]
+        ? ame121_curPad : [ame121_curPad stringValue];
     for (int i = 0; i < pickList.count; i++) {
         [menuItems addObject:[UIAction
             actionWithTitle:pickList[i]
             image:nil identifier:nil
             handler:^(UIAction *action) {
-                cell.detailTextLabel.text = pickKeys[i];
+                // Task 121：选中后 cell 右侧显示本地化标签（存储值不变）。
+                cell.detailTextLabel.text = pickList[i];
                 self.setPreference(self.prefSections[indexPath.section], item[@"key"], pickKeys[i]);
                 void(^invokeAction)(NSString *) = item[@"action"];
                 if (invokeAction) {
                     invokeAction(pickKeys[i]);
                 }
             }]];
-        if ([cell.detailTextLabel.text isEqualToString:pickKeys[i]]) {
+        if ([ame121_curPads isEqualToString:pickKeys[i]]) {
             menuItems.lastObject.state = UIMenuElementStateOn;
         }
     }

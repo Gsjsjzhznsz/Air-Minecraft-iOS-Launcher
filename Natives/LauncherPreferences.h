@@ -19,6 +19,20 @@ BOOL getPrefBool(NSString *key);
 float getPrefFloat(NSString *key);
 NSInteger getPrefInt(NSString *key);
 
+/// Task 120：解析"有效渲染器"——profile 渲染器 + MobileGL 后端选项的单一事实源。
+/// 规则（与 JavaLauncher.m 的 AMETHYST_RENDERER 解析点严格一致）：
+///   1. 用户在渲染器列表里显式选择了非 auto 项 -> 永远尊重该选择
+///      （修复 1d4ff3a9 会话："选了 zink 却被旧 mobilegl_vulkan 开关静默换成
+///      MobileGL Vulkan"的困惑；显式选择优先于一切覆盖）；
+///   2. 渲染器为 auto（默认）且设置里 MobileGL 后端选项（mobilegl_backend）
+///      非"关闭" -> 覆盖为对应 MobileGL 家族渲染器（带 dylib 存在性守卫）；
+///   3. 其余 -> 原样返回（auto 交由 egl_bridge 按版本解析 gl4es/ANGLE）。
+/// 消费者：GameSurfaceView.layerClass（Task 124 崩溃修复）、
+/// SurfaceViewController.updateSavedResolution（Task 83/119 FSR 联动）、
+/// JavaLauncher（AMETHYST_RENDERER 解析点）。启动前/后调用结果一致（纯
+/// profile+偏好+bundle 查询，无时序依赖）。
+NSString *ame_effective_renderer(void);
+
 void setPrefObject(NSString *key, id value);
 void setPrefBool(NSString *key, BOOL value);
 void setPrefFloat(NSString *key, float value);

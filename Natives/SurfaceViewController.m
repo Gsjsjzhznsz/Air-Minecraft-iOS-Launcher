@@ -245,13 +245,19 @@ static float ame78_fsr_preset_scale(NSInteger preset) {
 //   - Vulkan 渲染器（libMoltenVK）：不联动。纯 Vulkan 路径无呈现钩子
 //     （vkQueuePresent 由 MC 自管）；而 ≤26.2 的 GL 回退路径走 ANGLE
 //     （非 MG）也无法升采样——两种形态下缩窗口都会得到“画面缩在角落”
-//     （Task82 同款症状）。需要 FSR 请选 MobileGlues 或 Zink。
+//     （Task82 同款症状）。需要 FSR 请选 MobileGlues / Zink / MobileGL。
 //   - auto/gl4es：GLES2 后端（无 VAO/ES3）——暂不接入
-//   - tinygl4angle/LTW/Mithril/MobileGL：gl_bridge 侧接入留待后续
+//   - tinygl4angle/LTW/Mithril：gl_bridge 侧接入留待后续
+//   - MobileGL（libMobileGL.dylib，DirectVulkan/DirectGLES 共体）：Task119
+//     接入——mgl_fsr.mm 预交换 EASU pass（与 zink 同款 shader，画进
+//     MobileGL 内部 swapchain image 后 eglSwapBuffers 直呈，零回读）。
+//     修复 5.1.0 实测"mg 的 vulkan 路径 fsr 没有放大、画面蜷缩"。
 static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     if (renderer.length == 0) return NO;
     if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;
     if ([renderer hasPrefix:@"libOSMesa"]) return YES;
+    // Task 119：MobileGL 两后端共体（libMobileGL.dylib / libMobileGL-gles.dylib）
+    if (isMobileGLRenderer(renderer.UTF8String)) return YES;
     return NO;
 }
 
@@ -1382,7 +1388,10 @@ static UIView *findSDL_uikitview(UIView *root);
     // 把 EASU/RCAS 升采样到 target = render × fsr_scale ≈ surface 后 blit
     // 上屏。此前 render 恒被 surface 尺寸覆写 → render==surface → FSR 永远
     // 零增益（Task76 只能旁路），用户只能手动降 video.resolution 逃生。
-    NSString *ame78_renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    // Task 119/120：改用 ame_effective_renderer（含 MobileGL 后端选项覆盖）——
+    // 裸读 profile 会在“覆盖成 MobileGL”的会话里把窗口缩给一个不存在
+    // 的升采样器（蜷缩根因），或反向漏掉 MobileGL 的 mgl_fsr 升采样。
+    NSString *ame78_renderer = ame_effective_renderer();
     NSInteger ame78_fsr_preset = getPrefInt(@"mobileglues.fsr1_setting");
     // Task 83（FSR 独立化）：联动不再仅限 MG——zink（osm_bridge EASU）与
     // Vulkan 渲染器的 GL 路径（=MG）同样吃下窗口=表面/档位系数。能力表见

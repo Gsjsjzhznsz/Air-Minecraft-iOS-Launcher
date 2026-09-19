@@ -54,28 +54,28 @@ check("A4 pin 位于 library.path 之后（依赖 frameworksPath 已构造）",
 check("A5 病历注释含 SOFTSystemEvents 崩溃链（可追溯性）",
       'alcEventIsSupportedSOFT' in jl and 'Checks.check' in jl)
 
-print("== B. Task113 MobileGL Vulkan ==")
+print("== B. Task113/120 MobileGL（Task120 重锚：布尔开关 -> 单一 backend 选项）==")
 dylib = os.path.join(REPO, "Natives/resources/Frameworks/libMobileGL.dylib")
 check("B1 libMobileGL.dylib 已 vendor（上游 caf6822 同款 85757760B）",
       os.path.exists(dylib) and os.path.getsize(dylib) == 85757760)
 check("B2 渲染器列表已移除 mobilegl/mobilegl_gles 条目",
       'RENDERER_NAME_MOBILEGL,' not in lp and 'RENDERER_NAME_MOBILEGL_GLES' not in lp,
       "rendererCandidates 不再含 MobileGL 条目")
-check("B3 移除决策注释存在（列表不占空间的设计说明）",
+check("B3 合并决策注释存在（列表不占空间 + Task120 单一选项说明）",
       'Task 113' in lp and '不进主渲染器列表' in lp.replace('不再进主渲染器列表', '不进主渲染器列表'))
-check("B4 设置开关 mobilegl_vulkan（与 enable_angle 同分区）",
-      '@"key": @"mobilegl_vulkan"' in lpvc and
-      lpvc.find('@"key": @"mobilegl_vulkan"') > lpvc.find('@"key": @"enable_angle"'))
-check("B5 PLPreferences 默认值 mobilegl_vulkan=NO",
-      '"mobilegl_vulkan": @NO' in plp)
-check("B6 启动覆盖点（AMETHYST_RENDERER 解析后施加，dylib 存在性守卫）",
-      'mobileglues.mobilegl_vulkan' in jl and
-      'MobileGL Vulkan override active' in jl and
-      'using profile renderer' in jl)
-check("B7 仅 DirectVulkan 后端（覆盖只指向 libMobileGL.dylib，无 -gles）",
-      'RENDERER_NAME_MOBILEGL]' in jl.replace(' @ RENDERER_NAME_MOBILEGL]', 'RENDERER_NAME_MOBILEGL]') or
-      'RENDERER_NAME_MOBILEGL ' in jl or 'RENDERER_NAME_MOBILEGL;' in jl or
-      '@ RENDERER_NAME_MOBILEGL' in jl)
+check("B4 设置单一选项 mobilegl_backend（与 enable_angle 同分区，pick 类型）",
+      '@"key": @"mobilegl_backend"' in lpvc and
+      lpvc.find('@"key": @"mobilegl_backend"') > lpvc.find('@"key": @"enable_angle"') and
+      'self.typePickField' in lpvc)
+check("B5 PLPreferences 默认值 mobilegl_backend=1（Vulkan 默认）",
+      '"mobilegl_backend": @(1)' in plp and '"mobilegl_vulkan"' not in plp)
+check("B6 有效渲染器单一事实源（ame_effective_renderer + 显式选择优先）",
+      'ame_effective_renderer' in rd("Natives/LauncherPreferences.m") and
+      'MobileGL backend override active' in jl and
+      'mobileglues.mobilegl_backend' in rd("Natives/LauncherPreferences.m"))
+check("B7 后端档位支持 GLES（同二进制切 DirectGLES，Mithril 带存在性守卫）",
+      'getPrefInt(@"mobileglues.mobilegl_backend") == 2' in jl and
+      'RENDERER_NAME_MITHRIL' in rd("Natives/LauncherPreferences.m"))
 check("B8 Makefile dep_mobilegl 更新（prebuilt 说明 + Task113 标记）",
       'Task113, Vulkan-only' in mk and 'prebuilt libMobileGL.dylib' in mk)
 check("B9 egl_bridge MobileGL 装载路径仍在（既有管线未被破坏）",
@@ -129,9 +129,10 @@ crash_keys = ['crash.reason.missing_mods', 'crash.suggestion.missingmods_manual'
               'crash.suggestion.missingmods_override', 'crash.suggestion.missingmods_share']
 check("E3 4 个 crash.* key 补齐（zh+en）",
       all(f'"{k}"' in zh for k in crash_keys) and all(f'"{k}"' in en for k in crash_keys))
-check("E4 新开关 title/detail（mobilegl_vulkan，zh+en）",
-      '"preference.title.mobilegl_vulkan"' in zh and '"preference.detail.mobilegl_vulkan"' in zh and
-      '"preference.title.mobilegl_vulkan"' in en and '"preference.detail.mobilegl_vulkan"' in en)
+check("E4 单一选项 title/detail + 档位标签（mobilegl_backend，zh+en）",
+      '"preference.title.mobilegl_backend"' in zh and '"preference.detail.mobilegl_backend"' in zh and
+      '"preference.title.mobilegl_backend"' in en and '"preference.detail.mobilegl_backend"' in en and
+      '"preference.title.mobilegl_backend-0"' in zh and '"preference.title.mobilegl_backend-1"' in zh)
 # 动态审计复跑：全部 localize() key 与 hasDetail 项归零
 audit = subprocess.run([sys.executable, "/home/z/my-project/scripts/task116_l10n_audit.py"],
                        capture_output=True, text=True, timeout=120)

@@ -278,19 +278,49 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
           @"file": @ RENDERER_NAME_LTW},
         @{@"key": @ RENDERER_NAME_VULKAN,
           @"name": localize(@"preference.title.renderer.debug.vulkan", nil),
-          @"file": @ RENDERER_NAME_VULKAN},
-        @{@"key": @ RENDERER_NAME_MITHRIL,
-          @"name": localize(@"preference.title.renderer.debug.mithril", nil),
-          @"file": @ RENDERER_NAME_MITHRIL}
+          @"file": @ RENDERER_NAME_VULKAN}
     ];
 }
 
-// Task 113：MobileGL 渲染器不再进主渲染器列表（用户要求：列表太占空间）。
-// MobileGL 只保留 DirectVulkan 后端（上游实测 GLES/Metal 后端有问题，Vulkan 完全流畅），
-// 入口改为设置页"视频"分区里与"ANGLE ES 驱动"并排的独立开关（mobilegl_vulkan），
-// 启动时由 JavaLauncher.m 的 AMETHYST_RENDERER 解析点施加覆盖（见 Task113 注释）。
-// 渲染器列表因此移除 mobilegl / mobilegl_gles 两个条目——dylib 已随包附带，
-// 若保留在列表里它们会重新出现，违背"不占列表空间"的设计目标。
+// Task 113 -> Task 120（重构）：MobileGL 渲染器不进主渲染器列表（用户要求：
+// 列表太占空间）。上游的三个 MobileGL 家族列表条目（MobileGL / MobileGL-gles /
+// Mithril）合并为设置页"视频"分区里的单一选项 mobilegl_backend（与"ANGLE ES
+// 驱动"并排），默认 Vulkan；GLES 与 MobileGL 共用同一个 libMobileGL.dylib
+// （运行时由 MOBILEGL_BACKEND_TYPE 选择后端），Mithril 需 libmithril.dylib
+// 随包存在（当前未附带，选项存在但启动时守卫回落 auto 并留日志）。
+// 旧的 mobilegl_vulkan 布尔开关（Task113）已退役：它无条件覆盖任何显式渲染器
+// 选择，1d4ff3a9 会话用户选 zink 被静默换成 MobileGL Vulkan（"用了 zink 却回
+// 退 vk"）——Task120 起【显式渲染器选择永远优先】，后端选项仅在 auto 时生效。
+
+// Task 120：有效渲染器解析（单一事实源，见 LauncherPreferences.h 头注释）。
+// 注意与 JavaLauncher.m 的 AMETHYST_RENDERER 解析点保持逐字一致——两处任何
+// 分叉都会复刻 Task124 的事故形态（layerClass 按旧渲染器建了普通 CALayer，
+// 实际渲染器却是 MobileGL DirectVulkan，其内部 MoltenVK 在 swapchain 创建时
+// 向普通 CALayer 发送 naturalDrawableSizeMVK -> unrecognized selector 崩溃）。
+NSString *ame_effective_renderer(void) {
+    NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    if (![renderer isKindOfClass:NSString.class] || renderer.length == 0) {
+        renderer = @"auto";
+    }
+    // (1) 显式渲染器选择优先：zink/ANGLE/MobileGlues/LTW/MoltenVK/Mithril
+    //     等任何非 auto 选择都原样生效，MobileGL 后端选项不干预。
+    if (![renderer isEqualToString:@"auto"]) {
+        return renderer;
+    }
+    // (2) auto + MobileGL 后端选项：按档位覆盖（dylib 缺失时守卫回落）。
+    NSInteger backend = getPrefInt(@"mobileglues.mobilegl_backend");
+    if (backend == 1 || backend == 2) {
+        if (rendererLibraryExists(@ RENDERER_NAME_MOBILEGL)) {
+            return @ RENDERER_NAME_MOBILEGL;
+        }
+    } else if (backend == 3) {
+        if (rendererLibraryExists(@ RENDERER_NAME_MITHRIL)) {
+            return @ RENDERER_NAME_MITHRIL;
+        }
+    }
+    // (3) 关闭 / dylib 缺失：维持 auto（egl_bridge 按版本解析 gl4es/ANGLE）。
+    return renderer;
+}
 
 // 当前选中的渲染器（可能已不在候选表里，见下方说明）
 static NSString *currentRendererKey(void) {
@@ -299,7 +329,8 @@ static NSString *currentRendererKey(void) {
 }
 
 // 过滤规则：
-//   1. dylib 不存在的候选不显示（Mithril 需另下载、MobileGL 默认不构建）
+//   1. dylib 不存在的候选不显示（Task120 起 MobileGL 家族全部移出本表，此规则
+//      仅剩通用防御意义：防换构建/删 dylib 后列表出现死条目）
 //   2. 但当前已选中的值永远保留 —— 否则用户选了某个渲染器、之后该 dylib 被移除
 //      （例如换了个不含 MobileGL 的构建），设置页会失去这一项，pick 控件拿不到
 //      对应下标，显示为空白或错选中第一项，用户无从察觉当前到底是什么渲染器。

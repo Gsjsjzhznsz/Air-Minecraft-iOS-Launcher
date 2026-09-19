@@ -739,11 +739,17 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     if (s_task78_fsr_link < 0) {
         const char *ame78_renderer = getenv("AMETHYST_RENDERER");
         NSInteger ame78_fsr = getPrefInt(@"mobileglues.fsr1_setting");
+        // Task 119：豁免扩展到 MobileGL 两后端——其 FSR 形态与 MG 同构
+        // （viewport=渲染尺寸 < surface，mgl_fsr.mm 预交换 EASU 负责铺满），
+        // 补偿链同样不应介入。（实证上 es 表解析自 ANGLE，对 MobileGL 上下文
+        // 读数归零 → geoMismatch 天然不触发；本扩展是口径自卫，防 es 解析
+        // 路径变化后几何链与 MobileGL EASU 打架。）
         s_task78_fsr_link = (ame78_renderer != NULL &&
-                             strcmp(ame78_renderer, RENDERER_NAME_MOBILEGLUES) == 0 &&
-                             ame78_fsr > 0) ? 1 : 0;
+                             ame78_fsr > 0 &&
+                             (strcmp(ame78_renderer, RENDERER_NAME_MOBILEGLUES) == 0 ||
+                              isMobileGLRenderer(ame78_renderer))) ? 1 : 0;
         if (s_task78_fsr_link) {
-            NSLog(@"[GLGeo] Task78 FSR linkage active: renderer=MobileGlues fsr1_setting=%ld -- viewport (render) < surface is the expected upscale geometry, compensation chain exempted", (long)ame78_fsr);
+            NSLog(@"[GLGeo] Task78 FSR linkage active: renderer=%s fsr1_setting=%ld -- viewport (render) < surface is the expected upscale geometry, compensation chain exempted", ame78_renderer, (long)ame78_fsr);
         }
     }
     const BOOL geoMismatch = (viewport[2] > 0 && viewport[3] > 0 &&
@@ -1583,6 +1589,17 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     };
     // 单次创建（无重试环）：原生 scale 对齐后 ANGLE 无论读 bounds×scale 还是
     // drawableSize 都得到与 MC viewport 相同的尺寸，无需执法。
+    // Task 124（诊断探针，非写入）：MobileGL + CAMetalLayer 且 drawableSize
+    // 仍为零时只报警不写——layer 尺寸的写入者纪律（主线程单一写者：
+    // Task60 对齐块与 updateSavedResolution）不允许渲染线程写入。正常路径
+    // 下 Task60 的 align60 必已写入非零值；此日志若出现 = 不变量被打破
+    // （layerClass 修复失效/别的路径换了层），此时 MobileGL 内部 MoltenVK
+    // 的 swapchain 会走 naturalDrawableSizeMVK 回退（普通 CALayer 上即
+    // 1d4ff3a9 的崩点），装机日志凭此一眼定位。
+    if (mobileGL && [layer isKindOfClass:CAMetalLayer.class] &&
+        ((CAMetalLayer *)layer).drawableSize.width < 1.0) {
+        NSLog(@"[GLGeo] Task124 WARN: MobileGL CAMetalLayer drawableSize still zero before surface creation (Task60 align invariant broken?)");
+    }
     bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
         (__bridge EGLNativeWindowType)layer, mobileGL ? mobileGLSurfaceAttribs : NULL);
     if (!bundle->surface) {
@@ -1618,6 +1635,9 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         // Task 50：GL 拥有呈现层（跨线程标志）——此后主线程
         // updateSavedResolution 走原生 scale 对齐分支（bounds x scale 跟随旋转）。
         atomic_store(&g_ame50_gl_owns_layer, 1);
+        // Task 119：MobileGL FSR 状态复位——新上下文意味着旧 program/VAO/纹理
+        // 已随旧上下文销毁，必须重编（首次调用为无日志空操作）。
+        ame_mgl_fsr_context_reset();
     }
 
     const EGLint gles_ctx_attribs[] = {
@@ -1740,6 +1760,11 @@ void gl_swap_buffers() {
     // Task 48 呈现几何卫兵：先于一切交换动作执行（可能在内部重建表面，
     // 重建后 currentBundle->gl.surface 已更新，后续探针/交换都作用于新表面）。
     ame48_swap_geometry_guard(currentBundle);
+    // Task 119：MobileGL 预交换 FSR1 EASU——渲染器为 MobileGL 且 FSR 联动
+    // 激活时，把 MC 的半分辨率帧升采样铺满默认帧缓冲（= MobileGL 内部
+    // swapchain image），eglSwapBuffers 直呈。其余渲染器零开销返回。
+    // 必须在卫兵之后（卫兵可能重建表面，EASU 画进最终表面）。
+    ame_mgl_fsr_before_swap();
     // 黑屏取证（Task 32）：记录每次 swap 的真实结果。
     // 成功：首次打一条日志（证明呈现路径至少活过一次）；之后交给原子计数器，
     // 由 SurfaceViewController 的 [RenderDiag] 5 秒心跳汇总上报。

@@ -1983,3 +1983,54 @@
 "login.title" = "登入";
 "login.cancelled" = "登入已取消";
 "preference.profile.title.lwjgl_version" = "LWJGL 版本";
+
+/* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
+
+/* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
+"preference.title.mobilegl_backend" = "MobileGL 渲染后端";
+"preference.detail.mobilegl_backend" = "MobileGL 家族渲染器（Vulkan / GLES / Mithril）的统一入口，不占用渲染器列表。預設 Vulkan：GL→Vulkan→MoltenVK→Metal 层直出，无逐帧 CPU 回读，上游实测最流畅。仅在上方渲染器選擇为“自动”时生效——显式選擇的渲染器永远优先。FSR 画质档在 MobileGL 路径同样可用（预交换 EASU 升采样）。遇到兼容性問題可切 GLES 档或关闭。";
+"preference.title.mobilegl_backend-0" = "关闭（跟随渲染器選擇）";
+"preference.title.mobilegl_backend-1" = "Vulkan（預設）";
+"preference.title.mobilegl_backend-2" = "GLES";
+"preference.title.mobilegl_backend-3" = "Mithril";
+"preference.title.announcement_preview_level" = "公告展示詳細度";
+"preference.title.app_language" = "应用語言";
+"preference.title.curseforge_api_key" = "CurseForge API 金鑰";
+"preference.title.custom_accent_color" = "自自訂強調色";
+"preference.title.custom_card_color" = "自自訂卡片顏色";
+"preference.title.custom_text_color" = "自自訂文字顏色";
+"preference.title.debug_always_attached_jit" = "調試器持續附加（JIT26）";
+"preference.title.debug_universal_script_jit" = "Universal JIT 腳本";
+"preference.title.launcher_background" = "啟動器背景";
+"preference.title.markdown_enabled" = "Markdown 渲染";
+"preference.title.multi_threaded" = "多執行緒下載";
+"preference.title.provider_config" = "提供商配置";
+"preference.title.reset_appearance_colors" = "重置外观配色";
+"preference.title.safety_mode" = "預設安全模式";
+"preference.title.session_list" = "会话列表";
+"preference.title.system_prompt" = "系統提示词";
+"preference.title.ui_layout" = "介面布局";
+"preference.title.ui_theme" = "外观主题";
+"preference.section.footer.general" = "啟動器常规行为与外观選項。";
+"preference.section.footer.download" = "游戏资源下載源与镜像策略。";
+"preference.section.footer.control" = "触控、手柄与虚拟按键的操控方式。";
+"preference.section.footer.java" = "Java 執行时与 JVM 高级選項。";
+"preference.section.footer.ai" = "Air AI 助手的模型提供商与行为配置。";
+"crash.reason.missing_mods" = "整合包缺失 mod 檔案（入口点阶段类加载失败，常见于匯入不完整）";
+"crash.suggestion.missingmods_manual" = "或在 Mod 管理器中手動補齊缺失的 mod（版本需与整合包要求一致）";
+"crash.suggestion.missingmods_override" = "日志显示依賴檢查被覆蓋（Dependencies overridden），它会让缺失 mod 逃避報錯直到執行時崩潰；修复后可刪掉 config/fabric-loader.json 裡的 dependencyOverrides 條目";
+"crash.suggestion.missingmods_share" = "分享 latestlog.txt 回饋，可凭崩溃報告中的缺失类清單直接定位";
+"i18n_str_2068" = "应用語言";
+"preference.title.renderer.debug.mithril" = "Mithril（1.17+）- OpenGL 3.3 核心，经 Vulkan/Metal，实验性";
+"preference.detail.announcement_preview_level" = "控制公告在主介面展示的詳細程度。";
+"preference.detail.app_language" = "設定啟動器介面語言，選擇“系統”时跟随裝置語言。";
+"preference.detail.curseforge_api_key" = "設定 CurseForge API 金鑰，用于瀏覽/下載 CurseForge 模組与整合包；未設定时使用內建預設金鑰。";
+"preference.detail.custom_accent_color" = "自自訂介面強調色（按钮、開關等控制項的高亮顏色）。";
+"preference.detail.custom_card_color" = "自自訂卡片背景顏色。";
+"preference.detail.custom_text_color" = "自自訂介面主文字顏色，深淺色模式下均生效。";
+"preference.detail.debug_always_attached_jit" = "調試選項：让 JIT26 調試器在啟動后持續附加（服务后续中斷點，用于排查 JIT/dyld 問題）。仅在使用 Universal JIT 腳本时有意義，可能影響效能。";
+"preference.detail.launcher_background" = "設定啟動器背景（圖片/影片），或恢復預設纯色背景。";
+"preference.detail.manage_runtime" = "管理 Java 執行时：查看、下載、删除各版本執行时。";
+"preference.detail.multi_threaded" = "下載游戏资源时启用多執行緒，可提升下載速度；部分镜像源可能不支持。";
+"preference.detail.ui_layout" = "選擇主介面布局：多卡並列或緊湊檢視，修改后重啟啟動器完全生效。";
+"preference.detail.ui_theme" = "選擇淺色/深色/跟随系統的外观模式。";

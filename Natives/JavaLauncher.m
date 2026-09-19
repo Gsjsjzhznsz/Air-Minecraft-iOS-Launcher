@@ -983,28 +983,23 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         }
 
         // Setup AMETHYST_RENDERER
-        NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-        NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
-
-        // Task 113：MobileGL Vulkan 主开关（设置-视频-与"ANGLE ES 驱动"并排）。
-        // 开启后无条件覆盖渲染器为 libMobileGL.dylib（DirectVulkan：
-        // GL -> Vulkan -> MoltenVK -> CAMetalLayer 直呈，无 OSMesa 回读常数）。
-        // 上游 26.3 实测该后端完全流畅（读已退役、IMMEDIATE 呈现模式、直呈 Metal 层），
-        // GLES/Metal 后端有问题故不引入；渲染器列表不出现 MobileGL 条目（用户要求
-        // 不占列表空间），此开关是唯一入口。覆盖点选在 AMETHYST_RENDERER 解析处：
-        // 下游全部渲染器分支（zink env / LTW / MobileGL env / egl_bridge 装载）
-        // 都消费这一份 renderer 值，单点覆盖即全链路生效。
-        if ([getPrefObject(@"mobileglues.mobilegl_vulkan") boolValue]) {
-            NSString *mgPath = [NSString stringWithFormat:@"%@/Frameworks/%s",
-                NSBundle.mainBundle.bundlePath, RENDERER_NAME_MOBILEGL];
-            if ([[NSFileManager defaultManager] fileExistsAtPath:mgPath]) {
-                NSLog(@"[Amethyst] Task113: MobileGL Vulkan override active (profile renderer was %@)", renderer);
-                renderer = @ RENDERER_NAME_MOBILEGL;
-            } else {
-                NSLog(@"[Amethyst] Task113: mobilegl_vulkan=ON but %@ missing -- using profile renderer %@",
-                      @ RENDERER_NAME_MOBILEGL, renderer);
-            }
+        NSString *profileRenderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+        // Task 120（替代 Task113 的 mobilegl_vulkan 布尔开关）：MobileGL 家族
+        // （Vulkan / GLES / Mithril 三后端）合并为设置-视频的单一选项
+        // mobilegl_backend，且【仅在渲染器为 auto（默认）时生效】——显式渲染器
+        // 选择永远优先。旧开关的无条件覆盖在 1d4ff3a9 会话翻车：用户显式选了
+        // zink，开关却静默换成 MobileGL Vulkan（用户以为"zink 回退了 vk"），
+        // 且 GameSurfaceView.layerClass 按旧 profile 建了普通 CALayer，MobileGL
+        // 内部 MoltenVK 向其发送 naturalDrawableSizeMVK -> unrecognized selector
+        // 崩溃（Task124 同根修复：layerClass 改用同源 ame_effective_renderer）。
+        // 解析逻辑与 LauncherPreferences.m 的 ame_effective_renderer() 逐字一致
+        // （单一事实源；此处内联展开仅为保留原日志点）。
+        NSString *renderer = ame_effective_renderer();
+        if (![renderer isEqualToString:profileRenderer]) {
+            NSLog(@"[Amethyst] Task120: MobileGL backend override active (profile renderer was %@ -> %@)",
+                  profileRenderer, renderer);
         }
+        NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
 
         // Apply Zink-specific environment variables if Zink renderer is selected
@@ -1044,12 +1039,16 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         //   libMobileGL.dylib      -> DirectVulkan (GL -> Vulkan -> MoltenVK -> Metal)
         //   libMobileGL-gles.dylib -> DirectGLES   (GL -> OpenGL ES)
         // 必须在 JVM 启动前设置：MobileGL 的 constructor 在 dlopen 时就读取该变量。
+        // Task 120：GLES 档位（mobilegl_backend=2）与 libMobileGL-gles.dylib 文件名
+        // 两种形态都解析为 DirectGLES——设置页的 GLES 档复用同一个 Vulkan 二进制，
+        // 只切后端环境变量，不要求 -gles 变体 dylib 随包。
         //
         // MOBILEGL_LOG_FILE_PATH 指向 POJAV_HOME 下的 mobilegl.log，便于导出诊断。
         // 日志量较大，仅在选中 MobileGL 时开启。
         if (isMobileGLRenderer(renderer.UTF8String)) {
             const char *backend = [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]
-                ? "DirectGLES" : "DirectVulkan";
+                ? "DirectGLES"
+                : ((getPrefInt(@"mobileglues.mobilegl_backend") == 2) ? "DirectGLES" : "DirectVulkan");
             setenv("MOBILEGL_BACKEND_TYPE", backend, 1);
             const char *pojavHome = getenv("POJAV_HOME");
             if (pojavHome && *pojavHome) {

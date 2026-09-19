@@ -142,9 +142,15 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
         // Auto 渲染器实际使用 ANGLE，不会加载 MobileGlues，这些设置不生效。
         @"mobileglues": @{
             @"enable_angle": @NO,
-            // Task 113：MobileGL Vulkan 直呈渲染器开关（设置-视频-MobileGlues 区，
-            // 与"ANGLE ES 驱动"并排）。开启后启动时覆盖渲染器为 libMobileGL.dylib。
-            @"mobilegl_vulkan": @NO,
+            // Task 120：MobileGL 渲染后端单一选项（设置-视频-MobileGlues 区，
+            // 与"ANGLE ES 驱动"并排）。上游的三个 MobileGL 家族列表条目
+            // （MobileGL / MobileGL-gles / Mithril）合并进此选项：
+            //   0=关闭（跟随渲染器选择） 1=Vulkan（默认） 2=GLES 3=Mithril。
+            // 仅在渲染器为 auto（默认）时生效——显式渲染器选择永远优先
+            // （旧 mobilegl_vulkan 布尔开关退役，见 Task120 注释）。
+            // 默认 1（Vulkan）：用户实测上游 DirectVulkan 后端流畅度最高
+            // （CAMetalLayer 直呈 + IMMEDIATE 呈现 + 无逐帧回读）。
+            @"mobilegl_backend": @(1),
             @"enable_no_error": @(0),
             @"enable_ext_timer_query": @YES,
             @"enable_ext_compute_shader": @NO,

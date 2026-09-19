@@ -293,6 +293,7 @@ add_executable(AngelAuraAmethyst
 
   ctxbridges/gl_bridge.m
   ctxbridges/osm_bridge.mm
+  ctxbridges/mgl_fsr.mm
   ctxbridges/vk_bridge.m
 
   customcontrols/ControlButton.m
@@ -541,15 +542,19 @@ add_executable(AngelAuraAmethyst
   AI/AiInstanceCreator.m
 )
 
-# Task 83（FSR 独立化）：osm_bridge.mm 是唯一的 ObjC++ 源——它同时包含
-# MobileGlues FSRShaderSource.h（C++ raw string 字面量，必须 C++ 方言）与
-# SurfaceViewController.h/UIKit+hook.h（ObjC 世界）。工程未启用 OBJCXX
+# Task 83（FSR 独立化）：osm_bridge.mm 与 mgl_fsr.mm（Task119 新增）是仅有的
+# 两个 ObjC++ 源——它们都包含 MobileGlues FSRShaderSource.h（C++ raw string
+# 字面量，必须 C++ 方言）与 ObjC 世界头。工程未启用 OBJCXX
 # 语言（全部 .m 走 C + "-ObjC" 强制路线），CMake 会把 .mm 当纯 CXX 编译，
 # @interface 直接解析失败（CI run 34987233296，28 errors）。单文件强制
 # objective-c++ 方言 + ARC + gnu++17（Apple clang 15 的 clang++ 默认 gnu++98，
 # 不认 C++11 raw string——FSRShaderSource.h 的 R"fsr_glsl(...)" 需要，
 # CI run 34992226284："use of undeclared identifier R"）。与 .m 侧口径对齐。
 set_source_files_properties(ctxbridges/osm_bridge.mm PROPERTIES
+  COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc;-std=gnu++17")
+# Task 119：MobileGL 预交换 FSR1 EASU 模块（与 osm_bridge 同款 FSRShaderSource.h
+# 依赖，同方言同标准）。实现见 Natives/ctxbridges/mgl_fsr.mm 头注释。
+set_source_files_properties(ctxbridges/mgl_fsr.mm PROPERTIES
   COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc;-std=gnu++17")
 
 # Add ModLoaderIcons PNG files into the app bundle Resources/ModLoaderIcons so they are available at runtime.

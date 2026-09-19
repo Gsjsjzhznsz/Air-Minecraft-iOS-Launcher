@@ -832,17 +832,41 @@
               @"type": self.typeSwitch,
               @"enableCondition": whenNotInGame
             },
-            // Task 113：MobileGL Vulkan 直呈渲染器开关。
-            // 与"ANGLE ES 驱动"并排（用户要求合并进 ES 驱动选项区，不进主渲染器列表）。
-            // 开启后启动时覆盖渲染器为 libMobileGL.dylib（DirectVulkan：
-            // GL -> Vulkan -> MoltenVK -> CAMetalLayer 直呈，无 CPU 回读）。
-            // 上游实测 26.3 + Vulkan 后端完全流畅；GLES/Metal 后端有问题故不引入。
-            // 需要 MobileGL dylib 随包存在（Natives/resources/Frameworks/libMobileGL.dylib）。
-            @{@"key": @"mobilegl_vulkan",
-              @"hasDetail": @YES,
-              @"icon": @"bolt.fill",
-              @"type": self.typeSwitch,
-              @"enableCondition": whenNotInGame
+            // Task 120（替代 Task113 的 mobilegl_vulkan 布尔开关）：MobileGL
+            // 渲染后端单一选项——上游的三个 MobileGL 家族列表条目（MobileGL /
+            // MobileGL-gles / Mithril）合并进此 pick，不进主渲染器列表（用户
+            // 要求不占列表空间）。默认 Vulkan（DirectVulkan：
+            // GL -> Vulkan -> MoltenVK -> CAMetalLayer 直呈，无逐帧 CPU 回读，
+            // 上游实测 26.3 最流畅路径）；GLES 档复用同一个 libMobileGL.dylib
+            // 仅切 MOBILEGL_BACKEND_TYPE=DirectGLES；Mithril 档需 libmithril.dylib
+            // 随包存在（当前未附带，档位动态隐藏）。
+            // 生效条件：渲染器选择为 auto（默认）。显式选择了 zink/ANGLE/… 的
+            // 用户永远得到他们的选择（修复 1d4ff3a9"选 zink 却被换成 vk"）。
+            // MobileGL 路径的 FSR 升采样由 mgl_fsr.mm 的预交换 EASU 提供（Task119）。
+            @{
+                @"key": @"mobilegl_backend",
+                @"hasDetail": @YES,
+                @"icon": @"bolt.fill",
+                @"type": self.typePickField,
+                @"enableCondition": whenNotInGame,
+                @"pickKeys": ([[NSFileManager defaultManager] fileExistsAtPath:
+                    [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
+                        [@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MITHRIL]]]
+                    ? @[@"0", @"1", @"2", @"3"] : @[@"0", @"1", @"2"]),
+                @"pickList": ([[NSFileManager defaultManager] fileExistsAtPath:
+                    [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
+                        [@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MITHRIL]]]
+                    ? @[
+                        localize(@"preference.title.mobilegl_backend-0", nil),
+                        localize(@"preference.title.mobilegl_backend-1", nil),
+                        localize(@"preference.title.mobilegl_backend-2", nil),
+                        localize(@"preference.title.mobilegl_backend-3", nil)
+                      ]
+                    : @[
+                        localize(@"preference.title.mobilegl_backend-0", nil),
+                        localize(@"preference.title.mobilegl_backend-1", nil),
+                        localize(@"preference.title.mobilegl_backend-2", nil)
+                      ])
             },
             @{@"key": @"enable_no_error",
               @"hasDetail": @YES,
@@ -1271,6 +1295,31 @@
     ];
 
     [super viewDidLoad];
+    // Task 120：pick 行右侧显示本地化标签而非原始存储值。
+    // 基类 typePickField 把存储值（如 "1"）直接写进 detailTextLabel——
+    // 用户看到的是裸数字，还得猜档位含义。此处包一层：行带 pickKeys/
+    // pickList 且两表等长时，按当前存储值映射成本地化标签显示
+    // （"1" -> "Vulkan"、"2" -> "超高品质" 等）。fsr1_setting /
+    // multidraw_mode / custom_gl_version / mobilegl_backend 全部受益；
+    // 无 pickKeys 的 pick 行与存储语义不变（写入仍是 pickKeys 原值）。
+    {
+        CreateView ame120_basePick = self.typePickField;
+        __weak typeof(self) ame120_self = self;
+        self.typePickField = ^void(UITableViewCell *cell, NSString *section, NSString *key, NSDictionary *item) {
+            ame120_basePick(cell, section, key, item);
+            NSArray *ame120_keys = item[@"pickKeys"];
+            NSArray *ame120_list = item[@"pickList"];
+            if (ame120_keys.count > 0 && ame120_keys.count == ame120_list.count) {
+                id ame120_val = ame120_self.getPreference(section, key);
+                NSString *ame120_vs = [ame120_val isKindOfClass:NSString.class]
+                    ? ame120_val : [ame120_val stringValue];
+                NSUInteger ame120_i = [ame120_keys indexOfObject:ame120_vs];
+                if (ame120_i != NSNotFound) {
+                    cell.detailTextLabel.text = ame120_list[ame120_i];
+                }
+            }
+        };
+    }
     // 适配自定义启动器背景：通过 BackgroundManager 将当前视图控制器透明化，
     // 让全局背景容器（图片/视频）能够透出显示。必须在 super viewDidLoad 之后调用，
     // 以确保 view 与 tableView 均已就绪。
