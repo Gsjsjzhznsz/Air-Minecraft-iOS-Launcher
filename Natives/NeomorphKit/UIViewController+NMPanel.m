@@ -21,7 +21,7 @@ static void *s_nm127_appliedKey = &s_nm127_appliedKey;
 - (void)nm_applySubpanelNeomorphStyle {
     // 幂等：每个 VC 实例只应用一次
     if (objc_getAssociatedObject(self, s_nm127_appliedKey)) return;
-    objc_setAssociatedObject(self, s_nm127_appliedKey, @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMICT);
+    objc_setAssociatedObject(self, s_nm127_appliedKey, @(YES), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     if ([self nm_subpanelExcludesNeomorphStyle]) return;
 
@@ -51,10 +51,16 @@ static void *s_nm127_appliedKey = &s_nm127_appliedKey;
         UITableView *tv = (UITableView *)view;
         // 纯色画布场景：表格清透，画布色接管；照片透出场景同样清透（原本多为此值，幂等）
         if (tv.backgroundColor != UIColor.clearColor) {
-            // 已被面板自定义为 surface 等主题色的不动（Task89 体系面板）
-            if (tv.backgroundColor == nil ||
-                [tv.backgroundColor isEqual:UIColor.systemBackground] ||
-                [tv.backgroundColor isEqual:UIColor.groupTableViewBackgroundColor]) {
+            // 已被面板自定义为 surface 等主题色的不动（Task89 体系面板）。
+            // 系统默认底判定：nil / groupTableViewBackgroundColor /
+            // systemBackgroundColor（iOS 13+，类方法而非属性——deployment
+            // target 低于 13 时需 @available 守卫，CI 35458151048 教训）
+            BOOL ame127_isSysDefault = (tv.backgroundColor == nil ||
+                [tv.backgroundColor isEqual:UIColor.groupTableViewBackgroundColor]);
+            if (!ame127_isSysDefault && @available(iOS 13.0, *)) {
+                ame127_isSysDefault = [tv.backgroundColor isEqual:[UIColor systemBackgroundColor]];
+            }
+            if (ame127_isSysDefault) {
                 tv.backgroundColor = UIColor.clearColor;
             }
         }

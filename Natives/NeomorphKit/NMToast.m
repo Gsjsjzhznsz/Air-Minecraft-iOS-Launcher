@@ -226,7 +226,7 @@ static __weak NMToast *s_nm125_current = nil;
             container.transform = CGAffineTransformMakeTranslation(0, -12);
         } completion:teardown];
     } else {
-        teardown();
+        teardown(NO);
     }
 }
 
