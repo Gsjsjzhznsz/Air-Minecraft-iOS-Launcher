@@ -49,7 +49,10 @@
 | **Frame-Rate Unlock Series** | 26.x AFK/inactivity limiters neutralized (options.txt dedup writes + 45s wheel heartbeat); the dynamic_fps mod's window-state machine now reads FOCUSED in the foreground (30fps pin root-caused and fixed) and UNFOCUSED in the background so throttle mods legitimately save power during background transitions. |
 | **On-Screen Keyboard Auto-Open Fix** | SDL text-input entry points (Start/Stop TextInput, SetTextInputArea) marshalled to the main thread and `SDL_ENABLE_SCREEN_KEYBOARD=1` re-asserted over MC's desktop-convention 0 -- the keyboard now opens when an in-game text field gains a blinking cursor. |
 | **Neomorph UI + Custom Backgrounds** | Full neomorphism redesign with dual light/dark themes, custom image/video backgrounds with glass-blur cards, customizable accent/text/card colors, and a self-healing main-screen icon pipeline. |
-| **Self-Hosted Update Checks** | In-app update checks and release links now point to this repository (previously the upstream's). |
+| **Self-Hosted Update Checks + Auto Check on Launch** | In-app update checks and release-page links now target this repo (previously the upstream); the launcher also checks for new releases automatically on startup -- a new version surfaces as an in-app card notification (tap to open the release page), total silence otherwise, disableable in Settings. |
+| **Third-party Login Fully Restored** | LittleSkin / custom authlib-injector servers (external Yggdrasil auth): FCL-style card login form, multi-profile accounts, skins and server authentication all working. The login component ships in the app bundle (no online download dependency); accounts with expired tokens can still be selected and launch, with a re-login hint. |
+| **Microsoft Login Notice Rework** | Genuine-account login result notices are now auto-dismissing in-app notifications; fixed the system-style popup that had to be manually dismissed. |
+| **Sub-panel Neumorphic Design** | All sub-level panels (~30 of them: accounts, downloads, mod management, file lists, help, ...) now share the neumorphic base style of the main UI; panels with custom background pass-through are unaffected. |
 | **Complete Settings Localization** | Every settings row (including all detail footers added by the UI refresh) is fully localized in Chinese and English -- no raw keys shown anywhere. |
 
 ---
