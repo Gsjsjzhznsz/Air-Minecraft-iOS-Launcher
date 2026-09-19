@@ -50,7 +50,12 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-#include "../external/MobileGlues/MobileGlues-cpp/gl/FSR1/FSRShaderSource.h"
+// Task 122 链接修复：FSRShaderSource.h 里的 FSR_VSSource/FSR_FSSource 是
+// 非 static 全局【定义】（每个包含它的 TU 都产出一份强符号；此前 osm_bridge.mm
+// 是唯一包含者，本文件加入后链接期重复符号）。改为 extern 借用 osm_bridge.mm
+// 的定义（同一份 shader 源，字面单一事实源）。
+extern const char* FSR_VSSource;
+extern const char* FSR_FSSource;
 #include "../environ.h"
 #include "../utils.h"
 

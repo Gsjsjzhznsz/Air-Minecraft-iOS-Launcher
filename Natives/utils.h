@@ -108,7 +108,14 @@ static inline bool isDesktopGLRenderer(const char *renderer) {
 #define SPECIALBTN_MENU -9
 
 #define NSDebugLog(...) if (debugLogEnabled) { NSLog(__VA_ARGS__); }
+// Task 122 链接修复（CI 35459629168：osm_bridge 与 mgl_fsr 两个 C++ TU 各自
+// 强定义这对全局 -> 4 个重复符号）。environ.h 的 AME_ENVIRON_DECL 同款守卫：
+// C++ TU 只见 extern 声明，存储由各 C TU 的 tentative 定义承担（-fcommon 合并）。
+#ifdef __cplusplus
+extern BOOL debugLogEnabled, isJailbroken;
+#else
 BOOL debugLogEnabled, isJailbroken;
+#endif
 
 //__weak UIViewController *viewController;
 
