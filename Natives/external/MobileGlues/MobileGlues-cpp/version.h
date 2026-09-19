@@ -732,3 +732,79 @@
 // FSR preset instead). The '[PojavLauncher] Task107: sodium-extra
 // reduce_resolution_on_mac true->false' anchor is retired with it. The 26.3
 // re-signing fix (fix A) is untouched.
+
+// REVISION 17 addendum (Task 109, no bump): the 698c6fe log pair (both sessions
+// on 38fb316) closes the "26.3 modpack locked at 30fps but vanilla fine"
+// question with per-phase data and ships a self-stabilizing experiment.
+// VERDICT (superseded by Task 110 same log pair): the 30fps pin on the
+// modpack is dynamic_fps 3.11.10 seeing an UNFOCUSED window (SDL focus bit
+// never set -- see Task 110); the modpack session also measured MC-side
+// 21-36ms/frame + our present ~10ms during its 13-second load-storm stay,
+// vs vanilla's MC-side median 3.3ms + the SAME present ~10ms = 53fps median
+// ("normal"). Zero VANILLA limiter hits (FramerateLimiter, maxFps=260, no
+// vsync) -- the mod's throttle was invisible to our watchdog because it
+// lives outside the vanilla classes we monitor. The launcher present path is identical across both
+// sessions (glFinish phase ~8-15ms regardless of scene -- the heavier modpack
+// session actually reads LOWER) = fixed driver
+// sync/readback constant; our own authoritative readback (glReadPixels full
+// surface + row-flip) measures only ~4ms/event, so the cost is NOT the data
+// movement but the driver glFinish's internal synchronization. EXPERIMENT
+// (osm_bridge.mm Task109 no-finish trial): in two fixed FSR-frame windows
+// (FSR frames 300-419 and 1020-1139, 120 frames each) the driver glFinish is SKIPPED and the
+// authoritative glReadPixels path (with its internal sync) takes over
+// presenting; phase timing then shows [glFinish ~0 | readback +sync] vs
+// neighbor windows -- the A/B decides next round (adopt permanently if
+// cheaper; if not, the wait is inherent GPU completion and only the CA
+// direct-present / IOSurface zero-copy architecture remains). Safety: the
+// authoritative path is the same one that runs for the first ~30 frames of
+// every session (incl. its circuit breaker); sentinel voting is skipped
+// inside the window (bundle is stale by design, no false fallback logs); if
+// the authoritative path fails mid-window a LATE glFinish runs so the legacy
+// bundle wrap still shows the correct frame -- the screen can never break;
+// non-FSR frames/sessions are untouched (legacy present needs the driver
+// readback). Window enter/exit log lines carry trial-vs-baseline averages:
+// '[OSMBridge] Task109 no-finish trial: window opens/closed ...'. FAQ
+// fpsUnlock's modpack-vs-vanilla bullet was later re-attributed to the
+// dynamic_fps root cause by Task 110 (same file). Binary forensics started:
+// libOSMesa.8.dylib is Mesa 25.0.7 (git-742a20f48c) built from
+// /Volumes/D/mesa-source gallium osmesa target; export trie parsed
+// (OSMesaCreateContextAttribs 0x4078 / OSMesaMakeCurrent 0x4970 / glFinish
+// 0x9204); MakeCurrent's format dispatch confirmed RGBA+UBYTE -> internal
+// 0x33 vs BGRA+UBYTE -> 0x36 (formats DO diverge internally -- a BGRA client
+// switch remains a candidate micro-opt if the no-finish trial fails).
+
+// REVISION 17 addendum (Task 110, no bump): ROOT CAUSE of "26.3 modpack
+// pinned at 30fps while vanilla runs free" -- dynamic_fps 3.11.10 sees an
+// UNFOCUSED window. Chain: the user reported the pack stuck at 30 (698c6fe
+// modpack session, 38fb316 build) while pure vanilla 26.3 was "completely
+// normal"; the pack's mod list contains dynamic_fps 3.11.10, vanilla does
+// not. Decompiled the ACTUAL Modrinth jar (dynamic-fps-3.11.10+minecraft-
+// 26.3.0, nested common jar): WindowObserver's constructor queries
+// SDLVideo.SDL_GetWindowFlags & SDL_WINDOW_INPUT_FOCUS (0x200) directly --
+// it does NOT use vanilla's Window.focused (which starts true and is only
+// flipped by SDL events 526/527 that we never deliver -- hence vanilla
+// behaves fine). The power state machine
+// focused ? (idle?ABANDONED : ... FOCUSED) : (hovered?HOVERED :
+// (iconified?INVISIBLE : UNFOCUSED)) had ALL THREE inputs broken by our
+// embed mode: the hidden SDL UIWindow (Task 32/49 anti-black-cover) holds
+// no input focus (0x200=0), no mouse focus (0x400=0), and is flagged
+// HIDDEN (0x4) -- so the mod sat in a throttle state (its defaults:
+// unfocused=1fps, invisible=0fps; the device pinned at the observed 30
+// per its config/render floor). Task 50's flag hook only stripped
+// MINIMIZED (0x40, for renderpearl's acquireNextTexture); the focus bit
+// was the escapee. FIX (sdl3_hook.m ame_SDL_GetWindowFlags): return
+// (flags | SDL_WINDOW_INPUT_FOCUS) & ~MINIMIZED & ~HIDDEN -- completing
+// the same harmless lie: in embed mode the game view IS the foreground
+// focus and the visible picture; iOS freezes the app in the background
+// anyway, so focus=1 is always true when it matters. With focus set the
+// mod's machine short-circuits into FOCUSED (Config.ACTIVE,
+// frame_rate_target=-1 = unlimited); the idle branch (ABANDONED, 10fps,
+// default timeout 300s) is neutralized by the Task104 45s wheel heartbeat
+// feeding IdleHandler.onActivity (mouse events 1536-1539 family, verified
+// in the decompile). Vanilla's ONLY flags consumer is Window.isFullscreen
+// (& 1 FULLSCREEN) -- untouched; renderpearl's MINIMIZED strip retained.
+// Reachability proven: LWJGL SDLVideo resolves through the same hooked
+// dlsym path Task 50's MINIMIZED strip already validated on device
+// (622166a). FAQ fpsUnlock bullet re-attributed to this root cause with
+// the [SDLHook] Task110 anchor. Task 109's no-finish experiment stands
+// unchanged (the 8-15ms present constant is a separate, real cost).

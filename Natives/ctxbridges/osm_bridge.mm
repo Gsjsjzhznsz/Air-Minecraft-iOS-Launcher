@@ -726,6 +726,67 @@ static bool ame106_bundle_sentinels(const unsigned char *buf, uint32_t w, uint32
     return buf[nearIdx] == code && buf[farIdx] == code;
 }
 
+// Task 109：no-finish 取证窗口（26.3 锁 30fps 第 3 轮，A/B 实验）。
+//
+// 背景（698c6fe 双会话实测，38fb316 构建）：
+//   · 原版 26.3：MC-side 中位 3.3ms + 我们呈现 ~10ms（glFinish 相位 8.5-13.7）
+//     → frame 中位 18.6ms（53fps）——用户判"完全正常"；
+//   · 整合包 26.3（110 mods，进世界前 13 秒）：MC-side 21-36ms + 同款呈现
+//     ~10ms → 21-30fps——用户判"锁 30"。Task110 定案：真凶是 dynamic_fps
+//     3.11.10（整合包含、原版不含）看到"未聚焦窗口"的降频档（SDL 焦点
+//     位从未置 1，见 sdl3_hook.m Task110）；vanilla 限帧器们全程 0 命中
+//     （FramerateLimiter、maxFps=260、无 vsync、AFK 心跳在岗）；
+//   · 两会话 glFinish 相位区间重叠（主体 8-15ms，重载的整合包会话反而
+//     更低 = 非场景 GPU 负载）= 固定驱动同步/回读常数；而我们自己的权威
+//     回读（glReadPixels 全幅 + 行翻，Task100 路径）实测每事件仅 ~4ms——
+//     数据搬运本身不贵，贵的是驱动 glFinish 内部的同步机制（待解剖：
+//     拷贝 vs swizzle vs 全队列等待）。
+//
+// 实验：在两个固定 FSR 帧窗口（FSR 帧 300-419 与 1020-1139，各 120 帧）内跳过驱动
+// glFinish，强制权威路径呈现（glReadPixels 的内部同步接管）。若 zink 的
+// glReadPixels 同步比 OSMesa 定制 glFinish 回读便宜，窗口内心跳的 t=swap
+// 将显著低于邻窗——下一轮据此决定是否把"无驱动回读"固化为常驻模式；
+// 若无收益则证明等待是 GPU 完成所固有，下一步只剩 CA 直呈（IOSurface
+// 零拷贝）架构项。安全性：权威路径即每会话前 30 帧的既有行为（含熔断）；
+// 窗口内哨兵票跳过（bundle 必然 stale，防误判 fallback 日志）；权威失败
+// 时补一次迟到 glFinish，legacy 包装仍能上屏正确帧——屏幕永不坏。
+// 非 FSR 帧 / 非 FSR 会话零影响（legacy 呈现依赖驱动回读，永不跳过）。
+static struct {
+    long frame;                    // FSR 帧计数（仅 fsrActiveThisFrame 帧递增）
+    bool inWindow;
+    double winSwapUs; long winN;   // 窗口内 swap 全段累计
+    double baseSwapUs; long baseN; // 窗口外（基线）swap 全段累计
+} ame109 = {0};
+
+static bool ame109_window_active(long f) {
+    return (f >= 300 && f < 420) || (f >= 1020 && f < 1140);
+}
+
+// 返回 true = 本帧跳过驱动 glFinish（窗口内且权威路径健康）。
+static bool ame109_trial_gate(bool fsrActive) {
+    if (!fsrActive) return false;
+    long f = ++ame109.frame;
+    bool inW = ame109_window_active(f);
+    if (inW && !ame109.inWindow) {
+        ame109.inWindow = true;
+        ame106.active = false;   // 退出窗口后按既有 warmup 纪律自然重臂（30 连中）
+        ame106.warm = 0;
+        NSLog(@"[OSMBridge] Task109 no-finish trial: window opens at FSR frame %ld "
+              "(120 frames skip driver glFinish, authoritative glReadPixels present; "
+              "watch [glFinish ~0 | readback +sync] vs neighbors in heartbeats)", f);
+    } else if (!inW && ame109.inWindow) {
+        ame109.inWindow = false;
+        double trialAvg = ame109.winN ? ame109.winSwapUs / ame109.winN / 1000.0 : 0.0;
+        double baseAvg = ame109.baseN ? ame109.baseSwapUs / ame109.baseN / 1000.0 : 0.0;
+        NSLog(@"[OSMBridge] Task109 no-finish trial: window closed -- trial avg swap %.1fms "
+              "(%ld frames) vs baseline %.1fms (%ld frames); bundle-direct re-arms in 30 fresh frames",
+              trialAvg, ame109.winN, baseAvg, ame109.baseN);
+        ame109.winSwapUs = ame109.winN = 0;
+        ame109.baseSwapUs = ame109.baseN = 0;
+    }
+    return ame109.inWindow && !ame100_present.broken;
+}
+
 // Task 103/106：哨兵票核心（计数 + 状态迁移 + 迁移取证日志）。
 // 原实现内联在 scratch 探针分支；Task106 bundle-direct 分支复用同一状态机
 // （票源不同：scratch = 权威回读，bundle = 驱动回读；状态语义完全一致）。
@@ -1032,7 +1093,12 @@ void osm_swap_buffers() {
     // Task 106 相位计时：t1 = pre+easu 完成（glFinish 前）；
     // t2 = glFinish（含驱动回读）完成。
     double t106_1 = ame106_us(mach_absolute_time());
-    handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
+    // Task 109：窗口内跳过驱动 glFinish（权威 glReadPixels 的内部同步接管）；
+    // 非窗口帧 / 非 FSR 帧 / 权威路径熔断时照旧调用（legacy 呈现依赖驱动回读）。
+    bool ame109Trial = ame109_trial_gate(fsrActiveThisFrame);
+    if (!ame109Trial) {
+        handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
+    }
     osm_render_window_t bundle = currentBundle->osm;
     double t106_2 = ame106_us(mach_absolute_time());
     ame106.tPreUs += t106_1 - t106_0;
@@ -1044,36 +1110,40 @@ void osm_swap_buffers() {
     // Task 106（bundle-direct 判定）：glFinish 已把本帧写进 bundle.buffer。
     // 双哨兵（markerCode 每帧 1..254 轮换）同时命中 = 驱动缓冲持有本帧
     // 全幅 EASU 输出——可跳过权威回读+行翻直接上屏（详见文件前段注释）。
+    // Task 109：窗口内跳过整段哨兵票——无人调 glFinish 时 bundle 必然
+    // stale，miss 会误触 fallback 取证日志；bd 已在进窗时强制退场。
     // ------------------------------------------------------------------
-    bool bundleFresh106 = fsrActiveThisFrame && ame83_fsr.markerArmed &&
-                          ame83_fsr.markerCode != 0 &&
-                          ame106_bundle_sentinels((const unsigned char *)bundle.buffer,
-                                                  bundle.width, bundle.height,
-                                                  (unsigned char)ame83_fsr.markerCode);
-    if (ame106.active) {
-        ++ame106.frames;
-        if (bundleFresh106) {
-            ame106.misses = 0;
-            ++ame106.hits;
-        } else if (++ame106.misses >= 2) {
-            ame106.active = false;
+    if (!ame109Trial) {
+        bool bundleFresh106 = fsrActiveThisFrame && ame83_fsr.markerArmed &&
+                              ame83_fsr.markerCode != 0 &&
+                              ame106_bundle_sentinels((const unsigned char *)bundle.buffer,
+                                                      bundle.width, bundle.height,
+                                                      (unsigned char)ame83_fsr.markerCode);
+        if (ame106.active) {
+            ++ame106.frames;
+            if (bundleFresh106) {
+                ame106.misses = 0;
+                ++ame106.hits;
+            } else if (++ame106.misses >= 2) {
+                ame106.active = false;
+                ame106.warm = 0;
+                if (!ame106.fallbackLogged) {
+                    ame106.fallbackLogged = true;
+                    NSLog(@"[OSMBridge] Task106 bundle-direct fallback: driver buffer lost per-frame sentinels (stale/pre-EASU transport) -- reverting to authoritative readback path");
+                }
+            }
+        } else if (bundleFresh106) {
+            if (++ame106.warm >= 30) {
+                ame106.active = true;
+                ame106.misses = 0;
+                if (!ame106.engagedLogged) {
+                    ame106.engagedLogged = true;
+                    NSLog(@"[OSMBridge] Task106 bundle-direct present engaged: 30 consecutive fresh full-surface EASU frames in the driver buffer -- duplicate readback + row-flip skipped per frame");
+                }
+            }
+        } else {
             ame106.warm = 0;
-            if (!ame106.fallbackLogged) {
-                ame106.fallbackLogged = true;
-                NSLog(@"[OSMBridge] Task106 bundle-direct fallback: driver buffer lost per-frame sentinels (stale/pre-EASU transport) -- reverting to authoritative readback path");
-            }
         }
-    } else if (bundleFresh106) {
-        if (++ame106.warm >= 30) {
-            ame106.active = true;
-            ame106.misses = 0;
-            if (!ame106.engagedLogged) {
-                ame106.engagedLogged = true;
-                NSLog(@"[OSMBridge] Task106 bundle-direct present engaged: 30 consecutive fresh full-surface EASU frames in the driver buffer -- duplicate readback + row-flip skipped per frame");
-            }
-        }
-    } else {
-        ame106.warm = 0;
     }
 
     // ------------------------------------------------------------------
@@ -1085,6 +1155,12 @@ void osm_swap_buffers() {
     bool presentThisFrame = false;
     if (fsrActiveThisFrame && bundle.width > 0 && bundle.height > 0 && !ame106.active) {
         presentThisFrame = ame100_present_frame((int)bundle.width, (int)bundle.height);
+    }
+    // Task 109 保底：窗口内权威路径失败（熔断/分配失败）→ 补一次迟到的
+    // glFinish，让 legacy bundle 包装仍能上屏本帧正确内容。计入 readback
+    // 相位（t2→t3）＝回退成本，语义自洽。
+    if (ame109Trial && !presentThisFrame) {
+        handle.glFinish();
     }
     // Task 106 相位计时：权威回读+行翻（bundle-direct 激活时本段为空，趋 0）
     {
@@ -1228,6 +1304,17 @@ void osm_swap_buffers() {
         double t106_end = ame106_us(mach_absolute_time());
         ame106.tSwapUs += t106_end - t106_0;
         if (t106_end - t106_0 > ame106.tSwapMax) ame106.tSwapMax = t106_end - t106_0;
+        // Task 109：swap 全段按窗口内外分桶累计（窗口进出日志的 A/B 数据源；
+        // 仅 FSR 帧计数，与 ame109.frame 语义对齐，非 FSR 帧不稀释基线）
+        if (fsrActiveThisFrame) {
+            if (ame109.inWindow) {
+                ame109.winSwapUs += t106_end - t106_0;
+                ++ame109.winN;
+            } else {
+                ame109.baseSwapUs += t106_end - t106_0;
+                ++ame109.baseN;
+            }
+        }
     }
 
     dispatch_async(dispatch_get_main_queue(), ^{

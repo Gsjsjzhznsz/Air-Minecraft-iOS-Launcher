@@ -583,9 +583,29 @@ static void *ame_SDL_EGL_GetProcAddress(const char *proc) {
 // "Cannot acquire minimized window" 跳帧（622166a 实测两次）。
 // 对 MC 撒一个无害的谎：窗口永不 minimized —— 画面/输入不受影响，
 // 真正的后台切换由 SDL_APP_WILL_ENTER_BACKGROUND 等事件表达，语义完整。
+//
+// Task 110：INPUT_FOCUS 位（0x200）置 1 + HIDDEN 位（0x4）一并剥离。
+// 同一隐藏动作的第二个后果：隐藏的 SDL 窗口既不持有输入焦点（0x200=0）
+// 又被标 HIDDEN（0x4）。Task50 只剥了 MINIMIZED，焦点位漏网——
+// dynamic_fps 3.11.10 的 WindowObserver 构造时直接查
+// SDL_GetWindowFlags & 0x200（不走 vanilla Window.focused，后者初始
+// true 且只由我们不喂的 526/527 事件驱动——所以纯原版 26.3 完全正常，
+// 698c6fe 双会话实锤），恒判"未聚焦"；其状态机
+//   focused ? (idle?ABANDONED:…FOCUSED) : (hovered?HOVERED:(iconified?INVISIBLE:UNFOCUSED))
+// 三输入全坏（0x200=0、0x400=0、0x40||0x4=true）→ 稳态落 UNFOCUSED/
+// INVISIBLE 降频档（mod 默认 unfocused=1fps/invisible=0fps；用户整合包
+// 实测钉 30fps，关 mod 即恢复）。这是"整合包卡 30、原版正常"的根因。
+// 补完同一个无害的谎：embed 模式下游戏视图就是前台焦点与可见画面——
+// iOS app 活跃时恒真；app 进后台本就被冻结/停摆不渲染，恒 1 无副作用。
+// 置 1 后状态机短路进 FOCUSED 分支（Config.ACTIVE，frame_rate_target=-1
+// 不限帧）；idle 档（ABANDONED,10fps）由 Task104 的 45s 滚轮心跳喂养
+// mod 的 IdleHandler.onActivity（事件 1536-1539 族）而永不误触。
+// vanilla 侧唯一 flags 消费点是 Window.isFullscreen() 的 & 1（FULLSCREEN）
+// ——不受影响；MINIMIZED 剥离（renderpearl）保持。
 static unsigned int ame_SDL_GetWindowFlags(void *window) {
     unsigned int f = ame_real_GetWindowFlags ? ame_real_GetWindowFlags(window) : 0;
-    return f & ~0x40u;   // 0x40 = SDL_WINDOW_MINIMIZED（SDL2/SDL3 同值）
+    // 0x200 = SDL_WINDOW_INPUT_FOCUS 置 1；0x40 = MINIMIZED、0x4 = HIDDEN 剥离
+    return (f | 0x200u) & ~0x40u & ~0x4u;
 }
 
 // ============================================================================

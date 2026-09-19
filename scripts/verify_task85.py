@@ -165,6 +165,10 @@ static struct { bool active; int warm, misses; long frames, hits; bool engagedLo
 static double ame106_us(uint64_t m) { (void)m; return 0; }
 static bool ame106_bundle_sentinels(const unsigned char *b, uint32_t w, uint32_t h, unsigned char c) { (void)b;(void)w;(void)h;(void)c; return false; }
 static void ame103_marker_vote(bool hit, osm_render_window_t b) { (void)hit; (void)b; }
+// —— Task109 段桩（真实定义在文件前部：no-finish 取证窗口状态机）——
+static struct { long frame; bool inWindow; double winSwapUs; long winN; double baseSwapUs; long baseN; } ame109 = {0};
+static bool ame109_window_active(long f) { (void)f; return false; }
+static bool ame109_trial_gate(bool fsrActive) { (void)fsrActive; return false; }
 static uint64_t mach_absolute_time(void) { return 0; }
 // —— ObjC 桩（真实 TU 为 ObjC++；此处 C 变换验证 C 语义段）——
 typedef void *CGColorSpaceRef; typedef void *CGDataProviderRef; typedef void *CGImageRef;

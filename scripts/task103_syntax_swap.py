@@ -82,6 +82,10 @@ static struct {
 static double ame106_us(uint64_t m) { (void)m; return 0; }
 static bool ame106_bundle_sentinels(const unsigned char *b, uint32_t w, uint32_t h, unsigned char c) { (void)b;(void)w;(void)h;(void)c; return false; }
 static void ame103_marker_vote(bool hit, osm_render_window_t b) { (void)hit; (void)b; }
+// ---- Task109 桩（真实定义在文件前段：no-finish 取证窗口状态机）----
+static struct { long frame; bool inWindow; double winSwapUs; long winN; double baseSwapUs; long baseN; } ame109;
+static bool ame109_window_active(long f) { (void)f; return false; }
+static bool ame109_trial_gate(bool fsrActive) { (void)fsrActive; return false; }
 static uint64_t mach_absolute_time(void) { return 0; }
 struct osm_bundle_t { uint32_t width, height; void *buffer; void *color_space; };
 // ---- 桩：CG / Surface / dispatch ----
