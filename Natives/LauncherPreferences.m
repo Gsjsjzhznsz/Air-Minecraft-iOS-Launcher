@@ -2,6 +2,7 @@
 #import "utils.h"
 #import "LauncherPreferences.h"
 #import "PLPreferences.h"
+#import "PLProfiles.h"   // Task120: ame_effective_renderer 需要（CI 35458985232 教训：此前从别处传递可见）
 #import "UIKit+hook.h"
 #import <CoreFoundation/CoreFoundation.h>
 
