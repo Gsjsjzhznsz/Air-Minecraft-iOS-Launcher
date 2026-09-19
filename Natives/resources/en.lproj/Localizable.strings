@@ -2038,3 +2038,13 @@
 "preference.section.footer.control" = "Touch, gamepad and virtual control behavior.";
 "preference.section.footer.java" = "Java runtimes and advanced JVM options.";
 "preference.section.footer.ai" = "Model provider and behavior for the Air AI assistant.";
+
+/* Task 125: auto update check on launch */
+"auto_update.toast.new_version" = "New version %@ available";
+"auto_update.toast.view" = "View";
+"preference.title.auto_update_check" = "Auto Check for Updates";
+"preference.detail.auto_update_check" = "Check for new releases automatically when the launcher starts. A silent in-app notification appears only when a newer version is available (tap to open the release page); no popup when up to date.";
+
+/* Task 128: third-party account stale-token graceful fallback */
+"login.3rdparty.stale.title" = "Signed in with an expired session";
+"login.3rdparty.stale.message" = "Skins and server authentication may not work. Re-login on this account to restore full access.";

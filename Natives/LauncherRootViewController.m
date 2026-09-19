@@ -23,6 +23,8 @@
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
 #import "AccountListViewController.h"
+#import "UpdateChecker.h"
+#import "NeomorphKit/NMToast.h"
 #import "AI/AIViewController.h"
 #import "AI/AiSessionStore.h"
 #import "LauncherHelpViewController.h"
@@ -174,6 +176,37 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [[BackgroundManager sharedManager] resumeVideo];
+    [self ame125_autoUpdateCheckOnce];
+}
+
+// Task 125：启动器启动时自动检测更新（非侵入式）。
+// 用户要求：启动时自动检测。设计口径：
+//   - 每次冷启动只检查一次（静态标志，同会话多次 viewWillAppear 不重复）
+//   - 偏好 general.auto_update_check（默认开）可关；与设置页手动"检查更新"
+//     共用 UpdateChecker（Task115 已指向本仓库）
+//   - 发现新版本 -> NMToast 新拟物卡片通知（自动消失，点击"查看"打开发布页）
+//     ——刻意不用 AlertDialog：启动场景用户无决策要做，弹窗即打扰
+//     （Task126 同批修复：旧 showDialog 的系统窗泄漏事故不复用在启动路径）
+//   - 已是最新/网络失败 -> 静默（不弹任何东西，启动零骚扰）
+//   - 延迟 1.5s：避开启动期 UI 竞争（侧栏/背景/JIT 卡首帧），toast 落在
+//     稳定后的主界面上
+- (void)ame125_autoUpdateCheckOnce {
+    static BOOL ame125_checked = NO;
+    if (ame125_checked) return;
+    ame125_checked = YES;
+    if (!getPrefBool(@"general.auto_update_check")) return;
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [UpdateChecker checkForUpdateWithCompletion:^(UpdateInfo *info, NSError *error) {
+            if (!info.hasUpdate) return;   // 已是最新/出错：静默
+            NSString *msg = [NSString stringWithFormat:localize(@"auto_update.toast.new_version", nil),
+                             info.latestVersion];
+            [NMToast showMessage:msg
+                     actionTitle:localize(@"auto_update.toast.view", nil)
+                        onAction:^{ [UpdateChecker openReleasePage]; }];
+        }];
+    });
 }
 
 - (void)viewWillDisappear:(BOOL)animated {

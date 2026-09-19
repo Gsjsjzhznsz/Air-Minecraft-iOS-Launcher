@@ -285,6 +285,8 @@ add_executable(AngelAuraAmethyst
   # 的 Neomorph 凸出算法：HSP 亮度→双阴影透明度、offset=±shadowRadius）
   NeomorphKit/NMTheme.m
   NeomorphKit/UIView+Neomorph.m
+  NeomorphKit/NMToast.m
+  NeomorphKit/UIViewController+NMPanel.m
 
   authenticator/BaseAuthenticator.m
   authenticator/LocalAuthenticator.m

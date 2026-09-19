@@ -90,6 +90,9 @@
 #ifndef GL_TEXTURE_MAX_LEVEL
 #define GL_TEXTURE_MAX_LEVEL 0x813D
 #endif
+#ifndef GL_TEXTURE_2D
+#define GL_TEXTURE_2D         0x0DE1
+#endif
 #ifndef GL_CLAMP_TO_EDGE
 #define GL_CLAMP_TO_EDGE    0x812F
 #endif

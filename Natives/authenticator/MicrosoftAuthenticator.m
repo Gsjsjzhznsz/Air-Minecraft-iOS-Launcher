@@ -168,6 +168,8 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
 
 - (void)checkMCProfile:(NSString *)mcAccessToken callback:(Callback)callback {
     self.authData[@"expiresAt"] = @((long)[NSDate.date timeIntervalSince1970] + 86400);
+    // Task 128：显式账户类型标记（防键位嗅探串类，见 BaseAuthenticator.loadSavedName）
+    self.authData[@"accountType"] = @"microsoft";
 
     callback(localize(@"login.msa.progress.checkMCProfile", nil), YES);
 

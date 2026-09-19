@@ -58,8 +58,19 @@ static BaseAuthenticator *current = nil;
     }
 
     // 根据账户数据创建对应类型的 authenticator（initWithData 会设置 current 单例）
+    // Task 128：优先读显式 accountType 标记（zl2 的 AccountType 思路；登录时
+    // 由各 authenticator 写入）。旧文件的键位嗅探保留为回退（expiresAt/clientToken），
+    // 三处判别器（此处 / AccountList 的 clientToken 嗅探 / Java 端 clientToken+xuid）
+    // 口径不一导致的串类自此统一。
     BaseAuthenticator *auth = nil;
-    if ([authData[@"expiresAt"] longValue] == 0) {
+    NSString *ame128_type = authData[@"accountType"];
+    if ([ame128_type isEqualToString:@"thirdparty"]) {
+        auth = [[ThirdPartyAuthenticator alloc] initWithData:authData];
+    } else if ([ame128_type isEqualToString:@"microsoft"]) {
+        auth = [[MicrosoftAuthenticator alloc] initWithData:authData];
+    } else if ([ame128_type isEqualToString:@"local"]) {
+        auth = [[LocalAuthenticator alloc] initWithData:authData];
+    } else if ([authData[@"expiresAt"] longValue] == 0) {
         auth = [[LocalAuthenticator alloc] initWithData:authData];
     } else if (authData[@"clientToken"] != nil) {
         // If there is a clientToken, this is a third-party account

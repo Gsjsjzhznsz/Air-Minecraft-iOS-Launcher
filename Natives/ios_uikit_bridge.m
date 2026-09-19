@@ -18,7 +18,20 @@ void internal_showDialog(NSString* title, NSString* message) {
         message:message
         preferredStyle:UIAlertControllerStyleAlert];
     //text.dataDetectorTypes = UIDataDetectorTypeLink;
-    UIAlertAction* okAction = [UIAlertAction actionWithTitle:localize(@"OK", nil) style:UIAlertActionStyleDefault handler:nil];
+    // Task 126：OK 后必须回收承载 window。旧实现 handler 为 nil——alert 消失
+    // 但 level-1000 的新 window 泄漏在场并占着 key window，用户被迫"手动删
+    // 系统弹窗"（5.1.0 实测反馈：正版登录提示弹窗关不掉）。修复：记下原
+    // key window，OK 时隐藏弹窗 window 并把 key 交还原窗口。
+    UIWindow *previousKeyWindow = UIWindow.mainWindow;
+    UIAlertAction* okAction = [UIAlertAction actionWithTitle:localize(@"OK", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * action) {
+        UIWindow *w = objc_getAssociatedObject(alert, @selector(alertWindow));
+        if (w) {
+            w.hidden = YES;
+            if (previousKeyWindow && previousKeyWindow != w) {
+                [previousKeyWindow makeKeyAndVisible];
+            }
+        }
+    }];
     [alert addAction:okAction];
 
     UIWindow *alertWindow = [[UIWindow alloc] initWithWindowScene:UIWindow.mainWindow.windowScene];

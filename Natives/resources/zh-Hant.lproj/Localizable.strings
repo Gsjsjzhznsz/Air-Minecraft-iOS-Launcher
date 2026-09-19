@@ -2034,3 +2034,13 @@
 "preference.detail.multi_threaded" = "下載游戏资源时启用多執行緒，可提升下載速度；部分镜像源可能不支持。";
 "preference.detail.ui_layout" = "選擇主介面布局：多卡並列或緊湊檢視，修改后重啟啟動器完全生效。";
 "preference.detail.ui_theme" = "選擇淺色/深色/跟随系統的外观模式。";
+
+/* Task 125：啟動時自動檢測更新 */
+"auto_update.toast.new_version" = "發現新版本 %@";
+"auto_update.toast.view" = "查看";
+"preference.title.auto_update_check" = "啟動時自動檢查更新";
+"preference.detail.auto_update_check" = "啟動器啟動時自動檢測新版本。僅在有新版本時以應用內卡片通知提示（點擊可打開發布頁），已是最新或檢測失敗時保持靜默，不打擾。";
+
+/* Task 128：第三方帳戶令牌過期的優雅回退提示 */
+"login.3rdparty.stale.title" = "已選擇該帳戶（登入狀態已過期）";
+"login.3rdparty.stale.message" = "皮膚與聯機驗證可能不可用，重新登入該帳戶即可恢復完整功能。";

@@ -13,6 +13,7 @@
 #import "LauncherMenuViewController.h"
 #import "LauncherNavigationController.h"
 #import "NeomorphKit/UIView+Neomorph.h"
+#import "NeomorphKit/UIViewController+NMPanel.h"
 #import "LauncherPreferences.h"
 #import "MinecraftResourceDownloadTask.h"
 #import "MinecraftResourceUtils.h"
@@ -56,6 +57,25 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 @end
 
 @implementation LauncherNavigationController
+
+// Task 127（单一执法点）：所有子级面板的新拟物基底样式。
+// 用户实测反馈"所有子级面板都需要使用新拟物设计"——主界面/设置页 Task89
+// 已新拟态化，但从侧栏推入的 29 个子面板仍是系统默认白/黑底。
+// 在 pushViewController: 与 viewDidAppear:（根面板）统一调用
+// nm_applySubpanelNeomorphStyle（幂等；透明定制面板自动跳过，
+// 见 UIViewController+NMPanel.h 头注释），现存与未来新增的子面板
+// 全部自动继承，无需逐个改造。
+- (void)pushViewController:(UIViewController *)viewController animated:(BOOL)animated {
+    [super pushViewController:viewController animated:animated];
+    [viewController nm_applySubpanelNeomorphStyle];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // 根面板（LauncherNewsViewController 等）也吃基底样式；
+    // viewDidAppear 而非 viewDidLoad：确保 view 已加载（loadView 惰性）
+    [self.viewControllers.firstObject nm_applySubpanelNeomorphStyle];
+}
 
 - (void)viewDidLoad
 {

@@ -27,6 +27,8 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"check_sha": @YES,
             @"cosmetica": @YES,
             @"debug_logging": @(!CONFIG_RELEASE),
+            // Task 125：启动时自动检测更新（默认开；关闭后仅保留手动检查入口）
+            @"auto_update_check": @YES,
             @"news_url": @"https://air-api.vercel.app/api/announcements.php",
             @"download_source": @"bmclapi",
             // 各资源类型独立下载源（未显式设置时回退到 modrinth）

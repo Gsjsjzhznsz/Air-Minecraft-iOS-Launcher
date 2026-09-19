@@ -1,5 +1,6 @@
 #import <AuthenticationServices/AuthenticationServices.h>
 #import "NeomorphKit/NMTheme.h"
+#import "NeomorphKit/NMToast.h"
 
 #import "authenticator/BaseAuthenticator.h"
 #import "authenticator/ThirdPartyAuthenticator.h"
@@ -317,13 +318,82 @@
     if (loadKey.length == 0) {
         loadKey = accountData[@"username"];
     }
-    if (accountData[@"clientToken"] != nil) {
+    // Task 128：判别统一走显式 accountType（旧文件回退 clientToken 嗅探），
+    // 与 BaseAuthenticator.loadSavedName 同口径。
+    NSString *ame128_type = accountData[@"accountType"];
+    BOOL ame128_is3P;
+    if (ame128_type.length > 0) {
+        ame128_is3P = [ame128_type isEqualToString:@"thirdparty"];
+    } else {
+        ame128_is3P = (accountData[@"clientToken"] != nil);
+    }
+    if (ame128_is3P) {
         // This is a third party account
-        [[ThirdPartyAuthenticator loadSavedName:loadKey] refreshTokenWithCallback:callback];
+        ThirdPartyAuthenticator *ame128_auth = [ThirdPartyAuthenticator loadSavedName:loadKey];
+        if ([self ame128_sessionValidated:loadKey]) {
+            // zl2 同款 isSessionValidated：本会话已通过服务端校验，直接选中，
+            // 不再每次选择都打 refresh（旧实现每次选择都请求，token 过期即
+            // 硬失败弹错误窗 -> 账户永远选不中 -> "第三方登录完全使用不了"）。
+            dispatch_async(dispatch_get_main_queue(), ^(){
+                [self ame128_finishSelectionForCell:cell];
+            });
+        } else {
+            [ame128_auth refreshTokenWithCallback:^(id status, BOOL success) {
+                dispatch_async(dispatch_get_main_queue(), ^(){
+                    if (success) {
+                        [self ame128_markSessionValidated:loadKey];
+                        [self callbackMicrosoftAuth:status success:YES forCell:cell];
+                    } else {
+                        // Task 128（zl2 同款优雅回退）：refresh 失败不再硬阻断选择。
+                        // 旧实现：错误弹窗 -> 账户无法选中 -> 第三方账户形同虚设。
+                        // 现在：仍然选中该账户（current 已由 loadSavedName 设置；
+                        // selected_account 持久化），toast 提示重新登录可恢复完整
+                        // 功能（皮肤/联机校验可能受限），游戏可正常启动。
+                        NSLog(@"[ThirdPartyAuthenticator] Task128: refresh failed (%@) -- selecting with stale token, re-login suggested", [status isKindOfClass:[NSError class]] ? [(NSError *)status localizedDescription] : @"unknown");
+                        [self ame128_markSessionValidated:loadKey];
+                        setPrefObject(@"internal.selected_account", loadKey);
+                        [self ame128_finishSelectionForCell:cell];
+                        [NMToast showMessage:[NSString stringWithFormat:@"%@\n%@",
+                            localize(@"login.3rdparty.stale.title", nil),
+                            localize(@"login.3rdparty.stale.message", nil)]
+                                      duration:6.0];
+                    }
+                });
+            }];
+        }
     } else {
         // This is a Microsoft or local account
         [[BaseAuthenticator loadSavedName:loadKey] refreshTokenWithCallback:callback];
     }
+}
+
+#pragma mark - Task 128: third-party selection resilience (zl2-style)
+
+// 本会话已通过服务端校验的账户（loadKey 集合；zl2 isSessionValidated 同款语义）
+static NSMutableSet *ame128_validatedSet(void) {
+    static NSMutableSet *set;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ set = [NSMutableSet set]; });
+    return set;
+}
+
+- (BOOL)ame128_sessionValidated:(NSString *)loadKey {
+    if (loadKey.length == 0) return NO;
+    return [ame128_validatedSet() containsObject:loadKey];
+}
+
+- (void)ame128_markSessionValidated:(NSString *)loadKey {
+    if (loadKey.length > 0) [ame128_validatedSet() addObject:loadKey];
+}
+
+// 选中收尾：恢复交互、刷新列表、通知容器（与 callbackMicrosoftAuth 成功路径同款）
+- (void)ame128_finishSelectionForCell:(UITableViewCell *)cell {
+    if (cell) [self removeActivityIndicatorFrom:cell];
+    self.modalInPresentation = NO;
+    self.tableView.userInteractionEnabled = YES;
+    [self reloadAccountList];
+    if (self.whenItemSelected) self.whenItemSelected();
+    [self dismissViewControllerAnimated:YES completion:nil];
 }
 
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -542,15 +612,25 @@
 - (void)callbackMicrosoftAuth:(id)status success:(BOOL)success forCell:(UITableViewCell *)cell {
     if (status != nil) {
         if (success) {
-            // 登录成功并伴随状态信息
-            if ([status isKindOfClass:[NSError class]]) {
-                showDialog(localize(@"login.title", @"账户"), [status localizedDescription]);
-            } else {
-                if ([status isKindOfClass:[NSString class]] && [status isEqualToString:@"DEMO"]) {
-                    showDialog(localize(@"login.warn.title.demomode", nil), localize(@"login.warn.message.demomode", nil));
-                } else if ([status isKindOfClass:[NSString class]]) {
-                    showDialog(localize(@"login.title", @"账户"), status);
-                }
+            // Task 126：登录成功/状态提示改走 NMToast（新拟物卡片，自动消失，
+            // 点击"查看"无动作需求）。旧 showDialog 的 level-1000 系统窗在
+            // OK 后泄漏在场（"弹窗要手动删"的根源），且登录成功本无需用户
+            // 做任何决定——非侵入提示即可。错误分支仍走 showDialog（错误
+            // 详情需要阅读，且已修复 window 回收）。
+            NSString *ame126_msg = nil;
+            if ([status isKindOfClass:NSError.class]) {
+                ame126_msg = [(NSError *)status localizedDescription];
+            } else if ([status isKindOfClass:NSString.class]) {
+                ame126_msg = (NSString *)status;
+            }
+            if (ame126_msg.length > 0) {
+                [NMToast showMessage:[NSString stringWithFormat:@"%@：%@",
+                    localize(@"login.title", @"账户"), ame126_msg]
+                                  duration:6.0];
+            }
+            if ([status isKindOfClass:NSString.class] && [status isEqualToString:@"DEMO"]) {
+                // 演示模式警告仍需用户知悉（影响后续离线体验预期），保留弹窗
+                showDialog(localize(@"login.warn.title.demomode", nil), localize(@"login.warn.message.demomode", nil));
             }
             // 登录成功后刷新列表以显示新账户
             if (cell) [self removeActivityIndicatorFrom:cell];

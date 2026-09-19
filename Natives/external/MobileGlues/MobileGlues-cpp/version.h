@@ -847,3 +847,46 @@
 //   window (default 1fps); WillEnterForeground restores the Task 110
 //   expression. Deliberately NOT INVISIBLE (0x4 passthrough would hit 0fps
 //   and risks aggressive side effects in other mods).
+//   Task 119 (MobileGL FSR): mgl_fsr.mm pre-swap EASU pass -- the 5.1.0 field
+//   report "mg vulkan path FSR shrinks instead of upscaling" was the Task83
+//   window-shrink linkage meeting a MobileGL path with NO upscaling hook;
+//   MC rendered into the bottom-left corner of the full-size swapchain image
+//   and eglSwapBuffers presented it curled. The new pass captures the render
+//   region and EASU-upscales it into the default framebuffer (= the MobileGL
+//   swapchain image) right before eglSwapBuffers, GPU-side, zero readback.
+//   Task 120: mobilegl_vulkan (unconditional override) retired in favor of
+//   the single mobilegl_backend pick (Vulkan default / GLES / Mithril /
+//   off) with ame_effective_renderer() as the single source of truth --
+//   explicit renderer selections now always win (the 1d4ff3a9 session had
+//   zink silently swapped to MobileGL Vulkan).
+//   Task 121: l10n parity -- en/zh-Hans were missing 23 keys, zh-CN/zh-Hant
+//   22 behind; all four key sets now identical, pick rows show localized
+//   labels instead of raw stored values.
+//   Task 124: the 774fa7871-build crash verdict (zink -> vk override +
+//   NSInvalidArgumentException naturalDrawableSizeMVK on a plain CALayer)
+//   closed by the Task120 single-source renderer + explicit-selection
+//   priority + CAMetalLayer for all MobileGL paths.
+//   Task 125: auto update check on launch (general.auto_update_check,
+//   default on) -- silent unless a newer release exists, then an in-app
+//   neumorphic toast (NMToast) with a View action; never a modal dialog.
+//   Task 126: showDialog's level-1000 UIWindow leaked after OK (the
+//   "system popup you must manually dismiss" complaint) -- the OK handler
+//   now hides the alert window and restores the previous key window;
+//   Microsoft-login success/status notices moved to auto-dismissing toasts.
+//   Task 127: all sub-level panels get the neumorphic base style via
+//   UIViewController+NMPanel, enforced at one point (LauncherNavigation
+//   Controller push + root), idempotent, transparent-by-design panels skip.
+//   Task 128 (third-party login completely broken, zl2-referenced): three
+//   stacked fixes -- (a) authlib-injector jar now bundled in the app
+//   payload (Natives/resources/authlib-injector-1.2.7.jar; POJAV_HOME
+//   copy installed locally from the bundle, network download demoted to
+//   last-resort fallback), so login/launch never hard-depends on a download
+//   again; (b) account selection no longer hard-fails when the Yggdrasil
+//   refresh rejects an expired token -- the account is still selected with
+//   a re-login toast (skins/server-auth may be limited), session-validated
+//   accounts skip the refresh entirely (zl2 isSessionValidated semantics);
+//   (c) explicit accountType marker ("thirdparty"/"microsoft"/"local") saved
+//   at login and honored by every classifier (three divergent key-sniffing
+//   discriminators unified; legacy files fall back to the old sniffing).
+//   Launch-time agent wiring additionally falls back to the bundled jar when
+//   the POJAV_HOME copy is missing (the silent 401 chain's missing link).

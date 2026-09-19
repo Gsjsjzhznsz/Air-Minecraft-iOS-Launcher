@@ -670,6 +670,14 @@
               @"action": ^void(){
                   [self checkForUpdateFromSettings];
               }
+            },
+            // Task 125：启动时自动检测更新（默认开）。仅在新版本可用时以
+            // 新拟物 toast 非侵入提示（点"查看"打开发布页）；已是最新/网络
+            // 失败一律静默。关闭后仅保留上方手动"检查更新"入口。
+            @{@"key": @"auto_update_check",
+              @"hasDetail": @YES,
+              @"icon": @"sparkles",
+              @"type": self.typeSwitch
             }
         ], @[
             // Download mirror policy settings（分类镜像策略，由 PLMirrorCenter 统一读取）

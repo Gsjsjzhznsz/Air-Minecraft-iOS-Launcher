@@ -167,6 +167,17 @@ static NSError* createError(NSString *message, NSInteger code) {
     return path;
 }
 
+// Task 128（zl2 同款思路）：随包内置的 authlib-injector 兜底路径。
+// 旧实现把 jar 的在线下载作为登录前置（ensureAuthlibInjectorWithCompletion
+// 是 loginWithCallback 第一步），下载失败 = 第三方登录完全不可用。
+// 现在应用包内常备同版本 jar（Natives/resources/authlib-injector-1.2.7.jar，
+// 由 payload 随包拷入），POJAV_HOME 侧缺文件/版本不匹配时直接从包内复制
+// （本地操作，零网络依赖），在线下载仅作为包内文件缺失的最后回退。
+- (NSString *)bundledAuthlibInjectorPath {
+    return [NSBundle.mainBundle pathForResource:@"authlib-injector-" AUTHLIB_INJECTOR_VERSION
+                                         ofType:@"jar"];
+}
+
 - (NSString *)getAuthlibInjectorVersionPath {
     NSString *path = [NSString stringWithFormat:@"%s/authlib-injector/%@", getenv("POJAV_HOME"), AUTHLIB_INJECTOR_VERSION_FILE];
     return path;
@@ -250,7 +261,32 @@ static NSError* createError(NSString *message, NSInteger code) {
 - (void)ensureAuthlibInjectorWithCompletion:(void (^)(BOOL success, NSError *error))completion {
     if ([self isAuthlibInjectorDownloaded]) {
         completion(YES, nil);
-    } else {
+        return;
+    }
+    // Task 128（zl2 同款思路）：优先从应用包内复制（本地、即时、零网络依赖）。
+    // 旧实现把 jar 的在线下载作为登录前置——下载失败 = 第三方登录完全不可用。
+    // 包内常备同版本 jar（Natives/resources/authlib-injector-1.2.7.jar，
+    // payload 随包拷入）；在线下载仅作为包内文件缺失的最后回退。
+    NSString *ame128_bundled = [self bundledAuthlibInjectorPath];
+    if (ame128_bundled.length > 0 && [NSFileManager.defaultManager fileExistsAtPath:ame128_bundled]) {
+        NSString *ame128_dir = [NSString stringWithFormat:@"%s/authlib-injector", getenv("POJAV_HOME")];
+        NSString *ame128_dest = [self getAuthlibInjectorPath];
+        NSError *ame128_copyErr = nil;
+        [NSFileManager.defaultManager createDirectoryAtPath:ame128_dir
+                                withIntermediateDirectories:YES attributes:nil error:nil];
+        // 目标已存在（版本不匹配的旧 jar）时先移除再复制
+        if ([NSFileManager.defaultManager fileExistsAtPath:ame128_dest]) {
+            [NSFileManager.defaultManager removeItemAtPath:ame128_dest error:nil];
+        }
+        if ([NSFileManager.defaultManager copyItemAtPath:ame128_bundled toPath:ame128_dest error:&ame128_copyErr]) {
+            NSLog(@"[ThirdPartyAuthenticator] Task128: authlib-injector installed from bundled copy");
+            [self saveAuthlibInjectorVersion];
+            completion(YES, nil);
+            return;
+        }
+        NSLog(@"[ThirdPartyAuthenticator] Task128: bundled copy failed (%@), falling back to network", ame128_copyErr.localizedDescription);
+    }
+    {
         NSLog(@"[ThirdPartyAuthenticator] Downloading authlib-injector (BMCLAPI preferred, falls back to GitHub)");
         [self downloadAuthlibInjector:^(BOOL success, NSError *error) {
             if (!success) {
@@ -275,10 +311,17 @@ static NSError* createError(NSString *message, NSInteger code) {
 - (NSArray *)getJvmArgsForAuthlib {
     NSString *injectorPath = [self getAuthlibInjectorPath];
 
-    // Check file existence
+    // Check file existence（Task 128：POJAV_HOME 副本缺失时回退包内 jar——
+    // 启动时 agent 永不因文件缺失而静默丢失，这正是 401 蜷缩链的断点之一）
     if (![[NSFileManager defaultManager] fileExistsAtPath:injectorPath]) {
-        NSLog(@"[ThirdPartyAuthenticator] Warning: authlib-injector file not found at %@", injectorPath);
-        return @[];
+        NSString *ame128_bundled = [self bundledAuthlibInjectorPath];
+        if (ame128_bundled.length > 0 && [NSFileManager.defaultManager fileExistsAtPath:ame128_bundled]) {
+            injectorPath = ame128_bundled;
+            NSLog(@"[ThirdPartyAuthenticator] Task128: using bundled authlib-injector at launch");
+        } else {
+            NSLog(@"[ThirdPartyAuthenticator] Warning: authlib-injector file not found at %@", injectorPath);
+            return @[];
+        }
     }
 
     // Get server URL from authData or use default Ely.by server
@@ -743,6 +786,10 @@ static NSError* createError(NSString *message, NSInteger code) {
 
             // Token expiration time (24 hours)
             self.authData[@"expiresAt"] = @((long)[NSDate.date timeIntervalSince1970] + 86400);
+            // Task 128：显式账户类型标记（zl2 同款 AccountType 思路）。
+            // 旧判别靠 expiresAt/clientToken 键位嗅探，三处判别器口径不一
+            // （BaseAuthenticator / AccountList / Java 端各一套），易串类。
+            self.authData[@"accountType"] = @"thirdparty";
 
             // Save changes
             callback(nil, [self saveChanges]);
@@ -1027,6 +1074,8 @@ static NSError* createError(NSString *message, NSInteger code) {
                 
                 // Token expiration time (24 hours)
                 self.authData[@"expiresAt"] = @((long)[NSDate.date timeIntervalSince1970] + 86400);
+                // Task 128：显式账户类型标记（同上）
+                self.authData[@"accountType"] = @"thirdparty";
                 
                 // Save changes
                 callback(nil, [self saveChanges]);

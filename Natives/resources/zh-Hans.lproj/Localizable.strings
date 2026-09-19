@@ -2036,3 +2036,13 @@
 "preference.detail.multi_threaded" = "下载游戏资源时启用多线程，可提升下载速度；部分镜像源可能不支持。";
 "preference.detail.ui_layout" = "选择主界面布局：多卡并列或紧凑视图，修改后重启启动器完全生效。";
 "preference.detail.ui_theme" = "选择浅色/深色/跟随系统的外观模式。";
+
+/* Task 125：启动时自动检测更新 */
+"auto_update.toast.new_version" = "发现新版本 %@";
+"auto_update.toast.view" = "查看";
+"preference.title.auto_update_check" = "启动时自动检查更新";
+"preference.detail.auto_update_check" = "启动器启动时自动检测新版本。仅在有新版本时以应用内卡片通知提示（点击可打开发布页），已是最新或检测失败时保持静默，不打扰。";
+
+/* Task 128：第三方账户令牌过期的优雅回退提示 */
+"login.3rdparty.stale.title" = "已选择该账户（登录状态已过期）";
+"login.3rdparty.stale.message" = "皮肤与联机验证可能不可用，重新登录该账户即可恢复完整功能。";
