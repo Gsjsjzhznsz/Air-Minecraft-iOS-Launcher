@@ -679,3 +679,35 @@
 // verify_task105 E2 re-anchored to the Task106 wording; syntax gates
 // (task83_syntax_osm.sh / task103_syntax_swap.py / verify_task85 D1)
 // gain ame106/mach/vote-helper stubs.
+
+// REVISION 17 addendum (Task 107, no bump): dyld_patch_platform.m now RE-SIGNS
+// (ad-hoc) every library it platform-retags, replacing Task106's signature
+// neutralization. The ce43a34 log pair (6a81ba5 build) proved the neutralized
+// form fatal: iPadOS 27's dyld4 hard-rejects ANY dlopen'ed image without a
+// code-signature blob ("missing code signature in <uuid>") while tolerating
+// stale ad-hoc hashes in a debug-signed process -- so rewriting
+// LC_CODE_SIGNATURE to LC_SOURCE_VERSION + zeroing the blob turned every
+// previously-loadable retagged ad-hoc lib into a guaranteed dlopen failure.
+// JNA's libjnidispatch was the first casualty (its LC_UUID matches the
+// reported uuid verbatim): both sessions lost JNA, and 26.3 crashed outright
+// at MacosUtil.disableCloseWindowMenuItem -> ca.weblite.objc.Runtime ->
+// JNA (no degradation path), while 1.20.1 merely degraded (oshi caught,
+// junixsocket suppressed) and ran on -- blurry. The re-signer (pure C in
+// Natives/ame107_codesign.h, SHA-256 backend injected as a function pointer:
+// CommonCrypto on device, OpenSSL in scripts/task107_harness.c) rebuilds a
+// v0x20400 CS_ADHOC CodeDirectory over [0, dataoff) with SHA-256 4K-page
+// hashes and swaps it in place (thin files may grow via realloc + ftruncate
+// with __LINKEDIT filesize/vmsize kept in cover; FAT slices stay in place or
+// keep the stale signature with a capped warning -- spark's team-signed FAT
+// remains blocklisted by hooked_dlopen). Page-0 load commands are finalized
+// BEFORE hashing (datasize tightened first), and any build failure rolls the
+// header back to the original stale state. Device anchors: '[Amethyst]
+// Task107: re-signed ad-hoc after platform retag (in place/grown)' and the
+// warn variants. Same log pair's second finding: BMC2 1.20.1 blurriness =
+// sodium-extra 0.5.4 reduce_resolution_on_mac halving the framebuffer under
+// the launcher's Mac spoof (vp=590x410 vs belief 1180x820, exactly half;
+// EASU then 4x-upscales to the 2360x1640 panel); PojavLauncher now flips
+// config/sodium-extra-options.json's reduce_resolution_on_mac to false at
+// launch (anchor '[PojavLauncher] Task107: sodium-extra
+// reduce_resolution_on_mac true->false ...'); FAQ sparkProfiler amended +
+// blurry gains cause #5 (both in place, count stays 34, zero cascade).

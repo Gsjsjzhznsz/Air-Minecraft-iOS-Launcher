@@ -303,6 +303,45 @@ public class PojavLauncher {
         }
         System.setProperty("log4j.configurationFile", configPath);
 
+        // Task107：修复 sodium-extra「reduce_resolution_on_mac」在 Mac 伪装的 iOS 上
+        // 把帧缓冲减半。ce43a34 装机日志实锤：BMC2 1.20.1 会话 MC 呈现视口 590x410
+        // 恰为启动器窗口信仰 1180x820 的一半（上一会话 907x631 vs 1814x1262 同签名），
+        // EASU 再放大到 2360x1640 物理屏 = 有效 4 倍上采样 = 用户反馈"画面很糊"。
+        // 反编译 sodium-extra 0.5.4（MixinWindow）：门控 = Minecraft.ON_OSX
+        // （os.name Mac 伪装，LWJGL/JNA/cacio 依赖，不可拆除）&& extraSettings.
+        // reduceResolutionOnMac。该选项为真 Mac 视网膜屏设计（系统级上采样），
+        // iOS 上无对应路径，纯属画质损失。GSON 命名策略 LOWER_CASE_WITH_UNDERSCORES
+        // → JSON 键 "reduce_resolution_on_mac"（0.5.4 与 26.3 的 0.9.4 同文件同字段，
+        // 26.3 会话从未触发减半——其配置为关，本补丁一并兜底）。
+        // 仅当文件存在且为 true 时改写为 false：幂等、无配置维持默认 false、
+        // 不触碰文件其余内容。用户追求帧率应改用 FSR 档位（等效降载且画质更优）。
+        patchSodiumExtraResolution();
+
         Tools.launchMinecraft(account, version, serverIp);
+    }
+
+    /**
+     * Task107：config/sodium-extra-options.json 的 extra_settings.
+     * reduce_resolution_on_mac 若为 true 则改写为 false（见调用点注释）。
+     * 任何异常静默跳过（打印一行取证），不阻断启动。
+     */
+    private static void patchSodiumExtraResolution() {
+        try {
+            java.io.File cfg = new java.io.File(Tools.DIR_GAME_PROFILE, "config/sodium-extra-options.json");
+            if (!cfg.isFile()) return;
+            java.nio.file.Path p = cfg.toPath();
+            String content = new String(java.nio.file.Files.readAllBytes(p),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                    "(\"reduce_resolution_on_mac\"\\s*:\\s*)true\\b").matcher(content);
+            if (!m.find()) return;
+            java.nio.file.Files.write(p, m.replaceAll("$1false").getBytes(
+                    java.nio.charset.StandardCharsets.UTF_8));
+            System.out.println("[PojavLauncher] Task107: sodium-extra reduce_resolution_on_mac "
+                    + "true->false (spoofed-Mac iOS halves the framebuffer, EASU 4x upscale "
+                    + "= blurry; full-res restored): " + cfg);
+        } catch (Throwable t) {
+            System.out.println("[PojavLauncher] Task107: sodium-extra config patch skipped: " + t);
+        }
     }
 }

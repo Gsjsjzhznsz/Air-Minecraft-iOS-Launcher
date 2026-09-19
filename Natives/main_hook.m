@@ -327,6 +327,14 @@ void* hooked_dlopen(const char* path, int mode) {
     // 字节码实证：AsyncProfilerAccess.load catch UnsatisfiedLinkError →
     // NativeLoadingException → getInstance catch Exception → 分析器禁用，
     // 游戏继续），拦截是零风险选择：spark 回退 Java 采样器，建档照常进行。
+    //
+    // Task107 修正（dyld_patch_platform.m 已改签名中和为 ad-hoc 重签名）：
+    // 上述"未签名库重标签无害"的表述经 ce43a34 双会话证伪——本机 dyld4
+    // 对"无签名 blob"的库一律拒载（JNA libjnidispatch 报 "missing code
+    // signature"，26.3 因此崩在 MacosUtil→JNA 链）；历史能加载的库其实
+    // 全部至少带 ad-hoc/linker 签名（哈希失效被容忍）。重签名后该拦截仅
+    // 防御"team 签名 FAT 库无法原位重签"的残余场景 + 不让 macOS 分析器
+    // 真的跑在 iOS 上，保留。
     if (path != NULL && strstr(path, "libasyncProfiler") != NULL) {
         static int s_ame106_blocked = 0;
         if (s_ame106_blocked < 3) {

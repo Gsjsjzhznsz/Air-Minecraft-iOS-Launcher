@@ -128,7 +128,8 @@
                     @"1. FSR 档位太低（均衡/性能优先）：换\"超高品质\"或关闭 FSR 对比；\n"
                     @"2. 分辨率滑条被手动调低过：恢复 100%（降分辨率应优先用 FSR 档位，画质好得多）；\n"
                     @"3. 历史版本的 1x 钉扎模糊已修复（渲染表面与物理像素 1:1），如再现请反馈；\n"
-                    @"4. UI 缩放调太低：游戏内 视频设置 → 界面缩放 调大。\n\n"
+                    @"4. UI 缩放调太低：游戏内 视频设置 → 界面缩放 调大；\n"
+                    @"5. sodium-extra 整合包在 Mac 伪装环境下自动减半分辨率（Task107）：带 sodium-extra 的包（如 BMC2）会把帧缓冲减半（实测 590x410 渲染上采到 2360x1640，等效 4 倍放大=明显发糊）。启动器现在每次启动自动把该选项改回关。验证：日志搜 “[PojavLauncher] Task107: sodium-extra reduce_resolution_on_mac”，下一行 viewport evidence 应显示 vp 与窗口信仰一致（如 vp=1180x820 match）。要追求帧率请改用 FSR 档位（画质更好）。\n\n"
                     @"提示：判断\"糊\"还是\"分辨率低\"——截图放大看方块边缘：锯齿状=分辨率，雾蒙蒙=滤镜/缩放。";
 
     LauncherHelpFaqItem *shader = [[LauncherHelpFaqItem alloc] init];
@@ -382,7 +383,7 @@
     sparkProfiler.question = @"整合包创建新世界时闪退（无崩溃报告、日志戛然而止）？";
     sparkProfiler.answer = @"典型表现：主菜单/标题界面一切正常，点“创建新的世界”后画面卡住或直接闪退；latestlog.txt 最后一行戛然而止（无 exit、无崩溃堆栈、无 hs_err），常见结尾是 spark 的 Starting background profiler... 或 [Amethyst] Patching ...libasyncProfiler.so.tmp。\n\n"
                          @"机制：spark 分析器在首次开启服务器（创建/进入世界）时会把自己内置的原生库 libasyncProfiler 解包到 config/spark/tmp 并加载。这个库是 macOS 平台且带代码签名——启动器把它的平台标签改写为 iOS 后，签名哈希不再匹配，系统加载器直接杀进程（静默闪退，无法捕获）。这是“已签名库改平台必死”：未签名库重标签无害，已签名库重标签必死。\n\n"
-                         @"启动器已修复（Task106 双层）：①拦截该库加载——spark 检测到加载失败会自动回退到纯 Java 采样器（分析功能照常可用，游戏继续）；②通用防护——平台重标签时同步把签名中和掉（改为未签名状态），其他带签名的 macOS 原生库也能安全加载。验证方法：日志搜 “[Amethyst] Task106: blocked dlopen”——出现后建档继续推进即修复生效；旧构建临时自救：整合包里移除 spark。\n\n"
+                         @"启动器已修复（Task106 双层 + Task107 修正）：①拦截该库加载——spark 检测到加载失败会自动回退到纯 Java 采样器（分析功能照常可用，游戏继续）；②通用防护——平台重标签后自动重建 ad-hoc 签名（重算页哈希，Task107：原“中和为无签名”方案被证实会引发 JNA 加载失败——系统加载器对无签名库一律拒载，日志报 missing code signature；已签名库重标签必死但重签名后可正常加载）。验证方法：日志搜 “[Amethyst] Task106: blocked dlopen”（拦截生效）或 “[Amethyst] Task107: re-signed”（重签名生效）——出现后建档继续推进即修复生效；旧构建临时自救：整合包里移除 spark。\n\n"
                          @"仍闪退且最后一行不是 spark 相关：留意内存——创建世界是内存峰值阶段（实测 537 mods 包建档前已 5.1GB），设备内存告急时系统也会静默杀进程；可适当调低启动器的最大内存或减少视距。";
 
     self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];

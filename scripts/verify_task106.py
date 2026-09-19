@@ -3,7 +3,7 @@
 
 A. 崩溃日志证据（git 钉 41cdff0，2e1ea09 构建）
 B. spark 原生库法证（真实 Modrinth jar 的 Mach-O 属性 + 补丁逻辑 Python 镜像）
-C. 代码锚点（main_hook.m 拦截 + dyld_patch_platform.m 签名中和）
+C. 代码锚点（main_hook.m 拦截 + dyld_patch_platform.m 签名重签（Task107 改写：原“中和”被证实破坏 JNA））
 D. osm_bridge bundle-direct + 相位计时锚点
 E. 行为镜像（bundle-direct 状态机 + 哨兵位置数学 + 签名中和不变量）
 F. FAQ/version.h/级联
@@ -122,10 +122,12 @@ check("C3 dyld_patch_platform 记录 LC_CODE_SIGNATURE 命令",
       "command->cmd == LC_CODE_SIGNATURE" in dpp and "sigCmd = (struct linkedit_data_command *)command;" in dpp)
 check("C4 中和仅在确实发生平台重标签时执行（platform 已匹配的早退路径零扰动）",
       "if (retagged && sigCmd != NULL) {" in dpp and "retagged = YES;" in dpp)
-check("C5 LC_CODE_SIGNATURE → LC_SOURCE_VERSION（等尺寸 16 字节良性替身）",
-      "#define kAme106LCSourceVersion 0x2A" in dpp and "sigCmd->cmd = kAme106LCSourceVersion;" in dpp)
-check("C6 签名 blob 清零（dyld 视为未签名而非签名失效）",
-      "memset(sliceBase + sigCmd->dataoff, 0, sigCmd->datasize);" in dpp)
+check("C5 【Task107 重锚】重签核心（尺寸预估 + SuperBlob 构建双调用点）",
+      "ame107_adhoc_blob_size(dataoff, strlen(kAme107Identifier) + 1)" in dpp
+      and dpp.count("ame107_build_adhoc_superblob(sliceBase, dataoff, kAme107Identifier,") == 2)
+check("C6 【Task107 重锚】原位写入 + 死区清零（替代原 LC_SOURCE_VERSION 中和）",
+      "memcpy(sliceBase + dataoff, blob, builtLen);" in dpp
+      and "memset(sliceBase + dataoff + builtLen, 0, origDatasize - builtLen);" in dpp)
 check("C7 返回值语义保持（dylib 名重写仍触发 msync；仅签名中和新增）",
       dpp.rstrip().count("return YES;") >= 1 and "return retagged;" not in dpp)
 
@@ -252,6 +254,29 @@ def build_fat(active_platform):
     fat += x86
     return fat, arm_off
 
+def build_adhoc_sb(body, dataoff, ident=b"amethyst-retag"):
+    """Python 镜像：与 Natives/ame107_codesign.h 同式的 ad-hoc SuperBlob。"""
+    import hashlib
+    ident_len = len(ident) + 1
+    hash_off = 88 + ((ident_len + 3) & ~3)
+    n_slots = (dataoff + 4095) // 4096
+    cd_size = hash_off + 32 * n_slots
+    cd = bytearray(cd_size)
+    struct.pack_into(">II", cd, 0, 0xFADE0C02, cd_size)
+    struct.pack_into(">IIIIIIIBBBB", cd, 8, 0x20400, 0x2, hash_off, 88, 0,
+                     n_slots, dataoff, 32, 2, 0, 12)
+    struct.pack_into(">Q", cd, 56, dataoff)
+    cd[88:88 + len(ident)] = ident
+    for i in range(n_slots):
+        p = i * 4096
+        n = min(4096, dataoff - p)
+        cd[hash_off + 32 * i: hash_off + 32 * (i + 1)] = hashlib.sha256(body[p:p + n]).digest()
+    sb = bytearray(20 + cd_size)
+    struct.pack_into(">III", sb, 0, 0xFADE0CC0, 20 + cd_size, 1)
+    struct.pack_into(">II", sb, 12, 0, 20)
+    sb[20:] = cd
+    return bytes(sb)
+
 def mirror_patch(fat, arm_off, active_platform):
     fat = bytearray(fat)
     hdr = fat[arm_off:]
@@ -259,6 +284,7 @@ def mirror_patch(fat, arm_off, active_platform):
     p = 32
     retagged = False
     sig = None
+    sig_cmd_off = None
     for _ in range(ncmds):
         cmd, cmdsize = struct.unpack("<2I", hdr[p:p + 8])
         if cmd == 0x32:
@@ -269,18 +295,19 @@ def mirror_patch(fat, arm_off, active_platform):
             retagged = True
         elif cmd == 0x1D:
             sig = struct.unpack("<2I", hdr[p + 8:p + 16])
+            sig_cmd_off = p
         p += cmdsize
     if retagged and sig:
-        # cmd → LC_SOURCE_VERSION(0x2A)，blob 清零
-        sig_cmd_off = None
-        p = 32
-        for _ in range(ncmds):
-            cmd, cmdsize = struct.unpack("<2I", hdr[p:p + 8])
-            if cmd == 0x1D:
-                sig_cmd_off = p
-            p += cmdsize
-        struct.pack_into("<I", fat, arm_off + sig_cmd_off, 0x2A)
-        fat[arm_off + sig[0]: arm_off + sig[0] + sig[1]] = b"\0" * sig[1]
+        # Task107：重标签后重建 ad-hoc 签名（原位，若新 blob ≤ 旧尺寸）。
+        # 与产线同序：datasize 先收紧（页 0 定稿）→ 再算哈希建 blob。
+        dataoff, old_datasize = sig
+        nlen = 20 + 88 + ((len(b"amethyst-retag") + 1 + 3) & ~3) + 32 * ((dataoff + 4095) // 4096)
+        if nlen <= old_datasize:
+            struct.pack_into("<I", fat, arm_off + sig_cmd_off + 12, nlen)  # 页 0 定稿
+            new_blob = build_adhoc_sb(bytes(fat[arm_off:arm_off + dataoff]), dataoff)
+            assert len(new_blob) == nlen
+            fat[arm_off + dataoff: arm_off + dataoff + nlen] = new_blob
+            fat[arm_off + dataoff + nlen: arm_off + dataoff + old_datasize] = b"\0" * (old_datasize - nlen)
     return bytes(fat), "patched"
 
 fat, arm_off = build_fat(active_platform=1)
@@ -288,10 +315,18 @@ patched, mode = mirror_patch(fat, arm_off, active_platform=13)  # iOS 活动平�
 check("E10 镜像：重标签发生（macOS→iOS）", mode == "patched"
       and struct.unpack("<I", patched[arm_off + 40:arm_off + 44])[0] == 13)
 # LC_CODE_SIGNATURE 位点（第 2 条命令，偏移 32+24=56）
-check("E11 镜像：签名命令改写为 LC_SOURCE_VERSION(0x2A) 等尺寸",
-      struct.unpack("<2I", patched[arm_off + 56:arm_off + 64]) == (0x2A, 16))
+check("E11 【Task107 重锚】镜像：签名命令保持 LC_CODE_SIGNATURE(0x1D)，datasize 收紧为新 blob 尺寸",
+      struct.unpack("<2I", patched[arm_off + 56:arm_off + 64]) == (0x1D, 16)
+      and struct.unpack("<I", patched[arm_off + 56 + 12:arm_off + 56 + 16])[0] == 156)
 blob_off = 32 + 40  # header 32 + 24 + 16
-check("E12 镜像：签名 blob 全零", patched[arm_off + blob_off:arm_off + blob_off + 1024] == b"\0" * 1024)
+import hashlib as _hl
+_hash_slot = patched[arm_off + blob_off + 20 + 104: arm_off + blob_off + 20 + 136]  # hashOffset=104 的 hash[0]
+check("E12 【Task107 重锚】镜像：新 blob 为合法 ad-hoc SuperBlob（magic/版本/标志/页哈希）+ 死区清零",
+      struct.unpack(">I", patched[arm_off + blob_off:arm_off + blob_off + 4])[0] == 0xFADE0CC0
+      and struct.unpack(">I", patched[arm_off + blob_off + 20 + 8:arm_off + blob_off + 20 + 12])[0] == 0x20400
+      and struct.unpack(">I", patched[arm_off + blob_off + 20 + 12:arm_off + blob_off + 20 + 16])[0] == 0x2
+      and _hash_slot == _hl.sha256(patched[arm_off:arm_off + 72]).digest()
+      and patched[arm_off + blob_off + 156: arm_off + blob_off + 1024] == b"\0" * (1024 - 156))
 check("E13 镜像：x86_64 切片零扰动", b"\xAA" * 64 in patched)
 check("E14 镜像：文件尺寸不变（无截断/扩展）", len(patched) == len(fat))
 same, mode2 = mirror_patch(fat, arm_off, active_platform=1)  # 平台已匹配
