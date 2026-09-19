@@ -182,10 +182,11 @@ check("C3 左侧菜单：选中凸出面板 / 未选中恢复平贴",
       "[btn nm_convexRadius:12 shadowRadius:5];" in menu
       and "[btn nm_removeNeomorph];" in menu)
 root = read("Natives/LauncherRootViewController.m")
-check("C4 根容器：侧栏/右面板平贴表面（无阴影）+ card_color 停用",
+check("C4 根容器：侧栏/右面板表面随背景模式切换（Task111 重锚）+ card_color 停用",
       "[self.sidebarContainer nm_flatSurfaceWithRadius:16];" in root
       and "[self.rightPanelContainer nm_flatSurfaceWithRadius:16];" in root
-      and "applyEffectToView:self.sidebarContainer" not in root)
+      and "updateChromeSurfaces" in root
+      and "applyEffectToView:self.sidebarContainer" in root)
 dl = read("Natives/DownloadViewController.m")
 check("C5 下载页：资源行卡片/图标占位/筛选按钮/导入按钮新拟态",
       "[self.contentContainer nm_convexRadius:8 shadowRadius:4];" in dl

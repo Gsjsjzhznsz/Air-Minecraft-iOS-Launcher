@@ -162,11 +162,11 @@ print("=" * 72)
 check("D1  beginMenuIconSelfHeal 定义且唯一 + allMenuIconsLoaded 就绪判定",
       menu_code.count("- (void)beginMenuIconSelfHeal") == 1
       and menu_code.count("- (BOOL)allMenuIconsLoaded") == 1)
-check("D2  重试参数：0.25s 周期 × 16 次上限（约 4s）",
+check("D2  重试参数：0.25s 周期 × 40 次上限约 10s（Task111 重锚：16→40）+ 自愈双入口",
       "timerWithTimeInterval:0.25 repeats:YES" in menu_code
-      and "attempts >= 16" in menu_code)
-check("D3  就绪即停 + 重试不叠加（allMenuIconsLoaded 返回 + 定时器已存在检查）",
-      "if ([self allMenuIconsLoaded]) return;" in menu_code
+      and "attempts >= 40" in menu_code)
+check("D3  就绪即停 + 重试不叠加（Task111 重锚：齐备且过 8 个强制重刷 tick 即停 + 定时器已存在检查）",
+      "([strongSelf allMenuIconsLoaded] && attempts >= 8) || attempts >= 40" in menu_code
       and "if (self.menuIconSelfHealTimer) return;" in menu_code)
 check("D4  定时器属性 + dealloc invalidate（runloop 强持有显式解除）",
       "@property(nonatomic, strong) NSTimer *menuIconSelfHealTimer;" in menu
@@ -174,9 +174,11 @@ check("D4  定时器属性 + dealloc invalidate（runloop 强持有显式解除�
 check("D5  双入口：viewWillAppear / viewDidLayoutSubviews → beginMenuIconSelfHeal",
       re.search(r"- \(void\)viewWillAppear:[\s\S]{0,300}?\[self beginMenuIconSelfHeal\];", menu_code)
       and re.search(r"- \(void\)viewDidLayoutSubviews \{[\s\S]{0,600}?\[self beginMenuIconSelfHeal\];", menu_code))
-check("D6  Task101 直补路径保留（updateButtonColors → refreshMenuIconImages）",
+check("D6  Task101 直补路径保留（Task111 重锚：updateButtonColors → refreshMenuIconImages 填充式 + 自愈入口强制式）",
       "updateButtonColors" in menu_code
-      and menu.count("[self refreshMenuIconImages];") >= 2)
+      and menu.count("[self refreshMenuIconImages];") >= 1
+      and "[self refreshMenuIconImagesForced:YES];" in menu_code
+      and "[strongSelf refreshMenuIconImagesForced:YES];" in menu_code)
 check("D7  根因留档注释（首调用 CoreUI 符号注册竞态 / 只有主界面消失的原因）",
       "systemImageNamed" in menu and "竞态" in menu and "beginMenuIconSelfHeal" in menu)
 check("D8  菜单括号配平（字符串感知）", bracket_balance(menu_code))

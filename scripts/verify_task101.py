@@ -204,19 +204,23 @@ print()
 print("=" * 72)
 print("E. 主界面图标消失自愈（启动早期偶发 systemImageNamed: nil）")
 print("=" * 72)
-check("E1  refreshMenuIconImages 方法存在且幂等（仅补 image 为空的按钮）",
+check("E1  refreshMenuIconImages 方法存在且幂等（Task111 重锚：填充式/强制式双路径，稳态仅补 nil）",
       "- (void)refreshMenuIconImages {" in menu_code
+      and "refreshMenuIconImagesForced:(BOOL)forced" in menu_code
+      and "if (!forced && current) continue;" in menu_code
       and "[btn imageForState:UIControlStateNormal]" in menu
-      and menu_code.count("- (void)refreshMenuIconImages") == 1)
-check("E2  自愈入口链（Task102 重锚）：viewWillAppear/viewDidLayoutSubviews → beginMenuIconSelfHeal，updateButtonColors 直补仍保留",
+      and menu_code.count("- (void)refreshMenuIconImages") == 2)
+check("E2  自愈入口链（Task111 重锚）：viewWillAppear/viewDidLayoutSubviews → beginMenuIconSelfHeal 强制式首拉，updateButtonColors 直补仍保留",
       re.search(r"- \(void\)viewWillAppear:[\s\S]{0,300}?\[self beginMenuIconSelfHeal\];", menu_code)
       and re.search(r"- \(void\)viewDidLayoutSubviews \{[\s\S]{0,600}?\[self beginMenuIconSelfHeal\];", menu_code)
-      and menu.count("[self refreshMenuIconImages];") >= 2)
+      and "[self refreshMenuIconImagesForced:YES];" in menu_code
+      and menu.count("[self refreshMenuIconImages];") >= 1)
 check("E3  viewWillAppear 正确调用 super",
       "- (void)viewWillAppear:(BOOL)animated {" in menu
       and "[super viewWillAppear:animated];" in menu)
-check("E4  自愈重取走同一符号表（menuItems icon 字段，不引入第二份图标清单）",
-      'systemImageNamed:self.menuItems[idx][@"icon"]' in menu)
+check("E4  自愈重取走同一符号表（menuItems icon 字段，不引入第二份图标清单；Task111 重锚 iconName 变量路径）",
+      'self.menuItems[idx][@"icon"]' in menu
+      and "[UIImage systemImageNamed:iconName]" in menu)
 check("E5  越界防御（tag 与 menuItems.count 校验）",
       "idx >= (NSInteger)self.menuItems.count" in menu)
 

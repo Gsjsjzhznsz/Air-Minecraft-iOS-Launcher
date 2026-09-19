@@ -1033,3 +1033,20 @@ Work Log:
 
 Stage Summary:
 - Task106 全链绿灯；新 IPA 就绪，装机锚点见 Task106 主条目
+
+---
+Task ID: 111
+Agent: main (Super Z)
+Task: 启动器背景照片功能恢复（检测并切换）+ 部分菜单背景消失修复 + 主界面按钮不稳定显示根治（用户 Task 102 IPA 实测反馈 + 截图 IMG_9143）
+
+Work Log:
+- 背景照片（检测并切换 + 调低层级）：Task89 的 applyBackgroundToWindow 无条件短路 NMTheme 纯色底，把图片/视频/毛玻璃/压暗全局管线整体顶掉。BackgroundManager 四入口按 hasBackground 自动切换：applyBackgroundToWindow/SplitViewController 有背景时恢复旧容器管线（insertSubview:atIndex:0 最底层 + applyImage/VideoBackgroundToContainer + makeSplitViewControllerTransparent），无背景维持新拟态纯色底；applyEffectToView/CollectionViewCell 有背景恢复 SystemThinMaterial 毛玻璃/半透明双模式（旧管线入口 [view nm_removeNeomorph] 清模式切换残留），无背景维持 nm_convex；applyEffectToCell 无背景分支改发 NMTheme nm_surface 实色卡片底（不再无条件半透明）；makeViewControllerTransparent 无背景 no-op 门控。设置/清除背景经既有 BackgroundChanged 通知链自动重跑
+- 菜单背景消失（只剩按钮和阴影）根因：无背景模式下 makeViewControllerTransparent 仍无条件透明化（默认毛玻璃分支 view=clear）+ applyEffectToCell 无条件 secondarySystemBackgroundColor（与 NMTheme 底色几乎同色）+ 背景设置页 view/tableView 默认 systemBackground 白底 → 表格型页面近透明。修复：设置页无背景分支 view+tableView 显式 nm_background（viewDidLoad/viewWillAppear 双处）+ styleCell 统一走 applyEffectToCell 检测切换（secondarySystemBackgroundColor 洗白路径退役）
+- 主界面按钮不稳定显示三重保险：①createMenuButtonWithItem 立即二次补拉（首调完成 CoreUI 符号注册，二拉同刻非 nil）；②自愈拆双路径——填充式（updateButtonColors 等稳态路径仅补 nil，零抖动）+ 强制式 refreshMenuIconImagesForced:（无条件重取重设，覆盖"非 nil 哑图"渲染失败，重设后 bringSubviewToFront 图标子视图）；重试窗口 0.25s×16→40（10s），图标齐备后仍强制重刷 8 tick（2s）再停；③z 序保险三处（创建/updateButtonColors 选中分支/强制重刷）——新拟物承载层 insertSublayer:atIndex:0 若遇主层 contents 绘制的图标会被不透明表面遮住，图标子视图存在时显式提到最前
+- Root chrome：新增 updateChromeSurfaces（hasBackground → applyEffectToView 双容器 / else nm_flatSurfaceWithRadius:16），setupContainers 尾部 + backgroundChanged + uiEffectChanged 三调用点；cornerRadius/maskedCorners/masksToBounds 几何零变化
+- 校验：verify_task111 新增 43 项（A 背景管线恢复 5 / B 效果枢纽切换 7 / C Root chrome 4 / D 主界面按钮 8 / E 设置页 4 / F 检测口径护栏 5 / G 括号配平 5 / H 行为镜像 4 / I 仓库卫生 1）；重锚 verify_task89 C4（updateChromeSurfaces 切换语义）、101 E1/E2/E4（填充/强制双路径 + iconName 变量）、102 D2/D3/D6（40 上限 + 8 tick 停止条件 + 强制式计数）；88 E1/89 E1/96 F2/101 F7/102 F3 为未提交改动守卫（提交后自愈），83-87/94/97-100 环境性失败零交集
+- 检测口径零变化：getEntitlementValue×2（SecTask 签名口径）/ isJITEnabled(NO)+TXM 三态链 / 刷新三件套 / 七卡工厂 / 侧栏按钮几何全部原样
+
+Stage Summary:
+- 用户预期：设置自定义背景（图片/视频）后壁纸全局可见（卡片毛玻璃透出、侧栏/右面板半透明），未设置时维持 Task89 新拟态纯色底；背景设置页各分组卡片底色清晰可辨；主界面按钮首启即稳定显示（nil 竞态/哑图/遮挡三机制全覆盖）
+- 待用户安装新 IPA 实机验证；若需回到"全局强制纯色"可清空背景即自动切换
