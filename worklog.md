@@ -1072,3 +1072,17 @@ Stage Summary:
 - 七任务全落地：OpenAL 崩溃根治（classpath 劫持免疫）/ MobileGL Vulkan 直呈入口（设置开关，列表不膨胀）/ 键盘自动弹出（上游同款钩子组合）/ 更新检测指向本仓库 / 设置本地化补全（双语零缺失）/ README + 5.1.0 版本号 / 后台焦点释放（模组可识别后台降帧省电）
 - 装机锚点："[Amethyst] Task112: OpenAL pinned to <path>"（26.3 声音正常 + 不再 NPE）；"[Amethyst] Task113: MobileGL Vulkan override active"（开关开启时）；"[SDLHook] hooked SDL_InitSubSystem -> Task114 launcher hints" + 输入框聚焦键盘弹出；"[SDLHook] Task118: app entered background -- SDL focus released (mods may throttle fps)" / "returning to foreground -- SDL focus restored (Task110)"
 - 发布：v5.1.0 tag + GitHub release（0->211+ 提交 changelog）待 CI 绿后执行
+
+---
+Task ID: 112-118 (续)
+Agent: main (Super Z)
+Task: CI 失败修复（Makefile/Info.plist TAB 展开回归）
+
+Work Log:
+- CI run 35446888307（da5918a7）失败：Makefile:240 "missing separator (did you mean TAB instead of 8 spaces?)"——da5918a7 的 Edit 工具重写把全文件 421 行 TAB 展开成 8 空格（fork 史上著名的同款坑，本次轮到自己踩）；Info.plist 同样中招（220 TAB 行 -> 0，XML 空白不敏感不致 CI 挂但一并还原）
+- 修复（scripts/task117_fix_makefile_tabs.py + task117_fix_plist_tabs.py）：git show HEAD~1 取回 TAB 完好基线 -> Python 注入 Task113 dep_mobilegl 块与 5.1.0 双版本号（全部真 TAB，写入前断言）；Makefile 终态 vs 基线 = 仅 dep_mobilegl 块 +12/-6；全量审计 13 个触碰文件确认无第三个受害者（.m 均为空格缩进风格，天然免疫）
+- verify_task112_118 复跑 49/49
+
+Stage Summary:
+- 教训入库：**改 Makefile/plist 等 TAB 敏感文件禁用 Edit 工具整文件重写，用 Python 脚本注入并断言 TAB 数**（工作流防回归）
+- 待 CI 绿后发布 v5.1.0
