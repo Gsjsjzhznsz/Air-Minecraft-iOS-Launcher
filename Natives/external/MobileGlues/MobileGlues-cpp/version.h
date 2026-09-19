@@ -711,3 +711,24 @@
 // launch (anchor '[PojavLauncher] Task107: sodium-extra
 // reduce_resolution_on_mac true->false ...'); FAQ sparkProfiler amended +
 // blurry gains cause #5 (both in place, count stays 34, zero cascade).
+
+// REVISION 17 addendum (Task 108, no bump): two follow-ups on 382432d. (1) CI
+// fix: the Task107 rewrite of dyld_patch_platform.m accidentally dropped the
+// bare 'extern int dyld_get_active_platform();' declaration that every prior
+// revision carried (<mach-o/dyld.h> declares it behind __API_AVAILABLE
+// (macos(12.0), ios(15.0)) -- too new for this deployment target, hence the
+// manual extern). CI's clang (C99+ mode, implicit-function-declaration is an
+// error) failed the 382432d build at dyld_patch_platform.m:84 with exactly
+// one error; the declaration is restored verbatim (the old include set
+// already covered every other syscall in the file -- open/pwrite/ftruncate/
+// read/fstat/pthread/CC_SHA256 -- proven by the CI-green Task106 build).
+// (2) sodium-extra revert, user decision: the user confirmed the BMC2 1.20.1
+// blurriness was their own configuration (reduce_resolution_on_mac was on by
+// their own choice -- an fps measure), and the launcher must not rewrite the
+// user's mod config on every launch. PojavLauncher's patchSodiumExtraResolution()
+// is removed (call + method); the mechanism knowledge moves to the FAQ page
+// ('画面模糊' cause #5 now tells the user to toggle the mod's own setting:
+// 视频设置 → sodium-extra 设置 → 性能 → Mac 下降低分辨率; fps-seekers use the
+// FSR preset instead). The '[PojavLauncher] Task107: sodium-extra
+// reduce_resolution_on_mac true->false' anchor is retired with it. The 26.3
+// re-signing fix (fix A) is untouched.

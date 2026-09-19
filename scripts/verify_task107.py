@@ -167,13 +167,16 @@ check("C10 尺寸公式与构建同源（ame107_adhoc_blob_size 独立函数）"
       "static size_t ame107_adhoc_blob_size(uint32_t codeLimit, size_t identLen)" in codesign_h)
 check("C11 main_hook.m Task106 注释修正（中和→重签名的表述更新）",
       "Task107 修正" in mh and "missing code" in mh)
-check("C12 Java 配置补丁（正则 true->false + 只改存在的 true + 异常静默）",
-      "patchSodiumExtraResolution();" in pj
-      and '(\\"reduce_resolution_on_mac\\"\\s*:\\s*)true\\b' in pj.replace("\\\\", "\\")
-      and "if (!m.find()) return;" in pj
-      and "Task107: sodium-extra config patch skipped" in pj)
-check("C13 调用点在 Tools.launchMinecraft 之前（游戏加载配置前生效）",
-      pj.index("patchSodiumExtraResolution();") < pj.index("Tools.launchMinecraft(account, version, serverIp);"))
+# Task108 撤销后：补丁代码必须清零，但撤销说明注释合法提及选项名——剔除整行注释后再查。
+_pj_code = "\n".join(ln for ln in pj.splitlines() if not ln.lstrip().startswith("//"))
+check("C12 Task108 撤销：Java 配置补丁已删（代码态无方法/调用/JSON 键）",
+      "patchSodiumExtraResolution" not in _pj_code
+      and "reduce_resolution_on_mac" not in _pj_code
+      and "sodium-extra-options.json" not in _pj_code)
+check("C13 撤销说明在位 + 启动主链完型（Task108 注释 + Tools.launchMinecraft 调用保留）",
+      "Task108：Task107 的 sodium-extra「reduce_resolution_on_mac」配置补丁已按" in pj
+      and "用户要求撤销" in pj
+      and "Tools.launchMinecraft(account, version, serverIp);" in pj)
 
 print("===== D. 本地 harness 端到端（真实 JNA 走产线头文件） =====")
 HARNESS = os.path.join(REPO, "scripts", "task107_harness.c")
@@ -249,15 +252,21 @@ print("===== F. FAQ / version.h / 级联 =====")
 check("F1 sparkProfiler 修正文案（Task107 修正 + re-signed 锚点 + missing code signature）",
       "Task106 双层 + Task107 修正" in faq and "Task107: re-signed" in faq
       and "missing code signature" in faq)
-check("F2 blurry 新增第 5 条原因（sodium-extra 减半 + Task107 锚点 + 判读法）",
-      "sodium-extra 整合包在 Mac 伪装环境下自动减半分辨率（Task107）" in faq
-      and "[PojavLauncher] Task107: sodium-extra reduce_resolution_on_mac" in faq
-      and "590x410" in faq)
+check("F2 blurry 第 5 条原因（Task108 改写：模组自身设置 + 用户自助关闭指引 + 实测数据保留）",
+      "sodium-extra 整合包的「Mac 下降低分辨率」选项" in faq
+      and "这是模组自身的设置、不是启动器问题" in faq
+      and "590x410" in faq and "2360x1640" in faq
+      and "启动器现在每次启动自动把该选项改回关" not in faq
+      and "[PojavLauncher] Task107: sodium-extra reduce_resolution_on_mac" not in faq)
 check("F3 FAQ 计数不变 34（两条均原位改写，零级联）",
       faq.count("= [[LauncherHelpFaqItem alloc] init]") == 34)
 check("F4 version.h REVISION 17 addendum (Task 107, no bump)",
       "REVISION 17 addendum (Task 107, no bump)" in vh
       and "missing code signature" in vh and "reduce_resolution_on_mac" in vh)
+check("F4b version.h REVISION 17 addendum (Task 108, no bump)（CI 修复 + 撤销记录）",
+      "REVISION 17 addendum (Task 108, no bump)" in vh
+      and "dyld_patch_platform.m:84" in vh
+      and "patchSodiumExtraResolution" in vh)
 # 级联：verify_task106 内部 F7 已传递覆盖 verify_task100/103/104/105，
 # 此处直接跑 106（全链）+ 85（osm D1 桩，本任务未触及但求稳）。
 for v in ("verify_task106.py", "verify_task85.py"):

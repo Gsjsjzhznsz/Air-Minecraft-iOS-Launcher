@@ -9,6 +9,14 @@
 
 #include "ame107_codesign.h"
 
+// dyld_get_active_platform() 声明于 <mach-o/dyld.h>，但其带
+// __API_AVAILABLE(macos(12.0), ios(15.0)) 可用性标注——本工程部署目标更低，
+// 直接 include 会在老目标上触发可用性错误。沿用 Task106 前的裸 extern 声明
+// （跳过可用性检查，运行时符号自 iOS 15 起存在，本设备 iPadOS 27 无虞）。
+// Task107 重写时该声明曾被意外丢失——CI（clang C99+，隐式函数声明为
+// error）在 dyld_patch_platform.m:84 响亮失败，本行即为其修复。
+extern int dyld_get_active_platform();
+
 // Task 107：重标签后的 ad-hoc 重签名，取代 Task106 的签名中和。
 //
 // Task106 中和（LC_CODE_SIGNATURE → LC_SOURCE_VERSION + blob 清零）的实测教训：

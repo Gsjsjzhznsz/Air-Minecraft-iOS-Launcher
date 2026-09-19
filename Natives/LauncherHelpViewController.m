@@ -129,7 +129,7 @@
                     @"2. 分辨率滑条被手动调低过：恢复 100%（降分辨率应优先用 FSR 档位，画质好得多）；\n"
                     @"3. 历史版本的 1x 钉扎模糊已修复（渲染表面与物理像素 1:1），如再现请反馈；\n"
                     @"4. UI 缩放调太低：游戏内 视频设置 → 界面缩放 调大；\n"
-                    @"5. sodium-extra 整合包在 Mac 伪装环境下自动减半分辨率（Task107）：带 sodium-extra 的包（如 BMC2）会把帧缓冲减半（实测 590x410 渲染上采到 2360x1640，等效 4 倍放大=明显发糊）。启动器现在每次启动自动把该选项改回关。验证：日志搜 “[PojavLauncher] Task107: sodium-extra reduce_resolution_on_mac”，下一行 viewport evidence 应显示 vp 与窗口信仰一致（如 vp=1180x820 match）。要追求帧率请改用 FSR 档位（画质更好）。\n\n"
+                    @"5. sodium-extra 整合包的「Mac 下降低分辨率」选项：带 sodium-extra 的包（如 BMC2）在 Mac 伪装环境下若开启该选项（视频设置 → sodium-extra 设置 → 性能 → Mac 下降低分辨率），帧缓冲会被减半再放大回全屏（实测 590x410 渲染上采到 2360x1640，等效 4 倍放大=明显发糊）。这是模组自身的设置、不是启动器问题——觉得糊就到模组设置里把它关掉即可恢复全分辨率渲染；追求帧率则保留该选项或改用 FSR 档位（画质更好）。\n\n"
                     @"提示：判断\"糊\"还是\"分辨率低\"——截图放大看方块边缘：锯齿状=分辨率，雾蒙蒙=滤镜/缩放。";
 
     LauncherHelpFaqItem *shader = [[LauncherHelpFaqItem alloc] init];
