@@ -832,6 +832,18 @@
               @"type": self.typeSwitch,
               @"enableCondition": whenNotInGame
             },
+            // Task 113：MobileGL Vulkan 直呈渲染器开关。
+            // 与"ANGLE ES 驱动"并排（用户要求合并进 ES 驱动选项区，不进主渲染器列表）。
+            // 开启后启动时覆盖渲染器为 libMobileGL.dylib（DirectVulkan：
+            // GL -> Vulkan -> MoltenVK -> CAMetalLayer 直呈，无 CPU 回读）。
+            // 上游实测 26.3 + Vulkan 后端完全流畅；GLES/Metal 后端有问题故不引入。
+            // 需要 MobileGL dylib 随包存在（Natives/resources/Frameworks/libMobileGL.dylib）。
+            @{@"key": @"mobilegl_vulkan",
+              @"hasDetail": @YES,
+              @"icon": @"bolt.fill",
+              @"type": self.typeSwitch,
+              @"enableCondition": whenNotInGame
+            },
             @{@"key": @"enable_no_error",
               @"hasDetail": @YES,
               @"icon": @"exclamationmark.triangle",

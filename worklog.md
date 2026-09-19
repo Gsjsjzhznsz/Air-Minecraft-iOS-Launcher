@@ -1050,3 +1050,25 @@ Work Log:
 Stage Summary:
 - 用户预期：设置自定义背景（图片/视频）后壁纸全局可见（卡片毛玻璃透出、侧栏/右面板半透明），未设置时维持 Task89 新拟态纯色底；背景设置页各分组卡片底色清晰可辨；主界面按钮首启即稳定显示（nil 竞态/哑图/遮挡三机制全覆盖）
 - 待用户安装新 IPA 实机验证；若需回到"全局强制纯色"可清空背景即自动切换
+
+---
+Task ID: 112-118
+Agent: main (Super Z)
+Task: 用户六连反馈（OpenAL 崩溃栈 + 上游 vulkan 后端流畅 + 键盘不弹出 + 更新检测指向 + 前端更新语言缺失 + 5.1.0 发布）+ 用户新增 Task118（后台释放 SDL 焦点）
+
+Work Log:
+- 同步 fa42cb8（用户上传 latestlog.old.txt = 上游 5.1.0 caf6822 会话）+ 朋友 Task111 提交（1c0fe93 背景恢复 / b230b9e 校验器）；添加 upstream 远程取 caf682286 做对照
+- Task112（26.3 OpenAL NPE，用户提供崩溃栈）：CFR 反编译正式版 client263.jar（blaze3d 不混淆，SoundEngine/CallbackDeviceTracker/Library 全链取证）—— isSupported() 先 alcIsExtensionPresent("ALC_SOFT_system_events") 通过后才调 LWJGL 绑定；LWJGL 3.4.3 ALC.create -> Library.loadNative(bundledWithLWJGL=true) classpath 资源优先于 java.library.path。本仓 libopenal.dylib 无该扩展（1.21-1.23 时代，历史全部会话零崩溃）-> NPE 只能来自 classpath 劫持的另一个 openal（modpack natives jar 场景）。修复 = -Dorg.lwjgl.openal.libname 钉 Frameworks 绝对路径（绝对路径直 dlopen，跳过 classpath 提取），文件缺失守卫回落默认解析
+- Task113（MobileGL Vulkan）：上游 log 判读定案流畅根因 = CAMetalLayer 直呈 + IMMEDIATE 呈现 + "readback retired"（Task75）——正是我们 zink 路径 8-15ms 呈现常数的对照面。vendor 上游同款 libMobileGL.dylib（85757760B，sha256 e7a8043b…与 caf6822 逐字节一致）到 Natives/resources/Frameworks/（payload cp -R 自动打包）；渲染器列表移除 mobilegl/mobilegl_gles 条目（用户要求不占列表）；设置-视频-MobileGlues 区新增 mobilegl_vulkan 开关（与"ANGLE ES 驱动"并排，PLPreferences 默认 NO）；JavaLauncher AMETHYST_RENDERER 解析点施加覆盖（dylib 存在性守卫，单点覆盖全链路生效）；Makefile dep_mobilegl 注释更新（prebuilt Vulkan-only）；GLES 变体刻意不引入（上游实测其他后端有问题）
+- Task114（键盘不自动弹出，上游正常）：对照 caf682286 sdl3_hook.m 实锤我们缺整个文本输入层。逐字移植：SDL_StartTextInput / StartTextInputWithProperties / StopTextInput / SetTextInputArea 主线程化（SDL iOS 后端操作 UIKit，MC 从渲染线程调；SetTextInputArea rect 堆拷贝防悬垂）+ SDL_InitSubSystem 钩子设三 hint（SDL_ENABLE_SCREEN_KEYBOARD=1 覆盖 MC 桌面惯例 0 / RETURN_KEY_HIDES_IME / FORCE_SRGB_FRAMEBUFFER=0 仅 gl-bridge）；typedef + 指针表 + 前置声明 + ame_maybeWrapWindowHook 副表 + amethyst_sdl3_hook_resolve 主表双路接线
+- Task115：UpdateChecker repoOwner/repoName herbrine8403/Amethyst-iOS-MyRemastered -> Gsjsjzhznsz/Air-Minecraft-iOS-Launcher（API + 打开页两条 URL 单一来源）
+- Task116（朋友更新语言缺失）：三层审计（全量 localize key / hasDetail 动态 key / i18n_str_NNN）定案 = 12 个 preference.detail.* + 4 个 crash.* 缺失（详情模式显示原始 key 的根因）；zh-Hans + en 双语补齐（含 mobilegl_vulkan 新开关 title/detail）；审计归零
+- Task117：README.md / README_CN.md 差异表补 9 行（zink+FSR / MobileGL Vulkan / 崩溃根治系列 / 帧率解锁系列 / 键盘 / 新拟态 UI / 更新检测 / 本地化）；Info.plist CFBundleShortVersionString + CFBundleVersion 5.0.0 -> 5.1.0；version.h REVISION 17 addendum（Tasks 112-118，no MG bump）
+- Task118（用户新增，后台焦点释放）：Task110 的"恒 1 无副作用"论证在后台过渡期不成立（iOS 留几秒执行时间，音频会话活跃时更长，恒 1 让 dynamic_fps 全程满帧烧电）。修复 = 状态依赖撒谎：前台保持 (f|0x200)&~0x40&~0x4（30fps 钉死修复不回归）；DidEnterBackground 后 f&~0x40&~0x4（模组读 UNFOCUSED -> 后台限帧档）；WillEnterForeground 恢复。刻意不进 INVISIBLE 档（个别模组对不可见有激进副作用）。_Atomic 状态 + dispatch_once 惰性观察者注册（主线程化）+ 翻转一次性日志
+- 验证：verify_task112_118 新建 49/49（A OpenAL pin 5 + B MobileGL 9 + C 键盘 8 + D 更新指向 3 + E 本地化 6 + F 后台焦点 7 + G 版本/语法 11，含裸括号 delta 与 HEAD 一致 ×6）；verify_task108 全链后台复跑 ALL PASS（此前 47/50 为沙箱超时误报，孤儿进程收割后确认）；110:34/34、111:43/43（TASK111_REPO 指向本仓）、59/61/65/80 外层链全绿；注释纪律：编号改 (1)(2) 防裸括号
+- 环境：600s 工具上限 × 长级联 = 后台 nohup + 轮询模式（kill 早期孤儿 82/84/86 提速）；副表与主表同符号双计数 -> 校验器按区域切片
+
+Stage Summary:
+- 七任务全落地：OpenAL 崩溃根治（classpath 劫持免疫）/ MobileGL Vulkan 直呈入口（设置开关，列表不膨胀）/ 键盘自动弹出（上游同款钩子组合）/ 更新检测指向本仓库 / 设置本地化补全（双语零缺失）/ README + 5.1.0 版本号 / 后台焦点释放（模组可识别后台降帧省电）
+- 装机锚点："[Amethyst] Task112: OpenAL pinned to <path>"（26.3 声音正常 + 不再 NPE）；"[Amethyst] Task113: MobileGL Vulkan override active"（开关开启时）；"[SDLHook] hooked SDL_InitSubSystem -> Task114 launcher hints" + 输入框聚焦键盘弹出；"[SDLHook] Task118: app entered background -- SDL focus released (mods may throttle fps)" / "returning to foreground -- SDL focus restored (Task110)"
+- 发布：v5.1.0 tag + GitHub release（0->211+ 提交 changelog）待 CI 绿后执行

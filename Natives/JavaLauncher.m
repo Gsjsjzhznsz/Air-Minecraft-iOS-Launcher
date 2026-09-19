@@ -985,6 +985,26 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // Setup AMETHYST_RENDERER
         NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
         NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
+
+        // Task 113：MobileGL Vulkan 主开关（设置-视频-与"ANGLE ES 驱动"并排）。
+        // 开启后无条件覆盖渲染器为 libMobileGL.dylib（DirectVulkan：
+        // GL -> Vulkan -> MoltenVK -> CAMetalLayer 直呈，无 OSMesa 回读常数）。
+        // 上游 26.3 实测该后端完全流畅（读已退役、IMMEDIATE 呈现模式、直呈 Metal 层），
+        // GLES/Metal 后端有问题故不引入；渲染器列表不出现 MobileGL 条目（用户要求
+        // 不占列表空间），此开关是唯一入口。覆盖点选在 AMETHYST_RENDERER 解析处：
+        // 下游全部渲染器分支（zink env / LTW / MobileGL env / egl_bridge 装载）
+        // 都消费这一份 renderer 值，单点覆盖即全链路生效。
+        if ([getPrefObject(@"mobileglues.mobilegl_vulkan") boolValue]) {
+            NSString *mgPath = [NSString stringWithFormat:@"%@/Frameworks/%s",
+                NSBundle.mainBundle.bundlePath, RENDERER_NAME_MOBILEGL];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:mgPath]) {
+                NSLog(@"[Amethyst] Task113: MobileGL Vulkan override active (profile renderer was %@)", renderer);
+                renderer = @ RENDERER_NAME_MOBILEGL;
+            } else {
+                NSLog(@"[Amethyst] Task113: mobilegl_vulkan=ON but %@ missing -- using profile renderer %@",
+                      @ RENDERER_NAME_MOBILEGL, renderer);
+            }
+        }
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
 
         // Apply Zink-specific environment variables if Zink renderer is selected
@@ -1231,6 +1251,39 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     NSString *frameworksPath = [NSString stringWithFormat:@"%@/Frameworks", NSBundle.mainBundle.bundlePath];
     PUSH_MARGV_FORMAT(@"-Djava.library.path=%@", frameworksPath);
     NSLog(@"[JavaLauncher] library.path = %@", frameworksPath);
+
+    // Task 112：钉死 OpenAL 库的解析路径（绝对路径直载）。
+    //
+    // 崩溃取证（26.3 SoundEngine NPE）：
+    //   net.minecraft.client.sounds.SoundEngine.<init>
+    //     -> com.mojang.blaze3d.audio.Library.createDeviceTracker()
+    //     -> CallbackDeviceTracker.isSupported()
+    //        先 alcIsExtensionPresent(NULL, "ALC_SOFT_system_events") 通过，
+    //     -> CallbackDeviceTracker.isSupportedForPlaybackDevice()
+    //     -> LWJGL SOFTSystemEvents.alcEventIsSupportedSOFT
+    //        ICD 函数指针为 NULL -> Checks.check 抛 NullPointerException -> 游戏崩溃。
+    //
+    // 错配条件 = "库宣称有扩展，但 alcGetProcAddress/dlsym 解析不到函数指针"。
+    // 本仓 libopenal.dylib（openal-soft 1.21-1.23 时代 iOS 构建，无 ALC_SOFT_system_events）
+    // 被加载时 isSupported() 走干净回退（PollingDeviceTracker），历史全部会话零崩溃；
+    // 因此该 NPE 只可能来自"另一个 openal 抢先被加载"——LWJGL 3.4.x 的
+    // Library.loadNative(bundledWithLWJGL=true) 会【优先查 classpath 里的 libopenal.dylib】
+    //（natives jar 提取路径），java.library.path 的 Frameworks 反而在后。modpack/
+    // 加载器链路一旦把 lwjgl-openal natives jar 混进 classpath，加载的即是被平台
+    // 重标签过的 openal-soft 1.24.x——扩展宣称与符号解析在这个场景下出现错配。
+    //
+    // 修复：ALC.create() 读 org.lwjgl.openal.libname（Configuration.OPENAL_LIBRARY_NAME），
+    // 而 Library.loadNative 对【绝对路径】直接 dlopen、完全跳过 classpath 提取。
+    // 把该属性钉到 Frameworks/libopenal.dylib 的绝对路径，任何 classpath 劫持即告失效；
+    // 我们的无扩展 openal 让 MC 干净回退到轮询式设备跟踪（与历史正常会话同构）。
+    NSString *task112OpenalPin = [frameworksPath stringByAppendingPathComponent:@"libopenal.dylib"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:task112OpenalPin]) {
+        PUSH_MARGV_FORMAT(@"-Dorg.lwjgl.openal.libname=%@", task112OpenalPin);
+        NSLog(@"[Amethyst] Task112: OpenAL pinned to %@", task112OpenalPin);
+    } else {
+        NSLog(@"[Amethyst] Task112: libopenal.dylib not found, OpenAL left to LWJGL default resolution");
+    }
+
     PUSH_MARGV_FORMAT(@"-Duser.dir=%@", gameDir);
     PUSH_MARGV_FORMAT(@"-Duser.home=%s", getenv("POJAV_HOME"));
     PUSH_MARGV_FORMAT(@"-Duser.timezone=%@", NSTimeZone.localTimeZone.name);

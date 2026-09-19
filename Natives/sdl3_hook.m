@@ -114,6 +114,22 @@ typedef bool (*ame_fn_SDL_GetWindowSizeInPixels)(void *window, int *w, int *h);
 // MC 的 InputConstants.isKeyDown/setAll/hasShiftDown 全部经此口轮询键盘态。
 typedef const bool *(*ame_fn_SDL_GetKeyboardState)(int *numkeys);
 
+// Task 114：文本输入族——SDL 的 iOS 后端在这些入口里直接操作 UIKit
+//（-[SDL_uikitviewcontroller setTextFieldProperties:] 等），而 MC 从渲染线程
+// 调用它们，必须主线程化（见 ame_dispatchTextInputToMain 处的完整说明）。
+typedef bool (*ame_fn_SDL_StartTextInput)(void *window);
+typedef bool (*ame_fn_SDL_StartTextInputWithProperties)(void *window,
+                                                        unsigned long long props);
+typedef bool (*ame_fn_SDL_StopTextInput)(void *window);
+typedef bool (*ame_fn_SDL_SetTextInputArea)(void *window, const void *rect, int cursor);
+// Task 114：子系统初始化——SDL hint 必须在 SDL_Init 之前设置才生效，
+// 挂在 InitSubSystem 上、调用原函数之前设置（对齐上游 caf6822 实测有效的做法）。
+typedef bool (*ame_fn_SDL_InitSubSystem)(uint32_t flags);
+typedef bool (*ame_fn_SDL_SetHint)(const char *name, const char *value);
+
+// SDL3 的 SDL_Rect：{ float x, float y, float w, float h; }
+typedef struct { float x, y, w, h; } ame_SDLRect;
+
 static ame_fn_SDL_GL_SetAttribute ame_real_GL_SetAttribute = NULL;
 static ame_fn_SDL_CreateWindow ame_real_CreateWindow = NULL;
 static ame_fn_SDL_CreateWindowWithProperties ame_real_CreateWindowWithProperties = NULL;
@@ -146,6 +162,13 @@ static ame_fn_SDL_GetWindowSize ame_real_GetWindowSize = NULL;
 static ame_fn_SDL_GetWindowSizeInPixels ame_real_GetWindowSizeInPixels = NULL;
 // Task 67：键盘状态数组轮询钩子（实现见 5) 节 Task67 块）
 static ame_fn_SDL_GetKeyboardState ame_real_GetKeyboardState = NULL;
+// Task 114：文本输入主线程化 + 启动器 hint（实现见 ame_dispatchTextInputToMain 节）
+static ame_fn_SDL_StartTextInput ame_real_StartTextInput = NULL;
+static ame_fn_SDL_StartTextInputWithProperties ame_real_StartTextInputWithProperties = NULL;
+static ame_fn_SDL_StopTextInput ame_real_StopTextInput = NULL;
+static ame_fn_SDL_SetTextInputArea ame_real_SetTextInputArea = NULL;
+static ame_fn_SDL_InitSubSystem ame_real_InitSubSystem = NULL;
+static ame_fn_SDL_SetHint ame_real_SetHint = NULL;
 
 // Task 32 embed：嵌入宿主层级的 SDL 视图（主线程赋值；定义见 "7) Amethyst embed" 一节）
 static UIView *ame_embeddedSDLView = NULL;
@@ -431,6 +454,12 @@ static void *ame_SDL_GetWindowFromEvent(const void *event); // Task 65（实现�
 static bool ame_SDL_GetWindowSize(void *window, int *w, int *h);            // Task 61（实现见 5) 节）
 static bool ame_SDL_GetWindowSizeInPixels(void *window, int *w, int *h);   // Task 61（实现见 5) 节）
 static const bool *ame_SDL_GetKeyboardState(int *numkeys);                  // Task 67（实现见 5) 节）
+// Task 114：文本输入主线程化 + 启动器 hint（实现见 ame_dispatchTextInputToMain 节）
+static bool ame_SDL_StartTextInput(void *window);
+static bool ame_SDL_StartTextInputWithProperties(void *window, unsigned long long props);
+static bool ame_SDL_StopTextInput(void *window);
+static bool ame_SDL_SetTextInputArea(void *window, const void *rect, int cursor);
+static bool ame_SDL_InitSubSystem(uint32_t flags);
 
 // Task 32：当 MC 通过 SDL_LoadFunction（而非 dlsym）解析符号时，同样把
 // 窗口生命周期/事件泵钩子装上（防御性双路覆盖，与 amethyst_sdl3_hook_resolve
@@ -483,6 +512,31 @@ static void ame_maybeWrapWindowHook(const char *name, void **out) {
         if (ame_real_GetKeyboardState == NULL)
             ame_real_GetKeyboardState = (ame_fn_SDL_GetKeyboardState)*out;
         *out = (void *)ame_SDL_GetKeyboardState;
+    } else if (strcmp(name, "SDL_StartTextInput") == 0) {
+        // Task 114：文本输入主线程化（键盘自动弹出修复）
+        if (ame_real_StartTextInput == NULL)
+            ame_real_StartTextInput = (ame_fn_SDL_StartTextInput)*out;
+        *out = (void *)ame_SDL_StartTextInput;
+    } else if (strcmp(name, "SDL_StartTextInputWithProperties") == 0) {
+        // Task 114：同上（带属性版，MC 26.x 走 SDL3 时实际调用的是这个入口）
+        if (ame_real_StartTextInputWithProperties == NULL)
+            ame_real_StartTextInputWithProperties = (ame_fn_SDL_StartTextInputWithProperties)*out;
+        *out = (void *)ame_SDL_StartTextInputWithProperties;
+    } else if (strcmp(name, "SDL_StopTextInput") == 0) {
+        // Task 114：停止文本输入（收起键盘）同样需要主线程化
+        if (ame_real_StopTextInput == NULL)
+            ame_real_StopTextInput = (ame_fn_SDL_StopTextInput)*out;
+        *out = (void *)ame_SDL_StopTextInput;
+    } else if (strcmp(name, "SDL_SetTextInputArea") == 0) {
+        // Task 114：输入框区域上报（软键盘避让），rect 栈上持有需堆拷贝
+        if (ame_real_SetTextInputArea == NULL)
+            ame_real_SetTextInputArea = (ame_fn_SDL_SetTextInputArea)*out;
+        *out = (void *)ame_SDL_SetTextInputArea;
+    } else if (strcmp(name, "SDL_InitSubSystem") == 0) {
+        // Task 114：SDL hint 注入点（必须在真实初始化前设置）
+        if (ame_real_InitSubSystem == NULL)
+            ame_real_InitSubSystem = (ame_fn_SDL_InitSubSystem)*out;
+        *out = (void *)ame_SDL_InitSubSystem;
     }
 }
 
@@ -602,9 +656,58 @@ static void *ame_SDL_EGL_GetProcAddress(const char *proc) {
 // mod 的 IdleHandler.onActivity（事件 1536-1539 族）而永不误触。
 // vanilla 侧唯一 flags 消费点是 Window.isFullscreen() 的 & 1（FULLSCREEN）
 // ——不受影响；MINIMIZED 剥离（renderpearl）保持。
+//
+// Task 118（后台焦点释放）：上面"恒 1 无副作用"的论证在两种真实场景下
+// 不成立——(a) 进后台后的过渡期（iOS 给 app 留几秒执行时间，音乐/音频
+// 会话活跃时更长），此时进程仍在渲染，恒 1 让 dynamic_fps 类模组全程
+// 满帧白白烧电；(b) 越过暂停即恢复的前台切换。正确语义是分状态撒谎：
+//   前台：0x200 恒置 1（Task 110 行为不变，根治 30fps 钉死）
+//   后台：0x200 不置（释放焦点），仍剥离 0x40/0x4 —— dynamic_fps 状态机
+//         读到 focused=0, hovered=0, iconified=0 → UNFOCUSED 档
+//        （默认 1fps，即"取消焦点让模组识别后台降低 fps"）。
+// 刻意不放进 INVISIBLE 档（HIDDEN 0x4 放行 → 0fps）：个别模组对"窗口
+// 不可见"有激进副作用（跳渲染/断线），UNFOCUSED 是最保守的后台态。
+// 观察者惰性注册（本函数首次被调时，dispatch_once + 转主线程）——
+// mod 每帧轮询 flags，状态切换在下一帧即被感知，无需事件投递。
+static _Atomic bool ame118_appBackgrounded = false;
+static dispatch_once_t ame118_observerOnce;
+
+static void ame118_installLifecycleObservers(void) {
+    dispatch_once(&ame118_observerOnce, ^{
+        void (^install)(void) = ^{
+            NSNotificationCenter *nc = NSNotificationCenter.defaultCenter;
+            [nc addObserverForName:UIApplicationDidEnterBackgroundNotification
+                             object:nil queue:nil
+                        usingBlock:^(NSNotification *note) {
+                if (!atomic_exchange(&ame118_appBackgrounded, true)) {
+                    NSLog(@"[SDLHook] Task118: app entered background -- SDL focus released (mods may throttle fps)");
+                }
+            }];
+            [nc addObserverForName:UIApplicationWillEnterForegroundNotification
+                             object:nil queue:nil
+                        usingBlock:^(NSNotification *note) {
+                if (atomic_exchange(&ame118_appBackgrounded, false)) {
+                    NSLog(@"[SDLHook] Task118: app returning to foreground -- SDL focus restored (Task110)");
+                }
+            }];
+        };
+        if ([NSThread isMainThread]) {
+            install();
+        } else {
+            dispatch_async(dispatch_get_main_queue(), install);
+        }
+    });
+}
+
 static unsigned int ame_SDL_GetWindowFlags(void *window) {
+    ame118_installLifecycleObservers();
     unsigned int f = ame_real_GetWindowFlags ? ame_real_GetWindowFlags(window) : 0;
-    // 0x200 = SDL_WINDOW_INPUT_FOCUS 置 1；0x40 = MINIMIZED、0x4 = HIDDEN 剥离
+    if (ame118_appBackgrounded) {
+        // Task 118 后台：不置焦点位（模组读到 UNFOCUSED → 后台限帧档），
+        // MINIMIZED/HIDDEN 剥离保持（renderpearl + 保守 iconified 语义）。
+        return f & ~0x40u & ~0x4u;
+    }
+    // Task 110 前台：0x200 = SDL_WINDOW_INPUT_FOCUS 置 1；0x40 = MINIMIZED、0x4 = HIDDEN 剥离
     return (f | 0x200u) & ~0x40u & ~0x4u;
 }
 
@@ -1462,6 +1565,103 @@ void *ame_hook_getEmbeddedSDLView(void) {
     return (__bridge void *)ame_embeddedSDLView;
 }
 
+#pragma mark - Task 114：文本输入主线程化 + 启动器 hint（键盘自动弹出修复）
+
+// 病历（用户反馈：输入框有闪竖线时键盘不自动弹出；上游正常）：
+//   (1) MC 26.x 桌面惯例在 SDL_Init 前把 SDL_ENABLE_SCREEN_KEYBOARD 设为 0
+//      （自绘 IME UI 用），移动端恰恰依赖 SDL 唤起系统软键盘——不覆盖回来，
+//      EditBox 聚焦（游戏内光标闪烁）时 SDL 的 iOS 后端不会拉起键盘。
+//      上游在 InitSubSystem 钩子里把该 hint 覆盖回 "1"（实测有效，设备日志
+//      "[SDLHook] hooked SDL_InitSubSystem -> launcher hints"）。
+//   (2) SDL 的 iOS 后端在 SDL_StartTextInputWithProperties 里直接操作 UIKit
+//      （-[SDL_uikitviewcontroller setTextFieldProperties:]）。MC 从渲染线程
+//      调用它，出现 "modifying the autolayout engine from a background thread"
+//      ——异常虽被 SDL 侧 catch，但布局未完成，软键盘行为不可预期。
+//      修法：非主线程就 dispatch 到主线程执行。文本输入低频，用 async 避免阻塞
+//      渲染线程（也避免主线程同步等待造成死锁）。
+static bool ame_dispatchTextInputToMain(void (^work)(void)) {
+    if (work == nil) return false;
+    if ([NSThread isMainThread]) {
+        work();
+        return true;
+    }
+    dispatch_async(dispatch_get_main_queue(), work);
+    return true;
+}
+
+static bool ame_SDL_StartTextInput(void *window) {
+    return ame_dispatchTextInputToMain(^{
+        if (ame_real_StartTextInput != NULL) ame_real_StartTextInput(window);
+    });
+}
+
+static bool ame_SDL_StartTextInputWithProperties(void *window,
+                                                 unsigned long long props) {
+    return ame_dispatchTextInputToMain(^{
+        if (ame_real_StartTextInputWithProperties != NULL) {
+            ame_real_StartTextInputWithProperties(window, props);
+        }
+    });
+}
+
+static bool ame_SDL_StopTextInput(void *window) {
+    return ame_dispatchTextInputToMain(^{
+        if (ame_real_StopTextInput != NULL) ame_real_StopTextInput(window);
+    });
+}
+
+static bool ame_SDL_SetTextInputArea(void *window, const void *rect, int cursor) {
+    // rect 由调用方栈上持有，且 block 是异步执行的 —— 不能把局部变量的地址
+    // 传进 block（函数返回后失效）。改堆分配，由 block 在使用后释放。
+    ame_SDLRect *heapRect = NULL;
+    if (rect != NULL) {
+        heapRect = (ame_SDLRect *)malloc(sizeof(ame_SDLRect));
+        if (heapRect != NULL) memcpy(heapRect, rect, sizeof(ame_SDLRect));
+    }
+
+    if ([NSThread isMainThread]) {
+        bool r = ame_real_SetTextInputArea != NULL
+                     ? ame_real_SetTextInputArea(window, heapRect, cursor)
+                     : false;
+        free(heapRect);
+        return r;
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (ame_real_SetTextInputArea != NULL) {
+            ame_real_SetTextInputArea(window, heapRect, cursor);
+        }
+        free(heapRect);
+    });
+    return true;
+}
+
+// hint 必须在 SDL_Init 之前设置才生效，因此挂在 InitSubSystem 上、在调用
+// 原函数之前设置（与上游 caf6822 的做法逐字对齐）：
+//   SDL_RETURN_KEY_HIDES_IME       启动器的正常行为（SDL 默认 false）
+//   SDL_ENABLE_SCREEN_KEYBOARD=1   覆盖 MC 的桌面惯例 0（见上方病历第 1 条）
+//   SDL_OPENGL_FORCE_SRGB_FRAMEBUFFER=0
+//                                  转译型渲染器（gl bridge）无法传入正确的
+//                                  EGL 参数支持它；仅对走 EGL bridge 的渲染器关闭
+static bool ame_SDL_InitSubSystem(uint32_t flags) {
+    if (ame_real_SetHint == NULL) {
+        ame_real_SetHint = (ame_fn_SDL_SetHint)ame_real_dlsym("SDL_SetHint");
+    }
+    if (ame_real_SetHint != NULL) {
+        ame_real_SetHint("SDL_RETURN_KEY_HIDES_IME", "true");
+        if (ame_glBridgeEnabled()) {
+            ame_real_SetHint("SDL_OPENGL_FORCE_SRGB_FRAMEBUFFER", "0");
+        }
+        ame_real_SetHint("SDL_ENABLE_SCREEN_KEYBOARD", "1");
+        NSDebugLog(@"[SDLHook] Task114 SDL hint set (screenKeyboard=1, srgb=%s)",
+                   ame_glBridgeEnabled() ? "off" : "default");
+    }
+    if (ame_real_InitSubSystem != NULL) {
+        return ame_real_InitSubSystem(flags);
+    }
+    return false;
+}
+
 #pragma mark - 对 main_hook.m 的接入点
 
 /// 由 hooked_dlsym 在返回 orig_dlsym 之前调用。
@@ -1603,6 +1803,39 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
         NSLog(@"[SDLHook] hooked SDL_GetKeyboardState (real=%p, Task67 kb-state poll observability)",
               (void *)ame_real_GetKeyboardState);
         return (void *)ame_SDL_GetKeyboardState;
+    }
+    // Task 114：文本输入族 + InitSubSystem hint（键盘自动弹出修复，实现见
+    // "Task 114" 一节；上游 caf6822 设备验证过的同款钩子组合）。
+    if (strcmp(name, "SDL_StartTextInput") == 0) {
+        if (ame_real_StartTextInput == NULL)
+            ame_real_StartTextInput = (ame_fn_SDL_StartTextInput)amethyst_orig_dlsym(handle, name);
+        NSDebugLog(@"[SDLHook] hooked SDL_StartTextInput -> main thread");
+        return (void *)ame_SDL_StartTextInput;
+    }
+    if (strcmp(name, "SDL_StartTextInputWithProperties") == 0) {
+        if (ame_real_StartTextInputWithProperties == NULL)
+            ame_real_StartTextInputWithProperties =
+                (ame_fn_SDL_StartTextInputWithProperties)amethyst_orig_dlsym(handle, name);
+        NSDebugLog(@"[SDLHook] hooked SDL_StartTextInputWithProperties -> main thread");
+        return (void *)ame_SDL_StartTextInputWithProperties;
+    }
+    if (strcmp(name, "SDL_StopTextInput") == 0) {
+        if (ame_real_StopTextInput == NULL)
+            ame_real_StopTextInput = (ame_fn_SDL_StopTextInput)amethyst_orig_dlsym(handle, name);
+        NSDebugLog(@"[SDLHook] hooked SDL_StopTextInput -> main thread");
+        return (void *)ame_SDL_StopTextInput;
+    }
+    if (strcmp(name, "SDL_SetTextInputArea") == 0) {
+        if (ame_real_SetTextInputArea == NULL)
+            ame_real_SetTextInputArea = (ame_fn_SDL_SetTextInputArea)amethyst_orig_dlsym(handle, name);
+        NSDebugLog(@"[SDLHook] hooked SDL_SetTextInputArea -> main thread");
+        return (void *)ame_SDL_SetTextInputArea;
+    }
+    if (strcmp(name, "SDL_InitSubSystem") == 0) {
+        if (ame_real_InitSubSystem == NULL)
+            ame_real_InitSubSystem = (ame_fn_SDL_InitSubSystem)amethyst_orig_dlsym(handle, name);
+        NSLog(@"[SDLHook] hooked SDL_InitSubSystem -> Task114 launcher hints");
+        return (void *)ame_SDL_InitSubSystem;
     }
     // SDL_GL_SetAttribute 不接管：MC 自己调用它设属性是合法行为，我们只在
     // 建窗前主动调用同一个函数来强制 ES profile（见 ame_forceEglProfileEs）。

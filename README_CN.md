@@ -43,6 +43,14 @@
 | **增强中文本地化** | 完整中文界面翻译（1955+ 行），覆盖比上游更全面。 |
 | **上游议题审计 Bug 修复** | 通过系统性审查上游及上上游 GitHub 议题，修复了 8+ 个 Bug，包括 JIT 脚本加载 nil 崩溃、UIKit 线程安全、KVO 观察者清理等。 |
 | **Makefile 健壮性** | 修复 TAB 缩进被转为空格导致 CI 构建失败的问题。 |
+| **Zink（Mesa 25.0.7）渲染器 + FSR1 管线** | 完整的 OSMesa/zink 桥接：分相位呈现计时、双哨兵 EASU 验证、视口自适应上采样、消灭重复全幅回读的 bundle-direct 快路径。设置 > 视频内五档 FSR 预设可在分辨率与帧率间取舍。 |
+| **MobileGL Vulkan 直呈选项** | 设置 > 视频内单一开关（与 ANGLE ES 驱动选项并排）即可用 MobileGL 的 DirectVulkan 后端启动（GL → Vulkan → MoltenVK → CAMetalLayer 直呈，无逐帧 CPU 回读）。渲染器列表保持简洁（按需设计）。 |
+| **崩溃根治系列** | 二进制级修复：glslang 左值栈踩踏（7 重防护机器码补丁 + SIGSEGV 恢复网）、spark 签名 macOS 采样库（dlopen 拦截 + iPadOS 27 平台重标签后的 ad-hoc 重签名）、26.3 OpenAL `alcEventIsSupportedSOFT` NPE（绝对路径 pin，阻断 classpath natives 劫持）。 |
+| **帧率解锁系列** | 26.x AFK/闲置限帧器中和（options.txt 去重写入 + 45s 滚轮心跳）；dynamic_fps 模组的窗口状态机前台读到 FOCUSED（30fps 钉死根因修复）、后台读到 UNFOCUSED（限帧类模组在后台过渡期合法省电）。 |
+| **键盘自动弹出修复** | SDL 文本输入入口（Start/Stop TextInput、SetTextInputArea）主线程化 + 将 `SDL_ENABLE_SCREEN_KEYBOARD=1` 覆盖回 MC 桌面惯例的 0 —— 游戏内输入框光标闪烁时键盘正常自动弹出。 |
+| **新拟态 UI + 自定义背景** | 全面新拟态化重设计：深浅双主题、自定义图片/视频背景 + 毛玻璃卡片、可自定义强调色/文字色/卡片色、主界面图标自愈管线。 |
+| **更新检测指向本仓库** | 应用内检查更新与发布页链接现指向本仓库（此前指向上游）。 |
+| **设置项本地化补全** | 所有设置行（含 UI 刷新新增的全部详情脚注）中英文完整本地化 —— 任何位置不再显示原始 key。 |
 
 ---
 

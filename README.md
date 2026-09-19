@@ -43,6 +43,14 @@
 | **Enhanced Chinese Localization** | Complete Chinese UI translation (1955+ lines), more comprehensive than upstream. |
 | **Bug Fixes from Upstream Issue Audit** | 8+ bug fixes identified through systematic review of upstream and upstream's upstream GitHub issues, including nil crash in JIT script loading, UIKit thread safety, KVO observer cleanup, and more. |
 | **Makefile Robustness** | Fixed TAB-to-space indentation issues that caused CI build failures. |
+| **Zink (Mesa 25.0.7) Renderer + FSR1 Pipeline** | Full OSMesa/zink bridge with per-phase present timing, dual-sentinel EASU validation, viewport-adaptive upscaling, and a bundle-direct fast path that eliminates duplicate full-surface readbacks. Five FSR presets trade resolution for fps in Settings > Video. |
+| **MobileGL Vulkan Direct-Present Option** | A single switch in Settings > Video (next to the ANGLE ES driver option) launches with MobileGL's DirectVulkan backend (GL -> Vulkan -> MoltenVK -> CAMetalLayer direct present, no per-frame CPU readback). The renderer list stays uncluttered by design. |
+| **Crash Root-Cause Series** | Binary-level fixes for: glslang lvalue stack-corruption (7-guard machine-code patch + SIGSEGV recovery net), spark's signed macOS profiler lib (dlopen blocklist + ad-hoc re-signing after platform retag on iPadOS 27), and the 26.3 OpenAL `alcEventIsSupportedSOFT` NPE (absolute-path pin defeating classpath natives hijacking). |
+| **Frame-Rate Unlock Series** | 26.x AFK/inactivity limiters neutralized (options.txt dedup writes + 45s wheel heartbeat); the dynamic_fps mod's window-state machine now reads FOCUSED in the foreground (30fps pin root-caused and fixed) and UNFOCUSED in the background so throttle mods legitimately save power during background transitions. |
+| **On-Screen Keyboard Auto-Open Fix** | SDL text-input entry points (Start/Stop TextInput, SetTextInputArea) marshalled to the main thread and `SDL_ENABLE_SCREEN_KEYBOARD=1` re-asserted over MC's desktop-convention 0 -- the keyboard now opens when an in-game text field gains a blinking cursor. |
+| **Neomorph UI + Custom Backgrounds** | Full neomorphism redesign with dual light/dark themes, custom image/video backgrounds with glass-blur cards, customizable accent/text/card colors, and a self-healing main-screen icon pipeline. |
+| **Self-Hosted Update Checks** | In-app update checks and release links now point to this repository (previously the upstream's). |
+| **Complete Settings Localization** | Every settings row (including all detail footers added by the UI refresh) is fully localized in Chinese and English -- no raw keys shown anywhere. |
 
 ---
 

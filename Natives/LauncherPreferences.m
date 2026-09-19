@@ -281,15 +281,16 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
           @"file": @ RENDERER_NAME_VULKAN},
         @{@"key": @ RENDERER_NAME_MITHRIL,
           @"name": localize(@"preference.title.renderer.debug.mithril", nil),
-          @"file": @ RENDERER_NAME_MITHRIL},
-        @{@"key": @ RENDERER_NAME_MOBILEGL,
-          @"name": localize(@"preference.title.renderer.debug.mobilegl", nil),
-          @"file": @ RENDERER_NAME_MOBILEGL},
-        @{@"key": @ RENDERER_NAME_MOBILEGL_GLES,
-          @"name": localize(@"preference.title.renderer.debug.mobilegl_gles", nil),
-          @"file": @ RENDERER_NAME_MOBILEGL_GLES}
+          @"file": @ RENDERER_NAME_MITHRIL}
     ];
 }
+
+// Task 113：MobileGL 渲染器不再进主渲染器列表（用户要求：列表太占空间）。
+// MobileGL 只保留 DirectVulkan 后端（上游实测 GLES/Metal 后端有问题，Vulkan 完全流畅），
+// 入口改为设置页"视频"分区里与"ANGLE ES 驱动"并排的独立开关（mobilegl_vulkan），
+// 启动时由 JavaLauncher.m 的 AMETHYST_RENDERER 解析点施加覆盖（见 Task113 注释）。
+// 渲染器列表因此移除 mobilegl / mobilegl_gles 两个条目——dylib 已随包附带，
+// 若保留在列表里它们会重新出现，违背"不占列表空间"的设计目标。
 
 // 当前选中的渲染器（可能已不在候选表里，见下方说明）
 static NSString *currentRendererKey(void) {

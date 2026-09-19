@@ -291,6 +291,22 @@
 "preference.title.mg_multidraw_mode-2" = "Emulated";
 "preference.title.angle_depth_clear_fix_mode" = "ANGLE Depth Clear Fix";
 "preference.detail.angle_depth_clear_fix_mode" = "Workaround for depth buffer clearing issues when using ANGLE ES driver.";
+
+"preference.title.mobilegl_vulkan" = "MobileGL Vulkan Renderer";
+"preference.detail.mobilegl_vulkan" = "When enabled, launches with MobileGL's Vulkan backend (GL → Vulkan → MoltenVK → direct Metal-layer presentation, no per-frame CPU readback). Best for high frame rates. This switch takes priority over the renderer selection above; turn it off if you hit compatibility issues.";
+"preference.detail.ui_layout" = "Choose the home screen layout: multi-card or compact. Restart the launcher to fully apply.";
+"preference.detail.ui_theme" = "Choose light/dark/system appearance.";
+"preference.detail.app_language" = "Set the launcher interface language. 'System' follows the device language.";
+"preference.detail.custom_accent_color" = "Custom accent color for buttons, switches and other controls.";
+"preference.detail.custom_text_color" = "Custom primary text color, applied in both light and dark modes.";
+"preference.detail.custom_card_color" = "Custom card background color.";
+"preference.detail.multi_threaded" = "Download game assets with multiple threads for higher speed. Some mirrors may not support it.";
+"preference.detail.curseforge_api_key" = "Set a CurseForge API key for browsing/downloading CurseForge mods and modpacks. The built-in default key is used when unset.";
+"preference.detail.launcher_background" = "Set a launcher background (image/video), or restore the default solid color.";
+"preference.detail.announcement_preview_level" = "How much detail announcements show on the home screen.";
+"preference.detail.manage_runtime" = "Manage Java runtimes: view, download and delete each version.";
+"preference.detail.debug_always_attached_jit" = "Debug option: keep the JIT26 debugger attached after launch (to service later breakpoints, for JIT/dyld troubleshooting). Only effective with the Universal JIT script.";
+
 "preference.title.custom_gl_version" = "Custom OpenGL Version";
 "preference.detail.custom_gl_version" = "Override the reported OpenGL version. Useful for compatibility with mods that require specific GL versions.";
 "preference.title.mg_custom_gl_version-0" = "Default";
@@ -581,6 +597,10 @@
 "crash.reason.terminated" = "Process terminated by external signal";
 "crash.reason.unknown" = "Unknown error (code: %d)";
 "crash.suggestion" = "Suggested Action";
+"crash.reason.missing_mods" = "Modpack is missing mod files (class loading fails at the entrypoint stage, typical of an incomplete import)";
+"crash.suggestion.missingmods_manual" = "Or manually add the missing mods in the Mod manager (versions must match the modpack's requirements)";
+"crash.suggestion.missingmods_override" = "The log shows dependency checks were overridden (Dependencies overridden) — missing mods slip past the error until a runtime crash; after fixing, remove the dependencyOverrides entries in config/fabric-loader.json";
+"crash.suggestion.missingmods_share" = "Share latestlog.txt for feedback — the missing-class list in the crash report pinpoints the cause";
 "crash.suggestion.oom" = "Crash caused by iOS memory limit. Use GetMoreRam (LiveContainer) to lift the memory limit and retry";
 "crash.view_log" = "View Log Details";
 "crash.share_log" = "Share Log";

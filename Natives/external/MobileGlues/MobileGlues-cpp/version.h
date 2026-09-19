@@ -808,3 +808,42 @@
 // (622166a). FAQ fpsUnlock bullet re-attributed to this root cause with
 // the [SDLHook] Task110 anchor. Task 109's no-finish experiment stands
 // unchanged (the 8-15ms present constant is a separate, real cost).
+//
+// REVISION 17 addendum (Tasks 112-118, launcher 5.1.0 release train; no MG
+// bump -- all changes are launcher-side):
+//   Task 112 (OpenAL NPE on 26.3): SoundEngine -> Library.createDeviceTracker
+//   -> CallbackDeviceTracker.isSupported() passed alcIsExtensionPresent(
+//   "ALC_SOFT_system_events") but LWJGL's SOFTSystemEvents ICD pointer was
+//   NULL -> Checks.check NPE -> crash. Our bundled libopenal.dylib (1.21-1.23
+//   era, no such extension) always fell back cleanly -- so the crashing openal
+//   had to come from a classpath-hijacked natives jar (LWJGL loadNative
+//   bundledWithLWJGL=true prefers classpath resources over java.library.path).
+//   FIX: -Dorg.lwjgl.openal.libname pinned to the absolute Frameworks path
+//   (absolute paths bypass classpath extraction entirely).
+//   Task 113 (MobileGL Vulkan): prebuilt libMobileGL.dylib vendored from the
+//   upstream-verified caf6822 build (DirectVulkan: GL -> Vulkan -> MoltenVK ->
+//   CAMetalLayer direct present, readback-free; upstream device log shows it
+//   smooth where the OSMesa readback path carries an 8-15ms present constant).
+//   Entry point is the mobilegl_vulkan switch next to the ANGLE ES driver
+//   setting (user request: keep the renderer LIST uncluttered); the GLES
+//   variant is intentionally NOT shipped (other backends misbehave upstream).
+//   Task 114 (keyboard would not auto-open when a text field had a blinking
+//   cursor): ported the upstream caf6822 SDL hooks verbatim -- Start/Stop
+//   TextInput + StartTextInputWithProperties + SetTextInputArea marshalled to
+//   the main thread (SDL's iOS backend touches UIKit from the render thread
+//   otherwise), and SDL_InitSubSystem sets SDL_ENABLE_SCREEN_KEYBOARD=1 to
+//   override MC's desktop-convention 0 (plus RETURN_KEY_HIDES_IME and the
+//   srgb-framebuffer hint for bridge renderers).
+//   Task 115: UpdateChecker now targets Gsjsjzhznsz/Air-Minecraft-iOS-Launcher
+//   (was pointing at the upstream repo).
+//   Task 116: 12 preference.detail.* keys + 4 crash.* keys added to zh-Hans
+//   and en (the settings page showed raw keys in detail mode after the UI
+//   refresh tasks).
+//   Task 118 (background focus release, complements Task 110): the Task 110
+//   focus lie is now state-dependent -- foreground keeps (f|0x200)&~0x40&~0x4
+//   (30fps pin fix intact); on UIApplicationDidEnterBackground the 0x200 bit
+//   is released (still stripping 0x40/0x4) so dynamic_fps-class mods read
+//   UNFOCUSED and legitimately throttle during the background transition
+//   window (default 1fps); WillEnterForeground restores the Task 110
+//   expression. Deliberately NOT INVISIBLE (0x4 passthrough would hit 0fps
+//   and risks aggressive side effects in other mods).

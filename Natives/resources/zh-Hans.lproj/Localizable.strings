@@ -291,6 +291,22 @@
 "preference.title.mg_multidraw_mode-2" = "模拟";
 "preference.title.angle_depth_clear_fix_mode" = "ANGLE 深度清除修复";
 "preference.detail.angle_depth_clear_fix_mode" = "针对使用 ANGLE ES 驱动时深度缓冲清除问题的修复方案。";
+
+"preference.title.mobilegl_vulkan" = "MobileGL Vulkan 直呈渲染器";
+"preference.detail.mobilegl_vulkan" = "开启后启动时优先使用 MobileGL 的 Vulkan 后端（GL→Vulkan→MoltenVK→Metal 层直出，无逐帧 CPU 回读），适合追求高帧率的场景。此开关优先于上方渲染器选择；遇到兼容性问题关闭即可。";
+"preference.detail.ui_layout" = "选择主界面布局：多卡并列或紧凑视图，修改后重启启动器完全生效。";
+"preference.detail.ui_theme" = "选择浅色/深色/跟随系统的外观模式。";
+"preference.detail.app_language" = "设置启动器界面语言，选择“系统”时跟随设备语言。";
+"preference.detail.custom_accent_color" = "自定义界面强调色（按钮、开关等控件的高亮颜色）。";
+"preference.detail.custom_text_color" = "自定义界面主文字颜色，深浅色模式下均生效。";
+"preference.detail.custom_card_color" = "自定义卡片背景颜色。";
+"preference.detail.multi_threaded" = "下载游戏资源时启用多线程，可提升下载速度；部分镜像源可能不支持。";
+"preference.detail.curseforge_api_key" = "设置 CurseForge API 密钥，用于浏览/下载 CurseForge 模组与整合包；未设置时使用内置默认密钥。";
+"preference.detail.launcher_background" = "设置启动器背景（图片/视频），或恢复默认纯色背景。";
+"preference.detail.announcement_preview_level" = "控制公告在主界面展示的详细程度。";
+"preference.detail.manage_runtime" = "管理 Java 运行时：查看、下载、删除各版本运行时。";
+"preference.detail.debug_always_attached_jit" = "调试选项：让 JIT26 调试器在启动后持续附加（服务后续断点，用于排查 JIT/dyld 问题）。仅在使用 Universal JIT 脚本时有效。";
+
 "preference.title.custom_gl_version" = "自定义 OpenGL 版本";
 "preference.detail.custom_gl_version" = "覆盖上报的 OpenGL 版本。用于兼容需要特定 GL 版本的 Mod。";
 "preference.title.mg_custom_gl_version-0" = "默认";
@@ -580,6 +596,10 @@
 "crash.reason.terminated" = "进程被外部信号终止";
 "crash.reason.unknown" = "未知错误 (代码: %d)";
 "crash.suggestion" = "建议操作";
+"crash.reason.missing_mods" = "整合包缺失 mod 文件（入口点阶段类加载失败，常见于导入不完整）";
+"crash.suggestion.missingmods_manual" = "或在 Mod 管理器中手动补齐缺失的 mod（版本需与整合包要求一致）";
+"crash.suggestion.missingmods_override" = "日志显示依赖检查被覆盖（Dependencies overridden），它会让缺失 mod 逃避报错直到运行时崩溃；修复后可删掉 config/fabric-loader.json 里的 dependencyOverrides 条目";
+"crash.suggestion.missingmods_share" = "分享 latestlog.txt 反馈，可凭崩溃报告中的缺失类清单直接定位";
 "crash.suggestion.oom" = "iOS 内存限制导致崩溃，建议使用 GetMoreRam (LiveContainer) 解除内存限制后重试";
 "crash.view_log" = "查看日志详情";
 "crash.share_log" = "分享日志";

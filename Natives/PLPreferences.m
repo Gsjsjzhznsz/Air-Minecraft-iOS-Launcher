@@ -142,6 +142,9 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
         // Auto 渲染器实际使用 ANGLE，不会加载 MobileGlues，这些设置不生效。
         @"mobileglues": @{
             @"enable_angle": @NO,
+            // Task 113：MobileGL Vulkan 直呈渲染器开关（设置-视频-MobileGlues 区，
+            // 与"ANGLE ES 驱动"并排）。开启后启动时覆盖渲染器为 libMobileGL.dylib。
+            @"mobilegl_vulkan": @NO,
             @"enable_no_error": @(0),
             @"enable_ext_timer_query": @YES,
             @"enable_ext_compute_shader": @NO,
