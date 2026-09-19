@@ -573,6 +573,18 @@ static NSError* createError(NSString *message, NSInteger code) {
             }
             // 第三方账户用 profileId（角色 UUID）作为 accountId，使同名账户可共存
             weakSelf.authData[@"accountId"] = weakSelf.authData[@"profileId"];
+            // Task 128 根因修复（多角色路径的键缺失）：refreshToBindProfile ->
+            // fetchProfileTextureWithCallback 的所有保存分支此前既不设 expiresAt
+            // 也不设 accountType，保存出的 json 在 loadSavedName 判别时落入
+            // local 分支（expiresAt==0 优先）-> current 变成"带着第三方数据的
+            // LocalAuthenticator" -> JavaLauncher 的 isKindOfClass 检查失败 ->
+            // authlib-injector 不注入 -> 原版 authlib 拿 LittleSkin 令牌请求
+            // Mojang -> 401 InvalidCredentialsException（"第三方登录完全使用
+            // 不了"的准确根因；4288040bc 日志：登录全绿 + 启动无 agent 行 +
+            // YggdrasilUserApiService 401 三证齐全）。两个键都在进入头像
+            // 异步流程前设置，所有下游 saveChanges 一并继承。
+            weakSelf.authData[@"expiresAt"] = @((long)[NSDate.date timeIntervalSince1970] + 86400);
+            weakSelf.authData[@"accountType"] = @"thirdparty";
 
             // 异步获取头像（与单角色路径一致）
             [weakSelf fetchProfileTextureWithCallback:callback];
