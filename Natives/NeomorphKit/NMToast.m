@@ -215,7 +215,8 @@ static __weak NMToast *s_nm125_current = nil;
     UIView *container = self.containerView;
     if (!container || !container.superview) return;
 
-    void (^teardown)(void) = ^{
+    // completion: 签名要求 BOOL finished 参数（CI 35457821271 类型错误教训）
+    void (^teardown)(BOOL) = ^(BOOL finished) {
         [container removeFromSuperview];
     };
     if (animated) {
