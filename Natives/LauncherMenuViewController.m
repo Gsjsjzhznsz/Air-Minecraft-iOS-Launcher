@@ -125,7 +125,14 @@
 
     // 设置图标（Task101：仅图标按钮，无文字；图标在 50×50 按钮内居中，
     // 与新拟物高亮面板几何中心对齐）
-    UIImage *icon = [UIImage systemImageNamed:item[@"icon"]];
+    // Task111：冷启动首次 systemImageNamed: 偶发 nil（CoreUI 符号注册竞态），
+    // 创建时立即二次补拉（首次调用本身会完成注册，第二次同刻拿到非 nil），
+    // 与后续重试自愈双保险。
+    NSString *iconName = item[@"icon"];
+    UIImage *icon = [UIImage systemImageNamed:iconName];
+    if (!icon) {
+        icon = [UIImage systemImageNamed:iconName];
+    }
     [btn setImage:icon forState:UIControlStateNormal];
 
     // 设置颜色 - 选中项高亮
@@ -144,6 +151,15 @@
     // 原偏移让图标偏离高亮面板中心，用户实测"高亮和图标有点偏差"）
     btn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
     btn.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
+
+    // Task111：z 序保险——选中新拟物承载层插入在 layer 最底部，但若
+    // UIButton 的图标以主层 contents 方式绘制（低于全部 sublayer），会被
+    // 不透明表面遮住，表现为"选中的主界面按钮图标消失"。图标子视图存在时
+    // 显式提到最前，两种绘制路径下都保证可见。幂等、无副作用。
+    UIView *iconView = btn.imageView;
+    if (iconView && iconView.superview == btn) {
+        [btn bringSubviewToFront:iconView];
+    }
     
     [btn addTarget:self action:@selector(menuButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
 
@@ -161,18 +177,35 @@
 
 // Task101：菜单图标自愈——启动早期偶发 systemImageNamed: 拿到 nil
 // （用户实测：左上角主界面 house.fill 图标有时刚打开软件时消失，
-// 二次启动恢复正常，典型时序型 nil）。这里对 image 为空的按钮
-// 幂等重取符号，viewWillAppear 与外观刷新路径都会调用。
+// 二次启动恢复正常，典型时序型 nil）。
+// Task111：拆成两条路径——
+//  ① 填充式（稳态路径：updateButtonColors/applyCustomAppearance）仅补 nil，
+//     幂等零抖动；
+//  ② 强制式（首启自愈窗口内）无条件重取重设——CoreUI 竞态除直接返回 nil
+//     外，还可能返回不可正常渲染的哑图（非 nil 但不显示，填充式会被
+//     imageForState != nil 误判已就绪）；重设新获取的 UIImage 强制重渲染。
 - (void)refreshMenuIconImages {
+    [self refreshMenuIconImagesForced:NO];
+}
+
+- (void)refreshMenuIconImagesForced:(BOOL)forced {
     for (UIView *view in self.menuStackView.arrangedSubviews) {
         if (![view isKindOfClass:[UIButton class]]) continue;
         UIButton *btn = (UIButton *)view;
         NSInteger idx = btn.tag;
         if (idx < 0 || idx >= (NSInteger)self.menuItems.count) continue;
-        if ([btn imageForState:UIControlStateNormal]) continue;
-        UIImage *icon = [UIImage systemImageNamed:self.menuItems[idx][@"icon"]];
-        if (icon) {
+        UIImage *current = [btn imageForState:UIControlStateNormal];
+        if (!forced && current) continue;
+        NSString *iconName = self.menuItems[idx][@"icon"];
+        UIImage *icon = [UIImage systemImageNamed:iconName];
+        if (!icon) continue;
+        if (forced || !current) {
             [btn setImage:icon forState:UIControlStateNormal];
+            // 重设后保证图标子视图在最前（同 createMenuButton 的 z 序保险）
+            UIView *iconView = btn.imageView;
+            if (iconView && iconView.superview == btn) {
+                [btn bringSubviewToFront:iconView];
+            }
         }
     }
 }
@@ -182,8 +215,9 @@
 // 首调用偶尔拿到 nil，后续调用全部正常，所以症状总是“只有主界面消失，
 // 其他按钮都在”。Task101 的单次 viewWillAppear 补拉仍在同一竞态窗口内
 // （viewDidLoad 与 viewWillAppear 几乎同刻执行），用户实测仍能复现。
-// 升级为短周期重试：0.25s×16 次（约 4s）内反复补拉，全部就绪即刻停止；
-// 竞态结束后首次重试即可恢复，用户无感。
+// Task111：重试窗口 0.25s×16（4s）→ 0.25s×40（10s），且每个 tick 用
+// 强制式重设（见 refreshMenuIconImagesForced:）覆盖哑图情形；即使图标全部
+// 非 nil，前 8 个 tick（2s）仍继续强制重刷，之后稳态提前退出，零开销。
 - (BOOL)allMenuIconsLoaded {
     for (UIView *view in self.menuStackView.arrangedSubviews) {
         if (![view isKindOfClass:[UIButton class]]) continue;
@@ -196,18 +230,19 @@
 }
 
 - (void)beginMenuIconSelfHeal {
-    // 先立即补拉一次（绝大多数情况到这一步就已恢复）
-    [self refreshMenuIconImages];
-    if ([self allMenuIconsLoaded]) return;
+    // 先立即强制重刷一次（绝大多数情况到这一步就已恢复）
+    [self refreshMenuIconImagesForced:YES];
     if (self.menuIconSelfHealTimer) return; // 重试已在跑，不叠加
     __weak typeof(self) weakSelf = self;
     __block NSInteger attempts = 0;
     NSTimer *timer = [NSTimer timerWithTimeInterval:0.25 repeats:YES block:^(NSTimer *t) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) { [t invalidate]; return; }
-        [strongSelf refreshMenuIconImages];
+        [strongSelf refreshMenuIconImagesForced:YES];
         attempts += 1;
-        if ([strongSelf allMenuIconsLoaded] || attempts >= 16) {
+        // 图标齐备且过了 8 个强制重刷 tick（哑图重渲染窗口）即停；
+        // 最多 40 个 tick（10s）兜底
+        if (([strongSelf allMenuIconsLoaded] && attempts >= 8) || attempts >= 40) {
             [strongSelf.menuIconSelfHealTimer invalidate];
             strongSelf.menuIconSelfHealTimer = nil;
         }
@@ -280,6 +315,11 @@
                 // Task89：新拟态——选中项为凸出面板（surface 底 + 双阴影），
                 // 替代原半透明 accent 高亮；幂等重刷（重复调用安全）
                 [btn nm_convexRadius:12 shadowRadius:5];
+                // Task111：z 序保险——承载层重装后把图标子视图提回最前
+                UIView *iconView = btn.imageView;
+                if (iconView && iconView.superview == btn) {
+                    [btn bringSubviewToFront:iconView];
+                }
             } else {
                 btn.tintColor = normalColor;
                 // 未选中项恢复平贴（无底色无阴影）

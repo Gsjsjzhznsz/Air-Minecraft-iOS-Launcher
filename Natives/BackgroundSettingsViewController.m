@@ -31,7 +31,12 @@
         self.tableView.backgroundColor = [UIColor clearColor];
         self.tableView.backgroundView = nil;
     } else {
-        self.view.backgroundColor = [UIColor systemBackgroundColor];
+        // Task111：无自定义背景时用 NMTheme 底色（与全局新拟态同源，
+        // 随深浅色自适应）；此前 systemBackground 纯白底会把 surface 色
+        // 卡片 cell 洗成几乎不可见（用户实测"菜单背景消失"）。
+        // tableView 必须显式同色（默认 systemBackground 白底）。
+        self.view.backgroundColor = [NMTheme nm_background];
+        self.tableView.backgroundColor = [NMTheme nm_background];
     }
     
     // Setup table view
@@ -71,6 +76,10 @@
         self.view.backgroundColor = [UIColor clearColor];
         self.tableView.backgroundColor = [UIColor clearColor];
         self.tableView.backgroundView = nil;
+    } else {
+        // Task111：与 viewDidLoad 同步的无背景底色（主题切换后保持一致）
+        self.view.backgroundColor = [NMTheme nm_background];
+        self.tableView.backgroundColor = [NMTheme nm_background];
     }
 }
 
@@ -321,11 +330,14 @@
 }
 
 - (void)styleCell:(UITableViewCell *)cell hasBackground:(BOOL)hasBackground {
+    // Task111：统一走 applyEffectToCell 的检测切换——有背景=毛玻璃/半透明
+    // （背景图从 cell 下方透出），无背景=NMTheme surface 实色卡片底。
+    // 此前无背景分支写死 secondarySystemBackgroundColor（与 NMTheme 底色
+    // 几乎同色），用户实测"菜单背景消失，只剩按钮和阴影"。
+    [[BackgroundManager sharedManager] applyEffectToCell:cell];
     if (hasBackground) {
-        [[BackgroundManager sharedManager] applyEffectToCell:cell];
         cell.textLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
     } else {
-        cell.backgroundColor = [UIColor secondarySystemBackgroundColor];
         cell.textLabel.textColor = [UIColor labelColor];
     }
 }

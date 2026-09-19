@@ -234,11 +234,13 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 #pragma mark - Setup
 
 - (void)setupContainers {
-    // 左侧边栏容器 - 新拟态平贴表面（Task89）：surface 底色、仅保留外侧（左上/左下）
-    // 圆角，无阴影（新拟态层级中的"平"面，立体感交给面板内的凸起元素）
+    // 左侧边栏容器：表面随背景模式切换（Task111）——有自定义背景时用
+    // 毛玻璃/半透明让背景图从侧栏下方透出，无背景时维持 Task89 新拟态
+    // 平贴表面（surface 底色、无阴影，立体感交给面板内的凸起元素）。
+    // 表面应用统一收敛到 updateChromeSurfaces（setupContainers 尾部一次调用）。
     self.sidebarContainer = [[UIView alloc] init];
     self.sidebarContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.sidebarContainer nm_flatSurfaceWithRadius:16];
+    self.sidebarContainer.layer.cornerRadius = 16;
     self.sidebarContainer.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
     self.sidebarContainer.layer.masksToBounds = YES;
     [self.view addSubview:self.sidebarContainer];
@@ -249,13 +251,16 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
     self.contentContainer.backgroundColor = [UIColor clearColor];
     [self.view addSubview:self.contentContainer];
 
-    // 右侧面板容器 - 新拟态平贴表面，仅保留外侧（右上/右下）圆角
+    // 右侧面板容器 - 表面同侧栏随背景模式切换（Task111），仅保留外侧（右上/右下）圆角
     self.rightPanelContainer = [[UIView alloc] init];
     self.rightPanelContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.rightPanelContainer nm_flatSurfaceWithRadius:16];
+    self.rightPanelContainer.layer.cornerRadius = 16;
     self.rightPanelContainer.layer.maskedCorners = kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
     self.rightPanelContainer.layer.masksToBounds = YES;
     [self.view addSubview:self.rightPanelContainer];
+
+    // 双容器几何就位后统一应用初始表面（随背景模式自动选择新旧管线）
+    [self updateChromeSurfaces];
     
     // 设置约束
     // 使用可变宽度约束，便于 traitCollection 变化时更新（iPhone/iPad 适配）
@@ -612,15 +617,28 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 - (void)backgroundChanged {
     // 重新应用背景
     [[BackgroundManager sharedManager] applyBackgroundToView:self.view];
+    // Task111：背景设置/清除后同步切换侧栏/右面板容器表面（毛玻璃↔新拟态平贴）
+    [self updateChromeSurfaces];
+}
+
+- (void)updateChromeSurfaces {
+    // Task111：检测并切换（用户实测：背景照片功能被 Task89 强制纯色底顶掉）。
+    // 有自定义背景 → 走 BackgroundManager 旧毛玻璃/半透明管线，背景图从
+    // 两侧面板下方透出；无背景 → 维持 Task89 新拟态平贴表面。
+    // cornerRadius/maskedCorners/masksToBounds 由调用点维护，此处只换表面。
+    if ([[BackgroundManager sharedManager] hasBackground]) {
+        [[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];
+        [[BackgroundManager sharedManager] applyEffectToView:self.rightPanelContainer];
+    } else {
+        [self.sidebarContainer nm_flatSurfaceWithRadius:16];
+        [self.rightPanelContainer nm_flatSurfaceWithRadius:16];
+    }
 }
 
 - (void)uiEffectChanged:(NSNotification *)notification {
-    // Task89：新拟态下毛玻璃/半透明效果停用（强制纯色底），重新应用平贴表面
+    // Task111：毛玻璃/半透明/背景模式变化后统一重刷容器表面
     // （attachment 幂等重建，表面色随主题）
-    [self.sidebarContainer nm_flatSurfaceWithRadius:16];
-    self.sidebarContainer.layer.maskedCorners = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
-    [self.rightPanelContainer nm_flatSurfaceWithRadius:16];
-    self.rightPanelContainer.layer.maskedCorners = kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
+    [self updateChromeSurfaces];
 }
 
 - (void)dealloc {
