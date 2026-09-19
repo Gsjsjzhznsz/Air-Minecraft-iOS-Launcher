@@ -1086,3 +1086,19 @@ Work Log:
 Stage Summary:
 - 教训入库：**改 Makefile/plist 等 TAB 敏感文件禁用 Edit 工具整文件重写，用 Python 脚本注入并断言 TAB 数**（工作流防回归）
 - 待 CI 绿后发布 v5.1.0
+
+---
+Task ID: 117 (续)
+Agent: main (Super Z)
+Task: v5.1.0 正式发布
+
+Work Log:
+- CI run 35447271138（9e6fc27c6）completed success（TAB 修复后一次过）
+- tag v5.1.0（annotated，含主题摘要）+ release id 392093900（非 prerelease）
+- 资产：AngelAuraAmethyst-5.1.0.ipa（207.4MB，AltStore/SideStore 签名）+ AngelAuraAmethyst-5.1.0.tipa（207.4MB，TrollStore）——均取自绿 CI 产物
+- 发布说明 = 0→212 提交全主题回顾（渲染/崩溃/帧率/输入/26.x/UI/基础设施 + 装机锚点表 + 已知事项），中英 README 差异表已同步扩充
+
+Stage Summary:
+- v5.1.0 发布闭环：https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v5.1.0
+- 应用内"检查更新"自此指向本仓库（Task115），5.1.0 用户会收到本 release 的更新提示
+- 装机验证清单见 Tasks 112-118 主条目锚点表
