@@ -306,42 +306,36 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         @{@"key": @ RENDERER_NAME_VULKAN,
           @"name": localize(@"preference.title.renderer.debug.vulkan", nil),
           @"file": @ RENDERER_NAME_VULKAN},
-        // Task 131（恢复上游形态，替代 Task120 的独立 mobilegl_backend 行）：
-        // MobileGL 三后端回到渲染器悬浮菜单——用户四次强调"设置项还是分开的/
-        // 二级菜单入口无法使用"：Task120 把上游渲染器列表里的 MobileGL 家族
-        // 三条目挪到 MobileGlues 分区的独立设置行，且仅 renderer=auto 时生效
-        // （用户设备 renderer=MobileGlues -> 切了后端也无效）。上游原本就在
-        // 渲染器悬浮菜单里直接选 MG 后端，现原样恢复：
-        //   libMobileGL.dylib（Vulkan 直呈，MG 默认档）/ libMobileGL-gles.dylib
-        //   （GLES 档）/ libmithril.dylib（Mithril 档）。
-        // -gles 条目的 key 是逻辑名（egl_bridge/JavaLauncher 按它切
-        //   MOBILEGL_BACKEND_TYPE=DirectGLES），file 用共享的 libMobileGL.dylib
-        // 做存在性判定（-gles 变体 dylib 不随包，物理加载点按 key 映射回共享
-        // 二进制）。Mithril 的 dylib 缺失时由下方过滤规则自动隐藏。
-        @{@"key": @ RENDERER_NAME_MITHRIL,
-          @"name": localize(@"preference.title.renderer.debug.mithril", nil),
-          @"file": @ RENDERER_NAME_MITHRIL},
-        @{@"key": @ RENDERER_NAME_MOBILEGL,
-          @"name": localize(@"preference.title.renderer.debug.mobilegl", nil),
-          @"file": @ RENDERER_NAME_MOBILEGL},
-        @{@"key": @ RENDERER_NAME_MOBILEGL_GLES,
-          @"name": localize(@"preference.title.renderer.debug.mobilegl_gles", nil),
-          @"file": @ RENDERER_NAME_MOBILEGL}
+        // Task 132（MG 三端合并，用户明令）：MobileGL 家族三后端条目从本表
+        // 退役，合并为 MobileGlues 分区的单一 pick 行（typePickField 悬浮
+        // 浮窗，选项 MobileGlues (Vulkan 直连) / (GLES 后端) / (OpenGL 4.0
+        // 实验性)，默认 Vulkan 直连）——见 getRendererFamilyKeys/Names 与
+        // LauncherPreferencesViewController 的 renderer_backend 行。
+        // 严禁再拆回三条独立条目或改成二级菜单页面（用户四次否决）。
+        // 渲染器悬浮菜单/版本管理器/Profile 编辑器自此共享七项列表
+        // （auto/gl4es/angle/mg/zink/ltw/vulkan），与
+        // VersionManagerViewController 硬编码的七个短名重新对齐（Task131
+        // 在本表加三后端时该表 10 vs 7 的潜在错位随之消失）。
     ];
 }
 
-// Task 113 -> Task 120 -> Task 131（再次重构）：MobileGL 三后端的入口形态变迁：
+// Task 113 -> Task 120 -> Task 131 -> Task 132（再次重构）：MobileGL 三后端的
+// 入口形态变迁：
 // - Task113：mobilegl_vulkan 布尔开关（无条件覆盖任何显式渲染器，1d4ff3a9
 //   "选 zink 被静默换成 vk"事故源，已退役）；
 // - Task120：合并为 MobileGlues 分区的独立设置行 mobilegl_backend，且仅
 //   renderer=auto 时生效——装机实测被用户四次否决："设置项还是分开的"，
-//   上游原本在渲染器悬浮菜单里直接选（用户设备 renderer=MobileGlues，
-//   独立行切了后端也无效，"二级菜单入口导致无法使用"）；
-// - Task131（现行）：三后端条目回到渲染器悬浮菜单（rendererCandidates 表），
-//   mobilegl_backend 独立设置行退役。legacy：存量设备 renderer=auto +
-//   mobilegl_backend=1/2/3 的解析路径保留在 ame_effective_renderer（行为
-//   不变，直到用户显式改选）。旧 mobilegl_vulkan 布尔开关（Task113）退役
-//   不变：【显式渲染器选择永远优先】。
+//   且其仅 renderer=auto 生效的门控让显式选了 MobileGlues/zink 的
+//   设备切了也无效；
+// - Task131：三后端条目回到渲染器悬浮菜单（rendererCandidates 表），
+//   mobilegl_backend 独立设置行退役——仍被否决：用户要求【合并为一个
+//   统一入口 + 原地悬浮浮窗】，菜单里三个独立条目还是"分开的"；
+// - Task132（现行）：三后端从渲染器菜单退役，合并为 MobileGlues 分区的
+//   单一 pick 行 renderer_backend（typePickField 原地悬浮浮窗，三选项
+//   默认 Vulkan 直连）；选择直接写渲染器键（与渲染器行同一存储层，
+//   显式选择永远优先）。legacy：存量设备 renderer=auto +
+//   mobilegl_backend=1/2/3 的解析路径保留在 ame_effective_renderer
+//   （行为不变，直到用户在新浮窗里显式改选）。
 
 // Task 120：有效渲染器解析（单一事实源，见 LauncherPreferences.h 头注释）。
 // 注意与 JavaLauncher.m 的 AMETHYST_RENDERER 解析点保持逐字一致——两处任何
@@ -419,4 +413,26 @@ NSArray* getRendererNames(BOOL containsDefault) {
         [array insertObject:@"(default)" atIndex:0];
     }
     return array;
+}
+
+// Task 132（MG 三端合并）：MobileGL 家族三后端的统一浮窗数据源。
+// keys 为逻辑键（与 ame_effective_renderer / egl_bridge / JavaLauncher 的
+// 渲染器值同一命名空间，直接写入 video.renderer 即生效）；names 为用户
+// 指定的三选项文案（本地化键见四语言 Localizable.strings）。
+// 无条件列出三项（用户明令浮窗列出三选项；Mithril 的 dylib 缺失与否
+// 不再作为隐藏条件——渲染器菜单时代的老过滤已随条目退役）。
+NSArray* getRendererFamilyKeys(void) {
+    return @[
+        @ RENDERER_NAME_MOBILEGL,
+        @ RENDERER_NAME_MOBILEGL_GLES,
+        @ RENDERER_NAME_MITHRIL
+    ];
+}
+
+NSArray* getRendererFamilyNames(void) {
+    return @[
+        localize(@"preference.title.renderer_backend-mobilegl", nil),
+        localize(@"preference.title.renderer_backend-mobilegl_gles", nil),
+        localize(@"preference.title.renderer_backend-mithril", nil)
+    ];
 }

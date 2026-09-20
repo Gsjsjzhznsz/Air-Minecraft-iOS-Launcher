@@ -100,10 +100,11 @@ check("B6 PLPreferences 默认 mobilegl_backend=1（Vulkan 默认），旧开关
 check("B7 mobilegl_backend 独立 pick 行已退役（Task131 回归锚）",
       '@"key": @"mobilegl_backend"' not in lpvc and
       '"mobilegl_backend": @(1)' in plp)
-check("B8 渲染器列表含 MobileGL 家族三后端条目（Task131 恢复上游形态）",
-      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL,\n\s*@\"name\"', lp) is not None and
-      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"', lp) is not None and
-      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n\s*@\"name\"', lp) is not None)
+check("B8 渲染器列表七项（Task132 重锚：家族三后端合并进统一悬浮浮窗行）",
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL,\n\s*@\"name\"', lp) is None and
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"', lp) is None and
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n\s*@\"name\"', lp) is None and
+      "NSArray* getRendererFamilyKeys(void)" in lp)
 check("B9 pick 行右侧显示本地化标签（存储值不进 UI）",
       "ame120_basePick" in lpvc and "ame120_keys" in lpvc)
 check("B10 GameSurfaceView.layerClass 用 ame_effective_renderer（Task124 同根修复）",

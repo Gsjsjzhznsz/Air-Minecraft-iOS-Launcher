@@ -92,8 +92,8 @@ check("C5 CMakeLists 收录新组件（NMToast + NMPanel）",
       "NeomorphKit/NMToast.m" in cml and "NeomorphKit/UIViewController+NMPanel.m" in cml)
 
 print("== D. Task128 第三方登录修复（zl2 参照）==")
-check("D1 authlib-injector jar 随包（344477B，sha256 eaf14bc5...）",
-      os.path.getsize(os.path.join(REPO, "Natives/resources/authlib-injector-1.2.7.jar")) == 344477)
+check("D1 authlib-injector jar 随包（Task132 升级 1.2.8：349681B，sha256 9c7f4343...）",
+      os.path.getsize(os.path.join(REPO, "Natives/resources/authlib-injector-1.2.8.jar")) == 349681)
 check("D2 bundled 路径解析（NSBundle pathForResource）",
       "bundledAuthlibInjectorPath" in tp and "pathForResource" in tp)
 check("D3 ensure 优先包内复制（零网络依赖），在线下载降为回退",

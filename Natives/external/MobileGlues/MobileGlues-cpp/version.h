@@ -981,3 +981,29 @@
 //   gets a guided one-time re-login. (d) Pick sheets present from the
 //   topmost view controller (a presenting self would be silently
 //   rejected) and log an evidence anchor per open.
+
+// REVISION 17 addendum (Task 132, no bump): four field fixes from the 43ef4ae
+// install logs. (a) 26.1.2 modpack crash (controlify 3.0.1 -> libsdl4j 3.2.18
+// -> JNA): Task131's guards sit at the dlsym-resolution layer, but libjnidispatch
+// calls dlsym through ITS OWN __la_symbol_ptr slot, which the startup fishhook
+// pass cannot cover for images loaded later (the crash session shows LWJGL
+// intercepted while JNA was not -- the same split). hooked_dlopen now detects
+// the libjnidispatch load (the JVM's System.load path, proven live by Task106's
+// profiler block) and rebinds that image's _dlsym pointer slots to hooked_dlsym
+// (Mach-O indirect-symbol-table walk, fishhook's linkedit-base arithmetic,
+// runtime page size, idempotent); JNA resolution then flows through
+// amethyst_sdl3_hook_resolve and the Task131 no-op guards cover the JNA path
+// too (real SDL_ symbols still pass through untouched). (b) The MG three
+// backends leave the renderer menu and merge into ONE unified pick row in the
+// MobileGlues section (in-place floating popup, exactly three options --
+// Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan default;
+// user-mandated wording), writing video.renderer directly (same storage layer
+// as the renderer row; explicit selection always wins). (c) The TouchController
+// child-pane entry is replaced by an in-place three-way popup (disabled / UDP /
+// static lib) with its companion rows inlined (vibrate, intensity, move view,
+// about); the pane file stays but is no longer referenced. (d) Third-party
+// skins: bundled authlib-injector upgraded 1.2.7 -> 1.2.8 (build 56) -- MC
+// 26.3+ rewrote authlib's service discovery, 1.2.7 only rewrites the legacy
+// URL constants so the new chain bypassed the injection straight to Mojang
+// (401, skins fell back to defaults); 1.2.8 adds httpd/DiscoveryFilter for the
+// new chain and keeps Java 17/21/25 compatibility.

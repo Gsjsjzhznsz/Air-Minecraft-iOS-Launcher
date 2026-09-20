@@ -318,6 +318,24 @@
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.selectionStyle = UITableViewCellSelectionStyleGray;
         id value = weakSelf.getPreference(section, key);
+        // Task 132：存储值命中 pickKeys 时，行右侧显示对应 pickList 本地化
+        // 标签（Task121 注释声称的行为至此真正落地——此前 reloadData 后
+        // 显示的是原始存储值）。未命中（动态键列表/复合映射行等）回落旧
+        // 显示路径，零行为回归。数字存储值按 stringValue 比对（与 ✓ 标记
+        // 的 ame121_curs 同款口径）。
+        NSArray *ame132_pickKeys = item[@"pickKeys"];
+        NSArray *ame132_pickList = item[@"pickList"];
+        if (ame132_pickKeys != nil && ame132_pickList != nil && value != nil) {
+            NSString *ame132_s = [value isKindOfClass:[NSString class]]
+                ? value : [value stringValue];
+            if ([ame132_s isKindOfClass:[NSString class]]) {
+                NSUInteger ame132_idx = [ame132_pickKeys indexOfObject:ame132_s];
+                if (ame132_idx != NSNotFound && ame132_idx < ame132_pickList.count) {
+                    cell.detailTextLabel.text = ame132_pickList[ame132_idx];
+                    return;
+                }
+            }
+        }
         if ([value isKindOfClass:[NSString class]]) {
             cell.detailTextLabel.text = value;
         } else if ([value isKindOfClass:[NSNumber class]]) {

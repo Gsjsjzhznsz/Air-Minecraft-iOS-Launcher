@@ -70,3 +70,11 @@ NSString* getSelectedJavaHome(NSString* defaultJRETag, int minVersion);
 
 NSArray* getRendererKeys(BOOL containsDefault);
 NSArray* getRendererNames(BOOL containsDefault);
+
+// Task 132（MG 三端合并）：MobileGL 家族三后端统一浮窗（MobileGlues 分区
+// renderer_backend pick 行）的数据源。keys 与渲染器值同一命名空间
+// （mobilegl / mobilegl_gles / mithril 逻辑键），names 为三选项本地化文案
+// （MobileGlues (Vulkan 直连) / (GLES 后端) / (OpenGL 4.0 实验性)，
+// 默认 Vulkan 直连）。索引两两配对。
+NSArray* getRendererFamilyKeys(void);
+NSArray* getRendererFamilyNames(void);

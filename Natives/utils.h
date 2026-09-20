@@ -187,6 +187,12 @@ void rebindZinkStrideFixForNewImage();
 void init_hookUIKitConstructor();
 void init_setupMultiDir();
 
+// Task 132（sdl3_hook.m 实现）：libjnidispatch 加载后重绑定其 _dlsym
+// 指针槽为 hook_fn——JNA 的符号解析由此进 hooked_dlsym /
+// amethyst_sdl3_hook_resolve，Task131 的 JNA closure 守卫对 JNA 路径生效。
+// handle = 真实 dlopen 返回的句柄（= image mach header 地址）。
+void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn);
+
 BOOL PLPatchMachOPlatformForFile(const char *path);
 
 UIViewController* currentVC();

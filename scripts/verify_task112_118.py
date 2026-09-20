@@ -60,12 +60,14 @@ check("B1 libMobileGL.dylib 已 vendor（上游 caf6822 同款 85757760B）",
       os.path.exists(dylib) and os.path.getsize(dylib) == 85757760)
 # Task 131 重锚：用户四次反馈“设置项还是分开的/二级菜单入口无法使用”，
 # 三后端回到渲染器悬浮菜单（上游形态），mobilegl_backend 独立行退役。
-check("B2 渲染器列表含 mobilegl/mobilegl_gles/mithril 三后端条目（Task131 恢复上游形态）",
-      'RENDERER_NAME_MOBILEGL,' in lp and 'RENDERER_NAME_MOBILEGL_GLES,' in lp
-      and 'RENDERER_NAME_MITHRIL,' in lp,
-      "rendererCandidates 含 MobileGL 家族条目")
-check("B3 形态变迁注释存在（Task 113 -> Task 120 -> Task 131 三段史）",
-      'Task 113 -> Task 120 -> Task 131' in lp)
+check("B2 渲染器列表七项（Task132 重锚：MobileGL 家族三后端已合并进统一浮窗行）",
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL,\n', lp) is None
+      and re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n', lp) is None
+      and re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n', lp) is None
+      and 'NSArray* getRendererFamilyKeys(void)' in lp,
+      "rendererCandidates 不再含家族条目；家族键经 getRendererFamilyKeys 供给")
+check("B3 形态变迁注释存在（Task 113 -> Task 120 -> Task 131 -> Task 132 四段史）",
+      'Task 113 -> Task 120 -> Task 131 -> Task 132' in lp)
 check("B4 mobilegl_backend 独立 pick 行已退役（Task131 回归锚，legacy 解析保留）",
       '@"key": @"mobilegl_backend"' not in lpvc and
       '"mobilegl_backend": @(1)' in plp)

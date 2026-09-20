@@ -40,6 +40,13 @@
 #include <strings.h>   // strcasecmp
 #include <sys/types.h>
 #include <objc/runtime.h>
+// Task 132：libjnidispatch GOT 重绑定所需的 Mach-O 遍历头（与
+// dyld_patch_platform.m 同款集合；vm_protect 经 <mach/mach.h>）
+#include <mach-o/dyld.h>
+#include <mach-o/loader.h>
+#include <mach-o/nlist.h>
+#include <mach/mach.h>
+#include <unistd.h>
 
 #pragma mark - SDL3 常量（与 SDL_video.h 对齐，避免依赖 SDL 头文件）
 
@@ -1716,6 +1723,169 @@ static void ame_SDL_AddEventWatch(void *filter, void *userdata) {
         ame131_logged = true;
         NSLog(@"[SDLHook] Task131: SDL_AddEventWatch(%p) blocked -- same JNA closure "
               @"non-executable reason as SDL_SetEventFilter", filter);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task 132：libjnidispatch 的 _dlsym 槽位重绑定（26.1.2 整合包 controlify/
+// JNA closure SIGBUS 的补完，43ef4ae 装机日志定案）
+//
+// Task131 的守卫拦在 dlsym 解析层（下方 amethyst_sdl3_hook_resolve 按名
+// 分发 SDL_SetEventFilter / SDL_AddEventWatch），LWJGL 路径由此根治——
+// LWJGL 经启动器进程自己的 dlsym 调用链取符号，该链路被 init_hookFunctions
+// 的 fishhook 重绑定覆盖。但 43ef4ae 崩溃会话（26.1.2 整合包，SIGBUS at
+// pc=0x1167b8010，native 栈 0x163e70a84 递归闭包帧）证明 JNA 路径漏网：
+//   controlify 3.0.1 -> libsdl4j 3.2.18 -> JNA NativeLibrary dlopen 命中
+//   Frameworks 的 iOS libSDL3.dylib 后，libjnidispatch 内部经【它自己的
+//   __la_symbol_ptr 槽】调用 dlsym 解析 SDL_SetEventFilter——该槽属于后续
+//   dlopen 的新 image，init_hookFunctions 传的是栈上 rebindings 数组，
+//   其对后续 image 的重绑定不可依赖（同会话里 LWJGL 被拦、JNA 未被拦的
+//   分裂行为与栈数组生命周期解释一致）。于是 JNA 拿到真函数，把 Java
+//   回调闭包注册进 SDL；SDL3 的 SDL_SetEventFilter 注册即对 pending 队列
+//   逐事件同步调用 filter -> 跳进 RW 不可执行的 libffi trampoline 页
+//   -> SIGBUS（崩溃日志最后三行 "Initializing Controlify..." /
+//   "[SDLNativesLoader] Attempting to load SDL3 from SDL3" /
+//   "Platform.isMac called from com.sun.jna.Structure" 与该链完全吻合，
+//   且全篇没有 Task131 守卫日志 = JNA 的符号解析根本没进过 hook）。
+//
+// 修复：hooked_dlopen 检出 libjnidispatch 加载（JVM 的 System.load 走被
+// hook 的 dlopen——Task106 的 libasyncProfiler 拦截已在装机日志实证同一
+// 链路），真实 dlopen 返回后立即遍历该 image 的间接符号表，把
+// __la_symbol_ptr（S_LAZY_SYMBOL_POINTERS）/ __got（S_NON_LAZY_SYMBOL_
+// POINTERS）中符号名为 _dlsym 的指针槽改写为传入的 hook 函数（main_hook.m
+// 的 hooked_dlsym）。此后 JNA 的一切符号解析都先进 amethyst_sdl3_hook_
+// resolve：Task131 守卫对 JNA 路径同样生效（SDL_SetEventFilter /
+// SDL_AddEventWatch 换成 no-op 守卫），真 SDL_ 符号照常透传，非 SDL 符号
+// 原样回落，零误伤。
+//
+// 实现细节（jna-5.13.0 darwin-aarch64 libjnidispatch 二进制实测）：
+//   - 传统 LC_DYLD_INFO 布局（无 chained fixups）；_dlsym 间接表项 2 处
+//     （__stubs 代码段符号引用 + __la_symbol_ptr 指针槽），真正的指针槽
+//     位于可写 __DATA——改写后经 stub 的调用全部改道；
+//   - __LINKEDIT 基址换算用 fishhook 同款算法（slide + vmaddr - fileoff），
+//     不假设 vmaddr == fileoff；
+//   - 页大小取运行时 sysconf(_SC_PAGESIZE)（arm64 iOS 为 16KB，硬编码
+//     4096 会让 vm_protect 失败）；
+//   - vm_protect 用 RW|COPY（fishhook 同款，对已可写页无副作用），不恢复
+//     原保护——与既有 zink 重绑定路径行为一致；
+//   - 幂等：槽位已是目标值时跳过（JNA 重复加载同一 image 安全）。
+// ---------------------------------------------------------------------------
+void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
+    if (handle == NULL || hook_fn == NULL) return;
+    // dlopen 句柄即 image 的 mach header 地址（dyld 实现细节，fishhook
+    // 同样依赖此对应）；遍历 dyld 已加载 image 找到本句柄的 slide
+    const struct mach_header_64 *ame132_hdr = NULL;
+    intptr_t ame132_slide = 0;
+    uint32_t ame132_count = _dyld_image_count();
+    for (uint32_t i = 0; i < ame132_count; i++) {
+        if ((const void *)_dyld_get_image_header(i) == handle) {
+            ame132_hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
+            ame132_slide = _dyld_get_image_vmaddr_slide(i);
+            break;
+        }
+    }
+    if (ame132_hdr == NULL) return; // 句柄不对应任何已加载 image（异常防御）
+    if (ame132_hdr->magic != MH_MAGIC_64) return;
+
+    // 第一遍：收集 SYMTAB / DYSYMTAB / __LINKEDIT 定位信息
+    struct symtab_command ame132_symtab;
+    struct dysymtab_command ame132_dysym;
+    memset(&ame132_symtab, 0, sizeof(ame132_symtab));
+    memset(&ame132_dysym, 0, sizeof(ame132_dysym));
+    uint64_t ame132_le_vmaddr = 0, ame132_le_fileoff = 0;
+    bool ame132_has_symtab = false, ame132_has_le = false;
+    const struct load_command *ame132_cmd =
+        (const struct load_command *)(ame132_hdr + 1);
+    for (uint32_t c = 0; c < ame132_hdr->ncmds; c++) {
+        if (ame132_cmd->cmd == LC_SYMTAB) {
+            ame132_symtab = *(const struct symtab_command *)ame132_cmd;
+            ame132_has_symtab = true;
+        } else if (ame132_cmd->cmd == LC_DYSYMTAB) {
+            ame132_dysym = *(const struct dysymtab_command *)ame132_cmd;
+        } else if (ame132_cmd->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg =
+                (const struct segment_command_64 *)ame132_cmd;
+            if (strcmp(seg->segname, SEG_LINKEDIT) == 0) {
+                ame132_le_vmaddr = seg->vmaddr;
+                ame132_le_fileoff = seg->fileoff;
+                ame132_has_le = true;
+            }
+        }
+        ame132_cmd = (const struct load_command *)
+            ((const uint8_t *)ame132_cmd + ame132_cmd->cmdsize);
+    }
+    if (!ame132_has_symtab || !ame132_has_le || ame132_dysym.nindirectsyms == 0) {
+        NSLog(@"[SDLHook] Task132: libjnidispatch image missing symtab/linkedit "
+              @"(layout change?), dlsym rebind skipped");
+        return;
+    }
+    // fishhook 同款 __LINKEDIT 基址换算（slide + vmaddr - fileoff）
+    uintptr_t ame132_base = (uintptr_t)ame132_slide + ame132_le_vmaddr - ame132_le_fileoff;
+    const struct nlist_64 *ame132_syms =
+        (const struct nlist_64 *)(ame132_base + ame132_symtab.symoff);
+    const char *ame132_strs = (const char *)(ame132_base + ame132_symtab.stroff);
+    const uint32_t *ame132_indirect =
+        (const uint32_t *)(ame132_base + ame132_dysym.indirectsymoff);
+
+    // 第二遍：扫 __la_symbol_ptr / __got 类指针段的间接符号表，找 _dlsym 槽
+    vm_size_t ame132_ps = (vm_size_t)sysconf(_SC_PAGESIZE);
+    int ame132_hits = 0;
+    ame132_cmd = (const struct load_command *)(ame132_hdr + 1);
+    for (uint32_t c = 0; c < ame132_hdr->ncmds; c++) {
+        if (ame132_cmd->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg =
+                (const struct segment_command_64 *)ame132_cmd;
+            const struct section_64 *sect = (const struct section_64 *)
+                ((const uint8_t *)seg + sizeof(struct segment_command_64));
+            for (uint32_t s = 0; s < seg->nsects; s++, sect++) {
+                uint32_t stype = sect->flags & SECTION_TYPE;
+                if (stype != S_LAZY_SYMBOL_POINTERS &&
+                    stype != S_NON_LAZY_SYMBOL_POINTERS) {
+                    continue;
+                }
+                uint32_t stride = sect->reserved2 ? sect->reserved2 : (uint32_t)sizeof(void *);
+                if (stride == 0) continue;
+                uint32_t n = (uint32_t)(sect->size / stride);
+                for (uint32_t j = 0; j < n; j++) {
+                    uint32_t idx = sect->reserved1 + j;
+                    if (idx >= ame132_dysym.nindirectsyms) continue;
+                    uint32_t symIdx = ame132_indirect[idx];
+                    // INDIRECT_SYMBOL_LOCAL（0x80000000，含 LOCAL|1）与
+                    // INDIRECT_SYMBOL_ABS（0x40000000）都不是符号表下标
+                    if ((symIdx & INDIRECT_SYMBOL_LOCAL) != 0) continue;
+                    if (symIdx == INDIRECT_SYMBOL_ABS) continue;
+                    if (symIdx >= ame132_symtab.nsyms) continue;
+                    uint32_t n_strx = ame132_syms[symIdx].n_un.n_strx;
+                    if (n_strx == 0 || n_strx >= ame132_symtab.strsize) continue;
+                    const char *sym_name = ame132_strs + n_strx;
+                    if (strcmp(sym_name, "_dlsym") != 0) continue;
+                    void **slot = (void **)(ame132_slide + sect->addr +
+                                            (uint64_t)j * stride);
+                    if (*slot == hook_fn) { ame132_hits++; continue; } // 幂等
+                    vm_address_t page = (vm_address_t)((uintptr_t)slot &
+                        ~((uintptr_t)ame132_ps - 1));
+                    kern_return_t kr = vm_protect(mach_task_self(), page,
+                        ame132_ps, false, VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+                    if (kr != KERN_SUCCESS) {
+                        NSLog(@"[SDLHook] Task132: vm_protect failed for "
+                              @"libjnidispatch _dlsym slot %p (kr=%d)", slot, kr);
+                        continue;
+                    }
+                    *slot = hook_fn;
+                    ame132_hits++;
+                    NSLog(@"[SDLHook] Task132: libjnidispatch _dlsym slot rebound "
+                          @"(%s[%s] slot=%p) -- JNA symbol resolution now routes "
+                          @"through hooked_dlsym (Task131 guard covers the JNA path)",
+                          seg->segname, sect->sectname, (void *)slot);
+                }
+            }
+        }
+        ame132_cmd = (const struct load_command *)
+            ((const uint8_t *)ame132_cmd + ame132_cmd->cmdsize);
+    }
+    if (ame132_hits == 0) {
+        NSLog(@"[SDLHook] Task132: libjnidispatch loaded but no _dlsym pointer "
+              @"slot found (unexpected layout -- JNA path stays on real dlsym)");
     }
 }
 

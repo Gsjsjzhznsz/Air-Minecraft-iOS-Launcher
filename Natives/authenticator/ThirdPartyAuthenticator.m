@@ -5,17 +5,23 @@
 #import <Security/Security.h>
 
 // authlib-injector 下载源：BMCLAPI 镜像优先，失败后回退到官方源
-// 修复：从 1.2.6 升级到 1.2.7（build 55），1.2.7 修复了 Java 25 兼容性问题。
-// 说明：26.x 默认使用 Java 21 启动（Mojang 元数据 javaVersion.majorVersion=21），
-// 但若用户在 PLProfiles 中为 26.x 显式设置 javaVersion=25，则 26.x 会使用 Java 25，
-// 此时 authlib-injector 1.2.6 的 ASM 字节码处理无法识别 Java 25 class file version 69，
-// 导致 javaagent 加载失败、游戏无法启动。升级到 1.2.7 后同时兼容 Java 17/21/25。
-// 另：authlib-injector 1.2.7 对 Java 25 的支持也用于 execute_jar 路径
-// （如某些 Mod 安装器 JAR 编译目标为 Java 25）。
-#define AUTHLIB_INJECTOR_URL_BMCL  @"https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/55/authlib-injector-1.2.7.jar"
-#define AUTHLIB_INJECTOR_URL_GITHUB @"https://authlib-injector.yushi.moe/artifact/55/authlib-injector-1.2.7.jar"
+// 修复史：
+// - 1.2.6 -> 1.2.7（build 55，Task128）：1.2.6 的 ASM 无法识别 Java 25
+//   class file version 69，javaagent 加载失败。1.2.7 同时兼容 Java 17/21/25。
+// - 1.2.7 -> 1.2.8（build 56，Task132）：第三方账号皮肤不加载的根治。
+//   MC 26.3 系列重写了 authlib 的服务发现架构（独立 discovery 链路），
+//   1.2.7（2025-12）只改写旧的 minecraftservices/sessionserver URL 常量，
+//   新链路绕过改写直连 Mojang 官方端点 -> 第三方 token 被 401 拒绝 ->
+//   皮肤/材质全部回落 Steve/Alex。1.2.8（2026-07，新增 httpd/DiscoveryFilter）
+//   补上新 discovery 链路的重定向；皮肤站 issue #298/#300 症状与用户
+//   装机日志（authlib 正常注入但皮肤不加载）完全吻合，官方以 1.2.8 修复。
+//   另：1.2.7 对 --userType mojang 的 msa 改写也会把 MC 推上
+//   MinecraftServices 链路（401 同源），1.2.8 一并修正。
+//   Java 17/21/25 兼容性（Task128 升级理由）在 1.2.8 保持不变。
+#define AUTHLIB_INJECTOR_URL_BMCL  @"https://bmclapi2.bangbang93.com/mirrors/authlib-injector/artifact/56/authlib-injector-1.2.8.jar"
+#define AUTHLIB_INJECTOR_URL_GITHUB @"https://authlib-injector.yushi.moe/artifact/56/authlib-injector-1.2.8.jar"
 #define AUTHLIB_INJECTOR_FILE @"authlib-injector.jar"
-#define AUTHLIB_INJECTOR_VERSION @"1.2.7"
+#define AUTHLIB_INJECTOR_VERSION @"1.2.8"
 #define AUTHLIB_INJECTOR_VERSION_FILE @"authlib-injector.version"
 
 // Helper function to create NSError
@@ -240,7 +246,7 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
 // Task 128（zl2 同款思路）：随包内置的 authlib-injector 兜底路径。
 // 旧实现把 jar 的在线下载作为登录前置（ensureAuthlibInjectorWithCompletion
 // 是 loginWithCallback 第一步），下载失败 = 第三方登录完全不可用。
-// 现在应用包内常备同版本 jar（Natives/resources/authlib-injector-1.2.7.jar，
+// 现在应用包内常备同版本 jar（Natives/resources/authlib-injector-1.2.8.jar，
 // 由 payload 随包拷入），POJAV_HOME 侧缺文件/版本不匹配时直接从包内复制
 // （本地操作，零网络依赖），在线下载仅作为包内文件缺失的最后回退。
 - (NSString *)bundledAuthlibInjectorPath {
@@ -259,7 +265,8 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
         return NO;
     }
     // 版本检查：已下载的 jar 版本必须与当前期望版本一致
-    // 修复：旧版 1.2.6 jar 与 Java 25 不兼容，必须升级到 1.2.7
+    // 修复：旧版 1.2.7 jar 在 MC 26.3+ 新 authlib discovery 链路上不生效
+    // （第三方皮肤不加载，Task132 根因），必须升级到 1.2.8
     NSString *versionPath = [self getAuthlibInjectorVersionPath];
     NSString *downloadedVersion = [NSString stringWithContentsOfFile:versionPath encoding:NSUTF8StringEncoding error:nil];
     if (downloadedVersion.length == 0 || ![downloadedVersion isEqualToString:AUTHLIB_INJECTOR_VERSION]) {
@@ -335,7 +342,7 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
     }
     // Task 128（zl2 同款思路）：优先从应用包内复制（本地、即时、零网络依赖）。
     // 旧实现把 jar 的在线下载作为登录前置——下载失败 = 第三方登录完全不可用。
-    // 包内常备同版本 jar（Natives/resources/authlib-injector-1.2.7.jar，
+    // 包内常备同版本 jar（Natives/resources/authlib-injector-1.2.8.jar，
     // payload 随包拷入）；在线下载仅作为包内文件缺失的最后回退。
     NSString *ame128_bundled = [self bundledAuthlibInjectorPath];
     if (ame128_bundled.length > 0 && [NSFileManager.defaultManager fileExistsAtPath:ame128_bundled]) {

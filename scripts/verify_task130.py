@@ -299,8 +299,8 @@ sets = []
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
-check("H3 四语言键集一致（Task131 基线 1901 = 1904 + 渲染器3 + 切换1 - mobilegl_backend死键6）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1901,
+check("H3 四语言键集一致（Task132 基线 1906 = 1901 + renderer_backend 5键）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1906,
       f"counts={[len(s) for s in sets]}")
 
 delta_ok = True

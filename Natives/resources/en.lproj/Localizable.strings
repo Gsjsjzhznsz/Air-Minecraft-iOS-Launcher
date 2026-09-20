@@ -2031,6 +2031,11 @@
 "preference.detail.ui_layout" = "Choose the home screen layout: multi-card or compact. Restart the launcher to fully apply.";
 "preference.detail.ui_theme" = "Choose light/dark/system appearance.";
 "preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
+"preference.title.renderer_backend" = "MobileGlues backend";
+"preference.detail.renderer_backend" = "Unified MobileGlues three-way switch (floating popup): Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan direct by default. The selection writes the renderer setting directly (explicit choice wins).";
+"preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
+"preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
+"preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
 
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
 "preference.title.announcement_preview_level" = "Announcement Detail Level";

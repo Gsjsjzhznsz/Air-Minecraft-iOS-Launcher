@@ -57,24 +57,28 @@ check("A7 事件过滤器零使用面（启动器/MC/LWJGL 不受误伤）",
       sdl.count("SDL_SetEventFilter") >= 4  # 声明+实现+resolve+注释
       and "hotplug events still arrive via SDL_PollEvent" in sdl)
 
-print("== B. 渲染器悬浮菜单恢复 MG 三后端（上游形态）==")
+print("== B. 渲染器入口形态（Task132 重锚：MG 三端合并为统一悬浮浮窗行）==")
 lp = rd("Natives/LauncherPreferences.m")
 lpvc = rd("Natives/LauncherPreferencesViewController.m")
 plp = rd("Natives/PLPreferences.m")
-check("B1 rendererCandidates 三后端条目（MobileGL / -gles / Mithril）",
-      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL,\n\s*@\"name\"', lp) is not None
-      and re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"', lp) is not None
-      and re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n\s*@\"name\"', lp) is not None)
-check("B2 -gles 条目 file 用共享 libMobileGL.dylib（存在性判定 + 变体不随包）",
-      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"[^}]*?@\"file\":\s*@ RENDERER_NAME_MOBILEGL\}', lp) is not None)
-check("B3 mobilegl_backend 独立 pick 行退役（Task131 回归锚）",
+check("B1 rendererCandidates 三后端条目已退役（Task132 合并；七项列表回归）",
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL,\n\s*@\"name\"', lp) is None
+      and re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"', lp) is None
+      and re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n\s*@\"name\"', lp) is None)
+check("B2 家族三键改经 getRendererFamilyKeys/Names 供给统一浮窗（无条件三选项）",
+      "NSArray* getRendererFamilyKeys(void)" in lp
+      and "NSArray* getRendererFamilyNames(void)" in lp
+      and 'RENDERER_NAME_MOBILEGL,' in lp and 'RENDERER_NAME_MOBILEGL_GLES,' in lp
+      and 'RENDERER_NAME_MITHRIL' in lp
+      and 'preference.title.renderer_backend-mobilegl_gles' in lp)
+check("B3 mobilegl_backend 独立 pick 行退役（Task131 回归锚，Task132 保持）",
       '@"key": @"mobilegl_backend"' not in lpvc)
 check("B4 PLPreferences 默认 mobilegl_backend=1 保留（legacy 解析）",
       '"mobilegl_backend": @(1)' in plp)
 check("B5 legacy 解析保留（auto + backend 1/2/3 -> libMobileGL/Mithril）",
       'getPrefInt(@"mobileglues.mobilegl_backend")' in lp)
-check("B6 形态变迁注释（Task113 -> Task120 -> Task131 三段史）",
-      "Task 113 -> Task 120 -> Task 131" in lp)
+check("B6 形态变迁注释（Task113 -> Task120 -> Task131 -> Task132 四段史）",
+      "Task 113 -> Task 120 -> Task 131 -> Task 132" in lp)
 
 print("== C. -gles 物理加载映射 ==")
 eb = rd("Natives/egl_bridge.m")
@@ -215,8 +219,8 @@ sets = []
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
-check("G3 四语言键集一致（1901 = 1904 + 渲染器2 + 切换1 - mobilegl_backend死键6）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1901,
+check("G3 四语言键集一致（Task132 基线 1906 = 1901 + renderer_backend 5键）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1906,
       f"counts={[len(s) for s in sets]}")
 
 delta_ok = True

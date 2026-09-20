@@ -2042,6 +2042,11 @@
 "crash.suggestion.missingmods_share" = "分享 latestlog.txt 反馈，可凭崩溃报告中的缺失类清单直接定位";
 "i18n_str_2068" = "应用语言";
 "preference.title.renderer.debug.mithril" = "Mithril（1.17+）- OpenGL 3.3 核心，经 Vulkan/Metal，实验性";
+"preference.title.renderer_backend" = "MobileGlues 渲染后端";
+"preference.detail.renderer_backend" = "MobileGlues 三端切换的统一入口（悬浮浮窗选择）：Vulkan 直连 / GLES 后端 / OpenGL 4.0 实验性，默认 Vulkan 直连。选择直接写入渲染器设置（显式选择优先）。";
+"preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直连)";
+"preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 后端)";
+"preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 实验性)";
 "preference.detail.announcement_preview_level" = "控制公告在主界面展示的详细程度。";
 "preference.detail.app_language" = "设置启动器界面语言，选择“系统”时跟随设备语言。";
 "preference.detail.curseforge_api_key" = "设置 CurseForge API 密钥，用于浏览/下载 CurseForge 模组与整合包；未设置时使用内置默认密钥。";

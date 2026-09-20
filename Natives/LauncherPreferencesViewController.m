@@ -7,6 +7,9 @@
 #import "LauncherMenuViewController.h"
 #import "LauncherPreferences.h"
 #import "LauncherPreferencesViewController.h"
+// Task 132：renderer_backend 行的 legacy 显示精化需读当前 profile 的
+// renderer 键（与 ame_effective_renderer 同一解析入口）
+#import "PLProfiles.h"
 #import "LauncherPrefContCfgViewController.h"
 #import "LauncherPrefManageJREViewController.h"
 #import "UIKit+hook.h"
@@ -293,6 +296,59 @@
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
             keyFull = @"mobileglues.fsr_rcas_sharpness";
         }
+        // Task 132（MG 三端合并）：MobileGlues 分区统一后端行——读有效渲染器，
+        // 家族键原样返回（含 legacy auto+backend 解析结果），非家族
+        // （auto/zink/…）回落默认 Vulkan 直连（用户指定默认选中项）。
+        // legacy 精化（仅显示层）：renderer=auto + mobilegl_backend=2 的存量
+        // 设备实际以 DirectGLES 运行（JavaLauncher 按 backend=2 设 env），
+        // ame_effective_renderer 返回的是共享二进制键 libMobileGL.dylib——
+        // 此处按 backend 抬到 -gles 逻辑键，浮窗 ✓ 与实际后端一致；
+        // 显式选过家族键（非 auto）的设备不受影响。
+        if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
+            NSString *ame132_eff = ame_effective_renderer();
+            BOOL ame132_isFamily =
+                [ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL] ||
+                [ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
+                [ame132_eff isEqualToString:@ RENDERER_NAME_MITHRIL];
+            if (ame132_isFamily) {
+                NSString *ame132_raw = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+                BOOL ame132_auto = ![ame132_raw isKindOfClass:NSString.class] ||
+                    ame132_raw.length == 0 || [ame132_raw isEqualToString:@"auto"];
+                if (ame132_auto && [ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL] &&
+                    getPrefInt(@"mobileglues.mobilegl_backend") == 2) {
+                    return @ RENDERER_NAME_MOBILEGL_GLES;
+                }
+                return ame132_eff;
+            }
+            return @ RENDERER_NAME_MOBILEGL;
+        }
+        // Task 132：渲染器行显示映射——存储值是家族键时，行右侧显示对应
+        // 后端文案（存储值不变；非家族值原样走通用路径）。
+        if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
+            NSString *ame132_val = getPrefObject(@"video.renderer");
+            if ([ame132_val isKindOfClass:NSString.class]) {
+                if ([ame132_val isEqualToString:@ RENDERER_NAME_MOBILEGL]) {
+                    return localize(@"preference.title.renderer_backend-mobilegl", nil);
+                }
+                if ([ame132_val isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]) {
+                    return localize(@"preference.title.renderer_backend-mobilegl_gles", nil);
+                }
+                if ([ame132_val isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+                    return localize(@"preference.title.renderer_backend-mithril", nil);
+                }
+            }
+        }
+        // Task 132（TouchController 浮窗化）：通信方式 pick 行的复合读——
+        // 禁用返回 @"0"；启用返回当前模式（@"1"=UDP / @"2"=静态库）。
+        // enableCondition 等处的 boolValue 消费对字符串数字语义兼容
+        // （@"0"->NO，@"1"/@"2"->YES）。
+        if ([section isEqualToString:@"control"] && [key isEqualToString:@"mod_touch_enable"]) {
+            if (!getPrefBool(@"control.mod_touch_enable")) {
+                return @"0";
+            }
+            return [NSString stringWithFormat:@"%ld",
+                    (long)[getPrefObject(@"control.mod_touch_mode") integerValue]];
+        }
         return getPrefObject(keyFull);
     };
     self.setPreference = ^(NSString *section, NSString *key, id value){
@@ -325,6 +381,38 @@
         // ame130_export_rcas_env 双态解析 NSNumber/NSString）
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
             keyFull = @"mobileglues.fsr_rcas_sharpness";
+        }
+        // Task 132（MG 三端合并）：统一后端行直接写渲染器键（与渲染器行
+        // 同一存储层 video.renderer；显式选择永远优先，profile 无覆盖时
+        // 即时生效——与 ame_effective_renderer 的解析一致）。
+        if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
+            setPrefObject(@"video.renderer", value);
+            return;
+        }
+        // Task 132（TouchController 浮窗化）：通信方式 pick 行的复合写——
+        // enable 与 mode 两键同步（等价原 TouchControllerPreferencesViewController
+        // 的 updateTouchControllerSetting），UDP 档联动 java.env_variables
+        // 里的 TOUCH_CONTROLLER_PROXY（同原行为）。
+        if ([section isEqualToString:@"control"] && [key isEqualToString:@"mod_touch_enable"]) {
+            NSInteger ame132_mode = [value integerValue];
+            setPrefObject(@"control.mod_touch_enable", @(ame132_mode != 0));
+            setPrefObject(@"control.mod_touch_mode", @(ame132_mode));
+            NSString *ame132_env = getPrefObject(@"java.env_variables");
+            if (ame132_mode == 1) {
+                if ([ame132_env isKindOfClass:NSString.class]) {
+                    if (![ame132_env containsString:@"TOUCH_CONTROLLER_PROXY=12450"]) {
+                        setPrefObject(@"java.env_variables",
+                            [ame132_env stringByAppendingString:@" TOUCH_CONTROLLER_PROXY=12450"]);
+                    }
+                } else {
+                    setPrefObject(@"java.env_variables", @"TOUCH_CONTROLLER_PROXY=12450");
+                }
+            } else if ([ame132_env isKindOfClass:NSString.class]) {
+                setPrefObject(@"java.env_variables",
+                    [ame132_env stringByReplacingOccurrencesOfString:@" TOUCH_CONTROLLER_PROXY=12450"
+                                                           withString:@""]);
+            }
+            return;
         }
         setPrefObject(keyFull, value);
     };
@@ -873,15 +961,24 @@
               @"type": self.typeSwitch,
               @"enableCondition": whenNotInGame
             },
-            // Task 131（替代 Task120 的 mobilegl_backend 独立 pick 行）：MobileGL
-            // 三后端（Vulkan/GLES/Mithril）已回到"视频"分区渲染器行的悬浮菜单
-            // （上游形态，见 LauncherPreferences.m rendererCandidates 的 Task131
-            // 注释）。用户四次反馈独立行"还是分开的/二级菜单入口无法使用"——
-            // 且其仅 renderer=auto 生效的门控让显式选了 MobileGlues/zink 的
-            // 设备切了也无效。存量设备 renderer=auto + mobilegl_backend=1/2/3
-            // 的解析仍由 ame_effective_renderer 的 legacy 路径保持（行为不变）。
-            // 退役的 pick 行定义已删除；偏好键 mobilegl_backend 保留在默认表
-            // （legacy 解析读取），不再出现在任何设置界面。
+            // Task 132（MG 三端合并，用户明令的统一入口 + 原地悬浮浮窗）：
+            // MobileGL 三后端（Vulkan 直连 / GLES 后端 / OpenGL 4.0 实验性）
+            // 合并为本分区唯一的 pick 行——typePickField 点击原地弹出
+            // UIAlertController actionSheet/popover 悬浮浮窗（openPicker
+            // AtIndexPath，与 FSR 档位/下载源同款形态，绝不跳转二级页面）。
+            // 读取经 getPreference 映射（有效渲染器为家族键原样返回，否则
+            // 默认 Vulkan 直连）；写入经 setPreference 映射直写 video.renderer
+            // （与渲染器行同一存储层，显式选择永远优先）。渲染器悬浮菜单里
+            // 的三条独立后端条目已随本行退役（见 LauncherPreferences.m
+            // rendererCandidates 的 Task132 注释）。
+            @{@"key": @"renderer_backend",
+              @"hasDetail": @YES,
+              @"icon": @"cpu",
+              @"type": self.typePickField,
+              @"enableCondition": whenNotInGame,
+              @"pickKeys": getRendererFamilyKeys(),
+              @"pickList": getRendererFamilyNames()
+            },
             @{@"key": @"enable_no_error",
               @"hasDetail": @YES,
               @"icon": @"exclamationmark.triangle",
@@ -961,14 +1058,99 @@
             // Control settings
             @{@"icon": @"gamecontroller"},
             
-            // --- [修改] TouchController 模组支持 ---
+            // --- [Task 132] TouchController 模组支持（浮窗化） ---
+            // 原为 typeChildPane 二级页面入口（TouchControllerPreferences
+            // ViewController）——用户明令严禁二级菜单：选择器语义的设置项
+            // 必须原地弹悬浮浮窗。现改为 typePickField：点击弹出三选项
+            // actionSheet/popover（禁用 / UDP 协议 / 静态库，✓ 标记当前值），
+            // get/setPreference 复合映射同步写 control.mod_touch_enable +
+            // control.mod_touch_mode（等价原 pane 的 updateTouchController
+            // Setting，含 UDP 档的 java.env_variables 联动）。原 pane 的
+            // 伴随行（震动/移动视角/关于）随下方内联，pane 文件不再被引用。
             @{@"key": @"mod_touch_enable",
-              @"icon": @"hand.point.up.left", // SF Symbols 图标
+              @"icon": @"hand.point.up.left",
               @"hasDetail": @YES,
-              @"type": self.typeChildPane,
+              @"type": self.typePickField,
               @"enableCondition": whenNotInGame,
-              @"canDismissWithSwipe": @NO,
-              @"class": NSClassFromString(@"TouchControllerPreferencesViewController")
+              @"pickKeys": @[@"0", @"1", @"2"],
+              @"pickList": @[
+                  localize(@"preference.touchcontroller.mode.disabled", nil),
+                  localize(@"preference.touchcontroller.mode.udp", nil),
+                  localize(@"preference.touchcontroller.mode.staticlib", nil)
+              ],
+              // Task 132：选中 UDP/静态库后展示模式说明（原 pane 的
+              // showModeDescriptionAlert 等价迁移）
+              @"action": ^void(NSString *value){
+                  NSString *ame132_title = nil;
+                  NSString *ame132_msg = nil;
+                  if ([value isEqualToString:@"1"]) {
+                      ame132_title = localize(@"preference.touchcontroller.udp.title", nil);
+                      ame132_msg = localize(@"preference.touchcontroller.udp.message", nil);
+                  } else if ([value isEqualToString:@"2"]) {
+                      ame132_title = localize(@"preference.touchcontroller.staticlib.title", nil);
+                      ame132_msg = localize(@"preference.touchcontroller.staticlib.message", nil);
+                  }
+                  if (ame132_title == nil) return;
+                  UIAlertController *ame132_alert = [UIAlertController
+                      alertControllerWithTitle:ame132_title
+                                       message:ame132_msg
+                                preferredStyle:UIAlertControllerStyleAlert];
+                  [ame132_alert addAction:[UIAlertAction
+                      actionWithTitle:localize(@"preference.touchcontroller.ok", nil)
+                                style:UIAlertActionStyleDefault handler:nil]];
+                  [self presentViewController:ame132_alert animated:YES completion:nil];
+              }
+            },
+            // Task 132：原 pane 伴随行内联（item 自带 title 走 pane 既有
+            // 本地化键，存储键不变——control.mod_touch_* 全部读者无感知）
+            @{@"key": @"mod_touch_vibrate_enable",
+              @"icon": @"waveform.path",
+              @"type": self.typeSwitch,
+              @"enableCondition": whenNotInGame,
+              @"title": localize(@"preference.touchcontroller.vibrate.enable", nil)
+            },
+            @{@"key": @"mod_touch_vibrate_intensity",
+              @"icon": @"speaker.wave.2",
+              @"type": self.typePickField,
+              @"enableCondition": whenNotInGame,
+              @"title": localize(@"preference.touchcontroller.vibrate.intensity", nil),
+              @"pickKeys": @[@"1", @"2", @"3"],
+              @"pickList": @[
+                  localize(@"preference.touchcontroller.vibrate.intensity.light", nil),
+                  localize(@"preference.touchcontroller.vibrate.intensity.medium", nil),
+                  localize(@"preference.touchcontroller.vibrate.intensity.heavy", nil)
+              ]
+            },
+            @{@"key": @"mod_touch_moveview_enable",
+              @"icon": @"arrow.triangle.2.circlepath",
+              @"type": self.typeSwitch,
+              @"enableCondition": whenNotInGame,
+              @"title": localize(@"preference.touchcontroller.moveview.enable", nil)
+            },
+            @{@"key": @"mod_touch_about",
+              @"icon": @"info.circle",
+              @"type": self.typeButton,
+              @"enableCondition": whenNotInGame,
+              @"title": localize(@"preference.touchcontroller.about", nil),
+              @"action": ^void(){
+                  // Task 132：原 pane showInfoAlert 等价内联
+                  UIAlertController *ame132_info = [UIAlertController
+                      alertControllerWithTitle:localize(@"preference.touchcontroller.about.title", nil)
+                                       message:localize(@"preference.touchcontroller.about.message", nil)
+                                preferredStyle:UIAlertControllerStyleAlert];
+                  [ame132_info addAction:[UIAlertAction
+                      actionWithTitle:localize(@"preference.touchcontroller.ok", nil)
+                                style:UIAlertActionStyleDefault handler:nil]];
+                  [ame132_info addAction:[UIAlertAction
+                      actionWithTitle:@"GitHub"
+                                style:UIAlertActionStyleDefault
+                              handler:^(UIAlertAction *a){
+                        [[UIApplication sharedApplication] openURL:
+                            [NSURL URLWithString:@"https://github.com/TouchController/TouchController"]
+                            options:@{} completionHandler:nil];
+                  }]];
+                  [self presentViewController:ame132_info animated:YES completion:nil];
+              }
             },
             // ------------------------------------------
 

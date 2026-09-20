@@ -1104,6 +1104,59 @@ Stage Summary:
 - 装机验证清单见 Tasks 112-118 主条目锚点表
 
 ---
+Task ID: 119-124
+Agent: main (Super Z)
+Task: 四联修复（MobileGL FSR 预交换 EASU / mobilegl_backend 单一选项 / 四语言 l10n 对齐 / Task124 zink→vk 崩溃判读）——774fa78（含 3d984fc 发布说明 Task123 补章）
+
+Work Log:
+- Task119（MG Vulkan 路径 FSR 缩小不放大）：Task83 联动把 MC 窗口缩到 surface/档位系数，但 MobileGL 路径无升采样钩子 → MC 画在全尺寸 swapchain 左下角。新建 Natives/ctxbridges/mgl_fsr.mm（528 行）：gl_swap_buffers 内预交换 EASU（ame48 几何守卫后、eglSwapBuffers 前）——glCopyTexImage2D 捕获渲染区，FSR1 EASU 全屏 quad 画回默认帧缓冲，GPU 侧零回读，EASU shader 源与 zink/MobileGlues 同源；视口自适应输入门控（Task105 模式）、GLES shader 版本自愈（EASU 构建失败时 nativeSendScreenSize 恢复全分辨率）、gl_init_context 重建时上下文重置、Task78 补偿链豁免扩展到 MobileGL、ame83_fsr_capable_renderer 纳入 MobileGL、FSR 联动读 ame_effective_renderer（覆盖感知）。CMake：mgl_fsr.mm 强制 objective-c++ 方言（Task83 CI 教训）
+- Task120（mobilegl_vulkan 布尔开关无条件覆盖显式渲染器）：新单一事实源 ame_effective_renderer()（LauncherPreferences.m/.h）——显式非 auto 渲染器永远优先；auto + mobilegl_backend 1/2 → libMobileGL.dylib（MOBILEGL_BACKEND_TYPE 切 DirectVulkan/DirectGLES，同一二进制）、3 → libmithril.dylib（存在性守卫）、0/缺失 → auto。消费者：JavaLauncher AMETHYST_RENDERER 解析、GameSurfaceView.layerClass、SurfaceViewController FSR 联动。设置 pick 四档（Mithril 档 dylib 缺失时动态隐藏）+ 本地化行标签；PLPreferences 默认 mobilegl_backend=1（Vulkan）；渲染器列表移除 Mithril 条目（三后端只经设置行进入）；旧 mobilegl_vulkan 全仓退役
+- Task121（l10n 审计）：en/zh-Hans 缺 23 键、zh-CN/zh-Hant 滞后 22 键；四语言键集拉齐一致（en 基线 1879，删 2 个死 renderer.debug.mobilegl* 键）；mobilegl_backend 标题/详情/四档文案全语言；pick 选中标记改按【存储值】比较（iPad 上下文菜单同修）
+- Task124 判读（日志 9f32cb4/1d4ff3a，构建 9e6fc27）："zink 被换成 vk" = profile 渲染器 libOSMesa.8.dylib 被 Task113 开关静默覆盖（'[Amethyst] Task113: MobileGL Vulkan override active'）；"vk 崩溃" = NSInvalidArgumentException '-[CALayer naturalDrawableSizeMVK]'——layerClass 按 zink 建了普通 CALayer，实际渲染器却是 MobileGL DirectVulkan，其内部 MoltenVK 在 swapchain 创建时向 layer 发 naturalDrawableSizeMVK。同根修复随 Task120 落地（渲染器单一源 + 显式选择优先 + MobileGL 全路径 CAMetalLayer）+ gl_bridge 诊断探针（'Task124 WARN: MobileGL CAMetalLayer drawableSize still zero'）
+- 语法三查：LPVC mobilegl_backend pick 三重括号 '([[[' 笔误（净 +2 '[' +2 '('）被 G6 裸括号 delta 门在推送前拦截
+- 验证：verify_task119_124 62/62（A FSR 钩子 12 / B 后端选项 11 / C l10n 9 含跨语言键集一致 / D Task124 锚点 3 / E 语法门 23 / F verify_task112_118 重锚全绿）；verify_task112_118 49/49；verify_task110 34/34；task83 73/73、task84 31/31、task85 24/24（105-109 可见锚点绿，深级联收割已记录，分跑政策不变）
+- 装机锚点：'[MGLFSR] Task119 FSR1 upscale engaged (MobileGL): render WxH -> surface WxH'；'[Amethyst] Task120: MobileGL backend override active' 仅 auto 出现；zink 会话必须无 override 行且无 naturalDrawableSizeMVK 异常
+
+Stage Summary:
+- MobileGL FSR 升采样闭环（GPU 侧 EASU，无逐帧回读）；渲染器单一事实源 + 显式选择优先（Task113 覆盖事故根除）；四语言键集一致；zink→vk 崩溃同根闭环
+- 3d984fc：5.1.0 发布说明 Task123 补章（项目史两段会话接力、30+ 提交）
+
+---
+Task ID: 124
+Agent: main (Super Z)
+Task: "选了 zink 被换成 vk + vk 崩溃" 双日志判读（9f32cb4/1d4ff3a，构建 9e6fc27）——同根闭环
+
+Work Log:
+- "zink 被换成 vk"：profile 渲染器 libOSMesa.8.dylib 被 Task113 mobilegl_vulkan 布尔开关静默覆盖，日志锚 '[Amethyst] Task113: MobileGL Vulkan override active (profile renderer was libOSMesa.8.dylib)'
+- "vk 崩溃"：NSInvalidArgumentException '-[CALayer naturalDrawableSizeMVK]: unrecognized selector' 于 23:00:00——layerClass 按裸 profile（zink）建了普通 CALayer，实际渲染器却是 MobileGL DirectVulkan，其内部 MoltenVK 在 swapchain 创建时向 layer 发 naturalDrawableSizeMVK（其 CAMetalLayer 分类方法），普通 CALayer 不响应 → 进程终止
+- 同根修复随 Task120 落地：渲染器单一事实源 ame_effective_renderer + 显式选择永远优先 + MobileGL 全路径 CAMetalLayer；另加 gl_bridge 诊断探针 'Task124 WARN: MobileGL CAMetalLayer drawableSize still zero'
+- 装机判读口径：zink 会话必须无 Task113 override 行且无 naturalDrawableSizeMVK 异常
+
+Stage Summary:
+- Task113 覆盖类事故（布尔开关压过显式选择）与 layerClass/实际渲染器分叉类崩溃的判读范式入档；修复由 Task120 单一源收口
+
+---
+Task ID: 125-128
+Agent: main (Super Z)
+Task: 四联修复（启动时自动更新检查 / 微软登录对话框修复 / 子面板新拟态基底 / 第三方登录救援）——0ac947c + 0877ca6（Task128 真根因补丁）+ CI 修复链 9d760c9/39b5c37/11f8a22/bd71210
+
+Work Log:
+- CI 修复先行（run 35455886772）：mgl_fsr.mm 9 处 'use of undeclared identifier GL_TEXTURE_2D'——防御性 #ifndef 块漏了 0x0DE1；补守卫后注释剥离审计归零（verify_task125_128 E3）
+- Task125（启动自动更新检查）：LauncherRootViewController.viewWillAppear → ame125_autoUpdateCheckOnce（单次守卫；general.auto_update_check 默认开，新设置行挨着手动检查按钮）→ 1.5s 延迟 UpdateChecker → 仅 hasUpdate 时 NMToast 新拟态卡片"新版本 X 可用"+ 查看动作开 release 页；已是最新/网络失败完全静默；刻意非模态（启动期无需用户决策）
+- Task126（"正版账号登录用系统弹窗、必须手动关"）：showDialog/ios_uikit_bridge.m 双层根因——UIAlertController 挂在新 UIWindow（windowLevel 1000）且 OK action handler 为 nil → 弹窗窗口泄漏并霸占 key window。修复：OK handler 隐藏弹窗窗并恢复原 key window；微软登录成功/状态通知改 6s 自动消失 NMToast（错误保留弹窗供阅读）
+- Task127（子面板新拟态）：UIViewController+NMPanel 分类 nm_applySubpanelNeomorphStyle——NMTheme 背景画布 + 深度 3 内 UITableView 清洗/主题化（不入 cell）；关联对象幂等；BackgroundManager 透明面板可跳过
+- Task128（第三方登录救援，zl2 同思路）：
+  (a) authlib-injector 在线下载是登录前置 → 下载失败 = 第三方登录全不可用：包内常备 jar（Natives/resources/authlib-injector-1.2.7.jar）本地复制兜底，在线下载降为末位回退；getJvmArgsForAuthlib 启动时同样回退包内 jar（-javaagent 不再静默消失——4288040 日志实证游戏带着原生 authlib 跑出 YggdrasilUserApiService.fetchProperties 401）
+  (b) 账号选择在 Yggdrasil refresh 拒绝时硬失败：token 过期 → ForbiddenOperationException → 永远选不上。zl2 语义修复：refresh 失败仍选择账号（selected_account 持久化），NMToast 建议重登，皮肤/服务器鉴权优雅降级；已校验账号跳过 refresh（isSessionValidated 静态集）
+  (c) 账号类型三分类嗅探口径不一（BaseAuthenticator expiresAt-先/clientToken；AccountList clientToken-only；Java clientToken!='0'&&xuid==null）→ 交叉错分类静默丢 authlib 接线：显式 accountType 标记（thirdparty/microsoft/local）登录保存点全写，加载优先认标记，旧文件回落嗅探
+- 0877ca6（Task128 真根因，4288040 日志）：多角色登录路径保存账号 json 时【不带 expiresAt/accountType】→ 重载被判 Local → -javaagent 静默消失 → 401。修复：进入头像抓取【前】设置两键（后续所有 saveChanges 继承）；单角色/refreshToken 路径 0ac947c 已带。装机锚点：第三方会话必现 '[JavaLauncher] Adding authlib-injector arguments for third party account' 且无原生 401
+- 端点活性复核：littleskin.cn ALI 头 + api root 200；BMCL/yushi.moe jar URL 200/344477B
+- 验证：verify_task125_128 52/52（A 自动更新 8 / B 对话框修复 3 / C 子面板基底 5 / D 第三方 10 含包内 jar 字节尺寸锚 / E 语法 23 + 级联 verify_task119_124 62/62）；12 个触碰文件花括号平衡 + 裸括号 delta vs HEAD 全净；version.h REVISION 17 增补记录 Tasks 119-128
+
+Stage Summary:
+- 启动更新提示闭环（非模态、静默失败）；系统弹窗泄漏根除；子面板新拟态统一；第三方登录三层修复（包内 jar 兜底 / refresh 失败可选 / accountType 显式标记 + 多角色保存补键）
+
+---
 Task ID: 129
 Agent: main (Super Z)
 Task: v5.1.0 装机实测八项反馈修复（双日志判读 + 根因闭环 + 级联维护）
@@ -1172,3 +1225,25 @@ Work Log:
 Stage Summary:
 - 新 IPA 就绪；装机锚点：26.1.2 进世界 '[SDLHook] Task131: SDL_SetEventFilter blocked' 无 SIGBUS；切换角色三段日志 + 新 accountId 启动；渲染器菜单三后端条目；'[PLPrefTable] Task131: pick opened' 取证
 - 老第三方账户需重登一次启用免密切换
+---
+Task ID: 132
+Agent: main (Super Z)
+Task: 43ef4ae 装机日志四联修复（26.1.2 controlify/JNA 崩溃根治 / MG 三端合并统一悬浮浮窗 / TouchController 二级页面浮窗化 / 第三方皮肤 authlib 1.2.8）
+
+Work Log:
+- 【问题 3：26.1.2 整合包崩溃】43ef4ae latestlog.txt 定案：'Initializing Controlify' -> '[SDLNativesLoader] Attempting to load SDL3 from SDL3' -> 'Platform.isMac called from com.sun.jna.Structure' -> SIGBUS at pc=0x1167b8010（native 栈 0x163e70a84 递归闭包帧），且全篇无 Task131 守卫日志——JNA 的符号解析根本没进过 hook。机制：libjnidispatch 经【自己的 __la_symbol_ptr 槽】调 dlsym 解析 SDL_SetEventFilter，该槽属于后续 dlopen 的新 image，init_hookFunctions 传栈上 rebindings 数组（后续 image 重绑定不可依赖；同会话 LWJGL 被拦、JNA 未拦的分裂行为与此一致）；JNA 拿到真函数把 Java 回调闭包注册进 SDL，SDL3 的 SDL_SetEventFilter 注册即对 pending 队列同步调用 filter -> 跳进 RW 不可执行 libffi trampoline -> SIGBUS
+- 修复（sdl3_hook.m Task132 块 + main_hook.m 接入）：hooked_dlopen 检出 libjnidispatch（JVM System.load 走被 hook 的 dlopen——Task106 libasyncProfiler 拦截同链路实证），真实 dlopen 返回后 amethyst_task132_rebind_jna_dlsym 遍历该 image 间接符号表，把 __la_symbol_ptr/__got 中符号 _dlsym 的指针槽改写为 hooked_dlsym（fishhook 同款 __LINKEDIT 基址换算 slide+vmaddr-fileoff、运行时 sysconf(_SC_PAGESIZE)（arm64 iOS 16KB）、vm_protect RW|COPY、幂等、INDIRECT_SYMBOL_LOCAL/ABS 与越界全防御）。三条 dlopen 路径（26PPL/bypass/原生）统一经 needsPostLoadFixup 走非尾返。JNA 解析自此进 amethyst_sdl3_hook_resolve，Task131 守卫对 JNA 路径生效（真 SDL_ 符号照常透传，零误伤）
+- 镜像验证（task132_jna_got_mirror.py）：真实 jna-5.13.0 darwin-aarch64 libjnidispatch 二进制复跑 GOT 遍历——__la_symbol_ptr 恰 1 个 _dlsym 指针槽（可写 __DATA，S_LAZY），__got 0 项（另一间接表项属 __stubs 代码段），与上会话取证结论一致
+- 【问题 1：MG 三端合并】rendererCandidates 三后端条目（mobilegl/mobilegl_gles/mithril）退役，渲染器菜单回归七项（与 VersionManagerViewController 硬编码七短名重新对齐——Task131 加三后端时的 10 vs 7 潜在错位随之消失）；MobileGlues 分区新增统一 pick 行 renderer_backend（typePickField 原地悬浮浮窗 = UIAlertController actionSheet/popover 锚定行，openPickerAtIndexPath 同款形态，绝不跳转二级页面），三选项 MobileGlues (Vulkan 直连)/(GLES 后端)/(OpenGL 4.0 实验性)（用户指定文案，四语言 l10n），默认选中 Vulkan 直连；读经 getPreference 映射（ame_effective_renderer 家族键原样返回否则默认 + legacy auto+backend=2 显示精化到 -gles 逻辑键），写直写 video.renderer（与渲染器行同一存储层，显式选择永远优先）；渲染器行显示映射（家族键 -> 后端文案）；PLPrefTableViewController pick 行标签显示落地（存储值命中 pickKeys -> pickList 本地化标签，Task121 注释声称的行为至此真正实现，未命中回落旧路径零回归）
+- 【问题 2：其他设置项浮窗恢复】审计四个 typeChildPane：custom_controls/default_gamepad_ctrl/manage_runtime 为真编辑器页面（上游母体同款，保留）；TouchController 行（选择器语义被页面入口吞掉）浮窗化——mod_touch_enable 改 typePickField 三选项（禁用/UDP/静态库，✓ 标记），get/set 复合映射同步写 control.mod_touch_enable + mod_touch_mode（等价原 pane updateTouchControllerSetting，含 UDP 档 java.env_variables 的 TOUCH_CONTROLLER_PROXY 联动与模式说明弹窗）；伴随行内联（vibrate 开关/intensity 三档浮窗/moveview 开关/about 按钮+GitHub 链接，item 自带 title 走 pane 既有 l10n 键）；pane 文件保留不再被引用
+- 【问题 4：第三方皮肤】根因：MC 26.3+ 重写 authlib 服务发现架构（独立 discovery 链路），1.2.7（2025-12）只改写旧 minecraftservices/sessionserver URL 常量 -> 新链路绕过注入直连 Mojang 官方端点 -> 第三方 token 401 -> 皮肤回落默认（皮肤站 issue #298/#300 同症状，1.2.8 修复）。升级：Natives/resources jar 换 1.2.8（build 56，349681B，sha256 9c7f4343...，新增 httpd/DiscoveryFilter.class 实证），ThirdPartyAuthenticator URL/版本常量/注释四点同步（Java 17/21/25 兼容保持）
+- 基线救援（环境快照回退后遗症）：重建外层 task116_l10n_audit.py + task116c_precise_audit.py（E5/E6 消费，范围定标主设置 VC + title:localize() 形态不计派生键 + warnKey 不计）；从提交记录重建 worklog 119-124/124/125-128 三条目并同步外层（verify_task119_124 D3 等级联锚复活）
+- 级联维护：verify_task112_118 B2/B3、verify_task119_124 B8、verify_task131 B1/B2/B6/G3 重锚（家族条目退役 + 四段史 + 1906 键基线 = 1901 + renderer_backend 5键）；verify_task125_128 D1 重锚（1.2.8 jar 349681B）；verify_task129 I3 / verify_task130 H3 键数重锚
+- verify_task132 53/53（A 崩溃修复 15：日志证据/实现锚/真实二进制镜像 + B MG 合并 11 + C TouchController 9 + D 浮窗呈现 3 + E authlib 6 + F l10n 5 + G 语法门 4 含真词法剥离器（先串后注 + pragma 剥离——URL 字符串 // 被注释先剥的伪影曾让括号门误报）+ 级联全绿）；全链：112_118 49/49、119_124 62/62、125_128 52/52、129 47/47、130 60/60、131 37/37
+- version.h REVISION 17 addendum（Task 132，no bump）四项修复入档
+
+Stage Summary:
+- 26.1.2 整合包崩溃根治：JNA 路径并入 hook 管辖，装机锚点 '[SDLHook] Task132: libjnidispatch _dlsym slot rebound (...slot=...)' + controlify 初始化不再 SIGBUS（'Initializing Controlify' 后游戏正常进入）
+- MG 三端：MobileGlues 分区单一统一入口 + 原地悬浮浮窗三选项（默认 Vulkan 直连），渲染器菜单不再有三个分开条目；装机锚点 '[PLPrefTable] Task131: pick opened: mobileglues.renderer_backend (3 options)'
+- TouchController：二级页面退役，原地浮窗选择 + 伴随行内联；装机锚点 'pick opened: control.mod_touch_enable (3 options)'
+- 第三方皮肤：authlib-injector 1.2.8（discovery 链路修复），装机锚点第三方会话 '[JavaLauncher] Adding authlib-injector arguments' + 皮肤正常加载（不再回落 Steve/Alex）

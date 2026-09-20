@@ -368,10 +368,20 @@ void* hooked_dlopen(const char* path, int mode) {
     // （installZinkStrideFix 在 libOSMesa 加载前调用，初次 rebind 无法
     //  捕获 libOSMesa image 内的引用；必须在其加载后再次 rebind）
     BOOL needsZinkRebind = path && strstr(path, "libOSMesa") && g_zinkStrideFixActive;
+    // Task 132（26.1.2 整合包 controlify/JNA closure SIGBUS 补完）：
+    // libjnidispatch（JNA 原生库）加载后重绑定其 _dlsym 指针槽为
+    // hooked_dlsym——否则 JNA 经自己的 GOT 槽调真 dlsym，Task131 的
+    // SDL_SetEventFilter/SDL_AddEventWatch 守卫对 JNA 路径不生效
+    // （机制与实现见 sdl3_hook.m 的 Task 132 块）。
+    // JVM 的 System.load 走被 hook 的 dlopen（Task106 libasyncProfiler
+    // 拦截同链路实证），此处检出必然命中。
+    BOOL needsJnaDlsymRebind = path != NULL && strstr(path, "libjnidispatch") != NULL;
+    // Task 132 同样需要拿到真实句柄做后处理，与 zink 重绑同款非尾返路径
+    BOOL needsPostLoadFixup = needsZinkRebind || needsJnaDlsymRebind;
 
     void *handle;
     if (shouldUseDyldBypass26PPL) {
-        if (needsZinkRebind) {
+        if (needsPostLoadFixup) {
             handle = hooked_dlopen_26_ppl(path, mode);
         } else {
             __attribute__((musttail)) return hooked_dlopen_26_ppl(path, mode);
@@ -381,13 +391,13 @@ void* hooked_dlopen(const char* path, int mode) {
         // which will break this dyld bypass, so we redirect calls to the original dlopen.
         static void *(*sys_dlopen)(const char *, int);
         if(!sys_dlopen) sys_dlopen = dlsym(RTLD_NEXT, "dlopen");
-        if (needsZinkRebind) {
+        if (needsPostLoadFixup) {
             handle = sys_dlopen(path, mode);
         } else {
             __attribute__((musttail)) return sys_dlopen(path, mode);
         }
     } else {
-        if (needsZinkRebind) {
+        if (needsPostLoadFixup) {
             handle = orig_dlopen(path, mode);
         } else {
             __attribute__((musttail)) return orig_dlopen(path, mode);
@@ -398,6 +408,11 @@ void* hooked_dlopen(const char* path, int mode) {
     if (handle && needsZinkRebind) {
         NSLog(@"[ZinkStrideFix] libOSMesa loaded via dlopen, re-rebinding Vulkan symbols");
         rebindZinkStrideFixForNewImage();
+    }
+    // Task 132：libjnidispatch 的 _dlsym 槽位重绑定（见 sdl3_hook.m）。
+    // 幂等（重复加载安全）；失败仅记日志不阻断加载。
+    if (handle && needsJnaDlsymRebind) {
+        amethyst_task132_rebind_jna_dlsym(handle, (void *)hooked_dlsym);
     }
     return handle;
 }
