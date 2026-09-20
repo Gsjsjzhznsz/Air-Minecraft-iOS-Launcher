@@ -895,7 +895,7 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
     if (gameDir.length == 0) {
         return;
     }
-    NSFileManager *fm = NSFileManager.defaultManager;
+    NSFileManager *ame134_fm = [NSFileManager defaultManager];
     NSString *configDir = [gameDir stringByAppendingPathComponent:@"config/touchcontroller"];
     NSString *presetDir = [configDir stringByAppendingPathComponent:@"preset"];
     NSString *configFile = [configDir stringByAppendingPathComponent:@"config.json"];
@@ -907,7 +907,7 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
 
     // 读现有全局配置（保留 mod 已有的其它设置）
     NSMutableDictionary *config = [NSMutableDictionary dictionary];
-    if ([fm fileExistsAtPath:configFile]) {
+    if ([ame134_fm fileExistsAtPath:configFile]) {
         NSDictionary *loaded = [NSDictionary dictionaryWithContentsOfFile:configFile];
         if ([loaded isKindOfClass:NSDictionary.class]) {
             config = loaded.mutableCopy;
@@ -916,14 +916,14 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
 
     if (getPrefBool(@"control.mod_touch_hide_controls")) {
         // —— 开启：写空布局预设 + order + preset 指向 ——
-        [fm createDirectoryAtPath:presetDir withIntermediateDirectories:YES attributes:nil error:nil];
+        [ame134_fm createDirectoryAtPath:presetDir withIntermediateDirectories:YES attributes:nil error:nil];
         NSString *presetJson = @"{\n  \"name\" : \"Amethyst Clean\",\n  \"layout\" : [\n  ]\n}";
         [presetJson writeToFile:presetFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
         // order.json：保留已有条目，追加本预设（mod 的 PresetsContainer 按
         // order 排序；缺 order.json 时按 uuid 排序兜底，写入只为整洁）
         NSMutableArray *order = [NSMutableArray array];
-        if ([fm fileExistsAtPath:orderFile]) {
+        if ([ame134_fm fileExistsAtPath:orderFile]) {
             NSArray *loaded = [NSArray arrayWithContentsOfFile:orderFile];
             if ([loaded isKindOfClass:NSArray.class]) {
                 [order addObjectsFromArray:loaded];
