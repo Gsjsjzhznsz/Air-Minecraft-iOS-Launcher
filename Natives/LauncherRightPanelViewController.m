@@ -1507,7 +1507,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         // NOTE: this intentionally does NOT reuse isJITEnabled() -- that
         // reports the persistent CS_DEBUGGED state, not debugger liveness.
         if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
-            !JIT26IsLikelyDebuggerKeepAttached()) {
+            !JIT26IsLikelyDebuggerKeepAttached() &&
+            !getPrefBool(@"debug.jit26_script_disable")) {
             NSLog(@"[JIT] [RightPanel] CS_DEBUGGED set but no live JIT26 debugger (ppid=%d traced=%d exn=%d) — re-attaching script via stikjit://",
                   getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
             NSString *scriptDataString = @"";
@@ -1544,16 +1545,66 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         NSLog(@"Debug option skipped waiting for JIT. Java might not work.");
         handler();
         return;
-    } else if (@available(iOS 17.4, *)) {
-        NSString *scriptDataString = @"";
-        if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM)) {
-            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-            scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
-        }
-        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
     } else {
-        // Assuming 16.7-17.3.1. SideStore still lacks this URL scheme at the time of writing, so it only jumps to SideStore.
-        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]] options:@{} completionHandler:nil];
+        // ---- Task 134：JIT 开启工具分发（LiveContainer 多工具方案） ----
+        // 病历：用户没装 StikDebug 而用 SideStore/StosDebug/JITStreamer 等
+        // 其它工具时，固定跳 stikjit:// 等于"点了没反应"，JIT 永远开不了。
+        // 现按 debug.jit_enabler 偏好分发；auto = 原自动判定（TrollStore 检测
+        // → apple-magnifier；iOS>=17.4 → stikjit；16.7-17.3.1 → sidestore）。
+        // debug.jit26_script_disable（用户点名）：关闭后 stikjit:// 请求不再
+        // 附带 UniversalJIT26.js 的 script-data（纯调试器附加式 JIT）。
+        NSString *ame134_enabler = getPrefObject(@"debug.jit_enabler");
+        if (![ame134_enabler isKindOfClass:NSString.class] || ame134_enabler.length == 0) {
+            ame134_enabler = @"auto";
+        }
+        BOOL ame134_noScript = getPrefBool(@"debug.jit26_script_disable");
+        NSString *ame134_bundleId = NSBundle.mainBundle.bundleIdentifier;
+        NSLog(@"[JIT] [RightPanel] Task134 enabler=%@ noScript=%d", ame134_enabler, ame134_noScript);
+
+        if ([ame134_enabler isEqualToString:@"manual"]) {
+            // 手动：不跳任何工具，等用户自己附加调试器（显示等待弹窗）
+        } else if ([ame134_enabler isEqualToString:@"trollstore"]) {
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+                [NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", ame134_bundleId]]
+                options:@{} completionHandler:nil];
+        } else if ([ame134_enabler isEqualToString:@"sidestore"]) {
+            // SideStore 官方 scheme（LiveContainer 同款）
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+                [NSString stringWithFormat:@"sidestore://enable-jit?bundle-id=%@", ame134_bundleId]]
+                options:@{} completionHandler:nil];
+        } else if ([ame134_enabler isEqualToString:@"stosdebug"]) {
+            NSString *ame134_appName = NSBundle.mainBundle.objectForInfoDictionaryKey(@"CFBundleDisplayName") ?: @"Amethyst";
+            NSMutableString *ame134_url = [NSMutableString stringWithFormat:
+                @"stosdebug://enableJIT?bundleId=%@&appName=%@", ame134_bundleId, ame134_appName];
+            if (!ame134_noScript) {
+                NSData *ame134_script = [NSData dataWithContentsOfFile:
+                    [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+                if (ame134_script) {
+                    [ame134_url appendFormat:@"&script=%@", [ame134_script base64EncodedStringWithOptions:0]];
+                }
+            }
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:ame134_url]
+                options:@{} completionHandler:nil];
+        } else if ([ame134_enabler isEqualToString:@"jitstreamer"]) {
+            // JitStreamer-EB：默认 WireGuard 本地地址（LiveContainer 同款
+            // 默认值 http://[fd00::]:9172），浏览器打开 launch_app 接口
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+                [NSString stringWithFormat:@"http://[fd00::]:9172/launch_app/%@", ame134_bundleId]]
+                options:@{} completionHandler:nil];
+        } else if (@available(iOS 17.4, *)) {
+            // auto / stikjit 共用 stikjit://（显式选择时无视系统版本）
+            NSString *scriptDataString = @"";
+            if (!ame134_noScript &&
+                ([ame134_enabler isEqualToString:@"stikjit"] ||
+                 DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM))) {
+                NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+            }
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+        } else {
+            // Assuming 16.7-17.3.1. SideStore still lacks this URL scheme at the time of writing, so it only jumps to SideStore.
+            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]] options:@{} completionHandler:nil];
+        }
     }
     
     self.progressLabel.text = localize(@"i18n_str_436", nil);

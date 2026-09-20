@@ -575,9 +575,19 @@
 "preference.touchcontroller.about" = "关于 TouchController";
 "preference.touchcontroller.about.title" = "关于 TouchController";
 "preference.touchcontroller.about.message" = "TouchController 是一个为 Minecraft Java 版添加触摸控制的模组。本启动器支持两种通信模式：\n\n• UDP 协议：基于网络的通信\n• 静态库：高性能本地通信\n\n访问 GitHub 获取更多信息。";
-"preference.pickextra.edit_layout" = "編輯當前佈局…";
-"preference.pickextra.edit_gamepad" = "編輯手柄按鍵…";
-"preference.pickextra.manage_runtime" = "管理執行時（匯入/刪除）…";
+// Task 134: JIT enabler pick + iOS 26 script toggle + TouchController hide-controls
+"preference.debug.jit_enabler.auto" = "自動（建議）";
+"preference.debug.jit_enabler.stikjit" = "StikDebug / StikJIT";
+"preference.debug.jit_enabler.sidestore" = "SideStore";
+"preference.debug.jit_enabler.stosdebug" = "StosDebug";
+"preference.debug.jit_enabler.jitstreamer" = "JitStreamer-EB";
+"preference.debug.jit_enabler.trollstore" = "TrollStore";
+"preference.debug.jit_enabler.manual" = "手動（自行附加除錯器）";
+"preference.title.jit_enabler" = "JIT 開啟工具";
+"preference.detail.jit_enabler" = "選擇用於開啟 JIT 的工具。沒有安裝 StikDebug 的使用者請改選 SideStore、StosDebug、JitStreamer-EB 或 TrollStore，否則點擊啟動可能沒有任何反應。預設自動：依裝置狀態依序嘗試 TrollStore、StikDebug、SideStore。";
+"preference.title.jit26_script_disable" = "停用 iOS 26 JS 指令碼 JIT";
+"preference.detail.jit26_script_disable" = "啟動遊戲時不再向 JIT 工具傳送 UniversalJIT26.js 指令碼（純除錯器附加式 JIT）。僅當你的工具不支援指令碼、或指令碼導致異常時才需要開啟；依賴系統級記憶體映射的裝置（TXM）開啟後可能無法啟動遊戲。";
+"preference.touchcontroller.hide_controls" = "遮蔽控制項（介面無控制項）";
 "preference.touchcontroller.ok" = "确定";
 "preference.touchcontroller.cancel" = "取消";
 "preference.touchcontroller.vibrate.enable" = "启用震动反馈";

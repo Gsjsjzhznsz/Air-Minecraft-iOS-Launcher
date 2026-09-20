@@ -1878,10 +1878,18 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
                     }
                     *slot = hook_fn;
                     ame132_hits++;
-                    NSLog(@"[SDLHook] Task132: libjnidispatch _dlsym slot rebound "
-                          @"(%s[%s] slot=%p) -- JNA symbol resolution now routes "
-                          @"through hooked_dlsym (Task131 guard covers the JNA path)",
-                          seg->segname, sect->sectname, (void *)slot);
+                    // Task 134：读回验证——写后槽值必须等于 hook，否则
+                    // （段保护被回退/写被忽略）立即报错，下次日志可定位
+                    if (*slot != hook_fn) {
+                        NSLog(@"[SDLHook] Task132: READBACK FAILED for _dlsym slot "
+                              @"%p (value=%p expected=%p) -- JNA stays unhooked!",
+                              (void *)slot, *slot, hook_fn);
+                    } else {
+                        NSLog(@"[SDLHook] Task132: libjnidispatch _dlsym slot rebound "
+                              @"(%s[%s] slot=%p verified) -- JNA symbol resolution now routes "
+                              @"through hooked_dlsym (Task131 guard covers the JNA path)",
+                              seg->segname, sect->sectname, (void *)slot);
+                    }
                 }
             }
         }
@@ -2091,6 +2099,9 @@ static const char *amethyst_task133_basename(const char *path) {
     return slash ? slash + 1 : path;
 }
 
+// Task 134 前向声明（定义在 ensure 之后）：JVM 镜像检出时启动看门狗。
+static void amethyst_task134_watchdog_maybe_start(void);
+
 // Task 133 主入口：扫描已加载镜像，把 JVM 侧 dlopen 调用链接进 hook。
 // 由 hooked_dlopen（JVM/JNA 相关路径加载后）与 hooked_dlsym（入口）调用。
 // 增量扫描：dyld 追加式注册新镜像，游标只进不退；镜像数回落（dlclose，
@@ -2137,6 +2148,8 @@ void amethyst_task133_ensure_jvm_chain(void) {
                   @"_dlopen slots", isJli ? @"libjli" : @"libjvm", path ?: "(null)");
             amethyst_task133_rebind_image_dlopen(hdr, slide,
                 (void *)hooked_dlopen, (void *)orig_dlopen);
+            // Task 134：JVM 家族镜像已出现——启动链路无关的看门狗扫描
+            amethyst_task134_watchdog_maybe_start();
         } else if (isJna) {
             // dlopen 句柄即 mach header 地址（Task132 同款对应关系），
             // 直接复用既有的 _dlsym 槽位重绑定
@@ -2144,11 +2157,56 @@ void amethyst_task133_ensure_jvm_chain(void) {
                   @"install %s) -- invoking Task132 dlsym rebind",
                   path ?: "(null)", install ?: "(null)");
             amethyst_task132_rebind_jna_dlsym((void *)hdr, (void *)hooked_dlsym);
+            amethyst_task134_watchdog_maybe_start();
         }
     }
     t133_cursor = _dyld_image_count();
     t133_initialized = true;
     pthread_mutex_unlock(&t133_lock);
+}
+
+// ---------------------------------------------------------------------------
+// Task 134：JVM 镜像扫描看门狗（26.1.2 controlify/JNA SIGBUS 的链路无关
+// 兜底层）。
+//
+// 动机：Task133 的拦截链依赖"libjli/libjvm 的 _dlopen 槽被成功重绑定"，
+// 装机日志（3bcf8c4）实证该链在真机上存在未知断点（用户在 9fa66fb 构建
+// 上仍报告崩溃，但未附新日志无法定位）。取证显示 JNA 在 Native 类静态
+// 初始化时加载 libjnidispatch（日志 21:33:2x），而 controlify 解析
+// SDL_SetEventFilter 的崩溃发生在 21:33:23——两者相隔【秒级】。这给了
+// 一个不依赖 JVM dlopen 链的兜底窗口：只要 libjnidispatch 镜像在 dyld
+// 列表里存在超过 200ms，定时器扫描就能检出它并执行 Task132 的 _dlsym
+// 槽重绑定（JNA 后续的符号解析即进入 hooked_dlsym，Task131 守卫生效）。
+//
+// 开销：主队列 200ms 定时器，空闲时一次 _dyld_image_count() + 整数比较
+// 即早退（ensure_jvm_chain 幂等 + 增量游标）。首次检出 JVM 家族镜像
+// （libjli/libjvm/jna）时启动，进程生命周期内常驻。
+// ---------------------------------------------------------------------------
+void amethyst_task134_jvm_watchdog_start(void);
+
+static void amethyst_task134_watchdog_maybe_start(void) {
+    static dispatch_once_t t134_once;
+    dispatch_once(&t134_once, ^{
+        dispatch_source_t timer = dispatch_source_create(
+            DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+        if (timer == NULL) return;
+        dispatch_source_set_timer(timer,
+            dispatch_time(DISPATCH_TIME_NOW, 200 * NSEC_PER_MSEC),
+            200 * NSEC_PER_MSEC, 50 * NSEC_PER_MSEC);
+        dispatch_source_set_event_handler(timer, ^{
+            amethyst_task133_ensure_jvm_chain();
+        });
+        dispatch_resume(timer);
+        // 进程级持有（定时器常驻；空闲 tick 是一次 dyld 计数调用，可忽略）
+        static dispatch_source_t t134_retain_anchor;
+        t134_retain_anchor = timer;
+        NSLog(@"[SDLHook] Task134: JVM image watchdog started (200ms dyld scan, "
+              @"chain-independent JNA rebind backstop)");
+    });
+}
+
+void amethyst_task134_jvm_watchdog_start(void) {
+    amethyst_task134_watchdog_maybe_start();
 }
 
 void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {

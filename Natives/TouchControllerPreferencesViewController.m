@@ -176,6 +176,15 @@ typedef NS_ENUM(NSInteger, TouchControllerCommMode) {
               @"canDismissWithSwipe": @NO,
               @"title": localize(@"preference.touchcontroller.moveview.enable", nil) ?: @"Enable Move View"
             },
+            // Task 134：屏蔽控件——把整个游戏界面换成没有任何屏幕控件的
+            // 样式（写入空布局预设到 <游戏目录>/config/touchcontroller/，
+            // mod 下次启动读取；触屏手势/震动/文本输入等全部功能保留）
+            @{@"key": @"mod_touch_hide_controls",
+              @"icon": @"eye.slash.circle",
+              @"type": self.typeSwitch,
+              @"canDismissWithSwipe": @NO,
+              @"title": localize(@"preference.touchcontroller.hide_controls", nil) ?: @"Hide All Controls"
+            },
             @{@"key": @"mod_touch_about",
               @"icon": @"info.circle",
               @"type": self.typeButton,

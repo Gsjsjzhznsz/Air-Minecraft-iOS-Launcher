@@ -40,7 +40,7 @@
 | **窗口模式恢复** | 恢复 iPadOS 26 多任务/窗口化（移除 `UIRequiresFullScreen`）。此前怀疑窗口模式导致画面分裂/模糊，后经取证排除——真因（EGL 常量、px/pt 语义）已另行修复。后台稳定性（MINIMIZED 事件处理）与呈现模式无关，继续生效。 |
 | **JIT 优化重连** | 在非 iOS 26 设备上，JIT 已启用时直接启动游戏。在 iOS 26+ 需要调试 JIT 映射的设备上，静默加载 UniversalJIT26 脚本（不显示等待对话框），避免后台切换闪退的同时确保 brk 指令能被正确处理。 |
 | **应用内语言切换** | 在设置 > 通用中新增语言选择器，支持跟随系统、简体中文、English 三种选项，切换后立即生效无需重启。 |
-| **增强中文本地化** | 完整中文界面翻译（1955+ 行），覆盖比上游更全面。 |
+| **增强中文本地化** | 完整中文界面翻译（2000+ 行），覆盖比上游更全面。 |
 | **上游议题审计 Bug 修复** | 通过系统性审查上游及上上游 GitHub 议题，修复了 8+ 个 Bug，包括 JIT 脚本加载 nil 崩溃、UIKit 线程安全、KVO 观察者清理等。 |
 | **Makefile 健壮性** | 修复 TAB 缩进被转为空格导致 CI 构建失败的问题。 |
 | **Zink（Mesa 25.0.7）渲染器 + FSR1 管线** | 完整的 OSMesa/zink 桥接：分相位呈现计时、双哨兵 EASU 验证、视口自适应上采样、消灭重复全幅回读的 bundle-direct 快路径。设置 > 视频内五档 FSR 预设可在分辨率与帧率间取舍。 |
@@ -54,6 +54,11 @@
 | **正版登录提示改进** | 微软账户登录的结果提示改为自动消失的应用内通知；修复了系统弹窗需要手动处理才能消失的问题。 |
 | **子面板新拟物设计** | 所有子级面板（账户、下载、Mod 管理、文件列表、帮助等约 30 个）统一新拟物基底样式，与主界面/设置页设计语言一致；自定义背景透出的面板不受影响。 |
 | **设置项本地化补全** | 所有设置行（含 UI 刷新新增的全部详情脚注）中英文完整本地化 —— 任何位置不再显示原始 key。 |
+| **26.1.x/26.2 整合包崩溃链修复** | 26.1.2 的 SoundEngine NPE（OpenAL 扩展守卫缺失）由内置 OpenAL 垫片根治；controlify/JNA 的 SIGBUS（libffi 闭包页在 iOS 上不可执行）三层拦截：dlsym 层对 `SDL_SetEventFilter`/`SDL_AddEventWatch` 的 no-op 守卫 + JVM 自身 dlopen/dlsym 槽的经典/chained-fixup 双法重绑定 + 200ms dyld 镜像扫描看门狗（无论 JVM 走哪条加载路径都能兜住 JNA 解包的 `jna*.tmp`）。 |
+| **TouchController 模组双 ABI 传输层** | 内置 iOS 传输层同时服务两代 TouchController 模组：旧句柄制（`new(path)/receive(handle,buffer)`）与 26.2 世代单例制（`init()/receive(buffer)`）共用同一组 JNI 符号，以零解引用的指针注册表判别分发；新增“屏蔽控件”开关向模组配置写入空布局预设，实现无控件的纯手势触屏界面。 |
+| **JIT 开启工具选择（LiveContainer 方案）** | 没装 StikDebug 的用户不再遭遇“点了没反应”：设置 > 调试提供 自动 / StikDebug / SideStore / StosDebug / JitStreamer-EB / TrollStore / 手动 七选，各自分发正确的 URL scheme；另提供独立开关，把 UniversalJIT26.js 脚本从 iOS 26+ 的 JIT 请求中剥离（供不支持脚本的工具）。 |
+| **第三方皮肤头像本地渲染** | Yggdrasil profile URL 改用无连字符 UUID（带连字符在 Blessing Skin 系直接 404），会话内立即下载签名皮肤纹理并本地渲染头像（脸 + 帽层）落盘为 `file://` URL —— 存量账户首次启动自愈，首页磁贴实时刷新无需重启。 |
+| **仓库托管公告 + FSR RCAS 锐化** | 启动器公告随仓库 `announcements.json` 发布（raw.githubusercontent.com 主源 / jsDelivr 镜像 / 离线兑底），零第三方接口依赖；FSR 在 MobileGL 与 zink 管线上新增 RCAS 锐化 pass（7 档滑杆）。 |
 
 ---
 

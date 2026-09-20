@@ -868,6 +868,106 @@ static void ame99_installAppKitMenuStubs(void) {
           "(iOS has no AppKit; MC 26.3 MacosUtil menu walk no-ops, numberOfItems=0)");
 }
 
+// ---------------------------------------------------------------------------
+// Task 134：TouchController 屏蔽控件——把整个游戏界面换成没有任何屏幕控件
+// 的样式。mod 的配置体系（fifthlight/TouchController，kotlinx.serialization）：
+//   <gameDir>/config/touchcontroller/config.json          全局配置（preset 字段选预设）
+//   <gameDir>/config/touchcontroller/preset/<uuid>.json   自定义布局预设
+//   <gameDir>/config/touchcontroller/order.json           预设顺序表（uuid 数组）
+// 预设指向一个【空布局】（layout: []，零层零控件）即达成"界面无控件"；
+// 触屏手势（点挖、滑动转视角）、震动、文本输入全部保留（手势不受布局影响）。
+//
+// 写入格式与 mod 源码逐字段核对（2026-09-21 clone 上游 master）：
+//   - LayoutPreset: name/controlInfo/layout；encodeDefaults=false 下 controlInfo
+//     全默认可省略，layout 空数组显式写出
+//   - PresetConfig 多态：{"type":"custom","uuid":"<8-4-4-4-12 小写hex>"}
+//   - order.json：uuid 字符串数组（PresetsContainer 按 order 排序）
+//   - mod 启动时 GlobalConfigHolder.load() 一次性读取——本函数在 JLI_Launch
+//     之前调用，当次启动即生效；jsonFormat isLenient + ignoreUnknownKeys，
+//     NSJSONSerialization 写出的任意合法 JSON 均可解析
+//
+// 可逆性：开启时把 config.json 原有的 preset 字段备份到
+// control.mod_touch_prev_preset_json；关闭时恢复（无备份则移除 preset 字段，
+// mod 回落默认内置预设）。空布局预设文件保留（在 mod 配置界面可见
+// "Amethyst Clean"，用户也可在游戏内手动选用）。
+// ---------------------------------------------------------------------------
+static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
+    if (gameDir.length == 0) {
+        return;
+    }
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *configDir = [gameDir stringByAppendingPathComponent:@"config/touchcontroller"];
+    NSString *presetDir = [configDir stringByAppendingPathComponent:@"preset"];
+    NSString *configFile = [configDir stringByAppendingPathComponent:@"config.json"];
+    NSString *orderFile = [configDir stringByAppendingPathComponent:@"order.json"];
+    // 固定 uuid（v7 形态、小写 hex、8-4-4-4-12——Uuid.parse 接受的规范形态）
+    NSString *cleanUuid = @"0196a1ba-6e9a-7b4c-8d5e-3f2a1c0e9b7d";
+    NSString *presetFile =
+        [presetDir stringByAppendingPathComponent:[cleanUuid stringByAppendingPathExtension:@"json"]];
+
+    // 读现有全局配置（保留 mod 已有的其它设置）
+    NSMutableDictionary *config = [NSMutableDictionary dictionary];
+    if ([fm fileExistsAtPath:configFile]) {
+        NSDictionary *loaded = [NSDictionary dictionaryWithContentsOfFile:configFile];
+        if ([loaded isKindOfClass:NSDictionary.class]) {
+            config = loaded.mutableCopy;
+        }
+    }
+
+    if (getPrefBool(@"control.mod_touch_hide_controls")) {
+        // —— 开启：写空布局预设 + order + preset 指向 ——
+        [fm createDirectoryAtPath:presetDir withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *presetJson = @"{\n  \"name\" : \"Amethyst Clean\",\n  \"layout\" : [\n  ]\n}";
+        [presetJson writeToFile:presetFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+
+        // order.json：保留已有条目，追加本预设（mod 的 PresetsContainer 按
+        // order 排序；缺 order.json 时按 uuid 排序兜底，写入只为整洁）
+        NSMutableArray *order = [NSMutableArray array];
+        if ([fm fileExistsAtPath:orderFile]) {
+            NSArray *loaded = [NSArray arrayWithContentsOfFile:orderFile];
+            if ([loaded isKindOfClass:NSArray.class]) {
+                [order addObjectsFromArray:loaded];
+            }
+        }
+        if (![order containsObject:cleanUuid]) {
+            [order addObject:cleanUuid];
+            [order writeToFile:orderFile atomically:YES];
+        }
+
+        // 备份原 preset 值（仅一次——重复启动不覆盖首次备份，保证还原语义）
+        NSString *backup = getPrefObject(@"control.mod_touch_prev_preset_json");
+        if (![backup isKindOfClass:NSString.class] && config[@"preset"] != nil) {
+            NSError *jsonErr = nil;
+            NSData *raw = [NSJSONSerialization dataWithJSONObject:config[@"preset"]
+                                                          options:0 error:&jsonErr];
+            if (raw && !jsonErr) {
+                setPrefObject(@"control.mod_touch_prev_preset_json",
+                              [[NSString alloc] initWithData:raw encoding:NSUTF8StringEncoding]);
+            }
+        }
+        config[@"preset"] = @{@"type": @"custom", @"uuid": cleanUuid};
+        [config writeToFile:configFile atomically:YES];
+        NSLog(@"[TouchController] Task134: clean layout applied (empty preset %@)", cleanUuid);
+    } else {
+        // —— 关闭：恢复备份的 preset（无备份则移除字段回落 mod 默认） ——
+        NSString *backup = getPrefObject(@"control.mod_touch_prev_preset_json");
+        if ([backup isKindOfClass:NSString.class] && backup.length > 0) {
+            NSData *raw = [backup dataUsingEncoding:NSUTF8StringEncoding];
+            id restored = [NSJSONSerialization JSONObjectWithData:raw options:0 error:nil];
+            if (restored) {
+                config[@"preset"] = restored;
+            }
+            setPrefObject(@"control.mod_touch_prev_preset_json", @"");
+        } else if (config[@"preset"] != nil) {
+            [config removeObjectForKey:@"preset"];
+        } else {
+            return; // 未开启也从未开启过：不动配置
+        }
+        [config writeToFile:configFile atomically:YES];
+        NSLog(@"[TouchController] Task134: clean layout reverted (preset restored)");
+    }
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -1117,6 +1217,10 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // Task 95：整合包完整性提醒（病历见 ame95_warnIncompleteImport 函数头）
         // ——读实例根目录的 import_report.json，有未确认缺失时一次性提醒，不阻断启动。
         ame95_warnIncompleteImport(gameDir);
+
+        // Task 134：TouchController 屏蔽控件——按开关写入/还原空布局预设
+        // （mod 在 JVM 启动早期读取 config/touchcontroller/，此处调用当次生效）
+        ame134_applyTouchControllerCleanLayout(gameDir);
     } else {
         defaultJRETag = @"execute_jar";
         gameDir = @(getenv("POJAV_GAME_DIR"));

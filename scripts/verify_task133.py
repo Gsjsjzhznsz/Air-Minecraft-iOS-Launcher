@@ -6,7 +6,7 @@ B 26.1.2 controlify/JNA SIGBUS 崩溃链根治（Task133 镜像扫描重绑定�
 C 第三方皮肤头像（无连字符 profileId + 本地渲染 + file:// URL + 存量自愈）；
 D 三个二级页面行浮窗化（键位调整/手柄配置/运行时管理 + pickExtraAction）；
 E ANGLE ES 驱动开关退役（与 GLES 后端重复，死配置）；
-F/G 语法与 l10n 门（键基线 1907）；
+F/G 语法与 l10n 门（键基线 1916，Task134 重锚）；
 H 级联全链。
 """
 import re
@@ -98,26 +98,27 @@ check("C5 存量账户自愈（initWithData 覆写：非 file:// 形态后台重
 check("C6 accountId 传递链未动（上轮已证 47e84d5d 即 yiqiu4178 有效 UUID，非根因）",
       "authData[@\"accountId\"] = self.authData[@\"profileId\"]" in tpa)
 
-print("== D. 三个二级页面行浮窗化（键位调整/手柄配置/运行时管理）==")
-check("D1 设置页 typeChildPane 行清零（零主观豁免）",
-      lpvc.count('@"type": self.typeChildPane') == 0)
-check("D2 键位调整 -> pickField（controlmap 列表 + 编辑器经 pickExtraAction 模态）",
-      '@"key": @"custom_controls"' in lpvc and "ame133_ctrlKeys" in lpvc and
-      "CustomControlsViewController" in lpvc.split('@"key": @"custom_controls"')[1][:1600] and
-      "setDefaultCtrl" in lpvc.split('@"key": @"custom_controls"')[1][:1600])
-check("D3 手柄配置 -> pickField（gamepads 列表 + ContCfg 模态）",
-      '@"key": @"default_gamepad_ctrl"' in lpvc and "ame133_padKeys" in lpvc and
-      "LauncherPrefContCfgViewController" in lpvc.split('@"key": @"default_gamepad_ctrl"')[1][:1200])
-check("D4 运行时管理 -> pickField（版本列表 + 1_17_newer 路由读写 + JRE 管理器模态）",
-      '@"key": @"manage_runtime"' in lpvc and "ame133_rtKeys" in lpvc and
-      'ame133_route[@"1_17_newer"]' in lpvc and
-      "LauncherPrefManageJREViewController" in lpvc.split('@"key": @"manage_runtime"')[1][:1400])
-check("D5 复合 get/set 映射（custom_controls<->default_ctrl；manage_runtime<->java_homes[0]）",
-      'getPrefObject(@"control.default_ctrl")' in lpvc and
-      'setPrefObject(@"control.default_ctrl", value)' in lpvc and
-      'ame133_homesM[@"0"] = ame133_route' in lpvc)
-check("D6 基类 pickExtraAction 支持（label/handler 键 + 收起后再呈现防竞争）",
-      'ame133_extra[@"label"]' in plpt and "ame133_alert dismissViewControllerAnimated" in plpt)
+print("== D. 三个二级页面行浮窗化（Task 134 已按用户指令回退——断言恢复后的 childPane 形态）==")
+check("D1 设置页 typeChildPane 行回归（Task134：TouchController/键位/手柄/运行时四行，用户宣告浮窗化指令为误判）",
+      lpvc.count('@"type": self.typeChildPane') >= 4)
+check("D2 键位调整 -> childPane（推入 CustomControlsViewController，Task62 特例保留在 openChildPaneAtIndexPath）",
+      '@"key": @"custom_controls"' in lpvc and "ame133_ctrlKeys" not in lpvc and
+      "CustomControlsViewController.class" in lpvc.split('@"key": @"custom_controls"')[1][:900] and
+      "setDefaultCtrl" in lpvc.split('openChildPaneAtIndexPath')[1][:2500])
+check("D3 手柄配置 -> childPane（推入 LauncherPrefContCfgViewController）",
+      '@"key": @"default_gamepad_ctrl"' in lpvc and "ame133_padKeys" not in lpvc and
+      "LauncherPrefContCfgViewController.class" in lpvc.split('@"key": @"default_gamepad_ctrl"')[1][:900])
+check("D4 运行时管理 -> childPane（推入 LauncherPrefManageJREViewController，canDismissWithSwipe=YES 沿袭原形态）",
+      '@"key": @"manage_runtime"' in lpvc and "ame133_rtKeys" not in lpvc and
+      'ame133_route[@"1_17_newer"]' not in lpvc and
+      "LauncherPrefManageJREViewController.class" in lpvc.split('@"key": @"manage_runtime"')[1][:900])
+check("D5 Task133 浮窗化数据源与复合映射彻底移除（ame133_* 无残留）",
+      "ame133_ctrlKeys" not in lpvc and "ame133_padKeys" not in lpvc and
+      "ame133_rtKeys" not in lpvc and 'ame133_homesM[@"0"] = ame133_route' not in lpvc and
+      'setPrefObject(@"control.default_ctrl", value)' not in lpvc)
+check("D6 基类 pickExtraAction 机制退役（Task134 随浮窗行移除）",
+      'ame133_extra[@"label"]' not in plpt and "ame133_alert dismissViewControllerAnimated" not in plpt and
+      "pickExtraAction" not in plpt)
 
 print("== E. ANGLE ES 驱动开关退役（与 GLES 后端重复，iOS 死配置）==")
 check("E1 设置行已删（LPVC 无 enable_angle 行）",
@@ -141,12 +142,19 @@ def lkeys(lang):
 
 
 ks = [lkeys(l) for l in LANGS]
-check("F1 四语言键集一致（Task133 基线 1907 = 1906 + pickextra 3 - enable_angle 2）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1907, f"counts={[len(k) for k in ks]}")
-check("F2 pickextra 三键在位（edit_layout/edit_gamepad/manage_runtime）",
-      all("preference.pickextra.edit_layout" in k and
-          "preference.pickextra.edit_gamepad" in k and
-          "preference.pickextra.manage_runtime" in k for k in ks))
+check("F1 四语言键集一致（Task134 基线 1916 = 1907 - pickextra 3 + 新增 12）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1916, f"counts={[len(k) for k in ks]}")
+check("F2 pickextra 三键已随机制退役；Task134 新 12 键在位（jit_enabler 7 + title/detail 4 + hide_controls）",
+      all("preference.pickextra.edit_layout" not in k and
+          "preference.pickextra.edit_gamepad" not in k and
+          "preference.pickextra.manage_runtime" not in k and
+          "preference.debug.jit_enabler.auto" in k and
+          "preference.debug.jit_enabler.manual" in k and
+          "preference.title.jit_enabler" in k and
+          "preference.detail.jit_enabler" in k and
+          "preference.title.jit26_script_disable" in k and
+          "preference.detail.jit26_script_disable" in k and
+          "preference.touchcontroller.hide_controls" in k for k in ks))
 check("F3 enable_angle 死键已删",
       all("preference.title.enable_angle" not in k and
           "preference.detail.enable_angle" not in k for k in ks))

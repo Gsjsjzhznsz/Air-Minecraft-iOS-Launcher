@@ -138,44 +138,43 @@ check("B11 legacy GLES 显示精化（auto + backend=2 -> -gles 逻辑键，仅�
       re.search(r'ame132_auto && \[ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL\] &&\s*\n\s*getPrefInt\(@"mobileglues\.mobilegl_backend"\) == 2', lpvc) is not None and
       "PLProfiles.h" in lpvc)
 
-print("== C. TouchController 悬浮浮窗化 ==")
+print("== C. TouchController（Task 134 已按用户指令回退——断言恢复后的 pane 形态）==")
 tp = rd("Natives/authenticator/ThirdPartyAuthenticator.m")
 tcpane = rd("Natives/TouchControllerPreferencesViewController.m")
 
 mod_row = lpvc[lpvc.index('@"key": @"mod_touch_enable"'):]
 mod_row = mod_row[:mod_row.index('\n            },')]
-check("C1 mod_touch_enable 为 typePickField（禁用/UDP/静态库三选项）",
-      '@"type": self.typePickField' in mod_row and
-      '@"0", @"1", @"2"' in mod_row and
-      "preference.touchcontroller.mode.disabled" in mod_row and
-      "preference.touchcontroller.mode.udp" in mod_row and
-      "preference.touchcontroller.mode.staticlib" in mod_row)
-check("C2 不再引用 TouchController pane（无二级页面入口；注释提及不计）",
-      "TouchControllerPreferencesViewController" not in
+check("C1 mod_touch_enable 为 typeChildPane（Task134 恢复：推入 TouchController pane）",
+      '@"type": self.typeChildPane' in mod_row and
+      'NSClassFromString(@"TouchControllerPreferencesViewController")' in mod_row and
+      "preference.touchcontroller.mode.disabled" not in mod_row)
+check("C2 pane 恢复引用（二级页面入口回归；存储键读写路径不变）",
+      "TouchControllerPreferencesViewController" in
       re.sub(r'//[^\n]*', '', lpvc))
-check("C3 复合读映射（enable+mode -> 0/1/2，boolValue 消费兼容）",
-      re.search(r'isEqualToString:@"mod_touch_enable"\]\) \{[^}]*?getPrefBool\(@"control\.mod_touch_enable"\)', lpvc) is not None and
-      '[getPrefObject(@"control.mod_touch_mode") integerValue]' in lpvc)
-check("C4 复合写映射（enable+mode 同步 + UDP 环境变量联动）",
-      'setPrefObject(@"control.mod_touch_enable", @(ame132_mode != 0))' in lpvc and
-      'setPrefObject(@"control.mod_touch_mode", @(ame132_mode))' in lpvc and
-      "TOUCH_CONTROLLER_PROXY=12450" in lpvc)
-check("C5 伴随行内联（vibrate 开关 / intensity 浮窗 / moveview 开关 / about 按钮）",
-      '@"key": @"mod_touch_vibrate_enable"' in lpvc and
-      '@"key": @"mod_touch_vibrate_intensity"' in lpvc and
-      '@"key": @"mod_touch_moveview_enable"' in lpvc and
-      '@"key": @"mod_touch_about"' in lpvc)
-check("C6 intensity 为 pick 浮窗（轻/中/重三档，非滑块）",
-      re.search(r'@\{@"key": @"mod_touch_vibrate_intensity",[^}]*?@"type": self\.typePickField', lpvc) is not None and
-      "vibrate.intensity.light" in lpvc and "vibrate.intensity.heavy" in lpvc)
-check("C7 about 内联（GitHub 链接 + about.message）",
-      "preference.touchcontroller.about.message" in lpvc and
-      "https://github.com/TouchController/TouchController" in lpvc)
-check("C8 UDP/静态库选中后的说明弹窗（原 pane 行为等价迁移）",
-      "preference.touchcontroller.udp.message" in lpvc and
-      "preference.touchcontroller.staticlib.message" in lpvc)
-check("C9 pane 文件保留但不被引用（存量行为档案）",
-      "updateTouchControllerSetting" in tcpane)
+check("C3 Task132 复合读写映射已随浮窗行退役（pane 自管 enable+mode + UDP 环境变量联动）",
+      'setPrefObject(@"control.mod_touch_enable", @(ame132_mode != 0))' not in lpvc and
+      "updateTouchControllerSetting" in tcpane and
+      "TOUCH_CONTROLLER_PROXY=12450" in tcpane)
+check("C4 伴随行回归 pane 内（vibrate / intensity / moveview / about）",
+      '@"key": @"mod_touch_vibrate_enable"' in tcpane and
+      '@"key": @"mod_touch_vibrate_intensity"' in tcpane and
+      '@"key": @"mod_touch_moveview_enable"' in tcpane and
+      '@"key": @"mod_touch_about"' in tcpane and
+      '@"key": @"mod_touch_vibrate_enable"' not in lpvc)
+check("C5 屏蔽控件开关在 pane 内（Task134 新增：mod_touch_hide_controls）",
+      '@"key": @"mod_touch_hide_controls"' in tcpane and
+      "preference.touchcontroller.hide_controls" in tcpane and
+      'mod_touch_hide_controls' in rd("Natives/PLPreferences.m"))
+check("C6 intensity 保持 pane 原生滑块形态（三档文案）",
+      "vibrate.intensity.light" in tcpane and "vibrate.intensity.heavy" in tcpane)
+check("C7 about 行为在 pane 内（GitHub 链接 + about.message）",
+      "preference.touchcontroller.about.message" in tcpane and
+      "https://github.com/TouchController/TouchController" in tcpane)
+check("C8 UDP/静态库说明弹窗在 pane 内（showModeDescriptionAlert）",
+      "preference.touchcontroller.udp.message" in tcpane and
+      "preference.touchcontroller.staticlib.message" in tcpane)
+check("C9 pane 文件保留且重新被引用（Task134 恢复为活动 pane）",
+      "updateTouchControllerSetting" in tcpane and "showModeSelectionAlert" in tcpane)
 
 print("== D. 悬浮浮窗呈现完整性 ==")
 plt = rd("Natives/PLPrefTableViewController.m")
@@ -218,8 +217,8 @@ sets = []
 for lang in langs:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
-check("F1 四语言键集一致（Task133 基线 1907 = 1906 + pickextra 3键 - enable_angle 2键）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1907,
+check("F1 四语言键集一致（Task134 基线 1916 = 1907 - pickextra 3键 + jit_enabler/hide 12键）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1916,
       f"counts={[len(s) for s in sets]}")
 newkeys = ["preference.title.renderer_backend",
            "preference.detail.renderer_backend",

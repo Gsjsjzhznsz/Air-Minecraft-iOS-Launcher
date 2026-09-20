@@ -578,9 +578,19 @@
 "preference.touchcontroller.about" = "About TouchController";
 "preference.touchcontroller.about.title" = "About TouchController";
 "preference.touchcontroller.about.message" = "TouchController is a Minecraft mod that adds touch controls to Java Edition. This launcher supports two communication modes:\n\n• UDP Protocol: Network-based communication\n• Static Library: High-performance local communication\n\nVisit GitHub for more information.";
-"preference.pickextra.edit_layout" = "Edit current layout…";
-"preference.pickextra.edit_gamepad" = "Edit gamepad buttons…";
-"preference.pickextra.manage_runtime" = "Manage runtimes (import/delete)…";
+// Task 134: JIT enabler pick + iOS 26 script toggle + TouchController hide-controls
+"preference.debug.jit_enabler.auto" = "Auto (recommended)";
+"preference.debug.jit_enabler.stikjit" = "StikDebug / StikJIT";
+"preference.debug.jit_enabler.sidestore" = "SideStore";
+"preference.debug.jit_enabler.stosdebug" = "StosDebug";
+"preference.debug.jit_enabler.jitstreamer" = "JitStreamer-EB";
+"preference.debug.jit_enabler.trollstore" = "TrollStore";
+"preference.debug.jit_enabler.manual" = "Manual (attach a debugger yourself)";
+"preference.title.jit_enabler" = "JIT Enabler";
+"preference.detail.jit_enabler" = "Choose the app used to enable JIT. If you don't have StikDebug installed, pick SideStore, StosDebug, JitStreamer-EB or TrollStore instead, otherwise tapping Launch does nothing. Auto (default) tries TrollStore, then StikDebug, then SideStore depending on your device.";
+"preference.title.jit26_script_disable" = "Disable iOS 26 JS-Script JIT";
+"preference.detail.jit26_script_disable" = "Stop sending UniversalJIT26.js to the JIT tool when launching the game (plain debugger-attach JIT). Only turn this on if your tool doesn't support scripts or the script misbehaves; devices that need system-level memory mapping (TXM) may fail to launch the game with this enabled.";
+"preference.touchcontroller.hide_controls" = "Hide All Controls";
 "preference.touchcontroller.ok" = "OK";
 "preference.touchcontroller.cancel" = "Cancel";
 "preference.touchcontroller.vibrate.enable" = "Enable Vibration";

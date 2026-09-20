@@ -201,6 +201,12 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn);
 // 无新镜像时开销 = 一次 dyld 计数调用。
 void amethyst_task133_ensure_jvm_chain(void);
 
+// Task 134（sdl3_hook.m 实现）：JVM 镜像扫描看门狗——主队列 200ms 定时
+// 器持续调 ensure_jvm_chain，链路无关地兜底检出 libjnidispatch（取证：
+// JNA 加载 jnilib 到 controlify 解析 SDL 符号相隔秒级，窗口充足）。
+// 检出 JVM 家族镜像时自动启动，也可外部主动调用提前启动。
+void amethyst_task134_jvm_watchdog_start(void);
+
 BOOL PLPatchMachOPlatformForFile(const char *path);
 
 UIViewController* currentVC();

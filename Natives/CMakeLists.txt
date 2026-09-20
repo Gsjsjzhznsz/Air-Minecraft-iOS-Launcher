@@ -95,7 +95,12 @@ target_link_libraries(awt_xawt
 # TouchController iOS native library
 # Provides JNI / C API for touch control communication between Minecraft mod and launcher
 #
-# 三级回退检测逻辑（按优先级从高到低）：
+# 四级回退检测逻辑（按优先级从高到低）：
+#   Level 0 — 源码编译（Task 134 起的最高优先级）：Natives/TouchController/
+#             ios_transport.c 是双 ABI（旧句柄制 + 新单例制）兼容实现，
+#             随 Task 134 引入——修复 MC 26.2 世代 mod 的 Transport 单例
+#             ABI 与旧 xcframework 句柄 ABI 的 JNI 同名异签名错位。
+#             XCFramework（旧 ABI）保留在仓库仅作历史参考，不再参与构建。
 #   Level 1 — 预编译 XCFramework：检测 TouchController.xcframework/，从 ios-arm64
 #             子目录提取设备静态库链接（由 build_xcframework.sh 生成）
 #   Level 2 — 预编译独立 .a：检测 libproxy_server_ios.a (device) 或
@@ -108,14 +113,29 @@ target_link_libraries(awt_xawt
 # 只提取被直接引用的对象文件——未被引用的对象文件会被丢弃，导致 dlsym 找不到符号。
 # 因此：
 #   - Level 1/2（预编译 .a）：必须用 -Wl,-force_load,<path> 强制加载整个静态库
-#   - Level 3（源码编译）：改用 OBJECT 库，对象文件直接链接到可执行文件，
+#   - Level 0/3（源码编译）：改用 OBJECT 库，对象文件直接链接到可执行文件，
 #     所有符号自动保留，无需 -force_load
 set(TOUCHCONTROLLER_LIB_DIR "${CMAKE_CURRENT_LIST_DIR}/TouchController")
 set(TOUCHCONTROLLER_XCFW "${TOUCHCONTROLLER_LIB_DIR}/TouchController.xcframework")
 set(TOUCHCONTROLLER_LIB "")
 
-# Level 1: 预编译 XCFramework（最高优先级）
-if(EXISTS "${TOUCHCONTROLLER_XCFW}/ios-arm64/libproxy_server_ios.a")
+# Level 0: 源码编译（Task 134 起最高优先级——双 ABI 修复版）
+if(EXISTS "${TOUCHCONTROLLER_LIB_DIR}/ios_transport.c")
+  message(STATUS "Building TouchController from source (Level 0: Task134 dual-ABI transport)")
+  # 使用 OBJECT 库而非 STATIC 库：对象文件直接链接到可执行文件，
+  # 所有符号自动保留，避免 dlsym 找不到符号的问题
+  add_library(proxy_server_ios OBJECT
+    ${TOUCHCONTROLLER_LIB_DIR}/ios_transport.c
+    ${TOUCHCONTROLLER_LIB_DIR}/ring_buffer.c
+  )
+  # jni.h 位于 Natives/ 根目录（OpenJDK 自包含头）
+  target_include_directories(proxy_server_ios PRIVATE
+    ${TOUCHCONTROLLER_LIB_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}
+  )
+  set(TOUCHCONTROLLER_LIB proxy_server_ios)
+# Level 1: 预编译 XCFramework
+elseif(EXISTS "${TOUCHCONTROLLER_XCFW}/ios-arm64/libproxy_server_ios.a")
   set(_TC_LIB_PATH "${TOUCHCONTROLLER_XCFW}/ios-arm64/libproxy_server_ios.a")
   message(STATUS "Found TouchController XCFramework (Level 1: prebuilt xcframework) at ${_TC_LIB_PATH}")
   # 强制加载整个静态库，确保 dlsym 能找到所有 touchcontroller_ios_* 符号

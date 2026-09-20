@@ -338,34 +338,6 @@
                 }
             }
         }
-        // Task 132（TouchController 浮窗化）：通信方式 pick 行的复合读——
-        // 禁用返回 @"0"；启用返回当前模式（@"1"=UDP / @"2"=静态库）。
-        // enableCondition 等处的 boolValue 消费对字符串数字语义兼容
-        // （@"0"->NO，@"1"/@"2"->YES）。
-        if ([section isEqualToString:@"control"] && [key isEqualToString:@"mod_touch_enable"]) {
-            if (!getPrefBool(@"control.mod_touch_enable")) {
-                return @"0";
-            }
-            return [NSString stringWithFormat:@"%ld",
-                    (long)[getPrefObject(@"control.mod_touch_mode") integerValue]];
-        }
-        // Task 133（键位调整浮窗化）：行的选中值 = control.default_ctrl
-        // （与主页/游戏内编辑器的 getDefaultCtrl 同一存储层，带 .json 扩展名）。
-        if ([section isEqualToString:@"control"] && [key isEqualToString:@"custom_controls"]) {
-            NSString *ame133_v = getPrefObject(@"control.default_ctrl");
-            return [ame133_v isKindOfClass:NSString.class] ? ame133_v : @"default.json";
-        }
-        // Task 133（运行时管理浮窗化）：行的选中值 = 默认路由表的
-        // 1_17_newer 槽（现代 MC 默认运行时；缺省回落 17——PLPreferences
-        // 的历史默认）。写入同步写回路由表，其余两条路由不动。
-        if ([section isEqualToString:@"java"] && [key isEqualToString:@"manage_runtime"]) {
-            NSDictionary *ame133_homes = getPrefObject(@"java.java_homes");
-            NSDictionary *ame133_route = [ame133_homes isKindOfClass:[NSDictionary class]]
-                ? ame133_homes[@"0"] : nil;
-            NSString *ame133_v = [ame133_route isKindOfClass:[NSDictionary class]]
-                ? ame133_route[@"1_17_newer"] : nil;
-            return [ame133_v isKindOfClass:NSString.class] ? ame133_v : @"17";
-        }
         return getPrefObject(keyFull);
     };
     self.setPreference = ^(NSString *section, NSString *key, id value){
@@ -406,56 +378,6 @@
             setPrefObject(@"video.renderer", value);
             return;
         }
-        // Task 132（TouchController 浮窗化）：通信方式 pick 行的复合写——
-        // enable 与 mode 两键同步（等价原 TouchControllerPreferencesViewController
-        // 的 updateTouchControllerSetting），UDP 档联动 java.env_variables
-        // 里的 TOUCH_CONTROLLER_PROXY（同原行为）。
-        if ([section isEqualToString:@"control"] && [key isEqualToString:@"mod_touch_enable"]) {
-            NSInteger ame132_mode = [value integerValue];
-            setPrefObject(@"control.mod_touch_enable", @(ame132_mode != 0));
-            setPrefObject(@"control.mod_touch_mode", @(ame132_mode));
-            NSString *ame132_env = getPrefObject(@"java.env_variables");
-            if (ame132_mode == 1) {
-                if ([ame132_env isKindOfClass:NSString.class]) {
-                    if (![ame132_env containsString:@"TOUCH_CONTROLLER_PROXY=12450"]) {
-                        setPrefObject(@"java.env_variables",
-                            [ame132_env stringByAppendingString:@" TOUCH_CONTROLLER_PROXY=12450"]);
-                    }
-                } else {
-                    setPrefObject(@"java.env_variables", @"TOUCH_CONTROLLER_PROXY=12450");
-                }
-            } else if ([ame132_env isKindOfClass:NSString.class]) {
-                setPrefObject(@"java.env_variables",
-                    [ame132_env stringByReplacingOccurrencesOfString:@" TOUCH_CONTROLLER_PROXY=12450"
-                                                           withString:@""]);
-            }
-            return;
-        }
-        // Task 133（键位调整浮窗化）：选中布局直写 control.default_ctrl
-        // （值 = pickKeys 里的完整文件名，如 "default.json"）。
-        if ([section isEqualToString:@"control"] && [key isEqualToString:@"custom_controls"]) {
-            setPrefObject(@"control.default_ctrl", value);
-            return;
-        }
-        // Task 133（运行时管理浮窗化）：选中版本写默认路由表的 1_17_newer
-        // 槽（其余路由不动）；路由表缺失时补齐三槽默认形态再写。
-        if ([section isEqualToString:@"java"] && [key isEqualToString:@"manage_runtime"]) {
-            NSDictionary *ame133_homes = getPrefObject(@"java.java_homes");
-            NSMutableDictionary *ame133_homesM = [ame133_homes isKindOfClass:[NSDictionary class]]
-                ? [ame133_homes mutableCopy] : [NSMutableDictionary dictionary];
-            NSMutableDictionary *ame133_route = [ame133_homesM[@"0"] isKindOfClass:[NSDictionary class]]
-                ? [ame133_homesM[@"0"] mutableCopy] : [NSMutableDictionary dictionary];
-            if (ame133_route[@"1_16_5_older"] == nil) {
-                ame133_route[@"1_16_5_older"] = @"8";
-            }
-            if (ame133_route[@"execute_jar"] == nil) {
-                ame133_route[@"execute_jar"] = value;
-            }
-            ame133_route[@"1_17_newer"] = value;
-            ame133_homesM[@"0"] = ame133_route;
-            setPrefObject(@"java.java_homes", ame133_homesM);
-            return;
-        }
         setPrefObject(keyFull, value);
     };
     
@@ -491,99 +413,6 @@
             [weakSelf presentViewController:alert animated:YES completion:nil];
         });
     };
-
-    // --- Task 133：三个原二级页面设置行的浮窗化数据源 ---
-    // 键位布局列表（controlmap/*.json，与 Profile 编辑器 listFilesAtPath 同源）：
-    // pickKeys 带扩展名（存储形态），pickList 去扩展名显示。
-    NSArray *ame133_ctrlKeys = @[];
-    NSArray *ame133_ctrlList = @[];
-    {
-        NSMutableArray *files = [NSFileManager.defaultManager
-            contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%s/controlmap", getenv("POJAV_HOME")]
-                                   error:nil].mutableCopy;
-        NSMutableArray *keys = [NSMutableArray array];
-        NSMutableArray *names = [NSMutableArray array];
-        for (NSString *f in files) {
-            if (![f isKindOfClass:NSString.class] || ![f hasSuffix:@".json"]) continue;
-            [keys addObject:f];
-            [names addObject:[f stringByDeletingPathExtension]];
-        }
-        if (keys.count == 0) {
-            // 目录缺失/为空：至少提供内置 default.json 选项，行不至于空壳
-            [keys addObject:@"default.json"];
-            [names addObject:@"default"];
-        }
-        ame133_ctrlKeys = keys;
-        ame133_ctrlList = names;
-    }
-    // 手柄布局列表（controlmap/gamepads/*.json，存储键 control.default_gamepad_ctrl
-    // 与 ContCfg pane 的读写形态一致：带 .json 扩展名的文件名）
-    NSArray *ame133_padKeys = @[];
-    NSArray *ame133_padList = @[];
-    {
-        NSMutableArray *files = [NSFileManager.defaultManager
-            contentsOfDirectoryAtPath:[NSString stringWithFormat:@"%s/controlmap/gamepads", getenv("POJAV_HOME")]
-                                   error:nil].mutableCopy;
-        NSMutableArray *keys = [NSMutableArray array];
-        NSMutableArray *names = [NSMutableArray array];
-        for (NSString *f in files) {
-            if (![f isKindOfClass:NSString.class] || ![f hasSuffix:@".json"]) continue;
-            [keys addObject:f];
-            [names addObject:[f stringByDeletingPathExtension]];
-        }
-        if (keys.count == 0) {
-            [keys addObject:@"default.json"];
-            [names addObject:@"default"];
-        }
-        ame133_padKeys = keys;
-        ame133_padList = names;
-    }
-    // 默认运行时版本列表（java.java_homes 的版本槽位键，"0" 为路由表不算）：
-    // 浮窗直接选【1_17_newer 路由】（现代 MC 的默认运行时——本启动器 26.x
-    // 实际游玩路径），完整管理（导入/删除/逐版本目录选择）经附加动作模态呈现。
-    NSArray *ame133_rtKeys = @[@"17"];
-    NSArray *ame133_rtList = @[@"Java 17"];
-    {
-        NSDictionary *ame133_homes = getPrefObject(@"java.java_homes");
-        NSMutableDictionary *ame133_verRoots = [NSMutableDictionary dictionary];
-        if ([ame133_homes isKindOfClass:[NSDictionary class]]) {
-            for (NSString *slot in ame133_homes) {
-                if (![slot isKindOfClass:NSString.class] || [slot isEqualToString:@"0"]) continue;
-                id dir = ame133_homes[slot];
-                // 槽位值可能指向 bundle 内置（"internal"）或外置目录——
-                // 确认目录真实存在才列出该版本
-                NSString *bundlePath = [NSString stringWithFormat:@"%@/java_runtimes", NSBundle.mainBundle.bundlePath];
-                NSString *extPath = [NSString stringWithFormat:@"%s/java_runtimes", getenv("POJAV_HOME")];
-                BOOL ok = NO;
-                if ([dir isEqualToString:@"internal"]) {
-                    ok = YES; // 内置运行时（列表头部强制给出）
-                } else if ([dir isKindOfClass:NSString.class]) {
-                    ok = [NSFileManager.defaultManager fileExistsAtPath:[extPath stringByAppendingPathComponent:dir]];
-                }
-                (void)bundlePath;
-                if (ok) {
-                    // 同一版本多个目录只记一次（版本路由只存版本号）
-                    ame133_verRoots[slot] = @(YES);
-                }
-            }
-        }
-        // 内置运行时始终可用（java-25-openjdk 随包）
-        ame133_verRoots[@"25"] = @(YES);
-        NSMutableArray *vers = [ame133_verRoots.allKeys mutableCopy];
-        [vers sortUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
-            return [b compare:a options:NSNumericSearch]; // 新版本在前
-        }];
-        NSMutableArray *rtKeys = [NSMutableArray array];
-        NSMutableArray *rtList = [NSMutableArray array];
-        for (NSString *v in vers) {
-            [rtKeys addObject:v];
-            [rtList addObject:[NSString stringWithFormat:@"Java %@", v]];
-        }
-        if (rtKeys.count > 0) {
-            ame133_rtKeys = rtKeys;
-            ame133_rtList = rtList;
-        }
-    }
 
     // -----------------------------------------------------------
 
@@ -1190,160 +1019,48 @@
             // Control settings
             @{@"icon": @"gamecontroller"},
             
-            // --- [Task 132] TouchController 模组支持（浮窗化） ---
-            // 原为 typeChildPane 二级页面入口（TouchControllerPreferences
-            // ViewController）——用户明令严禁二级菜单：选择器语义的设置项
-            // 必须原地弹悬浮浮窗。现改为 typePickField：点击弹出三选项
-            // actionSheet/popover（禁用 / UDP 协议 / 静态库，✓ 标记当前值），
-            // get/setPreference 复合映射同步写 control.mod_touch_enable +
-            // control.mod_touch_mode（等价原 pane 的 updateTouchController
-            // Setting，含 UDP 档的 java.env_variables 联动）。原 pane 的
-            // 伴随行（震动/移动视角/关于）随下方内联，pane 文件不再被引用。
+            // --- [Task 134] TouchController 模组支持（二级页面恢复） ---
+            // Task 132 曾按当时的“严禁二级菜单”指令把本行改成 pick 浮窗；
+            // 用户 Task 134 反馈该指令属于误判——恢复 43ef4ae 之前的原始
+            // typeChildPane 形态（推入 TouchControllerPreferencesViewController，
+            // 通信方式选择/震动/移动视角/关于等全部伴随行回到 pane 内，
+            // 新增屏蔽控件开关也位于 pane 内）。存储键与读写路径不变。
             @{@"key": @"mod_touch_enable",
               @"icon": @"hand.point.up.left",
               @"hasDetail": @YES,
-              @"type": self.typePickField,
+              @"type": self.typeChildPane,
               @"enableCondition": whenNotInGame,
-              @"pickKeys": @[@"0", @"1", @"2"],
-              @"pickList": @[
-                  localize(@"preference.touchcontroller.mode.disabled", nil),
-                  localize(@"preference.touchcontroller.mode.udp", nil),
-                  localize(@"preference.touchcontroller.mode.staticlib", nil)
-              ],
-              // Task 132：选中 UDP/静态库后展示模式说明（原 pane 的
-              // showModeDescriptionAlert 等价迁移）
-              @"action": ^void(NSString *value){
-                  NSString *ame132_title = nil;
-                  NSString *ame132_msg = nil;
-                  if ([value isEqualToString:@"1"]) {
-                      ame132_title = localize(@"preference.touchcontroller.udp.title", nil);
-                      ame132_msg = localize(@"preference.touchcontroller.udp.message", nil);
-                  } else if ([value isEqualToString:@"2"]) {
-                      ame132_title = localize(@"preference.touchcontroller.staticlib.title", nil);
-                      ame132_msg = localize(@"preference.touchcontroller.staticlib.message", nil);
-                  }
-                  if (ame132_title == nil) return;
-                  UIAlertController *ame132_alert = [UIAlertController
-                      alertControllerWithTitle:ame132_title
-                                       message:ame132_msg
-                                preferredStyle:UIAlertControllerStyleAlert];
-                  [ame132_alert addAction:[UIAlertAction
-                      actionWithTitle:localize(@"preference.touchcontroller.ok", nil)
-                                style:UIAlertActionStyleDefault handler:nil]];
-                  [self presentViewController:ame132_alert animated:YES completion:nil];
-              }
-            },
-            // Task 132：原 pane 伴随行内联（item 自带 title 走 pane 既有
-            // 本地化键，存储键不变——control.mod_touch_* 全部读者无感知）
-            @{@"key": @"mod_touch_vibrate_enable",
-              @"icon": @"waveform.path",
-              @"type": self.typeSwitch,
-              @"enableCondition": whenNotInGame,
-              @"title": localize(@"preference.touchcontroller.vibrate.enable", nil)
-            },
-            @{@"key": @"mod_touch_vibrate_intensity",
-              @"icon": @"speaker.wave.2",
-              @"type": self.typePickField,
-              @"enableCondition": whenNotInGame,
-              @"title": localize(@"preference.touchcontroller.vibrate.intensity", nil),
-              @"pickKeys": @[@"1", @"2", @"3"],
-              @"pickList": @[
-                  localize(@"preference.touchcontroller.vibrate.intensity.light", nil),
-                  localize(@"preference.touchcontroller.vibrate.intensity.medium", nil),
-                  localize(@"preference.touchcontroller.vibrate.intensity.heavy", nil)
-              ]
-            },
-            @{@"key": @"mod_touch_moveview_enable",
-              @"icon": @"arrow.triangle.2.circlepath",
-              @"type": self.typeSwitch,
-              @"enableCondition": whenNotInGame,
-              @"title": localize(@"preference.touchcontroller.moveview.enable", nil)
-            },
-            @{@"key": @"mod_touch_about",
-              @"icon": @"info.circle",
-              @"type": self.typeButton,
-              @"enableCondition": whenNotInGame,
-              @"title": localize(@"preference.touchcontroller.about", nil),
-              @"action": ^void(){
-                  // Task 132：原 pane showInfoAlert 等价内联
-                  UIAlertController *ame132_info = [UIAlertController
-                      alertControllerWithTitle:localize(@"preference.touchcontroller.about.title", nil)
-                                       message:localize(@"preference.touchcontroller.about.message", nil)
-                                preferredStyle:UIAlertControllerStyleAlert];
-                  [ame132_info addAction:[UIAlertAction
-                      actionWithTitle:localize(@"preference.touchcontroller.ok", nil)
-                                style:UIAlertActionStyleDefault handler:nil]];
-                  [ame132_info addAction:[UIAlertAction
-                      actionWithTitle:@"GitHub"
-                                style:UIAlertActionStyleDefault
-                              handler:^(UIAlertAction *a){
-                        [[UIApplication sharedApplication] openURL:
-                            [NSURL URLWithString:@"https://github.com/TouchController/TouchController"]
-                            options:@{} completionHandler:nil];
-                  }]];
-                  [self presentViewController:ame132_info animated:YES completion:nil];
-              }
+              @"canDismissWithSwipe": @NO,
+              @"class": NSClassFromString(@"TouchControllerPreferencesViewController")
             },
             // ------------------------------------------
 
-            // --- [Task 133] 键位调整：二级页面入口浮窗化 ---
-            // 原为 typeChildPane（CustomControlsViewController 全屏编辑器）
-            // ——用户明令严禁二级页面：现改为 typePickField 原地悬浮浮窗，
-            // 列出 controlmap/*.json 布局（✓ 当前项，写入 control.default_ctrl
-            // ——与启动器主页/游戏内编辑器的 getDefaultCtrl 同一存储层）。
-            // 全屏编辑器经附加动作"编辑当前布局…"以 OverFullScreen 模态呈现
-            // （与原 openChildPaneAtIndexPath 的 Task62 特例同款形态，含
-            // setDefaultCtrl/getDefaultCtrl 回调），入口零丢失。
+            // --- [Task 134] 键位调整：二级页面入口恢复 ---
+            // Task 133 曾按"严禁二级页面"指令改为 pick 浮窗；用户反馈该
+            // 指令属于误判——恢复 typeChildPane 原始形态。推入动作经
+            // openChildPaneAtIndexPath 的 custom_controls 特例（OverFullScreen
+            // 全屏画布编辑器，Task62 同款含 setDefaultCtrl/getDefaultCtrl
+            // 回调），与启动器主页/游戏内两个入口零差异。
             @{@"key": @"custom_controls",
               @"icon": @"gamecontroller.fill",
               @"hasDetail": @YES,
-              @"type": self.typePickField,
+              @"type": self.typeChildPane,
               @"enableCondition": whenNotInGame,
-              @"pickKeys": ame133_ctrlKeys,
-              @"pickList": ame133_ctrlList,
-              @"pickExtraAction": @{
-                  @"label": localize(@"preference.pickextra.edit_layout", nil),
-                  @"handler": ^void(void){
-                      // 与 openChildPaneAtIndexPath 的 Task62 特例逐字同款：
-                      // OverFullScreen 直接呈现、不包导航控制器（包了会在
-                      // iPadOS 26 缩成屏中方形 + CCMenuViewController 的
-                      // doUpdateButton 转发目标错位闪退）
-                      CustomControlsViewController *vc = [[CustomControlsViewController alloc] init];
-                      vc.modalPresentationStyle = UIModalPresentationOverFullScreen;
-                      vc.setDefaultCtrl = ^(NSString *name){
-                          setPrefObject(@"control.default_ctrl", name);
-                      };
-                      vc.getDefaultCtrl = ^{
-                          return getPrefObject(@"control.default_ctrl");
-                      };
-                      [weakSelf presentViewController:vc animated:YES completion:nil];
-                  }
-              }
+              @"canDismissWithSwipe": @NO,
+              @"class": CustomControlsViewController.class
             },
+
             // ---------------------------------------------
 
-            // --- [Task 133] 手柄配置：二级页面入口浮窗化 ---
-            // 原为 typeChildPane（LauncherPrefContCfgViewController 按键
-            // 映射编辑器）——同上明令。现改为 typePickField 悬浮浮窗，列出
-            // controlmap/gamepads/*.json（✓ 当前项，写入
-            // control.default_gamepad_ctrl——与 ContCfg pane 同一存储层）。
-            // 完整按键映射编辑经附加动作模态呈现（FormSheet 悬浮层，与
-            // AI 系统提示词编辑器同款呈现形态）。
+            // --- [Task 134] 手柄配置：二级页面入口恢复 ---
+            // 同上误判恢复：typeChildPane 推入 LauncherPrefContCfgViewController
+            // 按键映射编辑器（与 43ef4ae 之前完全一致）。
             @{@"key": @"default_gamepad_ctrl",
                 @"icon": @"hammer",
-                @"type": self.typePickField,
+                @"type": self.typeChildPane,
                 @"enableCondition": whenNotInGame,
-                @"pickKeys": ame133_padKeys,
-                @"pickList": ame133_padList,
-                @"pickExtraAction": @{
-                    @"label": localize(@"preference.pickextra.edit_gamepad", nil),
-                    @"handler": ^void(void){
-                      LauncherPrefContCfgViewController *vc = [LauncherPrefContCfgViewController new];
-                      UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-                      nav.modalPresentationStyle = UIModalPresentationFormSheet;
-                      [weakSelf presentViewController:nav animated:YES completion:nil];
-                    }
-                }
+                @"canDismissWithSwipe": @NO,
+                @"class": LauncherPrefContCfgViewController.class
             },
             @{@"key": @"custom_mouse_pointer",
                 @"icon": @"cursorarrow",
@@ -1513,31 +1230,16 @@
         ], @[
         // Java tweaks
             @{@"icon": @"sparkles"},
-            // --- [Task 133] 运行时管理：二级页面入口浮窗化 ---
-            // 原为 typeChildPane（LauncherPrefManageJREViewController）——
-            // 同上明令。现改为 typePickField 悬浮浮窗：直接选择【现代 MC
-            // 默认路由（1_17_newer）】的 Java 版本（✓ 当前值，写入
-            // java.java_homes[0][1_17_newer]——JRE pane 同一存储层；
-            // 1_16_older/execute_jar 路由不动，老版本兼容不破坏）。
-            // 完整管理（导入/删除/逐版本目录选择/三条路由）经附加动作
-            // "管理运行时…"以 FormSheet 模态呈现，功能零丢失。
+            // --- [Task 134] 运行时管理：二级页面入口恢复 ---
+            // 同上误判恢复：typeChildPane 推入 LauncherPrefManageJREViewController
+            // （canDismissWithSwipe=YES 沿袭 43ef4ae 之前的原始形态）。
             @{@"key": @"manage_runtime",
                 @"hasDetail": @YES,
                 @"icon": @"cube",
-                @"type": self.typePickField,
-                @"enableCondition": whenNotInGame,
-                @"pickKeys": ame133_rtKeys,
-                @"pickList": ame133_rtList,
-                @"pickExtraAction": @{
-                    @"label": localize(@"preference.pickextra.manage_runtime", nil),
-                    @"handler": ^void(void){
-                      LauncherPrefManageJREViewController *vc = [LauncherPrefManageJREViewController new];
-                      UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:vc];
-                      nav.navigationBar.prefersLargeTitles = YES;
-                      nav.modalPresentationStyle = UIModalPresentationFormSheet;
-                      [weakSelf presentViewController:nav animated:YES completion:nil];
-                    }
-                }
+                @"type": self.typeChildPane,
+                @"canDismissWithSwipe": @YES,
+                @"class": LauncherPrefManageJREViewController.class,
+                @"enableCondition": whenNotInGame
             },
             @{@"key": @"java_args",
                 @"hasDetail": @YES,
@@ -1579,6 +1281,50 @@
         ], @[
             // Debug settings - only recommended for developer use
             @{@"icon": @"ladybug"},
+            // --- [Task 134] JIT 开启工具（LiveContainer 多工具方案） ---
+            // 部分用户没有安装 StikDebug 而使用 SideStore/StosDebug/JITStreamer
+            // 等其它工具——此前启动器固定跳 stikjit:// 导致"点了没反应、JIT
+            // 永远开不了"。现提供工具选择：auto 沿用原自动判定（TrollStore
+            // 检测 → apple-magnifier；iOS>=17.4 → stikjit；16.7-17.3.1 →
+            // sidestore），其余选项强制走对应工具的 URL scheme
+            // （waitJITEnabled 消费）。
+            @{@"key": @"jit_enabler",
+                @"hasDetail": @YES,
+                @"icon": @"bolt.badge.clock",
+                @"type": self.typePickField,
+                @"enableCondition": whenNotInGame,
+                @"pickKeys": @[
+                    @"auto",
+                    @"stikjit",
+                    @"sidestore",
+                    @"stosdebug",
+                    @"jitstreamer",
+                    @"trollstore",
+                    @"manual"
+                ],
+                @"pickList": @[
+                    localize(@"preference.debug.jit_enabler.auto", nil),
+                    localize(@"preference.debug.jit_enabler.stikjit", nil),
+                    localize(@"preference.debug.jit_enabler.sidestore", nil),
+                    localize(@"preference.debug.jit_enabler.stosdebug", nil),
+                    localize(@"preference.debug.jit_enabler.jitstreamer", nil),
+                    localize(@"preference.debug.jit_enabler.trollstore", nil),
+                    localize(@"preference.debug.jit_enabler.manual", nil)
+                ]
+            },
+            // --- [Task 134] iOS 26 JS 脚本 JIT 开关 ---
+            // 用户点名：提供关闭"iOS 26+ 启动游戏走 js 文件获取 JIT"的
+            // 选项。关闭后 stikjit:// 请求不再附带 UniversalJIT26.js 的
+            // script-data（纯调试器附加式 JIT）。注意：TXM 设备（系统级
+            // 内存映射依赖脚本服务 brk）关闭后可能无法启动游戏，详情见
+            // 行说明文案。
+            @{@"key": @"jit26_script_disable",
+                @"hasDetail": @YES,
+                @"icon": @"scroll",
+                @"type": self.typeSwitch,
+                @"enableCondition": whenNotInGame,
+                @"requestReload": @YES
+            },
             @{@"key": @"debug_universal_script_jit",
                 @"icon": @"scroll",
                 @"type": self.typeSwitch,

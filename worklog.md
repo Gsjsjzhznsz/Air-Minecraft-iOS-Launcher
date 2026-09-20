@@ -1297,3 +1297,28 @@ Work Log:
 Stage Summary:
 - Task133 五项修复全链闭环：悬浮弹窗指针失配根治（Task120 包装器删除）/ controlify-JNA 崩溃链接通（libjli+libjvm dlopen 槽重绑 + jna*.tmp install-name 检出）/ 皮肤头像本地渲染（无连字符 UUID + file:// URL + 存量自愈）/ 三个二级页面行浮窗化（pickExtraAction 模态保功能）/ ANGLE 开关退役；验证器 42/42 + 七级联全绿；新 IPA 就绪（9fa66fb 构建）
 - 装机待验证锚点：①'[SDLHook] Task133: libjli/libjvm/libjnidispatch image detected' 三连 + 26.1.2 controlify 初始化不再 SIGBUS；②全部 pick 行（渲染器/下载源/UI 布局/外观/语言/FSR 等）点击弹悬浮窗且右侧显示当前选中项；③'[ThirdPartyAuthenticator] Task133: skin avatar rendered locally' + 头像真实皮肤；④'pick opened: control.custom_controls / control.default_gamepad_ctrl / java.manage_runtime'；⑤MobileGlues 分区无 ANGLE 独立开关
+
+---
+Task ID: 134
+Agent: main (Super Z)
+Task: 9fa66fb 装机反馈六项修复（右上角头像不刷新 / 26.1.2 仍崩溃加固 / 26.2 TouchController 失效根治 / 二级菜单恢复 / 屏蔽控件 / JIT 多工具 + iOS26 脚本开关）+ 6.0.0 发布物
+
+Work Log:
+- 判读用户验收：pick 弹窗修复确认生效（"完全正常了"）；新反馈六项 + 发布物三项
+- 【头像不刷新】根因：ThirdPartyAuthenticator 的 profilePicURL 更新（存量自愈/新登录抓取）只写 authData+落盘，首页资料磁贴（LauncherNewsViewController）仅 viewDidLoad/账户切换时读取——启动时读到失效 URL 下载失败后停在占位图；右面板每次 viewWillAppear 重读所以正常（"档案页有图标、右上角没有"的不对称）。修复：ame134_notifyAccountInfoUpdated 主线程广播 UpdateAccountInfo（两 VC 均已注册），全部 profilePicURL 写点（3 方法主路径 + mc-heads 兜底共 6 处）收尾调用
+- 【26.2 TouchController 失效】二进制+源码双取证定案：clone mod 上游（TouchController/TouchController，depth-1=7582eef 2026-09-20）对照启动器捆绑 xcframework——mod 已把原生传输层从句柄制（JNI new(path)->handle; receive(handle,buffer); send(handle,buffer,off,len)）改成单例制（JNI init() 建单例; receive(buffer); send(buffer,off,len)），JNI 符号【同名异签名】：新 mod 调旧库时 jbyteArray 落进 jlong 形参、垃圾寄存器落进 buffer 形参，且旧 init() 是 no-op 队列从未创建——功能全灭。修复（Natives/TouchController/ 全新 in-tree 双 ABI）：ios_transport.c（单例通道 + 命名注册表两代并存；JNI receive/send 用指针注册表判别 trampoline——旧 mod 的 handle 必然是本实现活动 malloc 指针，按指针同一性判别零解引用，jbyteArray 不可能命中；arm64 寄存器重解释：旧 send off/len 在 w4/w5、新 send 在 w3/w4，新 ABI off 取 a3 低 32 位）+ ring_buffer.{h,c}（上游忠实移植）+ 旧 C API 加 _v1 后缀（touchcontroller_ios_receive_v1/send_v1）避免与新 ABI 同名冲突 + 新 C API 与 mod 仓库当前签名一致（touchcontroller_ios_receive(void*)/send(const void*,int)）；CMakeLists 新增 Level 0 源码优先（旧 xcframework 退役仅存档）；TouchControllerBridge 双通道（收：先单例后句柄；发：广播两通道）——SurfaceViewController 零改动。本地 gcc -std=c11 -Wall -Wextra 语法门通过（stub os/log.h；strdup 补 _DEFAULT_SOURCE；初始化失败路径按上游 init 标志模式加固）
+- 【二级菜单恢复】用户宣告此前"严禁二级菜单"指令为误判：mod_touch_enable/custom_controls/default_gamepad_ctrl/manage_runtime 四行全部恢复 typeChildPane（43ef4ae 之前形态：TouchController pane + Task62 OverFullScreen 特例 + ContCfg + JRE 管理器）；Task132/133 的 pick 行、复合 get/set 映射、ame133 三组数据源全删；基类 pickExtraAction 机制退役（代码 + preference.pickextra.* 三键 ×4 语言）
+- 【屏蔽控件】TouchController pane 新增 mod_touch_hide_controls 开关：JavaLauncher.ame134_applyTouchControllerCleanLayout（gameDir 解析后、JLI_Launch 前调用）向 <gameDir>/config/touchcontroller/ 写入空布局预设（preset/<固定uuid>.json：LayoutPreset {"name":"Amethyst Clean","layout":[]}，controlInfo 全默认被 encodeDefaults=false 省略 + order.json uuid 数组 + config.json preset 字段 {"type":"custom","uuid":...}，格式与 mod 源码 kotlinx.serialization 逐字段核对：GlobalConfigHolder/PresetManager/ControllerLayoutSerializer/Uuid.parse 全链）；原值备份 control.mod_touch_prev_preset_json 可逆恢复；触屏手势/震动/文本输入不受布局影响全部保留
+- 【26.1.2 崩溃加固】无新日志无法定位断点，采链路无关兜底：sdl3_hook.m 新增 amethyst_task134_watchdog_maybe_start（主队列 200ms dispatch 定时器持续跑 amethyst_task133_ensure_jvm_chain；取证：3bcf8c4 日志 JNA 加载 jnilib 到 controlify 解析 SDL 符号相隔秒级，窗口充足；检出 JVM 家族镜像即启动，空闲 tick = 一次 dyld 计数调用）；Task132 重绑定加读回验证（*slot != hook_fn 即报 READBACK FAILED 取证日志）；utils.h 补声明 + 前向声明（35512461717 教训类）
+- 【JIT 多工具】设置>调试新增 jit_enabler pick（auto/stikjit/sidestore/stosdebug/jitstreamer/trollstore/manual 七选，LiveContainer 方案：stikjit://enable-jit?bundle-id&pid[&script-data] / sidestore://enable-jit?bundle-id / stosdebug://enableJIT?bundleId&appName[&script] / http://[fd00::]:9172/launch_app/<bid> / apple-magnifier://enable-jit / 手动=仅等待）+ jit26_script_disable 开关（用户点名：关闭后 stikjit:// 不带 UniversalJIT26.js script-data；TXM 重连路径同门控）；auto=原自动判定逐字保留（TrollStore 检测→iOS17.4 分支→16.7-17.3.1 sidestore）；PLPreferences 默认（jit_enabler=auto / jit26_script_disable=NO）
+- 【l10n】四语言（en/zh-Hans/zh-CN/zh-Hant）删 pickextra 3 键 + 增 12 键（jit_enabler 7 标签 + title/detail 4 + hide_controls），基线 1907→1916 一致；task116/116c 审计零缺失
+- 【发布物】README/README_CN 差异表新增 6 行（崩溃链/双 ABI/JIT 工具/头像本地渲染/公告+RCAS）+ 本地化行数刷新 2000+；announcements.json 顶部插入 v6.0.0 条目（JSON 校验通过）；发行版文案存 /home/z/my-project/download/v6.0.0-release-notes.md（中英双语，供撤 5.1.0 后发 6.0.0 直接复制）
+- 验证：verify_task134 65/65（A 双 ABI 13 + B 菜单恢复 3 + C 屏蔽控件 6 + D 头像 3 + E 看门狗 5 + F JIT 6 + G l10n/发布物 4 + H 语法门 10+3+4 含新文件绝对平衡与 .strings 零新增违例 delta 门 + I 级联 8）；级联重锚全绿（112_118 49/49、119_124 62/62、125_128 52/52、129 47/47、130 60/60、131 37/37、132 53/53——C 组重写为 pane 恢复形态、133 42/42——D 组重写为 childPane 回归形态 + 基线 1916）
+
+Stage Summary:
+- 26.2 TouchController 根治：装机锚点 '[TouchControllerTransport] Task134: singleton transport created' + 'Task134: new-ABI mod detected (singleton Transport), first receive'；旧 mod 走命名句柄通道不受影响
+- 屏蔽控件：锚点 '[TouchController] Task134: clean layout applied (empty preset 0196a1ba-…)'
+- JIT：锚点 '[JIT] [RightPanel] Task134 enabler=<tool> noScript=<0/1>'
+- 崩溃看门狗：锚点 '[SDLHook] Task134: JVM image watchdog started' + Task132 重绑定日志现带 'verified' 或 'READBACK FAILED'
+- 头像：锚点 = 无需重启启动器，首页磁贴在自愈完成后实时刷新
+- 新 IPA 就绪待 CI；6.0.0 发布物（README/公告/发行版文案）齐备

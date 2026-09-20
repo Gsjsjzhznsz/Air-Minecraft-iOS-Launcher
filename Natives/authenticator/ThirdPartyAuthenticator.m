@@ -72,6 +72,23 @@ static NSString *ame133_undashedProfileId(NSString *profileId) {
     return [profileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
 }
 
+/// Task 134：profilePicURL 更新 + saveChanges 之后通知 UI 刷新。
+/// 病历：存量账户自愈（initWithData 后台重取）与新登录的头像抓取都只写
+/// authData + 落盘——首页资料磁贴（LauncherNewsViewController）只在
+/// viewDidLoad/账户切换时读一次 profilePicURL，启动时读到的还是旧的失效
+/// URL（helm 一次性签名 / mc-heads 404），下载失败后头像停在占位图，
+/// 直到重启启动器才显示（重启时 file:// 已落盘）。右面板/账户列表每次
+/// 出现都重读所以看起来正常——"档案页有图标、右上角没有"的不对称即此。
+/// 解法：所有 profilePicURL 写点收尾时在主线程广播 UpdateAccountInfo
+/// （两个展示 VC 均已注册该通知，重读 authData 即拿到 file:// 新值）。
+static void ame134_notifyAccountInfoUpdated(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"UpdateAccountInfo"
+                                                            object:nil
+                                                          userInfo:nil];
+    });
+}
+
 /// 从皮肤 PNG 本地渲染头像：脸 8x8 @(8,8) + 帽层 8x8 @(40,8) 合成，
 /// 最近邻放大到 128x128。兼容 64x64 / 128x128（等比 HD）与 64x32（经典）
 /// 布局——三类皮肤的脸/帽层坐标同为 (8s,8s) 与 (40s,8s)，s=宽/64。
@@ -1048,10 +1065,12 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
         }
         weakSelf.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://mc-heads.net/avatar/%@/100", weakSelf.authData[@"username"]];
         [weakSelf saveChanges];
+        ame134_notifyAccountInfoUpdated();
         callback(nil, YES);
     } failure:^(NSURLSessionDataTask *task, NSError *error) {
         weakSelf.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://mc-heads.net/avatar/%@/100", weakSelf.authData[@"username"]];
         [weakSelf saveChanges];
+        ame134_notifyAccountInfoUpdated();
         callback(nil, YES);
     }];
 }
@@ -1265,10 +1284,12 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                 // 如果Yggdrasil API失败，使用 mc-heads.net 头像服务作为回退
                 weakSelf.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://mc-heads.net/avatar/%@/100", weakSelf.authData[@"username"]];
                 [weakSelf saveChanges];
+                ame134_notifyAccountInfoUpdated();
             } failure:^(NSURLSessionDataTask *task, NSError *error) {
                 // 如果请求失败，使用 mc-heads.net 头像服务作为回退
                 weakSelf.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://mc-heads.net/avatar/%@/100", weakSelf.authData[@"username"]];
                 [weakSelf saveChanges];
+                ame134_notifyAccountInfoUpdated();
             }];
 
             // 设置默认头像，避免UI显示问题（异步获取真实皮肤URL后会覆盖并再次保存）
@@ -1559,10 +1580,12 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                         // 如果Yggdrasil API失败，使用 mc-heads.net 头像服务作为回退
                         weakSelf.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://mc-heads.net/avatar/%@/100", weakSelf.authData[@"username"]];
                         [weakSelf saveChanges];
+                        ame134_notifyAccountInfoUpdated();
                     } failure:^(NSURLSessionDataTask *task, NSError *error) {
                         // 如果请求失败，使用 mc-heads.net 头像服务作为回退
                         weakSelf.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://mc-heads.net/avatar/%@/100", weakSelf.authData[@"username"]];
                         [weakSelf saveChanges];
+                        ame134_notifyAccountInfoUpdated();
                     }];
 
                     // 设置默认头像，避免UI显示问题（异步获取真实皮肤URL后会覆盖并再次保存）

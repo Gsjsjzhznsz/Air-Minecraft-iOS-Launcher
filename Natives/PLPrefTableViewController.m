@@ -577,30 +577,9 @@
         }];
         [alert addAction:action];
     }
-    // Task 133：pickExtraAction——选项列表之后、取消之前的附加动作（如
-    // "编辑当前布局…" / "管理运行时…"，呈现完整管理器为模态浮层）。
-    // 行内 item 形态：@{ @"label": <NSString>, @"handler": ^void(void){...} }。
-    // （键名用 label 而非 title：审计器把行内的 @"title": 视为行自带标题，
-    // 会海派生规则——嵌套键改名后三类浮窗行的 title 键照常纳入审计。）
-    // 呈现时机：先让本悬浮菜单完成收起动画，再执行 handler——直接在
-    // action handler 里 present 会撞上"正在收起"的呈现竞争被 UIKit 静默丢弃。
-    {
-        NSDictionary *ame133_extra = item[@"pickExtraAction"];
-        if ([ame133_extra isKindOfClass:[NSDictionary class]]) {
-            NSString *ame133_label = ame133_extra[@"label"];
-            void (^ame133_handler)(void) = ame133_extra[@"handler"];
-            if ([ame133_label isKindOfClass:[NSString class]] && ame133_label.length > 0 && ame133_handler) {
-                UIAlertController *ame133_alert = alert;
-                [alert addAction:[UIAlertAction actionWithTitle:ame133_label
-                                                          style:UIAlertActionStyleDefault
-                                                        handler:^(UIAlertAction *a) {
-                    [ame133_alert dismissViewControllerAnimated:YES completion:^{
-                        ame133_handler();
-                    }];
-                }]];
-            }
-        }
-    }
+    // Task 134：附加动作机制随三个浮窗行回归二级页面而退役（唯一使用者
+    // 已在 Task 134 恢复 typeChildPane；机制代码移除，l10n 键
+    // preference.pickextra.* 同步清理）。
     [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
                                                style:UIAlertActionStyleCancel
                                              handler:nil]];

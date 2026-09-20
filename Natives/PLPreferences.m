@@ -116,6 +116,9 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"mod_touch_vibrate_enable": @YES,
             @"mod_touch_vibrate_intensity": @2,
             @"mod_touch_moveview_enable": @YES,
+            // Task 134：屏蔽控件——隐藏 mod 全部屏幕控件（写入空布局
+            // 预设到 <游戏目录>/config/touchcontroller/，下次启动游戏生效）
+            @"mod_touch_hide_controls": @NO,
             // UI 子面板占位 key（LauncherPreferencesViewController 的 getPreference 回调
             // 会对每个设置项按 "section.key" 查询，包括 button/childPane 类型）。
             // 提供空串默认值避免触发 "Getter could not find preference control.custom_controls" 日志。
@@ -230,6 +233,11 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"debug_universal_script_jit": @NO,
             @"debug_always_attached_jit": @NO,
             @"debug_skip_wait_jit": @NO,
+            // Task 134：JIT 开启工具选择（auto = 原自动判定：TrollStore
+            // 检测 → apple-magnifier；iOS>=17.4 → stikjit；16.7-17.3.1 →
+            // sidestore）与 iOS 26 JS 脚本 JIT 开关（默认携带脚本）
+            @"jit_enabler": @"auto",
+            @"jit26_script_disable": @NO,
             @"debug_hide_home_indicator": @NO,
             // Task 129g：同 hidden_sidebar——model 推导，避免求值时机依赖。
             @"debug_ipad_ui": @([[[UIDevice currentDevice].model lowercaseString] containsString:@"ipad"]),
