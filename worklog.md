@@ -1340,3 +1340,17 @@ Stage Summary:
 - 26.1.2 崩溃链最终闭环：Task133 设计被新日志证明有效（三连检出全通），真正断点 = Task132 句柄重查静默失败——本轮直传+重试根治；装机锚点升级为 'slot=%p verified'（成功）或 'retry scheduled'/'still unverified (attempt N)'（重试中），任何形态都能从日志直接判读
 - 26.2 会话证明守卫与拦截设计本身有效（同构建同会话守卫触发、游戏正常退出），崩溃与否只取决于 controlify 版本的 SDL 加载路径是否命中未 hook 的 JNA dlsym
 - 新 IPA 待 CI；6.0.0 发布物不受影响（README/公告/文案已含看门狗与读回验证描述）
+
+---
+Task ID: 134 (续2：CI 修复闭环)
+Agent: main (Super Z)
+
+Work Log:
+- run 35528391900（1d7fc53）失败：6 错误同一根因——JavaLauncher.m 第 26 行遗留宏 #define fm NSFileManager.defaultManager，ame134 函数的局部变量 NSFileManager *fm 撞名被宏展开（声明变 NSFileManager *NSFileManager.defaultManager = ...）。修复：局部改名 ame134_fm + 消息语法 [NSFileManager defaultManager]
+- run 35528979722（b26d572）失败：单错误——LauncherRightPanelViewController.m:1576 把类方法 objectForInfoDictionaryKey 当属性用（点语法），改回消息发送语法
+- run 35529403924（1e3ba17）completed success —— Task 134 全链闭环，新 IPA 就绪
+- 两轮均为 Task108 教训类：Linux 工作树编不了 ObjC TU，语法门只能管结构，成员/消息区分只有 CI clang 能抓
+
+Stage Summary:
+- Task 134 全链闭环：六项修复（双 ABI 传输层 / 二级菜单恢复 / 屏蔽控件 / 头像实时刷新 / 崩溃链二次加固（直传 hdr+slide + 看门狗重试）/ JIT 多工具 + iOS26 脚本开关）+ 6.0.0 发布物（README/公告/发行版文案）+ 验证器链全绿（task134 68/68 + 八级联）+ CI 绿
+- 装机待验证锚点：①'[TouchControllerTransport] Task134: singleton transport created' + 'Task134: new-ABI mod detected (singleton Transport), first receive'（26.2 mod 功能恢复）；②'pick opened: control.mod_touch_enable' 后推入 TouchController 二级页 + 'Task134: clean layout applied'（屏蔽控件）；③首页头像自愈后实时刷新（无需重启）；④'[SDLHook] Task134: JVM image watchdog started' + Task132 行尾 'verified'（26.1.2 崩溃链读回验证闭环，若仍见 'still unverified' 即新断点证据）；⑤'[JIT] [RightPanel] Task134 enabler=<tool> noScript=<0/1>'
