@@ -41,6 +41,11 @@ extern void CallbackBridge_syncGrabStateFromSDL(BOOL relMode, const char *source
 // dlsym 层拦截。返回非 NULL 表示该符号被兼容层接管。
 extern void *amethyst_sdl3_hook_resolve(void *handle, const char *name);
 
+// Task 132：hooked_dlopen 的 libjnidispatch _dlsym 槽位重绑定需要
+// hooked_dlsym 的地址；其定义在本文件后部（JVM hook 区），此处前向声明
+// （CI 35512461717 教训：415 行引用点先于定义点，缺声明即 undeclared）。
+void *hooked_dlsym(void *handle, const char *name);
+
 static bool (*g_real_SDL_SetWindowRelativeMouseMode)(void *window, bool enabled) = NULL;
 
 static bool amethyst_SDL_SetWindowRelativeMouseMode(void *window, bool enabled) {
