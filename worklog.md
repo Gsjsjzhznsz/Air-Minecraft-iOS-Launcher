@@ -1155,3 +1155,20 @@ Stage Summary:
 - CI run 35493455961（51772b6）completed success，11.2 分钟；Task130 全链闭环，新 IPA 就绪
 - 装机待验证锚点：'[JavaLauncher] Task130: AMETHYST_FSR_RCAS_SHARPNESS=0.2000 exported'；'[OSMBridge] Task130 RCAS ready/engaged (zink)' 或 EASU-only 回退行；'[MGLFSR] Task130 RCAS ready/engaged (MobileGL)'；'[MG] Task130 RCAS ready/engaged' + 'Setting: fsr1RcasSharpness = 0.200'；公告来自 raw.githubusercontent.com；多角色第三方账户卡片切换图标且不弹密码；'[Preferences] Task130 migrated MG DSA default: 0 -> 1'（老设备首启）
 - 教训：ObjC++ 结构体成员只能在真实 clang 验证；新 GL 符号必须调用点+结构体+kSym 三位一体；nohup 后台轮询会被沙箱收割（轮询走前台）
+
+---
+Task ID: 131
+Agent: main (Super Z)
+Task: 1d4082f 装机四项反馈修复；CI 修复闭环
+
+Work Log:
+- fc34ceb 双日志（26.1.2 崩溃会话 + 26.3 正常对照，均 1d4082f 构建）判读定位四项根因，全部代码级闭环
+- 修复③：controlify 3.0.1（26.1.2 包独有）经 JNA 加载 SDL3 注册事件回调，libffi closure trampoline 页 RW 不可执行 → 每帧事件泵触发 → SIGBUS at 0x12e550010；sdl3_hook 在 dlsym 层把 SDL_SetEventFilter/AddEventWatch 拦为 no-op（JNA 与 LWJGL 的符号解析都命中；controlify 走 SDL_PollEvent 轮询不受损）
+- 修复①：Blessing Skin 系服务器拒绝已绑定 token 换绑（服务端源码定案）；登录成功存原始密码进 iOS Keychain + loginIdentifier 持久化；切换失败自动重新认证绑定新角色；老账户引导一次性重登
+- 修复②+④：MobileGL 三后端（Vulkan 默认/GLES/Mithril）回到渲染器悬浮菜单（上游形态），mobilegl_backend 独立行退役（legacy 解析保留）；-gles 逻辑键物理加载映射；pick 从最顶层 VC 呈现 + 取证日志
+- CI 修复（35498188445）：Keychain 辅助 3 处 ARC bridge（SecItemUpdate 双参数 __bridge + CFTypeRef 出参）→ 92dc0d1 绿（run 35498485909）
+- verify_task131 37/37 + 级联 112_118:49 / 119_124:62 / 129:47 / 130:60 全绿；键集基线 1901
+
+Stage Summary:
+- 新 IPA 就绪；装机锚点：26.1.2 进世界 '[SDLHook] Task131: SDL_SetEventFilter blocked' 无 SIGBUS；切换角色三段日志 + 新 accountId 启动；渲染器菜单三后端条目；'[PLPrefTable] Task131: pick opened' 取证
+- 老第三方账户需重登一次启用免密切换
