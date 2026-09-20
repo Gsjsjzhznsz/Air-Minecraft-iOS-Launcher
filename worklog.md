@@ -1283,3 +1283,17 @@ Stage Summary:
 - 三行浮窗化：pickExtraAction 附加动作模态呈现完整管理器（编辑器/导入功能零丢失），锚点 'pick opened: control.custom_controls / control.default_gamepad_ctrl / java.manage_runtime'
 - ANGLE：MobileGlues 分区不再有独立开关；renderer_backend 文案写明 GLES=ANGLE 翻译
 - 键基线 1907；验证器链全绿；新 IPA 就绪
+
+---
+Task ID: 133 (续)
+Agent: main (Super Z)
+Task: Task133 CI 闭环
+
+Work Log:
+- CI run 35521286052（a489d9b）失败：sdl3_hook.m:2045:62 'no member named addr in struct segment_command_64'——值扫描窗口误用 seg->addr（segment_command_64 的成员是 vmaddr；section_64 才有 addr，上方逐段遍历用法正确）。Task108 教训类：本地 Linux 编不了 ObjC TU，仅 CI clang 暴露
+- 9fa66fb 单 token 修复（seg->addr -> seg->vmaddr）+ Task133 Mach-O 遍历周边成员访问全量复核（segname/vmaddr/vmsize/fileoff/nsects、sectname/addr/size/flags/reserved1/reserved2、symoff/stroff/nsyms/strsize、indirectsymoff/nindirectsyms、n_un.n_strx、dylib.name.offset 全部正确）
+- CI run 35522017526（9fa66fb）completed success（前台轮询至绿）；worklog 双份同步（576c9b7）
+
+Stage Summary:
+- Task133 五项修复全链闭环：悬浮弹窗指针失配根治（Task120 包装器删除）/ controlify-JNA 崩溃链接通（libjli+libjvm dlopen 槽重绑 + jna*.tmp install-name 检出）/ 皮肤头像本地渲染（无连字符 UUID + file:// URL + 存量自愈）/ 三个二级页面行浮窗化（pickExtraAction 模态保功能）/ ANGLE 开关退役；验证器 42/42 + 七级联全绿；新 IPA 就绪（9fa66fb 构建）
+- 装机待验证锚点：①'[SDLHook] Task133: libjli/libjvm/libjnidispatch image detected' 三连 + 26.1.2 controlify 初始化不再 SIGBUS；②全部 pick 行（渲染器/下载源/UI 布局/外观/语言/FSR 等）点击弹悬浮窗且右侧显示当前选中项；③'[ThirdPartyAuthenticator] Task133: skin avatar rendered locally' + 头像真实皮肤；④'pick opened: control.custom_controls / control.default_gamepad_ctrl / java.manage_runtime'；⑤MobileGlues 分区无 ANGLE 独立开关
