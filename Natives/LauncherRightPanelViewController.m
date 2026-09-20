@@ -1573,7 +1573,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 [NSString stringWithFormat:@"sidestore://enable-jit?bundle-id=%@", ame134_bundleId]]
                 options:@{} completionHandler:nil];
         } else if ([ame134_enabler isEqualToString:@"stosdebug"]) {
-            NSString *ame134_appName = NSBundle.mainBundle.objectForInfoDictionaryKey(@"CFBundleDisplayName") ?: @"Amethyst";
+            NSString *ame134_appName = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleDisplayName"] ?: @"Amethyst";
             NSMutableString *ame134_url = [NSMutableString stringWithFormat:
                 @"stosdebug://enableJIT?bundleId=%@&appName=%@", ame134_bundleId, ame134_appName];
             if (!ame134_noScript) {
