@@ -109,6 +109,23 @@ int config_get_int(char* name) {
     return item->valueint;
 }
 
+// Task 130 (Amethyst fork): double getter for fsr1RcasSharpness. Returns
+// fallback when the key is absent or not a number; the sharpness semantics
+// (mpv-scale [0,1], negative = RCAS off, default 0.2) live in the consumer.
+double config_get_double(char* name, double fallback) {
+    if (config_json == NULL) {
+        return fallback;
+    }
+
+    cJSON* item = cJSON_GetObjectItem(config_json, name);
+    if (item == NULL || !cJSON_IsNumber(item)) {
+        LOG_D("Config item '%s' not found or not a number.\n", name);
+        return fallback;
+    }
+
+    return item->valuedouble;
+}
+
 char* config_get_string(char* name) {
     if (config_json == NULL) {
         return NULL;

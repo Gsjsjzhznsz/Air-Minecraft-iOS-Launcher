@@ -255,8 +255,8 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     ks = set(re.findall(r'^"([^"]+)"\s*=',
                         rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M))
     sets.append(ks)
-check("I3 四语言键集一致（含 Task129b 9 新键，基线 1894）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1894,
+check("I3 四语言键集一致（Task129b 9 + Task130b 1 + Task130 RCAS 9 新键，基线 1904）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1904,
       f"counts={[len(s) for s in sets]}")
 
 # Makefile TAB 完整性（9e6fc27/129 双教训）
@@ -264,8 +264,10 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("I4 Makefile TAB 完整（HEAD 427 + 新目标 19，无空格展开）",
-      cur_tab == head_tab + 19, f"head={head_tab} cur={cur_tab}")
+check("I4 Makefile TAB 完整（Task130 重锚：HEAD 相对比较，无空格展开）",
+      # Task129 已入 HEAD（446 含 openal_shim 的 19 个 TAB），原 +19 期望值
+      # 随提交失效；Task130 未触碰 Makefile，正确不变量是 cur == head。
+      cur_tab == head_tab, f"head={head_tab} cur={cur_tab}")
 
 print("== J. 级联 ==")
 for v in ["119_124", "125_128", "112_118"]:

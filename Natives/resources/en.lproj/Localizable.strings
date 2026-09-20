@@ -133,6 +133,7 @@
 "account.switch_role.working" = "Switching to %@ …";
 "account.switch_role.done" = "Switched to %@";
 "account.switch_role.failed" = "Switch failed: %@";
+"account.switch_role.button" = "Switch character";
 
 "login.warn.title.legacy_device" = "The next release of Amethyst will not be compatible with this device.";
 "login.warn.message.legacy_device" = "To run the next major release, a device capable of running iOS 14 is required.";
@@ -318,6 +319,15 @@
 "preference.title.mg_fsr1_setting-2" = "Quality";
 "preference.title.mg_fsr1_setting-3" = "Balanced";
 "preference.title.mg_fsr1_setting-4" = "Performance";
+"preference.title.fsr_rcas_sharpness" = "FSR sharpening";
+"preference.detail.fsr_rcas_sharpness" = "RCAS sharpening strength applied after FSR upscaling (mpv scale). Default 0.2; higher = sharper; Off = upscale only. Takes effect on next launch.";
+"preference.title.mg_fsr_rcas-0" = "Off (upscale only)";
+"preference.title.mg_fsr_rcas-1" = "0.1 Faintest";
+"preference.title.mg_fsr_rcas-2" = "0.2 Default";
+"preference.title.mg_fsr_rcas-3" = "0.3 Light+";
+"preference.title.mg_fsr_rcas-4" = "0.5 Medium";
+"preference.title.mg_fsr_rcas-5" = "0.7 Strong";
+"preference.title.mg_fsr_rcas-6" = "1.0 Maximum";
 "preference.title.default_gamepad_ctrl" = "Controller configuration";
 "preference.title.hardware_hide" = "Hide controls when hardware is connected";
 "preference.detail.hardware_hide" = "Enable the behaviour of automatically disabling the on-screen control overlay when a mouse or game controller is connected.";

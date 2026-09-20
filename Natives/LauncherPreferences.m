@@ -99,6 +99,32 @@ void migrateDefaultControlPref(void) {
     setPrefObject(@"control.default_ctrl_migrated_custom", @YES);
 }
 
+// Task 130：MobileGlues 性能默认值治愈迁移（见 LauncherPreferences.h 的根因注释）。
+// 装机证据（7a680d1 会话，2026-09-20 12:10 上传）：日志显示
+//   mobileglues.enable_ext_direct_state_access = 0
+//   mobileglues.max_glsl_cache_size = 64
+// 前者 = v5.1.0 持久化旧默认（新默认 1 被压制，DSA 是 MC/sodium/
+// ImmediatelyFast 低开销路径的探测点）；后者 = 用户滑条自选（旧默认是
+// 32，64 从未当过默认——保留不动，缓存大小非性能主因）。仅匹配旧默认
+// 值才迁移，哨兵保证一次性；用户此后仍可自由改回。
+void ame130_migrateMgPerfDefaults(void) {
+    if ([getPrefObject(@"mobileglues.task130_perf_defaults_migrated") boolValue]) return;
+
+    id dsa = getPrefObject(@"mobileglues.enable_ext_direct_state_access");
+    if ([dsa isKindOfClass:NSNumber.class] && [(NSNumber *)dsa intValue] == 0) {
+        setPrefObject(@"mobileglues.enable_ext_direct_state_access", @YES);
+        NSLog(@"[Preferences] Task130 migrated MG DSA default: 0 -> 1 (v5.1.0-era persisted default was suppressing the Task129d default)");
+    }
+    id cache = getPrefObject(@"mobileglues.max_glsl_cache_size");
+    if ([cache isKindOfClass:NSNumber.class] && [(NSNumber *)cache intValue] == 32) {
+        setPrefObject(@"mobileglues.max_glsl_cache_size", @(128));
+        NSLog(@"[Preferences] Task130 migrated MG GLSL cache default: 32 -> 128");
+    }
+    setPrefObject(@"mobileglues.task130_perf_defaults_migrated", @YES);
+    NSLog(@"[Preferences] Task130 MG perf defaults migration checked (dsa=%@ cache=%@)",
+          dsa, cache);
+}
+
 id getPrefObject(NSString *key) {
     return [pref getObject:key];
 }

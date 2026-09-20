@@ -214,6 +214,11 @@ struct global_settings_t {
     AngleDepthClearFixMode angle_depth_clear_fix_mode;
     Version custom_gl_version;
     FSR1_Quality_Preset fsr1_setting;
+    // Task 130 (Amethyst fork): RCAS sharpening strength for the FSR1 pipeline
+    // (mpv FSR.glsl scale: [0,1], higher = sharper; negative = RCAS off).
+    // Default 0.2. Sourced from config.json fsr1RcasSharpness, which the
+    // launcher writes from the mobileglues.fsr_rcas_sharpness preference.
+    float fsr1_rcas_sharpness;
     HideMGEnvLevel hide_mg_env_level;
 };
 

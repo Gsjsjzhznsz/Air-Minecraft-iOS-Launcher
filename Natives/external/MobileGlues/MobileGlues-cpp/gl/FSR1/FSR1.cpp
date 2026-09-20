@@ -9,6 +9,18 @@
 #include <ska/flat_hash_map.hpp>
 #include "FSRShaderSource.h"
 #include "../../config/settings.h"
+// Task 130 (Amethyst fork): RCAS pass-2 shader source lives in the launcher
+// tree (Natives/ctxbridges/FSRRCASSource.h, static const = internal linkage,
+// no cross-TU symbol clash with osm_bridge.mm / mgl_fsr.mm which include their
+// own copies). __has_include guards it: an upstream/standalone MobileGlues
+// build without the Amethyst tree simply compiles without RCAS (EASU-only),
+// same as a compile failure at runtime.
+#if __has_include("../../../../../ctxbridges/FSRRCASSource.h")
+#define AME130_FSR_RCAS 1
+#include "../../../../../ctxbridges/FSRRCASSource.h"
+#else
+#define AME130_FSR_RCAS 0
+#endif
 
 #define DEBUG 0
 
@@ -146,6 +158,12 @@ namespace FSR1_Context {
     GLuint g_targetFBO = 0;
     GLuint g_targetTexture = 0;
 
+    // Task 130 (Amethyst fork): RCAS pass-2 program (mpv FSR.glsl-referenced
+    // sharpness pipeline). 0 = unavailable -> ApplyFSR stays EASU-only.
+    GLuint g_rcasProgram = 0;
+    GLint g_rcasInputTexLoc = -1;
+    GLint g_rcasSharpnessLoc = -1;
+
     GLuint g_currentDrawFBO = 0;
     GLint g_viewport[4] = {0};
     GLsizei g_targetWidth = 2400;
@@ -223,6 +241,59 @@ void CalculateRenderResolution(FSR1_Quality_Preset preset, int targetWidth, int 
 
     *renderWidth = (*renderWidth + 1) & ~1;
     *renderHeight = (*renderHeight + 1) & ~1;
+}
+
+// Task 130 (Amethyst fork): compile the RCAS pass-2 program. Mirrors
+// CompileFSRShader's structure but never aborts FSR on failure -- a 0 return
+// simply leaves ApplyFSR on the EASU-only path (logged once below). AME130_
+// FSR_RCAS is 0 in a standalone build (no launcher tree) and this compiles to
+// the same "unavailable" state.
+GLuint CompileRCASShader() {
+#if AME130_FSR_RCAS
+    GLuint program = glCreateProgram();
+
+    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vs, 1, &FSR_VSSource, nullptr);
+    glCompileShader(vs);
+
+    GLint status;
+    glGetShaderiv(vs, GL_COMPILE_STATUS, &status);
+    if (!status) {
+        char log[512];
+        glGetShaderInfoLog(vs, 512, nullptr, log);
+        LOG_W("[MG] Task130 RCAS vertex error: %s -- staying EASU-only", log);
+        return 0;
+    }
+
+    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fs, 1, &FSR_RCAS_FSSource, nullptr);
+    glCompileShader(fs);
+
+    glGetShaderiv(fs, GL_COMPILE_STATUS, &status);
+    if (!status) {
+        char log[512];
+        glGetShaderInfoLog(fs, 512, nullptr, log);
+        LOG_W("[MG] Task130 RCAS fragment error: %s -- staying EASU-only", log);
+        return 0;
+    }
+
+    glAttachShader(program, vs);
+    glAttachShader(program, fs);
+    glLinkProgram(program);
+
+    glGetProgramiv(program, GL_LINK_STATUS, &status);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    if (!status) {
+        char log[512];
+        glGetProgramInfoLog(program, 512, nullptr, log);
+        LOG_W("[MG] Task130 RCAS link error: %s -- staying EASU-only", log);
+        return 0;
+    }
+    return program;
+#else
+    return 0;
+#endif
 }
 
 GLuint CompileFSRShader() {
@@ -352,6 +423,23 @@ void InitFSRResources() {
     GLES.glUseProgram(FSR1_Context::g_fsrProgram);
     GLES.glUniform1i(FSR1_Context::g_inputTexLoc, 0);
     GLES.glUseProgram(0);
+
+    // Task 130 (Amethyst fork): RCAS pass-2 program. Compiled AFTER the EASU
+    // program so a failure here cannot take EASU down with it (the user-facing
+    // fallback contract: unsupported contexts degrade to EASU-only, logged).
+    // The sampler pinning mirrors the EASU block above.
+    FSR1_Context::g_rcasProgram = CompileRCASShader();
+    if (FSR1_Context::g_rcasProgram != 0) {
+        FSR1_Context::g_rcasInputTexLoc = glGetUniformLocation(FSR1_Context::g_rcasProgram, "uInputTex");
+        FSR1_Context::g_rcasSharpnessLoc = glGetUniformLocation(FSR1_Context::g_rcasProgram, "uSharpness");
+        GLES.glUseProgram(FSR1_Context::g_rcasProgram);
+        GLES.glUniform1i(FSR1_Context::g_rcasInputTexLoc, 0);
+        GLES.glUseProgram(0);
+        LOG_I("[MG] Task130 RCAS ready: program=%u sharpness=%.3f (mpv scale [0,1], default 0.2; negative = off via config)",
+              FSR1_Context::g_rcasProgram, global_settings.fsr1_rcas_sharpness);
+    } else {
+        LOG_W("[MG] Task130 RCAS unavailable on this context -- staying EASU-only");
+    }
 
     InitFullscreenQuad();
 
@@ -529,6 +617,59 @@ void ApplyFSR() {
         FSR1_Context::g_targetHeight == FSR1_Context::g_surfaceHeight;
 
     if (directToSurface) {
+        // Task 130 (Amethyst fork): when RCAS is available and enabled (program
+        // linked + sharpness >= 0), EASU first draws into the offscreen target
+        // and RCAS then presents: render texture -> EASU -> target texture ->
+        // RCAS -> surface. That is one extra fullscreen 5-tap pass (<0.5ms on
+        // M-class GPUs at 2360x1640) for the sharpening. RCAS off/unavailable
+        // keeps the Task83 single-pass shortcut untouched: EASU straight into
+        // the surface, zero behavior change.
+        const bool rcasOn = FSR1_Context::g_rcasProgram != 0 &&
+                            global_settings.fsr1_rcas_sharpness >= 0.0f;
+        if (rcasOn) {
+            // Depth/scissor/blend/cull would all silently eat the quad on a
+            // default framebuffer that carries a depth attachment or app-leftover
+            // state -- the target FBO never had those, the surface may. MC
+            // re-arms its own state every frame, so leaving these disabled
+            // through the swap is the same stomp the rest of this function
+            // already makes.
+            GLES.glDisable(GL_DEPTH_TEST);
+            GLES.glDisable(GL_SCISSOR_TEST);
+            GLES.glDisable(GL_BLEND);
+            GLES.glDisable(GL_CULL_FACE);
+            GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FSR1_Context::g_targetFBO);
+            GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
+            GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
+
+            // RCAS: target texture -> surface. Unit 0 is current (guard), the
+            // sampler was pinned at init; only the texture binding and the
+            // sharpness uniform are per-frame (config reload picks changes up
+            // without a relaunch).
+            GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            GLES.glBindTexture(GL_TEXTURE_2D, FSR1_Context::g_targetTexture);
+            GLES.glUseProgram(FSR1_Context::g_rcasProgram);
+            if (FSR1_Context::g_rcasSharpnessLoc >= 0) {
+                GLES.glUniform1f(FSR1_Context::g_rcasSharpnessLoc,
+                                 global_settings.fsr1_rcas_sharpness);
+            }
+            GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
+            GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
+            GLES.glUseProgram(FSR1_Context::g_fsrProgram);
+            static bool s_rcasEngaged = false;
+            if (!s_rcasEngaged) {
+                s_rcasEngaged = true;
+                LOG_I("[MG] Task130 RCAS engaged: render %dx%d -> EASU -> target %dx%d -> RCAS -> surface, sharpness=%.3f",
+                      FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight,
+                      FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight,
+                      global_settings.fsr1_rcas_sharpness);
+            }
+            // Hand the draw binding back to the render FBO the application's next
+            // frame expects (the guard would restore it too, but the explicit
+            // bind documents the handoff).
+            GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FSR1_Context::g_renderFBO);
+            GLES.glViewport(0, 0, FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight);
+            return;
+        }
         // Depth/scissor/blend/cull would all silently eat the quad on a default
         // framebuffer that carries a depth attachment or app-leftover state --
         // the target FBO never had those, the surface may. MC re-arms its own
@@ -911,6 +1052,10 @@ namespace {
 struct fsr1_ctx_state_t {
     GLuint renderFBO = 0, renderTexture = 0, depthStencilRBO = 0;
     GLuint quadVAO = 0, quadVBO = 0, fsrProgram = 0;
+    // Task 130: RCAS program is a per-context GL object like fsrProgram --
+    // its name is meaningless in a second context, so it travels in the table.
+    GLuint rcasProgram = 0;
+    GLint rcasInputTexLoc = -1, rcasSharpnessLoc = -1;
     // Locations belong to fsrProgram, so they travel with it rather than being
     // re-resolved after a context switch.
     GLint inputTexLoc = -1, targetSizeLoc = -1, viewportSizeLoc = -1;
@@ -938,6 +1083,9 @@ void store_into(fsr1_ctx_state_t& d) {
     d.quadVAO = FSR1_Context::g_quadVAO;
     d.quadVBO = FSR1_Context::g_quadVBO;
     d.fsrProgram = FSR1_Context::g_fsrProgram;
+    d.rcasProgram = FSR1_Context::g_rcasProgram;
+    d.rcasInputTexLoc = FSR1_Context::g_rcasInputTexLoc;
+    d.rcasSharpnessLoc = FSR1_Context::g_rcasSharpnessLoc;
     d.inputTexLoc = FSR1_Context::g_inputTexLoc;
     d.targetSizeLoc = FSR1_Context::g_targetSizeLoc;
     d.viewportSizeLoc = FSR1_Context::g_viewportSizeLoc;
@@ -960,6 +1108,9 @@ void load_from(const fsr1_ctx_state_t& s) {
     FSR1_Context::g_quadVAO = s.quadVAO;
     FSR1_Context::g_quadVBO = s.quadVBO;
     FSR1_Context::g_fsrProgram = s.fsrProgram;
+    FSR1_Context::g_rcasProgram = s.rcasProgram;
+    FSR1_Context::g_rcasInputTexLoc = s.rcasInputTexLoc;
+    FSR1_Context::g_rcasSharpnessLoc = s.rcasSharpnessLoc;
     FSR1_Context::g_inputTexLoc = s.inputTexLoc;
     FSR1_Context::g_targetSizeLoc = s.targetSizeLoc;
     FSR1_Context::g_viewportSizeLoc = s.viewportSizeLoc;

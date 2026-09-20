@@ -23,6 +23,9 @@ extern dispatch_group_t fatalExitGroup;
     // Task 77：一次性迁移默认触控布局出厂值 default.json -> custom.json
     //（幂等，哨兵键保证只执行一次；用户自选的其他布局不受影响）
     migrateDefaultControlPref();
+    // Task 130：一次性治愈 MobileGlues 性能默认值（v5.1.0 持久化的旧默认
+    // 0/32 压制 Task129d 新默认 1/128；幂等，仅匹配旧默认值，自选值不动）
+    ame130_migrateMgPerfDefaults();
     // Called when a new scene session is being created.
     return [[UISceneConfiguration alloc] initWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];
 }

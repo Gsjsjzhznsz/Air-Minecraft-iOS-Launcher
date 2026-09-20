@@ -25,6 +25,7 @@ extern "C"
 
     int config_refresh();
     int config_get_int(char* name);
+    double config_get_double(char* name, double fallback);  // Task 130 (Amethyst fork)
     char* config_get_string(char* name);
     void config_cleanup();
 

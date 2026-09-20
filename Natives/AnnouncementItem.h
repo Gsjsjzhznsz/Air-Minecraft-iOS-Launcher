@@ -3,7 +3,8 @@
 //  Amethyst
 //
 //  公告数据模型
-//  数据源：general.news_url 指向的 JSON API（默认 https://amethyst.ct.ws/api/announcements.json）
+//  数据源：general.news_url 指向的 JSON（Task 130 起默认为本仓库托管的
+//  announcements.json：raw.githubusercontent.com 主源 + jsDelivr 镜像级联）
 //  字段映射：
 //    id            -> announcementId
 //    title         -> title

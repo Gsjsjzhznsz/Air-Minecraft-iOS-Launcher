@@ -27,6 +27,9 @@ void init_settings() {
     global_settings.angle_supported = false;
     global_settings.angle_depth_clear_fix_mode = AngleDepthClearFixMode::Disabled;
     global_settings.fsr1_setting = FSR1_Quality_Preset::Disabled;
+    // Task 130: mpv default (0.2). Absent key keeps this; the range consumer
+    // (ApplyFSR) treats negatives as RCAS-off.
+    global_settings.fsr1_rcas_sharpness = 0.2f;
     global_settings.hide_mg_env_level = HideMGEnvLevel::Disabled;
 
     // Load config.json for iOS-relevant settings (customGLVersion, cache size, etc.)
@@ -73,6 +76,22 @@ void init_settings() {
     int fsr1Raw = success ? config_get_int((char*)"fsr1Setting") : -1;
     if (fsr1Raw >= 0 && fsr1Raw < static_cast<int>(FSR1_Quality_Preset::MaxValue)) {
         global_settings.fsr1_setting = static_cast<FSR1_Quality_Preset>(fsr1Raw);
+    }
+    // Task 130 (Amethyst fork): fsr1RcasSharpness (double). Range policy: pass
+    // through [0,1] (mpv scale), keep negatives as the explicit off signal,
+    // and clamp anything above 1 to 1 (NaN/garbage falls back to the 0.2
+    // default via the !(x>=0) test).
+    float rcasRaw = success ? (float)config_get_double((char*)"fsr1RcasSharpness", 0.2) : 0.2f;
+    if (!(rcasRaw >= 0.0f)) {
+        if (rcasRaw == rcasRaw) {  // negative (not NaN) = explicit off
+            global_settings.fsr1_rcas_sharpness = rcasRaw;
+        } else {
+            global_settings.fsr1_rcas_sharpness = 0.2f;
+        }
+    } else if (rcasRaw <= 1.0f) {
+        global_settings.fsr1_rcas_sharpness = rcasRaw;
+    } else {
+        global_settings.fsr1_rcas_sharpness = 1.0f;
     }
     int depthFixRaw = success ? config_get_int((char*)"angleDepthClearFixMode") : -1;
     if (depthFixRaw >= 0 && depthFixRaw < static_cast<int>(AngleDepthClearFixMode::MaxValue)) {
@@ -289,6 +308,8 @@ void init_settings() {
               global_settings.custom_gl_version.toString().c_str());
     }
     LOG_V("[MobileGlues] Setting: fsr1Setting                 = %i", static_cast<int>(global_settings.fsr1_setting))
+    LOG_V("[MobileGlues] Setting: fsr1RcasSharpness           = %.3f (Task 130 RCAS, mpv scale, negative=off)",
+          global_settings.fsr1_rcas_sharpness)
     LOG_V("[MobileGlues] Setting: hideMGEnvLevel              = %i",
           static_cast<int>(global_settings.hide_mg_env_level))
 

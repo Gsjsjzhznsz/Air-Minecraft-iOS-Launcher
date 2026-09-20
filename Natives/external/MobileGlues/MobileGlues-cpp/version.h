@@ -927,3 +927,24 @@
 //   itself, whose neomorph caster sublayers paint over layer contents;
 //   content-rendering views (UIImageView/UILabel/UITextView/UIControl)
 //   are excluded from card-container detection.
+//
+// REVISION 17 addendum (Amethyst Task 130, no bump): FSR1 gains the RCAS
+//   sharpening pass (mpv FSR.glsl-referenced, AMD FSR1 1.20210629 verbatim
+//   32-bit non-packed body). Pipeline: EASU now draws into an offscreen
+//   target and RCAS presents (5-tap cross, <0.5ms fullscreen on M-class
+//   GPUs); the alpha channel passes through from the center pixel so the
+//   Task103/104 per-frame sentinel survives. Sharpness is one preference
+//   across all consumers: mobileglues.fsr_rcas_sharpness (mpv scale [0,1],
+//   default 0.2, negative = off) -> config.json fsr1RcasSharpness for
+//   MobileGlues (new config_get_double) AND the AMETHYST_FSR_RCAS_SHARPNESS
+//   env var for the zink (osm_bridge) and MobileGL (mgl_fsr) pre-swap
+//   paths; a 7-tier settings pick row sits next to the FSR preset. Any
+//   compile/link/FBO failure degrades to EASU-only with a logged reason
+//   (per backend: zink, MobileGL DirectVulkan/GLES/Mithril, MobileGlues
+//   via __has_include so standalone builds stay EASU-only). Also this
+//   round: the account list gains an inline "switch character" button
+//   (password-free, shares Task129b's switchToProfile rebind), and the
+//   launcher announcements moved to a repo-hosted announcements.json
+//   (raw.githubusercontent.com primary + jsDelivr mirror cascade, the old
+//   air-api.vercel.app feed is only kept as a known-default sentinel for
+//   the customization check).

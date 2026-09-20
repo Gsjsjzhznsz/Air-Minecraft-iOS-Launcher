@@ -34,6 +34,12 @@ namespace FSR1_Context {
     extern GLuint g_quadVAO;
     extern GLuint g_quadVBO;
     extern GLuint g_fsrProgram;
+    // Task 130 (Amethyst fork): RCAS sharpening pass program. 0 = unavailable
+    // (compile/link failed or the Amethyst source tree is absent) -- ApplyFSR
+    // then stays on the EASU-only path. Locations travel with the program.
+    extern GLuint g_rcasProgram;
+    extern GLint g_rcasInputTexLoc;
+    extern GLint g_rcasSharpnessLoc;
     // Uniform locations of g_fsrProgram, resolved when it is linked and valid for
     // as long as it lives. -1 for a name the linker dropped, which glUniform*
     // ignores.

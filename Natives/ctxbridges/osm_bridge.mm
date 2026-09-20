@@ -19,6 +19,9 @@
 // 每个包含它的 TU 各持一份私有拷贝——启动器主二进制与 libmobileglues.dylib
 // 互不可见，无符号冲突。
 #include "../external/MobileGlues/MobileGlues-cpp/gl/FSR1/FSRShaderSource.h"
+// Task 130：RCAS 锐化 pass 2 源（static const，internal linkage——本 TU 私有
+// 副本，与 FSRShaderSource.h 的非 static 全局定义划清界限，bd71210 教训）。
+#include "FSRRCASSource.h"
 
 static osmesa_library handle;
 static void *s_osmDL = NULL;   // libOSMesa 句柄（dlsym_OSMesa 保存，FSR GL 惰性解析用）
@@ -197,6 +200,7 @@ typedef struct {
     void (*glDeleteTextures)(GLsizei, const unsigned int*);
     void (*glBindTexture)(unsigned int, unsigned int);
     void (*glTexParameteri)(unsigned int, unsigned int, int);
+    void (*glTexImage2D)(unsigned int, int, int, int, int, int, unsigned int, unsigned int, const void*);  // Task 130：easuTex 分配（RCAS ping-pong）
     void (*glCopyTexImage2D)(unsigned int, int, unsigned int, int, int, GLsizei, GLsizei, int);
     void (*glCopyTexSubImage2D)(unsigned int, int, int, int, int, int, GLsizei, GLsizei);
     void (*glActiveTexture)(unsigned int);
@@ -210,6 +214,11 @@ typedef struct {
     void (*glEnableVertexAttribArray)(unsigned int);
     // draw/state
     void (*glBindFramebuffer)(unsigned int, unsigned int);
+    // Task 130：RCAS ping-pong（EASU -> 中间纹理 -> RCAS -> fb0）需要 FBO 对象
+    void (*glGenFramebuffers)(GLsizei, unsigned int*);
+    void (*glDeleteFramebuffers)(GLsizei, const unsigned int*);
+    void (*glFramebufferTexture2D)(unsigned int, unsigned int, unsigned int, unsigned int, int);
+    int  (*glCheckFramebufferStatus)(unsigned int);
     void (*glDrawArrays)(unsigned int, int, GLsizei);
     void (*glViewport)(int, int, GLsizei, GLsizei);
     void (*glDisable)(unsigned int);
@@ -233,7 +242,32 @@ static struct {
     bool engaged;       // 至少跑过一次升采样（一次性日志用）
     bool healed;        // 兜底窗口恢复已触发
     long frames;        // 升采样帧计数（低频日志用）
+    // ---- Task 130：RCAS 锐化 pass 2（mpv FSR.glsl 参照）----
+    // 管线变更：EASU 不再直画 fb0，改画 easuTex（离屏 FBO）；RCAS 读
+    // easuTex 画回 fb0。RCAS 编译/链接失败 → rcasFailed=true，EASU 恢复
+    // 直画 fb0（仅 EASU 回退，日志留痕）——原有自愈链不动。
+    unsigned int rcasProgram;      // RCAS program（0 = 未建/失败）
+    unsigned int easuTex, easuFBO; // EASU 输出中间目标（尺寸=easuW×easuH）
+    int easuW, easuH;              // easuTex 存储尺寸（变更时重建）
+    int uRcasInputTex, uRcasSharpness;  // RCAS uniforms
+    bool rcasFailed;               // RCAS 不可用 → 仅 EASU
+    float rcasSharpness;           // 锐化强度（mpv 口径 [0,1]，默认 0.2）
+    bool rcasEngaged;              // RCAS 首帧一次性日志
+    long rcasFrames;               // RCAS 帧计数（低频日志）
 } ame83_fsr = {0};
+
+// Task 130：RCAS 锐化强度（mpv 口径 [0,1] 越大越锐，默认 0.2；负值 = 关闭
+// RCAS，仅 EASU）。环境变量 AMETHYST_FSR_RCAS_SHARPNESS 由 JavaLauncher
+// 启动前从偏好 mobileglues.fsr_rcas_sharpness 写入（与 MobileGlues 渲染器
+// 读 config.json 的 fsr1RcasSharpness 同源——两类渲染器一个偏好键）。
+static float ame130_rcas_sharpness(void) {
+    const char *s = getenv("AMETHYST_FSR_RCAS_SHARPNESS");
+    if (s == NULL || s[0] == 0) return 0.2f;
+    float v = atof(s);
+    if (v < 0.0f) return v;                      // 负值 = off（原样传递）
+    if (!(v >= 0.0f && v <= 1.0f)) return 0.2f;  // NaN/越界回默认
+    return v;
+}
 
 // Task 99（修复 B）：zink FSR 上屏诊断与兜底状态。
 //   swaps       —— osm_swap_buffers 总次数（心跳取证：EASU 条件变量可见）
@@ -282,6 +316,7 @@ static bool ame83_resolve_gl(void) {
         {"glDeleteTextures",          (void**)&ame83_fsr.gl.glDeleteTextures},
         {"glBindTexture",             (void**)&ame83_fsr.gl.glBindTexture},
         {"glTexParameteri",           (void**)&ame83_fsr.gl.glTexParameteri},
+        {"glTexImage2D",              (void**)&ame83_fsr.gl.glTexImage2D},
         {"glCopyTexImage2D",          (void**)&ame83_fsr.gl.glCopyTexImage2D},
         {"glCopyTexSubImage2D",       (void**)&ame83_fsr.gl.glCopyTexSubImage2D},
         {"glActiveTexture",           (void**)&ame83_fsr.gl.glActiveTexture},
@@ -293,6 +328,11 @@ static bool ame83_resolve_gl(void) {
         {"glVertexAttribPointer",     (void**)&ame83_fsr.gl.glVertexAttribPointer},
         {"glEnableVertexAttribArray", (void**)&ame83_fsr.gl.glEnableVertexAttribArray},
         {"glBindFramebuffer",          (void**)&ame83_fsr.gl.glBindFramebuffer},
+        // Task 130：RCAS ping-pong 所需 FBO 入口
+        {"glGenFramebuffers",           (void**)&ame83_fsr.gl.glGenFramebuffers},
+        {"glDeleteFramebuffers",         (void**)&ame83_fsr.gl.glDeleteFramebuffers},
+        {"glFramebufferTexture2D",       (void**)&ame83_fsr.gl.glFramebufferTexture2D},
+        {"glCheckFramebufferStatus",     (void**)&ame83_fsr.gl.glCheckFramebufferStatus},
         {"glDrawArrays",              (void**)&ame83_fsr.gl.glDrawArrays},
         {"glViewport",                (void**)&ame83_fsr.gl.glViewport},
         {"glDisable",                 (void**)&ame83_fsr.gl.glDisable},
@@ -482,6 +522,52 @@ static bool ame83_fsr_init(void) {
     NSLog(@"[OSMBridge] Task83 FSR1 EASU ready (zink): program=%u uViewportSize=%d uTargetSize=%d marker=%d -- same EASU shader as MobileGlues",
           ame83_fsr.program, ame83_fsr.uViewportSize, ame83_fsr.uTargetSize,
           ame83_fsr.markerArmed ? 1 : 0);
+
+    // ---- Task 130：RCAS 锐化 pass（独立 program，失败不拖 EASU 下水）----
+    // EASU ready 后才尝试；任何一步失败 → rcasFailed=true，本会话仅 EASU
+    // （EASU 直画 fb0 的旧路径），日志留痕（用户要求的不支持回退口径）。
+    // VS 重新编译一份：EASU 的 vs 在 link 后已删除（GL 允许 link 后删 shader），
+    // RCAS program 需要自己的附件；源同 FSR_VSSource（布局 aPosition/vTexCoord）。
+    ame83_fsr.rcasSharpness = ame130_rcas_sharpness();
+    do {
+        if (g->glGenFramebuffers == NULL || g->glFramebufferTexture2D == NULL) {
+            NSLog(@"[OSMBridge] Task130 RCAS unavailable: FBO entry points missing -- EASU-only (zink)");
+            break;
+        }
+        std::string rcasVs = ame83_adapt_shader_version(FSR_VSSource, "rcas-vertex");
+        std::string rcasFs = ame83_adapt_shader_version(FSR_RCAS_FSSource, "rcas-fragment");
+        unsigned int rvs = ame83_compile(g, GL_VERTEX_SHADER, rcasVs.c_str());
+        if (rvs == 0) {
+            NSLog(@"[OSMBridge] Task130 RCAS vertex compile FAILED -- falling back to EASU-only (zink)");
+            break;
+        }
+        unsigned int rfs = ame83_compile(g, GL_FRAGMENT_SHADER, rcasFs.c_str());
+        if (rfs == 0) {
+            g->glDeleteShader(rvs);
+            NSLog(@"[OSMBridge] Task130 RCAS fragment compile FAILED -- falling back to EASU-only (zink)");
+            break;
+        }
+        unsigned int rprog = g->glCreateProgram();
+        g->glAttachShader(rprog, rvs);
+        g->glAttachShader(rprog, rfs);
+        g->glLinkProgram(rprog);
+        int rok = 0;
+        g->glGetProgramiv(rprog, GL_LINK_STATUS, &rok);
+        g->glDeleteShader(rvs);
+        g->glDeleteShader(rfs);
+        if (!rok) {
+            char log[1024];
+            g->glGetProgramInfoLog(rprog, sizeof(log), NULL, log);
+            NSLog(@"[OSMBridge] Task130 RCAS program link FAILED: %s -- EASU-only (zink)", log);
+            break;
+        }
+        ame83_fsr.rcasProgram = rprog;
+        ame83_fsr.uRcasInputTex = g->glGetUniformLocation(rprog, "uInputTex");
+        ame83_fsr.uRcasSharpness = g->glGetUniformLocation(rprog, "uSharpness");
+        NSLog(@"[OSMBridge] Task130 RCAS ready (zink): program=%u sharpness=%.3f (mpv-scale [0,1], default 0.2) -- EASU now draws offscreen, RCAS presents",
+              ame83_fsr.rcasProgram, (double)ame83_fsr.rcasSharpness);
+    } while (false);
+    if (ame83_fsr.rcasProgram == 0) ame83_fsr.rcasFailed = true;
     return true;
 }
 
@@ -534,7 +620,53 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
         g->glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, srcW, srcH);
     }
 
-    // (2) EASU 全屏绘制 → 默认帧缓冲全幅
+    // ---- Task 130：RCAS ping-pong 目标惰性建/重建（尺寸=dstW×dstH）----
+    // RCAS 不可用（编译失败/FBO 缺失/sharpness<0 关闭）时 ame130_rcasOn=false，
+    // 给下方的 EASU 保持旧直画 fb0 路径（仅 EASU 回退，零行为变化）。
+    float ame130_sharp = ame130_rcas_sharpness();
+    bool ame130_rcasOn = ame130_sharp >= 0.0f &&
+                         !ame83_fsr.rcasFailed && ame83_fsr.rcasProgram != 0;
+    if (ame130_rcasOn && (ame83_fsr.easuW != dstW || ame83_fsr.easuH != dstH)) {
+        if (ame83_fsr.easuTex != 0) g->glDeleteTextures(1, &ame83_fsr.easuTex);
+        if (ame83_fsr.easuFBO != 0) g->glDeleteFramebuffers(1, &ame83_fsr.easuFBO);
+        ame83_fsr.easuTex = ame83_fsr.easuFBO = 0;
+        ame83_fsr.easuW = ame83_fsr.easuH = 0;
+        unsigned int tex = 0, fbo = 0;
+        g->glGenTextures(1, &tex);
+        g->glBindTexture(GL_TEXTURE_2D, tex);
+        g->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        g->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        g->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, 0x812F);
+        g->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, 0x812F);
+        g->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        g->glTexImage2D(GL_TEXTURE_2D, 0, 0x8058 /*GL_RGBA8*/, dstW, dstH, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        g->glGenFramebuffers(1, &fbo);
+        g->glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        g->glFramebufferTexture2D(GL_FRAMEBUFFER, 0x8CE0 /*GL_COLOR_ATTACHMENT0*/, GL_TEXTURE_2D, tex, 0);
+        if (g->glCheckFramebufferStatus != NULL &&
+            g->glCheckFramebufferStatus(GL_FRAMEBUFFER) != 0x8CD5 /*GL_FRAMEBUFFER_COMPLETE*/) {
+            NSLog(@"[OSMBridge] Task130 RCAS offscreen target incomplete (%dx%d) -- falling back to EASU-only (zink)", dstW, dstH);
+            g->glDeleteTextures(1, &tex);
+            g->glDeleteFramebuffers(1, &fbo);
+            g->glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            ame83_fsr.rcasFailed = true;
+            ame130_rcasOn = false;
+        } else {
+            ame83_fsr.easuTex = tex;
+            ame83_fsr.easuFBO = fbo;
+            ame83_fsr.easuW = dstW;
+            ame83_fsr.easuH = dstH;
+            g->glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        }
+    }
+
+    // (2) EASU 全屏绘制：RCAS 就绪时 → 离屏 easuTex；否则直画 fb0（旧路径）。
+    //     注：哨兵像素 alpha 写进 EASU 输出（easuTex 或 fb0），RCAS 的
+    //     alpha 透传保证哨兵最终落在 fb0 —— Task103/104 验证链不断。
+    if (ame130_rcasOn) {
+        g->glBindFramebuffer(GL_FRAMEBUFFER, ame83_fsr.easuFBO);
+    }
+    // EASU 绘制（目标见上：RCAS 就绪 = easuTex，否则 = fb0 全幅）
     g->glUseProgram(ame83_fsr.program);
     // Task 99：uInputTex 显式钉单元 0（若着色器把该 uniform 优化掉，
     // glGetUniformLocation 返回 -1，glUniform1i(-1,..) 是合法空操作——零回归）
@@ -568,6 +700,30 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     }
     g->glDrawArrays(GL_TRIANGLES, 0, 6);
 
+    // (1z) Task 130：RCAS 锐化 pass —— easuTex → fb0（1:1，5-tap 十字）。
+    //     开销口径：全屏 fragment 5 次 texelFetch + 纯 ALU，无中间回读、
+    //     无额外同步——实测目标 <0.5ms（M 系 GPU 全屏 2360x1640 量级）。
+    //     uSharpness 每帧下发（运行期环境变量变更不重启也生效，调试友好）。
+    if (ame130_rcasOn) {
+        g->glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        g->glActiveTexture(GL_TEXTURE0);
+        g->glBindTexture(GL_TEXTURE_2D, ame83_fsr.easuTex);
+        g->glUseProgram(ame83_fsr.rcasProgram);
+        if (ame83_fsr.uRcasInputTex >= 0) g->glUniform1i(ame83_fsr.uRcasInputTex, 0);
+        if (ame83_fsr.uRcasSharpness >= 0) {
+            g->glUniform1f(ame83_fsr.uRcasSharpness, ame130_sharp);
+        }
+        g->glViewport(0, 0, dstW, dstH);
+        g->glDrawArrays(GL_TRIANGLES, 0, 6);
+        ame83_fsr.rcasFrames++;
+        if (!ame83_fsr.rcasEngaged) {
+            ame83_fsr.rcasEngaged = true;
+            NSLog(@"[OSMBridge] Task130 RCAS engaged (zink): EASU %dx%d -> offscreen %dx%d -> RCAS -> fb0, sharpness=%.3f",
+                  srcW, srcH, dstW, dstH, (double)ame130_sharp);
+        } else if (ame83_fsr.rcasFrames == 600) {
+            NSLog(@"[OSMBridge] Task130 RCAS steady: 600 frames sharpened (zink)");
+        }
+    }
     // (2b) Task 99（修复 B）：GPU 侧单次探针 + 错误清扫——读回默认帧缓冲
     // 顶带（GL y≈dstH，即 EASU 输出覆盖、游戏窗口区域之外的条带）的
     // 一个像素。若此处非零而回读缓冲顶带全零，则“绘制已落地 GPU、
@@ -619,8 +775,8 @@ static bool ame83_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
     ame83_fsr.frames++;
     if (!ame83_fsr.engaged) {
         ame83_fsr.engaged = true;
-        NSLog(@"[OSMBridge] Task83 FSR1 upscale engaged (zink): render %dx%d -> surface %dx%d (EASU pre-readback ordering, Task 85)",
-              srcW, srcH, dstW, dstH);
+        NSLog(@"[OSMBridge] Task83 FSR1 upscale engaged (zink): render %dx%d -> surface %dx%d (EASU pre-readback ordering, Task 85, RCAS=%d)",
+              srcW, srcH, dstW, dstH, ame130_rcasOn ? 1 : 0);
     } else if (ame83_fsr.frames == 600) {
         NSLog(@"[OSMBridge] Task83 FSR1 upscale steady: 600 frames upsampled (zink)");
     }

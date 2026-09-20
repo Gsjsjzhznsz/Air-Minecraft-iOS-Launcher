@@ -286,6 +286,13 @@
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr1_setting"]) {
             keyFull = @"mobileglues.fsr1_setting";
         }
+        // Task 130：同款重映射——video.fsr_rcas_sharpness -> mobileglues.
+        // fsr_rcas_sharpness（RCAS 锐化强度 pick 行也挂在视频分区，多渲染器
+        // 通用：MobileGlues 读 config.json，zink/MobileGL 读环境变量，
+        // 三路同源见 JavaLauncher ame130_export_rcas_env）。
+        if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
+            keyFull = @"mobileglues.fsr_rcas_sharpness";
+        }
         return getPrefObject(keyFull);
     };
     self.setPreference = ^(NSString *section, NSString *key, id value){
@@ -313,6 +320,11 @@
         // Task 83：同上——video.fsr1_setting 重映射到 mobileglues.fsr1_setting
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr1_setting"]) {
             keyFull = @"mobileglues.fsr1_setting";
+        }
+        // Task 130：锐化强度同款重映射（存储值 pick 行写字符串，
+        // ame130_export_rcas_env 双态解析 NSNumber/NSString）
+        if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
+            keyFull = @"mobileglues.fsr_rcas_sharpness";
         }
         setPrefObject(keyFull, value);
     };
@@ -777,6 +789,27 @@
                   localize(@"preference.title.mg_fsr1_setting-2", nil),
                   localize(@"preference.title.mg_fsr1_setting-3", nil),
                   localize(@"preference.title.mg_fsr1_setting-4", nil)
+              ]
+            },
+            // Task 130：FSR1 RCAS 锐化强度（mpv 口径 [0,1] 越大越锐，默认 0.2；
+            // -1 = 关闭仅 EASU）。EASU 档位并排，悬浮 pick 直接切换。
+            // pickKeys 是存储值（字符串）；默认值 0.2 来自 PLPreferences
+            // 默认表（NSNumber 0.2）——stringValue 与 pickKey @"0.2" 相等，
+            // ✓ 标记对齐（Task121 存储值比较口径）。
+            @{@"key": @"fsr_rcas_sharpness",
+              @"hasDetail": @YES,
+              @"icon": @"wand.and.rays",
+              @"type": self.typePickField,
+              @"enableCondition": whenNotInGame,
+              @"pickKeys": @[@"-1", @"0.1", @"0.2", @"0.3", @"0.5", @"0.7", @"1"],
+              @"pickList": @[
+                  localize(@"preference.title.mg_fsr_rcas-0", nil),
+                  localize(@"preference.title.mg_fsr_rcas-1", nil),
+                  localize(@"preference.title.mg_fsr_rcas-2", nil),
+                  localize(@"preference.title.mg_fsr_rcas-3", nil),
+                  localize(@"preference.title.mg_fsr_rcas-4", nil),
+                  localize(@"preference.title.mg_fsr_rcas-5", nil),
+                  localize(@"preference.title.mg_fsr_rcas-6", nil)
               ]
             },
             // 帧率限制选项已移除：CADisplayLink 始终采用 30-120Hz 自适应范围，

@@ -161,6 +161,35 @@ void init_loadCustomEnv() {
 ///   config.json 虽然会写入但不会被读取。用户需显式选择 MobileGlues 渲染器才能让设置生效。
 /// - Vulkan 渲染器：Vulkan 模式下 OpenGL 回退库使用 MobileGlues（对齐 Ynnyny 仓库），
 ///   config.json 会被 MobileGlues 读取并生效。
+/// Task 130：导出 FSR1 RCAS 锐化强度环境变量并返回规整后的值。
+/// 偏好键 mobileglues.fsr_rcas_sharpness 是唯一用户入口（PLPreferences 默认值
+/// 表提供 0.2）。mpv 口径 [0,1] 越大越锐；负值 = 显式关闭（仅 EASU）；
+/// NaN/越界回默认 0.2。三路分发同源：
+///   ① MobileGlues 渲染器：config.json 的 fsr1RcasSharpness（settings.cpp 读，
+///      本函数返回值写入）；
+///   ② MobileGL/zink 路径：环境变量 AMETHYST_FSR_RCAS_SHARPNESS
+///      （mgl_fsr.mm / osm_bridge.mm 的 ame130_rcas_sharpness 解析）；
+///   ③ setenv 在所有渲染器路径导出（含上方 usesMobileGlues 早退分支）。
+/// setenv 内部拷贝字符串，临时 NSString 的 UTF8String 无悬垂问题。
+static double ame130_export_rcas_env(void) {
+    id sharpObj = getPrefObject(@"mobileglues.fsr_rcas_sharpness");
+    double sharpness = 0.2;
+    if ([sharpObj isKindOfClass:NSNumber.class]) {
+        sharpness = [(NSNumber *)sharpObj doubleValue];
+    } else if ([sharpObj isKindOfClass:NSString.class]) {
+        // Task 130：设置页 pick 行存字符串（pickKeys 如 @"0.2" / @"-1"）；
+        // 默认表则是 NSNumber @0.2——双态解析， stringValue 相同语义。
+        sharpness = [(NSString *)sharpObj doubleValue];
+    }
+    if (!(sharpness >= -1.0 && sharpness <= 1.0) || sharpness != sharpness) {
+        sharpness = 0.2;   // NaN/超出 [-1,1] 回默认
+    }
+    setenv("AMETHYST_FSR_RCAS_SHARPNESS",
+           [[NSString stringWithFormat:@"%.4f", sharpness] UTF8String], 1);
+    NSLog(@"[JavaLauncher] Task130: AMETHYST_FSR_RCAS_SHARPNESS=%.4f exported (RCAS sharpness, mpv scale, default 0.2, negative = off)", sharpness);
+    return sharpness;
+}
+
 void init_loadMobileGluesConfig() {
     NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
     NSLog(@"[JavaLauncher] init_loadMobileGluesConfig: renderer=%@", renderer);
@@ -171,6 +200,10 @@ void init_loadMobileGluesConfig() {
 
     if (!usesMobileGlues) {
         NSLog(@"[JavaLauncher] MobileGlues config not written (renderer is not mobileglues/auto/vulkan)");
+        // Task 130：config.json 不写，但 RCAS 锐化环境变量仍需导出——
+        // zink / MobileGL 路径的 mgl_fsr.mm / osm_bridge.mm 读的是
+        // AMETHYST_FSR_RCAS_SHARPNESS（与渲染器无关的统一出口）。
+        ame130_export_rcas_env();
         return;
     }
 
@@ -322,6 +355,11 @@ void init_loadMobileGluesConfig() {
         config[@"fsr1Setting"] = @([fsr1Setting intValue]);
         NSLog(@"[JavaLauncher]   mobileglues.fsr1_setting = %@ -> fsr1Setting = %@", fsr1Setting, config[@"fsr1Setting"]);
     }
+
+    // Task 130：FSR1 RCAS 锐化强度写入 MobileGlues config（fsr1RcasSharpness，
+    // settings.cpp 读）；环境变量同步导出（ame130_export_rcas_env，见函数定义处
+    // 的三路分发注释）。
+    config[@"fsr1RcasSharpness"] = @(ame130_export_rcas_env());
 
     NSError *error = nil;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:config options:NSJSONWritingPrettyPrinted error:&error];

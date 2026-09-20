@@ -1,0 +1,37 @@
+{
+  "announcements": [
+    {
+      "id": "repo-migration-2026-09-20",
+      "title": "公告已迁移至仓库托管",
+      "date": "2026-09-20",
+      "summary": "启动器公告改为 GitHub 仓库直接托管，不再依赖任何第三方接口，内容随仓库更新即时生效。",
+      "content": "## 公告源迁移\n\n从本版本起，启动器公告由本项目的 GitHub 仓库直接托管：\n\n- **主源**：仓库根目录 `announcements.json`（raw.githubusercontent.com），提交后即时生效\n- **镜像**：jsDelivr CDN（国内可达性更好，最长 12 小时缓存延迟）\n- **离线兜底**：随安装包内置的离线公告（网络完全不可用时显示）\n\n旧的公告接口（air-api.vercel.app）已失效且不受我们控制。迁移后公告内容与启动器代码同仓维护、同版发布，不会再出现“公告加载失败”这类单点故障。\n\n---\n\nAnnouncements are now hosted directly in this project's GitHub repository (announcements.json at the repo root): raw.githubusercontent.com as the primary source, a jsDelivr CDN mirror for reachability, and a bundled offline notice as the floor. The retired third-party API was unreachable and out of our control.",
+      "priority": "normal",
+      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/blob/main/announcements.json",
+      "action_title": "查看公告源文件",
+      "image_url": ""
+    },
+    {
+      "id": "v5-1-1-preview-2026-09-20",
+      "title": "下一版本修复与新特性预览",
+      "date": "2026-09-20",
+      "summary": "26.1.2 整合包崩溃修复、FSR 锐化（RCAS）、第三方登录免密切换角色等已进入下一版本。",
+      "content": "## 即将在下一版本发布\n\n**修复**\n\n- **26.1.2 整合包启动崩溃**：根因是 26.1.2 的声音引擎在没有扩展守卫的情况下直接调用 OpenAL 事件接口。已通过 OpenAL 垫片补全扩展面，26.1.2 与 26.3 行为统一\n- **设置项二级菜单回归**：FSR、下载源等多选项设置恢复悬浮菜单直接切换（iPhone / iPad 统一）\n- **Vulkan 性能**：ext_direct_state_access 默认开启、GLSL 缓存扩至 128MB\n- **iPad 识别与白背景**：iPad 机型始终 Pad 形态；背景图解码失败时铺主题色兜底\n\n**新特性**\n\n- **FSR1 RCAS 锐化**：EASU 放大后追加 RCAS 锐化 pass（mpv 同源实现），默认强度 0.2，设置中可调，负值关闭\n- **免密切换角色**：账号档案旁新增切换入口，第三方登录多角色切换不再需要重新输入密码\n\n---\n\nComing in the next build: the 26.1.2 modpack OpenAL crash fix, floating pickers restored, Vulkan DSA + 128MB GLSL cache defaults, iPad idiom/white-background fixes, FSR1 RCAS sharpening (mpv-derived, default 0.2, negative disables), and password-free profile switching for third-party accounts.",
+      "priority": "high",
+      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases",
+      "action_title": "查看版本发布",
+      "image_url": ""
+    },
+    {
+      "id": "v5-1-0-release-2026-09-19",
+      "title": "v5.1.0 正式版发布",
+      "date": "2026-09-19",
+      "summary": "MobileGL FSR 放大、渲染后端单选项（默认 Vulkan）、第三方登录恢复、启动时自动检查更新。",
+      "content": "## v5.1.0 主要内容\n\n- **MobileGL FSR 放大**：MobileGL 后端接入 FSR1 EASU 空间放大，低分辨率渲染 + 放大输出，性能显著提升\n- **渲染后端单选项**：MobileGL 三后端（Vulkan / GLES / Mithril）合并为一个设置项，默认 Vulkan，显式选择优先\n- **第三方登录恢复**：内置 authlib-injector，过期令牌优雅降级，LittleSkin 等外置登录站可用\n- **自动更新检查**：启动器启动时静默检查新版本，有更新时以卡片提醒\n- **子面板新拟物化**：全部二级面板统一新拟物设计\n\n---\n\nv5.1.0 shipped MobileGL FSR upscaling, the unified renderer-backend option (Vulkan default), restored third-party login with a bundled authlib-injector, silent auto update checks, and neumorphic sub-panels.",
+      "priority": "normal",
+      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v5.1.0",
+      "action_title": "查看 v5.1.0",
+      "image_url": ""
+    }
+  ]
+}

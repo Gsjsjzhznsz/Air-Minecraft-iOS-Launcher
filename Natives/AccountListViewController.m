@@ -1,4 +1,5 @@
 #import <AuthenticationServices/AuthenticationServices.h>
+#import <objc/runtime.h>   // Task 130b：按钮 row 关联对象
 #import "NeomorphKit/NMTheme.h"
 #import "NeomorphKit/NMToast.h"
 
@@ -257,6 +258,42 @@
     checkmark.contentMode = UIViewContentModeScaleAspectFit;
     [cardView addSubview:checkmark];
 
+    // Task 130b：第三方多角色账户的行内「切换角色」按钮（用户反馈：选完
+    // 角色后想换角色只能重输密码——v5.1.0 无 Task129b 的长按菜单，且长按
+    // 本身发现性差）。按钮位于卡片右侧、类型徽章与选中勾之间的垂直中部；
+    // 点击弹出角色 actionSheet（与长按菜单共用 ame129b_switchAccountAtIndexPath，
+    // switchToProfile 走 refresh 重绑，免重输密码）。仅当 availableProfiles
+    // >= 2 时创建（判别口径与长按菜单一致：accountType 显式 + clientToken
+    // 嗅探回退）。
+    UIButton *ame130b_switchBtn = nil;
+    {
+        NSString *ame130b_type = accountData[@"accountType"];
+        BOOL ame130b_is3P;
+        if (ame130b_type.length > 0) {
+            ame130b_is3P = [ame130b_type isEqualToString:@"thirdparty"];
+        } else {
+            ame130b_is3P = (accountData[@"clientToken"] != nil);
+        }
+        NSArray *ame130b_profiles = accountData[@"availableProfiles"];
+        if (ame130b_is3P && [ame130b_profiles isKindOfClass:NSArray.class] &&
+            ame130b_profiles.count >= 2) {
+            ame130b_switchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+            ame130b_switchBtn.translatesAutoresizingMaskIntoConstraints = NO;
+            [ame130b_switchBtn setImage:[UIImage systemImageNamed:@"person.2"]
+                              forState:UIControlStateNormal];
+            ame130b_switchBtn.tintColor = [UIColor colorWithRed:0.30 green:0.55 blue:1.0 alpha:1.0];
+            ame130b_switchBtn.accessibilityLabel = localize(@"account.switch_role.button", @"切换角色");
+            // row 绑定：cell 复用后按钮随卡片重建（cellForRow 每次移除旧子
+            // 视图），关联对象携带当前 row，避免闭包捕获过期 indexPath。
+            objc_setAssociatedObject(ame130b_switchBtn, "ame130b_row",
+                                     @(indexPath.row), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            [ame130b_switchBtn addTarget:self
+                                   action:@selector(ame130b_switchRoleTapped:)
+                         forControlEvents:UIControlEventTouchUpInside];
+            [cardView addSubview:ame130b_switchBtn];
+        }
+    }
+
     NSString *selectedAccountId = [self currentSelectedAccountId];
     BOOL isCurrentSelected = (selectedAccountId.length > 0 &&
                               [selectedAccountId isEqualToString:accountData[@"accountId"]]);
@@ -293,6 +330,17 @@
         [checkmark.widthAnchor constraintEqualToConstant:20],
         [checkmark.heightAnchor constraintEqualToConstant:20],
     ]];
+
+    // Task 130b：切换角色按钮约束（底部行、选中勾左侧——与顶部徽章/用户名
+    // 行零重叠；点按热区 32x32 比图标大，小屏友好）。
+    if (ame130b_switchBtn != nil) {
+        [NSLayoutConstraint activateConstraints:@[
+            [ame130b_switchBtn.trailingAnchor constraintEqualToAnchor:checkmark.leadingAnchor constant:-10],
+            [ame130b_switchBtn.centerYAnchor constraintEqualToAnchor:checkmark.centerYAnchor],
+            [ame130b_switchBtn.widthAnchor constraintEqualToConstant:32],
+            [ame130b_switchBtn.heightAnchor constraintEqualToConstant:32],
+        ]];
+    }
 
     return cell;
 }
@@ -439,6 +487,54 @@ static NSMutableSet *ame128_validatedSet(void) {
         actionProvider:^UIMenu * _Nullable(NSArray<UIMenuElement *> * _Nonnull suggestedActions) {
             return menu;
         }];
+}
+
+/// Task 130b：行内「切换角色」按钮回调（卡片右侧 person.2 图标）。
+/// 弹出悬浮 actionSheet 角色列表（与设置页悬浮 pick 同形态；iPad 经
+/// popover 锚定在按钮旁）——用户实测反馈"想换角色只能重输密码"的直达
+/// 入口。选中走 ame129b_switchAccountAtIndexPath（switchToProfile：
+/// refresh 重绑，免密码）；长按 contextMenu（Task129b）保留，双入口共用。
+- (void)ame130b_switchRoleTapped:(UIButton *)sender {
+    NSNumber *rowNum = objc_getAssociatedObject(sender, "ame130b_row");
+    if (![rowNum isKindOfClass:NSNumber.class]) return;
+    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:rowNum.integerValue inSection:0];
+    if (indexPath.row >= self.accountList.count) return;   // 列表已变（删除/刷新后旧按钮）
+    NSDictionary *accountData = self.accountList[indexPath.row];
+    NSArray *profiles = accountData[@"availableProfiles"];
+    if (![profiles isKindOfClass:NSArray.class]) return;
+
+    NSString *currentProfileId = accountData[@"profileId"];
+    NSString *displayName = accountData[@"username"] ?: @"";
+    NSString *message = [NSString stringWithFormat:localize(@"account.switch_role.title", @"切换角色 — %@"), displayName];
+
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:message
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSDictionary *p in profiles) {
+        if (![p isKindOfClass:NSDictionary.class]) continue;
+        NSString *pid = [p[@"id"] isKindOfClass:[NSString class]] ? p[@"id"] : nil;
+        NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"?";
+        if (pid.length == 0) continue;
+        NSString *title = pname;
+        // ✓ 当前角色（UUID 归一化比较，与长按菜单同口径）
+        NSString *pidNorm = [pid stringByReplacingOccurrencesOfString:@"-" withString:@""];
+        NSString *curNorm = [currentProfileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
+        if ([pidNorm isEqualToString:curNorm]) {
+            title = [NSString stringWithFormat:@"✓ %@", title];
+        }
+        [alert addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault
+            handler:^(UIAlertAction *a) {
+                [self ame129b_switchAccountAtIndexPath:indexPath toProfile:p];
+            }]];
+    }
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    // iPad：actionSheet 以 popover 锚定在按钮旁（悬浮面板）；iPhone 底部弹出。
+    alert.popoverPresentationController.sourceView = sender;
+    alert.popoverPresentationController.sourceRect = sender.bounds;
+    alert.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 /// Task 129b：执行角色切换（长按菜单的 action 回调）

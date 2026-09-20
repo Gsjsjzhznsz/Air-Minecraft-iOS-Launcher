@@ -14,6 +14,15 @@ void migrateDownloadSourcePreferences(void);
 /// 其他布局（非 default.json）与已选 custom.json 的安装不受影响。
 void migrateDefaultControlPref(void);
 
+/// Task 130 一次性迁移：MobileGlues 性能默认值治愈（DSA / GLSL 缓存）。
+/// 根因（7a680d1 装机日志实锤）：PLPreferences.setDefaultsForPref 会把缺失
+/// 默认键合并进 plist 并落盘，v5.1.0 时代写入的旧默认
+/// （enable_ext_direct_state_access=0、max_glsl_cache_size=32）永久压制
+/// Task129d 的新默认（1/128）——默认合并只补缺失键，已存在的不覆盖。
+/// 迁移仅匹配旧默认值（0/32），用户自选值（如 64）不动；哨兵键
+/// mobileglues.task130_perf_defaults_migrated 保证只执行一次。
+void ame130_migrateMgPerfDefaults(void);
+
 id getPrefObject(NSString *key);
 BOOL getPrefBool(NSString *key);
 float getPrefFloat(NSString *key);

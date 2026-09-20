@@ -29,7 +29,10 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"debug_logging": @(!CONFIG_RELEASE),
             // Task 125：启动时自动检测更新（默认开；关闭后仅保留手动检查入口）
             @"auto_update_check": @YES,
-            @"news_url": @"https://air-api.vercel.app/api/announcements.php",
+            // Task 130：公告源改为本仓库托管的 announcements.json（旧上游
+            // air-api.vercel.app 已 404；AnnouncementService 的 raw + jsDelivr
+            // 源级联见同文件常量，此默认值同时是"未自定义"识别基准之一）
+            @"news_url": @"https://raw.githubusercontent.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/main/announcements.json",
             @"download_source": @"bmclapi",
             // 各资源类型独立下载源（未显式设置时回退到 modrinth）
             @"download_source_mod": @"modrinth",
@@ -169,7 +172,17 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"multidraw_mode": @(0),
             @"angle_depth_clear_fix_mode": @(0),
             @"custom_gl_version": @(0),
-            @"fsr1_setting": @(0)
+            @"fsr1_setting": @(0),
+            // Task 130：FSR1 RCAS 锐化强度（mpv 口径 [0,1] 越大越锐）。
+            // 0.2 = mpv 默认轻度锐化；负值 = 关闭 RCAS（仅 EASU）。
+            // 消费链：JavaLauncher ame130_export_rcas_env -> config.json
+            // fsr1RcasSharpness（MobileGlues）+ AMETHYST_FSR_RCAS_SHARPNESS
+            // 环境变量（MobileGL/zink 的 mgl_fsr/osm_bridge）。
+            @"fsr_rcas_sharpness": @0.2,
+            // Task 130：性能默认值治愈迁移哨兵（ame130_migrateMgPerfDefaults，
+            // 见 LauncherPreferences.h 根因注释——v5.1.0 持久化的旧默认 0/32
+            // 压制 Task129d 新默认 1/128，本哨兵保证迁移只跑一次）
+            @"task130_perf_defaults_migrated": @NO
         }.mutableCopy,
         // 游戏内覆盖层（GameMenuOverlayView）的位置持久化与开关
         // 位置以屏幕宽高百分比存储（0.0~1.0），哨兵值 -1 表示未设置，

@@ -133,6 +133,7 @@
 "account.switch_role.working" = "正在切换到 %@ …";
 "account.switch_role.done" = "已切换到 %@";
 "account.switch_role.failed" = "切换失败：%@";
+"account.switch_role.button" = "切换角色";
 
 "login.warn.title.legacy_device" = "Amethyst 的下一个版本将与此设备不兼容。";
 "login.warn.message.legacy_device" = "运行下一个主要版本，需要一台能够运行 iOS 14.5 的设备。";
@@ -316,6 +317,15 @@
 "preference.title.mg_fsr1_setting-2" = "高品质";
 "preference.title.mg_fsr1_setting-3" = "均衡";
 "preference.title.mg_fsr1_setting-4" = "性能优先";
+"preference.title.fsr_rcas_sharpness" = "FSR 锐化强度";
+"preference.detail.fsr_rcas_sharpness" = "FSR 放大后追加的 RCAS 锐化强度（mpv 口径）。默认 0.2，越大越锐；关闭 = 仅放大不锐化。下次启动游戏时生效。";
+"preference.title.mg_fsr_rcas-0" = "关闭（仅放大）";
+"preference.title.mg_fsr_rcas-1" = "0.1 极轻";
+"preference.title.mg_fsr_rcas-2" = "0.2 默认";
+"preference.title.mg_fsr_rcas-3" = "0.3 轻度+";
+"preference.title.mg_fsr_rcas-4" = "0.5 中度";
+"preference.title.mg_fsr_rcas-5" = "0.7 较强";
+"preference.title.mg_fsr_rcas-6" = "1.0 最强";
 "preference.title.default_gamepad_ctrl" = "手柄配置";
 "preference.title.hardware_hide" = "硬件连接时隐藏控制键";
 "preference.detail.hardware_hide" = "启用连接鼠标或游戏控制器时自动禁用屏幕控制叠加的行为。";

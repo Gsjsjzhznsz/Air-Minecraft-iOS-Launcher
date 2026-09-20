@@ -3,8 +3,10 @@
 //  Amethyst
 //
 //  公告拉取服务
-//  从 general.news_url 指向的 JSON API 拉取公告列表，带 30 分钟本地缓存。
-//  缓存原始 NSData 到 NSUserDefaults，网络失败时回退到缓存。
+//  Task 130：公告源为本仓库托管的 announcements.json（raw.githubusercontent.com
+//  主源 + jsDelivr 镜像级联，用户可用 general.news_url 自定义独占源）。
+//  带 30 分钟本地缓存；全部在线源失败时回退缓存，再回退随包内置离线公告
+//  （Task129h，Natives/resources/announcements-fallback.json）。
 //
 
 #import <Foundation/Foundation.h>
