@@ -562,13 +562,24 @@
     [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
                                                style:UIAlertActionStyleCancel
                                              handler:nil]];
-    // iPad：actionSheet 以 popover 呈现，锚定到被点击的行（悬浮面板）；
-    // iPhone：从底部弹出（popoverPresentationController 不生效，设置 sourceView
-    // 仅防御 iPad 分屏场景）。
+    // Task 131：呈现加固 + 设备侧取证锚点。
+    // 要点一（诊断日志）：记录 pick 打开事件（section.key + 选项数）——此前
+    // "悬浮菜单无法使用"的反馈只有用户描述没有设备证据，今后日志可直接判读
+    // pick 是否触发；
+    // 要点二（呈现收口）：self 若正处于某个呈现中（面板/搜索残留），
+    // presentViewController 会被 UIKit 静默拒绝（表现为"点了没反应"）。沿
+    // presentedViewController 链上溯到最外层再呈现，消除该静默失败面。
+    // popover 锚点保持在被点击的行上（iPad 悬浮面板形态不变）。
+    NSLog(@"[PLPrefTable] Task131: pick opened: %@.%@ (%lu options)",
+          self.prefSections[indexPath.section], item[@"key"], (unsigned long)pickList.count);
+    UIViewController *ame131_presenter = self;
+    while (ame131_presenter.presentedViewController != nil) {
+        ame131_presenter = ame131_presenter.presentedViewController;
+    }
     alert.popoverPresentationController.sourceView = cell;
     alert.popoverPresentationController.sourceRect = cell.bounds;
     alert.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
-    [self presentViewController:alert animated:YES completion:nil];
+    [ame131_presenter presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)tableView:(UITableView *)tableView invokeActionWithPromptAtIndexPath:(NSIndexPath *)indexPath {

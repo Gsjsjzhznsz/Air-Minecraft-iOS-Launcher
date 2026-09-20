@@ -305,19 +305,43 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
           @"file": @ RENDERER_NAME_LTW},
         @{@"key": @ RENDERER_NAME_VULKAN,
           @"name": localize(@"preference.title.renderer.debug.vulkan", nil),
-          @"file": @ RENDERER_NAME_VULKAN}
+          @"file": @ RENDERER_NAME_VULKAN},
+        // Task 131（恢复上游形态，替代 Task120 的独立 mobilegl_backend 行）：
+        // MobileGL 三后端回到渲染器悬浮菜单——用户四次强调"设置项还是分开的/
+        // 二级菜单入口无法使用"：Task120 把上游渲染器列表里的 MobileGL 家族
+        // 三条目挪到 MobileGlues 分区的独立设置行，且仅 renderer=auto 时生效
+        // （用户设备 renderer=MobileGlues -> 切了后端也无效）。上游原本就在
+        // 渲染器悬浮菜单里直接选 MG 后端，现原样恢复：
+        //   libMobileGL.dylib（Vulkan 直呈，MG 默认档）/ libMobileGL-gles.dylib
+        //   （GLES 档）/ libmithril.dylib（Mithril 档）。
+        // -gles 条目的 key 是逻辑名（egl_bridge/JavaLauncher 按它切
+        //   MOBILEGL_BACKEND_TYPE=DirectGLES），file 用共享的 libMobileGL.dylib
+        // 做存在性判定（-gles 变体 dylib 不随包，物理加载点按 key 映射回共享
+        // 二进制）。Mithril 的 dylib 缺失时由下方过滤规则自动隐藏。
+        @{@"key": @ RENDERER_NAME_MITHRIL,
+          @"name": localize(@"preference.title.renderer.debug.mithril", nil),
+          @"file": @ RENDERER_NAME_MITHRIL},
+        @{@"key": @ RENDERER_NAME_MOBILEGL,
+          @"name": localize(@"preference.title.renderer.debug.mobilegl", nil),
+          @"file": @ RENDERER_NAME_MOBILEGL},
+        @{@"key": @ RENDERER_NAME_MOBILEGL_GLES,
+          @"name": localize(@"preference.title.renderer.debug.mobilegl_gles", nil),
+          @"file": @ RENDERER_NAME_MOBILEGL}
     ];
 }
 
-// Task 113 -> Task 120（重构）：MobileGL 渲染器不进主渲染器列表（用户要求：
-// 列表太占空间）。上游的三个 MobileGL 家族列表条目（MobileGL / MobileGL-gles /
-// Mithril）合并为设置页"视频"分区里的单一选项 mobilegl_backend（与"ANGLE ES
-// 驱动"并排），默认 Vulkan；GLES 与 MobileGL 共用同一个 libMobileGL.dylib
-// （运行时由 MOBILEGL_BACKEND_TYPE 选择后端），Mithril 需 libmithril.dylib
-// 随包存在（当前未附带，选项存在但启动时守卫回落 auto 并留日志）。
-// 旧的 mobilegl_vulkan 布尔开关（Task113）已退役：它无条件覆盖任何显式渲染器
-// 选择，1d4ff3a9 会话用户选 zink 被静默换成 MobileGL Vulkan（"用了 zink 却回
-// 退 vk"）——Task120 起【显式渲染器选择永远优先】，后端选项仅在 auto 时生效。
+// Task 113 -> Task 120 -> Task 131（再次重构）：MobileGL 三后端的入口形态变迁：
+// - Task113：mobilegl_vulkan 布尔开关（无条件覆盖任何显式渲染器，1d4ff3a9
+//   "选 zink 被静默换成 vk"事故源，已退役）；
+// - Task120：合并为 MobileGlues 分区的独立设置行 mobilegl_backend，且仅
+//   renderer=auto 时生效——装机实测被用户四次否决："设置项还是分开的"，
+//   上游原本在渲染器悬浮菜单里直接选（用户设备 renderer=MobileGlues，
+//   独立行切了后端也无效，"二级菜单入口导致无法使用"）；
+// - Task131（现行）：三后端条目回到渲染器悬浮菜单（rendererCandidates 表），
+//   mobilegl_backend 独立设置行退役。legacy：存量设备 renderer=auto +
+//   mobilegl_backend=1/2/3 的解析路径保留在 ame_effective_renderer（行为
+//   不变，直到用户显式改选）。旧 mobilegl_vulkan 布尔开关（Task113）退役
+//   不变：【显式渲染器选择永远优先】。
 
 // Task 120：有效渲染器解析（单一事实源，见 LauncherPreferences.h 头注释）。
 // 注意与 JavaLauncher.m 的 AMETHYST_RENDERER 解析点保持逐字一致——两处任何

@@ -460,6 +460,10 @@ static bool ame_SDL_StartTextInputWithProperties(void *window, unsigned long lon
 static bool ame_SDL_StopTextInput(void *window);
 static bool ame_SDL_SetTextInputArea(void *window, const void *rect, int cursor);
 static bool ame_SDL_InitSubSystem(uint32_t flags);
+// Task 131：SDL 事件回调入口拦截（JNA closure 不可执行防御，实现见
+// ame_SDL_SetEventFilter 节）
+static bool ame_SDL_SetEventFilter(void *filter, void *userdata);
+static void ame_SDL_AddEventWatch(void *filter, void *userdata);
 
 // Task 32：当 MC 通过 SDL_LoadFunction（而非 dlsym）解析符号时，同样把
 // 窗口生命周期/事件泵钩子装上（防御性双路覆盖，与 amethyst_sdl3_hook_resolve
@@ -1666,6 +1670,55 @@ static bool ame_SDL_InitSubSystem(uint32_t flags) {
 
 /// 由 hooked_dlsym 在返回 orig_dlsym 之前调用。
 /// 返回非 NULL 表示本模块接管了该符号；否则返回 NULL 让调用方走原路径。
+// ---------------------------------------------------------------------------
+// Task 131：SDL 事件回调入口拦截（26.1.2 整合包 controlify 崩溃根治）
+//
+// 事故链（1d4082f 装机日志 latestlog.old.txt，SIGBUS at pc=0x12e550010）：
+//   1. 26.1.2 整合包含 controlify 3.0.1（26.3 包不含——两包同构建对照的
+//      唯一差异面），其依赖 dev_isxander:libsdl4j 经 JNA 加载 SDL3；
+//   2. controlify.jar 内嵌 darwin-aarch64/libSDL3.dylib（macOS 构建，链接
+//      Cocoa/AppKit/Carbon/ForceFeedback——iOS 上不存在，dlopen 必败），
+//      JNA 解包尝试失败后按名字回退 dlopen("libSDL3.dylib") -> rpath 命中
+//      本启动器 Frameworks 里的 iOS 版 libSDL3.dylib（LWJGL 已加载的同一
+//      实例；日志中两行 NativeLibrary + 一行 Structure 的 Platform.isMac
+//      调用轨迹与此一致）；
+//   3. SDL_Init 成功（子系统引用计数叠加）后，SDLControllerManager 构造
+//      调 SDL_SetEventFilter(JNA closure, NULL)——JNA 把 Java 回调包装成
+//      libffi closure，其 trampoline 页在无 JIT 权限的 iOS 进程里只能是
+//      RW 不可执行；
+//   4. 本启动器游戏侧每帧 pojavPumpEvents -> SDL_PumpEvents -> SDL 内部
+//      SDL_PushEvent 触发事件过滤器 -> 跳进 0x12e550010 的 RW trampoline
+//      -> ARM64 Darwin 对"执行不可执行页"投递 SIGBUS（PC=页基址+0x10，
+//      恰为 trampoline 入口布局），JVM 致命错误退出。
+//
+// 修复：在 dlsym 解析层把 SDL_SetEventFilter / SDL_AddEventWatch 替换为
+// no-op（按名字分发，LWJGL 与 JNA 的符号解析都会命中；SDL 内部自调用不经
+// dlsym，不受影响）。controlify 的热插拔事件仍经 SDL_PollEvent 轮询送达
+// （其 tick() 主路径），仅失去"过滤器即时消费"这一优化路径，功能不受损。
+// 启动器自身与 MC/LWJGL 均不使用事件过滤器（全仓 grep 验证），零误伤。
+// ---------------------------------------------------------------------------
+static bool ame_SDL_SetEventFilter(void *filter, void *userdata) {
+    (void)filter; (void)userdata;
+    static bool ame131_logged = false;
+    if (!ame131_logged) {
+        ame131_logged = true;
+        NSLog(@"[SDLHook] Task131: SDL_SetEventFilter(%p) blocked -- callback points into a "
+              @"JNA/libffi closure, which is not executable on iOS (no JIT entitlement); "
+              @"hotplug events still arrive via SDL_PollEvent", filter);
+    }
+    return true; // 假装注册成功，调用方（controlify）不会因此走异常路径
+}
+
+static void ame_SDL_AddEventWatch(void *filter, void *userdata) {
+    (void)filter; (void)userdata;
+    static bool ame131_logged = false;
+    if (!ame131_logged) {
+        ame131_logged = true;
+        NSLog(@"[SDLHook] Task131: SDL_AddEventWatch(%p) blocked -- same JNA closure "
+              @"non-executable reason as SDL_SetEventFilter", filter);
+    }
+}
+
 void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
     if (name == NULL) return NULL;
 
@@ -1836,6 +1889,17 @@ void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {
             ame_real_InitSubSystem = (ame_fn_SDL_InitSubSystem)amethyst_orig_dlsym(handle, name);
         NSLog(@"[SDLHook] hooked SDL_InitSubSystem -> Task114 launcher hints");
         return (void *)ame_SDL_InitSubSystem;
+    }
+    // Task 131：事件回调入口拦截（controlify/JNA closure 崩溃根治，见上方
+    // ame_SDL_SetEventFilter 节的完整事故链）。按名字分发 -> JNA 的 dlsym
+    // 解析（libjnidispatch 同样被 fishhook 重绑定）与 LWJGL 路径都会命中。
+    if (strcmp(name, "SDL_SetEventFilter") == 0) {
+        NSLog(@"[SDLHook] hooked SDL_SetEventFilter -> Task131 JNA closure guard");
+        return (void *)ame_SDL_SetEventFilter;
+    }
+    if (strcmp(name, "SDL_AddEventWatch") == 0) {
+        NSLog(@"[SDLHook] hooked SDL_AddEventWatch -> Task131 JNA closure guard");
+        return (void *)ame_SDL_AddEventWatch;
     }
     // SDL_GL_SetAttribute 不接管：MC 自己调用它设属性是合法行为，我们只在
     // 建窗前主动调用同一个函数来强制 ES profile（见 ame_forceEglProfileEs）。

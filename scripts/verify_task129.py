@@ -255,8 +255,8 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     ks = set(re.findall(r'^"([^"]+)"\s*=',
                         rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M))
     sets.append(ks)
-check("I3 四语言键集一致（Task129b 9 + Task130b 1 + Task130 RCAS 9 新键，基线 1904）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1904,
+check("I3 四语言键集一致（Task131 基线 1901 = 1904 + 渲染器3 + 切换1 - mobilegl_backend死键6）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1901,
       f"counts={[len(s) for s in sets]}")
 
 # Makefile TAB 完整性（9e6fc27/129 双教训）

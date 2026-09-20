@@ -1022,14 +1022,14 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
         // Setup AMETHYST_RENDERER
         NSString *profileRenderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-        // Task 120（替代 Task113 的 mobilegl_vulkan 布尔开关）：MobileGL 家族
-        // （Vulkan / GLES / Mithril 三后端）合并为设置-视频的单一选项
-        // mobilegl_backend，且【仅在渲染器为 auto（默认）时生效】——显式渲染器
-        // 选择永远优先。旧开关的无条件覆盖在 1d4ff3a9 会话翻车：用户显式选了
-        // zink，开关却静默换成 MobileGL Vulkan（用户以为"zink 回退了 vk"），
-        // 且 GameSurfaceView.layerClass 按旧 profile 建了普通 CALayer，MobileGL
-        // 内部 MoltenVK 向其发送 naturalDrawableSizeMVK -> unrecognized selector
-        // 崩溃（Task124 同根修复：layerClass 改用同源 ame_effective_renderer）。
+        // Task 113 -> Task 120 -> Task 131（形态变迁，详注见 LauncherPreferences.m）：
+        // MobileGL 家族（Vulkan / GLES / Mithril 三后端）的设置入口现为渲染器
+        // 悬浮菜单里的三个条目（上游形态，Task131 恢复）；Task120 的独立
+        // mobilegl_backend 设置行已退役，但其 legacy 解析（renderer=auto +
+        // mobilegl_backend=1/2/3）保留在 ame_effective_renderer——存量设备
+        // 行为不变，直到用户显式改选。【显式渲染器选择永远优先】（Task124：
+        // layerClass 与实际渲染器必须同源，否则 MobileGL 内部 MoltenVK 向普通
+        // CALayer 发送 naturalDrawableSizeMVK -> unrecognized selector 崩溃）。
         // 解析逻辑与 LauncherPreferences.m 的 ame_effective_renderer() 逐字一致
         // （单一事实源；此处内联展开仅为保留原日志点）。
         NSString *renderer = ame_effective_renderer();
@@ -1451,6 +1451,15 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         const char *openglLibName = (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0)
             ? RENDERER_NAME_MOBILEGLUES
             : glLibName;
+        // Task 131：-gles 变体是渲染器菜单里的逻辑键（GLES 档），物理 dylib
+        // 不随包——共享 libMobileGL.dylib 二进制，后端由上方 MobileGL 分支
+        // 设置的 MOBILEGL_BACKEND_TYPE=DirectGLES 选择。LWJGL 的 libname
+        // 必须指向磁盘上真实存在的文件（且含连字符的名字会被
+        // Platform.mapLibraryName 二次包装，见下方裸名修复注释），故映射到
+        // 共享二进制名。
+        if (strcmp(openglLibName, RENDERER_NAME_MOBILEGL_GLES) == 0) {
+            openglLibName = RENDERER_NAME_MOBILEGL;
+        }
 
         // 关键修复（libMobileGL-gles 加载失败）：这里必须传"裸名"，不能传完整文件名。
         //

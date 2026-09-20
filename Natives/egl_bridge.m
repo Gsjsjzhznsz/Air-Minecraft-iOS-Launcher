@@ -264,10 +264,25 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         unsetenv("MOBILEGL_LOG_FILE_PATH");
     }
     if (setLwjglProperty && strcmp(renderer.UTF8String, RENDERER_NAME_VULKAN) != 0) {
-        JNI_LWJGL_changeRenderer(renderer.UTF8String);
+        // Task 131：-gles 变体是逻辑键（物理 dylib 不随包，共享 libMobileGL.dylib
+        // 二进制，靠上方分支设置的 MOBILEGL_BACKEND_TYPE=DirectGLES 切后端）。
+        // 传给 Java 侧的 libname 必须是磁盘上真实存在的文件——LWJGL 的
+        // Platform.mapLibraryName 对含连字符的名字还会二次包装出
+        // "liblibMobileGL-gles.dylib.dylib"（JavaLauncher 的 opengl.libname 修复
+        // 注释有完整分析），此处直接映射到共享二进制名。
+        const char *ame131_libname = strcmp(renderer.UTF8String, RENDERER_NAME_MOBILEGL_GLES) == 0
+            ? RENDERER_NAME_MOBILEGL
+            : renderer.UTF8String;
+        JNI_LWJGL_changeRenderer(ame131_libname);
     }
     // Preload renderer library
-    dlopen([NSString stringWithFormat:@"@rpath/%@", renderer].UTF8String, RTLD_GLOBAL);
+    // Task 131：同上，-gles 逻辑键映射回共享的 libMobileGL.dylib 后再 dlopen。
+    {
+        const char *ame131_load = strcmp(renderer.UTF8String, RENDERER_NAME_MOBILEGL_GLES) == 0
+            ? RENDERER_NAME_MOBILEGL
+            : renderer.UTF8String;
+        dlopen([NSString stringWithFormat:@"@rpath/%s", ame131_load].UTF8String, RTLD_GLOBAL);
+    }
 
     return pojavFinishOpenGLInit(!br_init());
     //return 0;

@@ -54,19 +54,21 @@ check("A4 pin 位于 library.path 之后（依赖 frameworksPath 已构造）",
 check("A5 病历注释含 SOFTSystemEvents 崩溃链（可追溯性）",
       'alcEventIsSupportedSOFT' in jl and 'Checks.check' in jl)
 
-print("== B. Task113/120 MobileGL（Task120 重锚：布尔开关 -> 单一 backend 选项）==")
+print("== B. Task113/120/131 MobileGL（Task131 重锚：三后端回渲染器菜单，独立行退役）==")
 dylib = os.path.join(REPO, "Natives/resources/Frameworks/libMobileGL.dylib")
 check("B1 libMobileGL.dylib 已 vendor（上游 caf6822 同款 85757760B）",
       os.path.exists(dylib) and os.path.getsize(dylib) == 85757760)
-check("B2 渲染器列表已移除 mobilegl/mobilegl_gles 条目",
-      'RENDERER_NAME_MOBILEGL,' not in lp and 'RENDERER_NAME_MOBILEGL_GLES' not in lp,
-      "rendererCandidates 不再含 MobileGL 条目")
-check("B3 合并决策注释存在（列表不占空间 + Task120 单一选项说明）",
-      'Task 113' in lp and '不进主渲染器列表' in lp.replace('不再进主渲染器列表', '不进主渲染器列表'))
-check("B4 设置单一选项 mobilegl_backend（与 enable_angle 同分区，pick 类型）",
-      '@"key": @"mobilegl_backend"' in lpvc and
-      lpvc.find('@"key": @"mobilegl_backend"') > lpvc.find('@"key": @"enable_angle"') and
-      'self.typePickField' in lpvc)
+# Task 131 重锚：用户四次反馈“设置项还是分开的/二级菜单入口无法使用”，
+# 三后端回到渲染器悬浮菜单（上游形态），mobilegl_backend 独立行退役。
+check("B2 渲染器列表含 mobilegl/mobilegl_gles/mithril 三后端条目（Task131 恢复上游形态）",
+      'RENDERER_NAME_MOBILEGL,' in lp and 'RENDERER_NAME_MOBILEGL_GLES,' in lp
+      and 'RENDERER_NAME_MITHRIL,' in lp,
+      "rendererCandidates 含 MobileGL 家族条目")
+check("B3 形态变迁注释存在（Task 113 -> Task 120 -> Task 131 三段史）",
+      'Task 113 -> Task 120 -> Task 131' in lp)
+check("B4 mobilegl_backend 独立 pick 行已退役（Task131 回归锚，legacy 解析保留）",
+      '@"key": @"mobilegl_backend"' not in lpvc and
+      '"mobilegl_backend": @(1)' in plp)
 check("B5 PLPreferences 默认值 mobilegl_backend=1（Vulkan 默认）",
       '"mobilegl_backend": @(1)' in plp and '"mobilegl_vulkan"' not in plp)
 check("B6 有效渲染器单一事实源（ame_effective_renderer + 显式选择优先）",
@@ -129,10 +131,13 @@ crash_keys = ['crash.reason.missing_mods', 'crash.suggestion.missingmods_manual'
               'crash.suggestion.missingmods_override', 'crash.suggestion.missingmods_share']
 check("E3 4 个 crash.* key 补齐（zh+en）",
       all(f'"{k}"' in zh for k in crash_keys) and all(f'"{k}"' in en for k in crash_keys))
-check("E4 单一选项 title/detail + 档位标签（mobilegl_backend，zh+en）",
-      '"preference.title.mobilegl_backend"' in zh and '"preference.detail.mobilegl_backend"' in zh and
-      '"preference.title.mobilegl_backend"' in en and '"preference.detail.mobilegl_backend"' in en and
-      '"preference.title.mobilegl_backend-0"' in zh and '"preference.title.mobilegl_backend-1"' in zh)
+# Task 131 重锚：mobilegl_backend 独立行退役 -> 6 个死键已删；替代文案 =
+# 渲染器菜单三后端条目（renderer.debug.mobilegl / mobilegl_gles / mithril）。
+check("E4 mobilegl_backend 死键已删 + 渲染器菜单三后端文案（Task131，zh+en）",
+      '"preference.title.mobilegl_backend"' not in zh and '"preference.detail.mobilegl_backend"' not in zh and
+      '"preference.title.mobilegl_backend"' not in en and '"preference.detail.mobilegl_backend"' not in en and
+      '"preference.title.renderer.debug.mobilegl"' in zh and '"preference.title.renderer.debug.mobilegl_gles"' in zh and
+      '"preference.title.renderer.debug.mobilegl"' in en and '"preference.title.renderer.debug.mobilegl_gles"' in en)
 # 动态审计复跑：全部 localize() key 与 hasDetail 项归零
 audit = subprocess.run([sys.executable, "/home/z/my-project/scripts/task116_l10n_audit.py"],
                        capture_output=True, text=True, timeout=120)

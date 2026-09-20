@@ -134,6 +134,7 @@
 "account.switch_role.done" = "Switched to %@";
 "account.switch_role.failed" = "Switch failed: %@";
 "account.switch_role.button" = "Switch character";
+"account.switch_role.relogin_required" = "This server does not allow switching profiles on the current access token, and no login credentials are saved on this device yet. Please log in to this account once more; after that, switching becomes password-free.";
 
 "login.warn.title.legacy_device" = "The next release of Amethyst will not be compatible with this device.";
 "login.warn.message.legacy_device" = "To run the next major release, a device capable of running iOS 14 is required.";
@@ -256,6 +257,8 @@
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) - exports OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES wrapper (1.17+)";
 "preference.title.renderer.debug.vulkan" = "MoltenVK (26.2+) - exports vulkan 1.4";
+"preference.title.renderer.debug.mobilegl" = "MobileGL (Vulkan, default) - GL to Vulkan to Metal, direct present";
+"preference.title.renderer.debug.mobilegl_gles" = "MobileGL (GLES backend) - GL to OpenGL ES, experimental";
 
 "preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";
 
@@ -2030,12 +2033,6 @@
 "preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
 
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
-"preference.title.mobilegl_backend" = "MobileGL Renderer Backend";
-"preference.detail.mobilegl_backend" = "Unified entry for the MobileGL renderer family (Vulkan / GLES / Mithril) -- keeps the renderer list uncluttered. Defaults to Vulkan: GL -> Vulkan -> MoltenVK -> direct Metal-layer presentation with no per-frame CPU readback (the smoothest path in upstream testing). Only takes effect while the renderer selection above is Auto -- an explicitly selected renderer always wins. FSR quality presets also work on the MobileGL path (pre-swap EASU upscaling). Switch to GLES or turn off if you hit compatibility issues.";
-"preference.title.mobilegl_backend-0" = "Off (use renderer selection)";
-"preference.title.mobilegl_backend-1" = "Vulkan (default)";
-"preference.title.mobilegl_backend-2" = "GLES";
-"preference.title.mobilegl_backend-3" = "Mithril";
 "preference.title.announcement_preview_level" = "Announcement Detail Level";
 "preference.title.app_language" = "App Language";
 "preference.title.curseforge_api_key" = "CurseForge API Key";

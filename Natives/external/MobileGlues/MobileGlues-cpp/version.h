@@ -948,3 +948,36 @@
 //   (raw.githubusercontent.com primary + jsDelivr mirror cascade, the old
 //   air-api.vercel.app feed is only kept as a known-default sentinel for
 //   the customization check).
+
+// REVISION 17 addendum (Amethyst Task 131, no bump): four field fixes from
+//   the 1d4082f install. (a) 26.1.2 modpack SIGBUS at 0x12e550010 during
+//   world join root-caused: controlify 3.0.1 (26.3 pack lacks it -- the
+//   sole differential) loads SDL3 via JNA/libsdl4j; the jar's
+//   darwin-aarch64 libSDL3.dylib links Cocoa/AppKit/Carbon (cannot load on
+//   iOS), JNA falls back to the launcher's own bundled iOS libSDL3.dylib,
+//   then SDLControllerManager registers SDL_SetEventFilter with a JNA
+//   callback -- the libffi closure trampoline is a RW non-executable page
+//   without the JIT entitlement, and the game-side per-frame
+//   pojavPumpEvents -> SDL_PumpEvents -> SDL_PushEvent invokes it ->
+//   SIGBUS (exec-of-non-exec on ARM64 Darwin). Fix: sdl3_hook intercepts
+//   SDL_SetEventFilter/SDL_AddEventWatch at the dlsym layer (name-based
+//   dispatch covers both LWJGL and JNA resolution) as logged no-ops;
+//   controlify keeps working through its SDL_PollEvent tick path. (b) The
+//   MG three backends return to the renderer floating menu (upstream
+//   form): libMobileGL.dylib (Vulkan default) / libMobileGL-gles.dylib
+//   (logical key mapped to the shared binary at the physical load sites;
+//   MOBILEGL_BACKEND_TYPE selects DirectGLES) / libmithril.dylib
+//   (auto-hidden while absent). The Task120 standalone mobilegl_backend
+//   pick row is retired (user x4: "setting items still separate" / "second-
+//   level entry unusable" -- it only applied under renderer=auto); legacy
+//   auto+backend resolution is preserved for existing installs. (c)
+//   Third-party profile switching: Blessing Skin servers reject any
+//   rebinding refresh on a bound token ("the access token has already
+//   been assigned a profile"), so switching now falls back to a fresh
+//   /authenticate with credentials secured in the iOS Keychain at login
+//   (loginIdentifier persisted on the account json; raw password only --
+//   the 2FA-suffixed variant is never stored), then binds the target
+//   profile on the new unbound token; without stored credentials the user
+//   gets a guided one-time re-login. (d) Pick sheets present from the
+//   topmost view controller (a presenting self would be silently
+//   rejected) and log an evidence anchor per open.

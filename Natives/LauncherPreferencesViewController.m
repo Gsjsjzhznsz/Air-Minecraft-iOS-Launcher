@@ -873,42 +873,15 @@
               @"type": self.typeSwitch,
               @"enableCondition": whenNotInGame
             },
-            // Task 120（替代 Task113 的 mobilegl_vulkan 布尔开关）：MobileGL
-            // 渲染后端单一选项——上游的三个 MobileGL 家族列表条目（MobileGL /
-            // MobileGL-gles / Mithril）合并进此 pick，不进主渲染器列表（用户
-            // 要求不占列表空间）。默认 Vulkan（DirectVulkan：
-            // GL -> Vulkan -> MoltenVK -> CAMetalLayer 直呈，无逐帧 CPU 回读，
-            // 上游实测 26.3 最流畅路径）；GLES 档复用同一个 libMobileGL.dylib
-            // 仅切 MOBILEGL_BACKEND_TYPE=DirectGLES；Mithril 档需 libmithril.dylib
-            // 随包存在（当前未附带，档位动态隐藏）。
-            // 生效条件：渲染器选择为 auto（默认）。显式选择了 zink/ANGLE/… 的
-            // 用户永远得到他们的选择（修复 1d4ff3a9"选 zink 却被换成 vk"）。
-            // MobileGL 路径的 FSR 升采样由 mgl_fsr.mm 的预交换 EASU 提供（Task119）。
-            @{
-                @"key": @"mobilegl_backend",
-                @"hasDetail": @YES,
-                @"icon": @"bolt.fill",
-                @"type": self.typePickField,
-                @"enableCondition": whenNotInGame,
-                @"pickKeys": ([[NSFileManager defaultManager] fileExistsAtPath:
-                    [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
-                        [@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MITHRIL]]]
-                    ? @[@"0", @"1", @"2", @"3"] : @[@"0", @"1", @"2"]),
-                @"pickList": ([[NSFileManager defaultManager] fileExistsAtPath:
-                    [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
-                        [@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MITHRIL]]]
-                    ? @[
-                        localize(@"preference.title.mobilegl_backend-0", nil),
-                        localize(@"preference.title.mobilegl_backend-1", nil),
-                        localize(@"preference.title.mobilegl_backend-2", nil),
-                        localize(@"preference.title.mobilegl_backend-3", nil)
-                      ]
-                    : @[
-                        localize(@"preference.title.mobilegl_backend-0", nil),
-                        localize(@"preference.title.mobilegl_backend-1", nil),
-                        localize(@"preference.title.mobilegl_backend-2", nil)
-                      ])
-            },
+            // Task 131（替代 Task120 的 mobilegl_backend 独立 pick 行）：MobileGL
+            // 三后端（Vulkan/GLES/Mithril）已回到"视频"分区渲染器行的悬浮菜单
+            // （上游形态，见 LauncherPreferences.m rendererCandidates 的 Task131
+            // 注释）。用户四次反馈独立行"还是分开的/二级菜单入口无法使用"——
+            // 且其仅 renderer=auto 生效的门控让显式选了 MobileGlues/zink 的
+            // 设备切了也无效。存量设备 renderer=auto + mobilegl_backend=1/2/3
+            // 的解析仍由 ame_effective_renderer 的 legacy 路径保持（行为不变）。
+            // 退役的 pick 行定义已删除；偏好键 mobilegl_backend 保留在默认表
+            // （legacy 解析读取），不再出现在任何设置界面。
             @{@"key": @"enable_no_error",
               @"hasDetail": @YES,
               @"icon": @"exclamationmark.triangle",

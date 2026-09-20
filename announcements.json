@@ -12,11 +12,11 @@
       "image_url": ""
     },
     {
-      "id": "v5-1-1-preview-2026-09-20",
-      "title": "下一版本修复与新特性预览",
+      "id": "v5-1-2-preview-2026-09-20",
+      "title": "下一版本修复预览（装机反馈四项）",
       "date": "2026-09-20",
-      "summary": "26.1.2 整合包崩溃修复、FSR 锐化（RCAS）、第三方登录免密切换角色等已进入下一版本。",
-      "content": "## 即将在下一版本发布\n\n**修复**\n\n- **26.1.2 整合包启动崩溃**：根因是 26.1.2 的声音引擎在没有扩展守卫的情况下直接调用 OpenAL 事件接口。已通过 OpenAL 垫片补全扩展面，26.1.2 与 26.3 行为统一\n- **设置项二级菜单回归**：FSR、下载源等多选项设置恢复悬浮菜单直接切换（iPhone / iPad 统一）\n- **Vulkan 性能**：ext_direct_state_access 默认开启、GLSL 缓存扩至 128MB\n- **iPad 识别与白背景**：iPad 机型始终 Pad 形态；背景图解码失败时铺主题色兜底\n\n**新特性**\n\n- **FSR1 RCAS 锐化**：EASU 放大后追加 RCAS 锐化 pass（mpv 同源实现），默认强度 0.2，设置中可调，负值关闭\n- **免密切换角色**：账号档案旁新增切换入口，第三方登录多角色切换不再需要重新输入密码\n\n---\n\nComing in the next build: the 26.1.2 modpack OpenAL crash fix, floating pickers restored, Vulkan DSA + 128MB GLSL cache defaults, iPad idiom/white-background fixes, FSR1 RCAS sharpening (mpv-derived, default 0.2, negative disables), and password-free profile switching for third-party accounts.",
+      "summary": "26.1.2 整合包进入世界崩溃根治、第三方切换角色修复、MG 三后端回到渲染器悬浮菜单、设置悬浮菜单可用性加固。",
+      "content": "## 即将在下一版本发布（装机反馈四项修复）\n\n**修复**\n\n- **26.1.2 整合包进入世界崩溃**：根因是整合包内 Controlify 手柄模组经 JNA 向 SDL3 注册事件回调，该回调指针位于不可执行的内存页（iOS 无 JIT 权限），游戏每帧事件泵触发时直接 SIGBUS。已在 SDL 层拦截回调注册（手柄模组其余功能不受影响，26.3 会话不受影响）\n- **第三方登录切换角色失败（“访问令牌已经分配了角色”）**：LittleSkin 等 Blessing Skin 系服务器不允许在已绑定的访问令牌上换绑角色。现在登录时会把凭据安全保存进系统钥匙串，切换角色时自动重新认证并绑定新角色——仍然免密。老账户需重新登录一次以启用\n- **MG 三后端设置项“还是分开的”**：MobileGL 的 Vulkan / GLES / Mithril 三后端回到渲染器选择行的悬浮菜单（上游原有形态），MobileGlues 分区的独立后端设置行移除，选择即生效（不再要求渲染器先设为“自动”）\n- **设置悬浮菜单可用性**：选择菜单改为从最顶层界面呈现，消除个别场景下“点了没反应”的静默失败面\n\n----\n\nComing in the next build: the 26.1.2 world-join crash (controlify's JNA/SDL callback hitting a non-executable trampoline page) intercepted at the SDL layer; third-party profile switching now re-authenticates with Keychain-secured credentials after servers reject token rebinding (one re-login needed on existing accounts); the three MobileGL backends return to the renderer picker's floating menu (upstream form, effective immediately); and pick sheets present from the topmost view controller so a presenting state can no longer swallow the tap.",
       "priority": "high",
       "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases",
       "action_title": "查看版本发布",

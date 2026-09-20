@@ -134,6 +134,7 @@
 "account.switch_role.done" = "已切換到 %@";
 "account.switch_role.failed" = "切換失敗：%@";
 "account.switch_role.button" = "切換角色";
+"account.switch_role.relogin_required" = "該伺服器不允許在當前存取權杖上切換角色，且本機尚未保存該帳戶的登入憑證。請重新登入一次該帳戶，之後即可免密切換。";
 
 "login.warn.title.legacy_device" = "Amethyst 的下一个版本将与此设备不兼容。";
 "login.warn.message.legacy_device" = "运行下一个主要版本，需要一台能够运行 iOS 14 的设备。";
@@ -256,6 +257,8 @@
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) － 輸出OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES 转译（1.17+）";
 "preference.title.renderer.debug.vulkan" = "MoltenVK（26.2+）- 导出 Vulkan 1.4";
+"preference.title.renderer.debug.mobilegl" = "MobileGL（Vulkan 直呈·預設）- GL→Vulkan→Metal，無逐幀回讀";
+"preference.title.renderer.debug.mobilegl_gles" = "MobileGL（GLES 後端）- GL→OpenGL ES，實驗性";
 
 "preference.detail.renderer" = "改變要使用的OpenGL渲染引擎";
 
@@ -2008,12 +2011,6 @@
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
 
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
-"preference.title.mobilegl_backend" = "MobileGL 渲染后端";
-"preference.detail.mobilegl_backend" = "MobileGL 家族渲染器（Vulkan / GLES / Mithril）的统一入口，不占用渲染器列表。預設 Vulkan：GL→Vulkan→MoltenVK→Metal 层直出，无逐帧 CPU 回读，上游实测最流畅。仅在上方渲染器選擇为“自动”时生效——显式選擇的渲染器永远优先。FSR 画质档在 MobileGL 路径同样可用（预交换 EASU 升采样）。遇到兼容性問題可切 GLES 档或关闭。";
-"preference.title.mobilegl_backend-0" = "关闭（跟随渲染器選擇）";
-"preference.title.mobilegl_backend-1" = "Vulkan（預設）";
-"preference.title.mobilegl_backend-2" = "GLES";
-"preference.title.mobilegl_backend-3" = "Mithril";
 "preference.title.announcement_preview_level" = "公告展示詳細度";
 "preference.title.app_language" = "应用語言";
 "preference.title.curseforge_api_key" = "CurseForge API 金鑰";

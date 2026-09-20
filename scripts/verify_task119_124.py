@@ -94,12 +94,16 @@ check("B5 GLES 档切 DirectGLES（同二进制，MOBILEGL_BACKEND_TYPE）",
       '"DirectGLES"' in jl)
 check("B6 PLPreferences 默认 mobilegl_backend=1（Vulkan 默认），旧开关无残留",
       '"mobilegl_backend": @(1)' in plp and '"mobilegl_vulkan"' not in plp)
-check("B7 设置页 pick 选项（typePickField + 4 档 + Mithril 动态隐藏）",
-      '@"key": @"mobilegl_backend"' in lpvc and
-      "self.typePickField" in lpvc and
-      "RENDERER_NAME_MITHRIL" in lpvc)
-check("B8 渲染器列表无 MobileGL 家族条目（mobilegl/gles/mithril 全部移出）",
-      not re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_(MOBILEGL|MOBILEGL_GLES|MITHRIL),', lp))
+# Task 131 重锚：mobilegl_backend 独立 pick 行退役（用户四次反馈"设置项还是
+# 分开的/二级菜单入口无法使用"），MobileGL 三后端回到渲染器悬浮菜单（上游
+# 形态）；legacy：renderer=auto + mobilegl_backend=1/2/3 解析保留。
+check("B7 mobilegl_backend 独立 pick 行已退役（Task131 回归锚）",
+      '@"key": @"mobilegl_backend"' not in lpvc and
+      '"mobilegl_backend": @(1)' in plp)
+check("B8 渲染器列表含 MobileGL 家族三后端条目（Task131 恢复上游形态）",
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL,\n\s*@\"name\"', lp) is not None and
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"', lp) is not None and
+      re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n\s*@\"name\"', lp) is not None)
 check("B9 pick 行右侧显示本地化标签（存储值不进 UI）",
       "ame120_basePick" in lpvc and "ame120_keys" in lpvc)
 check("B10 GameSurfaceView.layerClass 用 ame_effective_renderer（Task124 同根修复）",
@@ -125,10 +129,14 @@ for lang in LANGS[1:]:
           not (en_keys - k), f"missing={sorted(en_keys - k)[:5]}")
 for lang in LANGS:
     s = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
-    ok = all(f'"preference.title.mobilegl_backend-{i}"' in s for i in range(4)) and \
-         '"preference.title.mobilegl_backend"' in s and \
-         '"preference.detail.mobilegl_backend"' in s
-    check(f"C3 {lang} 含 mobilegl_backend 全套文案（title/detail/4 档位）", ok)
+    # Task 131 重锚：mobilegl_backend 行退役 -> 6 个死键已删（回归锚）；替代
+    # 文案 = 渲染器菜单三后端条目（renderer.debug.mobilegl / mobilegl_gles）。
+    ok = ('"preference.title.mobilegl_backend' not in s) and \
+         '"preference.detail.mobilegl_backend' not in s and \
+         '"preference.title.renderer.debug.mobilegl"' in s and \
+         '"preference.title.renderer.debug.mobilegl_gles"' in s and \
+         '"preference.title.renderer.debug.mithril"' in s
+    check(f"C3 {lang} mobilegl_backend 死键已删 + 渲染器菜单三后端文案齐备（Task131）", ok)
 # Task 129e 重锚：iPad 紧凑菜单（_presentMenuAtLocation 私有 API）分支已
 # 退役，iPhone/iPad 统一为悬浮 actionSheet/popover；✓ 存储值比较保留。
 check("C4 pick 弹窗 ✓ 标记按存储值比较（Task129e 统一单分支）",

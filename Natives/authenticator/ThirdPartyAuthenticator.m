@@ -2,6 +2,7 @@
 #import "ThirdPartyAuthenticator.h"
 #import "../ios_uikit_bridge.h"
 #import "../utils.h"
+#import <Security/Security.h>
 
 // authlib-injector 下载源：BMCLAPI 镜像优先，失败后回退到官方源
 // 修复：从 1.2.6 升级到 1.2.7（build 55），1.2.7 修复了 Java 25 兼容性问题。
@@ -19,9 +20,74 @@
 
 // Helper function to create NSError
 static NSError* createError(NSString *message, NSInteger code) {
-    return [NSError errorWithDomain:@"ThirdPartyAuthenticator" 
-                            code:code 
+    return [NSError errorWithDomain:@"ThirdPartyAuthenticator"
+                            code:code
                         userInfo:@{NSLocalizedDescriptionKey: message}];
+}
+
+// ---------------------------------------------------------------------------
+// Task 131：第三方登录凭据的 Keychain 存取（免密切换角色的根基）
+//
+// 背景（1d4082f 装机日志 latestlog.old.txt + Blessing Skin 服务端源码取证）：
+//   用户在账号卡片上切换角色（switchToProfile HuaJicow_kqm8f13）被服务器
+//   拒绝，报"访问令牌已经分配了角色"。Blessing Skin（littleskin.cn 及全部
+//   BS 系皮肤站）的 refresh 语义（bs-community/yggdrasil-api AuthController）：
+//   token 一旦绑定 profileId，任何带 selectedProfile 的 refresh 都抛
+//   ForbiddenOperationException——【无密码切换在已绑定 token 上不可能】。
+//   唯一路径：重新 /authenticate（邮箱+密码）拿全新未绑定 token，再
+//   refresh+selectedProfile 绑定新角色。FCL 参照实现同理（YggdrasilAccount
+//   构造时保留密码；其"多角色"= 登录时 CharacterSelector 选择，无运行期
+//   无密码换绑）。
+//
+// 凭据存放：iOS Keychain（kSecClassGenericPassword）——系统加密保管，不落
+// 明文文件（BaseAuthenticator saveChanges 刻意剥离 input/password 的既有
+// 安全纪律不变）。键 = authserver + "|" + 登录标识（邮箱/用户名）。账户
+// json 新增 loginIdentifier 字段（登录标识持久化，供切换时反查 Keychain）。
+// 注意 authData[@"username"] 是【角色名】不是登录标识，故必须单存。
+// ---------------------------------------------------------------------------
+
+/// Keychain 服务的稳定标识（Bundle identifier 在重签名安装间可能变化，不用它）
+static NSString *const ame131_keychainService = @"com.air-devs.air.ame131.credentials";
+
+static NSString *ame131_credentialKey(NSString *authserver, NSString *loginIdentifier) {
+    NSString *server = authserver ?: @"";
+    if (![server hasSuffix:@"/"]) server = [server stringByAppendingString:@"/"];
+    return [NSString stringWithFormat:@"%@|%@", server, loginIdentifier ?: @""];
+}
+
+static void ame131_storeCredentials(NSString *authserver, NSString *loginIdentifier, NSString *password) {
+    if (loginIdentifier.length == 0 || password.length == 0) return;
+    NSString *key = ame131_credentialKey(authserver, loginIdentifier);
+    NSData *value = [password dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *query = @{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+                            (__bridge id)kSecAttrService: ame131_keychainService,
+                            (__bridge id)kSecAttrAccount: key};
+    NSDictionary *attrs = @{(__bridge id)kSecValueData: value,
+                            (__bridge id)kSecAttrAccessible: (__bridge id)kSecAttrAccessibleAfterFirstUnlock};
+    OSStatus st = SecItemUpdate(query, attrs);
+    if (st == errSecItemNotFound) {
+        NSMutableDictionary *add = [query mutableCopy];
+        [add addEntriesFromDictionary:attrs];
+        st = SecItemAdd((__bridge CFDictionaryRef)add, NULL);
+    }
+    if (st != errSecSuccess) {
+        NSLog(@"[ThirdPartyAuthenticator] Task131: keychain store failed (OSStatus %d)", (int)st);
+    }
+}
+
+static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIdentifier) {
+    if (loginIdentifier.length == 0) return nil;
+    NSDictionary *query = @{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+                            (__bridge id)kSecAttrService: ame131_keychainService,
+                            (__bridge id)kSecAttrAccount: ame131_credentialKey(authserver, loginIdentifier),
+                            (__bridge id)kSecReturnData: @YES,
+                            (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne};
+    CFDataRef out = NULL;
+    if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &out) != errSecSuccess || !out) {
+        return nil;
+    }
+    NSString *pw = [[NSString alloc] initWithData:(__bridge_transfer NSData *)out encoding:NSUTF8StringEncoding];
+    return pw.length > 0 ? pw : nil;
 }
 
 @implementation ThirdPartyAuthenticator
@@ -644,9 +710,99 @@ static NSError* createError(NSString *message, NSInteger code) {
                     [NSFileManager.defaultManager removeItemAtPath:oldPath error:nil];
                     NSLog(@"[ThirdPartyAuthenticator] Task129b: removed old account file %@", ame129b_oldAccountId);
                 }
+                if (callback) callback(status, YES);
+                return;
             }
-            if (callback) callback(status, success);
+            // Task 131：refresh 绑定被拒（Blessing Skin 系服务器对已绑定 token
+            // 一律拒绝换绑——"访问令牌已经分配了角色"；也覆盖 token 过期等其它
+            // 失败形态）。降级路径：用 Keychain 里的登录凭据重新 authenticate
+            // 拿全新未绑定 token，再绑定目标角色（见 ame131_retrySwitch… 注释）。
+            NSLog(@"[ThirdPartyAuthenticator] Task131: refresh-bind rejected (%@) -- falling back to re-authentication with secured credentials",
+                  [status isKindOfClass:[NSError class]] ? ((NSError *)status).localizedDescription : @"unknown error");
+            [weakSelf ame131_retrySwitchWithStoredCredentials:profile
+                                                 oldAccountId:ame129b_oldAccountId
+                                                      callback:callback];
         });
+    }];
+}
+
+// Task 131：切换角色的重新认证回退（Blessing Skin 系服务器的唯一可行路径，
+// 见文件头部注释）。流程：Keychain 读凭据 -> 原始 /authenticate（不触发
+// onProfileSelection 选择器 UI、不动 authData）-> 全新未绑定 token ->
+// refreshToBindProfile 绑定目标角色 -> 原有的 authData 更新/落盘/旧文件
+// 清理全部复用。凭据缺失（本版本之前登录的老账户）-> 明确引导重登一次。
+- (void)ame131_retrySwitchWithStoredCredentials:(NSDictionary *)profile
+                                    oldAccountId:(NSString *)oldAccountId
+                                         callback:(Callback)callback {
+    NSString *login = self.authData[@"loginIdentifier"];
+    if (![login isKindOfClass:[NSString class]] || login.length == 0) {
+        login = self.authData[@"input"];
+    }
+    NSString *password = ame131_readCredentials(self.authData[@"authserver"], login);
+    if (password == nil) {
+        NSLog(@"[ThirdPartyAuthenticator] Task131: no secured credentials for this account -- one re-login is required to enable password-free switching");
+        NSError *error = createError(localize(@"account.switch_role.relogin_required",
+            @"This server does not allow switching profiles on the current access token. Please log in to this account once more; after that, switching becomes password-free."), 1033);
+        callback(error, NO);
+        return;
+    }
+
+    NSString *serverURL = self.authData[@"authserver"] ?: @"https://authserver.ely.by";
+    if (![serverURL hasSuffix:@"/"]) {
+        serverURL = [serverURL stringByAppendingString:@"/"];
+    }
+    NSString *authURL = [self buildAuthURLForServer:serverURL];
+    NSDictionary *data = @{
+        @"agent": @{@"name": @"Minecraft", @"version": @1},
+        @"username": login,
+        @"password": password,
+        @"clientToken": [[NSUUID UUID] UUIDString],
+        @"requestUser": @YES
+    };
+    NSLog(@"[ThirdPartyAuthenticator] Task131: re-authenticating with secured credentials to obtain a fresh unbound token");
+
+    AFHTTPSessionManager *manager = AFHTTPSessionManager.manager;
+    manager.requestSerializer = AFJSONRequestSerializer.serializer;
+
+    __weak typeof(self) weakSelf = self;
+    [manager POST:authURL parameters:data headers:nil progress:nil success:^(NSURLSessionDataTask *task, NSDictionary *response) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!weakSelf) return;
+            if (![response isKindOfClass:[NSDictionary class]] ||
+                ![response[@"accessToken"] isKindOfClass:[NSString class]] ||
+                ![response[@"clientToken"] isKindOfClass:[NSString class]]) {
+                NSError *error = createError(localize(@"login.error.invalid_response", @"Invalid server response"), 1034);
+                callback(error, NO);
+                return;
+            }
+            NSLog(@"[ThirdPartyAuthenticator] Task131: fresh token obtained, binding target profile via refresh");
+            [weakSelf refreshToBindProfile:profile
+                              accessToken:response[@"accessToken"]
+                             clientToken:response[@"clientToken"]
+                                callback:^(id status2, BOOL success2) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (!weakSelf) return;
+                    if (success2) {
+                        NSString *newAccountId = weakSelf.authData[@"accountId"];
+                        if (oldAccountId.length > 0 && newAccountId.length > 0 &&
+                            ![oldAccountId isEqualToString:newAccountId]) {
+                            NSString *oldPath = [NSString stringWithFormat:@"%s/accounts/%@.json",
+                                                 getenv("POJAV_HOME"), oldAccountId];
+                            [NSFileManager.defaultManager removeItemAtPath:oldPath error:nil];
+                            NSLog(@"[ThirdPartyAuthenticator] Task129b: removed old account file %@", oldAccountId);
+                        }
+                        NSLog(@"[ThirdPartyAuthenticator] Task131: profile switch completed via re-authentication path");
+                    }
+                    if (callback) callback(status2, success2);
+                });
+            }];
+        });
+    } failure:^(NSURLSessionDataTask *task, NSError *error) {
+        NSString *errMsg = [self parseErrorMessageFromError:error];
+        NSLog(@"[ThirdPartyAuthenticator] Task131: re-authentication failed (%@)", errMsg);
+        // 凭据重放失败 = 存储的密码已失效（服务器侧改密/2FA 变更），用既有键
+        NSError *callbackError = createError(errMsg ?: localize(@"login.error.invalid_credentials", nil), 1035);
+        callback(callbackError, NO);
     }];
 }
 
@@ -723,18 +879,35 @@ static NSError* createError(NSString *message, NSInteger code) {
     [manager POST:authURL parameters:data headers:nil progress:nil success:^(NSURLSessionDataTask *task, NSDictionary *response) {
         @try {
             NSLog(@"[ThirdPartyAuthenticator] Authentication success response received");
-            
+
             // Handle successful response
             if (![response isKindOfClass:[NSDictionary class]]) {
                 NSError *error = createError(localize(@"login.error.invalid_response", @"Invalid server response"), 1003);
                 callback(error, NO);
                 return;
             }
-            
+
             if (!response[@"accessToken"] || !response[@"clientToken"]) {
                 NSError *error = createError(localize(@"login.error.invalid_response", @"Invalid server response"), 1004);
                 callback(error, NO);
                 return;
+            }
+
+            // Task 131：认证成功即把登录凭据存入 Keychain（后续免密切换角色的
+            // 根基，见文件头部注释）。注意用 authData 里的【原始密码】——2FA
+            // 路径的 data[@"password"] 是"密码:动态码"拼接版，存了也无法重放。
+            // loginIdentifier 同时写入 authData（saveChanges 不剥离该键），
+            // 供后续切换角色时反查 Keychain（authData[@"username"] 是角色名，
+            // 不是登录标识）。
+            {
+                NSString *ame131_login = self.authData[@"input"] ?: data[@"username"];
+                NSString *ame131_pass = self.authData[@"password"];
+                if ([ame131_login isKindOfClass:[NSString class]] && ame131_login.length > 0 &&
+                    [ame131_pass isKindOfClass:[NSString class]] && ame131_pass.length > 0) {
+                    ame131_storeCredentials(self.authData[@"authserver"], ame131_login, ame131_pass);
+                    self.authData[@"loginIdentifier"] = ame131_login;
+                    NSLog(@"[ThirdPartyAuthenticator] Task131: credentials secured in keychain for %@ (enables password-free profile switching)", ame131_login);
+                }
             }
 
             // Yggdrasil 规范：当用户有且仅有一个角色时返回 selectedProfile；
