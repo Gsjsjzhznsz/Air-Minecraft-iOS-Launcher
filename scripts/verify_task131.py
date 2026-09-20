@@ -102,6 +102,10 @@ check("D2 Keychain 语义（GenericPassword + AfterFirstUnlock + Update-then-Add
       "kSecClassGenericPassword" in tp
       and "kSecAttrAccessibleAfterFirstUnlock" in tp
       and "SecItemUpdate" in tp and "SecItemAdd" in tp)
+check("D2b ARC bridge 齐备（CI run 35498188445 回归锚：SecItemUpdate 双参数 __bridge + 出参 CFTypeRef）",
+      "SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)attrs)" in tp
+      and "CFTypeRef out = NULL;" in tp
+      and "SecItemCopyMatching((__bridge CFDictionaryRef)query, &out)" in tp)
 check("D3 登录成功存凭据（原始密码，2FA 拼接版不存）+ loginIdentifier 持久化",
       "ame131_storeCredentials(self.authData[@\"authserver\"], ame131_login, ame131_pass);" in tp
       and 'self.authData[@"loginIdentifier"] = ame131_login;' in tp

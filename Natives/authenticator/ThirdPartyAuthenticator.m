@@ -64,7 +64,10 @@ static void ame131_storeCredentials(NSString *authserver, NSString *loginIdentif
                             (__bridge id)kSecAttrAccount: key};
     NSDictionary *attrs = @{(__bridge id)kSecValueData: value,
                             (__bridge id)kSecAttrAccessible: (__bridge id)kSecAttrAccessibleAfterFirstUnlock};
-    OSStatus st = SecItemUpdate(query, attrs);
+    // ARC：CF 接口必须显式 __bridge（CI run 35498188445 教训：
+    // SecItemUpdate 直传 NSDictionary = "incompatible pointer types
+    // passing retainable parameter"）
+    OSStatus st = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)attrs);
     if (st == errSecItemNotFound) {
         NSMutableDictionary *add = [query mutableCopy];
         [add addEntriesFromDictionary:attrs];
@@ -82,7 +85,8 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                             (__bridge id)kSecAttrAccount: ame131_credentialKey(authserver, loginIdentifier),
                             (__bridge id)kSecReturnData: @YES,
                             (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne};
-    CFDataRef out = NULL;
+    // CF_RETURNS_RETAINED 出参类型是 CFTypeRef*（CFDataRef* 直传 = CI 错误 3）
+    CFTypeRef out = NULL;
     if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &out) != errSecSuccess || !out) {
         return nil;
     }
