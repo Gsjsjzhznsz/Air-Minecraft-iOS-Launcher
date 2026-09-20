@@ -1102,3 +1102,24 @@ Stage Summary:
 - v5.1.0 发布闭环：https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v5.1.0
 - 应用内"检查更新"自此指向本仓库（Task115），5.1.0 用户会收到本 release 的更新提示
 - 装机验证清单见 Tasks 112-118 主条目锚点表
+
+---
+Task ID: 129
+Agent: main (Super Z)
+Task: v5.1.0 装机实测八项反馈修复（双日志判读 + 根因闭环 + 级联维护）
+
+Work Log:
+- 判读：latestlog.old.txt = 26.1.2 整合包 SoundEngine NPE 崩溃；latestlog.txt = 26.3 MG Vulkan 干净会话
+- ①OpenAL 垫片（26.1.2 崩溃根治）：26.1.2 无扩展守卫 + LWJGL 槽位 0 = NPE（26.3 有守卫故存活）；openal_shim.c re-export 1.20.1 impl + 宣称扩展 + 桩返回 ALC_FALSE => MC 回退轮询；Linux 功能测试 4/4；Makefile dep_openal_shim 接线
+- ②第三方登录 FCL 对齐：多服务器（saved-server 卡 + ALI 成功自动入库 + 长按删除）+ 多角色（登录选择器 + availableProfiles 存档 + 账户列表长按切换 switchToProfile）；9 新键 ×4 语言
+- ③设置悬浮统一：iPad 紧凑菜单私有 API 退役，actionSheet/popover 双端一致
+- ④Vulkan 默认值：DSA YES + 缓存 128（偏好默认静默覆盖代码安全默认的纯 bug）
+- ⑤白背景：window/splitVC 底色主题化 + 解码失败兜底层
+- ⑥iPad 机型永远 Pad idiom（model 判据）
+- ⑦公告：air-api.vercel.app 已 404 => 内置离线公告兜底
+- ⑧MC 公告图片覆盖：cell 效果注入排除 UIImageView/UILabel/UITextView/UIControl（caster 子层画于 contents 之上）
+- 级联：task89 B3 / task119_124 C4C5 重锚；task101/102/111/88-93/96 过时路径修正；task116 双审计脚本重建；Makefile TAB 展开事故修复（Edit 工具重演 9e6fc27）
+- 验证：verify_task129 47/47；119_124 62/62；125_128 52/52；112_118 49/49
+
+Stage Summary:
+- 提交 b36454b 推送，CI 轮询中；装机锚点见 verify_task129 与提交信息
