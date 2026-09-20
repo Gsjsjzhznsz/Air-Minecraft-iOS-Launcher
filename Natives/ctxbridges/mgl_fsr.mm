@@ -182,6 +182,9 @@ typedef struct {
     void (*glUniform1i)(int, int);
     // texture
     void (*glGenTextures)(int, unsigned int*);
+    // Task 130：RCAS 离屏目标尺寸变更重建时需要删除旧纹理（CI run 35492554181
+    // 教训：结构体漏字段直接编译错误——补齐字段 + kSym 表项）
+    void (*glDeleteTextures)(int, const unsigned int*);
     void (*glBindTexture)(unsigned int, unsigned int);
     void (*glTexParameteri)(unsigned int, unsigned int, int);
     void (*glTexImage2D)(unsigned int, int, int, int, int, int, unsigned int, unsigned int, const void*);  // Task 130：RCAS 离屏目标
@@ -291,6 +294,7 @@ static bool ame119_resolve_gl(void) {
         {"glFramebufferTexture2D",    (void **)&ame119_fsr.gl.glFramebufferTexture2D},
         {"glCheckFramebufferStatus",  (void **)&ame119_fsr.gl.glCheckFramebufferStatus},
         {"glGenTextures",             (void **)&ame119_fsr.gl.glGenTextures},
+        {"glDeleteTextures",            (void **)&ame119_fsr.gl.glDeleteTextures},
         {"glBindTexture",             (void **)&ame119_fsr.gl.glBindTexture},
         {"glTexParameteri",           (void **)&ame119_fsr.gl.glTexParameteri},
         {"glCopyTexImage2D",          (void **)&ame119_fsr.gl.glCopyTexImage2D},

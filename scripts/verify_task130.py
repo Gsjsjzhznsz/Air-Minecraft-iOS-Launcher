@@ -72,9 +72,11 @@ check("B7 uSharpness 每帧下发（运行期可调）",
 
 print("== C. mgl_fsr（MobileGL）RCAS ==")
 mg = rd("Natives/ctxbridges/mgl_fsr.mm")
-check("C1 kSym 解析表含全部 6 新符号（本轮修复的缺表回归锚）",
+check("C1 kSym 解析表 7 新符号 + ame119_gl_t 结构体成员齐备（CI run 35492554181 回归锚：mgl_fsr.mm 调用 glDeleteTextures 而结构体漏字段 = 编译错误；表项与字段缺一即挂）",
       all(f'{{"{s}"' in mg for s in ["glUniform1f", "glTexImage2D", "glGenFramebuffers",
-          "glDeleteFramebuffers", "glFramebufferTexture2D", "glCheckFramebufferStatus"]))
+          "glDeleteFramebuffers", "glFramebufferTexture2D", "glCheckFramebufferStatus",
+          "glDeleteTextures"])
+      and "void (*glDeleteTextures)(int, const unsigned int*);" in mg)
 check("C2 RCAS init + 失败回退日志",
       "Task130 RCAS vertex compile FAILED -- falling back to EASU-only" in mg
       and "ame119_fsr.rcasProgram == 0) ame119_fsr.rcasFailed = true" in mg)
