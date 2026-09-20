@@ -1260,3 +1260,26 @@ Work Log:
 Stage Summary:
 - Task132 四联修复全链闭环：崩溃根治 + MG 统一浮窗 + TouchController 浮窗化 + authlib 1.2.8，验证器/级联/CI 全绿，新 IPA 就绪
 - 装机待验证锚点：①'[SDLHook] Task132: libjnidispatch _dlsym slot rebound' + 26.1.2 整合包 controlify 初始化不再 SIGBUS；②'pick opened: mobileglues.renderer_backend (3 options)' 浮窗三选（默认 Vulkan 直连）；③'pick opened: control.mod_touch_enable (3 options)'；④第三方会话皮肤正常加载（不再回落 Steve/Alex）
+
+---
+Task ID: 133
+Agent: main (Super Z)
+Task: 3bcf8c4 装机日志四联返工 + 用户截图（IMG_0182）暴露的悬浮弹窗回归——pick 行指针失配根治 / controlify-JNA 崩溃链第二次根治（真根因）/ 第三方皮肤头像本地渲染 / 三个二级页面行浮窗化 + ANGLE 开关退役
+
+Work Log:
+- 【问题 0（用户截图铁证，本轮新发现）】设置页 pick 行只剩 > 符号、选中项目不再右侧显示、点击完全无反应。根因：Task120 的 ame120 标签包装器在 viewDidLoad 尾部【替换】self.typePickField，但 prefContents 数组此前已按 init→initViewCreation 设置的基类块指针构建——PLPrefTableViewController 的渲染判定与点击路由均为指针比较，基类块 ≠ 包装块全部失配：渲染回落 cellSubtitle（值丢失、说明文字挤副标题、尾剩 >，观感即"二级菜单入口"），点击直接 return。这是 Task129/131/132 三轮"悬浮菜单无法使用"反馈的共同根因（此前分别误诊为 iPad 紧凑菜单/呈现上下文/标签映射）。修复：删除包装器（其功能自 Task132 起已落地基类块 ame132 映射，纯冗余）——指针一致性恢复，全部 pick 行重回 Value1 右侧显示选中项 + 原地悬浮 actionSheet/popover（即 c71dcfa 行为 + 标签增强）。代码注释立规：items 构建后严禁替换 type* 块
+- 【问题 1（崩溃根治，第二次且真根因）】3bcf8c4 日志实证 Task132 触发链从未接通（全篇零 Task132/131 行）：JVM 的 System.load dlopen 链走 libjli/libjvm 自己的未 hook 槽位（libjli 的 dlopen(libjvm) 根本不经过 hooked_dlopen）；且 JNA 5.13 解包到 jna<随机>.tmp——路径不含 "libjnidispatch"，Task132 的 strstr 永不命中（断点二）。fatal trace 取证（hooked_abort 从 libjvm 内部调用 = fishhook add_image 回调对 post-init 经典镜像确实生效）+ 崩溃序列（NativeLibrary→Structure→SIGBUS 于闭包页）定案：JNA 经真 dlsym 拿到真 SDL_SetEventFilter，SDL3 注册即对 pending 事件同步调用 filter → RW 闭包页执行 → SIGBUS。修复（Task133 三层）：amethyst_task133_ensure_jvm_chain（sdl3_hook.m）增量游标扫描已加载镜像——libjli/libjvm 的 _dlopen 槽改绑 hooked_dlopen（经典间接表遍历 + __DATA/__DATA_CONST 值扫描覆盖 chained fixups，__auth_got 认证槽刻意跳过），libjnidispatch 按 LC_ID_DYLIB install name 识别（tmp 解包文件与 jar 二进制逐字节一致）触发 Task132 dlsym 重绑定；触发面 = hooked_dlopen 的 libjli/libjvm/jna/.tmp/java 五路路径（非尾返）+ hooked_dlsym 入口兜底（启动器自身高频符号解析在 controlify 初始化前扫完全部镜像）。JNA 的 SDL_SetEventFilter/AddEventWatch 解析由此进 amethyst_sdl3_hook_resolve → Task131 no-op 守卫生效
+- 【问题 2（皮肤头像）】上轮已证 accountId=47e84d5d 即 yiqiu4178 有效 UUID（非根因）；真根因一：profile 端点 URL 用带连字符 profileId——Yggdrasil 规范要求无连字符（实测 47e84d5d-0c12-… 404 vs 47e84d5d0c124d51… 200+textures），404 后回落 mc-heads.net（只认 Mojang 玩家）→ Steve；真根因二：helm.png 换算对 Blessing Skin 无效（一次性签名纹理 URL，无该端点）。修复：三处 URL 一律 ame133_undashedProfileId（存储键不动，零迁移）；响应后立即下载真实皮肤 PNG（签名 URL 本会话内有效）本地渲染头像（脸 8x8 @(8,8) + 帽层 @(40,8) 最近邻放大 128x128，64x64/128x128/64x32 全兼容）落盘 Documents/avatars/skin-<accountId>.png（与 AvatarManager 自定义头像键空间不冲突），profilePicURL 存 file:// URL（两消费者 setImageWithURL:/dataWithContentsOfURL: 原生支持）；helm/mc-heads 保留兜底。initWithData 覆写自愈存量账户（非 file:// 形态后台重取一次 + 防抖集合）——升级免重登，换肤下次启动自动同步
+- 【问题 3（二级页面清零）】custom_controls/default_gamepad_ctrl/manage_runtime 三行全部 typeChildPane→typePickField 原地悬浮浮窗：键位调整列 controlmap/*.json（写 control.default_ctrl）+ "编辑当前布局…"（OverFullScreen 模态，Task62 同款含 setDefaultCtrl/getDefaultCtrl 回调）；手柄配置列 controlmap/gamepads/*.json（与 ContCfg pane 同存储层）+ "编辑手柄按键…"（FormSheet 模态）；运行时管理列已装 Java 版本（写 java.java_homes[0] 的 1_17_newer 路由槽，其余两路由不动）+ "管理运行时…"（JRE pane FormSheet 模态，导入/删除全保留）。基类 openPickerAtIndexPath 新增 pickExtraAction 支持（label/handler 键——"label" 而非 "title"，保 l10n 审计派生；handler 在浮窗收起动画后执行，防呈现竞争）。设置页 typeChildPane 行清零
+- 【问题 4（ANGLE 重复）】"ANGLE ES 驱动" 开关退役：GLES 后端已走内置 ANGLE 框架（MG 源码 iOS 分支无视 enable_angle 配置 = 死配置）。开关行 + JavaLauncher enableANGLE 写入 + PLPreferences 默认 + 2 个死 l10n 键全删；renderer_backend detail 文案四语言写明 "GLES 后端经内置 ANGLE 翻译" 关系
+- 验证：verify_task133 42/42（A 弹窗回归 4 / B 崩溃链 8 / C 皮肤 6 / D 浮窗化 6 / E ANGLE 3 / F l10n 4 / G 语法 8 含裸括号 delta 与 .strings 行文法 / H 审计+级联）；级联重锚全绿（112_118 49/49、119_124 62/62——B9 重锚到基类映射+包装器缺席、125_128 52/52、129 47/47、130 60/60、131 37/37、132 53/53——A1 改按 SIGBUS 序列形态匹配）；键基线 1906→1907（+3 pickextra −2 enable_angle）四语言一致；task116/116c 审计归零（Task133 注释里散落的 "hasDetail" 词元污染审计分块，已改写）；utils.h 补 ensure 声明
+- 环境教训（记档）：bash 输出层会吞 "[m"/"controlmap" 等字面序列（ANSI 过滤伪影，曾致 "[manager GET:" 假性"损坏"误判——字节级 hex 与 Read 工具才可信）；注释里 "1)" 列表标记会破裸括号 delta 门（改 "1."）；pickExtraAction 嵌套键叫 "title" 会遮蔽审计器的行标题派生（改 "label"）
+- CI：run 35521286052（a489d9b）单错误——sdl3_hook.m:2045:62 'no member named addr in struct segment_command_64'（值扫描窗口误用 seg->addr，segment 的成员是 vmaddr，Task108 教训类：本地 Linux 编不了 ObjC TU）；9fa66fb 单 token 修复 + 周边 Mach-O 成员访问全量复核，run 35522017526 轮询至绿
+
+Stage Summary:
+- 悬浮弹窗回归根治（Task120 起所有 pick 行点击死行+值丢失），用户指令"恢复首次二级菜单之前的提交行为"达成——包装器删除即恢复指针一致性
+- 26.1.2 崩溃：JVM 侧 dlopen 链 + jna*.tmp install-name 双断点接通，Task131 守卫对 JNA 路径真正生效；装机锚点 '[SDLHook] Task133: libjli image detected' → 'libjvm image detected' → 'libjnidispatch image detected (...jna*.tmp...) -- invoking Task132 dlsym rebind'，controlify 初始化不再 SIGBUS
+- 皮肤：装机锚点 '[ThirdPartyAuthenticator] Task133: skin avatar rendered locally for <用户名>'，头像显示真实皮肤（存量账户启动自愈，无需重登）
+- 三行浮窗化：pickExtraAction 附加动作模态呈现完整管理器（编辑器/导入功能零丢失），锚点 'pick opened: control.custom_controls / control.default_gamepad_ctrl / java.manage_runtime'
+- ANGLE：MobileGlues 分区不再有独立开关；renderer_backend 文案写明 GLES=ANGLE 翻译
+- 键基线 1907；验证器链全绿；新 IPA 就绪
