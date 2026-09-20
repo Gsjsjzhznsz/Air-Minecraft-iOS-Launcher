@@ -281,8 +281,6 @@
 "preference.detail.allow_microphone" = "仅当您使用 VoiceChat Mod 时启用此项。静音开关将被忽略，并且会影响其他应用的音频质量。";
 
 /* MobileGlues 设置 */
-"preference.title.enable_angle" = "ANGLE ES 驱动";
-"preference.detail.enable_angle" = "使用 ANGLE 作为 OpenGL ES 驱动，而非系统驱动。在某些设备上可能改善兼容性。";
 "preference.title.enable_no_error" = "GL No Error";
 "preference.detail.enable_no_error" = "控制 GL_NO_ERROR 行为。0=默认，1=始终无错误，2=从不。";
 "preference.title.mg_enable_no_error-0" = "默认";
@@ -577,6 +575,9 @@
 "preference.touchcontroller.about" = "关于 TouchController";
 "preference.touchcontroller.about.title" = "关于 TouchController";
 "preference.touchcontroller.about.message" = "TouchController 是一个为 Minecraft Java 版添加触摸控制的模组。本启动器支持两种通信模式：\n\n• UDP 协议：基于网络的通信\n• 静态库：高性能本地通信\n\n访问 GitHub 获取更多信息。";
+"preference.pickextra.edit_layout" = "編輯當前佈局…";
+"preference.pickextra.edit_gamepad" = "編輯手柄按鍵…";
+"preference.pickextra.manage_runtime" = "管理執行時（匯入/刪除）…";
 "preference.touchcontroller.ok" = "确定";
 "preference.touchcontroller.cancel" = "取消";
 "preference.touchcontroller.vibrate.enable" = "启用震动反馈";
@@ -2041,7 +2042,7 @@
 "i18n_str_2068" = "应用語言";
 "preference.title.renderer.debug.mithril" = "Mithril（1.17+）- OpenGL 3.3 核心，经 Vulkan/Metal，实验性";
 "preference.title.renderer_backend" = "MobileGlues 渲染後端";
-"preference.detail.renderer_backend" = "MobileGlues 三端切換的統一入口（懸浮浮窗選擇）：Vulkan 直連 / GLES 後端 / OpenGL 4.0 實驗性，預設 Vulkan 直連。選擇直接寫入渲染器設定（顯式選擇優先）。";
+"preference.detail.renderer_backend" = "MobileGlues 三後端統一選擇（原地懸浮浮窗）：Vulkan 直連 / GLES 後端 / OpenGL 4.0 實驗性，預設 Vulkan 直連。GLES 後端經內建 ANGLE 框架把桌面 GL 翻譯為 OpenGL ES——無需（也已移除）獨立的 \"ANGLE ES 驅動\" 開關。選擇直接寫渲染器設定（顯式選擇優先）。";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直連)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 實驗性)";

@@ -46,6 +46,13 @@ extern void *amethyst_sdl3_hook_resolve(void *handle, const char *name);
 // （CI 35512461717 教训：415 行引用点先于定义点，缺声明即 undeclared）。
 void *hooked_dlsym(void *handle, const char *name);
 
+// Task 133：JVM 侧 dlopen 链重绑定（sdl3_hook.m）——libjli/libjvm 的
+// _dlopen 槽改绑到 hooked_dlopen（此后 JVM 的一切 System.load 都可见），
+// libjnidispatch（含 jna*.tmp 解包形态，按 install name 识别）的 _dlsym
+// 槽改绑到 hooked_dlsym（Task131 守卫对 JNA 路径生效）。由本文件的
+// hooked_dlopen（JVM/JNA 相关路径加载后）与 hooked_dlsym（入口）驱动。
+void amethyst_task133_ensure_jvm_chain(void);
+
 static bool (*g_real_SDL_SetWindowRelativeMouseMode)(void *window, bool enabled) = NULL;
 
 static bool amethyst_SDL_SetWindowRelativeMouseMode(void *window, bool enabled) {
@@ -378,11 +385,22 @@ void* hooked_dlopen(const char* path, int mode) {
     // hooked_dlsym——否则 JNA 经自己的 GOT 槽调真 dlsym，Task131 的
     // SDL_SetEventFilter/SDL_AddEventWatch 守卫对 JNA 路径不生效
     // （机制与实现见 sdl3_hook.m 的 Task 132 块）。
-    // JVM 的 System.load 走被 hook 的 dlopen（Task106 libasyncProfiler
-    // 拦截同链路实证），此处检出必然命中。
+    // 注：JNA 5.13 从 jar 解包到临时文件（jna<随机>.tmp），路径里没有
+    // "libjnidispatch" 字样——单靠这个 strstr 永远不会命中（b33e550/
+    // 3bcf8c4 装机日志实证零 Task132 日志行）；真正的检测在 Task133 的
+    // install-name 扫描里，此处保留作为显式命名加载形态的直通路径。
     BOOL needsJnaDlsymRebind = path != NULL && strstr(path, "libjnidispatch") != NULL;
-    // Task 132 同样需要拿到真实句柄做后处理，与 zink 重绑同款非尾返路径
-    BOOL needsPostLoadFixup = needsZinkRebind || needsJnaDlsymRebind;
+    // Task 133：JVM/JNA 链路加载后跑镜像扫描——libjli/libjvm 的 _dlopen
+    // 槽改绑（JVM 后续 System.load 全部进入本 hook），jna*.tmp 按
+    // install name 检出并触发 Task132 重绑定。触发面：libjli/libjvm/
+    // jna/.tmp/java 路径；漏网的由 hooked_dlsym 入口的同款扫描兜底。
+    BOOL needsT133Scan = path != NULL && (strstr(path, "libjli") != NULL ||
+                                          strstr(path, "libjvm") != NULL ||
+                                          strstr(path, "jna") != NULL ||
+                                          strstr(path, ".tmp") != NULL ||
+                                          strstr(path, "java") != NULL);
+    // Task 132/133 同样需要拿到真实句柄做后处理，与 zink 重绑同款非尾返路径
+    BOOL needsPostLoadFixup = needsZinkRebind || needsJnaDlsymRebind || needsT133Scan;
 
     void *handle;
     if (shouldUseDyldBypass26PPL) {
@@ -418,6 +436,13 @@ void* hooked_dlopen(const char* path, int mode) {
     // 幂等（重复加载安全）；失败仅记日志不阻断加载。
     if (handle && needsJnaDlsymRebind) {
         amethyst_task132_rebind_jna_dlsym(handle, (void *)hooked_dlsym);
+    }
+    // Task 133：镜像扫描（增量，无新镜像时一次计数调用即早退）——
+    // libjli/libjvm 的 _dlopen 槽改绑 + libjnidispatch（任意文件名形态）
+    // 的 _dlsym 槽改绑。加载失败（handle==NULL）也扫：镜像可能已部分
+    // 注册或由其它线程并发加载完成，扫描本身幂等。
+    if (needsT133Scan) {
+        amethyst_task133_ensure_jvm_chain();
     }
     return handle;
 }
@@ -1666,6 +1691,12 @@ static int amethyst_spvc_compiler_compile(void *compiler, const char **source) {
 }
 
 void* hooked_dlsym(void* handle, const char* name) {
+    // Task 133：入口镜像扫描（兜底触发面）——即使 dlopen 链因意外形态
+    // 失守（如 JVM 库换了名字/路径），启动器自身的高频 dlsym（egl_bridge/
+    // gl_bridge/initSDLEventFuncs 等符号解析）也会在 controlify 初始化
+    // 之前把已加载的 libjli/libjvm/libjnidispatch 绑进 hook。增量游标，
+    // 无新镜像时开销 = 一次 dyld 计数调用。
+    amethyst_task133_ensure_jvm_chain();
     // SDL3 兼容层：建窗前强制 ES profile、主窗口复用、EGL 兼容重试、
     // Vulkan loader 句柄共享。返回非 NULL 表示已接管该符号。
     {

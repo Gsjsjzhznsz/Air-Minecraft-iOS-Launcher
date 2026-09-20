@@ -235,30 +235,6 @@ void init_loadMobileGluesConfig() {
     // 内置 glslang+SPIRV-Cross 从源码编译，GLSL→SPIRV→ESSL 转换链可靠工作）
     config[@"customGLVersion"] = @40;
 
-    id enableAngle = getPrefObject(@"mobileglues.enable_angle");
-    if (enableAngle) {
-        // MobileGlues AngleConfig 枚举（settings.h）：
-        //   0 = DisableIfPossible
-        //   1 = EnableIfPossible  ← iOS 上 hasVulkan12() 永远返回 0（#ifndef __APPLE__
-        //                            块被跳过），导致 checkIfANGLESupported 返回 false，
-        //                            ANGLE 被禁用。不能使用此值。
-        //   2 = ForceDisable
-        //   3 = ForceEnable       ← 强制启用，绕过 GPU 检测
-        // 用户启用 enable_angle 时写入 3 (ForceEnable)，禁用时写入 0 (DisableIfPossible)
-        config[@"enableANGLE"] = [enableAngle boolValue] ? @3 : @0;
-        NSLog(@"[JavaLauncher]   mobileglues.enable_angle = %@ -> enableANGLE = %@ (3=ForceEnable, 0=DisableIfPossible)",
-              enableAngle, config[@"enableANGLE"]);
-
-        // ANGLE 在 iOS 上实际只支持 OpenGL ES 3.0/3.1。
-        // customGLVersion=4.0 + ANGLE 时，Sodium 生成桌面端 GLSL 着色器（#version 400 core），
-        // 但 ANGLE 的 GLES 编译器只接受 #version 300 es，导致方块不渲染。
-        // 修复：ANGLE 启用时，将 GL 版本降至 3.2（ANGLE 在 iOS 上的实际上限）。
-        if ([enableAngle boolValue]) {
-            config[@"customGLVersion"] = @32;
-            NSLog(@"[JavaLauncher]   ANGLE enabled: override customGLVersion=32 (ANGLE iOS max is GLES 3.0/3.1)");
-        }
-    }
-
     id enableNoError = getPrefObject(@"mobileglues.enable_no_error");
     if (enableNoError) {
         config[@"enableNoError"] = @([enableNoError intValue]);

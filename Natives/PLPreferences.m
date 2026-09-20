@@ -146,7 +146,10 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
         // Vulkan 渲染器的 OpenGL 回退使用 MobileGlues（对齐 Ynnyny 仓库），设置生效。
         // Auto 渲染器实际使用 ANGLE，不会加载 MobileGlues，这些设置不生效。
         @"mobileglues": @{
-            @"enable_angle": @NO,
+            // Task 133：enable_angle 默认删除——独立 "ANGLE ES 驱动" 开关已随
+            // 用户指令退役（与 renderer_backend 的 GLES 后端重复冲突；且 MG
+            // 源码 iOS 分支的 ES 路径无视该配置，属死配置）。ES/ANGLE 路径的
+            // 唯一入口 = renderer_backend 选 GLES 后端。
             // Task 120：MobileGL 渲染后端单一选项（设置-视频-MobileGlues 区，
             // 与"ANGLE ES 驱动"并排）。上游的三个 MobileGL 家族列表条目
             // （MobileGL / MobileGL-gles / Mithril）合并进此选项：

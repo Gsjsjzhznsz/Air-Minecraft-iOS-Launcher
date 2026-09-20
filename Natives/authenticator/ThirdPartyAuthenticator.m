@@ -32,6 +32,146 @@ static NSError* createError(NSString *message, NSInteger code) {
 }
 
 // ---------------------------------------------------------------------------
+// Task 133：第三方皮肤头像根治（本地渲染 + file:// URL）
+//
+// 事故链（b33e550 构建 + 3bcf8c4 装机日志，LittleSkin 实测取证）：
+//   1. profile 端点 URL 用了【带连字符】的 profileId——Yggdrasil 规范
+//      （authlib-injector 文档，Mojang 官方 sessionserver 同款）要求无连字符
+//      形态。实测：47e84d5d-0c12-4d51-…（带连字符）→ 404 Not Found；
+//      47e84d5d0c124d51…（无连字符）→ 200 + yiqiu4178 + 皮肤纹理。带连字符
+//      404 后代码回落 mc-heads.net/avatar/<用户名>——该服务只认 Mojang 官方
+//      玩家，第三方角色名一律渲染默认 Steve。这是头像 Steve 的根因一。
+//   2. 即使修好 URL，旧的 helm.png 换算（skinURL 的 ".png" 替换成
+//      "/helm.png"）对第三方皮肤站也无效：Blessing Skin 系（littleskin 等）
+//      的纹理 URL 是【按请求动态签名的一次性 URL】（实测两次请求同一 profile
+//      返回的哈希都不同，过期后 404），且不提供 helm.png 换算端点。这是
+//      根因二。
+//
+// 修复（三层）：
+//   1. 三处 profile URL 构造一律用无连字符 profileId（存储键保持带连字符
+//      不变——accountId/账户文件/启动日志的既有形态零迁移）；
+//   2. 拿到 profile 响应后【立即】下载真实皮肤 PNG（一次性签名 URL 在本次
+//      会话内有效），本地渲染头像：脸 8x8 @(8,8) + 帽层 8x8 @(40,8) 合成
+//      放大到 128x128（最近邻插值保持像素风），写入 Documents/avatars/
+//      skin-<accountId>.png，profilePicURL 存 file:// URL（AvatarManager 的
+//      自定义头像键空间是 <accountId>.png，skin- 前缀不冲突；两个消费者
+//      AccountList 的 setImageWithURL: 与右面板的 dataWithContentsOfURL:
+//      均原生支持 file URL——ModpackImportService:171 已实证）；
+//   3. 兜底链保留：本地渲染失败（网络/解码/皮肤尺寸异常）→ 旧 helm.png
+//      换算（Mojang 风格纹理主机可能存在）→ mc-heads（仅 Mojang 账户有效）。
+//   另外 initWithData 覆写：存量账户（profilePicURL 非 file:// 形态）在
+//   加载时自动后台重取一次——升级后无需重新登录即可自愈，且用户在皮肤站
+//   换肤后下次启动自动同步。
+// ---------------------------------------------------------------------------
+
+/// profileId 去连字符（仅用于 URL 构造；Yggdrasil 规范要求无连字符形态）。
+static NSString *ame133_undashedProfileId(NSString *profileId) {
+    if (![profileId isKindOfClass:NSString.class] || profileId.length == 0) {
+        return profileId;
+    }
+    return [profileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
+}
+
+/// 从皮肤 PNG 本地渲染头像：脸 8x8 @(8,8) + 帽层 8x8 @(40,8) 合成，
+/// 最近邻放大到 128x128。兼容 64x64 / 128x128（等比 HD）与 64x32（经典）
+/// 布局——三类皮肤的脸/帽层坐标同为 (8s,8s) 与 (40s,8s)，s=宽/64。
+static UIImage *ame133_renderAvatarFromSkin(UIImage *skin) {
+    if (skin == nil || skin.CGImage == nil) return nil;
+    size_t w = CGImageGetWidth(skin.CGImage);
+    size_t h = CGImageGetHeight(skin.CGImage);
+    // 合法皮肤：宽>=64 且（正方形 或 高=宽/2 的经典布局）
+    if (w < 64 || (h != w && h * 2 != w)) return nil;
+    CGFloat s = (CGFloat)w / 64.0;
+    CGFloat tile = 8.0 * s;
+    CGRect faceRect = CGRectMake(8.0 * s, 8.0 * s, tile, tile);
+    CGRect hatRect = CGRectMake(40.0 * s, 8.0 * s, tile, tile);
+    CGImageRef faceImg = CGImageCreateWithImageInRect(skin.CGImage, faceRect);
+    CGImageRef hatImg = CGImageCreateWithImageInRect(skin.CGImage, hatRect);
+    if (faceImg == NULL) {
+        if (hatImg) CFRelease(hatImg);
+        return nil;
+    }
+    const CGFloat out = 128.0;
+    UIGraphicsImageRendererFormat *fmt = [UIGraphicsImageRendererFormat defaultFormat];
+    fmt.scale = 1;
+    UIGraphicsImageRenderer *renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(out, out) format:fmt];
+    UIImage *result = [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        CGContextRef cg = ctx.CGContext;
+        // 最近邻插值保持像素风（系统默认双线性会把 8x8 糊成一团）
+        CGContextSetInterpolationQuality(cg, kCGInterpolationNone);
+        // UIKit 渲染上下文原点在左上，CGImage 绘制以左下为原点——翻转一次
+        CGContextSaveGState(cg);
+        CGContextTranslateCTM(cg, 0, out);
+        CGContextScaleCTM(cg, 1, -1);
+        CGContextDrawImage(cg, CGRectMake(0, 0, out, out), faceImg);
+        if (hatImg) {
+            CGContextDrawImage(cg, CGRectMake(0, 0, out, out), hatImg);
+        }
+        CGContextRestoreGState(cg);
+    }];
+    CFRelease(faceImg);
+    if (hatImg) CFRelease(hatImg);
+    return result;
+}
+
+/// 本地头像落盘路径：Documents/avatars/skin-<accountId>.png
+/// （AvatarManager 自定义头像键空间是 <accountId>.png，skin- 前缀互不冲突；
+///   与账户 json 同容器共存亡，file:// URL 不会出现跨容器失效）。
+static NSString *ame133_skinAvatarPath(NSString *accountId) {
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *dir = [docs stringByAppendingPathComponent:@"avatars"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+    NSString *key = [accountId isKindOfClass:NSString.class] && accountId.length > 0
+        ? accountId : @"unknown";
+    return [dir stringByAppendingPathComponent:[NSString stringWithFormat:@"skin-%@.png", key]];
+}
+
+/// Task 133：下载真实皮肤 PNG 并本地渲染头像（在后台线程回调）。
+/// 成功返回 file:// URL 字符串，失败返回 nil（调用方走 helm/mc-heads 兜底）。
+/// 注意：skinURL 是 profile 响应里的一次性签名 URL，必须立即下载——
+/// 不能把 URL 存下来延迟使用（LittleSkin 实测过期即 404）。
+static void ame133_downloadAndCacheAvatar(NSString *skinURL,
+                                          NSString *accountId,
+                                          NSString *username,
+                                          void (^completion)(NSString *picURL)) {
+    NSURL *url = [NSURL URLWithString:skinURL];
+    if (url == nil || completion == NULL) {
+        if (completion) completion(nil);
+        return;
+    }
+    [[[NSURLSession sharedSession] dataTaskWithURL:url
+                                  completionHandler:^(NSData *data, NSURLResponse *resp, NSError *error) {
+        NSString *result = nil;
+        if (data != nil && error == nil) {
+            UIImage *skin = [UIImage imageWithData:data];
+            UIImage *avatar = ame133_renderAvatarFromSkin(skin);
+            if (avatar != nil) {
+                NSData *png = UIImagePNGRepresentation(avatar);
+                NSString *path = ame133_skinAvatarPath(accountId);
+                if (png != nil && [png writeToFile:path atomically:YES]) {
+                    result = [NSURL fileURLWithPath:path].absoluteString;
+                    NSLog(@"[ThirdPartyAuthenticator] Task133: skin avatar rendered locally for %@ -> %@",
+                          username ?: @"(null)", path);
+                }
+            }
+        }
+        if (result == nil) {
+            NSLog(@"[ThirdPartyAuthenticator] Task133: local avatar render failed for %@ "
+                  @"(skinURL download/decode), falling back to helm/mc-heads",
+                  username ?: @"(null)");
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            completion(result);
+        });
+    }] resume];
+}
+
+
+// ---------------------------------------------------------------------------
 // Task 131：第三方登录凭据的 Keychain 存取（免密切换角色的根基）
 //
 // 背景（1d4082f 装机日志 latestlog.old.txt + Blessing Skin 服务端源码取证）：
@@ -101,6 +241,47 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
 }
 
 @implementation ThirdPartyAuthenticator
+
+// Task 133：存量账户头像自愈——加载时发现 profilePicURL 不是 file:// 形态
+// （旧构建写入的失效 helm/mc-heads URL），后台重取一次。修复上线后用户
+// 无需重新登录即可看到真实皮肤头像；此后皮肤站换肤也在下次启动同步。
+// 自终止：成功路径写入 file:// URL，下次加载不再触发；失败路径每次加载
+// 至多一次后台请求（AFNetworking 异步，不阻塞 UI）。内存防抖集合避免
+// 同一 accountId 在列表重载时并发重复请求。
+- (id)initWithData:(NSMutableDictionary *)data {
+    self = [super initWithData:data];
+    if (self) {
+        NSString *ame133_pic = data[@"profilePicURL"];
+        NSString *ame133_aid = data[@"accountId"];
+        // 自愈条件：有 accountId 且头像 URL 不是本地 file:// 形态
+        // （覆盖：旧构建写入的失效 helm/mc-heads URL + 更早期无该字段的账户）
+        BOOL ame133_stale = ![ame133_pic isKindOfClass:NSString.class] ||
+                            ![ame133_pic hasPrefix:@"file://"];
+        if (ame133_aid.length > 0 && ame133_stale) {
+            static NSMutableSet *ame133_inflight;
+            static dispatch_once_t ame133_once;
+            dispatch_once(&ame133_once, ^{
+                ame133_inflight = [NSMutableSet set];
+            });
+            if (![ame133_inflight containsObject:ame133_aid]) {
+                @synchronized (ame133_inflight) {
+                    if (![ame133_inflight containsObject:ame133_aid]) {
+                        [ame133_inflight addObject:ame133_aid];
+                        NSLog(@"[ThirdPartyAuthenticator] Task133: stale avatar URL for %@, refetching in background", ame133_aid);
+                        __weak typeof(self) weakSelf = self;
+                        [self fetchProfileTextureWithCallback:^(NSError *ame133_err, BOOL ame133_ok) {
+                            @synchronized (ame133_inflight) {
+                                [ame133_inflight removeObject:ame133_aid];
+                            }
+                            (void)weakSelf; (void)ame133_err; (void)ame133_ok;
+                        }];
+                    }
+                }
+            }
+        }
+    }
+    return self;
+}
 
 + (void)resolveAuthserverURL:(NSString *)inputURL
                   completion:(void (^)(NSString *resolvedURL, NSString *_Nullable metadata))completion {
@@ -826,7 +1007,9 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
 
     AFHTTPSessionManager *manager = AFHTTPSessionManager.manager;
     manager.requestSerializer = AFJSONRequestSerializer.serializer;
-    NSString *profileURL = [NSString stringWithFormat:@"%@sessionserver/session/minecraft/profile/%@", serverURL, self.authData[@"profileId"]];
+    // Task 133：Yggdrasil 规范要求无连字符 UUID（带连字符形态 LittleSkin 等
+    // 严格服务器直接 404，此前一直回落 mc-heads → Steve——实测铁证）。
+    NSString *profileURL = [NSString stringWithFormat:@"%@sessionserver/session/minecraft/profile/%@", serverURL, ame133_undashedProfileId(self.authData[@"profileId"])];
 
     __weak typeof(self) weakSelf = self;
     [manager GET:profileURL parameters:nil headers:nil progress:nil success:^(NSURLSessionDataTask *task, NSDictionary *response) {
@@ -842,10 +1025,20 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                         if (texturesDict && !error) {
                             NSString *skinURL = texturesDict[@"textures"][@"SKIN"][@"url"];
                             if (skinURL) {
-                                NSString *headURL = [skinURL stringByReplacingOccurrencesOfString:@".png" withString:@"/helm.png"];
-                                weakSelf.authData[@"profilePicURL"] = headURL;
-                                [weakSelf saveChanges];
-                                callback(nil, YES);
+                                // Task 133：下载真实皮肤 PNG → 本地渲染头像（脸+帽层
+                                // 8x8 裁剪放大）→ file:// URL。helm.png 换算对
+                                // Blessing Skin 系一次性签名 URL 无效，仅作兑底。
+                                ame133_downloadAndCacheAvatar(skinURL,
+                                    weakSelf.authData[@"accountId"], weakSelf.authData[@"username"],
+                                    ^(NSString *ame133_picURL) {
+                                    if (ame133_picURL) {
+                                        weakSelf.authData[@"profilePicURL"] = ame133_picURL;
+                                    } else {
+                                        weakSelf.authData[@"profilePicURL"] = [skinURL stringByReplacingOccurrencesOfString:@".png" withString:@"/helm.png"];
+                                    }
+                                    [weakSelf saveChanges];
+                                    if (callback) callback(nil, YES);
+                                });
                                 return;
                             }
                         }
@@ -1028,7 +1221,8 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
 
             AFHTTPSessionManager *manager = AFHTTPSessionManager.manager;
             manager.requestSerializer = AFJSONRequestSerializer.serializer;
-            NSString *profileURL = [NSString stringWithFormat:@"%@sessionserver/session/minecraft/profile/%@", serverURL, self.authData[@"profileId"]];
+            // Task 133：无连字符 profileId（见 fetchProfileTextureWithCallback 同款注释）
+            NSString *profileURL = [NSString stringWithFormat:@"%@sessionserver/session/minecraft/profile/%@", serverURL, ame133_undashedProfileId(self.authData[@"profileId"])];
             
             // 保存当前的authData，以便在异步回调中使用
             __block NSMutableDictionary *localAuthData = [self.authData mutableCopy];
@@ -1049,11 +1243,17 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                                     // 获取皮肤URL
                                     NSString *skinURL = texturesDict[@"textures"][@"SKIN"][@"url"];
                                     if (skinURL) {
-                                        // 设置头像URL为皮肤URL的头盔版本
-                                        NSString *headURL = [skinURL stringByReplacingOccurrencesOfString:@".png" withString:@"/helm.png"];
-                                        weakSelf.authData[@"profilePicURL"] = headURL;
-                                        // 异步更新头像后再次保存，避免账户列表读到失效的占位 URL
-                                        [weakSelf saveChanges];
+                                        // Task 133：真实皮肤 PNG → 本地渲染头像 → file:// URL
+                                        ame133_downloadAndCacheAvatar(skinURL,
+                                            weakSelf.authData[@"accountId"], weakSelf.authData[@"username"],
+                                            ^(NSString *ame133_picURL) {
+                                            if (ame133_picURL) {
+                                                weakSelf.authData[@"profilePicURL"] = ame133_picURL;
+                                            } else {
+                                                weakSelf.authData[@"profilePicURL"] = [skinURL stringByReplacingOccurrencesOfString:@".png" withString:@"/helm.png"];
+                                            }
+                                            [weakSelf saveChanges];
+                                        });
                                         return;
                                     }
                                 }
@@ -1315,7 +1515,8 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                     
                     AFHTTPSessionManager *manager = AFHTTPSessionManager.manager;
                     manager.requestSerializer = AFJSONRequestSerializer.serializer;
-                    NSString *profileURL = [NSString stringWithFormat:@"%@sessionserver/session/minecraft/profile/%@", serverURL, self.authData[@"profileId"]];
+                    // Task 133：无连字符 profileId（见 fetchProfileTextureWithCallback 同款注释）
+                    NSString *profileURL = [NSString stringWithFormat:@"%@sessionserver/session/minecraft/profile/%@", serverURL, ame133_undashedProfileId(self.authData[@"profileId"])];
                     
                     // 保存当前的authData，以便在异步回调中使用
                     __block NSMutableDictionary *localAuthData = [self.authData mutableCopy];
@@ -1336,11 +1537,17 @@ static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIde
                                             // 获取皮肤URL
                                             NSString *skinURL = texturesDict[@"textures"][@"SKIN"][@"url"];
                                             if (skinURL) {
-                                                // 设置头像URL为皮肤URL的头盔版本
-                                                NSString *headURL = [skinURL stringByReplacingOccurrencesOfString:@".png" withString:@"/helm.png"];
-                                                weakSelf.authData[@"profilePicURL"] = headURL;
-                                                // 异步更新头像后再次保存，避免账户列表读到失效的占位 URL
-                                                [weakSelf saveChanges];
+                                                // Task 133：真实皮肤 PNG → 本地渲染头像 → file:// URL
+                                                ame133_downloadAndCacheAvatar(skinURL,
+                                                    weakSelf.authData[@"accountId"], weakSelf.authData[@"username"],
+                                                    ^(NSString *ame133_picURL) {
+                                                    if (ame133_picURL) {
+                                                        weakSelf.authData[@"profilePicURL"] = ame133_picURL;
+                                                    } else {
+                                                        weakSelf.authData[@"profilePicURL"] = [skinURL stringByReplacingOccurrencesOfString:@".png" withString:@"/helm.png"];
+                                                    }
+                                                    [weakSelf saveChanges];
+                                                });
                                                 return;
                                             }
                                         }

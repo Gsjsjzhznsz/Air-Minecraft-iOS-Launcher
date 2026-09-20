@@ -281,8 +281,6 @@
 "preference.detail.allow_microphone" = "Enable this only if you are using voice chat mod. Silent switch option will be ignored, and audio quality from other apps will be affected.";
 
 /* MobileGlues 设置 */
-"preference.title.enable_angle" = "ANGLE ES Driver";
-"preference.detail.enable_angle" = "Use ANGLE as the OpenGL ES driver instead of the system driver. May improve compatibility on some devices.";
 "preference.title.enable_no_error" = "GL No Error";
 "preference.detail.enable_no_error" = "Controls GL_NO_ERROR behavior. 0=Default, 1=Always no error, 2=Never.";
 "preference.title.mg_enable_no_error-0" = "Default";
@@ -580,6 +578,9 @@
 "preference.touchcontroller.about" = "About TouchController";
 "preference.touchcontroller.about.title" = "About TouchController";
 "preference.touchcontroller.about.message" = "TouchController is a Minecraft mod that adds touch controls to Java Edition. This launcher supports two communication modes:\n\n• UDP Protocol: Network-based communication\n• Static Library: High-performance local communication\n\nVisit GitHub for more information.";
+"preference.pickextra.edit_layout" = "Edit current layout…";
+"preference.pickextra.edit_gamepad" = "Edit gamepad buttons…";
+"preference.pickextra.manage_runtime" = "Manage runtimes (import/delete)…";
 "preference.touchcontroller.ok" = "OK";
 "preference.touchcontroller.cancel" = "Cancel";
 "preference.touchcontroller.vibrate.enable" = "Enable Vibration";
@@ -2032,7 +2033,7 @@
 "preference.detail.ui_theme" = "Choose light/dark/system appearance.";
 "preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
 "preference.title.renderer_backend" = "MobileGlues backend";
-"preference.detail.renderer_backend" = "Unified MobileGlues three-way switch (floating popup): Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan direct by default. The selection writes the renderer setting directly (explicit choice wins).";
+"preference.detail.renderer_backend" = "Unified MobileGlues three-way switch (floating popup): Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan direct by default. The GLES backend translates desktop GL to OpenGL ES via the built-in ANGLE framework -- no separate ANGLE switch is needed (the old \"ANGLE ES Driver\" toggle was removed as redundant). The selection writes the renderer setting directly (explicit choice wins).";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";

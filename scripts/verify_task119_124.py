@@ -105,8 +105,8 @@ check("B8 渲染器列表七项（Task132 重锚：家族三后端合并进统�
       re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MOBILEGL_GLES,\n\s*@\"name\"', lp) is None and
       re.search(r'\{\s*@\"key\":\s*@ RENDERER_NAME_MITHRIL,\n\s*@\"name\"', lp) is None and
       "NSArray* getRendererFamilyKeys(void)" in lp)
-check("B9 pick 行右侧显示本地化标签（存储值不进 UI）",
-      "ame120_basePick" in lpvc and "ame120_keys" in lpvc)
+check("B9 pick 行右侧显示本地化标签（存储值不进 UI；Task133 重锚：包装器退役、\n      映射落地基类块）",
+      "ame132_pickKeys" in plpt and "ame120_basePick" not in lpvc)
 check("B10 GameSurfaceView.layerClass 用 ame_effective_renderer（Task124 同根修复）",
       "ame_effective_renderer()" in gsv and "naturalDrawableSizeMVK" in gsv)
 check("B11 旧 mobilegl_vulkan 键无代码引用（注释史料除外）",

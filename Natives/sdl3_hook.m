@@ -47,6 +47,11 @@
 #include <mach-o/nlist.h>
 #include <mach/mach.h>
 #include <unistd.h>
+// Task 133：JVM 链重绑定需要 main_hook.m 的钩子与原函数指针 + 互斥锁
+#include <pthread.h>
+extern void *hooked_dlopen(const char *path, int mode);
+extern void *hooked_dlsym(void *handle, const char *name);
+extern void *(*orig_dlopen)(const char *path, int mode);
 
 #pragma mark - SDL3 常量（与 SDL_video.h 对齐，避免依赖 SDL 头文件）
 
@@ -1887,6 +1892,263 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
         NSLog(@"[SDLHook] Task132: libjnidispatch loaded but no _dlsym pointer "
               @"slot found (unexpected layout -- JNA path stays on real dlsym)");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Task 133：JVM 侧 dlopen 调用链重绑定（26.1.2 controlify/JNA SIGBUS 的
+// 真正根治——Task132 的触发链从未接通，3bcf8c4 装机日志实证）。
+//
+// 事故复盘（b33e550 构建 + 3bcf8c4 日志，对照 26.3 正常会话）：
+//   1. Task132 假设"JVM 的 System.load 走被 hook 的 dlopen"（引 Task106
+//      libasyncProfiler 拦截为证）——该假设错误。实际调用链是：
+//      启动器主二进制 dlopen(libjli.dylib)【可见 ✓ 主二进制 GOT 早已重绑定】
+//      → libjli 自己的 GOT 槽调 dlopen(libjvm.dylib)【不可见——libjli 在
+//      init_hookFunctions 之后才加载，fishhook 从未重绑定它】
+//      → libjvm 的 System.load 经它自己的 GOT 槽 dlopen(libjnidispatch)
+//      【不可见】→ libjnidispatch dlopen(SDL3)+dlsym(SDL_SetEventFilter)
+//      【不可见】。
+//      3bcf8c4 日志全篇零 Task132/Task131 守卫行 = 链条从 libjli 就断了。
+//   2. 第二个断点：即便 libjnidispatch 的加载进了 hooked_dlopen，
+//      strstr(path, "libjnidispatch") 也大概率不匹配——JNA 5.13 从 jar
+//      解包到临时文件（文件名形如 jna<随机>.tmp），路径里没有
+//      "libjnidispatch"字样；镜像身份只能靠 LC_ID_DYLIB install name
+//      （解包文件与 jar 内原始二进制逐字节一致，install name 不变）。
+//   3. 第三个断点：java-25-openjdk（2025 构建）几乎必然使用
+//      LC_DYLD_CHAINED_FIXUPS——本仓库 fishhook（283 行经典实现）不支持
+//      chained fixups，经典间接符号表遍历对这类镜像一无所获。chained
+//      镜像的 GOT 槽在 dyld 完成绑定后就是"已解析的裸指针"，可以按
+//      【值】扫描改写，无需解析链式结构。
+//
+// 修复（三层，全部幂等）：
+//   层一（确定性主链）：hooked_dlopen 每次成功加载后跑 ensure 扫描——
+//     libjli/libjvm 镜像的 _dlopen 槽改绑到 hooked_dlopen。此后
+//     libjvm 的一切 System.load 都进 hooked_dlopen，Task132 的
+//     libjnidispatch 检测由此接通（按镜像身份而非路径匹配）。
+//   层二（兜底触发）：hooked_dlsym 入口也跑 ensure 扫描——主二进制自身
+//     的 dlsym（initSDLEventFuncs 等）在 JNA 类初始化之后、controlify
+//     注册回调之前必然发生（MC 建窗在 mod 初始化之前），即使 dlopen 链
+//     因意外形态失守，也能在窗口期内把 libjnidispatch 绑上。
+//   层三（双法改写）：每个目标镜像先走经典间接符号表遍历（Task132 同款，
+//     覆盖传统 LC_DYLD_INFO 布局），再走 __DATA/__DATA_CONST 全段
+//     【值扫描】（qword == 真实 dlopen/dlsym 地址即改写，覆盖 chained
+//     fixups 布局与任何已绑定的 lazy 槽）。改写语义透明：hooked_dlopen
+//     对非拦截路径完全透传，误改任何"恰好存着该地址"的数据槽也无害。
+//
+// 安全边界（刻意收窄）：
+//   - 只改 libjli/libjvm 的 _dlopen 槽与 libjnidispatch 的 _dlsym 槽，
+//     不碰 JVM 侧任何 dlsym（JVM 自己的 os::dll_lookup 全走真 dlsym，
+//     RTLD_NEXT 语义零风险）；JNA dispatch.c 只用显式句柄 dlsym。
+//   - PLPatchMachOPlatformForFile 对平台已匹配的库提前返回 NO（不写回），
+//     JVM 运行时库全部预打 iOS 平台标签，新可见的加载零副作用。
+//   - 增量游标扫描（新镜像只处理一次；dlclose 回落时全量重扫，重绑定
+//     幂等），重复 dlopen 同一库零副作用。
+// ---------------------------------------------------------------------------
+// 内部：把一张镜像的 _dlopen 指针槽改绑为 hook_fn。
+// 经典间接表遍历（符号名匹配）+ __DATA* 值扫描（chained fixups 兜底）。
+static void amethyst_task133_rebind_image_dlopen(const struct mach_header_64 *hdr,
+                                                 intptr_t slide,
+                                                 void *hook_fn, void *orig_fn) {
+    if (hdr == NULL || hdr->magic != MH_MAGIC_64 || hook_fn == NULL || orig_fn == NULL) {
+        return;
+    }
+    // ---- 收集 SYMTAB / DYSYMTAB / __LINKEDIT（经典遍历用）----
+    struct symtab_command t133_symtab;
+    struct dysymtab_command t133_dysym;
+    memset(&t133_symtab, 0, sizeof(t133_symtab));
+    memset(&t133_dysym, 0, sizeof(t133_dysym));
+    uint64_t t133_le_vmaddr = 0, t133_le_fileoff = 0;
+    bool t133_has_symtab = false, t133_has_le = false;
+    const struct load_command *t133_cmd = (const struct load_command *)(hdr + 1);
+    for (uint32_t c = 0; c < hdr->ncmds; c++) {
+        if (t133_cmd->cmdsize == 0) break;
+        if (t133_cmd->cmd == LC_SYMTAB) {
+            t133_symtab = *(const struct symtab_command *)t133_cmd;
+            t133_has_symtab = true;
+        } else if (t133_cmd->cmd == LC_DYSYMTAB) {
+            t133_dysym = *(const struct dysymtab_command *)t133_cmd;
+        } else if (t133_cmd->cmd == LC_SEGMENT_64) {
+            const struct segment_command_64 *seg =
+                (const struct segment_command_64 *)t133_cmd;
+            if (strcmp(seg->segname, SEG_LINKEDIT) == 0) {
+                t133_le_vmaddr = seg->vmaddr;
+                t133_le_fileoff = seg->fileoff;
+                t133_has_le = true;
+            }
+        }
+        t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
+    }
+    const struct nlist_64 *t133_syms = NULL;
+    const char *t133_strs = NULL;
+    const uint32_t *t133_indirect = NULL;
+    if (t133_has_symtab && t133_has_le && t133_dysym.nindirectsyms > 0) {
+        uintptr_t t133_base = (uintptr_t)slide + t133_le_vmaddr - t133_le_fileoff;
+        t133_syms = (const struct nlist_64 *)(t133_base + t133_symtab.symoff);
+        t133_strs = (const char *)(t133_base + t133_symtab.stroff);
+        t133_indirect = (const uint32_t *)(t133_base + t133_dysym.indirectsymoff);
+    }
+
+    vm_size_t t133_ps = (vm_size_t)sysconf(_SC_PAGESIZE);
+    int t133_hits = 0;
+    t133_cmd = (const struct load_command *)(hdr + 1);
+    for (uint32_t c = 0; c < hdr->ncmds; c++) {
+        if (t133_cmd->cmdsize == 0) break;
+        if (t133_cmd->cmd != LC_SEGMENT_64) {
+            t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
+            continue;
+        }
+        const struct segment_command_64 *seg =
+            (const struct segment_command_64 *)t133_cmd;
+        // ---- A. 经典遍历：S_LAZY / S_NON_LAZY 指针段的间接符号表 ----
+        const struct section_64 *t133_sect = (const struct section_64 *)
+            ((const uint8_t *)seg + sizeof(struct segment_command_64));
+        for (uint32_t s = 0; s < seg->nsects; s++, t133_sect++) {
+            uint32_t stype = t133_sect->flags & SECTION_TYPE;
+            if (stype != S_LAZY_SYMBOL_POINTERS && stype != S_NON_LAZY_SYMBOL_POINTERS) {
+                continue;
+            }
+            // __auth_got（arm64e 带指针认证的 GOT）刻意跳过：往认证槽写裸
+            // 指针会直接崩溃；JVM/JNA 运行时库均为普通 arm64（无认证 GOT），
+            // 鱼与熊掌兼得——目标镜像全覆盖，认证镜像零接触。
+            if (strncmp(t133_sect->sectname, "__auth_got", 10) == 0) {
+                continue;
+            }
+            uint32_t stride = t133_sect->reserved2 ? t133_sect->reserved2 : (uint32_t)sizeof(void *);
+            if (stride == 0 || t133_indirect == NULL) continue;
+            uint32_t n = (uint32_t)(t133_sect->size / stride);
+            for (uint32_t j = 0; j < n; j++) {
+                uint32_t idx = t133_sect->reserved1 + j;
+                if (idx >= t133_dysym.nindirectsyms) continue;
+                uint32_t symIdx = t133_indirect[idx];
+                if ((symIdx & INDIRECT_SYMBOL_LOCAL) != 0) continue;
+                if (symIdx == INDIRECT_SYMBOL_ABS) continue;
+                if (symIdx >= t133_symtab.nsyms) continue;
+                uint32_t n_strx = t133_syms[symIdx].n_un.n_strx;
+                if (n_strx == 0 || n_strx >= t133_symtab.strsize) continue;
+                if (strcmp(t133_strs + n_strx, "_dlopen") != 0) continue;
+                void **slot = (void **)(slide + t133_sect->addr + (uint64_t)j * stride);
+                if (*slot == hook_fn) { t133_hits++; continue; } // 幂等
+                vm_address_t page = (vm_address_t)((uintptr_t)slot & ~((uintptr_t)t133_ps - 1));
+                if (vm_protect(mach_task_self(), page, t133_ps, false,
+                               VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY) != KERN_SUCCESS) {
+                    continue;
+                }
+                *slot = hook_fn;
+                t133_hits++;
+            }
+        }
+        // ---- B. 值扫描兜底：chained fixups 镜像（无间接符号表），以及
+        //      已被 dyld 绑定过的 lazy 槽——槽内已是真实 dlopen 地址 ----
+        if (strncmp(seg->segname, "__DATA", 6) != 0) {
+            t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
+            continue;
+        }
+        uintptr_t start = (uintptr_t)slide + (uintptr_t)seg->addr;
+        uintptr_t end = start + (uintptr_t)seg->vmsize;
+        if (end <= start) {
+            t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
+            continue;
+        }
+        for (uintptr_t p = start; p + sizeof(void *) <= end; p += sizeof(void *)) {
+            void *v = *(void **)p;
+            if (v != orig_fn) continue;
+            void **slot = (void **)p;
+            if (*slot == hook_fn) continue; // 幂等（不可达，v==orig_fn 已排除）
+            vm_address_t page = (vm_address_t)(p & ~((uintptr_t)t133_ps - 1));
+            if (vm_protect(mach_task_self(), page, t133_ps, false,
+                           VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY) != KERN_SUCCESS) {
+                continue;
+            }
+            *slot = hook_fn;
+            t133_hits++;
+        }
+        t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
+    }
+    NSLog(@"[SDLHook] Task133: _dlopen slots rebound for %s (hits=%d, "
+          @"classic+value-scan) -- JVM-side dlopen chain now routes through "
+          @"hooked_dlopen", hdr->magic == MH_MAGIC_64 ? "image" : "?", t133_hits);
+    (void)t133_hits;
+}
+
+// 内部：读镜像的 LC_ID_DYLIB install name（无则返回 NULL）。
+static const char *amethyst_task133_install_name(const struct mach_header_64 *hdr) {
+    if (hdr == NULL) return NULL;
+    const struct load_command *cmd = (const struct load_command *)(hdr + 1);
+    for (uint32_t c = 0; c < hdr->ncmds; c++) {
+        if (cmd->cmdsize == 0) break;
+        if (cmd->cmd == LC_ID_DYLIB) {
+            const struct dylib_command *dylib = (const struct dylib_command *)cmd;
+            return (const char *)dylib + dylib->dylib.name.offset;
+        }
+        cmd = (const struct load_command *)((const uint8_t *)cmd + cmd->cmdsize);
+    }
+    return NULL;
+}
+
+// 内部：basename of a POSIX path（尾部斜杠容错）。
+static const char *amethyst_task133_basename(const char *path) {
+    if (path == NULL) return NULL;
+    const char *slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
+}
+
+// Task 133 主入口：扫描已加载镜像，把 JVM 侧 dlopen 调用链接进 hook。
+// 由 hooked_dlopen（JVM/JNA 相关路径加载后）与 hooked_dlsym（入口）调用。
+// 增量扫描：dyld 追加式注册新镜像，游标只进不退；镜像数回落（dlclose，
+// 罕见）时游标归零全量重扫（重绑定幂等，代价可忽略）。无新镜像时开销
+// = 一次 dyld 计数调用 + 一次比较。
+void amethyst_task133_ensure_jvm_chain(void) {
+    static pthread_mutex_t t133_lock = PTHREAD_MUTEX_INITIALIZER;
+    static uint32_t t133_cursor = 0;
+    static bool t133_initialized = false;
+
+    uint32_t count = _dyld_image_count();
+    if (t133_initialized && count == t133_cursor) {
+        return; // 无新镜像，早退
+    }
+    pthread_mutex_lock(&t133_lock);
+    // 双检：等锁期间另一线程可能已扫完同一批镜像
+    count = _dyld_image_count();
+    if (t133_initialized && count == t133_cursor) {
+        pthread_mutex_unlock(&t133_lock);
+        return;
+    }
+    // 镜像数回落（dlclose 后复用下标）时全量重扫，防下标复用漏检
+    uint32_t start = (count >= t133_cursor) ? t133_cursor : 0;
+    for (uint32_t i = start; i < count; i++) {
+        const struct mach_header_64 *hdr =
+            (const struct mach_header_64 *)_dyld_get_image_header(i);
+        if (hdr == NULL || hdr->magic != MH_MAGIC_64) continue;
+
+        const char *path = _dyld_get_image_name(i);
+        const char *base = amethyst_task133_basename(path);
+        const char *install = amethyst_task133_install_name(hdr);
+        const char *installBase = amethyst_task133_basename(install);
+        bool isJli = (base && strstr(base, "libjli")) || (installBase && strstr(installBase, "libjli"));
+        bool isJvm = (base && strstr(base, "libjvm")) || (installBase && strstr(installBase, "libjvm"));
+        // libjnidispatch：JNA 从 jar 解包的临时文件（jna<随机>.tmp）路径不含该
+        // 名字，必须按 install name 识别（解包文件与 jar 内二进制逐字节
+        // 一致，LC_ID_DYLIB 保留原名）——Task132 只按路径 strstr 匹配因此
+        // 从未命中，这是 26.1.2 拦截链断开的第二个断点
+        bool isJna = (base && strstr(base, "libjnidispatch")) ||
+                     (installBase && strstr(installBase, "libjnidispatch"));
+        intptr_t slide = _dyld_get_image_vmaddr_slide(i);
+        if (isJli || isJvm) {
+            NSLog(@"[SDLHook] Task133: %@ image detected (%s) -- rebinding its "
+                  @"_dlopen slots", isJli ? @"libjli" : @"libjvm", path ?: "(null)");
+            amethyst_task133_rebind_image_dlopen(hdr, slide,
+                (void *)hooked_dlopen, (void *)orig_dlopen);
+        } else if (isJna) {
+            // dlopen 句柄即 mach header 地址（Task132 同款对应关系），
+            // 直接复用既有的 _dlsym 槽位重绑定
+            NSLog(@"[SDLHook] Task133: libjnidispatch image detected (%s / "
+                  @"install %s) -- invoking Task132 dlsym rebind",
+                  path ?: "(null)", install ?: "(null)");
+            amethyst_task132_rebind_jna_dlsym((void *)hdr, (void *)hooked_dlsym);
+        }
+    }
+    t133_cursor = _dyld_image_count();
+    t133_initialized = true;
+    pthread_mutex_unlock(&t133_lock);
 }
 
 void *amethyst_sdl3_hook_resolve(void *handle, const char *name) {

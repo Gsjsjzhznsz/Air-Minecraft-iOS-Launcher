@@ -45,11 +45,12 @@ mh = rd("Natives/main_hook.m")
 uh = rd("Natives/utils.h")
 log = rd("latestlog.txt")
 
-check("A1 崩溃日志证据（controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS）",
+import re as _re
+check("A1 崩溃日志证据（controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS；Task133 重锚：PC 随 ASLR 逐会话变化，改按序列形态匹配）",
       "Initializing Controlify" in log and
       "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
       "Platform.isMac called from com.sun.jna.Structure" in log and
-      "SIGBUS (0xa) at pc=0x00000001167b8010" in log)
+      _re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None)
 check("A2 崩溃会话无 Task131 守卫日志（JNA 未进 hook 的漏网实证）",
       "[SDLHook] Task131: SDL_SetEventFilter" not in log)
 check("A3 amethyst_task132_rebind_jna_dlsym 实现（dyld 遍历 + 句柄==mach header）",
@@ -217,8 +218,8 @@ sets = []
 for lang in langs:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
-check("F1 四语言键集一致（Task132 基线 1906 = 1901 + renderer_backend 5键）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1906,
+check("F1 四语言键集一致（Task133 基线 1907 = 1906 + pickextra 3键 - enable_angle 2键）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1907,
       f"counts={[len(s) for s in sets]}")
 newkeys = ["preference.title.renderer_backend",
            "preference.detail.renderer_backend",

@@ -193,6 +193,14 @@ void init_setupMultiDir();
 // handle = 真实 dlopen 返回的句柄（= image mach header 地址）。
 void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn);
 
+// Task 133（sdl3_hook.m 实现，26.1.2 controlify/JNA SIGBUS 根治）：
+// 增量扫描已加载镜像——libjli/libjvm 的 _dlopen 槽改绑到 hooked_dlopen
+// （JVM 的 System.load 链由此可见），libjnidispatch（含 jna*.tmp 解包形态，
+// 按 LC_ID_DYLIB install name 识别）触发 Task132 重绑定。由 hooked_dlopen
+// （JVM/JNA 相关路径加载后）与 hooked_dlsym（入口）驱动；游标设计，
+// 无新镜像时开销 = 一次 dyld 计数调用。
+void amethyst_task133_ensure_jvm_chain(void);
+
 BOOL PLPatchMachOPlatformForFile(const char *path);
 
 UIViewController* currentVC();
