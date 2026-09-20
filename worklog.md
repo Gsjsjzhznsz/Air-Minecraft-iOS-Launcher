@@ -1247,3 +1247,16 @@ Stage Summary:
 - MG 三端：MobileGlues 分区单一统一入口 + 原地悬浮浮窗三选项（默认 Vulkan 直连），渲染器菜单不再有三个分开条目；装机锚点 '[PLPrefTable] Task131: pick opened: mobileglues.renderer_backend (3 options)'
 - TouchController：二级页面退役，原地浮窗选择 + 伴随行内联；装机锚点 'pick opened: control.mod_touch_enable (3 options)'
 - 第三方皮肤：authlib-injector 1.2.8（discovery 链路修复），装机锚点第三方会话 '[JavaLauncher] Adding authlib-injector arguments' + 皮肤正常加载（不再回落 Steve/Alex）
+
+---
+Task ID: 132 (续)
+Agent: main (Super Z)
+Task: CI 闭环
+
+Work Log:
+- CI run 35512461717（a48183e）失败：main_hook.m:415:59 'use of undeclared identifier hooked_dlsym'——重绑定调用点（hooked_dlopen，文件前部）先于定义点（JVM hook 区），顶部 extern 块只覆盖了 amethyst_sdl3_hook_resolve。b33e550 补前向声明（Task108/130 教训类：本地 Linux 编不了 .m TU，仅 CI clang 暴露；sdl3_hook.m 的 Task132 Mach-O 遍历一次编译通过）
+- CI run 35513042961（b33e550）completed success（前台轮询至绿）
+
+Stage Summary:
+- Task132 四联修复全链闭环：崩溃根治 + MG 统一浮窗 + TouchController 浮窗化 + authlib 1.2.8，验证器/级联/CI 全绿，新 IPA 就绪
+- 装机待验证锚点：①'[SDLHook] Task132: libjnidispatch _dlsym slot rebound' + 26.1.2 整合包 controlify 初始化不再 SIGBUS；②'pick opened: mobileglues.renderer_backend (3 options)' 浮窗三选（默认 Vulkan 直连）；③'pick opened: control.mod_touch_enable (3 options)'；④第三方会话皮肤正常加载（不再回落 Steve/Alex）
