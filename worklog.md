@@ -1135,3 +1135,23 @@ Work Log:
 Stage Summary:
 - Task129 全链闭环：八项修复 + verify_task129 47/47 + 级联全绿 + CI 绿；新 IPA 就绪
 - 装机待验证锚点：'[Amethyst] Task129: OpenAL shim active'（26.1.2 不再 NPE，三条 Failed to check event WARN 属预期回退）；多角色登录选择器与账户列表长按切换；iPad 弹窗/popover 形态 + 右侧栏 220pt；设置 pick 全悬浮；26.3 会话 DSA=1/缓存=128
+
+---
+Task ID: 130
+Agent: main (Super Z)
+Task: RCAS 锐化 pass（主任务）+ 档案旁免密切换角色 + 公告仓库 JSON + 7a680d1 装机日志判读；CI 修复闭环
+
+Work Log:
+- f6a8f8b 推送后 CI run 35492554181 failure：mgl_fsr.mm:541/560 "no member named 'glDeleteTextures' in 'ame119_gl_t'"——RCAS 重建/清理路径调用该符号但结构体漏字段（会话中途 kSym 修复补了另外 6 项，这个只出现在调用点）；Linux 编译不了 .mm 验证门失明（Task108 教训同类）
+- 修复 51772b6：ame119_gl_t 补字段 + kSym 表项（两半都要——表项无字段=编译错误，字段无表项=槽位 NULL 触发 C6 全解析门杀掉整个 FSR）；verify_task130 C1 重锚为 7 表项+结构体成员共存的 CI 回归锚；全链 60/60 复跑绿
+- 任务 A（RCAS，mpv FSR.glsl 参照）：FSRRCASSource.h（AMD FSR1 1.20210629 32-bit non-packed 逐字移植；stops=2*(1-SHARPNESS)；con[1] 置零避 packHalf2x16；texelFetch；alpha 中心像素透传保 Task103/104 哨兵链）；zink osm_bridge EASU→离屏 easuTex/FBO→RCAS→fb0，任何失败 rcasFailed + EASU 直画回退 + 日志；MobileGL mgl_fsr 同款 ping-pong 画进 swapchain，context_reset 重试；MobileGlues FSR1.cpp 挂 directToSurface 复用 targetFBO，__has_include 守卫 standalone 编译；单偏好 mobileglues.fsr_rcas_sharpness（默认 0.2）三路分发（config.json fsr1RcasSharpness + AMETHYST_FSR_RCAS_SHARPNESS 环境变量含非 MobileGlues 早退分支）；设置页 7 档悬浮 pick 行 + 9 l10n 键 ×4 语言；全屏 5-tap 纯 ALU <0.5ms
+- 任务 B（免密切换角色）：账号卡片行内 person.2 按钮（第三方 + availableProfiles>=2，与 Task129b 长按菜单同口径）→ 悬浮 actionSheet → 复用 ame129b_switchAccountAtIndexPath
+- 任务 C（26.1.2 崩溃）：两份 09:2x 日志 = bd71210 v5.1.0 构建不含 Task129 修复，栈与判读逐字一致——新 IPA 即修复
+- 任务 F（公告仓库 JSON）：仓库根 announcements.json；AnnouncementService 级联 raw.githubusercontent.com → jsDelivr → Task129h 链（缓存→内置）；自定义 news_url 独占；已知默认值归一
+- d2bcf26 日志判读四定案：26.1.2 装机确认修复（OpenAL shim active + Sound engine started）；Task129b 多角色登录装机确认（5 profiles chose yiqiu4178）；Task129h 兜底按设计工作；新缺陷 Task129d 默认值压制（持久化旧默认 0/32 压制新默认 1/128）→ ame130_migrateMgPerfDefaults 一次性迁移（仅匹配旧默认值，自选 64 保留）
+- 会话续接复核修复：AccountListViewController 两处多余 ']]'（语法门 I1 抓获）；mgl_fsr kSym 缺 6 入口（结构体字段已加从未赋值——C1 回归锚）
+
+Stage Summary:
+- CI run 35493455961（51772b6）completed success，11.2 分钟；Task130 全链闭环，新 IPA 就绪
+- 装机待验证锚点：'[JavaLauncher] Task130: AMETHYST_FSR_RCAS_SHARPNESS=0.2000 exported'；'[OSMBridge] Task130 RCAS ready/engaged (zink)' 或 EASU-only 回退行；'[MGLFSR] Task130 RCAS ready/engaged (MobileGL)'；'[MG] Task130 RCAS ready/engaged' + 'Setting: fsr1RcasSharpness = 0.200'；公告来自 raw.githubusercontent.com；多角色第三方账户卡片切换图标且不弹密码；'[Preferences] Task130 migrated MG DSA default: 0 -> 1'（老设备首启）
+- 教训：ObjC++ 结构体成员只能在真实 clang 验证；新 GL 符号必须调用点+结构体+kSym 三位一体；nohup 后台轮询会被沙箱收割（轮询走前台）
