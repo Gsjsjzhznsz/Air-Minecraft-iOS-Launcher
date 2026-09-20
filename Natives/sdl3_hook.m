@@ -2042,7 +2042,7 @@ static void amethyst_task133_rebind_image_dlopen(const struct mach_header_64 *hd
             t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
             continue;
         }
-        uintptr_t start = (uintptr_t)slide + (uintptr_t)seg->addr;
+        uintptr_t start = (uintptr_t)slide + (uintptr_t)seg->vmaddr;
         uintptr_t end = start + (uintptr_t)seg->vmsize;
         if (end <= start) {
             t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
