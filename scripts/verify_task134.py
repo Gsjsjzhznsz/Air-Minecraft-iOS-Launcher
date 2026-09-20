@@ -155,6 +155,21 @@ check("E3 前向声明（定义在 ensure 之后，CI 35512461717 教训类防�
       "amethyst_task134_jvm_watchdog_start" in utils_h)
 check("E4 Task132 重绑定读回验证（写后槽值校验 + READBACK FAILED 取证日志）",
       "READBACK FAILED" in sdl and "*slot != hook_fn" in sdl)
+check("E4b 新日志取证闭环（df10f70/3756a05：Task133 链路已通但 Task132 静默早退——双会话零输出实证）",
+      rd("latestlog.old.txt").count("invoking Task132 dlsym rebind") >= 1 and
+      "slot rebound" not in rd("latestlog.old.txt") and
+      "Task131: SDL_SetEventFilter" in rd("latestlog.txt"))
+check("E4c 静默早退根治（核心改直传 hdr+slide + 旧入口句柄查找失败落日志）",
+      "amethyst_task132_rebind_jna_dlsym_ex(const struct mach_header_64 *ame132_hdr" in sdl and
+      "jna rebind handle %p not found in dyld image" in sdl and
+      "jna rebind rejected null args" in sdl and
+      "jna rebind bad magic" in sdl)
+check("E4d 看门狗重试机制（未验证绑定每 200ms 重试 + 100 次上限 + 验证通过即停）",
+      "amethyst_task134_retry_pending_jna" in sdl and
+      "t134_jna_attempts >= 100" in sdl and
+      "amethyst_task134_jna_retry_arm" in sdl and
+      "amethyst_task134_jna_retry_clear" in sdl and
+      sdl.index("amethyst_task134_retry_pending_jna();") < sdl.index("if (t133_initialized && count == t133_cursor)"))
 check("E5 看门狗病历注释（秒级窗口取证：JNA 加载到 controlify 解析相隔秒级）",
       "链路无关" in sdl and "相隔【秒级】" in sdl)
 

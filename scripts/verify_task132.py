@@ -43,16 +43,18 @@ print("== A. 26.1.2 崩溃根治（libjnidispatch _dlsym 槽位重绑定）==")
 sdl = rd("Natives/sdl3_hook.m")
 mh = rd("Natives/main_hook.m")
 uh = rd("Natives/utils.h")
-log = rd("latestlog.txt")
+log = rd("latestlog.old.txt")  # Task134 重锚：26.1.2 崩溃会话现于 latestlog.old.txt（df10f70 上传）
 
 import re as _re
-check("A1 崩溃日志证据（controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS；Task133 重锚：PC 随 ASLR 逐会话变化，改按序列形态匹配）",
+check("A1 崩溃日志证据（df10f70 新日志：controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS；PC 随 ASLR 逐会话变化，按序列形态匹配）",
       "Initializing Controlify" in log and
       "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
       "Platform.isMac called from com.sun.jna.Structure" in log and
       _re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None)
-check("A2 崩溃会话无 Task131 守卫日志（JNA 未进 hook 的漏网实证）",
-      "[SDLHook] Task131: SDL_SetEventFilter" not in log)
+check("A2 崩溃会话无 Task131 守卫日志（Task132 重绑定静默早退——Task133 链路已通但绑定未落地，Task134 直传+重试修复）",
+      "[SDLHook] Task131: SDL_SetEventFilter" not in log and
+      "Task133: libjnidispatch image detected" in log and
+      "invoking Task132 dlsym rebind" in log and "slot rebound" not in log)
 check("A3 amethyst_task132_rebind_jna_dlsym 实现（dyld 遍历 + 句柄==mach header）",
       "void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn)" in sdl and
       "_dyld_image_count()" in sdl and "_dyld_get_image_vmaddr_slide" in sdl)
@@ -87,9 +89,13 @@ check("A13 Task131 守卫原样保留（SDL_SetEventFilter/SDL_AddEventWatch stu
       "static bool ame_SDL_SetEventFilter" in sdl and
       "static void ame_SDL_AddEventWatch" in sdl and
       sdl.count("Task131 JNA closure guard") >= 2)
-check("A14 日志锚点（重绑定成功 + 布局异常双通道）",
+check("A14 日志锚点（重绑定成功 verified + 失败重试双通道；Task134：静默早退全部落日志）",
       "Task132: libjnidispatch _dlsym slot rebound" in sdl and
-      "Task132: libjnidispatch loaded but no _dlsym pointer" in sdl)
+      "slot=%p verified" in sdl and
+      "READBACK FAILED" in sdl and
+      "no verified _dlsym" in sdl and
+      "retry scheduled" in sdl and
+      "jna rebind handle %p not found in dyld image" in sdl)
 
 print("== A2. 真实二进制镜像（GOT 遍历算法命中证明）==")
 mirror = subprocess.run(

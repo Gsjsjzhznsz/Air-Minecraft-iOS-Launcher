@@ -1775,22 +1775,24 @@ static void ame_SDL_AddEventWatch(void *filter, void *userdata) {
 //     原保护——与既有 zink 重绑定路径行为一致；
 //   - 幂等：槽位已是目标值时跳过（JNA 重复加载同一 image 安全）。
 // ---------------------------------------------------------------------------
-void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
-    if (handle == NULL || hook_fn == NULL) return;
-    // dlopen 句柄即 image 的 mach header 地址（dyld 实现细节，fishhook
-    // 同样依赖此对应）；遍历 dyld 已加载 image 找到本句柄的 slide
-    const struct mach_header_64 *ame132_hdr = NULL;
-    intptr_t ame132_slide = 0;
-    uint32_t ame132_count = _dyld_image_count();
-    for (uint32_t i = 0; i < ame132_count; i++) {
-        if ((const void *)_dyld_get_image_header(i) == handle) {
-            ame132_hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
-            ame132_slide = _dyld_get_image_vmaddr_slide(i);
-            break;
-        }
+// Task 134：核心重绑定——直传 hdr+slide，返回【读回验证过】的槽数。
+// 病历（df10f70/3756a05 双会话实证）：本函数被调用后【零输出】——旧实现
+// 唯一无日志的提前返回是句柄重查失败（ame132_hdr == NULL）。Task133 的
+// 扫描刚从 _dyld_get_image_header(i) 拿到该指针，函数内重查却拿不到
+// （dyld 列表并发加载窗口的可见性问题）。修复：扫描侧直接传 hdr+slide
+// 消灭重查；所有提前返回落日志；未验证的绑定由看门狗每 200ms 重试。
+static int amethyst_task132_rebind_jna_dlsym_ex(const struct mach_header_64 *ame132_hdr,
+                                                intptr_t ame132_slide,
+                                                void *hook_fn) {
+    if (ame132_hdr == NULL || hook_fn == NULL) {
+        NSLog(@"[SDLHook] Task134: jna rebind rejected null args (hdr=%p hook=%p)",
+              (void *)ame132_hdr, hook_fn);
+        return 0;
     }
-    if (ame132_hdr == NULL) return; // 句柄不对应任何已加载 image（异常防御）
-    if (ame132_hdr->magic != MH_MAGIC_64) return;
+    if (ame132_hdr->magic != MH_MAGIC_64) {
+        NSLog(@"[SDLHook] Task134: jna rebind bad magic %08x", ame132_hdr->magic);
+        return 0;
+    }
 
     // 第一遍：收集 SYMTAB / DYSYMTAB / __LINKEDIT 定位信息
     struct symtab_command ame132_symtab;
@@ -1822,7 +1824,7 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
     if (!ame132_has_symtab || !ame132_has_le || ame132_dysym.nindirectsyms == 0) {
         NSLog(@"[SDLHook] Task132: libjnidispatch image missing symtab/linkedit "
               @"(layout change?), dlsym rebind skipped");
-        return;
+        return 0;
     }
     // fishhook 同款 __LINKEDIT 基址换算（slide + vmaddr - fileoff）
     uintptr_t ame132_base = (uintptr_t)ame132_slide + ame132_le_vmaddr - ame132_le_fileoff;
@@ -1877,14 +1879,14 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
                         continue;
                     }
                     *slot = hook_fn;
-                    ame132_hits++;
-                    // Task 134：读回验证——写后槽值必须等于 hook，否则
-                    // （段保护被回退/写被忽略）立即报错，下次日志可定位
+                    // Task 134：读回验证——只有写后槽值等于 hook 才计入
+                    // 返回值（未验证的绑定触发看门狗重试）
                     if (*slot != hook_fn) {
                         NSLog(@"[SDLHook] Task132: READBACK FAILED for _dlsym slot "
-                              @"%p (value=%p expected=%p) -- JNA stays unhooked!",
+                              @"%p (value=%p expected=%p) -- JNA stays unhooked, retry scheduled!",
                               (void *)slot, *slot, hook_fn);
                     } else {
+                        ame132_hits++;
                         NSLog(@"[SDLHook] Task132: libjnidispatch _dlsym slot rebound "
                               @"(%s[%s] slot=%p verified) -- JNA symbol resolution now routes "
                               @"through hooked_dlsym (Task131 guard covers the JNA path)",
@@ -1897,9 +1899,32 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
             ((const uint8_t *)ame132_cmd + ame132_cmd->cmdsize);
     }
     if (ame132_hits == 0) {
-        NSLog(@"[SDLHook] Task132: libjnidispatch loaded but no _dlsym pointer "
-              @"slot found (unexpected layout -- JNA path stays on real dlsym)");
+        NSLog(@"[SDLHook] Task132: libjnidispatch loaded but no verified _dlsym "
+              @"pointer slot (unexpected layout or write race -- retry scheduled)");
     }
+    return ame132_hits;
+}
+
+// Task 134：旧入口保留（hooked_dlopen 的显式命名路径触发）——句柄查找
+// 失败现在落日志（此前是静默 return，装机日志无法判读断点）。
+void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
+    if (handle == NULL || hook_fn == NULL) return;
+    const struct mach_header_64 *ame132_hdr = NULL;
+    intptr_t ame132_slide = 0;
+    uint32_t ame132_count = _dyld_image_count();
+    for (uint32_t i = 0; i < ame132_count; i++) {
+        if ((const void *)_dyld_get_image_header(i) == handle) {
+            ame132_hdr = (const struct mach_header_64 *)_dyld_get_image_header(i);
+            ame132_slide = _dyld_get_image_vmaddr_slide(i);
+            break;
+        }
+    }
+    if (ame132_hdr == NULL) {
+        NSLog(@"[SDLHook] Task134: jna rebind handle %p not found in dyld image "
+              @"list (dlopen-path trigger) -- giving up this trigger", handle);
+        return;
+    }
+    amethyst_task132_rebind_jna_dlsym_ex(ame132_hdr, ame132_slide, hook_fn);
 }
 
 // ---------------------------------------------------------------------------
@@ -2102,12 +2127,56 @@ static const char *amethyst_task133_basename(const char *path) {
 // Task 134 前向声明（定义在 ensure 之后）：JVM 镜像检出时启动看门狗。
 static void amethyst_task134_watchdog_maybe_start(void);
 
+// Task 134：JNA 重绑定重试状态（未验证 = 看门狗每 200ms 重试，直到读回
+// 验证通过或 100 次上限。病历：装机日志双会话实证首次绑定可静默失败，
+// 而 JNA 加载 jnilib 到 controlify 解析 SDL 符号相隔秒级——重试窗口充足）
+static const struct mach_header_64 *t134_jna_hdr = NULL;
+static intptr_t t134_jna_slide = 0;
+static int t134_jna_attempts = 0;
+
+static void amethyst_task134_jna_retry_arm(const struct mach_header_64 *hdr, intptr_t slide) {
+    t134_jna_hdr = hdr;
+    t134_jna_slide = slide;
+    if (t134_jna_attempts == 0) {
+        NSLog(@"[SDLHook] Task134: JNA rebind unverified -- watchdog will retry "
+              @"every 200ms (hdr=%p)", (void *)hdr);
+    }
+}
+
+static void amethyst_task134_jna_retry_clear(void) {
+    if (t134_jna_hdr != NULL) {
+        NSLog(@"[SDLHook] Task134: JNA rebind verified after %d attempt(s) -- retries stopped",
+              t134_jna_attempts + 1);
+    }
+    t134_jna_hdr = NULL;
+    t134_jna_slide = 0;
+    t134_jna_attempts = 0;
+}
+
+static void amethyst_task134_retry_pending_jna(void) {
+    if (t134_jna_hdr == NULL || t134_jna_attempts >= 100) {
+        return;
+    }
+    t134_jna_attempts++;
+    if (amethyst_task132_rebind_jna_dlsym_ex(t134_jna_hdr, t134_jna_slide,
+                                             (void *)hooked_dlsym) > 0) {
+        amethyst_task134_jna_retry_clear();
+    } else if (t134_jna_attempts == 1 || t134_jna_attempts % 10 == 0) {
+        NSLog(@"[SDLHook] Task134: JNA rebind still unverified (attempt %d, hdr=%p)",
+              t134_jna_attempts, (void *)t134_jna_hdr);
+    }
+}
+
 // Task 133 主入口：扫描已加载镜像，把 JVM 侧 dlopen 调用链接进 hook。
 // 由 hooked_dlopen（JVM/JNA 相关路径加载后）与 hooked_dlsym（入口）调用。
 // 增量扫描：dyld 追加式注册新镜像，游标只进不退；镜像数回落（dlclose，
 // 罕见）时游标归零全量重扫（重绑定幂等，代价可忽略）。无新镜像时开销
 // = 一次 dyld 计数调用 + 一次比较。
 void amethyst_task133_ensure_jvm_chain(void) {
+    // Task 134：未验证的 JNA 重绑定重试（看门狗 tick 驱动；必须在游标
+    // 早退之前处理——否则无新镜像时永远不会重试）。重试体幂等，跨线程
+    // 并发重试的最坏结果是一次多余的段保护调用，无害。
+    amethyst_task134_retry_pending_jna();
     static pthread_mutex_t t133_lock = PTHREAD_MUTEX_INITIALIZER;
     static uint32_t t133_cursor = 0;
     static bool t133_initialized = false;
@@ -2154,9 +2223,13 @@ void amethyst_task133_ensure_jvm_chain(void) {
             // dlopen 句柄即 mach header 地址（Task132 同款对应关系），
             // 直接复用既有的 _dlsym 槽位重绑定
             NSLog(@"[SDLHook] Task133: libjnidispatch image detected (%s / "
-                  @"install %s) -- invoking Task132 dlsym rebind",
+                  @"install %s) -- invoking Task132 dlsym rebind (direct hdr+slide)",
                   path ?: "(null)", install ?: "(null)");
-            amethyst_task132_rebind_jna_dlsym((void *)hdr, (void *)hooked_dlsym);
+            if (amethyst_task132_rebind_jna_dlsym_ex(hdr, slide, (void *)hooked_dlsym) > 0) {
+                amethyst_task134_jna_retry_clear();
+            } else {
+                amethyst_task134_jna_retry_arm(hdr, slide);
+            }
             amethyst_task134_watchdog_maybe_start();
         }
     }

@@ -54,13 +54,27 @@ check("A4 崩溃日志三轮反馈同根因记录（Task129/131/132 误诊史）
       "Task129" in lpvc and "Task131" in lpvc)
 
 print("== B. 26.1.2 controlify/JNA SIGBUS 根治（Task133 镜像扫描重绑定）==")
-log = rd("latestlog.txt")
-check("B1 崩溃证据链在位（3bcf8c4 日志：controlify -> SDLNativesLoader -> Structure -> SIGBUS，零守卫日志）",
+# Task134 重锚：df10f70/3756a05 上传的新日志——崩溃会话在 latestlog.old.txt
+# （26.1.2 整合包），成功会话在 latestlog.txt（26.2 TouchController 测试）。
+log = rd("latestlog.old.txt")
+log_ok = rd("latestlog.txt")
+check("B1 崩溃证据链在位（df10f70 新日志：controlify -> SDLNativesLoader -> Structure -> SIGBUS，零守卫日志）",
       "Initializing Controlify" in log and
       "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
       "Platform.isMac called from com.sun.jna.Structure" in log and
       re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None and
       "[SDLHook] Task131: SDL_SetEventFilter" not in log)
+check("B1b 新日志实证 Task133 链路已通（libjli/libjvm/libjnidispatch 三连检出 + 重绑定调用）——断点收窄到 Task132 静默早退（Task134 已修：直传 hdr+slide + 重试）",
+      "Task133: libjli image detected" in log and
+      "Task133: libjvm image detected" in log and
+      "Task133: libjnidispatch image detected" in log and
+      "invoking Task132 dlsym rebind" in log and
+      "slot rebound" not in log and
+      "no _dlsym pointer" not in log)
+check("B1c 成功会话对照（26.2 会话守卫触发 + 正常 exit(0)：拦截设计本身有效）",
+      "Task131: SDL_SetEventFilter" in log_ok and "hooked SDL_SetEventFilter" in log_ok and
+      "exit(0) called" in log_ok and
+      re.search(r"SIGBUS \\(0xa\\)", log_ok) is None and "Problematic frame" not in log_ok)
 check("B2 ensure 主函数定义 + 增量游标设计（dlclose 回落全量重扫）",
       "void amethyst_task133_ensure_jvm_chain(void)" in sdl and
       "t133_cursor" in sdl and "count >= t133_cursor" in sdl)

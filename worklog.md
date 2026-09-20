@@ -1322,3 +1322,21 @@ Stage Summary:
 - 崩溃看门狗：锚点 '[SDLHook] Task134: JVM image watchdog started' + Task132 重绑定日志现带 'verified' 或 'READBACK FAILED'
 - 头像：锚点 = 无需重启启动器，首页磁贴在自愈完成后实时刷新
 - 新 IPA 就绪待 CI；6.0.0 发布物（README/公告/发行版文案）齐备
+
+---
+Task ID: 134 (续：装机日志判读 + 二次加固)
+Agent: main (Super Z)
+Task: df10f70/3756a05 新上传日志判读——26.1.2 崩溃断点定案 + Task132 重绑定静默早退根治
+
+Work Log:
+- 推送时发现远端新增两个用户上传提交（df10f70 latestlog.txt + 3756a05 latestlog.old.txt，2026-09-21 00:26/00:33）——正是本轮反馈的原始日志，rebase 后立即判读
+- 【latestlog.old.txt = 26.1.2 崩溃会话】Task133 链路实证【已通】：libjli 检出+重绑定（hits=1）→ libjvm 检出+重绑定（hits=1）→ libjnidispatch 按 install name 检出（jna44392784326961074.tmp）→ 调用 Task132 dlsym 重绑定——但【零结果行】（既无 slot rebound 也无 no _dlsym slot found）：函数在唯一无日志的提前返回（ame132_hdr == NULL 句柄重查失败）静默退出。此后 controlify 3.0.1+26.1 "Attempting to load SDL3 from SDL3"（JNA 直连加载）→ 未 hook 的 dlsym 槽拿到真 SDL_SetEventFilter → 注册 JNA closure → SIGBUS @0x134ea0010（com.sun.jna.Structure 后）
+- 【latestlog.txt = 26.2 TouchController 测试会话】守卫【触发】（hooked SDL_SetEventFilter/AddEventWatch + Task131: SDL_SetEventFilter(0x17a697400) blocked）——26.2 版 controlify 走 "Loaded SDL from system" 路径（SDL3 已被先前加载，解析经由已 hook 的调用方）所以幸免；游戏正常进世界游玩后 FastQuit 干净退出（exit(0)，fatal trace 是 Task48 正常退出回溯非崩溃）；mod 列表含 touchcontroller-26-2-fabric——与双 ABI 诊断完全吻合（传输层 ABI 错位 = 功能失效但游戏本体正常）
+- 【二次加固（sdl3_hook.m）】(1) Task132 核心重绑定改 amethyst_task132_rebind_jna_dlsym_ex(hdr, slide, hook)——Task133 扫描直传 hdr+slide，彻底消灭句柄重查（静默早退的病灶）；返回值 = 读回验证过的绑定槽数；(2) 旧入口保留为日志包装（hooked_dlopen 显式命名路径），句柄查找失败现在落日志；(3) 全部提前返回落日志（null args / bad magic / missing symtab 原有）；(4) 看门狗重试：未验证的 JNA 绑定存 t134_jna_hdr/slide，ensure 入口（游标早退之前）每 tick 重试，100 次上限，验证通过即清—— hooked_dlsym 高频入口 + 200ms 定时器双驱动，JNA 加载到 controlify 解析的秒级窗口内数十次机会
+- 验证器重锚：verify_task133 B1 改读 latestlog.old.txt（新崩溃证据）+ 新增 B1b（Task133 链路通 + Task132 零输出的断点实证）/ B1c（26.2 成功会话守卫触发 + 无 SIGBUS + 正常 exit(0) 对照）；verify_task132 A1/A2 改读 latestlog.old.txt + A14 改断言 verified/READBACK/retry 双通道日志锚点；verify_task134 新增 E4b（日志取证闭环）/ E4c（静默早退根治三断言）/ E4d（重试机制四断言）
+- 全链复跑：verify_task134 68/68、task133 44/44、task132 53/53、其余级联全绿（129 47/130 60/131 37 等未再变动）
+
+Stage Summary:
+- 26.1.2 崩溃链最终闭环：Task133 设计被新日志证明有效（三连检出全通），真正断点 = Task132 句柄重查静默失败——本轮直传+重试根治；装机锚点升级为 'slot=%p verified'（成功）或 'retry scheduled'/'still unverified (attempt N)'（重试中），任何形态都能从日志直接判读
+- 26.2 会话证明守卫与拦截设计本身有效（同构建同会话守卫触发、游戏正常退出），崩溃与否只取决于 controlify 版本的 SDL 加载路径是否命中未 hook 的 JNA dlsym
+- 新 IPA 待 CI；6.0.0 发布物不受影响（README/公告/文案已含看门狗与读回验证描述）
