@@ -1123,3 +1123,15 @@ Work Log:
 
 Stage Summary:
 - 提交 b36454b 推送，CI 轮询中；装机锚点见 verify_task129 与提交信息
+
+---
+Task ID: 129 (续)
+Agent: main (Super Z)
+Task: CI 确认
+
+Work Log:
+- b36454b 的 run 35487068681 被并发取消（7a680d1 文档提交触发 cancel-in-progress）；7a680d1 的 run 35487205370（同代码 + worklog）completed success
+
+Stage Summary:
+- Task129 全链闭环：八项修复 + verify_task129 47/47 + 级联全绿 + CI 绿；新 IPA 就绪
+- 装机待验证锚点：'[Amethyst] Task129: OpenAL shim active'（26.1.2 不再 NPE，三条 Failed to check event WARN 属预期回退）；多角色登录选择器与账户列表长按切换；iPad 弹窗/popover 形态 + 右侧栏 220pt；设置 pick 全悬浮；26.3 会话 DSA=1/缓存=128
