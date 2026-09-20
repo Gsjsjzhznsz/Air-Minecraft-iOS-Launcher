@@ -599,6 +599,57 @@ static NSError* createError(NSString *message, NSInteger code) {
     }];
 }
 
+// Task 129b（FCL 多角色管理）：为已保存的多角色账户切换绑定角色。
+// profile 来自该账户 authData[@"availableProfiles"]（登录时由 Task129b 保存）。
+// 链路：当前 accessToken + 新 selectedProfile 走 refreshToBindProfile（更新
+// tokens/username/uuid/profileId/accountId/expiresAt/accountType + 头像 + saveChanges
+// ——saveChanges 以新 accountId 落盘并迁移 selected_account），随后清理旧
+// accountId 的账户文件（角色切换 = 文件换名，与登录路径同一语义）。
+- (void)switchToProfile:(NSDictionary *)profile callback:(Callback)callback {
+    if (![profile isKindOfClass:[NSDictionary class]] ||
+        ![profile[@"id"] isKindOfClass:[NSString class]] ||
+        ((NSString *)profile[@"id"]).length == 0) {
+        NSError *error = createError(localize(@"login.error.invalid_response", @"Invalid profile"), 1031);
+        callback(error, NO);
+        return;
+    }
+
+    NSString *accessToken = self.authData[@"accessToken"];
+    NSString *clientToken = self.authData[@"clientToken"];
+    if (![accessToken isKindOfClass:[NSString class]] || accessToken.length == 0 ||
+        ![clientToken isKindOfClass:[NSString class]] || clientToken.length == 0) {
+        NSError *error = createError(localize(@"i18n_str_1106", nil), 1032);
+        callback(error, NO);
+        return;
+    }
+
+    // 切换前记录旧 accountId：成功后若 profileId 变化则删除旧文件
+    NSString *ame129b_oldAccountId = self.authData[@"accountId"];
+    NSLog(@"[ThirdPartyAuthenticator] Task129b: switchToProfile %@ (old accountId %@)",
+          profile[@"name"], ame129b_oldAccountId);
+
+    __weak typeof(self) weakSelf = self;
+    [self refreshToBindProfile:profile
+                    accessToken:accessToken
+                   clientToken:clientToken
+                      callback:^(id status, BOOL success) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!weakSelf) return;
+            if (success) {
+                NSString *newAccountId = weakSelf.authData[@"accountId"];
+                if (ame129b_oldAccountId.length > 0 && newAccountId.length > 0 &&
+                    ![ame129b_oldAccountId isEqualToString:newAccountId]) {
+                    NSString *oldPath = [NSString stringWithFormat:@"%s/accounts/%@.json",
+                                         getenv("POJAV_HOME"), ame129b_oldAccountId];
+                    [NSFileManager.defaultManager removeItemAtPath:oldPath error:nil];
+                    NSLog(@"[ThirdPartyAuthenticator] Task129b: removed old account file %@", ame129b_oldAccountId);
+                }
+            }
+            if (callback) callback(status, success);
+        });
+    }];
+}
+
 /// 异步获取角色纹理并设置头像 URL，完成后触发 callback
 - (void)fetchProfileTextureWithCallback:(Callback)callback {
     NSString *serverURL = self.authData[@"authserver"] ?: @"https://authserver.ely.by";
@@ -696,9 +747,52 @@ static NSError* createError(NSString *message, NSInteger code) {
                 availableProfiles = @[];
             }
 
+            // Task 129b（FCL 多角色管理）：登录时保存角色表到 authData，供
+            // 账户列表后续"切换角色"使用（每项 {id, name}，plist 安全）。
+            if (availableProfiles.count > 0) {
+                NSMutableArray *ame129b_profiles = [NSMutableArray array];
+                for (NSDictionary *p in availableProfiles) {
+                    if (![p isKindOfClass:[NSDictionary class]]) continue;
+                    NSString *pid = [p[@"id"] isKindOfClass:[NSString class]] ? p[@"id"] : nil;
+                    NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"";
+                    if (pid.length == 0) continue;
+                    [ame129b_profiles addObject:@{@"id": pid, @"name": pname}];
+                }
+                if (ame129b_profiles.count > 0) {
+                    self.authData[@"availableProfiles"] = ame129b_profiles;
+                }
+            }
+
+            if (!selectedProfile && availableProfiles.count > 1 && self.onProfileSelection) {
+                // Task 129b（FCL 多角色）：多角色且 UI 层提供了选择器 -> 弹出角色
+                // 选择（旧实现"移动端简化为选第一个"被用户实测否决：多角色管理
+                // 去哪了）。用户取消（complete(nil)）-> 优雅终止登录。
+                NSString *accessToken = response[@"accessToken"];
+                NSString *clientToken = response[@"clientToken"];
+                NSLog(@"[ThirdPartyAuthenticator] Task129b: multi-profile login (%ld profiles), asking user", (unsigned long)availableProfiles.count);
+                __weak typeof(self) weakSelf = self;
+                self.onProfileSelection(availableProfiles, ^(NSDictionary *chosen) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (!weakSelf) return;
+                        if (![chosen isKindOfClass:[NSDictionary class]] ||
+                            ![chosen[@"id"] isKindOfClass:[NSString class]]) {
+                            NSLog(@"[ThirdPartyAuthenticator] Task129b: profile selection cancelled by user");
+                            NSError *error = createError(localize(@"login.error.cancelled", @"已取消"), 1030);
+                            callback(error, NO);
+                            return;
+                        }
+                        NSLog(@"[ThirdPartyAuthenticator] Task129b: user chose profile %@, refresh binding", chosen[@"name"]);
+                        [weakSelf refreshToBindProfile:chosen
+                                            accessToken:accessToken
+                                           clientToken:clientToken
+                                              callback:callback];
+                    });
+                });
+                return;
+            }
+
             if (!selectedProfile && availableProfiles.count > 0) {
-                // 多角色场景：先保存 token，再 refresh 绑定第一个角色
-                // （HMCL 这里会弹出角色选择器；移动端简化为选第一个）
+                // 多角色但无 UI 选择器（后台/无 UI 场景）：保持旧行为，自动绑定第一个
                 NSString *accessToken = response[@"accessToken"];
                 NSString *clientToken = response[@"clientToken"];
                 NSDictionary *profileToSelect = availableProfiles[0];

@@ -890,3 +890,40 @@
 //   discriminators unified; legacy files fall back to the old sniffing).
 //   Launch-time agent wiring additionally falls back to the bundled jar when
 //   the POJAV_HOME copy is missing (the silent 401 chain's missing link).
+//   Task 129 (v5.1.0 field report, eight fixes): (a) 26.1.2 modpack crash =
+//   OpenAL ALC_SOFT_system_events NPE -- MC 26.1.2's CallbackDeviceTracker
+//   calls alcEventIsSupportedSOFT without the alcIsExtensionPresent guard
+//   26.3 has, our openal-soft 1.20.1 impl lacks the extension, and LWJGL
+//   3.4.1 throws NPE on a NULL ICD slot; fixed by the openal_shim re-export
+//   wrapper (advertises the extension + stubs returning ALC_FALSE so MC
+//   falls back to PollingDeviceTracker; auto-transparent if the impl is
+//   ever upgraded to >=1.25). (b) third-party login FCL parity: multi-
+//   server list (saved-server chips, auto-remember after ALI resolution,
+//   long-press to remove) + multi-role management (login-time profile
+//   picker instead of auto-binding the first; saved accounts carry
+//   availableProfiles and offer long-press role switching via
+//   switchToProfile/refresh rebind). (c) settings pickers unified back to
+//   floating action sheets/popovers on iPhone AND iPad (the old iPad
+//   UIContextMenuInteraction + _presentMenuAtLocation private-API compact
+//   menu read as a second-level submenu and stopped presenting on
+//   iPadOS 27, making FSR/download-source/backend rows unswitchable).
+//   (d) MG Vulkan perf defaults: enable_ext_direct_state_access now YES
+//   and max_glsl_cache_size 128 -- the old pref defaults (NO/32) silently
+//   defeated the code's intended safe defaults via the getPrefObject
+//   override chain (device log: "enable_ext_direct_state_access = 0").
+//   (e) white-background on some devices (iPad9): a custom background
+//   image that fails to decode left the window's systemBackgroundColor
+//   (light mode = pure white) visible; both window and splitVC now paint
+//   the neumorphic base under the background container and the image
+//   loader drops a themed fallback view on decode failure. (f) iPad9
+//   treated as a small-screen device: the UIKit idiom hook unconditionally
+//   forced Phone; iPads are now always Pad idiom (model-derived, immune
+//   to the pref-default evaluation-order trap). (g) launcher announcement
+//   load failure: the default feed (air-api.vercel.app) now 404s (domain
+//   repurposed); a bundled offline announcement (announcements-fallback
+//   .json) serves when both network and cache are empty. (h) MC news
+//   images covered by neomorphism: the collection-cell effect injector's
+//   "first rounded subview" heuristic picked the thumbnail UIImageView
+//   itself, whose neomorph caster sublayers paint over layer contents;
+//   content-rendering views (UIImageView/UILabel/UITextView/UIControl)
+//   are excluded from card-container detection.

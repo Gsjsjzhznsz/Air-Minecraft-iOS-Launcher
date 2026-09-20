@@ -38,8 +38,8 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK92_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
-UPSTREAM = os.environ.get("TASK92_UPSTREAM", "/home/z/my-project/workspace/stikdebug-upstream/universal.js")
+REPO = os.environ.get("TASK92_REPO", "/home/z/my-project/Amethyst-iOS-MyRemastered")
+UPSTREAM = os.environ.get("TASK92_UPSTREAM", "/home/z/my-project/Amethyst-iOS-MyRemastered/universal.js")
 PASS, FAIL = 0, 0
 
 

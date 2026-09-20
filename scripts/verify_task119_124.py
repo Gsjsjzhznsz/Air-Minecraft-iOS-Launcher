@@ -129,10 +129,14 @@ for lang in LANGS:
          '"preference.title.mobilegl_backend"' in s and \
          '"preference.detail.mobilegl_backend"' in s
     check(f"C3 {lang} 含 mobilegl_backend 全套文案（title/detail/4 档位）", ok)
-check("C4 pick 弹窗 ✓ 标记按存储值比较（iPhone + iPad 双分支）",
-      "ame121_cur " in plpt and "ame121_curPads" in plpt)
-check("C5 选中后 cell 显示本地化标签（两分支 pickList[i]）",
-      plpt.count("cell.detailTextLabel.text = pickList[i];") >= 2)
+# Task 129e 重锚：iPad 紧凑菜单（_presentMenuAtLocation 私有 API）分支已
+# 退役，iPhone/iPad 统一为悬浮 actionSheet/popover；✓ 存储值比较保留。
+check("C4 pick 弹窗 ✓ 标记按存储值比较（Task129e 统一单分支）",
+      "ame121_cur " in plpt and "ame121_curPads" not in plpt
+      and "[interaction _presentMenuAtLocation:location];" not in plpt
+      and "popoverPresentationController.sourceView = cell;" in plpt)
+check("C5 选中后 cell 显示本地化标签（统一分支 pickList[i]）",
+      plpt.count("cell.detailTextLabel.text = pickList[i];") >= 1)
 # 引用完整性：LPVC/LauncherPreferences 引用的 preference.* 键都有 en 文案
 used = set(re.findall(r'localize\(@"(preference\.[^"]+)"', lpvc)) | \
        set(re.findall(r'localize\(@"(preference\.[^"]+)"', lp))

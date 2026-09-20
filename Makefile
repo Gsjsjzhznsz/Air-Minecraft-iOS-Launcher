@@ -422,6 +422,28 @@ dep_mobilegl:
 	# 保留空目标避免外部 make 调用报错（payload 依赖 resources/ 直拷，无需本目标做事）
 	@echo '[Amethyst v$(VERSION)] dep_mobilegl - using prebuilt libMobileGL.dylib in Natives/resources/Frameworks/ (Task113, Vulkan-only)'
 
+
+dep_openal_shim:
+	# Task 129：OpenAL ALC_SOFT_system_events 兼容垫片（26.1.2 整合包崩溃修复）。
+	# - 真库已 git mv 为 libopenal_impl.dylib（openal-soft 1.20.1 iOS 构建，无
+	#   ALC_SOFT_system_events 扩展）；本目标构建同名垫片 libopenal.dylib：
+	#   re-export impl 全部符号 + 覆盖 alcGetString/alcIsExtensionPresent 宣称扩展
+	#   + 提供 alcEventIsSupportedSOFT/alcEventControlSOFT/alcEventCallbackSOFT 桩。
+	# - 根因：MC 26.1.2 CallbackDeviceTracker.isSupported 无扩展守卫，直接调
+	#   LWJGL 绑定 -> ICD 槽位 0 -> NPE 崩溃（26.3 有守卫故存活）。
+	#   桩返回 ALC_FALSE 使 MC 干净回退 PollingDeviceTracker。
+	# - 与 dep_shader_shim 同款模式：re-export 必须指向 impl 名（LC_ID 先修正），
+	#   否则加载递归；本地函数定义优先于 re-export 符号（shaderc 先例）。
+	echo '[Amethyst v$(VERSION)] dep_openal_shim - start'
+	cp $(SOURCEDIR)/Natives/resources/Frameworks/libopenal_impl.dylib $(WORKINGDIR)/ || exit 1
+	install_name_tool -id @rpath/libopenal_impl.dylib $(WORKINGDIR)/libopenal_impl.dylib || exit 1
+	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
+		-install_name @rpath/libopenal.dylib \
+		-Wl,-reexport_library,$(WORKINGDIR)/libopenal_impl.dylib \
+		-o $(WORKINGDIR)/libopenal.dylib \
+		$(SOURCEDIR)/Natives/openal_shim.c || exit 1
+	echo '[Amethyst v$(VERSION)] dep_openal_shim - end'
+
 assets:
 	echo '[Amethyst v$(VERSION)] assets - start'
 	if [ '$(IOS)' = '0' ] && [ '$(DETECTPLAT)' = 'Darwin' ]; then \
@@ -530,7 +552,7 @@ dep_angle_freeze:
 		$(SOURCEDIR)/Natives/resources/Frameworks/libGLESv2.framework/libGLESv2 || exit 1
 	echo '[Amethyst v$(VERSION)] dep_angle_freeze - end'
 
-payload: native dep_mg java jre assets dep_shader_shims dep_angle_freeze
+payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_angle_freeze
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)

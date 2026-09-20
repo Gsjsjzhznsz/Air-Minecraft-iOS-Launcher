@@ -29,7 +29,22 @@ void swizzleUIImageMethod(SEL originalAction, SEL swizzledAction) {
 }
 
 void init_hookUIKitConstructor(void) {
-    UIUserInterfaceIdiom idiom = getPrefBool(@"debug.debug_ipad_ui") ? UIUserInterfaceIdiomPad : UIUserInterfaceIdiomPhone;
+    // Task 129g：iPad 机型永远使用真实 Pad idiom（用户实测："iPad9 被识别成
+    // 小屏幕设备，右边的新侧边栏变成小屏幕专用的简略侧边栏"）。
+    // 旧逻辑无条件把 idiom 压成 Phone（除非 debug_ipad_ui），仅靠
+    // PLPreferences 里 realUIIdiom==Pad 的默认值兜底——该默认值的求值时机
+    // 依赖构造器顺序/历史落盘，一旦求值时 idiom 已被改写或旧版本存过 NO，
+    // iPad 就永久落入 Phone 形态（弹窗变底部横条、popover 变全屏、整体
+    // "小屏幕专用"观感）。UIDevice.model 不受任何 hook 影响，是最可靠的
+    // 形态判据：iPad 机型直接 Pad；iPhone 保留原"解锁 iPad UI"开关语义。
+    BOOL ame129g_isIPad = [[[UIDevice currentDevice].model lowercaseString]
+        containsString:@"ipad"];
+    UIUserInterfaceIdiom idiom;
+    if (ame129g_isIPad) {
+        idiom = UIUserInterfaceIdiomPad;
+    } else {
+        idiom = getPrefBool(@"debug.debug_ipad_ui") ? UIUserInterfaceIdiomPad : UIUserInterfaceIdiomPhone;
+    }
     [UIDevice.currentDevice _setActiveUserInterfaceIdiom:idiom];
     [UIScreen.mainScreen _setUserInterfaceIdiom:idiom];
     

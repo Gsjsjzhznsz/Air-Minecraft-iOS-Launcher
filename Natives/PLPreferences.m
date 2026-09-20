@@ -156,8 +156,16 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"enable_no_error": @(0),
             @"enable_ext_timer_query": @YES,
             @"enable_ext_compute_shader": @NO,
-            @"enable_ext_direct_state_access": @NO,
-            @"max_glsl_cache_size": @(32),
+            // Task 129d：DSA 默认开启。init_loadMobileGluesConfig 的"安全默认值"
+            // 本就写入 enableExtDirectStateAccess=1（DSA 显著降低 MC/sodium
+            // 纹理与缓冲对象的 GL 调用开销；zink 会话实证 MC 检测到
+            // ARB_direct_state_access 即启用），但旧偏好默认 @NO 走
+            // getPrefObject 覆盖链把它静默改回 0（bd71210 26.3 会话日志：
+            // "enable_ext_direct_state_access = 0"）——意图与现实不符的纯 bug。
+            @"enable_ext_direct_state_access": @YES,
+            // Task 129d：着色器缓存 128MB（对齐代码内"安全默认值"；旧默认 32MB
+            // 对重型整合包偏小，缓存逐出意味着着色器重编译卡顿）。
+            @"max_glsl_cache_size": @(128),
             @"multidraw_mode": @(0),
             @"angle_depth_clear_fix_mode": @(0),
             @"custom_gl_version": @(0),
@@ -183,7 +191,9 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
         // Preferences that cannot be isolated
         NSDictionary *general = @{
             @"game_directory": @"default",
-            @"hidden_sidebar": @(realUIIdiom == UIUserInterfaceIdiomPhone),
+            // Task 129g：默认值改由 UIDevice.model 推导（不受 UIKit+hook 的
+            // idiom 改写影响，与 hook 的 iPad 机型直通 Pad 同口径）。
+            @"hidden_sidebar": @([[[UIDevice currentDevice].model lowercaseString] containsString:@"iphone"]),
             @"appicon": @"AppIcon-Light",
             @"ui_layout": @"vs",
             @"ui_theme": @"dark",
@@ -205,7 +215,8 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"debug_always_attached_jit": @NO,
             @"debug_skip_wait_jit": @NO,
             @"debug_hide_home_indicator": @NO,
-            @"debug_ipad_ui": @(realUIIdiom == UIUserInterfaceIdiomPad),
+            // Task 129g：同 hidden_sidebar——model 推导，避免求值时机依赖。
+            @"debug_ipad_ui": @([[[UIDevice currentDevice].model lowercaseString] containsString:@"ipad"]),
             @"debug_auto_correction": @YES,
             @"debug_show_layout_bounds": @NO,
             @"debug_show_layout_overlap": @NO

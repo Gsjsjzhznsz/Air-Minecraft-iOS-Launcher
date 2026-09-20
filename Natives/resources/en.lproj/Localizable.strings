@@ -123,6 +123,17 @@
 "login.option.local" = "Local account";
 "login.option.3rdparty" = "Third-party account";
 
+// Task 129b: third-party multi-server + multi-role management
+"login.thirdparty.servers.title" = "Saved servers";
+"login.thirdparty.servers.remove.title" = "Remove this server?";
+"login.thirdparty.servers.remove.confirm" = "Remove";
+"login.thirdparty.profiles.title" = "Choose a character to log in";
+"login.error.cancelled" = "Login cancelled";
+"account.switch_role.title" = "Switch character — %@";
+"account.switch_role.working" = "Switching to %@ …";
+"account.switch_role.done" = "Switched to %@";
+"account.switch_role.failed" = "Switch failed: %@";
+
 "login.warn.title.legacy_device" = "The next release of Amethyst will not be compatible with this device.";
 "login.warn.message.legacy_device" = "To run the next major release, a device capable of running iOS 14 is required.";
 "login.warn.title.legacy_ios" = "The next release of Amethyst will require a system update.";

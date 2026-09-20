@@ -73,8 +73,10 @@ public final class Tools {
         // spirv-cross 作为共享 dylib 放在根目录 Frameworks/，从 library.path
         // （Frameworks:Frameworks/lwjglXX）的根目录 Frameworks/ 加载。
         //
-        // openal 用 LWJGL 默认名加载 libopenal.dylib（libopenal.dylib 直接存在于根目录 Frameworks/），
-        // 无需 override。
+        // openal：JavaLauncher.m 通过 -Dorg.lwjgl.openal.libname 钉死到
+        // Frameworks/libopenal.dylib（Task112 防 classpath 劫持；该文件自 Task129 起为
+        // re-export 垫片：1.20.1 impl + ALC_SOFT_system_events 桩，26.1.2 崩溃修复），
+        // 本文件无需再 override。
         //
         // 历史教训：曾尝试移除 spvc.libname override 改用 Makefile 软链接
         // （libspirv-cross.dylib -> libspirv-cross-c-shared.0.dylib）+ LWJGL 默认名 "spirv-cross"，

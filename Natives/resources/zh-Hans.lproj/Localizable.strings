@@ -121,7 +121,18 @@
 "login.option.demo" = "演示账户";
 "login.option.microsoft" = "微软账户";
 "login.option.local" = "本地账户";
-"login.option.3rdparty" = "第三方账户";
+"login.option.3rdparty" = "第三方帐户";
+
+// Task 129b: third-party multi-server + multi-role management
+"login.thirdparty.servers.title" = "已保存的服务器";
+"login.thirdparty.servers.remove.title" = "删除该服务器？";
+"login.thirdparty.servers.remove.confirm" = "删除";
+"login.thirdparty.profiles.title" = "选择要登录的角色";
+"login.error.cancelled" = "已取消登录";
+"account.switch_role.title" = "切换角色 — %@";
+"account.switch_role.working" = "正在切换到 %@ …";
+"account.switch_role.done" = "已切换到 %@";
+"account.switch_role.failed" = "切换失败：%@";
 
 "login.warn.title.legacy_device" = "Amethyst 的下一个版本将与此设备不兼容。";
 "login.warn.message.legacy_device" = "运行下一个主要版本，需要一台能够运行 iOS 14 的设备。";

@@ -396,6 +396,79 @@ static NSMutableSet *ame128_validatedSet(void) {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
+// Task 129b（FCL 多角色管理）：多角色第三方账户长按 -> 角色切换菜单（公开
+// UIContextMenuConfiguration API，长按系统呈现；与设置页悬浮 pick 语义一致）。
+// 每个角色一个 action，当前绑定角色打勾；点击后走 switchToProfile（refresh
+// 绑定 + 旧账户文件清理 + selected_account 迁移），完成后刷新列表。
+- (UIContextMenuConfiguration *)tableView:(UITableView *)tableView
+    contextMenuConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath
+    point:(CGPoint)point API_AVAILABLE(ios(13.0)) {
+    if (indexPath.row >= self.accountList.count) return nil;
+    NSDictionary *accountData = self.accountList[indexPath.row];
+
+    // 仅第三方账户且有已保存角色表（Task129b 登录时写入）且多于 1 个
+    NSString *ame128_type = accountData[@"accountType"];
+    BOOL is3P = [ame128_type isEqualToString:@"thirdparty"] ?: (accountData[@"clientToken"] != nil);
+    if (!is3P) return nil;
+    NSArray *profiles = accountData[@"availableProfiles"];
+    if (![profiles isKindOfClass:[NSArray class]] || profiles.count < 2) return nil;
+
+    NSString *currentProfileId = accountData[@"profileId"];
+    NSString *displayName = accountData[@"username"] ?: @"";
+    NSMutableArray<UIAction *> *actions = [NSMutableArray array];
+    for (NSDictionary *p in profiles) {
+        if (![p isKindOfClass:[NSDictionary class]]) continue;
+        NSString *pid = [p[@"id"] isKindOfClass:[NSString class]] ? p[@"id"] : nil;
+        NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"?";
+        if (pid.length == 0) continue;
+        // UUID 归一化比较（服务器可能返回无连字符形式）
+        NSString *pidNorm = [pid stringByReplacingOccurrencesOfString:@"-" withString:@""];
+        NSString *curNorm = [currentProfileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
+        __block UIAction *action = [UIAction actionWithTitle:pname image:nil identifier:nil
+            handler:^(UIAction *a) {
+                [self ame129b_switchAccountAtIndexPath:indexPath toProfile:p];
+            }];
+        action.state = [pidNorm isEqualToString:curNorm] ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
+    }
+    if (actions.count < 2) return nil;
+
+    NSString *menuTitle = [NSString stringWithFormat:localize(@"account.switch_role.title", @"切换角色 — %@"), displayName];
+    UIMenu *menu = [UIMenu menuWithTitle:menuTitle children:actions];
+    return [UIContextMenuConfiguration configurationWithIdentifier:nil previewProvider:nil
+        actionProvider:^UIMenu * _Nullable(NSArray<UIMenuElement *> * _Nonnull suggestedActions) {
+            return menu;
+        }];
+}
+
+/// Task 129b：执行角色切换（长按菜单的 action 回调）
+- (void)ame129b_switchAccountAtIndexPath:(NSIndexPath *)indexPath toProfile:(NSDictionary *)profile {
+    if (indexPath.row >= self.accountList.count) return;
+    NSDictionary *accountData = self.accountList[indexPath.row];
+    NSString *loadKey = accountData[@"accountId"];
+    if (loadKey.length == 0) loadKey = accountData[@"username"];
+    if (loadKey.length == 0) return;
+
+    NSLog(@"[AccountList] Task129b: switching profile for %@ -> %@", loadKey, profile[@"name"]);
+    [NMToast showMessage:[NSString stringWithFormat:localize(@"account.switch_role.working", @"正在切换到 %@ …"), profile[@"name"]]];
+
+    ThirdPartyAuthenticator *auth = [ThirdPartyAuthenticator loadSavedName:loadKey];
+    if (!auth) return;
+    [auth switchToProfile:profile callback:^(id status, BOOL success) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (success) {
+                NSLog(@"[AccountList] Task129b: profile switch OK (%@)", profile[@"name"]);
+                [NMToast showMessage:[NSString stringWithFormat:localize(@"account.switch_role.done", @"已切换到 %@"), profile[@"name"]]];
+                [self reloadAccountList];
+            } else {
+                NSString *errMsg = [status isKindOfClass:[NSError class]] ? [(NSError *)status localizedDescription]
+                                 : ([status isKindOfClass:[NSString class]] ? status : localize(@"Error", nil));
+                [NMToast showMessage:[NSString stringWithFormat:localize(@"account.switch_role.failed", @"切换失败：%@"), errMsg ?: @"?"]];
+            }
+        });
+    }];
+}
+
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         // TODO: invalidate token

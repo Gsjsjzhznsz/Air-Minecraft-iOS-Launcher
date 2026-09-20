@@ -42,7 +42,7 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK96_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+REPO = os.environ.get("TASK96_REPO", "/home/z/my-project/Amethyst-iOS-MyRemastered")
 MEM_KEY = "com.apple.developer.kernel.increased-memory-limit"
 VM_KEY = "com.apple.developer.kernel.extended-virtual-addressing"
 PASS, FAIL = 0, 0

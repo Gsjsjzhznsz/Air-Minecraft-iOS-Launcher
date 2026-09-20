@@ -37,7 +37,7 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK111_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+REPO = os.environ.get("TASK111_REPO", "/home/z/my-project/Amethyst-iOS-MyRemastered")
 PASS, FAIL = 0, 0
 
 

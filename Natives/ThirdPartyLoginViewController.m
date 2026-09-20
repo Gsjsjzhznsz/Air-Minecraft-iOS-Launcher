@@ -8,6 +8,7 @@
 #import "ThirdPartyLoginViewController.h"
 #import "authenticator/ThirdPartyAuthenticator.h"
 #import "BackgroundManager.h"
+#import "LauncherPreferences.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 
@@ -29,6 +30,11 @@
 
 @property (nonatomic, strong) UIView *serverCard; // 仅 Custom 模式显示
 @property (nonatomic, strong) UITextField *serverField;
+
+// Task 129b：多服务器管理（FCL 参照）——已保存服务器条状列表 + 添加/删除
+@property (nonatomic, strong) UIView *serversCard;   // 仅 Custom 模式且列表非空时显示
+@property (nonatomic, strong) UIStackView *serverChipsStack;
+@property (nonatomic, strong) NSLayoutConstraint *serversCardHeight;
 
 @property (nonatomic, strong) UIButton *loginButton;
 @property (nonatomic, strong) UIActivityIndicatorView *loginIndicator;
@@ -114,6 +120,11 @@
     if (self.mode == ThirdPartyLoginModeCustom) {
         [self buildServerCard];
         [self.contentStack addArrangedSubview:self.serverCard];
+        // Task 129b：已保存服务器列表（恢复“可添加多个登录服务器”；
+        // ALI 解析成功过的地址自动入库，点条回填地址栏，长按删除）
+        [self buildServersCard];
+        [self.contentStack addArrangedSubview:self.serversCard];
+        [self rebuildServerChips];
     }
 
     // 错误提示（默认隐藏）
@@ -283,6 +294,167 @@
     self.serverField.returnKeyType = UIReturnKeyGo;
 }
 
+#pragma mark Task 129b - 已保存服务器列表（FCL 多服务器管理）
+
+/// 存储键：general.thirdparty_servers（NSString 数组，plist 安全）。
+/// 旧版只有单个地址输入框（每次登录都要重输）；现在 ALI 解析成功过的地址
+/// 自动入库，点条回填，长按删除，恢复“之前可以添加服务器地址”的体验。
++ (NSMutableArray<NSString *> *)savedServerList {
+    id raw = getPrefObject(@"general.thirdparty_servers");
+    NSMutableArray<NSString *> *list = [NSMutableArray array];
+    if ([raw isKindOfClass:[NSArray class]]) {
+        for (id item in (NSArray *)raw) {
+            if ([item isKindOfClass:[NSString class]] && [(NSString *)item length] > 0) {
+                [list addObject:item];
+            }
+        }
+    }
+    return list;
+}
+
++ (void)saveServerList:(NSArray<NSString *> *)list {
+    setPrefObject(@"general.thirdparty_servers", list ?: @[]);
+}
+
++ (void)rememberServer:(NSString *)url {
+    if (![url isKindOfClass:[NSString class]] || url.length == 0) return;
+    // 去掉尾部斜杠后去重
+    NSString *normalized = [url hasSuffix:@"/"] ? [url substringToIndex:url.length - 1] : url;
+    NSMutableArray<NSString *> *list = [self savedServerList];
+    for (NSString *existing in list) {
+        NSString *norm2 = [existing hasSuffix:@"/"] ? [existing substringToIndex:existing.length - 1] : existing;
+        if ([norm2 isEqualToString:normalized]) return; // 已存在
+    }
+    [list addObject:url];
+    // 上限 12 条，防无限增长
+    if (list.count > 12) {
+        [list removeObjectsInRange:NSMakeRange(0, list.count - 12)];
+    }
+    [self saveServerList:list];
+    NSLog(@"[ThirdPartyLogin] Task129b: remembered server %@ (total %lu)", url, (unsigned long)list.count);
+}
+
+- (void)buildServersCard {
+    self.serversCard = [[UIView alloc] init];
+    self.serversCard.translatesAutoresizingMaskIntoConstraints = NO;
+    self.serversCard.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
+    self.serversCard.layer.cornerRadius = 16;
+    self.serversCard.layer.cornerCurve = kCACornerCurveContinuous;
+    self.serversCard.layer.borderWidth = 0.5;
+    self.serversCard.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12].CGColor;
+    self.serversCard.hidden = YES; // 列表为空时隐藏（rebuildServerChips 控制）
+
+    UILabel *title = [[UILabel alloc] init];
+    title.translatesAutoresizingMaskIntoConstraints = NO;
+    title.text = localize(@"login.thirdparty.servers.title", @"已保存的服务器");
+    title.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    title.textColor = [UIColor secondaryLabelColor];
+    [self.serversCard addSubview:title];
+
+    self.serverChipsStack = [[UIStackView alloc] init];
+    self.serverChipsStack.translatesAutoresizingMaskIntoConstraints = NO;
+    self.serverChipsStack.axis = UILayoutConstraintAxisVertical;
+    self.serverChipsStack.spacing = 8;
+    [self.serversCard addSubview:self.serverChipsStack];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [title.topAnchor constraintEqualToAnchor:self.serversCard.topAnchor constant:12],
+        [title.leadingAnchor constraintEqualToAnchor:self.serversCard.leadingAnchor constant:14],
+        [title.trailingAnchor constraintEqualToAnchor:self.serversCard.trailingAnchor constant:-14],
+        [self.serverChipsStack.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:8],
+        [self.serverChipsStack.leadingAnchor constraintEqualToAnchor:self.serversCard.leadingAnchor constant:14],
+        [self.serverChipsStack.trailingAnchor constraintEqualToAnchor:self.serversCard.trailingAnchor constant:-14],
+        [self.serverChipsStack.bottomAnchor constraintEqualToAnchor:self.serversCard.bottomAnchor constant:-12],
+    ]];
+}
+
+/// 每行一个服务器条：点按回填地址栏；长按确认删除
+- (UIButton *)serverChipForURL:(NSString *)url {
+    UIButton *chip = [UIButton buttonWithType:UIButtonTypeSystem];
+    chip.translatesAutoresizingMaskIntoConstraints = NO;
+    // 展示名：去掉协议前缀，取 host+首段路径，过长截断
+    NSString *display = url;
+    if ([display hasPrefix:@"https://"]) display = [display substringFromIndex:8];
+    if ([display hasPrefix:@"http://"]) display = [display substringFromIndex:7];
+    if (display.length > 34) display = [[display substringToIndex:31] stringByAppendingString:@"…"];
+    [chip setTitle:display forState:UIControlStateNormal];
+    [chip setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+    chip.titleLabel.font = [UIFont systemFontOfSize:14];
+    chip.titleLabel.lineBreakMode = NSLineBreakByTruncatingMiddle;
+    chip.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeading;
+    chip.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10];
+    chip.layer.cornerRadius = 10;
+    chip.layer.cornerCurve = kCACornerCurveContinuous;
+    [chip.heightAnchor constraintEqualToConstant:38].active = YES;
+
+    UIImage *icon = [UIImage systemImageNamed:@"server.rack"];
+    [chip setImage:icon forState:UIControlStateNormal];
+    chip.imageEdgeInsets = UIEdgeInsetsMake(0, 0, 0, 8);
+    chip.contentEdgeInsets = UIEdgeInsetsMake(0, 12, 0, 12);
+
+    [chip addTarget:self action:@selector(serverChipTapped:) forControlEvents:UIControlEventTouchUpInside];
+    chip.accessibilityLabel = url;
+
+    UILongPressGestureRecognizer *lp = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(serverChipLongPressed:)];
+    lp.minimumPressDuration = 0.5;
+    [chip addGestureRecognizer:lp];
+    return chip;
+}
+
+- (void)serverChipTapped:(UIButton *)sender {
+    NSString *url = sender.accessibilityLabel;
+    if (url.length == 0) return;
+    self.serverField.text = url;
+    [self.serverField resignFirstResponder];
+    // 轻微视觉反馈
+    [UIView animateWithDuration:0.08 animations:^{
+        sender.alpha = 0.5;
+    } completion:^(BOOL finished) {
+        [UIView animateWithDuration:0.12 animations:^{
+            sender.alpha = 1.0;
+        }];
+    }];
+}
+
+- (void)serverChipLongPressed:(UILongPressGestureRecognizer *)gesture {
+    if (gesture.state != UIGestureRecognizerStateBegan) return;
+    UIButton *chip = (UIButton *)gesture.view;
+    NSString *url = chip.accessibilityLabel;
+    if (url.length == 0) return;
+
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:localize(@"login.thirdparty.servers.remove.title", @"删除该服务器？")
+                         message:url
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"login.thirdparty.servers.remove.confirm", @"删除")
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(UIAlertAction *a) {
+        NSMutableArray<NSString *> *list = [ThirdPartyLoginViewController savedServerList];
+        [list removeObject:url];
+        [ThirdPartyLoginViewController saveServerList:list];
+        [self rebuildServerChips];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    alert.popoverPresentationController.sourceView = chip;
+    alert.popoverPresentationController.sourceRect = chip.bounds;
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)rebuildServerChips {
+    // 清空重建
+    for (UIView *sub in self.serverChipsStack.arrangedSubviews) {
+        [self.serverChipsStack removeArrangedSubview:sub];
+        [sub removeFromSuperview];
+    }
+    NSArray<NSString *> *list = [ThirdPartyLoginViewController savedServerList];
+    for (NSString *url in list) {
+        [self.serverChipsStack addArrangedSubview:[self serverChipForURL:url]];
+    }
+    self.serversCard.hidden = (list.count == 0);
+}
+
 - (void)buildLoginButton {
     self.loginButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.loginButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -358,6 +530,13 @@
 
         [strongSelf hideError];
 
+        // Task 129b：ALI 解析成功 = 服务器可达且是合法 Yggdrasil 端点 ->
+        // 自动存入已保存服务器列表（下次登录一键回填，恢复多服务器体验）
+        if (strongSelf.mode == ThirdPartyLoginModeCustom && resolvedURL.length > 0) {
+            [ThirdPartyLoginViewController rememberServer:resolvedURL];
+            [strongSelf rebuildServerChips];
+        }
+
         ThirdPartyAuthenticator *auth = [[ThirdPartyAuthenticator alloc] initWithInput:username];
         auth.authData[@"password"] = password;
         auth.authData[@"authserver"] = resolvedURL;
@@ -365,6 +544,40 @@
         if (metadata.length > 0) {
             auth.authData[@"prefetchedMetadata"] = metadata;
         }
+
+        // Task 129b（FCL 多角色管理）：多角色账户登录时弹出角色选择器，
+        // 不再自动绑定第一个角色。选择器锚定在登录按钮上方（悬浮面板，
+        // 与设置页 pick 一致）；取消则优雅终止登录。
+        __weak typeof(strongSelf) weakSelf2 = strongSelf;
+        auth.onProfileSelection = ^(NSArray<NSDictionary *> *profiles, ThirdPartyProfileChoice complete) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf2) sSelf = weakSelf2;
+                if (!sSelf) {
+                    complete(nil);
+                    return;
+                }
+                UIAlertController *picker = [UIAlertController
+                    alertControllerWithTitle:localize(@"login.thirdparty.profiles.title", @"选择要登录的角色")
+                                     message:nil
+                              preferredStyle:UIAlertControllerStyleActionSheet];
+                for (NSDictionary *p in profiles) {
+                    NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"?";
+                    [picker addAction:[UIAlertAction actionWithTitle:pname
+                                                                style:UIAlertActionStyleDefault
+                                                              handler:^(UIAlertAction *a) {
+                        complete(p);
+                    }]];
+                }
+                [picker addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
+                                                            style:UIAlertActionStyleCancel
+                                                          handler:^(UIAlertAction *a) {
+                    complete(nil);
+                }]];
+                picker.popoverPresentationController.sourceView = sSelf.loginButton;
+                picker.popoverPresentationController.sourceRect = sSelf.loginButton.bounds;
+                [sSelf presentViewController:picker animated:YES completion:nil];
+            });
+        };
 
         id callback = ^(id status, BOOL success) {
             dispatch_async(dispatch_get_main_queue(), ^{

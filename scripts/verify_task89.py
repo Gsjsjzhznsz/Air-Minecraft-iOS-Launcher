@@ -30,7 +30,7 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK89_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+REPO = os.environ.get("TASK89_REPO", "/home/z/my-project/Amethyst-iOS-MyRemastered")
 PASS, FAIL = 0, 0
 
 
@@ -144,9 +144,11 @@ check("B1a 阴影半径 = 圆角一半（上限 8）",
       "MAX(4.0, MIN(8.0, radius * 0.5))" in bm)
 check("B2 applyEffectToCollectionViewCell → 卡片容器探测 + nm",
       "[target nm_convexRadius:radius shadowRadius:shadowRadius];" in bm)
-check("B3 强制纯色底（window + splitVC）",
-      bm.count("window.backgroundColor = [NMTheme nm_background];") == 1
-      and "splitVC.view.backgroundColor = [NMTheme nm_background];" in bm)
+# Task 129f 重锚：hasBackground 分支也把 window/splitVC 底色设为主题色
+# （自定义背景装载失败时兜底），两处出现；原判定 ==1 随之失效。
+check("B3 强制纯色底（window + splitVC 双分支，Task129f 兜底后各 2 处）",
+      bm.count("window.backgroundColor = [NMTheme nm_background];") == 2
+      and bm.count("splitVC.view.backgroundColor = [NMTheme nm_background];") == 2)
 check("B3a 防御性移除历史 blur 子视图",
       "kBackgroundBlurTag" in bm.split("applyEffectToView:(UIView *)view")[1][:800])
 check("B4 CMakeLists 已登记 NeomorphKit",

@@ -189,6 +189,11 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // 新拟态纯色底不动。两种模式随 hasBackground 自动切换，设置/清除背景后
     // 本方法被重新调用（setImageBackground/clearBackground 既有链路）。
     if ([self hasBackground]) {
+        // Task 129f：有自定义背景时也把窗口底色设为新拟态主题色（旧实现保留
+        // SceneDelegate 的 systemBackgroundColor=浅色纯白）：一旦图片/视频装载
+        // 失败（解码失败、视频初始化失败等），透出的底色是主题色而非白屏。
+        // 背景装载成功时该底色被容器完全覆盖，零视觉影响。
+        window.backgroundColor = [NMTheme nm_background];
         UIView *container = [[UIView alloc] initWithFrame:window.bounds];
         container.tag = kGlobalBackgroundTag;
         container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -233,6 +238,10 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // Task89 之前的容器管线（最底层插入 + 图片/视频 + 子 VC 透明化），
     // 无背景时维持 Task89 新拟态纯色主题底。
     if ([self hasBackground]) {
+        // Task 129f：与 applyBackgroundToWindow 同款兜底——背景容器之下的
+        // splitVC.view 底色设为新拟态主题色，图片/视频装载失败时透出的是
+        // 主题色而非 window 的 systemBackgroundColor（浅色=纯白）。
+        splitVC.view.backgroundColor = [NMTheme nm_background];
         UIView *container = [[UIView alloc] initWithFrame:splitVC.view.bounds];
         container.tag = kGlobalBackgroundTag;
         container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -346,11 +355,28 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     if (!self.currentBackgroundPath) return;
     
     UIImage *image = [UIImage imageWithContentsOfFile:self.currentBackgroundPath];
-    if (!image) return;
+    if (!image) {
+        // Task 129f：图片解码失败（内存压力/格式异常/文件半损）旧实现静默 return，
+        // 容器空置 -> 透出 window 底色 systemBackgroundColor（浅色模式=纯白）——
+        // “一些设备（如 iPad9）背景是白色而不是设置里的背景”的根因。
+        // 修复：容器底铺新拟态主题色兜底（与无背景默认一致），白底永不透出；
+        // 日志锚点供下一轮装机取证。
+        NSLog(@"[BackgroundManager] Task129f: background image failed to decode (%@) - falling back to neumorphic base", self.currentBackgroundPath.lastPathComponent);
+        UIView *fallback = [[UIView alloc] initWithFrame:container.bounds];
+        fallback.tag = kDefaultBackgroundTag;
+        fallback.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        fallback.backgroundColor = [NMTheme nm_background];
+        [container addSubview:fallback];
+        return;
+    }
     
     // Remove existing
     UIView *existing = [container viewWithTag:kBackgroundImageTag];
     if (existing) [existing removeFromSuperview];
+    
+    // Remove existing fallback (Task129f：解码成功时清除兜底层，避免叠压)
+    UIView *existingFallback = [container viewWithTag:kDefaultBackgroundTag];
+    if (existingFallback) [existingFallback removeFromSuperview];
     
     // Image view
     UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
@@ -864,6 +890,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // Task89：新拟态改造（同 applyEffectToView）。卡片容器为 contentView 内
     // 第一个带圆角的子视图（各 cell 的既定结构）；找不到时退回 contentView
     // 整体（radius 12）。
+    // Task 129i：候选排除"内容自绘"视图（UIImageView/UILabel/UITextView/
+    // UIControl 等）。它们的可见内容是 layer.contents，而 nm_convex 的 caster
+    // 是 host 的【子层】——CALayer 渲染序中子层画在 contents 之上，表面色
+    // caster 会把图片/文字整个盖住。用户实测："mc 公告的图片被新拟物覆盖"：
+    // MC 新闻 cell 的第一个带圆角子视图恰是缩略图 UIImageView，被启发式
+    // 误选为卡片容器。排除后该 cell 回退到 contentView（真正的卡片容器）。
     UIView *target = nil;
     CGFloat radius = 0;
     for (UIView *sub in cell.contentView.subviews) {
@@ -871,7 +903,11 @@ static const NSInteger kDefaultBackgroundTag = 99995;
             [sub removeFromSuperview];
             continue;
         }
-        if (!target && sub.layer.cornerRadius > 0) {
+        if (!target && sub.layer.cornerRadius > 0 &&
+            ![sub isKindOfClass:[UIImageView class]] &&
+            ![sub isKindOfClass:[UILabel class]] &&
+            ![sub isKindOfClass:[UITextView class]] &&
+            ![sub isKindOfClass:[UIControl class]]) {
             target = sub;
             radius = sub.layer.cornerRadius;
         }

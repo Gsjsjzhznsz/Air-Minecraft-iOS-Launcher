@@ -1253,28 +1253,30 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
     // Task 112：钉死 OpenAL 库的解析路径（绝对路径直载）。
     //
-    // 崩溃取证（26.3 SoundEngine NPE）：
+    // 崩溃取证（26.3 SoundEngine NPE，Task112 时代）：
     //   net.minecraft.client.sounds.SoundEngine.<init>
     //     -> com.mojang.blaze3d.audio.Library.createDeviceTracker()
     //     -> CallbackDeviceTracker.isSupported()
-    //        先 alcIsExtensionPresent(NULL, "ALC_SOFT_system_events") 通过，
-    //     -> CallbackDeviceTracker.isSupportedForPlaybackDevice()
     //     -> LWJGL SOFTSystemEvents.alcEventIsSupportedSOFT
     //        ICD 函数指针为 NULL -> Checks.check 抛 NullPointerException -> 游戏崩溃。
     //
     // 错配条件 = "库宣称有扩展，但 alcGetProcAddress/dlsym 解析不到函数指针"。
-    // 本仓 libopenal.dylib（openal-soft 1.21-1.23 时代 iOS 构建，无 ALC_SOFT_system_events）
-    // 被加载时 isSupported() 走干净回退（PollingDeviceTracker），历史全部会话零崩溃；
-    // 因此该 NPE 只可能来自"另一个 openal 抢先被加载"——LWJGL 3.4.x 的
-    // Library.loadNative(bundledWithLWJGL=true) 会【优先查 classpath 里的 libopenal.dylib】
-    //（natives jar 提取路径），java.library.path 的 Frameworks 反而在后。modpack/
-    // 加载器链路一旦把 lwjgl-openal natives jar 混进 classpath，加载的即是被平台
-    // 重标签过的 openal-soft 1.24.x——扩展宣称与符号解析在这个场景下出现错配。
+    // 当时归因为 classpath 里被平台重标签的 openal-soft 1.24.x 抢先加载。
     //
     // 修复：ALC.create() 读 org.lwjgl.openal.libname（Configuration.OPENAL_LIBRARY_NAME），
     // 而 Library.loadNative 对【绝对路径】直接 dlopen、完全跳过 classpath 提取。
-    // 把该属性钉到 Frameworks/libopenal.dylib 的绝对路径，任何 classpath 劫持即告失效；
-    // 我们的无扩展 openal 让 MC 干净回退到轮询式设备跟踪（与历史正常会话同构）。
+    // 把该属性钉到 Frameworks/libopenal.dylib 的绝对路径，任何 classpath 劫持即告失效。
+    //
+    // ⚠️ Task129 论断修正（bd71210 会话 26.1.2 整合包实锤）：
+    //   "无扩展 => MC 干净回退"对无守卫的 MC 版本不成立。26.1.2 的
+    //   CallbackDeviceTracker.isSupported 没有 alcIsExtensionPresent 前置守卫
+    //   （26.3 有——这是同一构建上 26.3 存活、26.1.2 崩溃的全部差异），
+    //   直接调 LWJGL 绑定：扩展不在 ALC_EXTENSIONS 串里 => ALCCapabilities 的
+    //   32/33/34 号函数槽保持 0 => Checks.check NPE。因此本钉子指向的
+    //   Frameworks/libopenal.dylib 已改为 Task129 垫片（re-export 1.20.1 impl
+    //   + 宣称 ALC_SOFT_system_events + 桩函数返回 ALC_FALSE），使 MC 走
+    //   "result==0 => warn + PollingDeviceTracker" 的干净回退。本钉子继续
+    //   保留：垫片与钉子共同构成完整防线（钉子防 classpath 劫持，垫片补扩展面）。
     NSString *task112OpenalPin = [frameworksPath stringByAppendingPathComponent:@"libopenal.dylib"];
     if ([[NSFileManager defaultManager] fileExistsAtPath:task112OpenalPin]) {
         PUSH_MARGV_FORMAT(@"-Dorg.lwjgl.openal.libname=%@", task112OpenalPin);

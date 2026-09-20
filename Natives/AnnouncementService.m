@@ -44,6 +44,33 @@ static NSString * const kCachedAnnouncementsTimestampKey = @"cached_announcement
     return [self parseAnnouncementsFromJSON:json];
 }
 
+// Task 129h：随包内置的离线公告（Natives/resources/announcements-fallback.json，
+// payload 的 "cp -R resources/*" 自动打包）。在线源不可达且无缓存时兜底，
+// 使首页公告磁贴与公告列表始终有内容可显示。
+- (NSArray<AnnouncementItem *> *)builtinAnnouncements {
+    static NSArray<AnnouncementItem *> *cached = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        NSString *path = [NSBundle.mainBundle pathForResource:@"announcements-fallback" ofType:@"json"];
+        if (path.length == 0) {
+            cached = @[];
+            return;
+        }
+        NSData *data = [NSData dataWithContentsOfFile:path];
+        if (!data) {
+            cached = @[];
+            return;
+        }
+        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        if (![json isKindOfClass:[NSDictionary class]]) {
+            cached = @[];
+            return;
+        }
+        cached = [self parseAnnouncementsFromJSON:json] ?: @[];
+    });
+    return cached;
+}
+
 - (BOOL)isCacheValid {
     NSTimeInterval timestamp = [[NSUserDefaults standardUserDefaults] doubleForKey:kCachedAnnouncementsTimestampKey];
     if (timestamp == 0) return NO;
@@ -84,8 +111,28 @@ static NSString * const kCachedAnnouncementsTimestampKey = @"cached_announcement
         if (error || !data || ((NSHTTPURLResponse *)response).statusCode != 200) {
             // 网络失败时尝试返回缓存
             NSArray *cached = [self cachedAnnouncements];
+            if (cached.count > 0) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(cached, nil);
+                });
+                return;
+            }
+            // Task 129h：缓存也为空 -> 返回随包内置的离线公告（用户实测：
+            // "主页的启动器公告加载失败"——默认公告源 air-api.vercel.app 已
+            // 404（域名被改作他用），全新安装无缓存时公告列表只剩错误文案。
+            // 内置兜底与 Task128 的 authlib-injector 内置化同一思路：核心
+            // 内容不依赖单点在线服务。在线源恢复后正常路径自动接管（缓存
+            // 时间戳仍只由网络成功写入）。
+            NSArray<AnnouncementItem *> *builtin = [self builtinAnnouncements];
+            if (builtin.count > 0) {
+                NSLog(@"[AnnouncementService] Task129h: online feed unreachable (%@), serving bundled offline announcements", urlString);
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    completion(builtin, nil);
+                });
+                return;
+            }
             dispatch_async(dispatch_get_main_queue(), ^{
-                completion(cached ?: @[], error ?: [NSError errorWithDomain:@"AnnouncementService" code:2 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_24", nil)}]);
+                completion(@[], error ?: [NSError errorWithDomain:@"AnnouncementService" code:2 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_24", nil)}]);
             });
             return;
         }

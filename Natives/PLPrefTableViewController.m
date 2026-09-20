@@ -491,6 +491,9 @@
     }
 }
 
+// Task 129e：以下 UIContextMenuInteraction 代理方法随旧 iPad"紧凑菜单"分支一并
+// 退役（openPickerAtIndexPath 已统一悬浮 actionSheet/popover）。保留方法体以
+// 最小化改动面——无任何代码路径再创建 UIContextMenuInteraction，不会被执行。
 - (UIContextMenuConfiguration *)contextMenuInteraction:(UIContextMenuInteraction *)interaction configurationForMenuAtLocation:(CGPoint)location
 {
     return [UIContextMenuConfiguration configurationWithIdentifier:nil previewProvider:nil actionProvider:^UIMenu * _Nullable(NSArray<UIMenuElement *> * _Nonnull suggestedActions) {
@@ -517,83 +520,55 @@
     NSArray *pickKeys = item[@"pickKeys"];
     NSArray *pickList = item[@"pickList"];
 
-    // 修复 iPhone 上选项弹出菜单被过度压缩不可调整的问题。
-    // 根因：UIContextMenuInteraction 紧凑菜单（preferredLayout=3）锚点取自窄小的
-    // cell.detailTextLabel.frame，在 iPhone 窄屏上把多个中文选项挤压到很小的浮动气泡内。
-    // 修复：iPhone 上改用 UIAlertController actionSheet，提供标准尺寸的全宽选择器，
-    // 每个选项有足够空间可正常点击。iPad 上保留 UIContextMenuInteraction 紧凑菜单
-    // （锚点 popover 在大屏上更自然）。
-    if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:message
-                                                                       message:nil
-                                                                preferredStyle:UIAlertControllerStyleActionSheet];
-        // Task 121：✓ 选中标记改按【存储值】比较——Task120 起 pick 行右侧
-        // 显示本地化标签而非原始存储值，按 cell 文本比较会永远失配。
-        id ame121_cur = self.getPreference(self.prefSections[indexPath.section], item[@"key"]);
-        NSString *ame121_curs = [ame121_cur isKindOfClass:NSString.class]
-            ? ame121_cur : [ame121_cur stringValue];
-        for (int i = 0; i < pickList.count; i++) {
-            NSString *title = pickList[i];
-            NSString *value = pickKeys[i];
-            // 在标题前加 ✓ 标记当前选中项，让用户能直观看到当前值
-            if ([ame121_curs isEqualToString:value]) {
-                title = [NSString stringWithFormat:@"✓ %@", title];
-            }
-            UIAlertAction *action = [UIAlertAction actionWithTitle:title
-                                                              style:UIAlertActionStyleDefault
-                                                            handler:^(UIAlertAction *a) {
-                // Task 121：选中后 cell 右侧显示本地化标签（存储值不变）。
-                cell.detailTextLabel.text = pickList[i];
-                self.setPreference(self.prefSections[indexPath.section], item[@"key"], value);
-                void(^invokeAction)(NSString *) = item[@"action"];
-                if (invokeAction) {
-                    invokeAction(value);
-                }
-            }];
-            [alert addAction:action];
-        }
-        [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
-                                                   style:UIAlertActionStyleCancel
-                                                 handler:nil]];
-        // 配置 popoverPresentationController，防御性处理（iPhone 上 actionSheet 从底部弹出，
-        // popoverPresentationController 不会生效，但设置 sourceView 避免 iPad 分屏时崩溃）
-        alert.popoverPresentationController.sourceView = cell;
-        alert.popoverPresentationController.sourceRect = cell.bounds;
-        [self presentViewController:alert animated:YES completion:nil];
-        return;
-    }
-
-    // iPad：保留 UIContextMenuInteraction 紧凑菜单
-    NSMutableArray<UIAction *> *menuItems = [[NSMutableArray alloc] init];
-    // Task 121：✓ 同款按存储值比较（见上方 iPhone 分支注释）。
-    id ame121_curPad = self.getPreference(self.prefSections[indexPath.section], item[@"key"]);
-    NSString *ame121_curPads = [ame121_curPad isKindOfClass:NSString.class]
-        ? ame121_curPad : [ame121_curPad stringValue];
+    // Task 129e：统一悬浮选择器（用户实测反馈："像 FSR、下载源等可打开的悬浮
+    // 设置项变成了二级菜单入口，导致无法切换"）。
+    // 旧 iPad 分支用 UIContextMenuInteraction + _presentMenuAtLocation:（私有
+    // API）呈现"紧凑菜单"——观感是锚定在 cell 上的二级小菜单，且在 iPadOS 27
+    // 上该私有入口已不可靠（点按无反应 = 无法切换）。Task120 合并 MobileGL 三
+    // 后端为单一 pick 行（用户唯一要求的合并）后，pick 行成为切换后端/FSR 档位
+    // /下载源的唯一途径，此缺陷升级为阻断项。
+    // 修复：iPhone 与 iPad 一律用 UIAlertController actionSheet——iPhone 从底部
+    // 弹出全宽选择器；iPad 经 popoverPresentationController 锚定在行旁，呈现为
+    // 标准悬浮面板（与设置页其余浮层一致）。✓ 选中标记沿用 Task121 的存储值
+    // 比较与本地化标签回写。
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:message
+                                                                   message:nil
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+    // Task 121：✓ 选中标记改按【存储值】比较——Task120 起 pick 行右侧
+    // 显示本地化标签而非原始存储值，按 cell 文本比较会永远失配。
+    id ame121_cur = self.getPreference(self.prefSections[indexPath.section], item[@"key"]);
+    NSString *ame121_curs = [ame121_cur isKindOfClass:NSString.class]
+        ? ame121_cur : [ame121_cur stringValue];
     for (int i = 0; i < pickList.count; i++) {
-        [menuItems addObject:[UIAction
-            actionWithTitle:pickList[i]
-            image:nil identifier:nil
-            handler:^(UIAction *action) {
-                // Task 121：选中后 cell 右侧显示本地化标签（存储值不变）。
-                cell.detailTextLabel.text = pickList[i];
-                self.setPreference(self.prefSections[indexPath.section], item[@"key"], pickKeys[i]);
-                void(^invokeAction)(NSString *) = item[@"action"];
-                if (invokeAction) {
-                    invokeAction(pickKeys[i]);
-                }
-            }]];
-        if ([ame121_curPads isEqualToString:pickKeys[i]]) {
-            menuItems.lastObject.state = UIMenuElementStateOn;
+        NSString *title = pickList[i];
+        NSString *value = pickKeys[i];
+        // 在标题前加 ✓ 标记当前选中项，让用户能直观看到当前值
+        if ([ame121_curs isEqualToString:value]) {
+            title = [NSString stringWithFormat:@"✓ %@", title];
         }
+        UIAlertAction *action = [UIAlertAction actionWithTitle:title
+                                                          style:UIAlertActionStyleDefault
+                                                        handler:^(UIAlertAction *a) {
+            // Task 121：选中后 cell 右侧显示本地化标签（存储值不变）。
+            cell.detailTextLabel.text = pickList[i];
+            self.setPreference(self.prefSections[indexPath.section], item[@"key"], value);
+            void(^invokeAction)(NSString *) = item[@"action"];
+            if (invokeAction) {
+                invokeAction(value);
+            }
+        }];
+        [alert addAction:action];
     }
-
-    self.currentMenu = [UIMenu menuWithTitle:message children:menuItems];
-    UIContextMenuInteraction *interaction = [[UIContextMenuInteraction alloc] initWithDelegate:self];
-    // 挂载到 cell 本身而不是 detailTextLabel，避免 detailTextLabel 尚未进入 window 时触发 UITargetedPreview 断言崩溃
-    [cell addInteraction:interaction];
-    CGRect detailFrame = cell.detailTextLabel.frame;
-    CGPoint location = CGPointMake(CGRectGetMidX(detailFrame), CGRectGetMidY(detailFrame));
-    [interaction _presentMenuAtLocation:location];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
+                                               style:UIAlertActionStyleCancel
+                                             handler:nil]];
+    // iPad：actionSheet 以 popover 呈现，锚定到被点击的行（悬浮面板）；
+    // iPhone：从底部弹出（popoverPresentationController 不生效，设置 sourceView
+    // 仅防御 iPad 分屏场景）。
+    alert.popoverPresentationController.sourceView = cell;
+    alert.popoverPresentationController.sourceRect = cell.bounds;
+    alert.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)tableView:(UITableView *)tableView invokeActionWithPromptAtIndexPath:(NSIndexPath *)indexPath {
