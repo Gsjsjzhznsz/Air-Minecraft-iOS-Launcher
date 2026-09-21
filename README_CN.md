@@ -54,8 +54,8 @@
 | **正版登录提示改进** | 微软账户登录的结果提示改为自动消失的应用内通知；修复了系统弹窗需要手动处理才能消失的问题。 |
 | **子面板新拟物设计** | 所有子级面板（账户、下载、Mod 管理、文件列表、帮助等约 30 个）统一新拟物基底样式，与主界面/设置页设计语言一致；自定义背景透出的面板不受影响。 |
 | **设置项本地化补全** | 所有设置行（含 UI 刷新新增的全部详情脚注）中英文完整本地化 —— 任何位置不再显示原始 key。 |
-| **26.1.x/26.2 整合包崩溃链修复** | 26.1.2 的 SoundEngine NPE（OpenAL 扩展守卫缺失）由内置 OpenAL 垫片根治；controlify/JNA 的 SIGBUS（libffi 闭包页在 iOS 上不可执行）三层拦截：dlsym 层对 `SDL_SetEventFilter`/`SDL_AddEventWatch` 的 no-op 守卫 + JVM 自身 dlopen/dlsym 槽的经典/chained-fixup 双法重绑定 + 200ms dyld 镜像扫描看门狗（无论 JVM 走哪条加载路径都能兜住 JNA 解包的 `jna*.tmp`）。 |
-| **TouchController 模组双 ABI 传输层** | 内置 iOS 传输层同时服务两代 TouchController 模组：旧句柄制（`new(path)/receive(handle,buffer)`）与 26.2 世代单例制（`init()/receive(buffer)`）共用同一组 JNI 符号，以零解引用的指针注册表判别分发；新增“屏蔽控件”开关向模组配置写入空布局预设，实现无控件的纯手势触屏界面。 |
+| **26.1.x/26.2 整合包崩溃链修复** | 26.1.2 的 SoundEngine NPE（OpenAL 扩展守卫缺失）由内置 OpenAL 垫片根治；controlify/JNA 的 SIGBUS（libffi 闭包页在 iOS 上不可执行）四层拦截：dlsym 层对 `SDL_SetEventFilter`/`SDL_AddEventWatch` 的 no-op 守卫 + 内置 libSDL3.dylib 二进制入口机器码守卫（非空事件回调在 SDL 函数入口一律置空/拒绝，与调用方符号解析路径完全无关）+ JVM 自身 dlopen/dlsym 槽的经典/chained-fixup 双法重绑定 + 200ms dyld 镜像扫描看门狗（无论 JVM 走哪条加载路径都能兜住 JNA 解包的 `jna*.tmp`）。 |
+| **TouchController 模组双 ABI 传输层** | 内置 iOS 传输层同时服务两代 TouchController 模组：旧句柄制（`new(path)/receive(handle,buffer)`）与 26.2 世代单例制（`init()/receive(buffer)`）共用同一组 JNI 符号，以零解引用的指针注册表判别分发；鉴于 mod 0.3.1-alpha14 的静态库分支在上游尚未完成，静态库模式现在会自动附带模组自带的 legacy UDP 通道（端口 12450）作为回落——任何当前版本模组都能开箱即用；新增“屏蔽控件”开关向模组配置写入空布局预设，实现无控件的纯手势触屏界面。 |
 | **JIT 开启工具选择（LiveContainer 方案）** | 没装 StikDebug 的用户不再遭遇“点了没反应”：设置 > 调试提供 自动 / StikDebug / SideStore / StosDebug / JitStreamer-EB / TrollStore / 手动 七选，各自分发正确的 URL scheme；另提供独立开关，把 UniversalJIT26.js 脚本从 iOS 26+ 的 JIT 请求中剥离（供不支持脚本的工具）。 |
 | **第三方皮肤头像本地渲染** | Yggdrasil profile URL 改用无连字符 UUID（带连字符在 Blessing Skin 系直接 404），会话内立即下载签名皮肤纹理并本地渲染头像（脸 + 帽层）落盘为 `file://` URL —— 存量账户首次启动自愈，首页磁贴实时刷新无需重启。 |
 | **仓库托管公告 + FSR RCAS 锐化** | 启动器公告随仓库 `announcements.json` 发布（raw.githubusercontent.com 主源 / jsDelivr 镜像 / 离线兑底），零第三方接口依赖；FSR 在 MobileGL 与 zink 管线上新增 RCAS 锐化 pass（7 档滑杆）。 |

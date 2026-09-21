@@ -1388,3 +1388,16 @@ Work Log:
 
 Stage Summary:
 - 装机待验证锚点：①26.2 TouchController：'[JavaLauncher] Enabled TouchController with Static Library mode (+ UDP fallback' + mod 侧 'use legacy UDP transport' + 进世界不再弹"不支持的操作系统"警告 + 触控恢复；②26.1.2：controlify 初始化不再 SIGBUS（此前必崩点 'Attempting to load SDL3 from SDL3' 之后继续走完）；③取证：'Task135: _dlsym slot ... idempotent hit' 出现与否直接判读 fishhook 竞态假说
+
+---
+Task ID: 135 (续2：发布物同步)
+Agent: main (Super Z)
+
+Work Log:
+- 上一轮会话的 /home/z/my-project/download/v6.0.0-release-notes.md 被沙箱清理——已重建（中英双语，含 Task135 双修复要点），路径不变
+- announcements.json v6.0.0 条目两处要点修正：TouchController 26.2 修复改为"双重修复"表述（双 ABI + alpha14 静态分支上游 WIP 的 UDP 自动回落）；26.1.2 崩溃拦截升级为四层（新增 SDL3 二进制入口守卫）；summary 同步
+- README/README_CN 差异表两行更新：崩溃链行"三层拦截"→"四层拦截"（补 SDL3 入口守卫描述）；TouchController 行补 UDP 自动回落说明
+- JSON 校验通过（4 条目）
+
+Stage Summary:
+- 6.0.0 发布物三件套就绪：README/README_CN（repo）+ announcements.json（repo）+ v6.0.0-release-notes.md（download 目录），口径一致（四层拦截 / 双重修复 / UDP 回落）
