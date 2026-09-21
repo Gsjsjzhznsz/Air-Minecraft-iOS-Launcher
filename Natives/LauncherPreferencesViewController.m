@@ -9,6 +9,7 @@
 // Task 132：renderer_backend 行的 legacy 显示精化需读当前 profile 的
 // renderer 键（与 ame_effective_renderer 同一解析入口）
 #import "PLProfiles.h"
+#import "PLMirrorCenter.h"   // Task138: mod_mirror 粗控落键后的测速引擎触发
 #import "LauncherPrefContCfgViewController.h"
 #import "LauncherPrefManageJREViewController.h"
 #import "UIKit+hook.h"
@@ -321,6 +322,19 @@
             }
             return @ RENDERER_NAME_MOBILEGL;
         }
+        // Task138：模组镜像源行（已移入 download 分区）——统一粗控读数：
+        // 读 assetDownloadSource 为准（写入时两键同值；细粒度分叉时以
+        // 文件下载键为准显示，用户在两行上仍可单独调整）。
+        if ([section isEqualToString:@"download"] && [key isEqualToString:@"mod_mirror"]) {
+            NSString *ame138_mm = getPrefObject(@"download.assetDownloadSource");
+            if ([ame138_mm isKindOfClass:NSString.class] &&
+                ([ame138_mm isEqualToString:@"official_first"] ||
+                 [ame138_mm isEqualToString:@"mirror_first"] ||
+                 [ame138_mm isEqualToString:@"speed_first"])) {
+                return ame138_mm;
+            }
+            return @"speed_first";
+        }
         // Task 132：渲染器行显示映射——存储值是家族键时，行右侧显示对应
         // 后端文案（存储值不变；非家族值原样走通用路径）。
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
@@ -370,11 +384,41 @@
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
             keyFull = @"mobileglues.fsr_rcas_sharpness";
         }
+        // Task138：模组镜像源行——统一粗控写入：同时落
+        // assetSearchSource 与 assetDownloadSource（模组的 API 搜索与
+        // 文件下载同属 MCIM 体系，粗控一体变更语义最直观）。
+        if ([section isEqualToString:@"download"] && [key isEqualToString:@"mod_mirror"]) {
+            setPrefObject(@"download.assetSearchSource", value);
+            setPrefObject(@"download.assetDownloadSource", value);
+            // 选择变化后让测速引擎立即跟上（speed_first 时补测）
+            [PLMirrorCenter startSpeedProbesIfNeeded];
+            return;
+        }
         // Task 132（MG 三端合并）：统一后端行直接写渲染器键（与渲染器行
         // 同一存储层 video.renderer；显式选择永远优先，profile 无覆盖时
         // 即时生效——与 ame_effective_renderer 的解析一致）。
         if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
             setPrefObject(@"video.renderer", value);
+            // Task 138：选择即提示（dylib 缺失不再等到启动闪退才发现）。
+            // 三个选项按用户指令无条件列出（Task132），Mithril 的
+            // libmithril.dylib 是需另外下载的预编译产物——缺失时此处
+            // NMToast 即时告知，启动时 ame_effective_renderer 会再兜底
+            // 回落 auto（ANGLE），游戏不会闪退。
+            if ([value isKindOfClass:NSString.class] && ![value isEqualToString:@"auto"]) {
+                NSString *ame138_pick = @(ame_physical_renderer_dylib([value UTF8String]));
+                NSString *ame138_pickPath = [NSBundle.mainBundle.bundlePath
+                    stringByAppendingPathComponent:[@"Frameworks"
+                        stringByAppendingPathComponent:ame138_pick]];
+                if ([ame138_pick hasSuffix:@".dylib"] &&
+                    ![[NSFileManager defaultManager] fileExistsAtPath:ame138_pickPath]) {
+                    NSString *ame138_pickName =
+                        [ame138_pick isEqualToString:@ RENDERER_NAME_MITHRIL]
+                            ? localize(@"preference.title.renderer_backend-mithril", nil)
+                            : value;
+                    [NMToast showMessage:[NSString stringWithFormat:
+                        localize(@"preference.warning.renderer_missing_dylib", nil), ame138_pickName]];
+                }
+            }
             return;
         }
         setPrefObject(keyFull, value);
@@ -426,21 +470,10 @@
               @"enableCondition": whenNotInGame
             },
             // 旧"下载源"行已移除：general.download_source 已由启动时的
-            // migrateDownloadSourcePreferences 迁移到下方"下载镜像策略"分组的 4 个分类键
-            @{@"key": @"mod_mirror",
-              @"hasDetail": @YES,
-              @"icon": @"network",
-              @"type": self.typePickField,
-              @"enableCondition": whenNotInGame,
-              @"pickKeys": @[
-                  @"official",
-                  @"mcim"
-              ],
-              @"pickList": @[
-                  localize(@"preference.title.mod_mirror-official", nil),
-                  localize(@"preference.title.mod_mirror-mcim", nil)
-              ]
-            },
+            // migrateDownloadSourcePreferences 迁移到下方"下载镜像策略"分组的 4 个分类键。
+            // Task138：模组镜像源行也移入"下载镜像策略"分区（用户指令），
+            // 成为搜索+下载两键的统一粗控（见 download 分区新行与
+            // getPreference/setPreference 的 mod_mirror 分支）。
             @{@"key": @"ui_layout",
               @"title": localize(@"i18n_str_376", nil),
               @"hasDetail": @YES,
@@ -743,7 +776,28 @@
             }
         ], @[
             // Download mirror policy settings（分类镜像策略，由 PLMirrorCenter 统一读取）
+            // Task138：全部行新增加载速度快优先（speed_first，参考 FCL 测速策略，
+            // PLMirrorCenter 官方 vs 镜像竞速、24 小时缓存）并设为默认。
             @{@"icon": @"arrow.down.circle"},
+            // 模组镜像源（Task138 从启动器设置分区移入，用户指令）：统一粗控，
+            // 选择同时写入 assetSearchSource + assetDownloadSource 两键（模组的
+            // API 搜索与文件下载本就同属 MCIM 体系）；细粒度仍可用下方两行单独调整
+            @{@"key": @"mod_mirror",
+              @"hasDetail": @YES,
+              @"icon": @"network",
+              @"type": self.typePickField,
+              @"enableCondition": whenNotInGame,
+              @"pickKeys": @[
+                  @"official_first",
+                  @"mirror_first",
+                  @"speed_first"
+              ],
+              @"pickList": @[
+                  localize(@"preference.title.mod_mirror-official", nil),
+                  localize(@"preference.title.mod_mirror-mcim", nil),
+                  localize(@"preference.title.mirror_policy-speed_first", nil)
+              ]
+            },
             @{@"key": @"fileSource",
               @"hasDetail": @YES,
               @"icon": @"arrow.down.circle",
@@ -751,11 +805,13 @@
               @"enableCondition": whenNotInGame,
               @"pickKeys": @[
                   @"official_first",
-                  @"mirror_first"
+                  @"mirror_first",
+                  @"speed_first"
               ],
               @"pickList": @[
                   localize(@"preference.title.mirror_policy-official_first", nil),
-                  localize(@"preference.title.mirror_policy-mirror_first", nil)
+                  localize(@"preference.title.mirror_policy-mirror_first", nil),
+                  localize(@"preference.title.mirror_policy-speed_first", nil)
               ]
             },
             @{@"key": @"assetSearchSource",
@@ -765,11 +821,13 @@
               @"enableCondition": whenNotInGame,
               @"pickKeys": @[
                   @"official_first",
-                  @"mirror_first"
+                  @"mirror_first",
+                  @"speed_first"
               ],
               @"pickList": @[
                   localize(@"preference.title.mirror_policy-official_first", nil),
-                  localize(@"preference.title.mirror_policy-mirror_first", nil)
+                  localize(@"preference.title.mirror_policy-mirror_first", nil),
+                  localize(@"preference.title.mirror_policy-speed_first", nil)
               ]
             },
             @{@"key": @"assetDownloadSource",
@@ -779,11 +837,13 @@
               @"enableCondition": whenNotInGame,
               @"pickKeys": @[
                   @"official_first",
-                  @"mirror_first"
+                  @"mirror_first",
+                  @"speed_first"
               ],
               @"pickList": @[
                   localize(@"preference.title.mirror_policy-official_first", nil),
-                  localize(@"preference.title.mirror_policy-mirror_first", nil)
+                  localize(@"preference.title.mirror_policy-mirror_first", nil),
+                  localize(@"preference.title.mirror_policy-speed_first", nil)
               ]
             },
             @{@"key": @"modLoaderSource",
@@ -793,11 +853,13 @@
               @"enableCondition": whenNotInGame,
               @"pickKeys": @[
                   @"official_first",
-                  @"mirror_first"
+                  @"mirror_first",
+                  @"speed_first"
               ],
               @"pickList": @[
                   localize(@"preference.title.mirror_policy-official_first", nil),
-                  localize(@"preference.title.mirror_policy-mirror_first", nil)
+                  localize(@"preference.title.mirror_policy-mirror_first", nil),
+                  localize(@"preference.title.mirror_policy-speed_first", nil)
               ]
             }
         ], @[

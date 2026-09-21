@@ -1454,3 +1454,33 @@ Stage Summary:
 ### Stage Summary
 - 用户预期：①小字框按字体动态宽度永不截断（…"根因修复），游戏目录/已安装版本计数徽章同规格接入 ②下载中心黑底深字直修 + 扫描器删除 ③④新拟态代码全删（无阴影截断/无间距异常/圆角逐元素原生）⑤全 UI 尽量 iOS 原生（语义色 + 系统色 + 标准圆角）⑥层级还原（裁剪恢复/承载层清场/背景照片管线保留）⑦大小位置不变 ⑧功能零占用影响。
 - 待用户安装新 CI 工件实机验证；深浅色切换由系统语义色自动完成，无扫描器。
+---
+Task ID: 138
+Agent: main (Super Z)
+Task: c68552a 四日志判读 + 八项修复（26.1.2 崩溃终根因 JNA ffi 闭包页 / TouchController+屏蔽控件 plist XML 污染 / MobileGL-gles dlsym_EGL 漏映射 / Mithril 缺 dylib 守卫 / 头像变方形 / 公告磁贴高度 / 下载镜像 speed_first / 动画优化）+ 回答"是否回退"疑问
+
+Work Log:
+- 环境恢复：本会话沙箱回滚至 Task110（fa3c154），远程已推进 65 提交（Task111-137 + 用户 18:53-18:57 四个日志上传提交）——git fetch + ff-only merge 全量恢复；外层 worklog 缺 111-137（沙箱丢同步）已从 repo 副本补齐
+- 四日志配对判读：latestlog=26.1.2 controlify SIGBUS（0x119a70010）/ latestlog.old.txt=26.2 MobileGL-gles SIGSEGV(pc=0, gl_init_context+0x1a4) / latestlog.txt=26.2 mithril UnsatisfiedLinkError / latestlog.txt.old.txt=26.2 OSMesa 60fps 干净会话（TouchController UDP 已被 mod 接受 + config 读取报错现场）
+- 【用户"是否回退"疑问的答案：未回退】日志锚点实证 Task131/132/133/134/135 全链在位（libjli/libjvm/jnidispatch 三连检出 + idempotent hit + Task134 clean layout + Task134 JIT enabler 行）；两起"mg 后端"崩溃是两个具体 bug（见 c/d），非代码回退
+- 【修复 A：26.1.2 崩溃终根因】新日志证明守卫全链生效仍崩、且崩溃先于任何 SDL 符号解析——下载 controlify 3.0.1+26.1 实证：SDLNativesLoader(POJAV 检测失败→裸名) → NativeLibrary.getInstance("SDL3") → startSDL3 首个 SDL_SetHint 触发 Native.register；下载 JNA 5.13 dispatch.c 实证：registerMethod = ffi_closure_alloc + ffi_prep_closure_loc + RegisterNatives(闭包跳板)；aarch64 跳板在闭包页内、iOS 无匿名可执行权限 → RW 页 +0x10（libffi 页首空闲链表头）执行即 SIGBUS，与 0x134ea0010/0x119a70010 双崩溃 +0x10 形态吻合。修复：JavaLauncher setenv POJAV_NATIVEDIR=POJAV_HOME（controlify 的 CUtil.IS_POJAV_LAUNCHER 检测该变量 → 改找 libSDL3.so 不存在 → UnsatisfiedLinkError 被 tryLoad 捕获 → initializeControlify 回落 GLFWControllerManager 游戏继续）。影响面核查：controlify 3.0.1 全 jar 仅两处读该变量；3.5.0+（FFM 四级链）不读；启动器两侧无既有读写点。用户指引：26.1.2 要完整 SDL 手柄请升 controlify 至 3.5.0+mc26.1
+- 【修复 B：TouchController/屏蔽控件】latestlog.txt.old.txt 实锤 mod 侧 "Failed to read config: JsonDecodingException: Expected start of the object '{', but had '<'"——Task134 用 NSDictionary/NSArray writeToFile 写 config.json/order.json 输出 plist XML，mod 按 JSON 解析必炸 → 配置回落默认、屏蔽控件 preset 指针丢失；读侧同病（dictionaryWithContentsOfFile 读不了 mod 的 JSON，"保留设置"从未生效）。修复：ame138_readJSONDictionary/ame138_readJSONArray/ame138_writeJSON 三助手全 JSON 化（PrettyPrinted），存量 XML 下次启动自动被合法 JSON 覆盖
+- 【修复 C：MobileGL-gles】latestlog.old.txt 实锤 "EGLBridge: failed to load @rpath/libMobileGL-gles.dylib"（文件不存在——-gles 是逻辑键共享 libMobileGL.dylib）→ dlsym_EGL false → br_init 失败仍走 br_init_context → gl_init_context 空指针 SIGSEGV(pc=0)。修复：utils.h 新增 ame_physical_renderer_dylib 统一映射，gl_bridge.m dlsym_EGL 与 sdl3_hook.m ame_rendererHandle 兜底两处接入（JavaLauncher/egl_bridge 原有两处映射不变）
+- 【修复 D：Mithril】latestlog.txt 实锤 "Failed to locate library: libmithril.dylib"（崩溃报告 java.library.path 清单有 libMobileGL.dylib 无 libmithril——预编译产物未随包）。修复（保留 Task132 三选项浮窗不变）：ame_effective_renderer 加 dylib 缺失守卫（回落 auto/ANGLE + 单次 NMToast + 日志），renderer_backend 选择时即时提示；新 l10n 键 preference.warning.renderer_missing_dylib ×4 语言
+- 【修复 E：头像变方形】主页顶卡头像圆角仅在 layoutSubviews 取半，切标签页回来时离屏预布局 bounds=0 守卫跳过、新图层 radius 停 0。修复：胶囊常量 cornerRadius=999（CALayer 钳制为半边长，方形恒正圆，布局时序免疫），动态取半保留为冗余
+- 【修复 F：公告磁贴】固定 90pt 高 + actionButton 无底部约束 → 消息多行时按钮被裁。修复：ame138_announcementTileHeight 按预览档位实测文本行高 + 按钮叠加（下限 90）；reloadAnnouncementSection 改 performBatchUpdates 平滑高度过渡
+- 【修复 G：下载镜像策略】PLMirrorCenter 新增 PLMirrorPolicySpeedFirst（FCL 式测速）：双体系（BMCLAPI vs Mojang / MCIM vs Modrinth）根路径竞速（4s 超时，串行队列结算防 in-flight 卡死，双失败不落库），24h 持久缓存（download.speed_probe.*），结果未落地前临时镜像序；candidateURLs/modrinthAPIBaseURL/curseForgeAPIBaseURL 三路联动；资产文件仅 speed_first 档跟随测速（镜像优先档保留官方前置减压规则）。设置：四行 pick 各加 speed_first 第三选项；模组镜像源行从 general 分区移入 download 分区（发现 general.mod_mirror 是死键——无任何消费方，真实控制在 assetSearch/assetDownload——迁移行为统一粗控双键写入 + getPreference 读 assetDownloadSource）；PLPreferences defaults 四键 + 粗控默认 speed_first；loadPreferences 末尾预热测速 + 选择变化即触发；新 l10n 键 mirror_policy-speed_first ×4 + mod_mirror detail 值更新
+- 【修复 H：动画】willDisplayCell 首现门控（ame138_animatedPaths 集合，滚动回滑/标签往返零重播）+ 条目级 stagger（section*0.04+item*0.02 上限 0.3）；侧栏 updateButtonColors 抽出 ame138_applyButtonColors 包 0.18s 淡入；公告 section 批量动画（见 F）
+- 验证：verify_task138 52/52（A 崩溃链 5 + B JSON 5 + C 映射 4 + D 守卫 4 + E/F 4 + G 镜像 11 + H 动画 4 + I 语法门 16 + J 级联 3）；重建沙箱丢失的三会话工件（task116_l10n_audit / task116c_precise_audit——块切分改 12 空格缩进行界修复跨行误报；task132_jna_got_mirror——LC_DYSYMTAB indirectsymoff 字段 12 修正，RESULT: ALL PASS）；task83_syntax_osm.sh 补 GL_NEAREST/FSR_RCAS_FSSource 桩（Task130 RCAS 存量断点，stub 修复后 syntax OK，外层副本同步）
+- 级联重锚：verify_task136/137 的 REPO 从已清除的旧克隆路径改回仓库相对（环境修复）；verify_task85 B9 含 Task130 RCAS 后缀；verify_task129 H2 改钉 Task137 继任形态；verify_task125_128 的 NMToast/NMPanel 路径与 C 组断言整体迁移到 Task137 继任形态（AMEPanel 语义保留断言）；键基线 1916→1918 全面重锚（132 F1/133 F1/129 I3/130 H3/131 G3/134 G1/135 D3）；Makefile TAB 断言 head+14 形态改 cur==head+目标在位（135 E10/129 I4）；132 A1/A2、133 B1/B1b/B1c、134 E4b 日志证据全部重锚到 c68552a 四日志 + Task138 定案口径
+- 全套件终态：55 校验器——38 个直接全绿（含 83-86 修复链、103/105/106/107/109/110/111 满超时全绿），其余全部为"无未提交改动/delta 与 HEAD 一致"类提交后自愈门（88 E1/89 E1/92 E1/93 D1/96 F2/101 F7/102 F3/112_118 G6/119_124 E2/125_128 E4/129 J/130 I1/131 H1/132 G/133 G·H3/134 H·I/135 E·F），108 为级联超时截断（可见检查全 PASS、全部叶子单独验证绿）
+- 环境教训（记档）：①Write 工具内容与 heredoc 传输的字面量需警惕——本轮两次 '@{@"key"' 少写第二个 @ 的自笔误 + bash 显示层吞字符伪影叠加，定位浪费两轮；od 字节级 + Grep 工具才是真相，heredoc 内嵌 @" 序列的搜索结果不可信；②历史校验器的 git-ref 依赖断言（HEAD+14 类）在提交后恒假，重锚应改为绝对在位断言；③外层 worklog 的补同步会被沙箱回滚吃掉，每轮会话开始应检查双份一致性
+
+Stage Summary:
+- 26.1.2 装机锚点：'[JavaLauncher] Task138: POJAV_NATIVEDIR=... (controlify JNA direct-mapping guard...)' + controlify 日志 'Failed to find SDL' + 游戏不再 SIGBUS（手柄走 GLFW 路径；完整 SDL 支持需升 controlify 3.5.0+mc26.1）
+- 26.2 TouchController 装机锚点：mod 侧 'Reading TouchController config file' 不再报 JsonDecodingException；屏蔽控件开 → 'Task134: clean layout applied ... [Task138: config.json/order.json now written as JSON, was plist XML]' + 控件实际隐藏
+- MobileGL-gles 装机锚点：'[egl_bridge] MobileGL renderer: backend=DirectGLES' 后无 'failed to load @rpath/libMobileGL-gles.dylib'，正常出画面
+- Mithril 装机锚点：缺 dylib 时选它 → NMToast '未随包携带...' + 启动日志 'falling back to auto (ANGLE)'，游戏正常
+- 镜像测速锚点：'[PLMirrorCenter] Task138 speed probe (family=0/1): official/mirror won (official=XXms mirror=XXms)'
+- 动画：滚动回滑不再重播入场、公告磁贴高度变化平滑过渡
+- 遗留：108 校验器全链跑完需 >10 分钟（级联超时截断非失败）；外层 scripts/ 会话工件在沙箱重置后需按本条目记录重建

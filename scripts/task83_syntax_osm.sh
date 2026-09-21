@@ -38,6 +38,11 @@ typedef unsigned int GLbitfield; typedef unsigned char GLubyte;
 #define GL_FLOAT 0x1406
 #define GL_FALSE 0
 #define GL_TRIANGLES 0x0004
+#define GL_NEAREST 0x2600
+#define GL_LINEAR 0x2601
+// Task138 stub: the real definition of FSR_RCAS_FSSource is in FSRRCASSource.h (outside the extraction block,
+// introduced by Task130 RCAS — satisfying the syntax-check semantics in declaration form).
+extern const char *const FSR_RCAS_FSSource;
 #define GL_TEXTURE_2D 0x0DE1
 #define GL_VIEWPORT 0x0BA2
 #define GL_DEPTH_TEST 0x0B71
@@ -108,6 +113,9 @@ typedef struct {
     void (*glClear)(GLbitfield);
     void (*glFinish)(void);
 } osmesa_library;
+// Task138 补桩：FSR_RCAS_FSSource 真实定义位于 FSRRCASSource.h（提取块外），
+// Task130 的 RCAS 代码引用它——语法门以声明形态满足链接语义即可。
+extern const char *const FSR_RCAS_FSSource;
 static osmesa_library handle;
 static void *s_osmDL = NULL;
 '''

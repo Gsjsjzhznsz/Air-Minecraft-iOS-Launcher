@@ -27,7 +27,10 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK136_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+# Task138 环境修复：上一会话的默认克隆路径 /home/z/my-project/workspace/
+# Air-Minecraft-iOS-Launcher 已被沙箱清除，默认值改为脚本所在仓库（与
+# verify_task133/134 同形态），TASK136_REPO 环境变量覆盖能力保留。
+REPO = os.environ.get("TASK136_REPO", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PASS = 0
 FAIL = 0
 

@@ -3,6 +3,8 @@
 #import "LauncherPreferences.h"
 #import "PLPreferences.h"
 #import "PLProfiles.h"   // Task120: ame_effective_renderer 需要（CI 35458985232 教训：此前从别处传递可见）
+#import "PLMirrorCenter.h"  // Task138: loadPreferences 末尾的测速预热
+#import "NMToast.h"    // Task138: 渲染器 dylib 缺失回退的用户提示
 #import "UIKit+hook.h"
 #import <CoreFoundation/CoreFoundation.h>
 
@@ -15,6 +17,10 @@ void loadPreferences(BOOL reset) {
     } else {
         pref = [[PLPreferences alloc] initWithAutomaticMigrator];
     }
+    // Task138：偏好就绪后预热测速引擎——任意镜像策略为 speed_first 且
+    // 缓存缺失/过期时异步发起官方 vs 镜像竞速（幂等，无网络阻塞）。
+    // 首次下载前结果大概率已落地，"加载速度快优先"从第一个请求起生效。
+    [PLMirrorCenter startSpeedProbesIfNeeded];
 }
 
 void toggleIsolatedPref(BOOL forceEnable) {
@@ -350,6 +356,36 @@ NSString *ame_effective_renderer(void) {
     // (1) 显式渲染器选择优先：zink/ANGLE/MobileGlues/LTW/MoltenVK/Mithril
     //     等任何非 auto 选择都原样生效，MobileGL 后端选项不干预。
     if (![renderer isEqualToString:@"auto"]) {
+        // Task 138：dylib 缺失守卫。显式选中的渲染器物理文件不在 app
+        // Frameworks 时回落 auto（当前唯一现实命中 = Mithril——
+        // libmithril.dylib 是需另外下载的预编译产物，而 Task132 按用户
+        // 指令在悬浮菜单无条件列出 MobileGL 家族三选项，缺文件时选中
+        // 即必崩：本轮 26.2 会话实证 LWJGL 侧 "Failed to locate
+        // library: libmithril.dylib" 的 UnsatisfiedLinkError 闪退）。
+        // -gles 逻辑键先经 ame_physical_renderer_dylib 映射到共享
+        // libMobileGL.dylib（随包存在，不会误伤）。回落带主线程 NMToast
+        // 明示 + 日志留档；每进程只提示一次（本函数会被显示层高频
+        // 调用）。layerClass 与 JavaLauncher 均以本函数为单一事实源，
+        // 回落后两端一致（Task124 的同源纪律）。
+        NSString *ame138_physical = @(ame_physical_renderer_dylib(renderer.UTF8String));
+        if ([ame138_physical hasSuffix:@".dylib"] && !rendererLibraryExists(ame138_physical)) {
+            static BOOL ame138_warned = NO;
+            NSLog(@"[Amethyst] Task138: renderer %@ selected but %@ is missing from the app "
+                  @"bundle -- falling back to auto (ANGLE). Install the dylib into Frameworks "
+                  @"to use this renderer.", renderer, ame138_physical);
+            if (!ame138_warned) {
+                ame138_warned = YES;
+                NSString *ame138_name = [ame138_physical isEqualToString:@ RENDERER_NAME_MITHRIL]
+                    ? localize(@"preference.title.renderer_backend-mithril", nil)
+                    : renderer;
+                NSString *ame138_msg = [NSString stringWithFormat:
+                    localize(@"preference.warning.renderer_missing_dylib", nil), ame138_name];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [NMToast showMessage:ame138_msg];
+                });
+            }
+            return @"auto";
+        }
         return renderer;
     }
     // (2) auto + MobileGL 后端选项：按档位覆盖（dylib 缺失时守卫回落）。

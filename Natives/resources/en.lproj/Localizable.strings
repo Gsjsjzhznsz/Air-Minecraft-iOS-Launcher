@@ -214,8 +214,9 @@
 "preference.detail.modLoaderSource" = "Source policy for Fabric / Forge / NeoForge meta, maven and installer downloads. Mirror first uses the BMCLAPI mirror.";
 "preference.title.mirror_policy-official_first" = "Official First";
 "preference.title.mirror_policy-mirror_first" = "Mirror First";
+"preference.title.mirror_policy-speed_first" = "Fastest First";
 "preference.title.mod_mirror" = "Mod Mirror Source";
-"preference.detail.mod_mirror" = "Choose the mirror source for mod/shader/resourcepack/datapack/modpack/world API and file downloads.";
+"preference.detail.mod_mirror" = "Unified mirror control for mods, shaders, resource packs, datapacks, modpacks and worlds. A selection writes to both the search and download policies. Fastest First probes official vs MCIM and uses the quicker endpoint (result cached for 24 hours).";
 "preference.title.mod_mirror-official" = "Official Source";
 "preference.title.mod_mirror-mcim" = "MCIM Mirror";
 "preference.title.debug_logging" = "Debug logging";
@@ -2047,6 +2048,7 @@
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
+"preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";
 
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
 "preference.title.announcement_preview_level" = "Announcement Detail Level";

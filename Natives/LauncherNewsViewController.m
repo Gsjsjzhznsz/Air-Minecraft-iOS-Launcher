@@ -402,7 +402,15 @@ static NSString *festivalGreeting(void) {
     self.avatarImageView = [[UIImageView alloc] init];
     self.avatarImageView.translatesAutoresizingMaskIntoConstraints = NO;
     self.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
-    // 圆形裁剪：AspectFill 下图片必须裁进圆形边框（圆角值在 layoutSubviews 动态取半）
+    // 圆形裁剪：AspectFill 下图片必须裁进圆形边框。
+    // Task138：胶囊常量圆角根治"切标签页变正方形"。CALayer 对超过边长一半
+    // 的圆角自动钳制为半边长——方形视图 + 大常量 = 恒为正圆，与布局时序
+    // 完全解耦。此前仅靠 layoutSubviews 动态取半，集合视图切标签页回来时
+    // 离屏预布局阶段头像 bounds 仍为 0，守卫跳过赋值，新图层 radius 停留
+    // 0（正方形），要等下一次布局通过才恢复——用户实测"切一次变方、再切
+    // 恢复"。现初始化即设 999（任何 ≥ 半边长的值等价），layoutSubviews
+    // 的精确取半保留为冗余兜底。
+    self.avatarImageView.layer.cornerRadius = 999.0;
     self.avatarImageView.layer.masksToBounds = YES;
     self.avatarImageView.layer.borderWidth = 2.5;
     self.avatarImageView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.35].CGColor;
@@ -893,12 +901,56 @@ static NSString *festivalGreeting(void) {
     ]];
 }
 
+/// Task138：公告磁贴自适应高度（用户报告"公告的高度太小，导致按钮被藏在
+/// 下面"）。原 90pt 固定高度只容纳单行消息：summary 档两行、full 档三行
+/// 时动作按钮（消息底 + 10 间距 + 30 高）被直接裁出磁贴底缘。现按当前
+/// 预览档位对实际文本做行高测量，叠加按钮与上下边距得出所需高度，
+/// 下限保留原 90（短消息观感不变）。announcement_preview_level 改动或
+/// 公告数据到达（reloadAnnouncementSection 触发 reloadData）都会重新
+/// 走 sectionProvider 取到新高度。
+- (CGFloat)ame138_announcementTileHeight {
+    const CGFloat ame138_base = 90;
+    NSString *ame138_message = nil;
+    BOOL ame138_hasButton = NO;
+    if (self.latestAnnouncement) {
+        AnnouncementItem *ann = self.latestAnnouncement;
+        NSString *ame138_level = getPrefObject(@"general.announcement_preview_level") ?: @"summary";
+        if ([ame138_level isEqualToString:@"title_only"]) {
+            ame138_message = ann.title;
+        } else if ([ame138_level isEqualToString:@"full"]) {
+            ame138_message = [NSString stringWithFormat:@"%@\n%@\n%@",
+                ann.title, ann.formattedDateString, ann.summary];
+        } else {
+            ame138_message = [NSString stringWithFormat:@"%@\n%@", ann.title, ann.summary];
+        }
+        ame138_hasButton = ann.actionURL.length > 0 && ann.actionTitle.length > 0;
+    } else {
+        ame138_message = self.announcementText;
+        ame138_hasButton = self.hasUpdate;
+    }
+    if (ame138_message.length == 0) return ame138_base;
+    // 可用文本宽度：全宽磁贴 - 区块内边距(15x2) - 条目内边距(5x2)
+    // - 左边距 16 - 图标 22 - 间距 10 - 右边距 16
+    CGFloat ame138_tileWidth = self.collectionView.bounds.size.width > 0
+        ? self.collectionView.bounds.size.width : UIScreen.mainScreen.bounds.size.width;
+    CGFloat ame138_textWidth = ame138_tileWidth - 15 * 2 - 5 * 2 - 16 - 22 - 10 - 16;
+    if (ame138_textWidth < 80) ame138_textWidth = 80;
+    NSAttributedString *ame138_attr = [[NSAttributedString alloc] initWithString:ame138_message
+        attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium]}];
+    CGRect ame138_rect = [ame138_attr boundingRectWithSize:CGSizeMake(ame138_textWidth, CGFLOAT_MAX)
+        options:NSStringDrawingUsesLineFragmentOrigin context:nil];
+    CGFloat ame138_needed = 16 + ceil(CGRectGetHeight(ame138_rect))
+        + (ame138_hasButton ? (10 + 30) : 0) + 16;
+    return MAX(ame138_base, ame138_needed);
+}
+
 - (CGFloat)heightForTileConfig:(HomeTileConfig *)config {
     switch (config.tileType) {
         case HomeTileTypeProfile:
             return config.tileSize == HomeTileSizeFull ? 170 : 140;
         case HomeTileTypeAnnouncement:
-            return 90;
+            // Task138：自适应（病历见 ame138_announcementTileHeight 注释）
+            return [self ame138_announcementTileHeight];
         case HomeTileTypeVersionRelease:
         case HomeTileTypeVersionSnapshot:
             return 100;
@@ -1414,7 +1466,15 @@ static NSString *festivalGreeting(void) {
     for (NSInteger s = 0; s < self.displaySections.count; s++) {
         for (HomeTileConfig *tile in self.displaySections[s]) {
             if (tile.tileType == HomeTileTypeAnnouncement) {
-                [self.collectionView reloadSections:[NSIndexSet indexSetWithIndex:s]];
+                // Task138：reloadSections 改 performBatchUpdates——公告磁贴
+                // 高度现为自适应（ame138_announcementTileHeight），数据到达
+                // 或预览档位变化引起的高度变化会以 0.3s 平滑过渡呈现，
+                // 不再瞬间跳变把后续磁贴顶下去。
+                [self.collectionView performBatchUpdates:^{
+                    [self.collectionView reloadSections:[NSIndexSet indexSetWithIndex:s]];
+                } completion:^(BOOL finished) {
+                    if (finished) [self.collectionView.collectionViewLayout invalidateLayout];
+                }];
                 return;
             }
         }
@@ -1491,10 +1551,32 @@ static NSString *festivalGreeting(void) {
 
 // MARK: - Cell Fade-In Animation
 
+/// Task138：本会话已播过入场动画的 indexPath（防滚动重播）。
+/// willDisplayCell 在每次滚动回滑、标签页往返时都会再次触发，无条件
+/// 重播 alpha+位移入场会让列表"闪一下再弹一遍"（用户反馈的动画毛刺
+/// 主源）。此集合按 indexPath 记忆首现：首次显示播 0.35s 弹簧入场，
+/// 之后任何重复显示立即原样呈现，滚动丝滑无重播。
+static NSMutableSet<NSIndexPath *> *ame138_animatedPaths = nil;
+
 - (void)collectionView:(UICollectionView *)collectionView willDisplayCell:(UICollectionViewCell *)cell forItemAtIndexPath:(NSIndexPath *)indexPath {
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        ame138_animatedPaths = [NSMutableSet set];
+    });
+    if ([ame138_animatedPaths containsObject:indexPath]) {
+        // 已播过：直接呈现（滚动回滑/标签页往返零重播）
+        cell.alpha = 1;
+        cell.transform = CGAffineTransformIdentity;
+        return;
+    }
+    [ame138_animatedPaths addObject:indexPath];
+    // Task138：stagger 细化到条目级（原仅按 section，同区条目同时弹出）：
+    // 区级 0.04s + 条目级 0.02s 波浪感，上限 0.3s 防长列表尾部拖沓
+    NSTimeInterval ame138_delay =
+        MIN(0.3, indexPath.section * 0.04 + indexPath.item * 0.02);
     cell.alpha = 0;
     cell.transform = CGAffineTransformMakeTranslation(0, 12);
-    [UIView animateWithDuration:0.35 delay:indexPath.section * 0.04 usingSpringWithDamping:0.85 initialSpringVelocity:0.3 options:UIViewAnimationOptionAllowUserInteraction animations:^{
+    [UIView animateWithDuration:0.35 delay:ame138_delay usingSpringWithDamping:0.85 initialSpringVelocity:0.3 options:UIViewAnimationOptionAllowUserInteraction animations:^{
         cell.alpha = 1;
         cell.transform = CGAffineTransformIdentity;
     } completion:nil];

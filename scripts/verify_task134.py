@@ -155,10 +155,13 @@ check("E3 前向声明（定义在 ensure 之后，CI 35512461717 教训类防�
       "amethyst_task134_jvm_watchdog_start" in utils_h)
 check("E4 Task132 重绑定读回验证（写后槽值校验 + READBACK FAILED 取证日志）",
       "READBACK FAILED" in sdl and "*slot != hook_fn" in sdl)
-check("E4b 新日志取证闭环（df10f70/3756a05：Task133 链路已通但 Task132 静默早退——双会话零输出实证）",
-      rd("latestlog.old.txt").count("invoking Task132 dlsym rebind") >= 1 and
-      "slot rebound" not in rd("latestlog.old.txt") and
-      "Task131: SDL_SetEventFilter" in rd("latestlog.txt"))
+# Task138 重锚：c68552a 四日志（latestlog=26.1.2 崩溃 / latestlog.txt.old.txt
+# =26.2 成功）——Task132 直传重绑被调用 + jnilib 槽 idempotent hit（fishhook
+# 抢先，Task135 取证假说落定），崩溃链最终定案为 JNA ffi 闭包页（Task138 修复）。
+check("E4b 新日志取证闭环（c68552a：直传重绑调用 + idempotent hit，Task138 定案 JNA ffi 闭包页）",
+      rd("latestlog").count("invoking Task132 dlsym rebind") >= 1 and
+      "idempotent hit" in rd("latestlog") and
+      "hooked SDL_SetEventFilter" in rd("latestlog.txt.old.txt"))
 check("E4c 静默早退根治（核心改直传 hdr+slide + 旧入口句柄查找失败落日志）",
       "amethyst_task132_rebind_jna_dlsym_ex(const struct mach_header_64 *ame132_hdr" in sdl and
       "jna rebind handle %p not found in dyld image" in sdl and
@@ -212,8 +215,9 @@ def lkeys(lang):
 
 
 ks = [lkeys(l) for l in LANGS]
-check("G1 四语言键集一致（Task134 基线 1916）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1916, f"counts={[len(k) for k in ks]}")
+# Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
+check("G1 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + 2）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1918, f"counts={[len(k) for k in ks]}")
 check("G2 Task134 新键齐备（jit_enabler 7 + title/detail 4 + hide_controls；pickextra 3 键已删）",
       all("preference.debug.jit_enabler.auto" in k and
           "preference.debug.jit_enabler.manual" in k and

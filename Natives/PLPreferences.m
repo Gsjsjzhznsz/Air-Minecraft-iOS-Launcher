@@ -46,20 +46,25 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"curseforge_api_key": @"",
             // Mod 更新时是否保留旧文件（默认 YES）
             @"mod_update_keep_old": @YES,
-            // 模组镜像源：official（官方源）/ mcim（MCIM 镜像源，国内加速）
+            // 模组镜像源（Task138：设置行已移入 download 分区，选择写
+            // download.assetSearchSource / assetDownloadSource；此键自此无
+            // 消费方，仅为存量 plist 兼容保留默认值）
             @"mod_mirror": @"official",
             // profile 写入的强制内存分配，0=使用 java.allocated_memory/auto_ram 逻辑
             @"ram_allocation": @(0),
             // 首页公告磁贴预览级别：full（标题+日期+摘要）/ summary（标题+摘要）/ title_only（仅标题）
             @"announcement_preview_level": @"summary",
         }.mutableCopy,
-        // 分类镜像策略（值 official_first / mirror_first，由 PLMirrorCenter 统一读取，
-        // 未迁移时 PLMirrorCenter 会回退旧键 general.download_source）
+        // 分类镜像策略（值 official_first / mirror_first / speed_first，
+        // 由 PLMirrorCenter 统一读取，未迁移时回退旧键 general.download_source）。
+        // Task138：默认改为 speed_first（加载速度快优先，用户指令，参考 FCL
+        // 测速策略）——显式设置过其它值的设备不受影响，仅"从未选择"的
+        // 设备落到新默认。
         @"download": @{
-            @"fileSource": @"official_first",
-            @"assetSearchSource": @"official_first",
-            @"assetDownloadSource": @"official_first",
-            @"modLoaderSource": @"official_first",
+            @"fileSource": @"speed_first",
+            @"assetSearchSource": @"speed_first",
+            @"assetDownloadSource": @"speed_first",
+            @"modLoaderSource": @"speed_first",
             // 一次性迁移哨兵：YES 表示旧键 download_source 已迁移到上述 4 键，
             // 防止用户手动改新键后被重复迁移覆盖（见 LauncherPreferences.m migrateDownloadSourcePreferences）
             @"sourceMigrated": @NO,

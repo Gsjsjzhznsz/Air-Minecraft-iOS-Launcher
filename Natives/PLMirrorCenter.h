@@ -20,6 +20,10 @@ typedef NS_ENUM(NSInteger, PLMirrorPolicy) {
     PLMirrorPolicyOfficialFirst = 0,
     /// 镜像优先，官方 URL 作为回退候选
     PLMirrorPolicyMirrorFirst = 1,
+    /// 加载速度快优先（Task 138，参考 FCL）：按测速结果排序官方与镜像，
+    /// 快的一方在前；未出结果前临时按镜像优先（目标用户群体镜像几乎
+    /// 恒快，测速落地后自动纠正）
+    PLMirrorPolicySpeedFirst = 2,
 };
 
 /// BMCLAPI 镜像根地址（https://bmclapi2.bangbang93.com，全工程唯一定义处，供他处引用）
@@ -74,6 +78,10 @@ FOUNDATION_EXPORT NSString *const PLMirrorMCIMRootURL;
 
 /// 读取指定资源类型当前生效的镜像策略（含旧键回退逻辑）
 + (PLMirrorPolicy)policyForType:(PLMirrorResourceType)type;
+
+/// Task 138：任意策略为 speed_first 且测速缓存缺失/过期时，异步发起
+/// 官方 vs 镜像竞速探测（双体系：BMCLAPI 系 / MCIM 系）。幂等可随时调用。
++ (void)startSpeedProbesIfNeeded;
 
 @end
 

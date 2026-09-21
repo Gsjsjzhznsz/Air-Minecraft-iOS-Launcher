@@ -94,8 +94,10 @@ check("B7 GL 枚举六件套在位（FRAMEBUFFER/DRAW/READ×值+绑定+STENCIL�
 check("B8 枚举定义不重复（MultiEdit 事故防护）",
       osm.count("#define GL_FRAMEBUFFER ") == 1
       and osm.count("#define GL_STENCIL_TEST ") == 1)
-check("B9 engaged 日志带 Task 85 判读标记",
-      "(EASU pre-readback ordering, Task 85)" in osm)
+# Task138 重锚：Task130 的 RCAS 锐化档位在 engaged 日志尾部追加 RCAS=%d，
+# 原无 RCAS 后缀的精确串自此失配（Task130 会话未重锚本项）。
+check("B9 engaged 日志带 Task 85 判读标记（Task138 重锚：含 Task130 的 RCAS 后缀）",
+      "(EASU pre-readback ordering, Task 85, RCAS=%d)" in osm)
 
 print("===== C. FAQ（fsr 病史修订 + upscalerAlt 条目） =====")
 helpvc = read("Natives/LauncherHelpViewController.m")

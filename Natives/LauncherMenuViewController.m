@@ -299,6 +299,15 @@
 - (void)updateButtonColors {
     UIColor *normalColor = [self menuNormalColor];
     UIColor *accent = accentColor();
+    // Task138：选中态着色包一层 0.18s 淡入——切换标签页时图标配色
+    // 平滑过渡，替代原本的瞬时硬切（动效优化，语义不变）。
+    [UIView animateWithDuration:0.18 delay:0 options:UIViewAnimationOptionAllowUserInteraction | UIViewAnimationOptionCurveEaseOut animations:^{
+        [self ame138_applyButtonColors:normalColor accent:accent];
+    } completion:nil];
+}
+
+/// Task138：updateButtonColors 的实际着色体（从原实现抽出，供动画块调用）
+- (void)ame138_applyButtonColors:(UIColor *)normalColor accent:(UIColor *)accent {
     // Task101：顺手补拉缺失图标（幂等，仅填 nil）
     [self refreshMenuIconImages];
     // 按钮现在在 menuStackView.arrangedSubviews 中（UIStackView 重构后）

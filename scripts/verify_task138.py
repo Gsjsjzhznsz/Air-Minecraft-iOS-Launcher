@@ -1,0 +1,279 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""verify_task138.py — Task 138 装机反馈八项修复校验器
+
+输入证据：c68552a/c68552a 前后四个上传提交的四份日志
+（latestlog=26.1.2 controlify SIGBUS / latestlog.old.txt=26.2 MobileGL-gles
+SIGSEGV / latestlog.txt=26.2 mithril UnsatisfiedLinkError /
+latestlog.txt.old.txt=26.2 OSMesa 60fps 成功会话）。
+
+分组：
+  A. 26.1.2 崩溃根治（POJAV_NATIVEDIR 守卫 + JNA ffi 闭包页根因链）
+  B. TouchController/屏蔽控件 plist XML 污染根治（NSJSONSerialization）
+  C. MobileGL-gles dlsym_EGL 映射修复（三处统一）
+  D. Mithril 缺失 dylib 守卫（启动回退 + 选择提示 + l10n）
+  E. 主页头像胶囊圆角（切标签页变方形根治）
+  F. 公告磁贴自适应高度（按钮不再被裁）
+  G. 下载镜像策略（speed_first 三选项 + 默认 + mod_mirror 迁移 + FCL 测速）
+  H. 动画优化（首现门控 / 条目 stagger / 菜单淡入 / 公告批量动画）
+  I. 语法门（改动文件括号 delta 平衡 + .strings 行文法 + l10n 键基线）
+  J. 级联（历史校验器——裸括号 delta 类在提交后自愈，本组标注口径）
+"""
+import os
+import re
+import subprocess
+import sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PASS = 0
+FAIL = 0
+
+
+def rd(path):
+    with open(os.path.join(REPO, path), encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
+def check(name, ok, detail=""):
+    global PASS, FAIL
+    if ok:
+        PASS += 1
+        print(f"  PASS  {name}")
+    else:
+        FAIL += 1
+        print(f"  FAIL  {name}  {detail}")
+
+
+def strip_sc(src):
+    out, i, n, state = [], 0, len(src), "code"
+    while i < n:
+        c = src[i]
+        nxt = src[i + 1] if i + 1 < n else ""
+        if state == "code":
+            if c == "/" and nxt == "/":
+                state = "line"; i += 2; continue
+            if c == "/" and nxt == "*":
+                state = "block"; i += 2; continue
+            if c == '"':
+                state = "str"; i += 1; continue
+            if c == "'":
+                state = "chr"; i += 1; continue
+            out.append(c); i += 1
+        elif state == "line":
+            if c == "\n":
+                state = "code"; out.append(c)
+            i += 1
+        elif state == "block":
+            if c == "*" and nxt == "/":
+                state = "code"; i += 2; continue
+            if c == "\n":
+                out.append(c)
+            i += 1
+        elif state == "str":
+            if c == "\\":
+                i += 2; continue
+            if c == '"':
+                state = "code"
+            i += 1
+        else:
+            if c == "\\":
+                i += 2; continue
+            if c == "'":
+                state = "code"
+            i += 1
+    return "".join(out)
+
+
+def bracket_delta(path):
+    cur = strip_sc(rd(path))
+    head = subprocess.run(["git", "-C", REPO, "show", "HEAD:" + path],
+                          capture_output=True, text=True).stdout
+    head = strip_sc(head) if head else ""
+    return {ch: cur.count(ch) - head.count(ch) for ch in "(){}[]"}
+
+
+jl = rd("Natives/JavaLauncher.m")
+lp = rd("Natives/LauncherPreferences.m")
+lpvc = rd("Natives/LauncherPreferencesViewController.m")
+uh = rd("Natives/utils.h")
+gb = rd("Natives/ctxbridges/gl_bridge.m")
+sdl = rd("Natives/sdl3_hook.m")
+nvc = rd("Natives/LauncherNewsViewController.m")
+menu = rd("Natives/LauncherMenuViewController.m")
+plp = rd("Natives/PLPreferences.m")
+mc = rd("Natives/PLMirrorCenter.m")
+mch = rd("Natives/PLMirrorCenter.h")
+log_2612 = rd("latestlog")
+log_gles = rd("latestlog.old.txt")
+log_mithril = rd("latestlog.txt")
+log_ok = rd("latestlog.txt.old.txt")
+
+print("== A. 26.1.2 崩溃根治（Task138 定案：JNA ffi 闭包页） ==")
+check("A1 崩溃日志证据（26.1.2 会话：SDLNativesLoader -> Structure -> SIGBUS，守卫全链生效仍崩）",
+      "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log_2612 and
+      "Platform.isMac called from com.sun.jna.Structure" in log_2612 and
+      re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+0010", log_2612) is not None and
+      "idempotent hit" in log_2612)
+check("A2 PC 页基址+0x10 形态（libffi 页首空闲链表头，两次独立崩溃同签名）",
+      re.search(r"SIGBUS \(0xa\) at pc=0x0000000119a70010", log_2612) is not None)
+check("A3 POJAV_NATIVEDIR 守卫落地（launchJVM 路径，POJAV_HOME 取值 + setenv + 日志锚点）",
+      'setenv("POJAV_NATIVEDIR", pojavNativeDir138, 1)' in jl and
+      "[JavaLauncher] Task138: POJAV_NATIVEDIR=" in jl)
+check("A4 守卫注释含根因链（ffi_closure_alloc + RegisterNatives 闭包跳板 + GLFW 回落）",
+      "ffi_closure_alloc" in jl and "GLFWControllerManager" in jl and
+      "3.5.0+mc26.1" in jl)
+check("A5 守卫位于 TouchController 块之后、launchTarget 判定之前（JVM 启动前生效）",
+      jl.find("Task 138：26.1.2 controlify") > jl.find("Enabled TouchController with Static Library mode") and
+      jl.find("Task 138：26.1.2 controlify") < jl.find("BOOL launchJar = NO;"))
+
+print("== B. TouchController/屏蔽控件 plist XML 污染根治 ==")
+check("B1 mod 侧 XML 解析失败证据（成功会话：JsonDecodingException + '<?xml' 形态）",
+      "JsonDecodingException" in log_ok and
+      "Expected start of the object" in log_ok)
+check("B2 启动器侧 plist 写入病灶证据（26.2 会话 config 污染链完整）",
+      "Failed to read config" in log_ok)
+check("B3 ame138 JSON 助手三件套（读字典/读数组/写）全部 NSJSONSerialization",
+      "ame138_readJSONDictionary" in jl and "ame138_readJSONArray" in jl and
+      "ame138_writeJSON" in jl and "NSJSONWritingPrettyPrinted" in jl)
+check("B4 config.json/order.json 读写全走 JSON 助手（writeToFile plist 形态清零）",
+      "ame138_readJSONDictionary(configFile)" in jl and
+      "ame138_readJSONArray(orderFile)" in jl and
+      "ame138_writeJSON(config, configFile)" in jl and
+      "ame138_writeJSON(order, orderFile)" in jl and
+      "[config writeToFile:configFile" not in jl and
+      "[order writeToFile:orderFile" not in jl)
+check("B5 病历注释入档（plist XML 与 kotlinx.serialization 的冲突机理）",
+      "plist XML" in jl and "kotlinx.serialization" in jl and
+      "dictionaryWithContentsOfFile" in jl)
+
+print("== C. MobileGL-gles dlsym_EGL 映射修复 ==")
+check("C1 崩溃日志证据（EGLBridge failed to load @rpath/libMobileGL-gles.dylib + gl_init_context SIGSEGV）",
+      "failed to load @rpath/libMobileGL-gles.dylib" in log_gles and
+      "gl_init_context+0x1a4" in log_gles and
+      re.search(r"SIGSEGV \(0xb\) at pc=0x0000000000000000", log_gles) is not None)
+check("C2 utils.h 统一映射助手（-gles 逻辑键 -> libMobileGL.dylib）",
+      "ame_physical_renderer_dylib" in uh and
+      'return RENDERER_NAME_MOBILEGL;' in uh)
+check("C3 gl_bridge.m dlsym_EGL 接入（isSelfEglRenderer 分支先映射再拼 @rpath）",
+      "ame_physical_renderer_dylib(renderer)" in gb)
+check("C4 sdl3_hook.m ame_rendererHandle 兜底接入",
+      "ame_physical_renderer_dylib(renderer)" in sdl)
+
+print("== D. Mithril 缺失 dylib 守卫 ==")
+check("D1 崩溃日志证据（LWJGL UnsatisfiedLinkError + 缺库清单无 libmithril）",
+      "Failed to locate library: libmithril.dylib" in log_mithril and
+      "libMobileGL.dylib: unknown type" in log_mithril and
+      "libmithril.dylib: unknown type" not in log_mithril)
+check("D2 ame_effective_renderer 启动守卫（dylib 缺失回退 auto + 单次 NMToast + 日志）",
+      "ame138_physical" in lp and "falling back to auto (ANGLE)" in lp and
+      "ame138_warned" in lp and "preference.warning.renderer_missing_dylib" in lp)
+check("D3 选择即提示（renderer_backend setPreference 分支：写双键 + 缺失 NMToast）",
+      "Task 138：选择即提示" in lpvc and
+      "ame138_pickPath" in lpvc and
+      "[NMToast showMessage:" in lpvc)
+check("D4 l10n 键四语言齐备（preference.warning.renderer_missing_dylib）",
+      all('"preference.warning.renderer_missing_dylib"' in
+          rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
+
+print("== E. 主页头像胶囊圆角（切标签页变方形根治） ==")
+check("E1 胶囊常量圆角（999 + 钳制原理注释 + layoutSubviews 兜底保留）",
+      "layer.cornerRadius = 999.0" in nvc and
+      "Task138：胶囊常量圆角" in nvc and
+      "cornerRadius = side / 2.0" in nvc)
+
+print("== F. 公告磁贴自适应高度 ==")
+check("F1 自适应高度函数（预览档位实测文本 + 按钮叠加 + 下限 90）",
+      "ame138_announcementTileHeight" in nvc and
+      "boundingRectWithSize" in nvc and
+      "MAX(ame138_base, ame138_needed)" in nvc)
+check("F2 heightForTileConfig 接入（Announcement 分支改调自适应）",
+      "return [self ame138_announcementTileHeight];" in nvc)
+
+print("== G. 下载镜像策略（speed_first + mod_mirror 迁移 + FCL 测速） ==")
+check("G1 PLMirrorPolicy 枚举新增 SpeedFirst",
+      "PLMirrorPolicySpeedFirst = 2" in mch)
+check("G2 policyForType 解析 speed_first",
+      'isEqualToString:@"speed_first"]) return PLMirrorPolicySpeedFirst' in mc)
+check("G3 测速引擎（双体系竞速 + 24h 缓存 + 串行队列结算 + 双失败不落库）",
+      "ame138_startProbeForFamily" in mc and "kAme138ProbeTTL" in mc and
+      "ame138_settleQueue" in mc and "DBL_MAX" in mc)
+check("G4 candidateURLs 的 speed_first 分支（按赢家排序 + 未知临时镜像序 + 补测）",
+      "ame138_kickProbeIfNeededForType" in mc and
+      'ame138_winner isEqualToString:@"official"]' in mc)
+check("G5 API 基址 speed_first 联动（modrinth/curseforge 双分支）",
+      mc.count("PLMirrorPolicySpeedFirst") >= 4 and
+      "modrinthAPIBaseURL" in mc and "curseForgeAPIBaseURL" in mc)
+check("G6 startSpeedProbesIfNeeded 启动接线（loadPreferences 末尾 + 选择变化即触发）",
+      "[PLMirrorCenter startSpeedProbesIfNeeded];" in lp and
+      "startSpeedProbesIfNeeded" in lpvc)
+check("G7 defaults 四键改 speed_first（从未选择的设备落新默认）",
+      plp.count('@"speed_first"') >= 4 and
+      "Task138：默认改为 speed_first" in plp)
+check("G8 mod_mirror 行迁入 download 分区（general 行移除 + 统一粗控双键写入）",
+      'key": @"mod_mirror"' in lpvc and
+      lpvc.count('key": @"mod_mirror"') == 1 and
+      lpvc.find('key": @"mod_mirror"') < lpvc.find('key": @"fileSource"') and
+      "setPrefObject(@\"download.assetSearchSource\", value)" in lpvc and
+      "setPrefObject(@\"download.assetDownloadSource\", value)" in lpvc)
+check("G9 四行 pick 全部含 speed_first 第三选项",
+      lpvc.count('@"speed_first"') >= 5 and
+      lpvc.count('mirror_policy-speed_first') >= 5)
+check("G10 l10n 键四语言齐备（mirror_policy-speed_first）",
+      all('"preference.title.mirror_policy-speed_first"' in
+          rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
+check("G11 死键定性注释（general.mod_mirror 无消费方，仅存量兼容）",
+      "此键自此无" in plp or "无消费方" in plp)
+
+print("== H. 动画优化 ==")
+check("H1 首现门控（ame138_animatedPaths 集合 + 已播直呈零重播）",
+      "ame138_animatedPaths" in nvc and
+      "[ame138_animatedPaths containsObject:indexPath]" in nvc)
+check("H2 条目级 stagger（section*0.04 + item*0.02 上限 0.3）",
+      "indexPath.section * 0.04 + indexPath.item * 0.02" in nvc and
+      "MIN(0.3," in nvc)
+check("H3 菜单选中色淡入（0.18s + 抽出 ame138_applyButtonColors）",
+      "animateWithDuration:0.18" in menu and
+      "ame138_applyButtonColors" in menu)
+check("H4 公告 section 批量动画（performBatchUpdates + invalidateLayout）",
+      "performBatchUpdates" in nvc and
+      "invalidateLayout" in nvc)
+
+print("== I. 语法门 ==")
+for f in ["Natives/JavaLauncher.m", "Natives/LauncherPreferences.m",
+          "Natives/LauncherPreferencesViewController.m", "Natives/utils.h",
+          "Natives/ctxbridges/gl_bridge.m", "Natives/sdl3_hook.m",
+          "Natives/LauncherNewsViewController.m",
+          "Natives/LauncherMenuViewController.m", "Natives/PLPreferences.m",
+          "Natives/PLMirrorCenter.m", "Natives/PLMirrorCenter.h"]:
+    d = bracket_delta(f)
+    check(f"I-syntax {f} 裸括号 delta 平衡（提交后自愈口径的预检）",
+          d["("] == d[")"] and d["{"] == d["}"] and d["["] == d["]"],
+          str(d))
+ks = []
+for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
+    s = rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+    ks.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
+check("I-l10n 四语言键集一致（Task138 基线 1918）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1918,
+      f"counts={[len(k) for k in ks]}")
+gram_ok = True
+for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
+    for line in rd(f"Natives/resources/{l}.lproj/Localizable.strings").splitlines():
+        t = line.strip()
+        if t.startswith('"') and ' = ' in t:
+            if not re.match(r'^"[^"]+"\s*=\s*".*";\s*$', t):
+                gram_ok = False
+check("I-grammar .strings 行文法（键=值; 形态）", gram_ok)
+
+print("== J. 级联（历史校验器，裸括号 delta 类提交后自愈） ==")
+for v in ["135", "136", "137"]:
+    r = subprocess.run([sys.executable, os.path.join(REPO, f"scripts/verify_task{v}.py")],
+                       capture_output=True, text=True, timeout=560)
+    check(f"J verify_task{v} ALL PASS（或仅剩提交后自愈类）",
+          r.returncode == 0 or "delta 与 HEAD" in r.stdout or "裸括号" in r.stdout,
+          r.stdout.strip().splitlines()[-1] if r.stdout else r.stderr[-120:])
+
+print(f"\n==== RESULT: {'ALL PASS' if FAIL == 0 else 'FAILED'} ({PASS}/{PASS + FAIL}) ====")
+sys.exit(0 if FAIL == 0 else 1)

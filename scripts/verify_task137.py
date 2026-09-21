@@ -36,7 +36,10 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK137_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+# Task138 环境修复：上一会话的默认克隆路径 /home/z/my-project/workspace/
+# Air-Minecraft-iOS-Launcher 已被沙箱清除，默认值改为脚本所在仓库（与
+# verify_task133/134 同形态），TASK137_REPO 环境变量覆盖能力保留。
+REPO = os.environ.get("TASK137_REPO", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PASS = 0
 FAIL = 0
 
@@ -314,9 +317,27 @@ check("G2  新增 UIColor 语义色选择器拼写审计（全量白名单）",
                "systemOrangeColor", "whiteColor", "blackColor", "clearColor",
                "groupTableViewBackgroundColor", "systemGroupedBackgroundColor", "grayColor",
                "systemTealColor", "systemPinkColor", "systemGray3Color", "quaternaryLabelColor"}])
-check("G3  本地化资源零改动（.strings 基线不动）",
-      not subprocess.run(["git", "-C", REPO, "diff", "HEAD", "--name-only", "--",
-                          "Natives/resources/*.strings"], capture_output=True, text=True).stdout.strip())
+# Task138 重锚：Task138 新增 2 键（preference.warning.renderer_missing_dylib
+# + preference.title.mirror_policy-speed_first，四语言 8 行）并更新
+# mod_mirror detail 值（四语言 4 删 4 增）——断言从"零改动"放宽为
+# "改动行仅限这三键"。
+_ame138_diff = subprocess.run(
+    ["git", "-C", REPO, "diff", "HEAD", "--unified=0", "--",
+     "Natives/resources/en.lproj/Localizable.strings",
+     "Natives/resources/zh-Hans.lproj/Localizable.strings",
+     "Natives/resources/zh-CN.lproj/Localizable.strings",
+     "Natives/resources/zh-Hant.lproj/Localizable.strings"],
+    capture_output=True, text=True).stdout
+_ame138_added = [l for l in _ame138_diff.splitlines()
+                 if l.startswith("+") and not l.startswith("+++")]
+_ame138_removed = [l for l in _ame138_diff.splitlines()
+                   if l.startswith("-") and not l.startswith("---")]
+check("G3  本地化资源改动仅限 Task138 三键（+2 新键 x 四语言 + detail 值更新）",
+      len(_ame138_added) == 12 and len(_ame138_removed) == 4 and
+      all(("renderer_missing_dylib" in l or "mirror_policy-speed_first" in l
+           or "preference.detail.mod_mirror" in l)
+          for l in _ame138_added + _ame138_removed),
+      f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md"))
           for ln in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],

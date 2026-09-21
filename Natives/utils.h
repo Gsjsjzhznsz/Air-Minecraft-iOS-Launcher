@@ -89,6 +89,24 @@ static inline bool isMithrilRenderer(const char *renderer) {
 static inline bool isSelfEglRenderer(const char *renderer) {
     return isMithrilRenderer(renderer) || isMobileGLRenderer(renderer);
 }
+// Task 138：-gles 逻辑键到物理 dylib 名的统一映射。
+// 渲染器菜单里的 libMobileGL-gles.dylib 是逻辑键（物理文件不随包，共享
+// libMobileGL.dylib 二进制，后端由 MOBILEGL_BACKEND_TYPE 选择）。Java 侧
+// 的 opengl.libname 映射早已存在（JavaLauncher），egl_bridge 的
+// JNI_LWJGL_changeRenderer 与预加载 dlopen 也有（Task 131），但
+// gl_bridge.m 的 dlsym_EGL 与 sdl3_hook.m 的 ame_rendererHandle 兜底
+// 漏了同一映射——本轮 26.2 会话（libMobileGL-gles 渲染器）装机日志实证：
+// dlopen("@rpath/libMobileGL-gles.dylib") 必败（文件不存在）→
+// dlsym_EGL 返回 false → pojavInitOpenGL 报 br_init 失败 →
+// pojavCreateContext 仍走 br_init_context → gl_init_context 空函数
+// 指针 → SIGSEGV(pc=0)。此助手把三处语义收敛为一份。
+static inline const char *ame_physical_renderer_dylib(const char *renderer) {
+    if (renderer && strcmp(renderer, RENDERER_NAME_MOBILEGL_GLES) == 0) {
+        return RENDERER_NAME_MOBILEGL;
+    }
+    return renderer;
+}
+
 
 // 导出 desktop OpenGL（而非 OpenGL ES）的渲染器：
 // 需要 EGL_OPENGL_BIT 配置 + eglBindAPI(EGL_OPENGL_API)。

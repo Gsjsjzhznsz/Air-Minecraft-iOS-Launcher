@@ -43,18 +43,23 @@ print("== A. 26.1.2 崩溃根治（libjnidispatch _dlsym 槽位重绑定）==")
 sdl = rd("Natives/sdl3_hook.m")
 mh = rd("Natives/main_hook.m")
 uh = rd("Natives/utils.h")
-log = rd("latestlog.old.txt")  # Task134 重锚：26.1.2 崩溃会话现于 latestlog.old.txt（df10f70 上传）
+log = rd("latestlog")  # Task138 重锚：26.1.2 崩溃会话现于 latestlog（c68552a 上传，四日志中最新的 26.1.2 会话）
 
 import re as _re
-check("A1 崩溃日志证据（df10f70 新日志：controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS；PC 随 ASLR 逐会话变化，按序列形态匹配）",
+check("A1 崩溃日志证据（c68552a 新日志：controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS；PC 随 ASLR 逐会话变化，按序列形态匹配）",
       "Initializing Controlify" in log and
       "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
       "Platform.isMac called from com.sun.jna.Structure" in log and
       _re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None)
-check("A2 崩溃会话无 Task131 守卫日志（Task132 重绑定静默早退——Task133 链路已通但绑定未落地，Task134 直传+重试修复）",
+# Task138 重锚：新日志证明 Task132/133/135 全链如实生效（直传重绑被调用 +
+# jnilib 槽位 idempotent hit = fishhook 抢先），崩溃仍发生且先于任何 SDL
+# 符号解析——真根因为 JNA direct mapping 的 ffi 闭包跳板页在 iOS 上不可
+# 执行（Task138 以 POJAV_NATIVEDIR 让 controlify 走 GLFW 降级根治）。
+check("A2 崩溃会话守卫机制全链生效仍崩溃（Task138 定案：JNA ffi 闭包页，非符号解析层）",
       "[SDLHook] Task131: SDL_SetEventFilter" not in log and
       "Task133: libjnidispatch image detected" in log and
-      "invoking Task132 dlsym rebind" in log and "slot rebound" not in log)
+      "invoking Task132 dlsym rebind" in log and
+      "Task135: _dlsym slot" in log and "idempotent hit" in log)
 check("A3 amethyst_task132_rebind_jna_dlsym 实现（dyld 遍历 + 句柄==mach header）",
       "void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn)" in sdl and
       "_dyld_image_count()" in sdl and "_dyld_get_image_vmaddr_slide" in sdl)
@@ -223,8 +228,9 @@ sets = []
 for lang in langs:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
-check("F1 四语言键集一致（Task134 基线 1916 = 1907 - pickextra 3键 + jit_enabler/hide 12键）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1916,
+# Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
+check("F1 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + 2）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1918,
       f"counts={[len(s) for s in sets]}")
 newkeys = ["preference.title.renderer_backend",
            "preference.detail.renderer_backend",

@@ -214,8 +214,9 @@
 "preference.detail.modLoaderSource" = "Fabric / Forge / NeoForge 的 meta、maven 與安裝器下載策略。鏡像優先使用 BMCLAPI 鏡像。";
 "preference.title.mirror_policy-official_first" = "官方優先";
 "preference.title.mirror_policy-mirror_first" = "鏡像優先";
+"preference.title.mirror_policy-speed_first" = "載入速度快優先";
 "preference.title.mod_mirror" = "模组镜像源";
-"preference.detail.mod_mirror" = "选择模组/光影/资源包/数据包/整合包/世界的 API 与文件下载镜像源。MCIM镜像源（mod.mcimirror.top）提供国内加速，兼容 Modrinth 和 CurseForge 接口。";
+"preference.detail.mod_mirror" = "模組/光影/資源包/資料包/整合包/世界的鏡像統一入口，選擇同時作用於資源搜尋源與資源下載源。載入速度快優先會實測官方與 MCIM 鏡像的回應速度並自動選用較快的一方（結果快取 24 小時）。";
 "preference.title.mod_mirror-official" = "官方源";
 "preference.title.mod_mirror-mcim" = "MCIM镜像源";
 "preference.title.debug_logging" = "除錯日誌";
@@ -2056,6 +2057,7 @@
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直連)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 實驗性)";
+"preference.warning.renderer_missing_dylib" = "本構建未隨包攜帶 %@，遊戲將回退為 Auto（ANGLE）。如需啟用，請把對應 dylib 放入 app 的 Frameworks 目錄。";
 "preference.detail.announcement_preview_level" = "控制公告在主介面展示的詳細程度。";
 "preference.detail.app_language" = "設定啟動器介面語言，選擇“系統”时跟随裝置語言。";
 "preference.detail.curseforge_api_key" = "設定 CurseForge API 金鑰，用于瀏覽/下載 CurseForge 模組与整合包；未設定时使用內建預設金鑰。";

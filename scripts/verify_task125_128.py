@@ -36,8 +36,10 @@ plp = rd("Natives/PLPreferences.m")
 bridge = rd("Natives/ios_uikit_bridge.m")
 acc = rd("Natives/AccountListViewController.m")
 nav = rd("Natives/LauncherNavigationController.m")
-toast = rd("Natives/NeomorphKit/NMToast.m")
-panel = rd("Natives/NeomorphKit/UIViewController+NMPanel.m")
+# Task138 重锚：Task137 将 NMToast 迁出 NeomorphKit 至 Natives/ 根
+toast = rd("Natives/NMToast.m")
+# Task138 重锚：Task137 将 NMPanel 原生化重写为 UIViewController+AMEPanel
+panel = rd("Natives/UIViewController+AMEPanel.m")
 tp = rd("Natives/authenticator/ThirdPartyAuthenticator.m")
 ba = rd("Natives/authenticator/BaseAuthenticator.m")
 ms = rd("Natives/authenticator/MicrosoftAuthenticator.m")
@@ -46,9 +48,9 @@ cml = rd("Natives/CMakeLists.txt")
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 
 print("== A. Task125 启动自动检测更新 ==")
-check("A1 NMToast 组件存在（新拟物应用内通知）",
-      os.path.exists(os.path.join(REPO, "Natives/NeomorphKit/NMToast.m")) and
-      os.path.exists(os.path.join(REPO, "Natives/NeomorphKit/NMToast.h")))
+check("A1 NMToast 组件存在（Task137 迁至 Natives/ 根）",
+      os.path.exists(os.path.join(REPO, "Natives/NMToast.m")) and
+      os.path.exists(os.path.join(REPO, "Natives/NMToast.h")))
 check("A2 NMToast 无新建 window（挂 mainWindow，Task126 教训）",
       "UIWindow.mainWindow" in toast and "windowLevel = 1000" not in toast)
 check("A3 自动检测一次性守卫 + 偏好开关（general.auto_update_check）",
@@ -77,19 +79,22 @@ check("B2 MS 登录成功/状态提示走 NMToast（不再系统弹窗）",
 check("B3 错误分支保留弹窗（可阅读，且已修回收）",
       acc.find("认证失败：恢复交互并展示错误") > 0)
 
-print("== C. Task127 子面板新拟物基底 ==")
-check("C1 UIViewController+NMPanel 存在（幂等 + 逃生舱）",
-      "nm_applySubpanelNeomorphStyle" in panel and
-      "nm_subpanelExcludesNeomorphStyle" in panel)
-check("C2 透明定制面板跳过（背景照片功能不破坏）",
-      "UIColor.clearColor" in panel and "transparentByDesign" in panel)
-check("C3 表格深度限界遍历（不深入 cell）",
+print("== C. Task127 子面板基底（Task138 重锚：Task137 新拟态退役后的原生化继任形态） ==")
+# Task137 按用户指令删除全部新拟态代码，NMPanel 重写为 AMEPanel；
+# Task127 的四条语义保证（幂等/透明跳过/深度限界/单一执法点）在继任者
+# 中原样保留，断言改钉继任符号。
+check("C1 UIViewController+AMEPanel 存在（幂等语义保留）",
+      "ame_applySubpanelBaseStyle" in panel and
+      "幂等：每个 VC 实例只应用一次" in panel)
+check("C2 透明定制面板跳过（背景照片功能不破坏，语义保留）",
+      "clearColor" in panel)
+check("C3 表格深度限界遍历（不深入 cell，语义保留）",
       "depth > 3" in panel)
-check("C4 单一执法点（push + 根面板）",
+check("C4 单一执法点（push + 根面板，语义保留）",
       "pushViewController:(UIViewController *)viewController" in nav and
-      "nm_applySubpanelNeomorphStyle" in nav)
-check("C5 CMakeLists 收录新组件（NMToast + NMPanel）",
-      "NeomorphKit/NMToast.m" in cml and "NeomorphKit/UIViewController+NMPanel.m" in cml)
+      "ame_applySubpanelBaseStyle" in nav)
+check("C5 CMakeLists 收录继任组件（Natives/NMToast.m + AMEPanel）",
+      "NMToast.m" in cml and "UIViewController+AMEPanel.m" in cml)
 
 print("== D. Task128 第三方登录修复（zl2 参照）==")
 check("D1 authlib-injector jar 随包（Task132 升级 1.2.8：349681B，sha256 9c7f4343...）",
@@ -141,7 +146,7 @@ def balance(src):
             if c == '*' and i + 1 < n and src[i+1] == '/': state = 0; i += 1
         i += 1
     return depth
-TOUCHED = ["Natives/NeomorphKit/NMToast.m", "Natives/NeomorphKit/UIViewController+NMPanel.m",
+TOUCHED = ["Natives/NMToast.m", "Natives/UIViewController+AMEPanel.m",
            "Natives/LauncherRootViewController.m", "Natives/LauncherNavigationController.m",
            "Natives/ios_uikit_bridge.m", "Natives/AccountListViewController.m",
            "Natives/authenticator/ThirdPartyAuthenticator.m", "Natives/authenticator/BaseAuthenticator.m",

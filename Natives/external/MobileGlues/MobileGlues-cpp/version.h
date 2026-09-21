@@ -1007,3 +1007,53 @@
 // URL constants so the new chain bypassed the injection straight to Mojang
 // (401, skins fell back to defaults); 1.2.8 adds httpd/DiscoveryFilter for the
 // new chain and keeps Java 17/21/25 compatibility.
+
+// REVISION 17 addendum (Task 138, no bump): eight fixes from the c68552a
+// four-log install feedback (latestlog = 26.1.2 controlify SIGBUS persists /
+// latestlog.old.txt = 26.2 MobileGL-gles SIGSEGV / latestlog.txt = 26.2
+// Mithril UnsatisfiedLinkError / latestlog.txt.old.txt = 26.2 OSMesa 60fps
+// clean run). (a) 26.1.2 crash FINAL root cause: JNA direct mapping. The new
+// crash log proves every Task131/132/133/135 guard engaged as designed (three
+// image detections, direct hdr+slide rebind invoked, jnilib slot idempotent
+// hit -- the fishhook race hypothesis confirmed) yet the crash persists, and
+// it happens BEFORE any SDL symbol resolution: controlify 3.0.1+26.1 bundles
+// libsdl4j 3.2.18 whose Native.register path allocates libffi closure
+// trampolines via ffi_closure_alloc + RegisterNatives; on iOS those pages are
+// RW-only, so the first direct-mapped call jumps to page+0x10 and SIGBUSes
+// (0x134ea0010 and 0x119a70010 share the +0x10 libffi free-list signature).
+// Fix: setenv POJAV_NATIVEDIR (from POJAV_HOME) so Pojav-aware mods steer to
+// the nonexistent libSDL3.so, UnsatisfiedLinkError is caught, controlify
+// falls back to GLFWControllerManager and the game runs; verified against
+// controlify source (only SDLNativesLoader/CUtil read the var; the 3.5.0 FFM
+// loader ignores it). (b) TouchController + hide-controls were broken by
+// Task134 writing config.json/order.json with NSDictionary/NSArray
+// writeToFile (plist XML) while the mod parses JSON -- kotlinx threw
+// JsonDecodingException reading '<', the config fell back to defaults and the
+// clean-preset pointer was lost; also the read side (dictionaryWithContentsOfFile)
+// could never read the mod's own JSON, so the "preserve mod settings" rewrite
+// wiped them every launch. Both files now go through NSJSONSerialization
+// helpers (ame138_readJSONDictionary/ame138_readJSONArray/ame138_writeJSON).
+// (c) MobileGL-gles SIGSEGV: gl_bridge.m dlsym_EGL and sdl3_hook.m's renderer
+// handle fallback used the logical key libMobileGL-gles.dylib verbatim for
+// the @rpath dlopen (file does not exist -- the -gles variant shares
+// libMobileGL.dylib); the shared mapping now lives in utils.h as
+// ame_physical_renderer_dylib and both call sites use it. (d) Mithril pick
+// with the dylib absent crashed with UnsatisfiedLinkError: the picker keeps
+// all three family options (user mandate) but ame_effective_renderer now
+// falls back to auto (ANGLE) with a once-per-process NMToast, and the pick
+// handler warns immediately at selection time; new l10n key
+// preference.warning.renderer_missing_dylib x4 languages. (e) Home avatar
+// could turn square on tab switches: the radius was only set in
+// layoutSubviews when bounds were final; a capsule constant (999) now makes
+// the square view a perfect circle regardless of layout timing. (f) The
+// announcement tile's fixed 90pt height clipped its action button; height is
+// now measured from the preview-level text plus button (ame138_announcementTileHeight,
+// floor 90) and the section reload animates via performBatchUpdates. (g)
+// Download mirror strategy gains a third option "speed first" (FCL-style):
+// PLMirrorCenter races official vs mirror per family (BMCLAPI / MCIM) with a
+// 24h persisted cache, unknown-results default to mirror order; all four
+// policy rows and the moved-in mod mirror row (from the launcher section,
+// now a unified coarse control writing assetSearch+assetDownload) default to
+// speed_first. (h) Animation polish: home tiles animate only on first
+// appearance (no re-fade on scroll-back), item-level stagger, sidebar
+// selection color cross-fades in 0.18s.

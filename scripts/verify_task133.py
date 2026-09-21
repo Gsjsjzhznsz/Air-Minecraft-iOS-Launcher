@@ -54,27 +54,30 @@ check("A4 崩溃日志三轮反馈同根因记录（Task129/131/132 误诊史）
       "Task129" in lpvc and "Task131" in lpvc)
 
 print("== B. 26.1.2 controlify/JNA SIGBUS 根治（Task133 镜像扫描重绑定）==")
-# Task134 重锚：df10f70/3756a05 上传的新日志——崩溃会话在 latestlog.old.txt
-# （26.1.2 整合包），成功会话在 latestlog.txt（26.2 TouchController 测试）。
-log = rd("latestlog.old.txt")
-log_ok = rd("latestlog.txt")
-check("B1 崩溃证据链在位（df10f70 新日志：controlify -> SDLNativesLoader -> Structure -> SIGBUS，零守卫日志）",
+# Task138 重锚：c68552a 上传的四份新日志——26.1.2 崩溃会话在 latestlog
+# （26.1.2 整合包），成功会话在 latestlog.txt.old.txt（26.2 OSMesa 60fps）。
+log = rd("latestlog")
+log_ok = rd("latestlog.txt.old.txt")
+# Task138 定案：新崩溃日志证明 Task133 全链如实生效（三连检出 + 直传重绑 +
+# jnilib 槽 idempotent hit），崩溃仍发生——真根因不在符号解析层，而是 JNA
+# direct mapping 的 ffi 闭包跳板页在 iOS 不可执行（Task138 POJAV_NATIVEDIR
+# 让 controlify 走 GLFWControllerManager 优雅降级根治）。
+check("B1 崩溃证据链在位（c68552a 新日志：controlify -> SDLNativesLoader -> Structure -> SIGBUS）",
       "Initializing Controlify" in log and
       "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
       "Platform.isMac called from com.sun.jna.Structure" in log and
       re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None and
       "[SDLHook] Task131: SDL_SetEventFilter" not in log)
-check("B1b 新日志实证 Task133 链路已通（libjli/libjvm/libjnidispatch 三连检出 + 重绑定调用）——断点收窄到 Task132 静默早退（Task134 已修：直传 hdr+slide + 重试）",
+check("B1b 新日志实证 Task133 链路已通且全链生效仍崩溃（Task138 收窄定案：JNA ffi 闭包页）",
       "Task133: libjli image detected" in log and
       "Task133: libjvm image detected" in log and
       "Task133: libjnidispatch image detected" in log and
       "invoking Task132 dlsym rebind" in log and
-      "slot rebound" not in log and
-      "no _dlsym pointer" not in log)
-check("B1c 成功会话对照（26.2 会话守卫触发 + 正常 exit(0)：拦截设计本身有效）",
+      "Task135: _dlsym slot" in log and "idempotent hit" in log)
+check("B1c 成功会话对照（26.2 会话守卫触发 + 60fps 心跳干净游玩：拦截设计本身有效）",
       "Task131: SDL_SetEventFilter" in log_ok and "hooked SDL_SetEventFilter" in log_ok and
-      "exit(0) called" in log_ok and
-      re.search(r"SIGBUS \\(0xa\\)", log_ok) is None and "Problematic frame" not in log_ok)
+      re.search(r"fps=60", log_ok) is not None and
+      re.search(r"SIGBUS \(0xa\)", log_ok) is None and "Problematic frame" not in log_ok)
 check("B2 ensure 主函数定义 + 增量游标设计（dlclose 回落全量重扫）",
       "void amethyst_task133_ensure_jvm_chain(void)" in sdl and
       "t133_cursor" in sdl and "count >= t133_cursor" in sdl)
@@ -156,8 +159,10 @@ def lkeys(lang):
 
 
 ks = [lkeys(l) for l in LANGS]
-check("F1 四语言键集一致（Task134 基线 1916 = 1907 - pickextra 3 + 新增 12）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1916, f"counts={[len(k) for k in ks]}")
+# Task138 重锚：+2 键（preference.warning.renderer_missing_dylib +
+# preference.title.mirror_policy-speed_first），1916 -> 1918
+check("F1 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + Task138 新增 2）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1918, f"counts={[len(k) for k in ks]}")
 check("F2 pickextra 三键已随机制退役；Task134 新 12 键在位（jit_enabler 7 + title/detail 4 + hide_controls）",
       all("preference.pickextra.edit_layout" not in k and
           "preference.pickextra.edit_gamepad" not in k and

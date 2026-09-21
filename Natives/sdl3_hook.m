@@ -1032,7 +1032,8 @@ static void *ame_rendererHandle(void) {
 
     const char *renderer = getenv("AMETHYST_RENDERER");
     if (renderer == NULL || renderer[0] == '\0') return NULL;
-    NSString *path = [NSString stringWithFormat:@"@rpath/%s", renderer];
+    // Task 138：同 gl_bridge 的 dlsym_EGL——-gles 逻辑键先映射回共享二进制。
+    NSString *path = [NSString stringWithFormat:@"@rpath/%s", ame_physical_renderer_dylib(renderer)];
     // 渲染器已由 LWJGL（org.lwjgl.opengl.libname）加载。先 NOLOAD 取同一
     // 句柄；万一失败（@rpath 展开差异等），退回普通 dlopen —— dyld 按文件
     // 身份去重，不会真的映射第二份。

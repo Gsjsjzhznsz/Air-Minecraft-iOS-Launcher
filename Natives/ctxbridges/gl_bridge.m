@@ -1230,7 +1230,13 @@ static bool dlsym_EGL() {
     //     mg_init_gles 引导完成前避免触发前端内部的 LOAD_EGL 一次性初始化）。
     //   - 其余渲染器（gl4es / ANGLE / LTW）：全部从 ANGLE 解析。
     const char *renderer = getenv("AMETHYST_RENDERER");
-    const char *eglLibrary = isSelfEglRenderer(renderer) ? renderer : RENDERER_NAME_MTL_ANGLE;
+    // Task 138：-gles 逻辑键先映射回共享的 libMobileGL.dylib（utils.h 的
+    // ame_physical_renderer_dylib，病历见其注释——此前此处按字面拼
+    // @rpath/libMobileGL-gles.dylib，dlopen 必败，EGL 全空导致后续
+    // gl_init_context 空指针 SIGSEGV）。
+    const char *eglLibrary = isSelfEglRenderer(renderer)
+        ? ame_physical_renderer_dylib(renderer)
+        : RENDERER_NAME_MTL_ANGLE;
     NSString *eglPath = [NSString stringWithFormat:@"@rpath/%s", eglLibrary ?: ""];
     void* dl_handle = dlopen(eglPath.UTF8String, RTLD_NOW | RTLD_GLOBAL);
     if (!dl_handle) {

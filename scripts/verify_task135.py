@@ -136,8 +136,10 @@ for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     keys = set(re.findall(r'^"([^"]+)"\s*=', s, re.M))
     base[l] = len(keys)
 vals = set(base.values())
-check("D3 四语言唯一键集一致且为 Task134 基线 1916（本任务只改值不动键）",
-      vals == {1916}, str(base))
+# Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first），
+# 唯一键基线 1916 -> 1918
+check("D3 四语言唯一键集一致且为 Task138 基线 1918（Task134 的 1916 + Task138 新增 2）",
+      vals == {1918}, str(base))
 r2 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_sdl3_eventfilter_guard.py"),
                      os.path.join(REPO, "Natives/resources/Frameworks/libSDL3.dylib")],
                     capture_output=True, text=True, timeout=60)
@@ -158,8 +160,11 @@ cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("E10 Makefile TAB 基线 = HEAD+14（I4 重锚自校验）",
-      cur_tab == head_tab + 14, f"head={head_tab} cur={cur_tab}")
+# Task138 重锚：Task135 的 14 个 TAB 行已随提交入 HEAD，"+14" 形态在
+# 提交后恒假；长期不变量 = 工作树与 HEAD 一致 + dep_sdl3_guard 目标在位。
+check("E10 Makefile TAB 基线 = HEAD 且 dep_sdl3_guard 在位（Task138 重锚）",
+      cur_tab == head_tab and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk,
+      f"head={head_tab} cur={cur_tab}")
 
 print(f"\n==== RESULT: {'ALL PASS' if FAIL == 0 else 'FAILED'} ({PASS}/{PASS+FAIL}) ====")
 sys.exit(0 if FAIL == 0 else 1)

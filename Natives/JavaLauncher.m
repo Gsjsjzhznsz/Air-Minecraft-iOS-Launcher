@@ -891,6 +891,45 @@ static void ame99_installAppKitMenuStubs(void) {
 // mod 回落默认内置预设）。空布局预设文件保留（在 mod 配置界面可见
 // "Amethyst Clean"，用户也可在游戏内手动选用）。
 // ---------------------------------------------------------------------------
+// Task 138：JSON 读写全面替换 Task134 的 plist 序列化。
+//
+// 病历（本轮 latestlog.txt.old.txt 26.2 会话实锤）：Task134 用
+// NSDictionary/NSArray 的 writeToFile 写 config.json 与 order.json——
+// 该 API 输出的是 plist XML（文件头为 <?xml version="1.0" ...），而 mod
+// 侧 GlobalConfigHolder.load 与 PresetsContainer 用 kotlinx.serialization
+// 按 JSON 解析，读到首个字符为 < 直接抛 JsonDecodingException
+// （期望 JSON 对象开头，却读到了 XML 声明）→ 全局配置读取失败回落默认 → preset 指针
+// 丢失 → 屏蔽控件失效；读取侧同病：dictionaryWithContentsOfFile/
+// arrayWithContentsOfFile 对 mod 写出的合法 JSON 恒返回 nil，"保留 mod
+// 已有设置"的读改写逻辑从未生效过（每次启动都把 mod 的全部设置清成只剩
+// preset 一个键，且还是 XML 形态）。本函数现全部改用 NSJSONSerialization
+// 读写两个文件，mod 侧 "Reading TouchController config file" 不再报错，
+// 读改写真正保留 mod 设置；存量被污染的 XML 文件会在下一次启动被合法
+// JSON 覆盖（XML 解析失败按"无既有配置"处理，与全新安装等价）。
+static NSDictionary *ame138_readJSONDictionary(NSString *path) {
+    NSData *ame138_data = [NSData dataWithContentsOfFile:path];
+    if (!ame138_data) return nil;
+    id ame138_obj = [NSJSONSerialization JSONObjectWithData:ame138_data
+        options:0 error:nil];
+    return [ame138_obj isKindOfClass:NSDictionary.class] ? ame138_obj : nil;
+}
+
+static NSArray *ame138_readJSONArray(NSString *path) {
+    NSData *ame138_data = [NSData dataWithContentsOfFile:path];
+    if (!ame138_data) return nil;
+    id ame138_obj = [NSJSONSerialization JSONObjectWithData:ame138_data
+        options:0 error:nil];
+    return [ame138_obj isKindOfClass:NSArray.class] ? ame138_obj : nil;
+}
+
+static BOOL ame138_writeJSON(id obj, NSString *path) {
+    if (![NSJSONSerialization isValidJSONObject:obj]) return NO;
+    NSData *ame138_out = [NSJSONSerialization dataWithJSONObject:obj
+        options:NSJSONWritingPrettyPrinted error:nil];
+    if (!ame138_out) return NO;
+    return [ame138_out writeToFile:path options:NSDataWritingAtomic error:nil];
+}
+
 static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
     if (gameDir.length == 0) {
         return;
@@ -905,13 +944,12 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
     NSString *presetFile =
         [presetDir stringByAppendingPathComponent:[cleanUuid stringByAppendingPathExtension:@"json"]];
 
-    // 读现有全局配置（保留 mod 已有的其它设置）
+    // 读现有全局配置（Task 138：JSON 读，保留 mod 已有的其它设置；
+    // 存量 XML 污染文件在此按无既有配置处理）
     NSMutableDictionary *config = [NSMutableDictionary dictionary];
-    if ([ame134_fm fileExistsAtPath:configFile]) {
-        NSDictionary *loaded = [NSDictionary dictionaryWithContentsOfFile:configFile];
-        if ([loaded isKindOfClass:NSDictionary.class]) {
-            config = loaded.mutableCopy;
-        }
+    NSDictionary *ame138_loaded = ame138_readJSONDictionary(configFile);
+    if (ame138_loaded) {
+        config = ame138_loaded.mutableCopy;
     }
 
     if (getPrefBool(@"control.mod_touch_hide_controls")) {
@@ -920,18 +958,17 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
         NSString *presetJson = @"{\n  \"name\" : \"Amethyst Clean\",\n  \"layout\" : [\n  ]\n}";
         [presetJson writeToFile:presetFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
-        // order.json：保留已有条目，追加本预设（mod 的 PresetsContainer 按
-        // order 排序；缺 order.json 时按 uuid 排序兜底，写入只为整洁）
+        // order.json（Task 138：JSON 数组）：保留已有条目，追加本预设
+        // （mod 的 PresetsContainer 按 order 排序；缺 order.json 时按
+        // uuid 排序兜底，写入只为整洁）
         NSMutableArray *order = [NSMutableArray array];
-        if ([ame134_fm fileExistsAtPath:orderFile]) {
-            NSArray *loaded = [NSArray arrayWithContentsOfFile:orderFile];
-            if ([loaded isKindOfClass:NSArray.class]) {
-                [order addObjectsFromArray:loaded];
-            }
+        NSArray *ame138_orderLoaded = ame138_readJSONArray(orderFile);
+        if (ame138_orderLoaded) {
+            [order addObjectsFromArray:ame138_orderLoaded];
         }
         if (![order containsObject:cleanUuid]) {
             [order addObject:cleanUuid];
-            [order writeToFile:orderFile atomically:YES];
+            ame138_writeJSON(order, orderFile);
         }
 
         // 备份原 preset 值（仅一次——重复启动不覆盖首次备份，保证还原语义）
@@ -946,8 +983,9 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
             }
         }
         config[@"preset"] = @{@"type": @"custom", @"uuid": cleanUuid};
-        [config writeToFile:configFile atomically:YES];
-        NSLog(@"[TouchController] Task134: clean layout applied (empty preset %@)", cleanUuid);
+        ame138_writeJSON(config, configFile);
+        NSLog(@"[TouchController] Task134: clean layout applied (empty preset %@)"
+              @" [Task138: config.json/order.json now written as JSON, was plist XML]", cleanUuid);
     } else {
         // —— 关闭：恢复备份的 preset（无备份则移除字段回落 mod 默认） ——
         NSString *backup = getPrefObject(@"control.mod_touch_prev_preset_json");
@@ -963,7 +1001,7 @@ static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
         } else {
             return; // 未开启也从未开启过：不动配置
         }
-        [config writeToFile:configFile atomically:YES];
+        ame138_writeJSON(config, configFile);
         NSLog(@"[TouchController] Task134: clean layout reverted (preset restored)");
     }
 }
@@ -1087,6 +1125,50 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         }
     }
     // ------------------------------------------
+
+    // Task 138：26.1.2 controlify 3.0.1+26.1 JNA 直连 SIGBUS 根治。
+    //
+    // 崩溃链（本轮四日志判读 + JNA 5.13 dispatch.c 反编译实锤）：
+    //   controlify 3.0.1+26.1 捆绑 libsdl4j 3.2.18（JNA 版 SDL3 绑定），
+    //   加载链 = SDLNativesLoader.tryLoad → loadLibSDL3FromFilePathNow →
+    //   NativeLibrary.getInstance("SDL3") → startSDL3 → SdlHints.SDL_SetHint
+    //   首次调用触发 SdlHints 类初始化 → Native.register（JNA direct mapping）→
+    //   jnidispatch 的 registerMethod：ffi_closure_alloc +
+    //   ffi_prep_closure_loc + RegisterNatives(闭包跳板)。
+    //   aarch64 上 libffi 的可执行跳板就在闭包页内；iOS 普通进程拿不到
+    //   匿名可执行内存，该页只读可写不可执行 → 首个 direct-mapped 调用
+    //   跳入 RW 页 → SIGBUS 于页基址+0x10（libffi 页首空闲链表头占 0x10，
+    //   两次独立崩溃 0x134ea0010 与 0x119a70010 的 +0x10 形态完全吻合）。
+    //   Task131/132/133/135 的符号重绑与 SDL3 二进制守卫在装机日志中全部
+    //   如实生效（idempotent hit 与 verified 锚点齐全），但崩溃点位于 JNA
+    //   自身的 ffi 闭包基础设施、先于任何 SDL 函数解析——守卫覆盖不到。
+    //
+    // 修复：设置 POJAV_NATIVEDIR。controlify 的 CUtil.IS_POJAV_LAUNCHER
+    // 判定 = 该环境变量非空；检测到 Pojav 系启动器后 SDLNativesLoader 改从
+    // POJAV_NATIVEDIR 下的 libSDL3.so 加载。该文件不存在时
+    // NativeLibrary.getInstance 抛 UnsatisfiedLinkError，tryLoad 的
+    // catch (UnsatisfiedLinkError) 兜住并记 "Failed to find SDL"，
+    // initializeControlify 随即回落 GLFWControllerManager（GLFW 手柄路径，
+    // 与本启动器 LWJGL 栈兼容）——游戏正常继续，不再 SIGBUS。
+    //
+    // 取值指向 POJAV_HOME（Documents 根，无任何 .so）：语义上符合 Pojav
+    // 系约定，且绝不误中（本 app 的 SDL3 是 Frameworks 里的 libSDL3.dylib，
+    // 非 .so 命名）。影响面核查：controlify 3.0.1+26.1 全 jar 仅
+    // SDLNativesLoader 与 CUtil 两处读该变量；controlify 3.5.0 起（26.2
+    // 会话在用）SDLNativesLoader 已改为 FFM 四级加载链（controlify_natives
+    // → LWJGL → nativesInJar → loadFromSystem），不读该变量、不受影响；
+    // 本启动器 ObjC 与 Java 两侧均无该变量的既有读写点。
+    // 用户侧指引：26.1.2 想要完整 SDL 手柄支持，把 controlify 升级到
+    // 3.5.0+mc26.1 或更新（FFM 路径，与本启动器完全兼容，26.2 会话实证）。
+    {
+        const char *pojavNativeDir138 = getenv("POJAV_HOME");
+        if (pojavNativeDir138 && *pojavNativeDir138) {
+            setenv("POJAV_NATIVEDIR", pojavNativeDir138, 1);
+            NSLog(@"[JavaLauncher] Task138: POJAV_NATIVEDIR=%s (controlify JNA direct-mapping guard: "
+                  @"libsdl4j ffi closure thunks are non-executable on iOS, steer Pojav-aware mods "
+                  @"to graceful GLFW fallback)", pojavNativeDir138);
+        }
+    }
 
     BOOL launchJar = NO;
     NSString *gameDir;
