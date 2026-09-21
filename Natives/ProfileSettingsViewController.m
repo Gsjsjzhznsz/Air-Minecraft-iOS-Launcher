@@ -617,6 +617,12 @@ static NSString * localizeProfileTitle(NSString *title) {
         existing = [NSMutableDictionary dictionary];
     }
     existing[@"renderer"] = self.selectedRenderer;
+    // Task 139：渲染器四处写入同构（设置页主行/renderer_backend 行/版本
+    // 管理器/本实例设置页）——本页此前只写 profile，全局 video.renderer
+    // 停在旧值，与设置页的双写读者形成层级间漂移。同步全局，两层恒一致。
+    if ([self.selectedRenderer isKindOfClass:NSString.class] && self.selectedRenderer.length > 0) {
+        setPrefString(@"video.renderer", self.selectedRenderer);
+    }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
     existing[@"javaVersion"] = self.selectedJavaVersion;
     existing[@"allocatedMemory"] = @(self.allocatedMemory);

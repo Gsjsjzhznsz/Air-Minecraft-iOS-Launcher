@@ -676,6 +676,10 @@ extern "C" bool ame_mgl_fsr_before_swap(void) {
               surfW, surfH);
         // 与 osm_bridge Task83b 同款自愈：MC 切回全分辨率渲染，画面退出蜷缩。
         CallbackBridge_nativeSendScreenSize(surfW, surfH);
+        // Task 139：输入侧同步复位 —— MC 窗口信念已变为全表面，
+        // sendTouchPoint 的 mgFsrScale 除数若仍为档位系数，触点坐标
+        // 只发一半（23:08 会话“mg 渲染器输入错位”实锤）。
+        ame139_fsr_heal_reset_input_scale();
     }
     return ok;
 }

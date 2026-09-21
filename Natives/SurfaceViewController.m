@@ -347,6 +347,38 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
 // forward physical keyboard events to the embedded SDL_uikitview.
 static UIView *findSDL_uikitview(UIView *root);
 
+// Task 139：FSR 渲染兜底自愈的输入侧复位入口。
+//
+// 病历（23:08 MobileGL-gles 装机会话实锤）：mgl_fsr 的 Task119 兜底在
+// EASU 不可用时把 MC 窗口恢复为全表面分辨率（nativeSendScreenSize 会
+// 同步全局 windowWidth/windowHeight），MC 随即按全分辨率渲染（viewport
+// 2360x1640 证据）——但 sendTouchPoint 的输入换算仍除以 mgFsrScale(2.0)，
+// 触点坐标只发了一半，落在 MC 全分辨率窗口信念的四分之一处 = 用户看到
+// 的"mg 渲染器输入错位"。osm_bridge 的 Task83b 兜底同款隐患。
+//
+// 修法：两个兜底点在恢复窗口尺寸后调用本函数，把 mgFsrScale 归一。
+// ivar 是本文件类扩展私有，桥接文件碰不到 —— 本函数是唯一入口（主线程
+// 派发，与 UI 归属一致；输入事件本身在主线程产生，无竞态）。
+void ame139_fsr_heal_reset_input_scale(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        @try {
+            UIViewController *vc = UIWindow.mainWindow.rootViewController;
+            if (![vc isKindOfClass:SurfaceViewController.class]) {
+                // 游戏中 root 一定是 SurfaceViewController；防御其它形态
+                return;
+            }
+            SurfaceViewController *svc = (SurfaceViewController *)vc;
+            if (svc->mgFsrScale > 1.0f) {
+                NSLog(@"[SurfaceVC] Task139: FSR heal -- input scale reset (%.2f -> 1.00; MC window was restored to full surface)",
+                      (double)svc->mgFsrScale);
+                svc->mgFsrScale = 1.0f;
+            }
+        } @catch (NSException *e) {
+            NSLog(@"[SurfaceVC] Task139: FSR heal reset exception: %@", e);
+        }
+    });
+}
+
 @implementation SurfaceViewController
 
 #pragma mark - TouchController Static Library Support
@@ -435,6 +467,23 @@ static UIView *findSDL_uikitview(UIView *root);
 
     if (self.touchControllerTransportHandle >= 0 && messageData) {
         [TouchControllerBridge sendToTransport:self.touchControllerTransportHandle data:messageData];
+    }
+
+    // Task 139：静态库模式双发 —— mod 0.3.1-alpha14 的 iOS 静态分支是上游
+    // 半成品（Task135 判读：创建 IosPlatform 后不 return，probeNativeLibraryInfo
+    // 落入 Cocoa/Unknown 返回 null），启动器为此设置了 TOUCH_CONTROLLER_PROXY
+    // 环境变量让 mod 自动回落 legacy UDP 通道。但本方法此前【只发 native 单例
+    // 通道】——mod 在 UDP 通道上等，事件全发进了没人读的 ring buffer，进世界
+    // 后触控全灭（菜单阶段因启动器直发输入链路兜底而幸存，造成"菜单能点、
+    // 游戏内失灵"的假象）。两通道线格式逐字节一致（type/id/x/y 大端 16/8B），
+    // 同一事件同时投递：当前 alpha14 走 UDP 收到；未来 mod 修好静态分支用
+    // 新 ABI 时走 native 收到；mod 只在其中一个通道监听，不会重复消费。
+    if (self.touchSender) {
+        if (isRemove) {
+            [self.touchSender sendType:2 id:index x:0 y:0];
+        } else {
+            [self.touchSender sendType:1 id:index x:x y:y];
+        }
     }
 }
 
@@ -1184,7 +1233,7 @@ static UIView *findSDL_uikitview(UIView *root);
         mouse.mouseInput.mouseMovedHandler = nil;
         [mouse.mouseInput.auxiliaryButtons makeObjectsPerformSelector:@selector(setPressedChangedHandler:) withObject:nil];
         [self setNeedsUpdateOfPrefersPointerLocked];
-        if (getPrefBool(@"controll.hardware_hide")) { self.ctrlView.hidden = NO; }
+        if (getPrefBool(@"controll.hardware_hide") && ![self ame139_modControlsHidden]) { self.ctrlView.hidden = NO; }
     }];
     if (GCMouse.current != nil) { [self registerMouseCallbacks:GCMouse.current]; }
 
@@ -1199,7 +1248,7 @@ static UIView *findSDL_uikitview(UIView *root);
     self.controllerDisconnectCallback = [[NSNotificationCenter defaultCenter] addObserverForName:GCControllerDidDisconnectNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
         GCController* controller = note.object;
         [ControllerInput unregisterControllerCallbacks:controller];
-        if (getPrefBool(@"control.hardware_hide")) { self.ctrlView.hidden = NO; }
+        if (getPrefBool(@"control.hardware_hide") && ![self ame139_modControlsHidden]) { self.ctrlView.hidden = NO; }
     }];
     if (GCController.controllers.count == 1) {
         [ControllerInput initKeycodeTable];
@@ -1878,11 +1927,32 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
     });
 }
 
+// Task 139：屏蔽控件门控 —— mod 已启用且开启屏蔽控件时，启动器【自身】的
+// 虚拟控件层（ctrlView，经典 Pojav 屏幕按钮）也必须一并隐藏。
+// 病历：Task134/138 只向 mod 写入了空布局预设（mod 侧控件确实隐藏了，
+// 反编译 + 装机日志双验证：config.json/preset 解析零报错、status=ENABLED
+// 时 currentPreset=空布局），但启动器自己的 ctrlView 照常显示 —— 用户
+// 看到“屏蔽控件开了但控件还在”。此门控同时作用于：初始加载（loadCustomControls）、
+// 鼠标/手柄连接断开时的 hardware_hide 恢复路径（防止意外重新显示）。
+// updateControlHiddenState 只改逐按钮 hidden，ctrlView 整层隐藏优先级更高，
+// 无需改动。
+- (BOOL)ame139_modControlsHidden {
+    return getPrefBool(@"control.mod_touch_enable") &&
+           getPrefBool(@"control.mod_touch_hide_controls");
+}
+
 - (void)loadCustomControls {
     self.edgeGesture.enabled = YES;
     [self.swipeableButtons removeAllObjects];
     NSString *controlFile = [PLProfiles resolveKeyForCurrentProfile:@"defaultTouchCtrl"];
     [self.ctrlView loadControlFile:controlFile];
+
+    // Task 139：屏蔽控件 —— 启动器自身控件层整体退场（mod 侧空布局预设
+    // 已在 JavaLauncher.ame134_applyTouchControllerCleanLayout 写入）。
+    if ([self ame139_modControlsHidden]) {
+        self.ctrlView.hidden = YES;
+        NSLog(@"[SurfaceVC] Task139: launcher control layout hidden (mod hide-controls active)");
+    }
 
     ControlButton *menuButton;
     for (ControlButton *button in self.ctrlView.subviews) {

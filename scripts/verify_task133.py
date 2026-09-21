@@ -62,12 +62,15 @@ log_ok = rd("latestlog.txt.old.txt")
 # jnilib 槽 idempotent hit），崩溃仍发生——真根因不在符号解析层，而是 JNA
 # direct mapping 的 ffi 闭包跳板页在 iOS 不可执行（Task138 POJAV_NATIVEDIR
 # 让 controlify 走 GLFWControllerManager 优雅降级根治）。
-check("B1 崩溃证据链在位（c68552a 新日志：controlify -> SDLNativesLoader -> Structure -> SIGBUS）",
+# Task 139 重锚：latestlog 已被覆盖为新一轮 26.1.2 会话（Task138 构建：
+# controlify JNA 回落成功无 SIGBUS；死于 voicechat 麦克风 tap 异常——
+# Task139 修复目标）。旧 SIGBUS 序列证据退役，新证据 = 守卫链最终生效。
+check("B1 崩溃证据链在位（Task139 重锚：POJAV_NATIVEDIR 守卫生效，UnsatisfiedLinkError → GLFW 回落，无 SIGBUS）",
       "Initializing Controlify" in log and
-      "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
-      "Platform.isMac called from com.sun.jna.Structure" in log and
-      re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None and
-      "[SDLHook] Task131: SDL_SetEventFilter" not in log)
+      "[SDLNativesLoader] Attempting to load SDL3 from " in log and
+      "java.lang.UnsatisfiedLinkError" in log and
+      "Controller connected: 'Unknown'#GLFWUniqueControllerID" in log and
+      re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is None)
 check("B1b 新日志实证 Task133 链路已通且全链生效仍崩溃（Task138 收窄定案：JNA ffi 闭包页）",
       "Task133: libjli image detected" in log and
       "Task133: libjvm image detected" in log and

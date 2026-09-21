@@ -1057,3 +1057,63 @@
 // speed_first. (h) Animation polish: home tiles animate only on first
 // appearance (no re-fade on scroll-back), item-level stagger, sidebar
 // selection color cross-fades in 0.18s.
+
+// REVISION 17 addendum (Task 139, no bump): eight fixes from the 8a6307f
+// four-log install feedback (latestlog = 26.1.2 world-join crash /
+// latestlog.txt = 26.2 MobileGL-gles input misalignment / latestlog.old.txt
+// + latestlog.txt.old.txt = 26.2 static-lib TouchController + clean-layout
+// sessions). (a) 26.1.2 world-join crash root cause: NOT a SIGBUS at all --
+// voicechat 2.6.17's MicrophoneThread takes the macOS path (Platform.isMac
+// spoof), opens our IOSAudioMixer TargetDataLine, and audio_capture_bridge's
+// createCapture force-installed the tap with a constructed 1ch/48000 Float32
+// format while the hardware input node's native format differs ->
+// uncaught com.apple.coreaudio.avfaudio 'Failed to create tap due to format
+// mismatch' NSException terminates the app (the three 26.2 sessions had no
+// voicechat mod, which is why they survived). Fix: the tap is now installed
+// with the input node's native format and the callback linearly resamples
+// (absolute-position accumulation, mono mixdown, int16 quantize) to the
+// requested rate; the whole creation + engine start is @try/@catch-guarded
+// and destroyCapture removes the tap before freeing the capture state
+// (use-after-free race). Failure now degrades to no-microphone instead of
+// killing the game. (b) MobileGL-gles input misalignment: the 23:08 session
+// proves the chain -- Task119's FSR-unavailable heal restored MC's window to
+// the full surface (viewport 2360x1640, 'GLFW: Set size 2360x1640') but
+// sendTouchPoint kept dividing by mgFsrScale(2.0), so touches landed at a
+// quarter of the screen. New ame139_fsr_heal_reset_input_scale() (declared
+// in utils.h, implemented in SurfaceViewController.m, called from BOTH heal
+// sites -- mgl_fsr Task119 and osm_bridge Task83b) resets the divisor to 1.0
+// on the main thread. (c) TouchController static-library mode dead input:
+// mode==2 sends ProxyMessages into the native singleton transport, but mod
+// 0.3.1-alpha14 (forced onto legacy UDP by TOUCH_CONTROLLER_PROXY from
+// Task135) listens on the UDP socket -- menus kept working through the
+// launcher's direct input path, in-world touch died. sendTouchControllerProxyMessage
+// now dual-sends (native channel + TouchSender UDP; byte-identical wire
+// format, mod consumes exactly one). (d) Hide-controls still showing
+// controls: mod-side forensics (CFR on the actual Modrinth jar:
+// GlobalConfigHolder.currentPreset resolves our empty preset whenever
+// status==ENABLED, and the default IS ENABLED; preset files parse clean in
+// all four logs) prove the mod side works -- the culprit is the launcher's
+// OWN ctrlView (classic Pojav buttons) which never hid. New
+// ame139_modControlsHidden gate hides it in loadCustomControls and guards
+// both hardware_hide un-hide paths; order.json also moves to preset/ (the
+// mod's PresetManager reads presetDir/order.json, the old location was
+// never read). (e) Renderer selection resetting to auto: both settings rows
+// wrote ONLY the global video.renderer while every launch-path reader
+// resolves profile-first -- an instance profile with a stored renderer
+// (version manager / instance settings / instance creation) permanently
+// shadowed the settings pick. Both rows now dual-write (profile + global,
+// ame139_writeRendererBoth), the main row displays profile-first, and
+// ProfileSettingsViewController.saveSettings syncs the global key too. (f)
+// mg OpenGL 4.0 backend showing 'not built': libmithril.dylib was never
+// actually committed (the CI comment lied). Vendored the Mithril-Wrapper
+// main-line build (3.5MB arm64 iOS, static MoltenVK, 44 egl + 380 gl
+// exports verified from the symbol table) into Natives/resources/Frameworks/
+// -- the option ships working now. (g) Forge install demanding manual JIT:
+// launchHeadlessJVM now auto-requests (debug.jit_enabler dispatch identical
+// to the launch-button flow, waiting dialog + poll) when JIT is off, and
+// re-attaches the JIT26 script via stikjit:// on TXM devices when
+// CS_DEBUGGED is set but no debugger is live (the RightPanel re-attach
+// logic, previously missing in the headless path). (h) iPhone right panel
+// streamlined: 168pt full-content column -> 96pt icon rail (username + info
+// cards retired on phone, launch/version/jar buttons icon-only, avatar 44pt),
+// matching the 56pt left sidebar's FCL-style language.

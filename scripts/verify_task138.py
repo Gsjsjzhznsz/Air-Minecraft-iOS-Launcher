@@ -103,19 +103,30 @@ menu = rd("Natives/LauncherMenuViewController.m")
 plp = rd("Natives/PLPreferences.m")
 mc = rd("Natives/PLMirrorCenter.m")
 mch = rd("Natives/PLMirrorCenter.h")
+# Task 139 重锚：用户上传了四个新 log（旧证据被覆盖）。
+#   latestlog          = 26.1.2 会话（Task138 构建：controlify JNA 回落成功，
+#                          进世界后 voicechat 麦克风 avfaudio tap 异常闪退）
+#   latestlog.txt      = 26.2 MobileGL-gles 会话（Task138 C 修复生效，游戏
+#                          正常运行；新证据 = Task119 FSR heal 恢复全分辨率）
+#   latestlog.old.txt  = 26.2 zink 会话（Task138 构建，正常游玩）
+#   latestlog.txt.old.txt = 26.2 zink 会话（旧构建，XML 污染证据仍在）
 log_2612 = rd("latestlog")
-log_gles = rd("latestlog.old.txt")
+log_gles = rd("latestlog.txt")
 log_mithril = rd("latestlog.txt")
 log_ok = rd("latestlog.txt.old.txt")
 
-print("== A. 26.1.2 崩溃根治（Task138 定案：JNA ffi 闭包页） ==")
-check("A1 崩溃日志证据（26.1.2 会话：SDLNativesLoader -> Structure -> SIGBUS，守卫全链生效仍崩）",
-      "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log_2612 and
-      "Platform.isMac called from com.sun.jna.Structure" in log_2612 and
-      re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+0010", log_2612) is not None and
-      "idempotent hit" in log_2612)
-check("A2 PC 页基址+0x10 形态（libffi 页首空闲链表头，两次独立崩溃同签名）",
-      re.search(r"SIGBUS \(0xa\) at pc=0x0000000119a70010", log_2612) is not None)
+print("== A. 26.1.2 崩溃根治（Task138 定案：JNA ffi 闭包页；Task139 重锚：回落成功 + 麦克风层新崩溃） ==")
+check("A1 崩溃日志证据（26.1.2 会话：POJAV_NATIVEDIR 生效 → UnsatisfiedLinkError → GLFW 回落成功，SIGBUS 消失）",
+      "[JavaLauncher] Task138: POJAV_NATIVEDIR=" in log_2612 and
+      "[SDLNativesLoader] Attempting to load SDL3 from " in log_2612 and
+      "java.lang.UnsatisfiedLinkError" in log_2612 and
+      "Controller connected: 'Unknown'#GLFWUniqueControllerID" in log_2612 and
+      "SIGBUS" not in log_2612 and
+      "Config loaded successfully" in log_2612)
+check("A2 新崩溃签名（voicechat 麦克风 avfaudio tap 格式不匹配 —— Task139 修复目标）",
+      "Terminating app due to uncaught exception 'com.apple.coreaudio.avfaudio'" in log_2612 and
+      "Failed to create tap due to format mismatch" in log_2612 and
+      "MicrophoneThread" in log_2612)
 check("A3 POJAV_NATIVEDIR 守卫落地（launchJVM 路径，POJAV_HOME 取值 + setenv + 日志锚点）",
       'setenv("POJAV_NATIVEDIR", pojavNativeDir138, 1)' in jl and
       "[JavaLauncher] Task138: POJAV_NATIVEDIR=" in jl)
@@ -146,11 +157,13 @@ check("B5 病历注释入档（plist XML 与 kotlinx.serialization 的冲突机�
       "plist XML" in jl and "kotlinx.serialization" in jl and
       "dictionaryWithContentsOfFile" in jl)
 
-print("== C. MobileGL-gles dlsym_EGL 映射修复 ==")
-check("C1 崩溃日志证据（EGLBridge failed to load @rpath/libMobileGL-gles.dylib + gl_init_context SIGSEGV）",
-      "failed to load @rpath/libMobileGL-gles.dylib" in log_gles and
-      "gl_init_context+0x1a4" in log_gles and
-      re.search(r"SIGSEGV \(0xb\) at pc=0x0000000000000000", log_gles) is not None)
+print("== C. MobileGL-gles dlsym_EGL 映射修复（Task139 重锚：修复生效，GLES 会话正常运行） ==")
+check("C1 会话证据（MobileGL-gles 渲染器启动成功无 SIGSEGV + Task119 FSR heal 新证据）",
+      "renderer=libMobileGL-gles.dylib" in log_gles and
+      "MobileGL renderer active: backend=DirectGLES" in log_gles and
+      "Espryt (MobileGL Core)" in log_gles and
+      "SIGSEGV" not in log_gles and
+      "Task119 FSR upscale unavailable -- restoring MC window to surface" in log_gles)
 check("C2 utils.h 统一映射助手（-gles 逻辑键 -> libMobileGL.dylib）",
       "ame_physical_renderer_dylib" in uh and
       'return RENDERER_NAME_MOBILEGL;' in uh)
@@ -159,11 +172,11 @@ check("C3 gl_bridge.m dlsym_EGL 接入（isSelfEglRenderer 分支先映射再拼
 check("C4 sdl3_hook.m ame_rendererHandle 兜底接入",
       "ame_physical_renderer_dylib(renderer)" in sdl)
 
-print("== D. Mithril 缺失 dylib 守卫 ==")
-check("D1 崩溃日志证据（LWJGL UnsatisfiedLinkError + 缺库清单无 libmithril）",
-      "Failed to locate library: libmithril.dylib" in log_mithril and
-      "libMobileGL.dylib: unknown type" in log_mithril and
-      "libmithril.dylib: unknown type" not in log_mithril)
+print("== D. Mithril 缺失 dylib 守卫（Task139 重锚：dylib 已 vendored，选项随包可用） ==")
+check("D1 libmithril.dylib 已 vendored（Task139：Natives/resources/Frameworks 下存在且为 iOS arm64 Mach-O）",
+      __import__("os").path.exists("Natives/resources/Frameworks/libmithril.dylib") and
+      __import__("os").path.getsize("Natives/resources/Frameworks/libmithril.dylib") > 3000000 and
+      open("Natives/resources/Frameworks/libmithril.dylib", "rb").read(4) == b"\xcf\xfa\xed\xfe")
 check("D2 ame_effective_renderer 启动守卫（dylib 缺失回退 auto + 单次 NMToast + 日志）",
       "ame138_physical" in lp and "falling back to auto (ANGLE)" in lp and
       "ame138_warned" in lp and "preference.warning.renderer_missing_dylib" in lp)

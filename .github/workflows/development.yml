@@ -96,8 +96,9 @@ jobs:
       # 编译失败（表现为 run 直接 failure、jobs total_count=0、日志 404）。
       # 判断逻辑一律放进 shell，env: 里引用是安全的标准用法。
       #
-      # Mithril 不需要下载步骤：libmithril.dylib 已提交在
-      # Natives/resources/Frameworks/ 下，随 Natives/resources/* 一起打包。
+      # Mithril（Task 139）：libmithril.dylib 已 vendored 自 Mithril-Wrapper
+      # 主线构建（Natives/resources/Frameworks/，随 Natives/resources/* 一起
+      # 打包）——"OpenGL 4.0 实验性"后端自此随包可用，不再显示"未构建"。
       - name: Build for ${{ matrix.platform_name }}
         env:
           IPHONEOS_DEPLOYMENT_TARGET: 14.0

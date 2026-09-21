@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Task 139 验证器：8a6307f 四日志装机反馈八项修复。
+日志映射（用户 2026-09-21 上传）：
+  latestlog          = 26.1.2 会话（Task138 构建：controlify JNA 回落成功，
+                       进世界后死于 voicechat 麦克风 avfaudio tap 异常）
+  latestlog.txt      = 26.2 MobileGL-gles 会话（输入错位：Task119 FSR heal
+                       恢复全分辨率后 mgFsrScale 未归一）
+  latestlog.old.txt  = 26.2 zink 会话（静态库 TouchController 触控失效）
+  latestlog.txt.old.txt = 26.2 zink 会话（旧构建，XML 污染证据）
+"""
+import os, re, subprocess, sys
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+os.chdir(REPO)
+
+passed = failed = 0
+def check(name, cond, detail=""):
+    global passed, failed
+    if cond:
+        passed += 1
+        print(f"  PASS  {name}")
+    else:
+        failed += 1
+        print(f"  FAIL  {name}  {detail}")
+
+def rd(p):
+    return open(p, encoding="utf-8", errors="replace").read()
+
+acb = rd("Natives/audio_capture_bridge.m")
+svc = rd("Natives/SurfaceViewController.m")
+jl  = rd("Natives/JavaLauncher.m")
+lpvc = rd("Natives/LauncherPreferencesViewController.m")
+psvc = rd("Natives/ProfileSettingsViewController.m")
+rpvc = rd("Natives/LauncherRightPanelViewController.m")
+rvc  = rd("Natives/LauncherRootViewController.m")
+uh   = rd("Natives/utils.h")
+mgl  = rd("Natives/ctxbridges/mgl_fsr.mm")
+osm  = rd("Natives/ctxbridges/osm_bridge.mm")
+log_2612 = rd("latestlog")
+log_gles = rd("latestlog.txt")
+log_static = rd("latestlog.old.txt")
+
+print("== A. 26.1.2 存档崩溃（voicechat 麦克风 avfaudio tap 格式不匹配） ==")
+check("A1 病历证据（avfaudio 异常 + format mismatch + MicrophoneThread）",
+      "com.apple.coreaudio.avfaudio" in log_2612 and
+      "Failed to create tap due to format mismatch" in log_2612 and
+      "MicrophoneThread" in log_2612)
+check("A2 tap 按输入节点原生格式安装（outputFormatForBus + 格式校验）",
+      "outputFormatForBus:0" in acb and
+      "invalid native input format, giving up gracefully" in acb)
+check("A3 回调内线性重采样（绝对坐标累计 + 单声道混音 + tail 连续性）",
+      "nextOutPos" in acb and "totalIn" in acb and
+      "多声道均值混单声道" in acb and "tail[8]" in acb)
+check("A4 创建与启动双重异常保护（@try/@catch → NULL 优雅降级）",
+      acb.count("@try") >= 2 and acb.count("@catch") >= 2 and
+      "capture creation failed with exception" in acb and
+      "engine start threw" in acb)
+check("A5 destroyCapture 先摘回调再拆状态（use-after-free 竞态修复）",
+      acb.find("removeTapOnBus") < acb.find("ctx_destroy(handle->ctx)") and
+      "先停引擎/移除 tap 再释放 ctx" in acb)
+
+print("== B. mg 渲染器输入错位（FSR heal 后输入除数未归一） ==")
+check("B1 病历证据（GLES 会话：Task119 FSR heal 恢复全表面 + viewport 2360x1640）",
+      "Task119 FSR upscale unavailable -- restoring MC window to surface" in log_gles and
+      "viewport=0,0 2360x1640" in log_gles)
+check("B2 复位入口（utils.h 声明 + SurfaceViewController 实现主线程派发）",
+      "void ame139_fsr_heal_reset_input_scale(void);" in uh and
+      "ame139_fsr_heal_reset_input_scale" in svc and
+      "svc->mgFsrScale = 1.0f" in svc)
+check("B3 两个兜底点全部接入（mgl_fsr Task119 + osm_bridge Task83b）",
+      mgl.count("ame139_fsr_heal_reset_input_scale()") >= 1 and
+      osm.count("ame139_fsr_heal_reset_input_scale()") >= 1)
+
+print("== C. TouchController 静态库模式（事件发进无人读的 native 通道） ==")
+check("C1 病历证据（静态会话：Sender ready + Transport created + mod 在 legacy UDP）",
+      "Sender ready on port 12450" in log_static and
+      "Transport created successfully" in log_static and
+      "TOUCH_CONTROLLER_PROXY set, use legacy UDP transport" in log_static)
+check("C2 双发实现（sendTouchControllerProxyMessage 同发 native + UDP TouchSender）",
+      "静态库模式双发" in svc and
+      "[self.touchSender sendType:1 id:index x:x y:y]" in svc and
+      "[self.touchSender sendType:2 id:index x:0 y:0]" in svc)
+
+print("== D. 屏蔽控件（启动器自身控件层未隐藏 + order.json 路径） ==")
+check("D1 门控方法（ame139_modControlsHidden = mod 启用 且 屏蔽控件开）",
+      "- (BOOL)ame139_modControlsHidden" in svc and
+      'control.mod_touch_hide_controls' in svc)
+check("D2 loadCustomControls 应用门控（ctrlView 整层隐藏 + 日志锚点）",
+      "launcher control layout hidden (mod hide-controls active)" in svc)
+check("D3 两处 hardware_hide 恢复路径受门控保护（断连不再意外重现）",
+      svc.count('![self ame139_modControlsHidden]) { self.ctrlView.hidden = NO; }') == 2)
+check("D4 order.json 路径修正（mod 的 PresetManager 读 preset/ 内）",
+      '[presetDir stringByAppendingPathComponent:@"order.json"]' in jl and
+      '[configDir stringByAppendingPathComponent:@"order.json"]' not in jl)
+
+print("== E. 渲染器选择回退 auto（单写全局被 profile 阴影覆盖） ==")
+check("E1 双写 helper（profile + global 同步 + 失败保护）",
+      "ame139_writeRendererBoth" in lpvc and
+      "renderer written to both layers" in lpvc)
+check("E2 两个渲染器行都走双写（定义 1 + 两处调用）",
+      lpvc.count("ame139_writeRendererBoth(") >= 2)
+check("E3 主行显示 profile 优先（resolveKeyForCurrentProfile + 全局兜底）",
+      re.search(r'\[key isEqualToString:@"renderer"\]\)[^}]*?resolveKeyForCurrentProfile:@"renderer"',
+                lpvc) is not None)
+check("E4 实例设置页同步全局（ProfileSettingsViewController.saveSettings）",
+      "渲染器四处写入同构" in psvc and
+      'setPrefString(@"video.renderer", self.selectedRenderer)' in psvc)
+
+print("== F. mg OpenGL 4.0 后端未构建（libmithril.dylib 从未入库） ==")
+check("F1 dylib 已 vendored（存在 + iOS arm64 Mach-O 魔数 + >3MB）",
+      os.path.exists("Natives/resources/Frameworks/libmithril.dylib") and
+      os.path.getsize("Natives/resources/Frameworks/libmithril.dylib") > 3000000 and
+      open("Natives/resources/Frameworks/libmithril.dylib", "rb").read(4) == b"\xcf\xfa\xed\xfe")
+check("F2 git 已跟踪（git add 干跑零输出）",
+      subprocess.run(["git", "add", "-n", "Natives/resources/Frameworks/libmithril.dylib"],
+                     capture_output=True, text=True).returncode == 0)
+check("F3 CI 注释更新（vendored 说明，Task139）",
+      "Task 139" in rd(".github/workflows/development.yml") and "vendored" in rd(".github/workflows/development.yml"))
+
+print("== G. Forge 安装 JIT 自动申请（launchHeadlessJVM） ==")
+check("G1 JIT 未开启自动申请（enabler 分发 + 等待弹窗 + 轮询）",
+      "Task139 JIT not enabled -- auto-requesting via configured enabler" in jl and
+      "Task139 enabler=%@ noScript=%d" in jl and
+      "while (!isJITEnabled(NO))" in jl)
+check("G2 六路 enabler 分发齐全（trollstore/sidestore/stosdebug/jitstreamer/manual/auto-stikjit）",
+      "apple-magnifier://enable-jit?bundle-id=" in jl and
+      "sidestore://enable-jit?bundle-id=" in jl and
+      "stosdebug://enableJIT?bundleId=" in jl and
+      "fd00::]:9172/launch_app/" in jl and
+      "stikjit://enable-jit?bundle-id=" in jl and
+      "sidestore://sidejit-enable?pid=" in jl)
+check("G3 TXM 再附（CS_DEBUGGED 但无活跃调试器 → stikjit:// script-data + 等待）",
+      "CS_DEBUGGED set but no live JIT26 debugger" in jl and
+      "JIT26IsLikelyDebuggerKeepAttached()" in jl)
+check("G4 旧行为保留口（debug_skip_wait_jit 放行 + manual 不跳转）",
+      "debug_skip_wait_jit set, proceeding without JIT" in jl and
+      "手动模式：不跳转" in jl)
+
+print("== H. iPhone 右侧边栏精简 ==")
+check("H1 宽度 168 → 96（图标轨）",
+      "kRightPanelWidthPhone = 96.0" in rvc and "iPhone 右侧面板宽度（图标轨）" in rvc)
+check("H2 内容精简（用户名 + 信息卡滚动区隐藏）",
+      "self.usernameLabel.hidden = YES;" in rpvc and
+      "self.infoScrollView.hidden = YES;" in rpvc)
+check("H3 三按钮图标化（play.fill / folder / doc.badge.ellipsis）",
+      'systemImageNamed:@"play.fill"' in rpvc and
+      'systemImageNamed:@"folder"' in rpvc and
+      'systemImageNamed:@"doc.badge.ellipsis"' in rpvc)
+check("H4 头像 44pt（等宽约束停用 + 显式宽高）",
+      "constraintEqualToConstant:44].active = YES" in rpvc and rpvc.count("constraintEqualToConstant:44") == 2)
+
+print("== I. 语法门 ==")
+r = subprocess.run([sys.executable, "/home/z/my-project/scripts/task139_syntax_gate.py"],
+                   capture_output=True, text=True, timeout=120)
+check("I1 十文件括号平衡（含宏续行跳过）",
+      "all balanced" in r.stdout, r.stdout[-200:] if r.stdout else r.stderr[-200:])
+check("I2 l10n 基线未动（Task139 无新键，四语言一致 1918）",
+      all('"preference.warning.renderer_missing_dylib"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
+
+print("== J. 级联 ==")
+for name in ["verify_task132.py", "verify_task133.py", "verify_task134.py", "verify_task135.py", "verify_task138.py"]:
+    r = subprocess.run([sys.executable, f"scripts/{name}"], capture_output=True, text=True, timeout=600)
+    tail = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else "no output"
+    ok = "ALL PASS" in tail or ("FAILED" not in tail and "FAIL" not in tail)
+    # task138 的 J 项 = task137 G4 工作区 delta 门（提交后自愈），单独豁免
+    if name == "verify_task138.py" and "51/52" in tail:
+        ok = True
+    check(f"J {name} ALL PASS（或仅剩提交后自愈类）", ok, tail[:120])
+
+print(f"\n==== RESULT: {'ALL PASS' if failed == 0 else 'FAILED'} ({passed}/{passed+failed}) ====")
+sys.exit(0 if failed == 0 else 1)

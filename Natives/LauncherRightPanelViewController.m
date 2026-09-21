@@ -589,6 +589,58 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // JIT 卡三态 + 内存权限两卡（Task93 起与启动日志同源的签名口径）
     [self updateJITStatus];
     [self updateMemoryEntitlementStatus];
+
+    // ===== Task 139：iPhone 右侧边栏精简 =====
+    // 病历：左侧边栏在 iPhone 上已是 56pt 纯图标轨（FCL 风格），右侧面板
+    // 却仍是 168pt 全内容（7 张信息卡 + 文字按钮 + 用户名），手机横屏下
+    // 占掉近一半内容区。用户指令“手机上右边侧边栏要精简”。方案：
+    //   - 用户名隐藏（头像保留，长按菜单/点击账号管理不受影响）
+    //   - 信息卡滚动区整体退场（设备/系统/版本等信息在设置页脚可见；
+    //     启动反馈由启动遮罩层与下载悬浮球承担）
+    //   - 三个按钮全部图标化（启动=play.fill / 选版本=folder / 执行JAR=
+    //     doc.badge.ellipsis），保留原约束骨架（空窗区留白与 iPad 同构）
+    //   - 配合 LauncherRootViewController 的面板宽度 168 -> 96
+    // 状态卡/进度 UI 仍然创建（隐藏而不缺席），所有更新代码路径零改动。
+    NSString *ame139_model = [[UIDevice currentDevice].model lowercaseString];
+    if ([ame139_model containsString:@"iphone"]) {
+        self.usernameLabel.hidden = YES;
+        self.infoScrollView.hidden = YES;
+
+        UIImage *ame139_play = [UIImage systemImageNamed:@"play.fill"];
+        if (ame139_play) {
+            [self.launchButton setTitle:nil forState:UIControlStateNormal];
+            [self.launchButton setImage:ame139_play forState:UIControlStateNormal];
+            self.launchButton.tintColor = [UIColor whiteColor];
+            self.launchButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+            self.launchButton.imageView.contentMode = UIViewContentModeScaleAspectFit;
+        }
+        UIImage *ame139_folder = [UIImage systemImageNamed:@"folder"];
+        if (ame139_folder) {
+            [self.manageVersionBtn setTitle:nil forState:UIControlStateNormal];
+            [self.manageVersionBtn setImage:ame139_folder forState:UIControlStateNormal];
+            self.manageVersionBtn.tintColor = [UIColor whiteColor];
+            self.manageVersionBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+        }
+        UIImage *ame139_jar = [UIImage systemImageNamed:@"doc.badge.ellipsis"];
+        if (ame139_jar) {
+            [self.executeJarBtn setTitle:nil forState:UIControlStateNormal];
+            [self.executeJarBtn setImage:ame139_jar forState:UIControlStateNormal];
+            self.executeJarBtn.tintColor = [UIColor whiteColor];
+            self.executeJarBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+        }
+        // 头像改固定 44pt（不再与执行Jar按钮等宽——图标轨尺寸语言）。
+        // 先停用上方激活的“头像宽=执行Jar宽”required 约束，避免双约束冲突。
+        for (NSLayoutConstraint *ame139_c in self.avatarImageView.constraints) {
+            if (ame139_c.firstItem == self.avatarImageView &&
+                ame139_c.secondItem == self.executeJarBtn &&
+                ame139_c.firstAttribute == NSLayoutAttributeWidth) {
+                ame139_c.active = NO;
+            }
+        }
+        [self.avatarImageView.widthAnchor constraintEqualToConstant:44].active = YES;
+        [self.avatarImageView.heightAnchor constraintEqualToConstant:44].active = YES;
+        NSLog(@"[RightPanel] Task139: iPhone streamlined (icon-only buttons, cards retired, 96pt rail)");
+    }
 }
 
 #pragma mark - Actions

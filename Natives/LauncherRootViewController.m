@@ -33,7 +33,10 @@
 static const CGFloat kSidebarWidthPad = 70.0;      // iPad 左侧边栏宽度
 static const CGFloat kSidebarWidthPhone = 56.0;    // iPhone 左侧边栏宽度（仅图标）
 static const CGFloat kRightPanelWidthPad = 220.0;  // iPad 右侧面板宽度
-static const CGFloat kRightPanelWidthPhone = 168.0; // iPhone 右侧面板宽度（保证按钮文字可读）
+// Task 139：iPhone 右侧面板精简（用户指令“手机上右边侧边栏要精简”）：
+// 内容全部图标化（启动/选版本/执行JAR 图标按钮 + 头像），96pt 图标轨与
+// 左侧 56pt 侧栏同语言；7 张信息卡与用户名仅在 iPad 展示。
+static const CGFloat kRightPanelWidthPhone = 96.0;  // iPhone 右侧面板宽度（图标轨）
 
 /// 检测物理设备是否为 iPhone（不受 debug.debug_ipad_ui 的 idiom hook 影响）。
 /// UIKit+hook.m 会把 idiom 强制改成 Pad，导致 trait.userInterfaceIdiom 不可靠。

@@ -46,11 +46,15 @@ uh = rd("Natives/utils.h")
 log = rd("latestlog")  # Task138 重锚：26.1.2 崩溃会话现于 latestlog（c68552a 上传，四日志中最新的 26.1.2 会话）
 
 import re as _re
-check("A1 崩溃日志证据（c68552a 新日志：controlify -> SDLNativesLoader -> JNA Structure -> SIGBUS；PC 随 ASLR 逐会话变化，按序列形态匹配）",
+# Task 139 重锚：latestlog 已被用户覆盖为新一轮 26.1.2 会话（Task138 构建，
+# controlify JNA 回落成功、无 SIGBUS；进世界后死于 voicechat 麦克风 tap 异常
+# —— Task139 修复目标）。旧 SIGBUS 序列证据退役，新证据 = 守卫链最终生效。
+check("A1 崩溃日志证据（Task139 重锚：POJAV_NATIVEDIR 守卫生效，UnsatisfiedLinkError 优雅回落 GLFW，无 SIGBUS）",
       "Initializing Controlify" in log and
-      "[SDLNativesLoader] Attempting to load SDL3 from SDL3" in log and
-      "Platform.isMac called from com.sun.jna.Structure" in log and
-      _re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is not None)
+      "[SDLNativesLoader] Attempting to load SDL3 from " in log and
+      "java.lang.UnsatisfiedLinkError" in log and
+      "Controller connected: 'Unknown'#GLFWUniqueControllerID" in log and
+      "SIGBUS" not in log)
 # Task138 重锚：新日志证明 Task132/133/135 全链如实生效（直传重绑被调用 +
 # jnilib 槽位 idempotent hit = fishhook 抢先），崩溃仍发生且先于任何 SDL
 # 符号解析——真根因为 JNA direct mapping 的 ffi 闭包跳板页在 iOS 上不可
@@ -135,8 +139,8 @@ check("B5 浮窗数据源接线（pickKeys=getRendererFamilyKeys，pickList=getR
 check("B6 读映射（有效渲染器家族键原样返回，否则默认 Vulkan 直连）",
       re.search(r'\[key isEqualToString:@"renderer_backend"\][^}]*?ame_effective_renderer\(\)', lpvc) is not None and
       "return @ RENDERER_NAME_MOBILEGL;" in lpvc)
-check("B7 写映射（直写 video.renderer，与渲染器行同一存储层）",
-      re.search(r'isEqualToString:@"renderer_backend"\]\) \{\s*\n\s*setPrefObject\(@"video\.renderer", value\);', lpvc) is not None)
+check("B7 写映射（Task139 双写：renderer_backend 分支经 ame139_writeRendererBoth 同写 profile+global）",
+      re.search(r'isEqualToString:@"renderer_backend"\]\) \{[^}]*?ame139_writeRendererBoth\(', lpvc) is not None)
 check("B8 渲染器行显示映射（家族键 -> 后端文案）",
       'preference.title.renderer_backend-mobilegl"' in lpvc and
       lpvc.count("RENDERER_NAME_MOBILEGL_GLES") >= 1)

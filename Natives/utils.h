@@ -107,6 +107,11 @@ static inline const char *ame_physical_renderer_dylib(const char *renderer) {
     return renderer;
 }
 
+// Task 139：FSR 渲染兜底自愈后的输入缩放复位（实现在 SurfaceViewController.m，
+// mgl_fsr.mm / osm_bridge.mm 的兜底点调用）。MC 窗口被恢复为全表面分辨率时，
+// 输入换算的 mgFsrScale 除数必须同步归一，否则触点只发一半 = 输入错位。
+void ame139_fsr_heal_reset_input_scale(void);
+
 
 // 导出 desktop OpenGL（而非 OpenGL ES）的渲染器：
 // 需要 EGL_OPENGL_BIT 配置 + eglBindAPI(EGL_OPENGL_API)。

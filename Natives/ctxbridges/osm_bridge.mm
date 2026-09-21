@@ -1244,6 +1244,10 @@ void osm_swap_buffers() {
             // 尺寸事件）——MC 会真正切回全分辨率渲染，不再出现"小窗渲染 +
             // 未初始化缓冲区域上屏"的绿色花屏。
             CallbackBridge_nativeSendScreenSize((int)currentBundle->osm.width, (int)currentBundle->osm.height);
+            // Task 139：输入侧同步复位（同 mgl_fsr Task119 兜底）——
+            // MC 窗口信念已变为全表面，sendTouchPoint 的 mgFsrScale
+            // 除数必须归一，否则触点坐标只发一半 = 输入错位。
+            ame139_fsr_heal_reset_input_scale();
         }
     }
     // Task 106 相位计时：t1 = pre+easu 完成（glFinish 前）；
