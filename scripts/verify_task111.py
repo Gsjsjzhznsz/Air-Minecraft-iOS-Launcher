@@ -111,13 +111,13 @@ check("A2  容器最底层插入（调低层级：insertSubview:atIndex:0，wind
 check("A3  容器内容分派：图片/视频两条旧管线均在窗口分支恢复",
       "[self applyImageBackgroundToContainer:container];" in bm_code
       and "[self applyVideoBackgroundToContainer:container];" in bm_code)
-check("A4  无背景分支维持 Task89 新拟态纯色底（nm_background 仅保留在该分支；原始文件含 Task89 注释）",
-      re.search(r"hasBackground\]\) \{[\s\S]{0,2000}?return;\s*\}\s*// Task89", bm)
-      and "window.backgroundColor = [NMTheme nm_background];" in bm_code)
-check("A5  splitVC 路径同款恢复：容器插入 + 内容分派 + 子 VC 透明化",
+check("A4  无背景分支回归原生系统底色（Task137 重锚：新拟态退役，语义色自适应）",
+      re.search(r"hasBackground\]\) \{[\s\S]{0,2000}?return;\s*\}", bm)
+      and "window.backgroundColor = [UIColor systemBackgroundColor];" in bm_code)
+check("A5  splitVC 路径同款恢复：容器插入 + 内容分派 + 子 VC 透明化（Task137 重锚：兜底底色原生系统色）",
       "[splitVC.view insertSubview:container atIndex:0];" in bm_code
       and "[self makeSplitViewControllerTransparent:splitVC];" in bm_code
-      and "splitVC.view.backgroundColor = [NMTheme nm_background];" in bm_code)
+      and "splitVC.view.backgroundColor = [UIColor systemBackgroundColor];" in bm_code)
 
 print()
 print("=" * 72)
@@ -127,16 +127,17 @@ check("B1  applyEffectToView：hasBackground → 旧毛玻璃（SystemThinMateri
       re.search(r"- \(void\)applyEffectToView:\(UIView \*\)view \{[\s\S]{0,400}?if \(\[self hasBackground\]\) \{[\s\S]{0,2000}?UIBlurEffectStyleSystemThinMaterial", bm_code))
 check("B2  applyEffectToView：旧半透明分支恢复（secondarySystemBackgroundColor + uiOpacity）",
       re.search(r"applyEffectToView:\(UIView \*\)view \{[\s\S]{0,6000}?\[base colorWithAlphaComponent:effectiveOpacity\]", bm_code))
-check("B3  applyEffectToView：旧管线清残留（模式切换时移除新拟态承载层）",
-      re.search(r"if \(\[self hasBackground\]\) \{[\s\S]{0,6000}?\[view nm_removeNeomorph\];\s*return;", bm_code))
-check("B4  applyEffectToView：无背景分支维持新拟态凸出（Task136 重锚：阴影基准 10）",
-      "[view nm_convexRadius:radius shadowRadius:10];" in bm_code
-      and "if (radius <= 0) radius = 12;" in bm_code)
+check("B3  applyEffectToView：旧管线收尾为纯 return（Task137 重锚：新拟态承载层整体退役，无需清残留）",
+      re.search(r"if \(\[self hasBackground\]\) \{[\s\S]{0,6000}?colorWithWhite:0\.08 alpha:self\.uiOpacity[\s\S]{0,400}?\}\s*return;", bm_code))
+check("B4  applyEffectToView：无背景分支回归原生表面（Task137 重锚：有圆角→卡片表面，无圆角→systemBackground 平铺）",
+      "[view ame_applyCardSurfaceWithRadius:radius];" in bm_code
+      and "if (radius > 0) {" in bm_code
+      and "view.backgroundColor = [UIColor systemBackgroundColor];" in bm_code)
 check("B5  applyEffectToCollectionViewCell：双分支切换（毛玻璃 blurView@contentView + 半透明）",
       "[cell.contentView insertSubview:blurView atIndex:0];" in bm_code
       and "[[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity]" in bm_code)
-check("B6  applyEffectToCell：无背景分支 → NMTheme surface 实色卡片底（洗白修复）",
-      re.search(r"- \(void\)applyEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(!\[self hasBackground\]\) \{[\s\S]{0,600}?cell\.backgroundColor = \[NMTheme nm_surface\];", bm_code)
+check("B6  applyEffectToCell：无背景分支 → 原生透明默认 cell（Task137 重锚：标准列表外观，语义色自适应）",
+      re.search(r"- \(void\)applyEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(!\[self hasBackground\]\) \{[\s\S]{0,600}?cell\.backgroundColor = \[UIColor clearColor\];", bm_code)
       and "cell.backgroundView = nil;" in bm_code)
 check("B7  makeViewControllerTransparent：无背景 no-op 门控（白色蒙膜根治）",
       re.search(r"- \(void\)makeViewControllerTransparent:\(UIViewController \*\)viewController \{[\s\S]{0,600}?if \(!\[self hasBackground\]\) \{\s*return;\s*\}", bm_code))
@@ -149,9 +150,9 @@ check("C1  updateChromeSurfaces 定义且唯一：hasBackground → applyEffectT
       root_code.count("- (void)updateChromeSurfaces {") == 1
       and "[[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];" in root_code
       and "[[BackgroundManager sharedManager] applyEffectToView:self.rightPanelContainer];" in root_code)
-check("C2  无背景 → 新拟态平贴表面维持（nm_flatSurfaceWithRadius:16 双容器）",
-      "[self.sidebarContainer nm_flatSurfaceWithRadius:16];" in root_code
-      and "[self.rightPanelContainer nm_flatSurfaceWithRadius:16];" in root_code)
+check("C2  无背景 → 原生平贴表面维持（Task137 重锚：ame_applyPanelSurfaceWithRadius:16 双容器）",
+      "[self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];" in root_code
+      and "[self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16];" in root_code)
 check("C3  三调用点齐备：setupContainers / backgroundChanged / uiEffectChanged",
       root_code.count("[self updateChromeSurfaces];") == 3
       and re.search(r"- \(void\)backgroundChanged \{[\s\S]{0,400}?\[self updateChromeSurfaces\];", root_code)
@@ -197,11 +198,11 @@ print()
 print("=" * 72)
 print("E. 背景设置页（菜单背景消失修复三处）")
 print("=" * 72)
-check("E1  viewDidLoad 无背景分支 → nm_background（view + tableView 显式同色）",
-      re.search(r"\} else \{\s*self\.view\.backgroundColor = \[NMTheme nm_background\];\s*self\.tableView\.backgroundColor = \[NMTheme nm_background\];", bset_code)
+check("E1  viewDidLoad 无背景分支 → systemBackgroundColor（Task137 重锚：view + tableView 显式同色，原生底）",
+      re.search(r"\} else \{\s*self\.view\.backgroundColor = \[UIColor systemBackgroundColor\];\s*self\.tableView\.backgroundColor = \[UIColor systemBackgroundColor\];", bset_code)
       and "Task111" in bset)
-check("E2  viewWillAppear 无背景分支同色维持（主题切换后一致；Task136 重锚：清除背景处理器同步主题化 +2）",
-      bset_code.count("self.tableView.backgroundColor = [NMTheme nm_background];") == 4)
+check("E2  viewWillAppear 无背景分支同色维持（Task137 重锚：清除背景处理器同步原生化 +2，共 4 处）",
+      bset_code.count("self.tableView.backgroundColor = [UIColor systemBackgroundColor];") == 4)
 check("E3  styleCell 统一走 applyEffectToCell 检测切换（洗白分支退役）",
       re.search(r"- \(void\)styleCell:\(UITableViewCell \*\)cell hasBackground:\(BOOL\)hasBackground \{[\s\S]{0,300}?\[\[BackgroundManager sharedManager\] applyEffectToCell:cell\];", bset_code)
       and "secondarySystemBackgroundColor" not in bset_code.split("- (void)styleCell")[1].split("@end")[0])
@@ -225,10 +226,10 @@ check("F3  刷新时机三件套零变化（updateJITStatus + updateMemoryEntitl
       re.search(r"\[self updateJITStatus\];\s*\[self updateMemoryEntitlementStatus\];", rp))
 check("F4  右面板七卡工厂零变化（makeInfoCardWithIcon 存在，7 卡仍在）",
       "makeInfoCardWithIcon" in rp_code)
-check("F5  侧栏按钮几何零变化（50×50 / 圆角 10；Task136 重锚：选中凸出 50+10）",
+check("F5  侧栏按钮几何零变化（50×50 / 圆角 10；Task137 重锚：选中态为 accent 0.15 原生高亮）",
       "CGFloat buttonSize = 50;" in menu_code
       and "btn.layer.cornerRadius = 10;" in menu_code
-      and "[btn nm_convexRadius:50 shadowRadius:10];" in menu_code)
+      and "[accent colorWithAlphaComponent:0.15]" in menu_code)
 
 print()
 print("=" * 72)

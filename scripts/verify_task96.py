@@ -233,8 +233,8 @@ check("D3  启动按钮本体零改动（高度46/阴影/按压动画/白字）"
       "self.launchButton.heightAnchor constraintEqualToConstant:46" in rp
       and "self.launchButton.layer.shadowColor = [UIColor blackColor].CGColor;" in rp_code
       and "self.launchButton setTitleColor:[UIColor whiteColor]" in rp)
-check("D4  下载中心按钮深灰底原样保留",
-      "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];" in rp_code)
+check("D4  下载中心按钮原生卡片底（Task137 重锚：黑底深字直修）",
+      "self.downloadCenterButton.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];" in rp_code)
 
 print()
 print("=" * 72)

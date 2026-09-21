@@ -192,9 +192,9 @@ check("D2  空白标题不再渲染（setTitle/setTitleColor titleLabel.font 零
 check("D3  图标居中对齐：内容水平/垂直双居中保持",
       "btn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;" in menu
       and "btn.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;" in menu)
-check("D4  新拟物选中态不受影响（凸出面板/平贴恢复原样；Task136 重锚：基准 50+10）",
-      "[btn nm_convexRadius:50 shadowRadius:10];" in menu
-      and "[btn nm_removeNeomorph];" in menu)
+check("D4  侧栏选中态原生 accent 高亮（Task137 重锚：凸出面板退役，双入口 accent 0.15）",
+      menu.count("[accent colorWithAlphaComponent:0.15]") == 2
+      and "nm_convexRadius" not in menu)
 check("D5  菜单图标清单原样（house.fill 等 6 项未动）",
       all(k in menu for k in ['@"house.fill"', '@"arrow.down.circle.fill"', '@"sparkles"',
                               '@"puzzlepiece.fill"', '@"gearshape.fill"', '@"questionmark.circle.fill"']))

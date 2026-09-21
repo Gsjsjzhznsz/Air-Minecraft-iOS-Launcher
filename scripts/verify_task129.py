@@ -126,13 +126,13 @@ check("D3 修正说明入档（bd71210 日志实锚）",
 
 print("== E. 白背景双层兜底 ==")
 bm = rd("Natives/BackgroundManager.m")
-check("E1 window 底色双分支主题化（hasBackground + 无背景）",
-      bm.count("window.backgroundColor = [NMTheme nm_background];") == 2)
-check("E2 splitVC.view 底色双分支主题化",
-      bm.count("splitVC.view.backgroundColor = [NMTheme nm_background];") == 2)
-check("E3 图片解码失败铺主题色兜底层（不再静默 return）",
+check("E1 window 底色双分支兜底（hasBackground + 无背景；Task137 重锚：原生系统底色）",
+      bm.count("window.backgroundColor = [UIColor systemBackgroundColor];") == 2)
+check("E2 splitVC.view 底色双分支兜底（Task137 重锚：原生系统底色）",
+      bm.count("splitVC.view.backgroundColor = [UIColor systemBackgroundColor];") == 2)
+check("E3 图片解码失败铺系统底色兜底层（不再静默 return；Task137 重锚）",
       "background image failed to decode" in bm
-      and "falling back to neumorphic base" in bm)
+      and "falling back to system base" in bm)
 check("E4 解码成功清除兜底层（避免叠压）",
       "Remove existing fallback (Task129f" in bm)
 

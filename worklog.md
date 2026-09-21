@@ -1421,3 +1421,36 @@ Work Log:
 Stage Summary:
 - 用户预期：①所有新拟态按钮/卡片/弹窗换装指定色板（浅 #e0e0e0 双影/#333·#888，深 #2c2c2c 双影/#f5f5f5·#a0a0a0，radius 50，尺寸位置不变）②MC 新闻卡新拟态+等高固定（原样式最低高度，长文截断）③主页顶卡最左=大号圆形 MC 头像（半透明边框）+欢迎语纵轴居中 ④列表右侧小字框随字体自适应宽度、靠右不裁剪、尺寸对齐左侧两行字 ⑤深浅色动态检测修复黑字深底 ⑥模组加载器页与上级菜单同款卡片/间距/新拟态 ⑦设置页图标本体着色无底块
 - 待用户装机验证（背景照片模式不受影响：hasBackground 时一律走旧毛玻璃/半透明管线）
+
+---
+
+## Task 137（2026-06-XX 会话记录）
+
+### 用户反馈（Task 136 IPA 实测四项 + 总指令）
+1. **Item 3 小字框**："现在所有小字框都是…了，游戏目录和已安装版本的数量显示还是原样"。
+2. **Item 4 深底深字**："右侧栏的下载中心小框还是黑底深字的，你还不如去掉扫描器直接排查"。
+3. **Item 5 阴影截断**："新拟态按钮上下的阴影全被截断了，还莫名其妙多出很宽的间距"。
+4. **Item 7 圆角一刀切**："每一个按钮的圆角、阴影大小都一样，10px 的按钮和 100px 的按钮圆角阴影都一样，导致有的太圆，有的阴影太宽"。
+5. **总指令**："请修改3、4，现在请把所有UI全部尽量改成能用iOS原生UI的，删去所有新拟态代码，重新调整层级等，大小保持一样，确保启动器每个功能都不会被占用影响"。
+
+### 根因与修复
+- **"…"截断根因**：Task136 的 InsetTypeLabel 只重写 textRectForBounds:/drawTextInRect: 注入左右 8pt 内边距，**未重写 intrinsicContentSize**——自动布局按纯文字宽度定宽，绘制再被内边距裁掉 16pt，任何文本必然尾部截断。修复：新建共享 `AmeBadgeLabel`（UIKit+NativeSurface.h/.m），完整实现 intrinsicContentSize = 文字 + 内边距；版本类型胶囊（正式版/测试版）、游戏目录/已安装版本计数徽章（不再用 " %ld " 空格凑宽度）、账户徽章统一接入；计数徽章几何保持（高 24 ≈ 两行 12pt 字 / 靠右 18pt / 垂直居中文字块）。
+- **下载中心黑底深字根因**：RightPanel 下载中心按钮硬编码 `colorWithWhite:0.2`（深灰）底 + labelColor 黑字。直修 = `secondarySystemGroupedBackgroundColor` 底（语义色，深浅对比系统保证）；同族问题右面板头像占位 0.2 白深灰一并原生化（tertiarySystemFillColor）。
+- **扫描器退役**：按用户要求整体删除 Task136 的 NMContrast 动态文字对比度扫描器（NeomorphKit/NMContrast.{h,m} + SceneDelegate 启动接线）。
+- **新拟态整体退役**：删除 NeomorphKit 全部十个源文件（NMTheme/UIView+Neomorph 凸出双承载层阴影引擎/NMContrast/UIViewController+NMPanel）；全仓 nm_* 调用点原生替换；统一 50/10 圆角阴影基准退役，回归**逐元素原生圆角**（版本卡 12/账户卡 16/筛选 14/崩溃卡 16/主页磁贴 16/加载器名条 10/新闻卡 12/下载行卡 8/工具栏按钮 5）；原生表面辅助 `UIView(AmeNativeSurface)` 三 API（卡片=secondarySystemGrouped / 凸起=tertiarySystemGrouped / 面板=secondarySystem，前两者裁剪到圆角，面板不动裁剪）。
+- **按钮原生还原（Task89 之前基线考古 7ab2b41）**：服务器加入 systemBlue / 服务端包 systemPurple / 公告动作 systemBlue / 整合包导出 systemBlue / 模组下载 accent 胶囊 / 下载页导入 systemPurple / 侧栏筛选 tertiarySystemFill+红 tint / 工具栏启动+下载中心 品牌紫(121,56,162)；侧栏选中态回归 accent 0.15 半透明高亮（双入口）。
+- **页面底色**：13 个页面 nm_background → systemBackgroundColor（语义色自适应）；窗口/split 兜底同款；BackgroundSettings 清除背景处理器同步 ×4。
+- **层级与裁剪还原**：applyEffectToCollectionViewCell/applyCardEffectToCell 恢复 cell 级裁剪（clipsToBounds YES，此前为露出帧外阴影而放开）；磁贴 cell shadowPath 生成退役；BackgroundManager 无背景分支原生化（有圆角→卡片表面，无圆角→systemBackground 平铺，整页 self.view 不再被兜底 12pt 圆角）；**hasBackground 背景照片检测切换管线原样保留**（最底层容器插入 + SystemThinMaterial 毛玻璃 + 子 VC 透明化 + chrome 表面切换三调用点）。
+- **子面板基座**：UIViewController+NMPanel 原生化重写为 UIViewController+AMEPanel（ame_applySubpanelBaseStyle：systemBackground + 系统分隔线 + 默认指示器；幂等/透明面板跳过/深度 3 遍历语义保留）；LauncherNavigationController 单一执法点同步换名。
+- **NMToast**：迁出 NeomorphKit 至 Natives/ 根（git mv），类名/API 零变化（showMessage 三重载+dismiss），卡片改原生表面 18pt 圆角 + labelColor 正文。
+- **深浅色策略**：语义色动态适配全面替代 NMTheme 手动主题 + 扫描器（labelColor/secondaryLabelColor/secondarySystemGroupedBackgroundColor/tertiarySystemFillColor 等）。
+
+### 校验
+- 新建 verify_task137（46 项：A 退役完整性 5/B 小字框 7/C 深底深字直修 6/D 原生换装 9/E 层级裁剪 5/F 尺寸功能护栏 10/G 语法审计 4，含 UIColor 选择器全量白名单审计——本地拦截一处 `secondarySystemBackground` 拼写错误，CI 前修复）。
+- verify_task89 重写为"新拟态退役完整性"校验器（22 项）；verify_task136 重锚为"幸存特性+退役门"（63 项）；重锚 90（4 门：下载中心原生底/占位底色×2/磁贴圆角 16+shadowPath 退役）、91（NMTheme.m 门→语义色门，74/74）、96（D4）、111（9 门全重锚 43/43）、101（D4 accent 高亮）、129（E1-E3 兜底底色）。
+- 全量级联 stash 基线对拍：**失败集与基线完全一致（零新增破坏）**；MyRemastered 克隆已被沙箱重置清除，指向它的校验器（100/106-110/112_118/119_124/125_128/135）为环境性 FileNotFoundError，与本任务无关。
+- 口径护栏零变化：getEntitlementValue ×2 / isJITEnabled(NO)+TXM / 七卡工厂+滚动区居中 KVO / 头像几何锚点 / 侧栏自愈 / 新闻卡等高 / 加载器分节 / 顶卡头像交换 / 设置图标本体着色 / NMToast API 全部原位。
+
+### Stage Summary
+- 用户预期：①小字框按字体动态宽度永不截断（…"根因修复），游戏目录/已安装版本计数徽章同规格接入 ②下载中心黑底深字直修 + 扫描器删除 ③④新拟态代码全删（无阴影截断/无间距异常/圆角逐元素原生）⑤全 UI 尽量 iOS 原生（语义色 + 系统色 + 标准圆角）⑥层级还原（裁剪恢复/承载层清场/背景照片管线保留）⑦大小位置不变 ⑧功能零占用影响。
+- 待用户安装新 CI 工件实机验证；深浅色切换由系统语义色自动完成，无扫描器。

@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 """
-Task 89 验证器：全局自绘 UI 新拟态化（Neomorph 凸出样式 + 双主题 + 强制纯色底）
+Task 89 验证器（Task137 重写为"新拟态退役"校验器）
 
-背景（用户需求）：
-  参照 react-native-neomorph-shadows（tokkozhin）README 中的 Neomorph /
-  NeomorphFlex 样式（用户选定"凸出/outer"，非 inner/凹陷），把启动器全部
-  非 iOS 原生的自绘 UI 替换为新拟态。红框（原生 UISegmentedControl /
-  UISearchBar 等）不动；蓝框（版本列表卡片等自绘 UI）全部替换。
+历史：Task 89 引入 NeomorphKit（NMTheme + UIView+Neomorph 凸出双阴影引擎，
+react-native-neomorph-shadows 忠实移植），经历 Task101/111/136 多轮重锚。
 
-用户确认的决策：
-  - 实现方式：ObjC 原生移植（NeomorphKit），算法忠实对齐库的 src/helpers.js
-  - 底色主题：跟随系统双主题（浅 #ECF0F3 / 深 #262A2F，含 App 内 override）
-  - 背景图：新拟态下强制纯色底（背景图/视频/毛玻璃停用）
-  - 节奏：一次全改（单次提交覆盖全部自绘 UI）
-  - 主按钮：全灰新拟态（所有按钮与底同色，仅靠阴影分层）
+Task137（用户最终决定）：
+  "现在请把所有UI全部尽量改成能用iOS原生UI的，删去所有新拟态代码，
+   重新调整层级等，大小保持一样，确保启动器每个功能都不会被占用影响"
+  ——新拟态在实测中暴露：阴影被父视图裁剪、统一圆角 50 对小元素过圆/
+  大元素阴影过宽、深浅色对比需额外扫描器兜底。全部新拟态代码退役，
+  回归 iOS 原生 UI（UIKit 语义色 + 标准圆角，无自绘阴影）。
 
-实现：
-  1. NeomorphKit/——NMTheme（双主题参数 + HSP 亮度→双阴影透明度算法移植）+
-     UIView+Neomorph（凸出双阴影引擎：暗影 (+r,+r) 黑 / 亮影 (−r,−r) 白，
-     KVO bounds 同步几何，NMThemeDidChangeNotification 驱动主题重绘）
-  2. BackgroundManager.applyEffectToView / applyEffectToCollectionViewCell
-     切换为 Neomorph 分发（64 处既有卡片调用点一次性接入，保留各自圆角）；
-     applyBackgroundToWindow / ToSplitViewController 强制 NMTheme 纯色底
-  3. 核心屏幕（右侧面板/左侧菜单/根容器/下载页/导航工具栏）+ 长尾
-     （主按钮全灰化、占位底色主题化、card_color 偏好停用）
+本文件因此从"新拟态存在性校验"重写为"新拟态退役完整性校验"：
+  A. NeomorphKit 目录与引擎/主题/扫描器源文件彻底删除
+  B. 全仓 .m/.h 无任何 nm_*/NMTheme/NMContrast 代码引用（注释豁免）
+  C. 构建清单（CMakeLists.txt）与文件系统一致（Kit 源移除、原生辅助登记）
+  D. 原生替换层就位（UIKit+NativeSurface 三表面 + AmeBadgeLabel）
+  E. 工作区改动仅限预期文件集（提交后自愈）
 """
 import os
 import re
@@ -44,209 +38,99 @@ def check(name, cond, detail=""):
         print(f"  FAIL  {name}  {detail}")
 
 
-def read(path):
-    with open(os.path.join(REPO, path), encoding="utf-8", errors="replace") as f:
+def read(rel):
+    with open(os.path.join(REPO, rel), encoding="utf-8", errors="replace") as f:
         return f.read()
-
-
-def strip_objc(src):
-    out, i, n = [], 0, len(src)
-    while i < n:
-        c = src[i]
-        if c == '"':
-            i += 1
-            while i < n and src[i] != '"':
-                i += 2 if src[i] == '\\' else 1
-            i += 1
-            out.append('""')
-        elif src.startswith("//", i):
-            while i < n and src[i] != '\n':
-                i += 1
-        elif src.startswith("/*", i):
-            j = src.find("*/", i + 2)
-            i = n if j < 0 else j + 2
-        else:
-            out.append(c)
-            i += 1
-    return "".join(out)
-
-
-def bracket_ok(src):
-    s = strip_objc(src)
-    bal = {"(": 0, "[": 0, "{": 0}
-    pair = {")": "(", "]": "[", "}": "{"}
-    for ch in s:
-        if ch in bal:
-            bal[ch] += 1
-        elif ch in pair:
-            bal[pair[ch]] -= 1
-            if bal[pair[ch]] < 0:
-                return False
-    return all(v == 0 for v in bal.values())
-
-
-def jsmath_opacities(hexcolor):
-    """独立实现 helpers.js 的算法，用于与 NMTheme.m 常量对拍"""
-    r = int(hexcolor[1:3], 16)
-    g = int(hexcolor[3:5], 16)
-    b = int(hexcolor[5:7], 16)
-    hsp = (0.299 * r * r + 0.587 * g * g + 0.114 * b * b) ** 0.5
-    ratio = 50.0
-    opacity = ratio ** (hsp / 255.0) / ratio - 1.0 / ratio
-    light = 0.025 + (1.0 - 0.025) * opacity
-    dark = 0.35 * (1.0 - opacity)
-    return light, dark
-
-
-print("== A. NeomorphKit（算法忠实移植）==")
-theme_h = read("Natives/NeomorphKit/NMTheme.h")
-theme_m = read("Natives/NeomorphKit/NMTheme.m")
-cat_h = read("Natives/NeomorphKit/UIView+Neomorph.h")
-cat_m = read("Natives/NeomorphKit/UIView+Neomorph.m")
-check("A1 双主题表面色（Task136：浅 #E0E0E0 / 深 #2C2C2C）",
-      "E0E0E0" in theme_m and "2C2C2C" in theme_m)
-check("A2 HSP 亮度公式（0.299/0.587/0.114）",
-      "0.299 * r255 * r255 + 0.587 * g255 * g255 + 0.114 * b255 * b255" in theme_m)
-check("A3 亮度转透明度（ratio=50 指数公式）",
-      "pow(ratio, ratioBrightness) / ratio - 1.0 / ratio" in theme_m)
-check("A4 亮/暗阴影透明度（Task136：CSS 全 alpha 直绘，两方法均返 1.0）",
-      theme_m.count("return 1.0;") >= 2
-      and "lightShadowOpacityForSurfaceColor" in theme_m
-      and "darkShadowOpacityForSurfaceColor" in theme_m)
-check("A5 主题切换通知常量", "NMThemeDidChangeNotification" in theme_h and theme_m)
-l_op, d_op = jsmath_opacities("#ECF0F3")
-check("A5a 算法对拍：#ECF0F3 亮阴影≈%.3f 暗≈%.3f（NMTheme 常量可复现）" % (l_op, d_op),
-      abs(l_op - 0.7678) < 0.01 and abs(d_op - 0.0827) < 0.01,
-      f"got light={l_op:.4f} dark={d_op:.4f}")
-check("A6 阴影几何（暗 (+r,+r) / 亮 (−r,−r)，模糊=r）",
-      "CGSizeMake(r, r)" in cat_m and "CGSizeMake(-r, -r)" in cat_m
-      and "dark.shadowRadius = r" in cat_m and "light.shadowRadius = r" in cat_m)
-check("A7 阴影色（Task136：浅 #BEBEBE/#FFFFFF、深 #1E1E1E/#3A3A3A）",
-      '#1E1E1E' in theme_m and '#BEBEBE' in theme_m
-      and '#3A3A3A' in theme_m and '#FFFFFF' in theme_m)
-check("A8 KVO bounds 同步几何 + 主题通知重绘",
-      'addObserver:self forKeyPath:@"bounds"' in cat_m
-      and "NMThemeDidChangeNotification" in cat_m)
-check("A9 胶囊模式圆角 = 高度一半", "NMRadiusModePill" in cat_m
-      and "MIN(size.height / 2.0, size.width / 2.0)" in cat_m)
-check("A10 凸出模式放开 masksToBounds / 平贴模式保留",
-      "if (!self.flat) {" in cat_m and "host.layer.masksToBounds = NO;" in cat_m)
-check("A11 API 完整（convex/pill/raised/flat/remove/styleConvexButton）",
-      all(k in cat_h for k in ["nm_convex", "nm_convexRadius:(CGFloat)cornerRadius shadowRadius:",
-                               "nm_convexRaisedRadius", "nm_pill", "nm_flatSurfaceWithRadius:",
-                               "nm_removeNeomorph", "nm_styleConvexButtonRadius:"]))
-check("A12 全部括号平衡（4 文件，字符串感知）",
-      all(bracket_ok(x) for x in [theme_m, cat_m, theme_h, cat_h]))
-
-print("== B. 枢纽接线（64 处卡片调用点一次性接入）==")
-bm = read("Natives/BackgroundManager.m")
-check("B1 applyEffectToView → nm_convexRadius（保留调用点圆角，默认 12；Task136 阴影基准 10）",
-      "[view nm_convexRadius:radius shadowRadius:10];" in bm
-      and "if (radius <= 0) radius = 12;" in bm)
-check("B1a 阴影半径 = Task136 基准 10；表格卡片化方法在案（applyCardEffectToCell）",
-      "MAX(4.0, MIN(8.0, radius * 0.5))" not in bm
-      and "[cell.contentView nm_convexRadius:50 shadowRadius:10];" in bm
-      and "applyCardEffectToCell" in bm)
-check("B2 applyEffectToCollectionViewCell → 卡片容器探测 + nm（Task136 阴影基准 10）",
-      "[target nm_convexRadius:radius shadowRadius:10];" in bm)
-# Task 129f 重锚：hasBackground 分支也把 window/splitVC 底色设为主题色
-# （自定义背景装载失败时兜底），两处出现；原判定 ==1 随之失效。
-check("B3 强制纯色底（window + splitVC 双分支，Task129f 兜底后各 2 处）",
-      bm.count("window.backgroundColor = [NMTheme nm_background];") == 2
-      and bm.count("splitVC.view.backgroundColor = [NMTheme nm_background];") == 2)
-check("B3a 防御性移除历史 blur 子视图",
-      "kBackgroundBlurTag" in bm.split("applyEffectToView:(UIView *)view")[1][:800])
-check("B4 CMakeLists 已登记 NeomorphKit",
-      "NeomorphKit/NMTheme.m" in read("Natives/CMakeLists.txt")
-      and "NeomorphKit/UIView+Neomorph.m" in read("Natives/CMakeLists.txt"))
-sd = read("Natives/SceneDelegate.m")
-# Task90 同步：SceneDelegate 最终采用 KVO window.traitCollection 方案
-# （UIWindowSceneDelegate 非 UIResponder，traitCollectionDidChange: 永不触发），
-# 原断言的字面量已不存在。
-check("B5 主题广播接线（NMTheme reloadAndBroadcast + KVO window.traitCollection）",
-      "[[NMTheme shared] reloadAndBroadcast];" in sd
-      and 'forKeyPath:@"traitCollection"' in sd
-      and "kNMSceneTraitKVOContext" in sd)
-
-print("== C. 核心屏幕与长尾改造 ==")
-rp = read("Natives/LauncherRightPanelViewController.m")
-# Task90：用户反馈"全灰新拟态按钮"选择有误，右侧面板按钮恢复原样（7ab2b41）。
-# Task96：执行Jar/选择版本与「登录并启动」同款（accent 底 + 白字，用户指定）；
-# 下载中心按钮保持深灰原样；断言随 Task96 改版同步。
-check("C1 右侧面板按钮（Task96 同步：启动/版本/JAR accent 底白字，下载中心深灰）",
-      all(k in rp for k in ["self.launchButton.backgroundColor = accentColor();",
-                            "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];",
-                            "self.manageVersionBtn.backgroundColor = accentColor();",
-                            "self.executeJarBtn.backgroundColor = accentColor();",
-                            "[self.manageVersionBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];",
-                            "[self.executeJarBtn setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];"]))
-check("C1a 右侧面板不再使用新拟态（nm_ 调用与 NeomorphKit 导入已随原样恢复移除）",
-      "NeomorphKit" not in rp and not re.search(r"\bnm_", rp))
-check("C2 状态卡片（Task96 同步：胶囊改 MeloNX 卡）15% 透明卡底仍在",
-      rp.count("colorWithAlphaComponent:0.15]") >= 1 and "nm_pill" not in rp)
-menu = read("Natives/LauncherMenuViewController.m")
-check("C3 左侧菜单：选中凸出面板 / 未选中恢复平贴（Task136 基准 50+10）",
-      "[btn nm_convexRadius:50 shadowRadius:10];" in menu
-      and "[btn nm_removeNeomorph];" in menu)
-root = read("Natives/LauncherRootViewController.m")
-check("C4 根容器：侧栏/右面板表面随背景模式切换（Task111 重锚）+ card_color 停用",
-      "[self.sidebarContainer nm_flatSurfaceWithRadius:16];" in root
-      and "[self.rightPanelContainer nm_flatSurfaceWithRadius:16];" in root
-      and "updateChromeSurfaces" in root
-      and "applyEffectToView:self.sidebarContainer" in root)
-dl = read("Natives/DownloadViewController.m")
-check("C5 下载页：资源行卡片/图标占位/筛选按钮/导入按钮新拟态（Task136 基准）",
-      "[self.contentContainer nm_convexRadius:50 shadowRadius:10];" in dl
-      and "[NMTheme nm_surfaceRaised];" in dl
-      and "[button nm_convexRadius:50 shadowRadius:10];" in dl
-      and "[self.importModpackButton nm_convexRadius:50 shadowRadius:10];" in dl)
-vc = read("Natives/VersionCardCell.m")
-check("C5a 版本卡片（截图蓝框）：手动底色/边框/旧阴影已移交 NeomorphKit",
-      "whiteColor] colorWithAlphaComponent:0.08" not in vc
-      and "applyEffectToView:self.cardContainer" in vc)
-nav = read("Natives/LauncherNavigationController.m")
-check("C6 工具栏按钮（启动/下载中心）全灰新拟态（Task136 基准）",
-      "[self.buttonInstall nm_convexRadius:50 shadowRadius:10];" in nav
-      and "[self.downloadCenterButton nm_convexRadius:50 shadowRadius:10];" in nav)
-check("C7 公告/导出/服务器主按钮全灰化（Task136 基准）",
-      "[self.actionButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/AnnouncementDetailViewController.m")
-      and "[self.exportButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/ModpackExportViewController.m")
-      and "[self.joinButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/ServerDetailViewController.m")
-      and "[self.downloadPackButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/ServerDetailViewController.m"))
-mtc = read("Natives/ModTableViewCell.m")
-check("C8 Mod 下载按钮全灰化（Task136 基准）", "[_downloadButton nm_convexRadius:50 shadowRadius:10];" in mtc)
-cl = read("Natives/LauncherCardLayoutViewController.m")
-# Task90 同步：21a3364 最终实现使用的注释标记为"新拟态下空操作"（C9 原断言的
-# neumorph_surfaces_locked_by_task89 字面量在最终提交中并不存在）。
-check("C9 卡片布局：card_color 叠加停用", "Task89：新拟态下空操作" in cl)
-check("C10 深色占位底色主题化（账户/新闻）",
-      "[NMTheme nm_surfaceRaised];" in read("Natives/AccountListViewController.m")
-      and read("Natives/LauncherNewsViewController.m").count("[NMTheme nm_surfaceRaised];") >= 2)
-
-print("== D. 红框原则（原生控件不动）==")
-gitdiff = subprocess.run(["git", "-C", REPO, "diff", "HEAD", "--",
-                          "Natives/DownloadViewController.m"],
-                         capture_output=True, text=True).stdout
-check("D1 UISegmentedControl 相关行未被改动",
-      "tabSegment" not in gitdiff.replace("+", "", 1) or
-      not re.search(r'^[+-].*tabSegment', gitdiff, re.M))
-check("D1a UISearchBar 样式行未被改动",
-      not re.search(r'^[+-].*searchBarStyle', gitdiff, re.M))
-check("D2 游戏画面覆盖层（GameMenuOverlayView）保持原样",
-      "nm_" not in read("Natives/GameMenuOverlayView.m"))
-
-print("== E. 工作区作用域 ==")
 
 
 def git(*args):
     return subprocess.run(["git", "-C", REPO, *args], capture_output=True, text=True).stdout
 
 
+print("=" * 72)
+print("A. NeomorphKit 退役（引擎/主题/扫描器/面板基座源文件删除）")
+print("=" * 72)
+for rel in ["Natives/NeomorphKit/NMTheme.h", "Natives/NeomorphKit/NMTheme.m",
+            "Natives/NeomorphKit/UIView+Neomorph.h", "Natives/NeomorphKit/UIView+Neomorph.m",
+            "Natives/NeomorphKit/NMContrast.h", "Natives/NeomorphKit/NMContrast.m",
+            "Natives/NeomorphKit/UIViewController+NMPanel.h", "Natives/NeomorphKit/UIViewController+NMPanel.m"]:
+    check(f"已删除 {rel}", not os.path.exists(os.path.join(REPO, rel)))
+
+print()
+print("=" * 72)
+print("B. 全仓代码零新拟态引用（strip 注释/字符串后扫描）")
+print("=" * 72)
+
+
+def strip_objc(src):
+    # 去掉块注释、行注释与字符串字面量，避免历史注释误报
+    src = re.sub(r"/\*.*?\*/", "", src, flags=re.S)
+    src = re.sub(r"//[^\n]*", "", src)
+    src = re.sub(r'"(?:\\.|[^"\\\n])*"', '""', src)
+    return src
+
+
+code_refs = []
+for root, dirs, files in os.walk(os.path.join(REPO, "Natives")):
+    dirs[:] = [d for d in dirs if d not in ("external", "resources", "AI")]
+    for fn in files:
+        if not fn.endswith((".m", ".h")):
+            continue
+        p = os.path.join(root, fn)
+        rel = os.path.relpath(p, REPO)
+        if not os.path.exists(p):
+            continue
+        code = strip_objc(read(rel))
+        for pat in ("nm_convex", "nm_flat", "nm_pill", "nm_styleConvex",
+                    "nm_removeNeomorph", "nm_hasNeomorph", "NMTheme",
+                    "NMContrast", "nm_applySubpanel"):
+            if pat in code:
+                code_refs.append(f"{rel}:{pat}")
+check("Natives 全部 .m/.h 代码零新拟态符号", not code_refs, str(code_refs[:6]))
+
+print()
+print("=" * 72)
+print("C. 构建清单与文件系统一致")
+print("=" * 72)
+cmake = read("Natives/CMakeLists.txt")
+check("CMake 不再登记 Kit 源", "NeomorphKit/" not in cmake)
+check("CMake 登记原生表面辅助 UIKit+NativeSurface.m", "UIKit+NativeSurface.m" in cmake)
+check("CMake 登记原生面板基座 UIViewController+AMEPanel.m", "UIViewController+AMEPanel.m" in cmake)
+check("CMake 登记迁出后的 NMToast.m", "  NMToast.m" in cmake)
+kit_dir = os.path.join(REPO, "Natives/NeomorphKit")
+check("NeomorphKit 目录不存在或为空", (not os.path.isdir(kit_dir)) or not os.listdir(kit_dir))
+
+print()
+print("=" * 72)
+print("D. 原生替换层就位")
+print("=" * 72)
+ns_h = read("Natives/UIKit+NativeSurface.h")
+ns_m = read("Natives/UIKit+NativeSurface.m")
+check("三表面 API 声明齐备", all(m in ns_h for m in
+      ["ame_applyCardSurfaceWithRadius", "ame_applyRaisedCardSurfaceWithRadius",
+       "ame_applyPanelSurfaceWithRadius"]))
+check("AmeBadgeLabel 声明（Task136 '…' 截断回归的修复载体）", "AmeBadgeLabel" in ns_h)
+check("卡片表面使用 secondarySystemGroupedBackground",
+      "secondarySystemGroupedBackgroundColor" in ns_m)
+check("面板表面使用 secondarySystemBackground",
+      "secondarySystemBackgroundColor" in ns_m)
+check("AmeBadgeLabel intrinsicContentSize 补偿内边距",
+      "intrinsicContentSize" in ns_m and "_textInsets.left + _textInsets.right" in ns_m)
+ame_panel = read("Natives/UIViewController+AMEPanel.m")
+check("AMEPanel 基座原生化（systemBackgroundColor + separatorColor）",
+      "[UIColor systemBackgroundColor]" in ame_panel and "[UIColor separatorColor]" in ame_panel)
+nav = read("Natives/LauncherNavigationController.m")
+check("导航单一执法点改调 ame_applySubpanelBaseStyle",
+      nav.count("[viewController ame_applySubpanelBaseStyle];") >= 1
+      and "[self.viewControllers.firstObject ame_applySubpanelBaseStyle];" in nav)
+
+print()
+print("=" * 72)
+print("E. 工作区改动仅限预期文件集（提交后自愈）")
+print("=" * 72)
 changed = {ln[3:].strip() for ln in git("status", "--porcelain").splitlines() if ln.strip()}
 check("E1 改动仅限预期文件集", all(
-    c.startswith(("Natives/", "scripts/verify_task89.py", "scripts/verify_task96.py",
-                  "scripts/verify_task101.py", "scripts/verify_task88.py",
-                  "scripts/verify_task95.py", "worklog.md")) for c in changed),
+    c.startswith(("Natives/", "scripts/verify_task", "worklog.md")) for c in changed),
     f"unexpected={changed}")
 
 print()

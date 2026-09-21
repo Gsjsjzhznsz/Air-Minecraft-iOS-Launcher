@@ -79,13 +79,13 @@ def balanced(src):
 
 
 print("=" * 72)
-print("C1. NMTheme 主文字色精确值：浅 #222222 / 深 #EEEEEE")
+print("C1. 主文字色（Task137 重锚：NMTheme 退役，改由 UIKit 语义色自适应）")
 print("=" * 72)
-nm = read("Natives/NeomorphKit/NMTheme.m")
-check("label 深色 0xF5/0xF5/0xF5（Task136 重锚）", "0xF5 / 255.0" in nm)
-check("label 浅色 0x33/0x33/0x33（Task136 重锚）", "0x33 / 255.0" in nm)
-check("Task91 标记注释存在", "Task91" in nm)
-check("NMTheme.m 花括号配平", balanced(strip_objc(nm)))
+check("NeomorphKit/NMTheme.m 已随 Task137 退役删除", not os.path.exists(os.path.join(REPO, "Natives/NeomorphKit/NMTheme.m")))
+check("全局文字色已切换为 UIKit 语义色（labelColor）",
+      "[UIColor labelColor]" in read("Natives/AccountLoginViewController.m")
+      and "[UIColor labelColor]" in read("Natives/MultiplayerViewController.m"))
+check("Task91 标记注释保留（历史可追溯）", "Task91" in read("Natives/AccountLoginViewController.m"))
 
 print()
 print("=" * 72)
@@ -105,21 +105,21 @@ for path, allowed in changed_to_theme.items():
     src = read(path)
     plain = re.findall(r"textColor(?:\[?\(?)?\s*=\s*\[?UIColor\s+whiteColor\]?", src)
     check(f"{os.path.basename(path)} 文字白色直写清零", len(plain) == allowed, str(plain[:3]))
-    check(f"{os.path.basename(path)} 引入 NMTheme",
-          '#import "NeomorphKit/NMTheme.h"' in src)
+    check(f"{os.path.basename(path)} 不再引入 NMTheme（Task137 重锚：Kit 退役）",
+          '#import "NeomorphKit/NMTheme.h"' not in src)
     check(f"{os.path.basename(path)} 花括号配平", balanced(strip_objc(src)))
 
 # 重点文件的具体改造点
 al = read("Natives/AccountLoginViewController.m")
-check("登录页标题/副标题/卡片标题/描述四处主题化",
-      al.count("[NMTheme nm_label]") >= 2 and al.count("[NMTheme nm_secondaryLabel]") >= 2)
+check("登录页标题/副标题/卡片标题/描述四处原生化（Task137 重锚）",
+      al.count("[UIColor labelColor]") >= 2 and al.count("[UIColor secondaryLabelColor]") >= 2)
 mp = read("Natives/MultiplayerViewController.m")
-check("联机页 cell 文字全部主题化（含 CRLF 文件）",
-      "[NMTheme nm_label]; // Task91" in mp and mp.count("// Task91") >= 15)
+check("联机页 cell 文字全部原生化（含 CRLF 文件；Task137 重锚）",
+      "[UIColor labelColor]; // Task91" in mp and mp.count("// Task91") >= 15)
 vp = read("Natives/LauncherPreferencesViewController.m")
-check("偏好页 cell/textField/label/header 四处主题化", vp.count("[NMTheme nm_") >= 5)
-check("偏好页 textField 底色同步主题化（nm_surfaceRaised）",
-      "textField.backgroundColor = [NMTheme nm_surfaceRaised];" in vp)
+check("偏好页 cell/textField/label/header 四处原生化（Task137 重锚）", vp.count("[UIColor labelColor]") >= 3)
+check("偏好页 textField 底色原生化（tertiarySystemFillColor；Task137 重锚）",
+      "textField.backgroundColor = [UIColor tertiarySystemFillColor];" in vp)
 
 # 保留项：彩色底/游戏内/终端等场景的白字必须原样保留
 keep_checks = [

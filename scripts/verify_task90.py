@@ -24,7 +24,7 @@ Task 90 验证器：右侧面板按钮恢复原样 + 主界面卡片顶部色条
      "签名携带"与"实际生效"。
   另：LauncherNewsViewController.m——HomeTileBaseCell 移除 accentBar 渐变
   装饰条（保留 setAccentColor: 空操作以兼容 6 处调用点；磁贴图标语义色不受
-  影响）；Task89 的占位底色（nm_surfaceRaised）保持不变。
+  影响）；Task137 起占位底色为原生 tertiarySystemFillColor（语义色自适应）。
 """
 import os
 import re
@@ -134,7 +134,7 @@ rp_code = strip_objc_strings_comments(rp)
 
 # —— Task96 同步：右面板改版为 MeloNX 信息卡（用户指定），断言随改版更新 ——
 for tag, needle in [
-    ("下载中心按钮深灰底（原样保留）", "self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];"),
+    ("下载中心按钮原生卡片底（Task137 重锚：黑底深字直修，语义色自适应）", "self.downloadCenterButton.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];"),
     ("启动按钮 accentColor 底", "self.launchButton.backgroundColor = accentColor();"),
     ("启动按钮圆角+阴影注释（masksToBounds）", "self.launchButton.layer.masksToBounds = YES;"),
     ("管理版本按钮 accentColor 底（Task96 与登录并启动同款）", "self.manageVersionBtn.backgroundColor = accentColor();"),
@@ -173,8 +173,8 @@ check("不再创建渐变装饰条", "accentBar = [CAGradientLayer layer]" not i
 check("不再 addSublayer 挂载色条", "addSublayer:self.accentBar" not in news_code)
 check("layoutSubviews 不再更新色条 frame",
       "self.accentBar.frame" not in news_code)
-check("layoutSubviews 保留阴影路径（卡片阴影不受影响；Task136 重锚：基准圆角 50）",
-      "self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:50].CGPath;" in news_code)
+check("layoutSubviews 阴影路径退役（Task137 重锚：原生磁贴卡片无自绘阴影）",
+      "self.layer.shadowPath" not in news_code)
 check("setAccentColor: 声明保留（兼容 6 处调用点）",
       "- (void)setAccentColor:(UIColor *)color;" in news_code)
 check("setAccentColor: 实现保留（空操作）",
@@ -183,12 +183,12 @@ call_sites = len(re.findall(r"\[cell setAccentColor:\[config accentColor\]\]", n
 check("数据源 6 处调用点原样保留", call_sites == 6, f"实际 {call_sites} 处")
 check("磁贴图标配色不受影响（iconView.tintColor = config accentColor）",
       "cell.iconView.tintColor = [config accentColor];" in news_code)
-check("Task89 成果保留：头像占位底色仍为 nm_surfaceRaised",
-      "self.avatarImageView.backgroundColor = [NMTheme nm_surfaceRaised];" in news_code)
-check("Task89 成果保留：新闻缩略图占位底色仍为 nm_surfaceRaised",
-      "self.thumbnailView.backgroundColor = [NMTheme nm_surfaceRaised];" in news_code)
-check("卡片 contentView 圆角 50 保留（新拟态枢纽依赖；Task136 重锚）",
-      "self.contentView.layer.cornerRadius = 50;" in news_code)
+check("Task137 重锚：头像占位底色为原生 tertiarySystemFillColor",
+      "self.avatarImageView.backgroundColor = [UIColor tertiarySystemFillColor];" in news_code)
+check("Task137 重锚：新闻缩略图占位底色为原生 tertiarySystemFillColor",
+      "self.thumbnailView.backgroundColor = [UIColor tertiarySystemFillColor];" in news_code)
+check("卡片 contentView 圆角 16 保留（原生磁贴卡片；Task137 重锚）",
+      "self.contentView.layer.cornerRadius = 16;" in news_code)
 check("BackgroundManager 枢纽调用保留（applyEffectToCollectionViewCell）",
       "applyEffectToCollectionViewCell:self]" in news_code)
 check("花括号配平", bracket_balance(news_code))

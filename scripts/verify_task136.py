@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-verify_task136.py —— Task 136 校验器
-用户八项 UI 需求（新闻卡新拟态+固定高度 / 主页顶卡头像交换 / 列表右侧小字框 /
-深浅色动态检测 / 下载页模组加载器卡片化 / 设置页图标本体 / 全局新拟态新色板）+
-历史校验器重锚自检。
+verify_task136.py —— Task 136 校验器（Task137 重锚版）
+
+Task 136 原始八项需求中，与新拟态强绑定的色板/引擎/扫描器门已随 Task 137
+（用户最终决定：删去所有新拟态代码，回归 iOS 原生 UI）退役或转为"退役门"；
+幸存特性（新闻卡等高、顶卡头像交换、列表小字框、模组加载器卡片化、
+设置页图标本体着色、页面底色自适应）的门重锚到 Task137 原生实现。
 口径护栏（Task93 检测链）零变化断言保留。
+
+分节：
+  A. 新拟态色板/引擎退役（原 NMTheme/UIView+Neomorph 色板门 → 退役门）
+  B. NMContrast 扫描器退役（原 Item 4a 扫描器门 → 退役门；深浅色由语义色自适应）
+  C. BackgroundManager 枢纽（原凸出分发 → 原生表面分发）
+  D. Item 1：MC 新闻卡固定最低高度（机制保留；圆角回归原生 12）
+  E. Item 2：主页顶卡头像交换 + 欢迎语纵轴居中（原样幸存）
+  F. Item 3：列表右侧小字框（Task137 重锚：AmeBadgeLabel intrinsic 完整实现）
+  G. Item 4b：下载页模组加载器卡片化（机制保留；圆角回归原生）
+  H. Item 5：设置页 SF 图标改图标本体（原样幸存）
+  I. 全局样式清扫（原 50/10 基准门 → 原生圆角/原生表面退役门）
+  J. 页面底色（nm_background → systemBackgroundColor 重锚）
+  K. 口径护栏（Task93 检测链零变化）与语法配平
 """
 import os
 import re
@@ -20,6 +35,10 @@ FAIL = 0
 def read(path):
     with open(os.path.join(REPO, path), encoding="utf-8", errors="replace") as f:
         return f.read()
+
+
+def exists(path):
+    return os.path.exists(os.path.join(REPO, path))
 
 
 def strip_objc(s):
@@ -46,99 +65,67 @@ def check(name, ok, detail=""):
 
 
 print("=" * 72)
-print("A. NMTheme Task136 新色板（用户指定 CSS 色板忠实落地）")
+print("A. 新拟态色板/引擎退役（Task137：用户决定删去所有新拟态代码）")
 print("=" * 72)
-theme_m = read("Natives/NeomorphKit/NMTheme.m")
-theme_h = read("Natives/NeomorphKit/NMTheme.h")
-cat_m = read("Natives/NeomorphKit/UIView+Neomorph.m")
-cat_h = read("Natives/NeomorphKit/UIView+Neomorph.h")
-
-check("A1  浅色 surface #E0E0E0（+raised #E8E8E8 / bg #D6D6D6）",
-      "kLightSurface        = @\"#E0E0E0\"" in theme_m
-      and "kLightSurfaceRaised  = @\"#E8E8E8\"" in theme_m
-      and "kLightBackground     = @\"#D6D6D6\"" in theme_m)
-check("A2  深色 surface #2C2C2C（+raised #333333 / bg #252525）",
-      "kDarkSurface         = @\"#2C2C2C\"" in theme_m
-      and "kDarkSurfaceRaised   = @\"#333333\"" in theme_m
-      and "kDarkBackground      = @\"#252525\"" in theme_m)
-check("A3  主文字色 浅 #333333 / 深 #F5F5F5（0x33/0xF5 直写）",
-      "0x33 / 255.0" in theme_m and "0xF5 / 255.0" in theme_m)
-check("A4  次要文字色 浅 #888888 / 深 #A0A0A0",
-      "0x88 / 255.0" in theme_m and "0xA0 / 255.0" in theme_m)
-check("A5  阴影色 浅 #BEBEBE/#FFFFFF、深 #1E1E1E/#3A3A3A",
-      all(h in theme_m for h in ["#BEBEBE", "#FFFFFF", "#1E1E1E", "#3A3A3A"]))
-check("A6  阴影透明度固定 1.0（CSS 全 alpha 直绘，旧亮度换算退役）",
-      theme_m.count("return 1.0;") >= 2
-      and "0.025 + (1.0 - 0.025) * opacity" not in theme_m
-      and "0.35 * (1.0 - opacity)" not in theme_m)
-check("A7  旧色板残留清零（ECF0F3/262A2F/222222/EEEEEE 不在实现中）",
-      all(k not in theme_m for k in ["ECF0F3", "262A2F"])
-      and "0x22 / 255.0" not in theme_m and "0xEE / 255.0" not in theme_m)
-check("A8  引擎默认凸出样式 = 圆角 50 / 阴影 10（nm_convex）",
-      "[self nm_convexRadius:50 shadowRadius:10];" in cat_m)
-check("A9  按钮默认样式 = 圆角 50 / 阴影 10（nm_styleConvexButton）",
-      "[self nm_styleConvexButtonRadius:50 shadowRadius:10];" in cat_m)
-check("A10 夹断规则保留（radius = MIN(radius, w/2, h/2)，50px 超尺寸自动夹断）",
-      "MIN(size.height / 2.0, size.width / 2.0)" in cat_m
-      and "MIN(radius, size.width / 2.0)" in cat_m)
-check("A11 NeomorphKit 全文件括号配平",
-      all(balanced(x) for x in [theme_m, cat_m, theme_h, cat_h,
-                                read("Natives/NeomorphKit/NMToast.m"),
-                                read("Natives/NeomorphKit/NMContrast.m")]))
+check("A1  NeomorphKit 目录整体退役（NMTheme/UIView+Neomorph 等源文件不存在）",
+      not exists("Natives/NeomorphKit/NMTheme.m")
+      and not exists("Natives/NeomorphKit/NMTheme.h")
+      and not exists("Natives/NeomorphKit/UIView+Neomorph.m")
+      and not exists("Natives/NeomorphKit/UIView+Neomorph.h"))
+check("A2  NMToast 迁出 Kit（原 NeomorphKit/NMToast.m 不存在，Natives/NMToast.m 存在）",
+      not exists("Natives/NeomorphKit/NMToast.m") and exists("Natives/NMToast.m"))
+check("A3  原生表面辅助 UIKit+NativeSurface 就位",
+      exists("Natives/UIKit+NativeSurface.m") and exists("Natives/UIKit+NativeSurface.h"))
+check("A4  CMake 不再登记 Kit 源，登记原生辅助",
+      "NeomorphKit/" not in read("Natives/CMakeLists.txt")
+      and "UIKit+NativeSurface.m" in read("Natives/CMakeLists.txt"))
+check("A5  原生卡片表面 = secondarySystemGroupedBackground（Task136 色板的语义色替代）",
+      "secondarySystemGroupedBackgroundColor" in read("Natives/UIKit+NativeSurface.m"))
 
 print()
 print("=" * 72)
-print("B. NMContrast 动态文字对比度修复器（Item 4a：深浅色动态检测）")
+print("B. NMContrast 扫描器退役（Task137：直接修复替代动态扫描）")
 print("=" * 72)
-nc_m = read("Natives/NeomorphKit/NMContrast.m")
-nc_h = read("Natives/NeomorphKit/NMContrast.h")
-cmake = read("Natives/CMakeLists.txt")
-check("B1  NMContrast.{h,m} 存在并登记 CMakeLists",
-      "NeomorphKit/NMContrast.m" in cmake)
-check("B2  WCAG 对比度阈值 2.0 + 饱和表面跳过 0.35",
-      "kNMContrastFixThreshold = 2.0" in nc_m
-      and "kNMSaturationSkipThreshold = 0.35" in nc_m)
-check("B3  自管理扫描：监听主题切换 + 背景效果切换广播",
-      "NMThemeDidChangeNotification" in nc_m
-      and "BackgroundUIEffectChanged" in nc_m)
-check("B4  修复动作：UIButton setTitleColor / UILabel textColor → [NMTheme nm_label]",
-      "setTitleColor:[NMTheme nm_label]" in nc_m
-      and "label.textColor = [NMTheme nm_label];" in nc_m)
-check("B5  有效背景解析：不透明实色判定 + 无法解析时宁可不改",
-      "NMEffectiveBackgroundColor" in nc_m and "a < 0.9" in nc_m)
-check("B6  SceneDelegate 接线：启动扫描 + 窗口底色主题化",
-      "[NMContrast nm_startContrastSweep];" in read("Natives/SceneDelegate.m")
-      and "self.window.backgroundColor = [NMTheme nm_background];" in read("Natives/SceneDelegate.m"))
+check("B1  NMContrast.{h,m} 源文件删除", not exists("Natives/NeomorphKit/NMContrast.h")
+      and not exists("Natives/NeomorphKit/NMContrast.m"))
+check("B2  CMake 不再登记 NMContrast", "NMContrast" not in read("Natives/CMakeLists.txt"))
+check("B3  SceneDelegate 启动扫描接线移除",
+      "[NMContrast nm_startContrastSweep];" not in read("Natives/SceneDelegate.m"))
+check("B4  窗口底色回归原生 systemBackgroundColor（Task137 重锚）",
+      "self.window.backgroundColor = [UIColor systemBackgroundColor];" in read("Natives/SceneDelegate.m"))
+check("B5  全仓无 NMContrast 代码引用",
+      "NMContrast" not in strip_objc(read("Natives/SceneDelegate.m"))
+      and "NMContrast" not in strip_objc(read("Natives/BackgroundManager.m")))
 
 print()
 print("=" * 72)
-print("C. BackgroundManager 枢纽（阴影基准 10 / 卡片化方法 / 裁剪放开）")
+print("C. BackgroundManager 枢纽（原生表面分发 / 裁剪恢复 / 检测切换保留）")
 print("=" * 72)
 bm = read("Natives/BackgroundManager.m")
 bmh = read("Natives/BackgroundManager.h")
-check("C1  applyCardEffectToCell 新方法（h+m），无背景 → contentView 凸出 50/10",
+check("C1  applyCardEffectToCell 保留，无背景 → 原生卡片行（contentView 卡片表面 12pt）",
       "applyCardEffectToCell" in bmh
-      and "[cell.contentView nm_convexRadius:50 shadowRadius:10];" in bm)
+      and "[cell.contentView ame_applyCardSurfaceWithRadius:12];" in bm)
 check("C2  applyCardEffectToCell 有背景 → 与 applyEffectToCell 同管线",
       re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(\[self hasBackground\]\) \{\s*\[self applyEffectToCell:cell\];", bm))
-check("C3  collection cell 无背景分支放开 cell 级裁剪（新拟物阴影可见）",
-      "cell.clipsToBounds = NO;" in bm and "cell.layer.masksToBounds = NO;" in bm)
-check("C4  collection cell 圆角来源升级：优先读 contentView 自身圆角",
+check("C3  collection cell 无背景分支恢复 cell 级裁剪（原生卡片无需帧外阴影空间）",
+      "cell.clipsToBounds = YES;" in bm and "cell.layer.masksToBounds = NO;" in bm)
+check("C4  collection cell 圆角来源保留：优先读 contentView 自身圆角",
       "cell.contentView.layer.cornerRadius > 0" in bm)
-check("C5  applyEffectToView 阴影基准 10（旧 radius*0.5 上限 8 规则退役）",
-      "[view nm_convexRadius:radius shadowRadius:10];" in bm
-      and "MAX(4.0, MIN(8.0, radius * 0.5))" not in bm)
-check("C6  检测并切换架构原样保留（hasBackground 双分支 + nm_removeNeomorph 清残留）",
-      bm.count("[view nm_removeNeomorph];") >= 1
-      and "SystemThinMaterial" in bm)
+check("C5  applyEffectToView 无背景 → 原生表面分派（有圆角=卡片，无圆角=systemBackground）",
+      "[view ame_applyCardSurfaceWithRadius:radius];" in bm
+      and "view.backgroundColor = [UIColor systemBackgroundColor];" in bm)
+check("C6  检测并切换架构原样保留（hasBackground 双分支 + SystemThinMaterial 旧管线）",
+      bm.count("[self hasBackground]") >= 5 and "SystemThinMaterial" in bm
+      and "nm_removeNeomorph" not in bm)
 
 print()
 print("=" * 72)
-print("D. Item 1：MC 新闻卡新拟态 + 固定最低高度")
+print("D. Item 1：MC 新闻卡固定最低高度（机制保留；圆角回归原生）")
 print("=" * 72)
 mcnews = read("Natives/MinecraftNewsViewController.m")
-check("D1  卡片圆角基准 50（kNewsCardCornerRadius = 50.0）",
-      "kNewsCardCornerRadius = 50.0" in mcnews)
+check("D1  卡片圆角回归原生 12（Task137 重锚：kNewsCardCornerRadius = 12.0）",
+      "kNewsCardCornerRadius = 12.0" in mcnews)
 check("D2  固定高度 = 原样式最低高度（模板 cell 实测，dispatch_once 缓存）",
       "newsCardFixedHeight" in mcnews
       and "systemLayoutSizeFitting" in mcnews
@@ -150,13 +137,13 @@ check("D4  正文纵向 stack + 截断优先级（摘要 750 先截断，标题/
       "initWithArrangedSubviews:@[_titleLabel, _metaLabel, _summaryLabel, _readMoreLabel]" in mcnews
       and "setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical" in mcnews
       and "setCustomSpacing:4 afterView:_titleLabel" in mcnews)
-check("D5  新闻页底色主题化（nm_background）",
-      "self.view.backgroundColor = [NMTheme nm_background];" in mcnews
-      and "self.view.backgroundColor = [UIColor systemBackgroundColor];" not in mcnews)
+check("D5  新闻页底色原生（systemBackgroundColor；Task137 重锚）",
+      "self.view.backgroundColor = [UIColor systemBackgroundColor];" in mcnews
+      and "self.view.backgroundColor = [NMTheme nm_background];" not in mcnews)
 
 print()
 print("=" * 72)
-print("E. Item 2：主页顶卡头像交换 + 欢迎语纵轴居中")
+print("E. Item 2：主页顶卡头像交换 + 欢迎语纵轴居中（原样幸存）")
 print("=" * 72)
 home = read("Natives/LauncherNewsViewController.m")
 check("E1  皮肤全身预览退场（skinImageView 代码引用清零，仅留档注释）",
@@ -180,38 +167,42 @@ check("E6  皮肤全身图请求退役（updateSkinDisplay 不再调用 loadSkin
 
 print()
 print("=" * 72)
-print("F. Item 3：列表右侧小字框（动态宽度 / 防裁剪靠右 / 尺寸对齐两行字）")
+print("F. Item 3：列表右侧小字框（Task137 重锚：AmeBadgeLabel 完整 intrinsic 实现）")
 print("=" * 72)
 vc = read("Natives/VersionCardCell.m")
 vm = read("Natives/VersionManagerViewController.m")
-acct = read("Natives/AccountListViewController.m")
-check("F1  版本类型胶囊（正式版/测试版）：12pt + 高 24 + 内边距 8 + 圆角随高取半",
-      "systemFontOfSize:12 weight:UIFontWeightSemibold" in vc
+nsh = read("Natives/UIKit+NativeSurface.h")
+check("F1  版本类型胶囊 = AmeBadgeLabel（12pt + 高 24 + 内边距 8 由共享实现保证）",
+      "[[AmeBadgeLabel alloc] init]" in vc
+      and "systemFontOfSize:12 weight:UIFontWeightSemibold" in vc
       and "typeLabel.heightAnchor constraintEqualToConstant:24" in vc
-      and "UIEdgeInsetsMake(0, 8, 0, 8)" in vc
-      and "self.layer.cornerRadius = h / 2.0" in vc)
+      and "UIEdgeInsetsMake(0, 8, 0, 8)" in read("Natives/UIKit+NativeSurface.m"))
+check("F1b AmeBadgeLabel intrinsicContentSize 补偿内边距（修复 Task136 全胶囊'…'截断回归）",
+      "intrinsicContentSize" in read("Natives/UIKit+NativeSurface.m")
+      and "_textInsets.left + _textInsets.right" in read("Natives/UIKit+NativeSurface.m"))
 check("F2  版本类型胶囊靠右锚定 chevron 左侧 8pt（不贴卡片边缘）",
       "typeLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8" in vc)
 check("F3  版本类型胶囊移出顶行 stack（独立靠右，版本号侧留 8pt 间隙）",
       "initWithArrangedSubviews:@[self.versionLabel]]" in vc
       and "topRowStack.trailingAnchor constraintLessThanOrEqualToAnchor:self.typeLabel.leadingAnchor constant:-8" in vc)
-check("F4  计数徽章（游戏目录/已安装版本）：高 24 ≈ 两行字 + 圆角 12 + 垂直居中对齐文字块",
-      "countBadge.heightAnchor constraintEqualToConstant:24" in vm
-      and "countBadge.layer.cornerRadius = 12" in vm
+check("F4  计数徽章（游戏目录/已安装版本）= AmeBadgeLabel：高 24 ≈ 两行字 + 垂直居中对齐文字块",
+      "[[AmeBadgeLabel alloc] init]" in vm
+      and "countBadge.heightAnchor constraintEqualToConstant:24" in vm
       and "countBadge.centerYAnchor constraintEqualToAnchor:self.centerYAnchor" in vm
       and "sp:12" in vm)
 check("F5  计数徽章右侧 18pt 安全边距保留",
       "countBadge.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18" in vm)
 check("F6  账户类型徽章：高 24 + 圆角 12 + 12pt 字",
-      "badgeLabel.heightAnchor constraintEqualToConstant:24" in acct
-      and "badgeLabel.layer.cornerRadius = 12" in acct
-      and "badgeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold]" in acct)
-check("F7  模组下载列表的下载按钮不在小字框改造范围（ModTableViewCell 仅样式基准更新）",
-      "nm_convexRadius:50 shadowRadius:10" in read("Natives/ModTableViewCell.m"))
+      "badgeLabel.heightAnchor constraintEqualToConstant:24" in read("Natives/AccountListViewController.m")
+      and "badgeLabel.layer.cornerRadius = 12" in read("Natives/AccountListViewController.m")
+      and "badgeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold]" in read("Natives/AccountListViewController.m"))
+check("F7  模组下载列表的下载按钮回归 Task89 之前原生样式（accent 底白字胶囊；Task137 重锚）",
+      "_downloadButton.backgroundColor = accentColor();" in read("Natives/ModTableViewCell.m")
+      and "_downloadButton.layer.cornerRadius = 13.0" in read("Natives/ModTableViewCell.m"))
 
 print()
 print("=" * 72)
-print("G. Item 4b：下载页模组加载器与上级菜单样式统一（样式/间距/新拟态）")
+print("G. Item 4b：下载页模组加载器与上级菜单样式统一（机制保留；圆角回归原生）")
 print("=" * 72)
 ml = read("Natives/installer/ModLoaderInstallViewController.m")
 check("G1  每个加载器独立 section（insetGrouped 独立圆角卡）",
@@ -220,11 +211,10 @@ check("G1  每个加载器独立 section（insetGrouped 独立圆角卡）",
 check("G2  卡片间距 10pt（无标题 section 头高 10 + footer 0.01）",
       "if (section < (NSInteger)_loaders.count) return 10;" in ml
       and "return 0.01;" in ml)
-check("G3  两类 cell 均走 applyCardEffectToCell（新拟态凸出卡片）",
+check("G3  两类 cell 均走 applyCardEffectToCell（Task137：原生卡片行）",
       ml.count("[[BackgroundManager sharedManager] applyCardEffectToCell:cell];") == 2)
-check("G4  nameBar 与上级菜单同语言（圆角 50 + applyEffectToView，系统灰底退役）",
-      "_nameBar.layer.cornerRadius = 50;" in ml
-      and "secondarySystemGroupedBackgroundColor" not in ml)
+check("G4  nameBar 与上级菜单同语言（Task137 重锚：原生圆角 10 + 原生表面枢纽）",
+      "_nameBar.layer.cornerRadius = 10;" in ml)
 check("G5  didSelect 按新 section 语义取行（_loaders[indexPath.section] + 越界守卫）",
       "ModLoaderRow *row = _loaders[indexPath.section];" in ml
       and "if (indexPath.section >= (NSInteger)_loaders.count) return;" in ml)
@@ -239,7 +229,7 @@ check("G8  cellForRow 按新 section 语义取行",
 
 print()
 print("=" * 72)
-print("H. Item 5：设置页 SF 图标改图标本体（去彩底白标）")
+print("H. Item 5：设置页 SF 图标改图标本体（去彩底白标；原样幸存）")
 print("=" * 72)
 pref = read("Natives/LauncherPreferencesViewController.m")
 seg = pref.split("applySettingsAppStyleToCell:(UITableViewCell *)cell")[1].split("@end")[0]
@@ -261,46 +251,43 @@ check("H5  图标尺寸随本体渲染放大（pointSize 20）",
 
 print()
 print("=" * 72)
-print("I. Item 6：全局新拟态基准样式清扫（12 处按钮/凸出 + 卡片圆角 50）")
+print("I. 全局样式清扫（Task137 重锚：统一 50/10 基准退役 → 原生圆角/原生表面）")
 print("=" * 72)
-convex_50 = "[CONV] nm_convexRadius:50 shadowRadius:10"
-targets = {
-    "Natives/LauncherMenuViewController.m": 2,
-    "Natives/DownloadViewController.m": 4,
-    "Natives/LauncherNavigationController.m": 2,
-    "Natives/AnnouncementDetailViewController.m": 1,
-    "Natives/ModpackExportViewController.m": 1,
-    "Natives/ServerDetailViewController.m": 2,
-    "Natives/ModTableViewCell.m": 1,
-}
-bad = {f: read(f).count("nm_convexRadius:50 shadowRadius:10") for f in targets}
-check("I1  按钮凸出调用点全部 50/10（菜单×2/下载×4/工具栏×2/公告/导出/服务器×2/Mod下载）",
-      all(bad[f] == n for f, n in targets.items()), f"got={bad}")
-check("I2  旧小圆角凸出调用点清零（6/8/10/12/13 组合不再出现）",
-      not re.search(r"nm_convexRadius:(6|8|10|12|13)(\.0)? shadowRadius:[0-9.]+",
-                    "".join(read(f) for f in targets)))
-cards_50 = {
-    "Natives/VersionCardCell.m": "cardContainer.layer.cornerRadius = 50",
-    "Natives/ResourceCardTableViewCell.m": "contentView.layer.cornerRadius = 50.0",
-    "Natives/ModVersionTableViewCell.m": "cardContainer.layer.cornerRadius = 50",
-    "Natives/AccountListViewController.m": "cardView.layer.cornerRadius = 50",
-    "Natives/AssetVersionViewController.m": "filterContainerView.layer.cornerRadius = 50",
-    "Natives/HomeCustomizeViewController.m": "contentView.layer.cornerRadius = 50",
-    "Natives/PLCrashView.m": "layer.cornerRadius = 50",
-}
-check("I3  卡片圆角基准 50（版本卡/资源卡/Mod版本卡/账户卡/筛选容器/自定义行/崩溃卡×3）",
-      all(k in read(f) for f, k in cards_50.items()))
-check("I4  主页磁贴圆角 50（contentView + shadowPath）",
-      "self.contentView.layer.cornerRadius = 50;" in home
-      and "cornerRadius:50].CGPath" in home)
-check("I5  NMToast 弹窗 = 凸出 raised 50/10",
-      "[self.cardView nm_convexRaisedRadius:50 shadowRadius:10];" in read("Natives/NeomorphKit/NMToast.m"))
-check("I6  平贴面板/胶囊不在基准清扫范围（侧栏/右面板 radius 16 保留）",
-      "[self.sidebarContainer nm_flatSurfaceWithRadius:16];" in read("Natives/LauncherRootViewController.m"))
+check("I1  全仓 nm_convex/nm_flat/nm_pill 引擎调用点清零",
+      not re.search(r"nm_(convex|flat|pill|styleConvex)",
+                    "".join(strip_objc(read(f)) for f in [
+                        "Natives/LauncherMenuViewController.m",
+                        "Natives/DownloadViewController.m",
+                        "Natives/LauncherNavigationController.m",
+                        "Natives/AnnouncementDetailViewController.m",
+                        "Natives/ModpackExportViewController.m",
+                        "Natives/ServerDetailViewController.m",
+                        "Natives/ModTableViewCell.m",
+                        "Natives/LauncherRootViewController.m",
+                        "Natives/BackgroundManager.m"])))
+check("I2  卡片圆角回归原生逐元素取值（版本卡 12/资源卡 12/Mod版本卡 12/账户卡 16/筛选 14/自定义行 12/崩溃卡 16）",
+      "cardContainer.layer.cornerRadius = 12" in read("Natives/VersionCardCell.m")
+      and "contentView.layer.cornerRadius = 12.0" in read("Natives/ResourceCardTableViewCell.m")
+      and "cardContainer.layer.cornerRadius = 12" in read("Natives/ModVersionTableViewCell.m")
+      and "cardView.layer.cornerRadius = 16" in read("Natives/AccountListViewController.m")
+      and "filterContainerView.layer.cornerRadius = 14" in read("Natives/AssetVersionViewController.m")
+      and "self.contentView.layer.cornerRadius = 12;" in read("Natives/HomeCustomizeViewController.m")
+      and read("Natives/PLCrashView.m").count("layer.cornerRadius = 16;  // Task137") == 3)
+check("I3  主页磁贴圆角 16（Task137 重锚：原生磁贴卡片，阴影路径退场）",
+      "self.contentView.layer.cornerRadius = 16;" in home
+      and "cornerRadius:50].CGPath" not in home)
+check("I4  NMToast 卡片 = 原生表面 18pt 圆角（凸出 raised 50/10 退役）",
+      "[self.cardView ame_applyCardSurfaceWithRadius:kNMToastCornerRadius];" in read("Natives/NMToast.m")
+      and "kNMToastCornerRadius = 18.0" in read("Natives/NMToast.m"))
+check("I5  平贴面板 = 原生 panel 表面（侧栏/右面板 radius 16）",
+      "[self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];" in read("Natives/LauncherRootViewController.m")
+      and "[self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16];" in read("Natives/LauncherRootViewController.m"))
+check("I6  侧栏选中态 = accent 0.15 原生高亮（凸出面板退役）",
+      "[accent colorWithAlphaComponent:0.15]" in read("Natives/LauncherMenuViewController.m"))
 
 print()
 print("=" * 72)
-print("J. Item 4a：页面底色主题化清扫（12 文件 systemBackground 退役）")
+print("J. 页面底色（Task137 重锚：13 页面 nm_background → systemBackgroundColor）")
 print("=" * 72)
 page_files = ["AssetVersionViewController.m", "AnnouncementDetailViewController.m",
               "MinecraftNewsViewController.m", "LauncherSplitViewController.m",
@@ -309,18 +296,17 @@ page_files = ["AssetVersionViewController.m", "AnnouncementDetailViewController.
               "DownloadTasksViewController.m", "PLTaskProgressViewController.m",
               "AnnouncementListViewController.m", "ModVersionViewController.m",
               "BackgroundSettingsViewController.m"]
-sweep_ok = all("self.view.backgroundColor = [NMTheme nm_background];" in read("Natives/" + f)
+sweep_ok = all("self.view.backgroundColor = [UIColor systemBackgroundColor];" in read("Natives/" + f)
                for f in page_files)
-check("J1  13 个页面 view 底色 = nm_background", sweep_ok)
-check("J2  上述页面 view 底色 systemBackgroundColor 残留清零",
-      all("self.view.backgroundColor = [UIColor systemBackgroundColor];" not in read("Natives/" + f)
-          for f in page_files))
-check("J3  LauncherSplitViewController 黑色兜底分支退役（nm_background 自适应替代）",
-      read("Natives/LauncherSplitViewController.m").count("[NMTheme nm_background];") == 2
+check("J1  13 个页面 view 底色 = systemBackgroundColor（原生自适应）", sweep_ok)
+check("J2  上述页面 nm_background 残留清零",
+      all("[NMTheme nm_background]" not in read("Natives/" + f) for f in page_files))
+check("J3  LauncherSplitViewController 双入口均原生（systemBackgroundColor ×2）",
+      read("Natives/LauncherSplitViewController.m").count("[UIColor systemBackgroundColor];") == 2
       and "self.view.backgroundColor = [UIColor blackColor];" not in read("Natives/LauncherSplitViewController.m"))
-check("J4  BackgroundSettings 清除背景处理器同步主题化（tableView nm_background ×4）",
+check("J4  BackgroundSettings 清除背景处理器同步原生化（tableView systemBackgroundColor ×4）",
       read("Natives/BackgroundSettingsViewController.m").count(
-          "self.tableView.backgroundColor = [NMTheme nm_background];") == 4)
+          "self.tableView.backgroundColor = [UIColor systemBackgroundColor];") == 4)
 
 print()
 print("=" * 72)
@@ -347,6 +333,9 @@ check("K5  关键改动文件括号配平",
           "Natives/BackgroundManager.m",
           "Natives/SceneDelegate.m",
           "Natives/LauncherSplitViewController.m",
+          "Natives/UIKit+NativeSurface.m",
+          "Natives/UIViewController+AMEPanel.m",
+          "Natives/NMToast.m",
       ]))
 
 print()
