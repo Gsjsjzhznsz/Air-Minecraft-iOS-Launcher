@@ -332,11 +332,20 @@ _ame138_added = [l for l in _ame138_diff.splitlines()
                  if l.startswith("+") and not l.startswith("+++")]
 _ame138_removed = [l for l in _ame138_diff.splitlines()
                    if l.startswith("-") and not l.startswith("---")]
-check("G3  本地化资源改动仅限 Task138 三键（+2 新键 x 四语言 + detail 值更新）",
-      len(_ame138_added) == 12 and len(_ame138_removed) == 4 and
-      all(("renderer_missing_dylib" in l or "mirror_policy-speed_first" in l
-           or "preference.detail.mod_mirror" in l)
-          for l in _ame138_added + _ame138_removed),
+# 持久形态（Task138 二次重锚）：提交前 = diff 行恰好 12 增 4 删且全限三键；
+# 提交后 = diff 为空但两新键已在 HEAD 文件中。两种状态都算通过。
+_ame138_strings = "".join(
+    open(os.path.join(REPO, f"Natives/resources/{_l}.lproj/Localizable.strings"),
+         encoding="utf-8", errors="replace").read()
+    for _l in ["en", "zh-Hans", "zh-CN", "zh-Hant"])
+check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或提交后键在位形态）",
+      (len(_ame138_added) == 12 and len(_ame138_removed) == 4 and
+       all(("renderer_missing_dylib" in l or "mirror_policy-speed_first" in l
+            or "preference.detail.mod_mirror" in l)
+           for l in _ame138_added + _ame138_removed))
+      or (not _ame138_added and not _ame138_removed
+          and _ame138_strings.count("renderer_missing_dylib") >= 4
+          and _ame138_strings.count("mirror_policy-speed_first") >= 4),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md"))
