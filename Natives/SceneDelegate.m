@@ -5,14 +5,9 @@
 #import "LauncherCardLayoutViewController.h"
 #import "LauncherPreferences.h"
 #import "BackgroundManager.h"
-#import "NeomorphKit/NMTheme.h"
-#import "NeomorphKit/NMContrast.h"
 // Terracotta 暂时移除（排查启动崩溃）
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
-
-// Task89：window.traitCollection KVO 上下文（见 willConnect 处注释）
-static void *kNMSceneTraitKVOContext = &kNMSceneTraitKVOContext;
 
 extern __weak UIWindow *mainWindow;
 
@@ -35,10 +30,10 @@ extern __weak UIWindow *mainWindow;
     
     self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
     self.window.frame = windowScene.coordinateSpace.bounds;
-    // Task136：窗口底色改用 NMTheme 背景色（浅 #D6D6D6 / 深 #252525，随深浅色
-    // 自动切换），与新拟态表面同族保证阴影可读；用户设置自定义壁纸时仍由
-    // BackgroundManager.applyBackgroundToWindow 接管（Task111 检测并切换）。
-    self.window.backgroundColor = [NMTheme nm_background];
+    // Task137：窗口底色回归 iOS 原生系统底色（深浅色由语义色自动适配）；
+    // 用户设置自定义壁纸时仍由 BackgroundManager.applyBackgroundToWindow
+    // 接管（Task111 检测并切换）。
+    self.window.backgroundColor = [UIColor systemBackgroundColor];
     mainWindow = self.window;
 
     // 根据设置选择布局：默认 VS 三栏布局，可切换为卡片式便当盒布局
@@ -50,15 +45,6 @@ extern __weak UIWindow *mainWindow;
         rootVC = [[LauncherRootViewController alloc] init];
     }
     self.window.rootViewController = rootVC;
-
-    // Task89：KVO 监听 window.traitCollection——SceneDelegate 遵循
-    // UIWindowSceneDelegate（非 UIResponder），traitCollectionDidChange:
-    // 永远不会被调用，故用 KVO 捕获系统深浅色变化（auto 模式）与
-    // 设置页外观切换（applyUITheme 内也会广播，双重触发幂等无害）。
-    [self.window addObserver:self
-                  forKeyPath:@"traitCollection"
-                     options:NSKeyValueObservingOptionNew
-                     context:kNMSceneTraitKVOContext];
 
     // 外观模式（浅色/深色/跟随系统）：读 general.ui_theme 偏好。
     //   light  -> UIUserInterfaceStyleLight
@@ -78,9 +64,10 @@ extern __weak UIWindow *mainWindow;
 
     [self.window makeKeyAndVisible];
 
-    // Task136：启动动态文字对比度修复器（监听主题/背景效果广播自动扫描；
-    // 幂等，只拦截黑字深底等不可读组合）
-    [NMContrast nm_startContrastSweep];
+    // Task137：Task136 的 NMContrast 动态文字对比度扫描器随新拟态一并退役。
+    // 深底深字问题改为直接修复（各元素使用系统语义色/动态色自动适配，
+    // 例：右侧栏下载中心按钮 Task137 已改 secondarySystemGroupedBackground
+    // 底 + labelColor 字，深浅色下对比度均由系统保证）。
 
     // 立即应用背景（移除原来的 0.1s 延迟）：
     // 延迟会在启动时露出窗口底色形成"黑条"或"黑闪"。BackgroundManager 在其 init
@@ -164,18 +151,7 @@ extern __weak UIWindow *mainWindow;
             self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
         }
     }
-    // Task89：新拟态主题跟随有效外观（含 override），切换时广播重绘全部
-    // Neomorph 附件（表面色/阴影透明度按新主题重算）。
-    [[NMTheme shared] reloadAndBroadcast];
-}
-
-// Task89：auto 模式下跟随系统深浅色切换（KVO window.traitCollection，见 willConnect 处注释）
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey, id> *)change context:(void *)context {
-    if (context == kNMSceneTraitKVOContext && [keyPath isEqualToString:@"traitCollection"]) {
-        [[NMTheme shared] reloadAndBroadcast];
-        return;
-    }
-    [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+    // Task137：新拟态退役，无需主题广播重绘——外观切换由语义色动态适配。
 }
 
 - (void)applyLanguageChange:(NSNotification *)notification {

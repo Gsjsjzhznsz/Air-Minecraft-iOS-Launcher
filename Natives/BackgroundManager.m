@@ -7,8 +7,7 @@
 //
 
 #import "BackgroundManager.h"
-#import "NeomorphKit/NMTheme.h"
-#import "NeomorphKit/UIView+Neomorph.h"
+#import "UIKit+NativeSurface.h"
 #import <Photos/Photos.h>
 
 static NSString * const kBackgroundTypeKey = @"background_type";
@@ -185,15 +184,14 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // Task111：检测并切换（用户实测反馈：Task89 的强制纯色底把启动器背景照片
     // 功能全部顶掉了）。用户设置了自定义背景（图片/视频）时，恢复 Task89 之前的
     // 全局背景管线：容器插入窗口最底层（insertSubview:atIndex:0，即"调低层级"），
-    // 图片/视频/模糊/压暗自下而上铺开，UI 悬浮其上；未设置背景时维持 Task89
-    // 新拟态纯色底不动。两种模式随 hasBackground 自动切换，设置/清除背景后
-    // 本方法被重新调用（setImageBackground/clearBackground 既有链路）。
+    // 图片/视频/模糊/压暗自下而上铺开，UI 悬浮其上；未设置背景时回归 iOS 原生
+    // 系统底色（Task137：新拟态退役）。两种模式随 hasBackground 自动切换，
+    // 设置/清除背景后本方法被重新调用（setImageBackground/clearBackground 既有链路）。
     if ([self hasBackground]) {
-        // Task 129f：有自定义背景时也把窗口底色设为新拟态主题色（旧实现保留
-        // SceneDelegate 的 systemBackgroundColor=浅色纯白）：一旦图片/视频装载
-        // 失败（解码失败、视频初始化失败等），透出的底色是主题色而非白屏。
-        // 背景装载成功时该底色被容器完全覆盖，零视觉影响。
-        window.backgroundColor = [NMTheme nm_background];
+        // Task 129f：有自定义背景时也把窗口底色设为系统底色（动态适配深浅色）：
+        // 一旦图片/视频装载失败（解码失败、视频初始化失败等），透出的底色是
+        // 系统底色而非随机色。背景装载成功时该底色被容器完全覆盖，零视觉影响。
+        window.backgroundColor = [UIColor systemBackgroundColor];
         UIView *container = [[UIView alloc] initWithFrame:window.bounds];
         container.tag = kGlobalBackgroundTag;
         container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -217,9 +215,9 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task89：无自定义背景时维持新拟态纯色底。新拟物双阴影只在统一底色上可见，
-    // 因此仅在该分支应用 NMTheme 主题背景色。
-    window.backgroundColor = [NMTheme nm_background];
+    // Task137：新拟态退役——无自定义背景时回归 iOS 原生系统底色，
+    // 深浅色由语义色自动适配。
+    window.backgroundColor = [UIColor systemBackgroundColor];
 }
 
 - (void)applyBackgroundToSplitViewController:(UISplitViewController *)splitVC {
@@ -236,12 +234,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
     // Task111：同 applyBackgroundToWindow 的检测并切换——有自定义背景时恢复
     // Task89 之前的容器管线（最底层插入 + 图片/视频 + 子 VC 透明化），
-    // 无背景时维持 Task89 新拟态纯色主题底。
+    // 无背景时回归 iOS 原生系统底色（Task137：新拟态退役）。
     if ([self hasBackground]) {
         // Task 129f：与 applyBackgroundToWindow 同款兜底——背景容器之下的
-        // splitVC.view 底色设为新拟态主题色，图片/视频装载失败时透出的是
-        // 主题色而非 window 的 systemBackgroundColor（浅色=纯白）。
-        splitVC.view.backgroundColor = [NMTheme nm_background];
+        // splitVC.view 底色设为系统底色（动态适配深浅色），图片/视频装载
+        // 失败时透出的是系统底色而非随机色。
+        splitVC.view.backgroundColor = [UIColor systemBackgroundColor];
         UIView *container = [[UIView alloc] initWithFrame:splitVC.view.bounds];
         container.tag = kGlobalBackgroundTag;
         container.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -268,8 +266,8 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task89：无自定义背景时维持新拟态纯色主题底。
-    splitVC.view.backgroundColor = [NMTheme nm_background];
+    // Task137：新拟态退役——无自定义背景时回归 iOS 原生系统底色。
+    splitVC.view.backgroundColor = [UIColor systemBackgroundColor];
 }
 
 - (void)removeGlobalBackground {
@@ -359,13 +357,13 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         // Task 129f：图片解码失败（内存压力/格式异常/文件半损）旧实现静默 return，
         // 容器空置 -> 透出 window 底色 systemBackgroundColor（浅色模式=纯白）——
         // “一些设备（如 iPad9）背景是白色而不是设置里的背景”的根因。
-        // 修复：容器底铺新拟态主题色兜底（与无背景默认一致），白底永不透出；
+        // 修复：容器底铺系统底色兜底（动态适配深浅色），随机底色永不透出；
         // 日志锚点供下一轮装机取证。
-        NSLog(@"[BackgroundManager] Task129f: background image failed to decode (%@) - falling back to neumorphic base", self.currentBackgroundPath.lastPathComponent);
+        NSLog(@"[BackgroundManager] Task129f: background image failed to decode (%@) - falling back to system base", self.currentBackgroundPath.lastPathComponent);
         UIView *fallback = [[UIView alloc] initWithFrame:container.bounds];
         fallback.tag = kDefaultBackgroundTag;
         fallback.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        fallback.backgroundColor = [NMTheme nm_background];
+        fallback.backgroundColor = [UIColor systemBackgroundColor];
         [container addSubview:fallback];
         return;
     }
@@ -520,14 +518,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)applyEffectToCell:(UITableViewCell *)cell {
     // Task111：检测并切换——有自定义背景时保持 Task89 之前的毛玻璃/半透明
-    // cell 效果（背景图从 cell 下方透出）；无自定义背景时改为 NMTheme surface
-    // 实色卡片底（此前无条件走半透明分支，在纯色底上表现为近透明的洗白
-    // 菜单，用户实测"有些菜单的背景消失了，只剩下按钮和阴影"）。
-    // surface 与 background 对比明显、深浅色自适应，且不逐 cell 挂阴影
-    // （表格滚动中阴影会被裁剪，观感差）。
+    // cell 效果（背景图从 cell 下方透出）；无自定义背景时回归 iOS 原生列表
+    // 外观（Task137：新拟态退役）——cell 保持系统默认透明底，页面底色由各页
+    // 自持 systemBackgroundColor，深浅色由语义色自动适配，标准分隔线可见。
     if (![self hasBackground]) {
         cell.backgroundView = nil;
-        cell.backgroundColor = [NMTheme nm_surface];
+        cell.backgroundColor = [UIColor clearColor];
         cell.contentView.backgroundColor = [UIColor clearColor];
         return;
     }
@@ -824,19 +820,19 @@ static const NSInteger kDefaultBackgroundTag = 99995;
                 view.backgroundColor = [UIColor colorWithWhite:0.08 alpha:self.uiOpacity];
             }
         }
-        // 旧管线不走新拟态承载层；若此前已被装上（模式切换残留）则移除
-        [view nm_removeNeomorph];
         return;
     }
 
-    // Task89：新拟态改造（用户选定：凸出样式 + 纯色底）。
-    // 原毛玻璃/半透明双模式在无自定义背景时由新拟态凸出表面替代
-    // （surface 底色 + 暗/亮双阴影）。Task136：阴影半径改用用户指定基准 10
-    // （偏移=±10、模糊=10，颜色/透明度由 NMTheme 新色板提供）；
-    // 卡片圆角继续读调用点预先设置的 layer.cornerRadius（卡片类调用点已统一改 50）。
+    // Task137：新拟态退役——无自定义背景时回归 iOS 原生表面：
+    // 调用点预置了圆角的（卡片容器）= secondarySystemGroupedBackground 卡片；
+    // 未设圆角的（多数页面的整页 self.view）= systemBackground 平铺整页，
+    // 不加圆角不强制裁剪（原生页面形态，深浅色由语义色自动适配）。
     CGFloat radius = view.layer.cornerRadius;
-    if (radius <= 0) radius = 12;
-    [view nm_convexRadius:radius shadowRadius:10];
+    if (radius > 0) {
+        [view ame_applyCardSurfaceWithRadius:radius];
+    } else {
+        view.backgroundColor = [UIColor systemBackgroundColor];
+    }
 }
 
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
@@ -886,13 +882,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task89：新拟态改造（同 applyEffectToView）。卡片容器为 contentView 内
-    // 第一个带圆角的子视图（各 cell 的既定结构）；找不到时退回 contentView
-    // （优先读 contentView 自身圆角，未设置时取 12）。
-    // Task136：阴影半径基准 10；卡片圆角读 contentView 自身/子视图既定值
-    // （卡片类 cell 已统一改设 50）；同时放开 cell 级裁剪让双外阴影可见
-    // （此前 MC 新闻卡 self.clipsToBounds=YES 把承载层阴影全部裁掉，
-    // 用户实测"卡片不是新拟态"）。
+    // Task137：新拟态退役——无自定义背景时回归 iOS 原生卡片 cell：
+    // 卡片容器为 contentView 内第一个带圆角的子视图（各 cell 的既定结构），
+    // 找不到时退回 contentView（优先读自身圆角，未设置时取 12）。
+    // 表面 = secondarySystemGroupedBackground，无自绘阴影；
+    // cell 级裁剪恢复系统默认（此前为露出新拟态阴影而放开，原生卡片
+    // 由卡片自身圆角 + 裁剪呈现，不再需要帧外阴影空间）。
     UIView *target = nil;
     CGFloat radius = 0;
     for (UIView *sub in cell.contentView.subviews) {
@@ -916,11 +911,9 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     }
     cell.backgroundColor = [UIColor clearColor];
     cell.contentView.backgroundColor = [UIColor clearColor];
-    // Task136：阴影在承载层帧外发散，cell 级裁剪必须放开（毛玻璃分支
-    // 的圆角由 blurView 自身 cornerRadius 保证，不依赖 cell 级裁剪）
-    cell.clipsToBounds = NO;
+    cell.clipsToBounds = YES;
     cell.layer.masksToBounds = NO;
-    [target nm_convexRadius:radius shadowRadius:10];
+    [target ame_applyCardSurfaceWithRadius:radius];
 }
 
 - (void)applyCardEffectToCell:(UITableViewCell *)cell {
@@ -932,14 +925,14 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task136：无背景时 cell 整体为凸出新拟态卡片（与上级菜单卡片同语言）。
-    // 圆角 50 基准（引擎按行高自动夹断到半高），阴影半径 10。
+    // Task137：新拟态退役——无背景时 cell 整体为原生卡片行
+    // （secondarySystemGroupedBackground + 12pt 圆角，与上级菜单卡片同语言，
+    // 无自绘阴影；深浅色由语义色自动适配）。
     cell.backgroundView = nil;
     cell.backgroundColor = [UIColor clearColor];
-    cell.contentView.backgroundColor = [UIColor clearColor];
-    cell.clipsToBounds = NO;
+    cell.clipsToBounds = YES;
     cell.layer.masksToBounds = NO;
-    [cell.contentView nm_convexRadius:50 shadowRadius:10];
+    [cell.contentView ame_applyCardSurfaceWithRadius:12];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

@@ -1,6 +1,4 @@
 #import "utils.h"
-#import "NeomorphKit/NMTheme.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 //
 //  AnnouncementDetailViewController.m
 //  Amethyst
@@ -33,7 +31,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+    self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
 
     // 适配自定义启动器背景
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
@@ -85,10 +83,10 @@
     self.actionButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     self.actionButton.layer.cornerRadius = 10;
     self.actionButton.layer.cornerCurve = kCACornerCurveContinuous;
-    // Task89：全灰新拟态主按钮
-    self.actionButton.clipsToBounds = NO;
-    [self.actionButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
-    [self.actionButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    // Task137：恢复 Task89 之前的原生主按钮（系统蓝底白字，内容裁剪到圆角）
+    self.actionButton.clipsToBounds = YES;
+    self.actionButton.backgroundColor = [UIColor systemBlueColor];
+    [self.actionButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     [self.actionButton addTarget:self action:@selector(openActionURL) forControlEvents:UIControlEventTouchUpInside];
     self.actionButton.hidden = YES;
     [self.scrollView addSubview:self.actionButton];

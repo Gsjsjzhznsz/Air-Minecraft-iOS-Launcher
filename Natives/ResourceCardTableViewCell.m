@@ -51,7 +51,7 @@ static NSString * const kResourceCardDefaultIcon = @"doc.fill";
 
         // ----- 卡片本体 = contentView：半透明基底 + 12pt continuous 圆角 + 0.5pt 描边，裁圆角 -----
         self.contentView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-        self.contentView.layer.cornerRadius = 50.0;  // Task136 新拟态基准
+        self.contentView.layer.cornerRadius = 12.0;  // Task137：回归原生卡片圆角
         self.contentView.layer.cornerCurve = kCACornerCurveContinuous;
         self.contentView.layer.borderWidth = 0.5;
         self.contentView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;

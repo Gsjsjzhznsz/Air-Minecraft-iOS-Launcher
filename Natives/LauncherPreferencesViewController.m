@@ -1,6 +1,5 @@
 #import <Foundation/Foundation.h>
 
-#import "NeomorphKit/NMTheme.h"
 #import "DBNumberedSlider.h"
 #import "HostManagerBridge.h"
 #import "LauncherNavigationController.h"
@@ -1881,7 +1880,7 @@
         [[BackgroundManager sharedManager] applyEffectToCell:cell];
 
         // Task91：写死白色改主题主文字色（新拟态表面浅色模式下白字不可读）
-        cell.textLabel.textColor = [NMTheme nm_label];
+        cell.textLabel.textColor = [UIColor labelColor];
         cell.textLabel.shadowColor = [UIColor blackColor];
         cell.textLabel.shadowOffset = CGSizeMake(0, 1);
 
@@ -1912,15 +1911,15 @@
             // Style text fields
             if ([subview isKindOfClass:[UITextField class]]) {
                 UITextField *textField = (UITextField *)subview;
-                textField.textColor = [NMTheme nm_label]; // Task91：文字与输入框底色同步主题化
-                textField.backgroundColor = [NMTheme nm_surfaceRaised];
+                textField.textColor = [UIColor labelColor]; // Task91：文字与输入框底色同步主题化
+                textField.backgroundColor = [UIColor tertiarySystemFillColor];
                 textField.layer.cornerRadius = 8;
             }
 
             // Style labels
             if ([subview isKindOfClass:[UILabel class]]) {
                 UILabel *label = (UILabel *)subview;
-                label.textColor = [NMTheme nm_label]; // Task91
+                label.textColor = [UIColor labelColor]; // Task91
                 label.shadowColor = [UIColor blackColor];
                 label.shadowOffset = CGSizeMake(0, 1);
             }
@@ -2085,7 +2084,7 @@
     if ([[BackgroundManager sharedManager] hasBackground]) {
         if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
             UITableViewHeaderFooterView *header = (UITableViewHeaderFooterView *)view;
-            header.textLabel.textColor = [NMTheme nm_label]; // Task91
+            header.textLabel.textColor = [UIColor labelColor]; // Task91
             header.textLabel.shadowColor = [UIColor blackColor];
             header.textLabel.shadowOffset = CGSizeMake(0, 1);
             header.backgroundView = [[UIView alloc] init];

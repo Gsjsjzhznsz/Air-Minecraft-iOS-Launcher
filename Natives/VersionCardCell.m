@@ -9,41 +9,13 @@
 
 #import "VersionCardCell.h"
 #import "BackgroundManager.h"
+#import "UIKit+NativeSurface.h"
 
-// 修复问题3：带内边距的 UILabel 子类，让"正式版/测试版"等类型标签文字
-// 在背景块内完美居中，不再与背景边缘重叠。
-// 通过重写 textRectForBounds: 和 drawTextInRect: 注入左右 8pt / 上下 0pt 内边距，
-// 同时保持 UILabel 接口不变，VersionCardCell.h 中的 typeLabel 声明无需修改。
-@interface InsetTypeLabel : UILabel
-@property (nonatomic, assign) UIEdgeInsets textInsets;
-@end
-
-@implementation InsetTypeLabel
-- (instancetype)init {
-    self = [super init];
-    if (self) {
-        // Task136：胶囊内边距（左右 8pt）——宽度随字体自适应
-        _textInsets = UIEdgeInsetsMake(0, 8, 0, 8);
-    }
-    return self;
-}
-- (CGRect)textRectForBounds:(CGRect)bounds limitedToNumberOfLines:(NSInteger)numberOfLines {
-    CGRect insetRect = UIEdgeInsetsInsetRect(bounds, self.textInsets);
-    CGRect textRect = [super textRectForBounds:insetRect limitedToNumberOfLines:numberOfLines];
-    textRect.origin.x -= self.textInsets.left;
-    textRect.origin.y -= self.textInsets.top;
-    return textRect;
-}
-- (void)drawTextInRect:(CGRect)rect {
-    [super drawTextInRect:UIEdgeInsetsInsetRect(rect, self.textInsets)];
-}
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    // Task136：胶囊边框随字体宽度/高度动态调整（圆角=高/2，任意文本长度均保持胶囊）
-    CGFloat h = self.bounds.size.height;
-    if (h > 0) self.layer.cornerRadius = h / 2.0;
-}
-@end
+// Task137："正式版/测试版"类型胶囊改用共享的 AmeBadgeLabel
+// （UIKit+NativeSurface.h）：完整实现 intrinsicContentSize = 文字尺寸 +
+// 左右内边距，自动布局下宽度随字体动态且永不截断（Task136 的 InsetTypeLabel
+// 缺少 intrinsicContentSize 补偿，所有胶囊都被裁成"…"，本类修复该回归）；
+// 圆角随高度取半保持胶囊形状。
 
 @interface VersionCardCell ()
 // 容器视图：整张卡片的圆角背景（毛玻璃 + 半透明）
@@ -66,15 +38,16 @@
         self.contentView.backgroundColor = [UIColor clearColor];
         self.layer.masksToBounds = NO;
 
-        // ----- 卡片容器（Task89：新拟态凸出表面；Task136：新拟态基准圆角 50）-----
-        // 保留圆角供 applyEffectToView 读取；底色/边框/旧阴影移交 NeomorphKit 管理
+        // ----- 卡片容器（Task137：原生卡片表面，圆角回摑 Task136 之前的 12pt）-----
+        // 保留圆角供 applyEffectToView 读取；底色移交 UIKit+NativeSurface 管理
         self.cardContainer = [[UIView alloc] init];
         self.cardContainer.translatesAutoresizingMaskIntoConstraints = NO;
-        self.cardContainer.layer.cornerRadius = 50;
+        self.cardContainer.layer.cornerRadius = 12;
         self.cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
         [self.contentView addSubview:self.cardContainer];
 
-        // 应用新拟态效果（BackgroundManager.applyEffectToView 已切换为 Neomorph 分发）
+        // 应用原生卡片效果（BackgroundManager.applyEffectToView 检测切换：
+        // 有背景照片时走毛玻璃/半透明旧管线，无背景时原生卡片表面）
         [[BackgroundManager sharedManager] applyEffectToView:self.cardContainer];
 
         // ----- 左侧图标容器：40x40 圆角方块，类型色背景 -----
@@ -106,22 +79,17 @@
         [self.versionLabel setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
         [self.versionLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
 
-        // ----- 类型标签（Task136：右侧独立胶囊，按字体宽度自适应） -----
-        // 字号对齐左侧两行文字的次行（12pt）；宽度=文字+左右 8pt 内边距（随字体
-        // 动态），固定高 24（≈两行 12pt 字），圆角随高度取半（见 InsetTypeLabel
-        // layoutSubviews）；靠右固定在 chevron 左侧，永不贴近卡片边缘被裁剪；
-        // 不再压缩缩字（不再出现"……"）。
-        self.typeLabel = [[InsetTypeLabel alloc] init];
+        // ----- 类型标签（Task137：右侧独立胶囊，按字体宽度自适应且永不截断） -----
+        // AmeBadgeLabel：宽度 = 文字 + 左右 8pt 内边距（随字体动态，intrinsic
+        // 完整补偿）；固定高 24（≈两行 12pt 字），圆角随高度取半；靠右固定在
+        // chevron 左侧，永不贴近卡片边缘被裁剪；hugging/compression 均为
+        // Required：胶囊永不压缩变形（不再出现"…"）。
+        self.typeLabel = [[AmeBadgeLabel alloc] init];
         self.typeLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.typeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
         self.typeLabel.textColor = [UIColor whiteColor];
         self.typeLabel.textAlignment = NSTextAlignmentCenter;
-        self.typeLabel.layer.cornerCurve = kCACornerCurveContinuous;
-        self.typeLabel.layer.masksToBounds = YES;
-        // 类型标签 hugging/compression 均 Required：保持完整胶囊形状，空间不足时
-        // 由版本号侧压缩（adjustsFontSizeToFitWidth 机制退役）
-        [self.typeLabel setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-        [self.typeLabel setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        // 类型标签尺寸由 intrinsicContentSize 保证，空间不足时由版本号侧压缩
         [self.cardContainer addSubview:self.typeLabel];
 
         // ----- 顶行 stack：仅版本号（Task136：类型胶囊移出 stack 独立靠右） -----
@@ -200,7 +168,7 @@
             [self.topRowStack.topAnchor constraintEqualToAnchor:self.cardContainer.topAnchor constant:14],
             [self.topRowStack.trailingAnchor constraintLessThanOrEqualToAnchor:self.typeLabel.leadingAnchor constant:-8],
 
-            // Task136：类型胶囊——右侧锚定 chevron 左侧 8pt（不贴卡片边缘），
+            // Task136/137：类型胶囊——右侧锚定 chevron 左侧 8pt（不贴卡片边缘），
             // 垂直居中于左侧两行文字块（版本号+日期），高 24（≈两行 12pt 字）
             [self.typeLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
             [self.typeLabel.centerYAnchor constraintEqualToAnchor:self.cardContainer.centerYAnchor],
@@ -291,7 +259,7 @@
         self.iconContainer.backgroundColor = [typeColor colorWithAlphaComponent:0.85];
     }
 
-    // 类型标签：类型色底 + 白字（Task136：尺寸随字体动态，见布局注释）
+    // 类型标签：类型色底 + 白字（Task137：尺寸随字体动态且不截断，见布局注释）
     self.typeLabel.text = typeText;
     self.typeLabel.backgroundColor = typeColor;
 }

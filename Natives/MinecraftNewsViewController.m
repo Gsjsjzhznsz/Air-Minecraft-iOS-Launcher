@@ -4,7 +4,6 @@
 //
 
 #import "MinecraftNewsViewController.h"
-#import "NeomorphKit/NMTheme.h"
 #import "MinecraftNewsService.h"
 #import "MinecraftNewsItem.h"
 #import "BackgroundManager.h"
@@ -19,7 +18,7 @@ static const CGFloat kNewsCardSpacing = 12.0;
 /// 卡片内边距
 static const CGFloat kNewsCardPadding = 12.0;
 /// 卡片圆角（Task136：新拟态基准 50，引擎按卡片实际尺寸自动夹断）
-static const CGFloat kNewsCardCornerRadius = 50.0;
+static const CGFloat kNewsCardCornerRadius = 12.0;  // Task137：回归原生卡片圆角（等高机制不变）
 /// 缩略图圆角
 static const CGFloat kNewsThumbnailCornerRadius = 8.0;
 /// 每页条数
@@ -203,7 +202,7 @@ static const NSInteger kNewsPageSize = 24;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = localize(@"mc_news.title", nil);
-    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+    self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task137：原生页面底色
 
     // 适配自定义启动器背景
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];

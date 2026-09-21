@@ -1,5 +1,4 @@
 #import "LauncherNewsViewController.h"
-#import "NeomorphKit/NMTheme.h"
 #import "HomeCustomizeViewController.h"
 #import "authenticator/BaseAuthenticator.h"
 #import "LauncherPreferences.h"
@@ -339,9 +338,9 @@ static NSString *festivalGreeting(void) {
 
     // 圆角：contentView 设置圆角 + masksToBounds，让 BackgroundManager 注入的
     // 毛玻璃 blurView 也获得一致的圆角（applyEffectToCollectionViewCell: 会读取
-    // cell.contentView.layer.cornerRadius）。self.layer 保持 masksToBounds=NO
-    // 以便显示阴影，阴影路径在 layoutSubviews 中按 Task136 新拟态基准 50 生成。
-    self.contentView.layer.cornerRadius = 50;
+    // cell.contentView.layer.cornerRadius）。
+    // Task137：圆角回摑 Task136 之前的 16pt（原生磁贴卡片），阴影路径退场。
+    self.contentView.layer.cornerRadius = 16;
     self.contentView.layer.cornerCurve = kCACornerCurveContinuous;
     self.contentView.layer.masksToBounds = YES;
 
@@ -354,7 +353,7 @@ static NSString *festivalGreeting(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:50].CGPath;
+    // Task137：原生磁贴卡片无自绘阴影，shadowPath 生成随新拟态一并退役
 }
 
 // 弹簧按压动画
@@ -407,8 +406,8 @@ static NSString *festivalGreeting(void) {
     self.avatarImageView.layer.masksToBounds = YES;
     self.avatarImageView.layer.borderWidth = 2.5;
     self.avatarImageView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.35].CGColor;
-    // Task89：主题占位底色
-    self.avatarImageView.backgroundColor = [NMTheme nm_surfaceRaised];
+    // Task137：原生占位底色
+    self.avatarImageView.backgroundColor = [UIColor tertiarySystemFillColor];
     self.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
     self.avatarImageView.tintColor = [UIColor systemGrayColor];
     [self.contentContainer addSubview:self.avatarImageView];
@@ -592,10 +591,10 @@ static NSString *festivalGreeting(void) {
     self.thumbnailView.clipsToBounds = YES;
     self.thumbnailView.layer.cornerRadius = 10;
     self.thumbnailView.layer.cornerCurve = kCACornerCurveContinuous;
-    // Task89：主题占位底色
-    self.thumbnailView.backgroundColor = [NMTheme nm_surfaceRaised];
+    // Task137：原生占位底色
+    self.thumbnailView.backgroundColor = [UIColor tertiarySystemFillColor];
     self.thumbnailView.image = [UIImage systemImageNamed:@"newspaper.fill"];
-    self.thumbnailView.tintColor = [NMTheme nm_secondaryLabel];
+    self.thumbnailView.tintColor = [UIColor secondaryLabelColor];
     [self.contentContainer addSubview:self.thumbnailView];
     
     // 标题

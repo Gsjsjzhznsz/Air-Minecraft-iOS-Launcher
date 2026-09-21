@@ -1,5 +1,4 @@
 #import "utils.h"
-#import "NeomorphKit/NMTheme.h"
 //
 //  BackgroundSettingsViewController.m
 //  Amethyst
@@ -31,12 +30,11 @@
         self.tableView.backgroundColor = [UIColor clearColor];
         self.tableView.backgroundView = nil;
     } else {
-        // Task111：无自定义背景时用 NMTheme 底色（与全局新拟态同源，
-        // 随深浅色自适应）；此前 systemBackground 纯白底会把 surface 色
-        // 卡片 cell 洗成几乎不可见（用户实测"菜单背景消失"）。
-        // tableView 必须显式同色（默认 systemBackground 白底）。
-        self.view.backgroundColor = [NMTheme nm_background];
-        self.tableView.backgroundColor = [NMTheme nm_background];
+        // Task137：无自定义背景时回归原生页面底色（systemBackgroundColor，
+        // 深浅色自适应；cell 走 applyEffectToCell 的透明默认分支，标准
+        // 列表外观）。tableView 必须显式同色（默认即是，显式声明防漂移）。
+        self.view.backgroundColor = [UIColor systemBackgroundColor];
+        self.tableView.backgroundColor = [UIColor systemBackgroundColor];
     }
     
     // Setup table view
@@ -78,8 +76,8 @@
         self.tableView.backgroundView = nil;
     } else {
         // Task111：与 viewDidLoad 同步的无背景底色（主题切换后保持一致）
-        self.view.backgroundColor = [NMTheme nm_background];
-        self.tableView.backgroundColor = [NMTheme nm_background];
+        self.view.backgroundColor = [UIColor systemBackgroundColor];
+        self.tableView.backgroundColor = [UIColor systemBackgroundColor];
     }
 }
 
@@ -235,7 +233,7 @@
             
             UILabel *valueLabel = [cell.contentView viewWithTag:201];
             valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.uiOpacity * 100];
-            valueLabel.textColor = hasBackground ? [NMTheme nm_label] : [UIColor labelColor]; // Task91
+            valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
             self.opacityValueLabel = valueLabel;
             
             cell.textLabel.text = nil;
@@ -278,7 +276,7 @@
             
             UILabel *valueLabel = [cell.contentView viewWithTag:301];
             valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.blurIntensity * 100];
-            valueLabel.textColor = hasBackground ? [NMTheme nm_label] : [UIColor labelColor]; // Task91
+            valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
             
             cell.textLabel.text = nil;
             cell.imageView.image = [UIImage systemImageNamed:@"slider.horizontal.3"];
@@ -331,12 +329,11 @@
 
 - (void)styleCell:(UITableViewCell *)cell hasBackground:(BOOL)hasBackground {
     // Task111：统一走 applyEffectToCell 的检测切换——有背景=毛玻璃/半透明
-    // （背景图从 cell 下方透出），无背景=NMTheme surface 实色卡片底。
-    // 此前无背景分支写死 secondarySystemBackgroundColor（与 NMTheme 底色
-    // 几乎同色），用户实测"菜单背景消失，只剩按钮和阴影"。
+    // （背景图从 cell 下方透出），无背景=原生透明默认 cell（Task137：
+    // 新拟态退役，标准列表外观）。
     [[BackgroundManager sharedManager] applyEffectToCell:cell];
     if (hasBackground) {
-        cell.textLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
+        cell.textLabel.textColor = [UIColor labelColor]; // Task91：写死白色改主题主文字色
     } else {
         cell.textLabel.textColor = [UIColor labelColor];
     }
@@ -524,8 +521,8 @@
         [self.tableView reloadData];
         
         // 恢复默认背景色
-        self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
-        self.tableView.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+        self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
+        self.tableView.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
         self.tableView.backgroundView = nil;
         
         [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
@@ -551,8 +548,8 @@
         [self.tableView reloadData];
         
         // Restore default background color
-        self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
-        self.tableView.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+        self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
+        self.tableView.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
         
         [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
     }]];

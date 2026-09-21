@@ -8,7 +8,6 @@
 //
 
 #import "ResourceListViewController.h"
-#import "NeomorphKit/NMTheme.h"
 #import "BackgroundManager.h"
 #import "LauncherPreferences.h"
 #import "DownloadTaskItem.h"
@@ -66,7 +65,7 @@ static CGFloat const kBatchToolbarBottomGap = 12.0; // 工具栏与安全区底�
     if (self.pageTitle.length > 0) {
         self.title = self.pageTitle;
     }
-    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+    self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
     // 适配自定义启动器背景：透明化当前 VC，让全局背景图/毛玻璃透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 

@@ -12,8 +12,8 @@
 #import "PLCrashView.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNavigationController.h"
-#import "NeomorphKit/UIView+Neomorph.h"
-#import "NeomorphKit/UIViewController+NMPanel.h"
+#import "UIKit+NativeSurface.h"
+#import "UIViewController+AMEPanel.h"
 #import "LauncherPreferences.h"
 #import "MinecraftResourceDownloadTask.h"
 #import "MinecraftResourceUtils.h"
@@ -58,23 +58,22 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 @implementation LauncherNavigationController
 
-// Task 127（单一执法点）：所有子级面板的新拟物基底样式。
-// 用户实测反馈"所有子级面板都需要使用新拟物设计"——主界面/设置页 Task89
-// 已新拟态化，但从侧栏推入的 29 个子面板仍是系统默认白/黑底。
+// Task 127（单一执法点）→ Task137 原生化：所有子级面板的原生基底样式。
+// 主界面/设置页之外的推入子面板统一回归 iOS 原生页面底色（systemBackground）。
 // 在 pushViewController: 与 viewDidAppear:（根面板）统一调用
-// nm_applySubpanelNeomorphStyle（幂等；透明定制面板自动跳过，
-// 见 UIViewController+NMPanel.h 头注释），现存与未来新增的子面板
+// ame_applySubpanelBaseStyle（幂等；透明定制面板自动跳过，
+// 见 UIViewController+AMEPanel.h 头注释），现存与未来新增的子面板
 // 全部自动继承，无需逐个改造。
 - (void)pushViewController:(UIViewController *)viewController animated:(BOOL)animated {
     [super pushViewController:viewController animated:animated];
-    [viewController nm_applySubpanelNeomorphStyle];
+    [viewController ame_applySubpanelBaseStyle];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
     // 根面板（LauncherNewsViewController 等）也吃基底样式；
     // viewDidAppear 而非 viewDidLoad：确保 view 已加载（loadView 惰性）
-    [self.viewControllers.firstObject nm_applySubpanelNeomorphStyle];
+    [self.viewControllers.firstObject ame_applySubpanelBaseStyle];
 }
 
 - (void)viewDidLoad
@@ -122,11 +121,11 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     setButtonPointerInteraction(self.buttonInstall);
     [self.buttonInstall setTitle:localize(@"Play", nil) forState:UIControlStateNormal];
     self.buttonInstall.autoresizingMask = AUTORESIZE_MASKS;
-    // Task89：全灰新拟态主按钮（启动/安装）
+    // Task137：恢复 Task89 之前的原生主按钮（品牌紫底白字）
+    self.buttonInstall.backgroundColor = [UIColor colorWithRed:121/255.0 green:56/255.0 blue:162/255.0 alpha:1.0];
     self.buttonInstall.layer.cornerRadius = 5;
     self.buttonInstall.frame = CGRectMake(self.toolbar.frame.size.width * 0.8, 4, self.toolbar.frame.size.width * 0.2, self.toolbar.frame.size.height - 8);
-    [self.buttonInstall nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
-    self.buttonInstall.tintColor = [NMTheme nm_label];
+    self.buttonInstall.tintColor = UIColor.whiteColor;
     self.buttonInstall.enabled = NO;
     [self.buttonInstall addTarget:self action:@selector(performInstallOrShowDetails:) forControlEvents:UIControlEventPrimaryActionTriggered];
     [targetToolbar addSubview:self.buttonInstall];
@@ -139,13 +138,13 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     CGFloat dcBtnHeight = self.toolbar.frame.size.height - 8;
     self.downloadCenterButton = [UIButton buttonWithType:UIButtonTypeSystem];
     // 不使用按钮的 title 显示文字，改用独立的 progressLabel 避免与图标布局冲突
-    // Task89：全灰新拟态按钮
+    // Task137：恢复 Task89 之前的原生入口按钮（品牌紫底 + 白色图标）
+    self.downloadCenterButton.backgroundColor = [UIColor colorWithRed:121/255.0 green:56/255.0 blue:162/255.0 alpha:0.85];
     self.downloadCenterButton.layer.cornerRadius = 5;
     self.downloadCenterButton.frame = CGRectMake(4, 4, dcBtnWidth, dcBtnHeight);
     self.downloadCenterButton.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
     [self.downloadCenterButton setImage:[UIImage systemImageNamed:@"arrow.down.circle"] forState:UIControlStateNormal];
-    self.downloadCenterButton.tintColor = [NMTheme nm_label];
-    [self.downloadCenterButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
+    self.downloadCenterButton.tintColor = [UIColor whiteColor];
     // 图标固定在按钮左侧
     CGFloat iconSize = 22.0;
     [self.downloadCenterButton setImageEdgeInsets:UIEdgeInsetsMake(0, 4, 0, dcBtnWidth - iconSize - 4)];
@@ -155,8 +154,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
     // 活动指示器（按钮右侧，下载中时旋转）
     self.downloadCenterActivityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-    // Task89：主题主文字色（原白色假设紫色按钮底）
-    self.downloadCenterActivityIndicator.color = [NMTheme nm_label];
+    // Task137：恢复原生白色指示器（原紫色按钮底假设）
+    self.downloadCenterActivityIndicator.color = [UIColor whiteColor];
     self.downloadCenterActivityIndicator.hidesWhenStopped = YES;
     CGFloat indicatorSize = 20.0;
     self.downloadCenterActivityIndicator.frame = CGRectMake(dcBtnWidth - indicatorSize - 4, (dcBtnHeight - indicatorSize) / 2.0, indicatorSize, indicatorSize);
@@ -166,7 +165,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     // 进度百分比标签（按钮中间，显示聚合进度百分比）
     self.downloadCenterProgressLabel = [[UILabel alloc] init];
     self.downloadCenterProgressLabel.font = [UIFont monospacedDigitSystemFontOfSize:11 weight:UIFontWeightBold];
-    self.downloadCenterProgressLabel.textColor = [NMTheme nm_label];
+    self.downloadCenterProgressLabel.textColor = [UIColor whiteColor];
     self.downloadCenterProgressLabel.textAlignment = NSTextAlignmentCenter;
     self.downloadCenterProgressLabel.text = @"";
     self.downloadCenterProgressLabel.frame = CGRectMake(iconSize + 6, 0, dcBtnWidth - iconSize - indicatorSize - 12, dcBtnHeight);

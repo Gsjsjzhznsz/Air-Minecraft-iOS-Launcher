@@ -1,7 +1,6 @@
 #import <AuthenticationServices/AuthenticationServices.h>
 #import <objc/runtime.h>   // Task 130b：按钮 row 关联对象
-#import "NeomorphKit/NMTheme.h"
-#import "NeomorphKit/NMToast.h"
+#import "NMToast.h"
 
 #import "authenticator/BaseAuthenticator.h"
 #import "authenticator/ThirdPartyAuthenticator.h"
@@ -136,8 +135,8 @@
         badgeLabel.backgroundColor = [UIColor colorWithRed:0.92 green:0.55 blue:0.18 alpha:1.0];
     } else if (accountData[@"xboxGamertag"] == nil) {
         badgeLabel.text = localize(@"login.option.local", @"本地");
-        // Task89：主题占位底色（原硬编码深灰仅适配深色卡片）
-        badgeLabel.backgroundColor = [NMTheme nm_surfaceRaised];
+        // Task137：原生中性灰底（白字在深浅色下均可读；其余账户类型仍为品牌色底）
+        badgeLabel.backgroundColor = [UIColor systemGrayColor];
     } else {
         // 微软账户
         badgeLabel.text = @"Microsoft";
@@ -189,7 +188,7 @@
     UIView *cardView = [[UIView alloc] init];
     cardView.translatesAutoresizingMaskIntoConstraints = NO;
     cardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10];
-    cardView.layer.cornerRadius = 50;  // Task136 新拟态基准
+    cardView.layer.cornerRadius = 16;  // Task137：回归原生卡片圆角
     cardView.layer.cornerCurve = kCACornerCurveContinuous;
     cardView.layer.borderWidth = 0.5;
     cardView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12].CGColor;
@@ -207,8 +206,8 @@
     avatarView.clipsToBounds = YES;
     avatarView.layer.cornerRadius = 24;
     avatarView.layer.cornerCurve = kCACornerCurveContinuous;
-    // Task89：主题占位底色
-    avatarView.backgroundColor = [NMTheme nm_surfaceRaised];
+    // Task137：原生占位底色
+    avatarView.backgroundColor = [UIColor tertiarySystemFillColor];
     avatarView.image = [UIImage imageNamed:@"DefaultAccount"];
     [cardView addSubview:avatarView];
     NSString *picURLStr = [accountData[@"profilePicURL"] stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];

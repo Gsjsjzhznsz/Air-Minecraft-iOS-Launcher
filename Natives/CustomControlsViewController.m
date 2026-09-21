@@ -1,5 +1,4 @@
 #import "CustomControlsViewController.h"
-#import "NeomorphKit/NMTheme.h"
 #import "DBNumberedSlider.h"
 #import "FileListViewController.h"
 #import "LauncherPreferences.h"
@@ -59,7 +58,7 @@
     guideLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     guideLabel.numberOfLines = 0;
     guideLabel.textAlignment = NSTextAlignmentCenter;
-    guideLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
+    guideLabel.textColor = [UIColor labelColor]; // Task91：写死白色改主题主文字色
     guideLabel.text = localize(@"custom_controls.hint", nil);
     [self.view addSubview:guideLabel]; 
 

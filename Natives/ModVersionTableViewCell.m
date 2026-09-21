@@ -54,7 +54,7 @@
     self.cardContainer = [[UIView alloc] init];
     self.cardContainer.translatesAutoresizingMaskIntoConstraints = NO;
     self.cardContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-    self.cardContainer.layer.cornerRadius = 50;  // Task136 新拟态基准
+    self.cardContainer.layer.cornerRadius = 12;  // Task137：回归原生卡片圆角
     self.cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
     self.cardContainer.layer.borderWidth = 0.5;
     self.cardContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;

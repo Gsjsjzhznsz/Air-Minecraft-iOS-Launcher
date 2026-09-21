@@ -1,5 +1,4 @@
 #import "LauncherCardLayoutViewController.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNewsViewController.h"
 #import "LauncherRightPanelViewController.h"
@@ -269,10 +268,11 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
     return card;
 }
 
-/// Task89：新拟态下空操作（表面色由 NMTheme 统一管理，强制纯色底）。
+/// Task89 起空操作；Task137 新拟态退役后保持空操作（卡片表面归
+/// UIKit+NativeSurface / BackgroundManager 管理）。
 - (void)applyCustomCardColorToCard:(UIView *)card {
-    // Task89：新拟态下表面色由 NMTheme 统一管理（用户选定强制纯色底），
-    // general.card_color 不再叠加到卡片表面——整体成为空操作。
+    // Task89 起空操作（Task137 延续）：general.card_color 不再叠加到卡片
+    // 表面——卡片底色由原生表面辅助统一管理。
     // 原毛玻璃+半透明色叠加实现见 git 历史（1a135fe 之前版本）。
 }
 - (nullable UIColor *)colorFromHexString:(id)hex {

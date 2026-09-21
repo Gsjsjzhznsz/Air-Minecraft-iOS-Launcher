@@ -1,5 +1,4 @@
 #import "utils.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 //
 //  ModpackExportViewController.m
 //  Amethyst
@@ -399,11 +398,13 @@
     self.exportButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.exportButton setTitle:localize(@"i18n_str_513", nil) forState:UIControlStateNormal];
     [self.exportButton setImage:[UIImage systemImageNamed:@"square.and.arrow.up"] forState:UIControlStateNormal];
-    // Task89：全灰新拟态主按钮
-    [self.exportButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+    // Task137：恢复 Task89 之前的原生主按钮（系统蓝底白字，内容裁剪到圆角）
+    self.exportButton.backgroundColor = [UIColor systemBlueColor];
+    self.exportButton.layer.cornerRadius = 12;
+    self.exportButton.layer.masksToBounds = YES;
+    [self.exportButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.exportButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    [self.exportButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
-    self.exportButton.tintColor = [NMTheme nm_label];
+    self.exportButton.tintColor = [UIColor whiteColor];
     [self.exportButton addTarget:self action:@selector(startExport) forControlEvents:UIControlEventTouchUpInside];
 
     [self.exportButton.heightAnchor constraintEqualToConstant:50].active = YES;

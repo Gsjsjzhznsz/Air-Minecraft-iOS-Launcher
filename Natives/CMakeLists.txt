@@ -301,13 +301,10 @@ add_executable(AngelAuraAmethyst
   external/fishhook/fishhook.c
   UIKit+hook.m
   ScreenUtils.m
-  # Task89：NeomorphKit 新拟态组件库（忠实移植 react-native-neomorph-shadows
-  # 的 Neomorph 凸出算法：HSP 亮度→双阴影透明度、offset=±shadowRadius）
-  NeomorphKit/NMTheme.m
-  NeomorphKit/UIView+Neomorph.m
-  NeomorphKit/NMToast.m
-  NeomorphKit/UIViewController+NMPanel.m
-  NeomorphKit/NMContrast.m
+  # Task137：新拟态（NeomorphKit）退役，替换为 iOS 原生表面辅助与原生通知卡片
+  UIKit+NativeSurface.m
+  NMToast.m
+  UIViewController+AMEPanel.m
 
   authenticator/BaseAuthenticator.m
   authenticator/LocalAuthenticator.m

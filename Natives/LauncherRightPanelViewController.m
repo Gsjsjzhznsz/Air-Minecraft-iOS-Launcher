@@ -255,7 +255,9 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     self.avatarImageView.contentMode = UIViewContentModeScaleAspectFit;
     self.avatarImageView.layer.cornerRadius = 36;
     self.avatarImageView.layer.masksToBounds = YES;
-    self.avatarImageView.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    // Task137：占位底色原生化（0.2 白硬编码深灰与下载中心小框同族问题，
+    // 改 tertiarySystemFillColor 随深浅色自适应）
+    self.avatarImageView.backgroundColor = [UIColor tertiarySystemFillColor];
     self.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
     self.avatarImageView.tintColor = [UIColor systemGrayColor];
     self.avatarImageView.userInteractionEnabled = YES;
@@ -315,7 +317,10 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     self.downloadCenterButton.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.downloadCenterButton.titleLabel.minimumScaleFactor = 0.7;
     self.downloadCenterButton.titleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    self.downloadCenterButton.backgroundColor = [UIColor colorWithWhite:0.2 alpha:1.0];
+    // Task137：黑底深字直修（用户实测反馈）——旧实现硬编码 0.2 白（深灰）底
+    // 配 labelColor 字（浅色模式下黑字），深浅模式都可能不可读。改用原生卡片
+    // 表面（secondarySystemGroupedBackground），深浅色对比度由系统语义色保证。
+    self.downloadCenterButton.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
     self.downloadCenterButton.layer.cornerRadius = 10;
     self.downloadCenterButton.layer.masksToBounds = YES;
     // 左侧下载图标

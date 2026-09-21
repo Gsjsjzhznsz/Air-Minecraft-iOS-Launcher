@@ -886,7 +886,7 @@
     } else {
         // Task136：无背景时与上级菜单（版本卡列表）同语言——新拟态凸出卡片
         // （surface 底色 + 暗/亮双外阴影），圆角基准 50（引擎按高度夹断）
-        _nameBar.layer.cornerRadius = 50;
+        _nameBar.layer.cornerRadius = 10;  // Task137：回归原生圆角
         [[BackgroundManager sharedManager] applyEffectToView:_nameBar];
     }
     [self.view addSubview:_nameBar];

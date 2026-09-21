@@ -11,7 +11,6 @@
 //
 
 #import "AccountLoginViewController.h"
-#import "NeomorphKit/NMTheme.h"
 #import "BackgroundManager.h"
 #import "ScreenUtils.h"
 #import "utils.h"
@@ -138,7 +137,7 @@
     self.headerTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.headerTitleLabel.text = localize(@"i18n_str_17", nil);
     self.headerTitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:26] weight:UIFontWeightBold];
-    self.headerTitleLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
+    self.headerTitleLabel.textColor = [UIColor labelColor]; // Task91：写死白色改主题主文字色
     self.headerTitleLabel.numberOfLines = 1;
     [self.headerContainer addSubview:self.headerTitleLabel];
 
@@ -146,7 +145,7 @@
     self.headerSubtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.headerSubtitleLabel.text = localize(@"i18n_str_18", nil);
     self.headerSubtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:14] weight:UIFontWeightRegular];
-    self.headerSubtitleLabel.textColor = [NMTheme nm_secondaryLabel]; // Task91
+    self.headerSubtitleLabel.textColor = [UIColor secondaryLabelColor]; // Task91
     self.headerSubtitleLabel.numberOfLines = 0;
     [self.headerContainer addSubview:self.headerSubtitleLabel];
 
@@ -206,7 +205,7 @@
     titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     titleLabel.text = title;
     titleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:17] weight:UIFontWeightSemibold];
-    titleLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
+    titleLabel.textColor = [UIColor labelColor]; // Task91：写死白色改主题主文字色
     titleLabel.numberOfLines = 1;
     titleLabel.userInteractionEnabled = NO;
     [card addSubview:titleLabel];
@@ -216,7 +215,7 @@
     descLabel.translatesAutoresizingMaskIntoConstraints = NO;
     descLabel.text = description;
     descLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:13] weight:UIFontWeightRegular];
-    descLabel.textColor = [NMTheme nm_secondaryLabel]; // Task91
+    descLabel.textColor = [UIColor secondaryLabelColor]; // Task91
     descLabel.numberOfLines = 0;
     descLabel.userInteractionEnabled = NO;
     [card addSubview:descLabel];

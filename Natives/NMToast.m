@@ -1,26 +1,24 @@
 //
 //  NMToast.m
-//  NeomorphKit
+//  Amethyst
 //
-//  Task 125/126：新拟物应用内通知实现。头注释见 NMToast.h。
+//  Task 125/126：应用内通知实现。头注释见 NMToast.h。Task137：卡片表面
+//  改用 iOS 原生样式（ame_applyCardSurfaceWithRadius，无自绘阴影）。
 //
 //  实现要点：
 //  - 容器挂在当前 key window（UIWindow.mainWindow）上，不新建 window
 //    （Task126 的教训：新 window + level 1000 = "系统弹窗"观感 + 回收难题）
-//  - 卡片：nm_flatRaisedSurfaceWithRadius（新拟物凸出、surfaceRaised 底色），
-//    圆角 18、自动布局（左右边距 16、顶部贴安全区 + 8）
+//  - 卡片：原生卡片表面（secondarySystemGroupedBackground + 圆角 18，
+//    深浅色由语义色自动适配），自动布局（左右边距 16、顶部贴安全区 + 8）
 //  - 交互：整卡点按 = 提前关闭；动作按钮触发 onAction
 //  - 顶替语义：静态 s_current 管理当前实例，新 toast 直接替换旧的
 //    （旧的淡出，新的滑入，二者动画独立不冲突）
 //  - 自动消失：dispatch_after + 代际令牌（generation counter），
 //    防止"旧 toast 的关闭定时器误关新 toast"
-//  - 主题：颜色实时取自 NMTheme（呈现时解析；toast 生命周期仅数秒，
-//    不做主题切换重刷——场景可忽略）
 //
 
 #import "NMToast.h"
-#import "NMTheme.h"
-#import "UIView+Neomorph.h"
+#import "UIKit+NativeSurface.h"
 // UIWindow.mainWindow 来自工程内 UIWindow(global) 分类（UIKit+hook.h）
 #import "../UIKit+hook.h"
 
@@ -105,19 +103,17 @@ static __weak NMToast *s_nm125_current = nil;
     self.containerView.translatesAutoresizingMaskIntoConstraints = NO;
     self.containerView.backgroundColor = UIColor.clearColor;
 
-    // ---- 新拟物卡片 ----
+    // ---- 通知卡片（Task137：原生表面，无自绘阴影）----
     self.cardView = [[UIView alloc] initWithFrame:CGRectZero];
     self.cardView.translatesAutoresizingMaskIntoConstraints = NO;
-    // Task136：弹窗类新拟态凸出表面（surfaceRaised 底 + 暗亮双外影，
-    // 圆角基准 50 按实际尺寸夹断，随 NMTheme 深浅色自动重绘）
-    [self.cardView nm_convexRaisedRadius:50 shadowRadius:10];
+    [self.cardView ame_applyCardSurfaceWithRadius:kNMToastCornerRadius];
 
     // ---- 正文 ----
     self.messageLabel = [[UILabel alloc] initWithFrame:CGRectZero];
     self.messageLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.messageLabel.numberOfLines = 0;
     self.messageLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    self.messageLabel.textColor = [NMTheme nm_label];
+    self.messageLabel.textColor = [UIColor labelColor];
     self.messageLabel.text = message;
 
     [self.cardView addSubview:self.messageLabel];
@@ -131,7 +127,7 @@ static __weak NMToast *s_nm125_current = nil;
         [self.actionButton addTarget:self action:@selector(actionTapped)
                     forControlEvents:UIControlEventTouchUpInside];
         // 高对比但不过分抢眼：label 色加粗（不引入品牌色依赖）
-        [self.actionButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
+        [self.actionButton setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
         [self.cardView addSubview:self.actionButton];
     }
 

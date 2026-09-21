@@ -1,5 +1,4 @@
 #import "LauncherRootViewController.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNewsViewController.h"
 #import "LauncherRightPanelViewController.h"
@@ -24,7 +23,7 @@
 // #import "TerracottaBridge.h"
 #import "AccountListViewController.h"
 #import "UpdateChecker.h"
-#import "NeomorphKit/NMToast.h"
+#import "NMToast.h"
 #import "AI/AIViewController.h"
 #import "AI/AiSessionStore.h"
 #import "LauncherHelpViewController.h"
@@ -278,7 +277,7 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
     self.sidebarContainer.layer.masksToBounds = YES;
     [self.view addSubview:self.sidebarContainer];
 
-    // 中间内容容器 - 完全透明，四角直角（透出 NMTheme 主题背景色）
+    // 中间内容容器 - 完全透明，四角直角（透出系统页面底色/背景照片）
     self.contentContainer = [[UIView alloc] init];
     self.contentContainer.translatesAutoresizingMaskIntoConstraints = NO;
     self.contentContainer.backgroundColor = [UIColor clearColor];
@@ -657,14 +656,14 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 - (void)updateChromeSurfaces {
     // Task111：检测并切换（用户实测：背景照片功能被 Task89 强制纯色底顶掉）。
     // 有自定义背景 → 走 BackgroundManager 旧毛玻璃/半透明管线，背景图从
-    // 两侧面板下方透出；无背景 → 维持 Task89 新拟态平贴表面。
+    // 两侧面板下方透出；无背景 → 原生平贴表面（Task137：新拟态退役）。
     // cornerRadius/maskedCorners/masksToBounds 由调用点维护，此处只换表面。
     if ([[BackgroundManager sharedManager] hasBackground]) {
         [[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];
         [[BackgroundManager sharedManager] applyEffectToView:self.rightPanelContainer];
     } else {
-        [self.sidebarContainer nm_flatSurfaceWithRadius:16];
-        [self.rightPanelContainer nm_flatSurfaceWithRadius:16];
+        [self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];
+        [self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16];
     }
 }
 
@@ -681,7 +680,7 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 #pragma mark - Custom Appearance（字体颜色 / 卡片颜色，与 Card 布局一致）
 
 - (void)applyCustomAppearance {
-    // Task89：新拟态下表面色由 NMTheme 统一管理（强制纯色底），
+    // Task137：新拟态退役，容器表面由 updateChromeSurfaces 的原生平贴分支管理；
     // general.card_color / 毛玻璃不再作用于容器表面；text_color 偏好
     // 仍由子 VC 的 LauncherAppearanceApplied 处理。
     [[NSNotificationCenter defaultCenter] postNotificationName:@"LauncherAppearanceApplied" object:nil];

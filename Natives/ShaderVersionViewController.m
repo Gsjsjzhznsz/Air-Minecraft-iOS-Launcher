@@ -1,5 +1,4 @@
 #import "utils.h"
-#import "NeomorphKit/NMTheme.h"
 //
 //  ShaderVersionViewController.m
 //  Amethyst
@@ -99,7 +98,7 @@ static NSArray<NSDictionary *> *SortOptionItems(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = self.shaderItem.displayName;
-    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+    self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
     // 适配自定义启动器背景：透明化当前 VC，让全局背景图/毛玻璃透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 

@@ -1,5 +1,4 @@
 #import "LauncherMenuViewController.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 #import "LauncherPreferencesViewController.h"
 #import "LauncherPreferences.h"
 #import "VersionManagerViewController.h"
@@ -152,10 +151,8 @@
     btn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
     btn.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
 
-    // Task111：z 序保险——选中新拟物承载层插入在 layer 最底部，但若
-    // UIButton 的图标以主层 contents 方式绘制（低于全部 sublayer），会被
-    // 不透明表面遮住，表现为"选中的主界面按钮图标消失"。图标子视图存在时
-    // 显式提到最前，两种绘制路径下都保证可见。幂等、无副作用。
+    // Task111：z 序保险——图标子视图存在时显式提到最前，两种绘制路径下
+    // 都保证可见。幂等、无副作用（Task137 保留：高亮背景回归后无害）。
     UIView *iconView = btn.imageView;
     if (iconView && iconView.superview == btn) {
         [btn bringSubviewToFront:iconView];
@@ -165,9 +162,10 @@
 
     // 统一圆角：防御性设置 10pt，避免后续给选中态加背景高亮时出现直角方块
     btn.layer.cornerRadius = 10;
-    // Task89：新拟态——初始选中项直接应用凸出面板（选中态在 updateButtonColors 维护）
+    // Task137：新拟态退役——初始选中项直接应用原生 accent 半透明高亮
+    // （选中态在 updateButtonColors 维护）
     if (index == self.selectedIndex) {
-        [btn nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
+        btn.backgroundColor = [accent colorWithAlphaComponent:0.15];
     }
 
     return btn;
@@ -312,18 +310,17 @@
             if (index == self.selectedIndex) {
                 btn.tintColor = accent;
                 // Task101：按钮无标题（纯图标），仅剩图标着色，原 setTitleColor 分支退场
-                // Task89：新拟态——选中项为凸出面板（surface 底 + 双阴影），
-                // 替代原半透明 accent 高亮；幂等重刷（重复调用安全）
-                [btn nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
-                // Task111：z 序保险——承载层重装后把图标子视图提回最前
+                // Task137：新拟态退役——选中项回归原生 accent 半透明高亮
+                // （Task89 之前的样式）；幂等重刷（重复调用安全）
+                btn.backgroundColor = [accent colorWithAlphaComponent:0.15];
+                // Task111：z 序保险——把图标子视图提回最前（幂等保留）
                 UIView *iconView = btn.imageView;
                 if (iconView && iconView.superview == btn) {
                     [btn bringSubviewToFront:iconView];
                 }
             } else {
                 btn.tintColor = normalColor;
-                // 未选中项恢复平贴（无底色无阴影）
-                [btn nm_removeNeomorph];
+                // 未选中项恢复无底色
                 btn.backgroundColor = [UIColor clearColor];
             }
         }

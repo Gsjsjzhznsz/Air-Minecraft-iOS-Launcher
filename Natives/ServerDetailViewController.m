@@ -4,8 +4,6 @@
 //
 
 #import "ServerDetailViewController.h"
-#import "NeomorphKit/NMTheme.h"
-#import "NeomorphKit/UIView+Neomorph.h"
 #import "BackgroundManager.h"
 #import "InlineMessageView.h"
 #import "PLProfiles.h"
@@ -44,7 +42,7 @@
     // 适配自定义启动器背景：将当前视图控制器透明化，使全局背景壁纸能够透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
     [[BackgroundManager sharedManager] applyEffectToView:self.view];
-    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+    self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
     self.title = localize(@"i18n_str_958", nil);
 
     [self setupUI];
@@ -149,9 +147,10 @@
     self.joinButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.joinButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.joinButton setTitle:localize(@"i18n_str_960", nil) forState:UIControlStateNormal];
-    // Task89：全灰新拟态主按钮
-    [self.joinButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    [self.joinButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
+    // Task137：恢复 Task89 之前的原生主按钮（系统蓝底白字）
+    self.joinButton.backgroundColor = [UIColor systemBlueColor];
+    self.joinButton.layer.cornerRadius = 10;
+    [self.joinButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.joinButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.joinButton addTarget:self action:@selector(joinServer) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.joinButton];
@@ -160,9 +159,10 @@
     self.downloadPackButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.downloadPackButton.translatesAutoresizingMaskIntoConstraints = NO;
     [self.downloadPackButton setTitle:localize(@"i18n_str_961", nil) forState:UIControlStateNormal];
-    // Task89：全灰新拟态次按钮
-    [self.downloadPackButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    [self.downloadPackButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
+    // Task137：恢复 Task89 之前的原生次按钮（系统紫底白字）
+    self.downloadPackButton.backgroundColor = [UIColor systemPurpleColor];
+    self.downloadPackButton.layer.cornerRadius = 10;
+    [self.downloadPackButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
     self.downloadPackButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.downloadPackButton addTarget:self action:@selector(downloadServerPack) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.downloadPackButton];

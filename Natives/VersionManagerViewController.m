@@ -1,5 +1,5 @@
 #import "VersionManagerViewController.h"
-#import "NeomorphKit/NMTheme.h"
+#import "UIKit+NativeSurface.h"
 #import "BackgroundManager.h"
 #import "PLProfiles.h"
 #import "ProfileSettingsViewController.h"
@@ -115,14 +115,14 @@ static NSInteger const kSectionVersions    = 1;
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:titleFont weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
+    self.titleLabel.textColor = [UIColor labelColor]; // Task137：语义色（原 Task91 主题色）
     self.titleLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.titleLabel];
 
     self.subtitleLabel = [[UILabel alloc] init];
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.subtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:10] weight:UIFontWeightRegular];
-    self.subtitleLabel.textColor = [NMTheme nm_secondaryLabel]; // Task91
+    self.subtitleLabel.textColor = [UIColor secondaryLabelColor]; // Task137
     self.subtitleLabel.numberOfLines = 0;
     self.subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
     self.subtitleLabel.adjustsFontForContentSizeCategory = NO;
@@ -490,7 +490,7 @@ static NSInteger const kSectionVersions    = 1;
     self.nameLabel = [[UILabel alloc] init];
     self.nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.nameLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:13] weight:UIFontWeightSemibold];
-    self.nameLabel.textColor = [NMTheme nm_label]; // Task91：写死白色改主题主文字色
+    self.nameLabel.textColor = [UIColor labelColor]; // Task137：语义色（原 Task91 主题色）
     self.nameLabel.numberOfLines = 1;
     self.nameLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.nameLabel];
@@ -498,7 +498,7 @@ static NSInteger const kSectionVersions    = 1;
     self.descLabel = [[UILabel alloc] init];
     self.descLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.descLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:10] weight:UIFontWeightRegular];
-    self.descLabel.textColor = [NMTheme nm_secondaryLabel]; // Task91
+    self.descLabel.textColor = [UIColor secondaryLabelColor]; // Task137
     self.descLabel.numberOfLines = 2;
     self.descLabel.lineBreakMode = NSLineBreakByWordWrapping;
     self.descLabel.adjustsFontForContentSizeCategory = NO;
@@ -620,17 +620,14 @@ static NSInteger const kSectionVersions    = 1;
         self.subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
         [self addSubview:self.subtitleLabel];
 
-        // Task136：计数胶囊——尺寸对齐左侧两行文字块（高 24 ≈ 两行 12pt 字，
-        // 垂直居中于整块），宽度随字体自适应，圆角随高度取半（胶囊恒定）
-        self.countBadge = [[UILabel alloc] init];
+        // Task137：计数胶囊统一用 AmeBadgeLabel（与下载版本类型胶囊同实现）：
+        // 宽度随字体动态（intrinsic 完整补偿，永不截断）、高 24 ≈ 两行 12pt 字、
+        // 圆角随高度取半、垂直居中于整块；位置靠右固定（远离卡片边缘）。
+        self.countBadge = [[AmeBadgeLabel alloc] init];
         self.countBadge.translatesAutoresizingMaskIntoConstraints = NO;
         self.countBadge.font = [UIFont systemFontOfSize:[ScreenUtils sp:12] weight:UIFontWeightSemibold];
         self.countBadge.textColor = [UIColor whiteColor];
-        self.countBadge.textAlignment = NSTextAlignmentCenter;
         self.countBadge.backgroundColor = accentColor();
-        self.countBadge.layer.cornerRadius = 12;
-        self.countBadge.layer.cornerCurve = kCACornerCurveContinuous;
-        self.countBadge.layer.masksToBounds = YES;
         self.countBadge.hidden = YES;
         [self addSubview:self.countBadge];
 
@@ -659,7 +656,7 @@ static NSInteger const kSectionVersions    = 1;
             [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18],
             [self.subtitleLabel.bottomAnchor constraintLessThanOrEqualToAnchor:self.bottomAnchor constant:-4],
             // 计数徽章：右侧 18pt（远离卡片边缘），垂直居中对齐左侧两行文字块，
-            // 高 24；宽度由字体自适应（文本保留单空格内边距）
+            // 高 24；宽度由字体自适应（AmeBadgeLabel intrinsic + 8pt 内边距）
             [self.countBadge.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18],
             [self.countBadge.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
             [self.countBadge.heightAnchor constraintEqualToConstant:24]
@@ -683,7 +680,8 @@ static NSInteger const kSectionVersions    = 1;
     self.subtitleLabel.text = subtitle;
 
     if (count >= 0) {
-        self.countBadge.text = [NSString stringWithFormat:@" %ld ", (long)count];
+        // Task137：内边距由 AmeBadgeLabel 的 textInsets 保证，不再用空格凑宽度
+        self.countBadge.text = [NSString stringWithFormat:@"%ld", (long)count];
         self.countBadge.hidden = NO;
     } else {
         self.countBadge.hidden = YES;
