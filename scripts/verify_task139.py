@@ -63,10 +63,12 @@ print("== B. mg 渲染器输入错位（FSR heal 后输入除数未归一） =="
 check("B1 病历证据（GLES 会话：Task119 FSR heal 恢复全表面 + viewport 2360x1640）",
       "Task119 FSR upscale unavailable -- restoring MC window to surface" in log_gles and
       "viewport=0,0 2360x1640" in log_gles)
-check("B2 复位入口（utils.h 声明 + SurfaceViewController 实现主线程派发）",
+check("B2 复位入口（utils.h 声明 + C 入口主线程转发私有方法 + ivar 复位）",
       "void ame139_fsr_heal_reset_input_scale(void);" in uh and
       "ame139_fsr_heal_reset_input_scale" in svc and
-      "svc->mgFsrScale = 1.0f" in svc)
+      "ame139_resetFsrInputScale" in svc and
+      "mgFsrScale = 1.0f;" in svc and
+      "svc->mgFsrScale" not in svc)
 check("B3 两个兜底点全部接入（mgl_fsr Task119 + osm_bridge Task83b）",
       mgl.count("ame139_fsr_heal_reset_input_scale()") >= 1 and
       osm.count("ame139_fsr_heal_reset_input_scale()") >= 1)

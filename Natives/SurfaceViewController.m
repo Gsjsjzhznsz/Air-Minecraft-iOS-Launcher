@@ -267,6 +267,10 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     // 等输入换算读取它保持与 MC 窗口信念（windowWidth）同口径。
     float mgFsrScale;
 }
+// Task 139：FSR 兜底自愈后的输入缩放复位（C 入口
+// ame139_fsr_heal_reset_input_scale 经主线程转发到本方法；ivar 私有，
+// 类扩展外的 C 函数不可直接访问——e7632b3 CI 教训）。
+- (void)ame139_resetFsrInputScale;
 
 // FPS/内存监控相关（FPS 在 native pojavSwapBuffers 中计数，参照 FCL/ZL2）
 @property(nonatomic) NSTimer *statsTimer;                 // 低频定时器，1s 一次
@@ -357,8 +361,9 @@ static UIView *findSDL_uikitview(UIView *root);
 // 的"mg 渲染器输入错位"。osm_bridge 的 Task83b 兜底同款隐患。
 //
 // 修法：两个兜底点在恢复窗口尺寸后调用本函数，把 mgFsrScale 归一。
-// ivar 是本文件类扩展私有，桥接文件碰不到 —— 本函数是唯一入口（主线程
-// 派发，与 UI 归属一致；输入事件本身在主线程产生，无竞态）。
+// ivar 是类扩展私有（C 函数不可直接访问——e7632b3 CI 教训），实际复位由
+// 同类内的 ame139_resetFsrInputScale 方法执行；本函数是唯一外部入口
+// （主线程派发，与 UI/输入事件线程归属一致，无竞态）。
 void ame139_fsr_heal_reset_input_scale(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         @try {
@@ -367,12 +372,7 @@ void ame139_fsr_heal_reset_input_scale(void) {
                 // 游戏中 root 一定是 SurfaceViewController；防御其它形态
                 return;
             }
-            SurfaceViewController *svc = (SurfaceViewController *)vc;
-            if (svc->mgFsrScale > 1.0f) {
-                NSLog(@"[SurfaceVC] Task139: FSR heal -- input scale reset (%.2f -> 1.00; MC window was restored to full surface)",
-                      (double)svc->mgFsrScale);
-                svc->mgFsrScale = 1.0f;
-            }
+            [(SurfaceViewController *)vc ame139_resetFsrInputScale];
         } @catch (NSException *e) {
             NSLog(@"[SurfaceVC] Task139: FSR heal reset exception: %@", e);
         }
@@ -380,6 +380,15 @@ void ame139_fsr_heal_reset_input_scale(void) {
 }
 
 @implementation SurfaceViewController
+
+// Task 139：FSR 兜底自愈的输入缩放复位（方法体内可访问私有 ivar）。
+- (void)ame139_resetFsrInputScale {
+    if (mgFsrScale > 1.0f) {
+        NSLog(@"[SurfaceVC] Task139: FSR heal -- input scale reset (%.2f -> 1.00; MC window was restored to full surface)",
+              (double)mgFsrScale);
+        mgFsrScale = 1.0f;
+    }
+}
 
 #pragma mark - TouchController Static Library Support
 
