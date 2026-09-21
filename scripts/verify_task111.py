@@ -129,9 +129,9 @@ check("B2  applyEffectToView：旧半透明分支恢复（secondarySystemBackgro
       re.search(r"applyEffectToView:\(UIView \*\)view \{[\s\S]{0,6000}?\[base colorWithAlphaComponent:effectiveOpacity\]", bm_code))
 check("B3  applyEffectToView：旧管线清残留（模式切换时移除新拟态承载层）",
       re.search(r"if \(\[self hasBackground\]\) \{[\s\S]{0,6000}?\[view nm_removeNeomorph\];\s*return;", bm_code))
-check("B4  applyEffectToView：无背景分支维持新拟态凸出（nm_convexRadius + 阴影比例规则）",
-      "CGFloat shadowRadius = MAX(4.0, MIN(8.0, radius * 0.5));" in bm_code
-      and "[view nm_convexRadius:radius shadowRadius:shadowRadius];" in bm_code)
+check("B4  applyEffectToView：无背景分支维持新拟态凸出（Task136 重锚：阴影基准 10）",
+      "[view nm_convexRadius:radius shadowRadius:10];" in bm_code
+      and "if (radius <= 0) radius = 12;" in bm_code)
 check("B5  applyEffectToCollectionViewCell：双分支切换（毛玻璃 blurView@contentView + 半透明）",
       "[cell.contentView insertSubview:blurView atIndex:0];" in bm_code
       and "[[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity]" in bm_code)
@@ -200,8 +200,8 @@ print("=" * 72)
 check("E1  viewDidLoad 无背景分支 → nm_background（view + tableView 显式同色）",
       re.search(r"\} else \{\s*self\.view\.backgroundColor = \[NMTheme nm_background\];\s*self\.tableView\.backgroundColor = \[NMTheme nm_background\];", bset_code)
       and "Task111" in bset)
-check("E2  viewWillAppear 无背景分支同色维持（主题切换后一致）",
-      bset_code.count("self.tableView.backgroundColor = [NMTheme nm_background];") == 2)
+check("E2  viewWillAppear 无背景分支同色维持（主题切换后一致；Task136 重锚：清除背景处理器同步主题化 +2）",
+      bset_code.count("self.tableView.backgroundColor = [NMTheme nm_background];") == 4)
 check("E3  styleCell 统一走 applyEffectToCell 检测切换（洗白分支退役）",
       re.search(r"- \(void\)styleCell:\(UITableViewCell \*\)cell hasBackground:\(BOOL\)hasBackground \{[\s\S]{0,300}?\[\[BackgroundManager sharedManager\] applyEffectToCell:cell\];", bset_code)
       and "secondarySystemBackgroundColor" not in bset_code.split("- (void)styleCell")[1].split("@end")[0])
@@ -225,10 +225,10 @@ check("F3  刷新时机三件套零变化（updateJITStatus + updateMemoryEntitl
       re.search(r"\[self updateJITStatus\];\s*\[self updateMemoryEntitlementStatus\];", rp))
 check("F4  右面板七卡工厂零变化（makeInfoCardWithIcon 存在，7 卡仍在）",
       "makeInfoCardWithIcon" in rp_code)
-check("F5  侧栏按钮几何零变化（50×50 / 圆角 10 / 选中凸出 12+5）",
+check("F5  侧栏按钮几何零变化（50×50 / 圆角 10；Task136 重锚：选中凸出 50+10）",
       "CGFloat buttonSize = 50;" in menu_code
       and "btn.layer.cornerRadius = 10;" in menu_code
-      and "[btn nm_convexRadius:12 shadowRadius:5];" in menu_code)
+      and "[btn nm_convexRadius:50 shadowRadius:10];" in menu_code)
 
 print()
 print("=" * 72)

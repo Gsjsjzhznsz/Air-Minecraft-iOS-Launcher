@@ -103,14 +103,16 @@ theme_h = read("Natives/NeomorphKit/NMTheme.h")
 theme_m = read("Natives/NeomorphKit/NMTheme.m")
 cat_h = read("Natives/NeomorphKit/UIView+Neomorph.h")
 cat_m = read("Natives/NeomorphKit/UIView+Neomorph.m")
-check("A1 双主题表面色（浅 #ECF0F3 / 深 #262A2F）",
-      "ECF0F3" in theme_m and "262A2F" in theme_m)
+check("A1 双主题表面色（Task136：浅 #E0E0E0 / 深 #2C2C2C）",
+      "E0E0E0" in theme_m and "2C2C2C" in theme_m)
 check("A2 HSP 亮度公式（0.299/0.587/0.114）",
       "0.299 * r255 * r255 + 0.587 * g255 * g255 + 0.114 * b255 * b255" in theme_m)
 check("A3 亮度转透明度（ratio=50 指数公式）",
       "pow(ratio, ratioBrightness) / ratio - 1.0 / ratio" in theme_m)
-check("A4 亮/暗阴影透明度区间（0.025+0.975·op / 0.35·(1−op)）",
-      "0.025 + (1.0 - 0.025) * opacity" in theme_m and "0.35 * (1.0 - opacity)" in theme_m)
+check("A4 亮/暗阴影透明度（Task136：CSS 全 alpha 直绘，两方法均返 1.0）",
+      theme_m.count("return 1.0;") >= 2
+      and "lightShadowOpacityForSurfaceColor" in theme_m
+      and "darkShadowOpacityForSurfaceColor" in theme_m)
 check("A5 主题切换通知常量", "NMThemeDidChangeNotification" in theme_h and theme_m)
 l_op, d_op = jsmath_opacities("#ECF0F3")
 check("A5a 算法对拍：#ECF0F3 亮阴影≈%.3f 暗≈%.3f（NMTheme 常量可复现）" % (l_op, d_op),
@@ -119,8 +121,9 @@ check("A5a 算法对拍：#ECF0F3 亮阴影≈%.3f 暗≈%.3f（NMTheme 常量�
 check("A6 阴影几何（暗 (+r,+r) / 亮 (−r,−r)，模糊=r）",
       "CGSizeMake(r, r)" in cat_m and "CGSizeMake(-r, -r)" in cat_m
       and "dark.shadowRadius = r" in cat_m and "light.shadowRadius = r" in cat_m)
-check("A7 默认阴影色 = 库默认（黑/白）",
-      "return [UIColor blackColor];" in theme_m and "return [UIColor whiteColor];" in theme_m)
+check("A7 阴影色（Task136：浅 #BEBEBE/#FFFFFF、深 #1E1E1E/#3A3A3A）",
+      '#1E1E1E' in theme_m and '#BEBEBE' in theme_m
+      and '#3A3A3A' in theme_m and '#FFFFFF' in theme_m)
 check("A8 KVO bounds 同步几何 + 主题通知重绘",
       'addObserver:self forKeyPath:@"bounds"' in cat_m
       and "NMThemeDidChangeNotification" in cat_m)
@@ -137,13 +140,15 @@ check("A12 全部括号平衡（4 文件，字符串感知）",
 
 print("== B. 枢纽接线（64 处卡片调用点一次性接入）==")
 bm = read("Natives/BackgroundManager.m")
-check("B1 applyEffectToView → nm_convexRadius（保留调用点圆角，默认 12）",
-      "[view nm_convexRadius:radius shadowRadius:shadowRadius];" in bm
+check("B1 applyEffectToView → nm_convexRadius（保留调用点圆角，默认 12；Task136 阴影基准 10）",
+      "[view nm_convexRadius:radius shadowRadius:10];" in bm
       and "if (radius <= 0) radius = 12;" in bm)
-check("B1a 阴影半径 = 圆角一半（上限 8）",
-      "MAX(4.0, MIN(8.0, radius * 0.5))" in bm)
-check("B2 applyEffectToCollectionViewCell → 卡片容器探测 + nm",
-      "[target nm_convexRadius:radius shadowRadius:shadowRadius];" in bm)
+check("B1a 阴影半径 = Task136 基准 10；表格卡片化方法在案（applyCardEffectToCell）",
+      "MAX(4.0, MIN(8.0, radius * 0.5))" not in bm
+      and "[cell.contentView nm_convexRadius:50 shadowRadius:10];" in bm
+      and "applyCardEffectToCell" in bm)
+check("B2 applyEffectToCollectionViewCell → 卡片容器探测 + nm（Task136 阴影基准 10）",
+      "[target nm_convexRadius:radius shadowRadius:10];" in bm)
 # Task 129f 重锚：hasBackground 分支也把 window/splitVC 底色设为主题色
 # （自定义背景装载失败时兜底），两处出现；原判定 ==1 随之失效。
 check("B3 强制纯色底（window + splitVC 双分支，Task129f 兜底后各 2 处）",
@@ -180,8 +185,8 @@ check("C1a 右侧面板不再使用新拟态（nm_ 调用与 NeomorphKit 导入�
 check("C2 状态卡片（Task96 同步：胶囊改 MeloNX 卡）15% 透明卡底仍在",
       rp.count("colorWithAlphaComponent:0.15]") >= 1 and "nm_pill" not in rp)
 menu = read("Natives/LauncherMenuViewController.m")
-check("C3 左侧菜单：选中凸出面板 / 未选中恢复平贴",
-      "[btn nm_convexRadius:12 shadowRadius:5];" in menu
+check("C3 左侧菜单：选中凸出面板 / 未选中恢复平贴（Task136 基准 50+10）",
+      "[btn nm_convexRadius:50 shadowRadius:10];" in menu
       and "[btn nm_removeNeomorph];" in menu)
 root = read("Natives/LauncherRootViewController.m")
 check("C4 根容器：侧栏/右面板表面随背景模式切换（Task111 重锚）+ card_color 停用",
@@ -190,26 +195,26 @@ check("C4 根容器：侧栏/右面板表面随背景模式切换（Task111 重�
       and "updateChromeSurfaces" in root
       and "applyEffectToView:self.sidebarContainer" in root)
 dl = read("Natives/DownloadViewController.m")
-check("C5 下载页：资源行卡片/图标占位/筛选按钮/导入按钮新拟态",
-      "[self.contentContainer nm_convexRadius:8 shadowRadius:4];" in dl
+check("C5 下载页：资源行卡片/图标占位/筛选按钮/导入按钮新拟态（Task136 基准）",
+      "[self.contentContainer nm_convexRadius:50 shadowRadius:10];" in dl
       and "[NMTheme nm_surfaceRaised];" in dl
-      and "[button nm_convexRadius:8 shadowRadius:3];" in dl
-      and "[self.importModpackButton nm_convexRadius:10 shadowRadius:5];" in dl)
+      and "[button nm_convexRadius:50 shadowRadius:10];" in dl
+      and "[self.importModpackButton nm_convexRadius:50 shadowRadius:10];" in dl)
 vc = read("Natives/VersionCardCell.m")
 check("C5a 版本卡片（截图蓝框）：手动底色/边框/旧阴影已移交 NeomorphKit",
       "whiteColor] colorWithAlphaComponent:0.08" not in vc
       and "applyEffectToView:self.cardContainer" in vc)
 nav = read("Natives/LauncherNavigationController.m")
-check("C6 工具栏按钮（启动/下载中心）全灰新拟态",
-      "[self.buttonInstall nm_convexRadius:6 shadowRadius:3];" in nav
-      and "[self.downloadCenterButton nm_convexRadius:6 shadowRadius:3];" in nav)
-check("C7 公告/导出/服务器主按钮全灰化",
-      "[self.actionButton nm_convexRadius:10 shadowRadius:5];" in read("Natives/AnnouncementDetailViewController.m")
-      and "[self.exportButton nm_convexRadius:12 shadowRadius:6];" in read("Natives/ModpackExportViewController.m")
-      and "[self.joinButton nm_convexRadius:10 shadowRadius:5];" in read("Natives/ServerDetailViewController.m")
-      and "[self.downloadPackButton nm_convexRadius:10 shadowRadius:5];" in read("Natives/ServerDetailViewController.m"))
+check("C6 工具栏按钮（启动/下载中心）全灰新拟态（Task136 基准）",
+      "[self.buttonInstall nm_convexRadius:50 shadowRadius:10];" in nav
+      and "[self.downloadCenterButton nm_convexRadius:50 shadowRadius:10];" in nav)
+check("C7 公告/导出/服务器主按钮全灰化（Task136 基准）",
+      "[self.actionButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/AnnouncementDetailViewController.m")
+      and "[self.exportButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/ModpackExportViewController.m")
+      and "[self.joinButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/ServerDetailViewController.m")
+      and "[self.downloadPackButton nm_convexRadius:50 shadowRadius:10];" in read("Natives/ServerDetailViewController.m"))
 mtc = read("Natives/ModTableViewCell.m")
-check("C8 Mod 下载按钮全灰化", "[_downloadButton nm_convexRadius:13.0 shadowRadius:4];" in mtc)
+check("C8 Mod 下载按钮全灰化（Task136 基准）", "[_downloadButton nm_convexRadius:50 shadowRadius:10];" in mtc)
 cl = read("Natives/LauncherCardLayoutViewController.m")
 # Task90 同步：21a3364 最终实现使用的注释标记为"新拟态下空操作"（C9 原断言的
 # neumorph_surfaces_locked_by_task89 字面量在最终提交中并不存在）。

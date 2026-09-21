@@ -173,8 +173,8 @@ check("不再创建渐变装饰条", "accentBar = [CAGradientLayer layer]" not i
 check("不再 addSublayer 挂载色条", "addSublayer:self.accentBar" not in news_code)
 check("layoutSubviews 不再更新色条 frame",
       "self.accentBar.frame" not in news_code)
-check("layoutSubviews 保留阴影路径（卡片阴影不受影响）",
-      "self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:16].CGPath;" in news_code)
+check("layoutSubviews 保留阴影路径（卡片阴影不受影响；Task136 重锚：基准圆角 50）",
+      "self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:50].CGPath;" in news_code)
 check("setAccentColor: 声明保留（兼容 6 处调用点）",
       "- (void)setAccentColor:(UIColor *)color;" in news_code)
 check("setAccentColor: 实现保留（空操作）",
@@ -187,8 +187,8 @@ check("Task89 成果保留：头像占位底色仍为 nm_surfaceRaised",
       "self.avatarImageView.backgroundColor = [NMTheme nm_surfaceRaised];" in news_code)
 check("Task89 成果保留：新闻缩略图占位底色仍为 nm_surfaceRaised",
       "self.thumbnailView.backgroundColor = [NMTheme nm_surfaceRaised];" in news_code)
-check("卡片 contentView 圆角 16 保留（新拟态枢纽依赖）",
-      "self.contentView.layer.cornerRadius = 16;" in news_code)
+check("卡片 contentView 圆角 50 保留（新拟态枢纽依赖；Task136 重锚）",
+      "self.contentView.layer.cornerRadius = 50;" in news_code)
 check("BackgroundManager 枢纽调用保留（applyEffectToCollectionViewCell）",
       "applyEffectToCollectionViewCell:self]" in news_code)
 check("花括号配平", bracket_balance(news_code))

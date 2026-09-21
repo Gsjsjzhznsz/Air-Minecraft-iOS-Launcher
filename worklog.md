@@ -1401,3 +1401,23 @@ Work Log:
 
 Stage Summary:
 - 6.0.0 发布物三件套就绪：README/README_CN（repo）+ announcements.json（repo）+ v6.0.0-release-notes.md（download 目录），口径一致（四层拦截 / 双重修复 / UDP 回落）
+
+---
+Task ID: 136
+Agent: main (Super Z)
+
+Work Log:
+- 八项 UI 需求一次落地。①全局新拟态换装（用户 CSS 色板）：NMTheme 浅色 surface #E0E0E0/深色 #2C2C2C，主文字 #333333/#F5F5F5、次要文字 #888888/#A0A0A0，双阴影色 浅 #BEBEBE+#FFFFFF / 深 #1E1E1E+#3A3A3A 全 alpha 直绘（旧亮度→透明度换算退役），圆角基准 50（引擎按 min(w/2,h/2) 夹断）；引擎默认 nm_convex/nm_styleConvexButton 改 50/10，12 处按钮凸出调用点（侧栏×2/下载×4/工具栏×2/公告/导出/服务器×2/Mod下载）与全部卡片圆角（版本卡/资源卡/Mod版本卡/账户卡/筛选容器/自定义行/崩溃卡×3/主页磁贴+shadowPath/NMToast 弹窗）统一基准；平贴面板（侧栏/右面板 16）与胶囊不在清扫范围
+- ②MC 新闻卡（Item 1）：卡片圆角 50 + 正文四行改纵向 UIStackView（摘要 750 先截断→标题 997→作者/查看详情保底，固定高度内截断零约束冲突）；卡片高度 = 原样式最低高度（模板 cell 以单行标题/摘要 systemLayoutSizeFitting 实测，dispatch_once 缓存），瀑布流 estimated:280 → absolute 固定高，长文不再逐卡调长
+- ③主页顶卡（Item 2）：MC 头像接管最左位（尺寸随卡高 0.5 倍正圆、保留半透明边框 white@0.35 与圆形裁剪、圆角 layoutSubviews 动态取半），原 52×52 小头像与皮肤全身预览（skinImageView + loadSkinForUUID 请求链）退场；两行欢迎句组成纵向 stack 相对头像纵轴居中（不再偏移 -10pt 链）
+- ④列表右侧小字框（Item 3）：版本类型胶囊（正式版/测试版）移出顶行 stack 独立靠右（锚定 chevron 左 8pt 不贴卡缘、垂直居中对齐左侧两行块、12pt 字/高 24/内边距 8/圆角随高取半、adjustsFontSizeToFitWidth 缩字机制退役）；版本管理计数徽章（游戏目录/已安装版本）高 24/圆角 12/对齐标题块垂直居中；账户类型徽章同步 24/12；模组下载列表下载按钮按用户要求不在此列
+- ⑤深浅色动态检测（Item 4a）：新增 NeomorphKit/NMContrast——沿 superview 链解析有效背景（不透明实色，无法解析宁可不改），饱和表面（accent 按钮等 sat>0.35）整支跳过保护白字设计，WCAG 对比度 <2.0 的按钮/标签按 NMTheme 深浅色重设主文字色；监听 NMThemeDidChange/BackgroundUIEffectChanged 自动扫描 key window，SceneDelegate 启动接线；窗口底色 nm_background 化，13 个页面 view 底色 systemBackgroundColor 退役（SplitVC 黑色兜底分支一并退役），BackgroundSettings 清除背景处理器同步主题化
+- ⑥下载页模组加载器（Item 4b）：每加载器独立 section（insetGrouped 独立圆角卡 + 10pt 卡间间距），两类 cell 走新增 BackgroundManager.applyCardEffectToCell（无背景 = contentView 凸出 50/10 + 裁剪放开，有背景 = 原 applyEffectToCell 管线），nameBar 圆角 50 + nm 凸出（系统灰底退役），分隔线关闭；didSelect/cellForRow 改 section 语义 + 越界守卫，switchChanged 整表重载
+- ⑦设置页图标（Item 5）：applySettingsAppStyleToCell 去 iOS 设置风彩底白标——图标以原 section 色本体渲染（pointSize 20 模板 + tintColor），背景块 clear、header 行仍 accentColor，destructive 红色保留为图标色
+- ⑧枢纽：applyEffectToCollectionViewCell 无背景分支放开 cell 级裁剪（修复 MC 新闻卡自 clipsToBounds 吞掉承载层阴影）；applyEffectToView 阴影基准 10
+- 校验：verify_task136 新增 69 项全绿（A 色板 11/B 对比度 6/C 枢纽 6/D 新闻 5/E 顶卡 6/F 徽标 7/G 加载器 8/H 设置图标 5/I 全局清扫 6/J 页面底色 4/K 口径护栏 5）；重锚 task89（A1/A4/A7/B1/B1a/B2/C3/C5/C6/C7/C8 → Task136 基准）、task90（磁贴圆角 16→50 ×2）、task91（label 0xEE/0x22 → 0xF5/0x33）、task101 D4、task111 B4/E2/F5——89/90/91/95/111 全绿，88/92/93/96/101/102 仅剩提交后自愈的未提交守卫
+- 口径护栏零变化：getEntitlementValue ×2 / isJITEnabled(NO)+TXM / 七卡工厂 / 侧栏自愈 / 检测并切换背景管线全部原位
+
+Stage Summary:
+- 用户预期：①所有新拟态按钮/卡片/弹窗换装指定色板（浅 #e0e0e0 双影/#333·#888，深 #2c2c2c 双影/#f5f5f5·#a0a0a0，radius 50，尺寸位置不变）②MC 新闻卡新拟态+等高固定（原样式最低高度，长文截断）③主页顶卡最左=大号圆形 MC 头像（半透明边框）+欢迎语纵轴居中 ④列表右侧小字框随字体自适应宽度、靠右不裁剪、尺寸对齐左侧两行字 ⑤深浅色动态检测修复黑字深底 ⑥模组加载器页与上级菜单同款卡片/间距/新拟态 ⑦设置页图标本体着色无底块
+- 待用户装机验证（背景照片模式不受影响：hasBackground 时一律走旧毛玻璃/半透明管线）
