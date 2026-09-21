@@ -1,4 +1,5 @@
 #import "LauncherRootViewController.h"
+#import "UIKit+NativeSurface.h"
 #import "LauncherMenuViewController.h"
 #import "LauncherNewsViewController.h"
 #import "LauncherRightPanelViewController.h"
