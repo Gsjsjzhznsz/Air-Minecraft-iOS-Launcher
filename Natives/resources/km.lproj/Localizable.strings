@@ -549,7 +549,7 @@
 "preference.touchcontroller.udp.title" = "UDP Protocol Mode";
 "preference.touchcontroller.udp.message" = "TouchController will communicate via UDP port 12450. This mode is compatible with most servers and provides stable network communication.";
 "preference.touchcontroller.staticlib.title" = "Static Library Mode";
-"preference.touchcontroller.staticlib.message" = "TouchController will use native static library for high-performance local communication via Unix Domain Socket. This mode provides better performance but requires the static library to be linked.";
+"preference.touchcontroller.staticlib.message" = "TouchController will use native static library via Unix Domain Socket. Note: TouchController 0.3.1-alpha14's static-library branch is unfinished upstream, so this mode automatically enables the UDP channel (port 12450) as a fallback -- touch controls work either way. Future mod versions will use the static path automatically.";
 "preference.touchcontroller.about" = "About TouchController";
 "preference.touchcontroller.about.title" = "About TouchController";
 "preference.touchcontroller.about.message" = "TouchController is a Minecraft mod that adds touch controls to Java Edition. This launcher supports two communication modes:\\n\\n• UDP Protocol: Network-based communication\\n• Static Library: High-performance local communication\\n\\nVisit GitHub for more information.";

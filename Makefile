@@ -552,7 +552,23 @@ dep_angle_freeze:
 		$(SOURCEDIR)/Natives/resources/Frameworks/libGLESv2.framework/libGLESv2 || exit 1
 	echo '[Amethyst v$(VERSION)] dep_angle_freeze - end'
 
-payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_angle_freeze
+dep_sdl3_guard:
+	echo '[Amethyst v$(VERSION)] dep_sdl3_guard - start'
+	# Task 135 (26.1.2 controlify/JNA closure SIGBUS 源头根治): libSDL3.dylib
+	# 入口机器码守卫 -- SDL_SetEventFilter / SDL_AddEventWatch 的非空回调指针
+	# 一律置空/拒绝注册。controlify 3.0.1 经 JNA 回退加载本 Frameworks 的 iOS
+	# 版 SDL3 后,把 JNA/libffi closure (RW 不可执行 trampoline 页) 注册进 SDL
+	# 事件过滤器, SDL 调用即 SIGBUS。Task131 的 dlsym 层守卫对 LWJGL/FFM 解析
+	# 路径有效 (26.2 会话实证), 但 JNA 解析路径仍可绕行 (26.1.2 会话零守卫日志);
+	# 本补丁把守卫下沉到 SDL 二进制自身, 与符号解析链路完全无关。启动器自身与
+	# MC/LWJGL 均不使用 SDL 事件过滤器 (全仓 grep 验证), 零误伤; 签名由打包时
+	# ldid -S 全 app 重签覆盖 (dep_angle_freeze 同款流程)。幂等; 字节不匹配
+	# (SDL3 版本漂移) 响亮失败。补丁工艺与字节推导见脚本头注释。
+	python3 $(SOURCEDIR)/scripts/patch_sdl3_eventfilter_guard.py \
+		$(SOURCEDIR)/Natives/resources/Frameworks/libSDL3.dylib || exit 1
+	echo '[Amethyst v$(VERSION)] dep_sdl3_guard - end'
+
+payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_angle_freeze dep_sdl3_guard
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)

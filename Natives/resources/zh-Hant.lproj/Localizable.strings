@@ -571,7 +571,7 @@
 "preference.touchcontroller.udp.title" = "UDP 协议模式";
 "preference.touchcontroller.udp.message" = "TouchController 将通过 UDP 端口 12450 进行通信。此模式兼容性较好，提供稳定的网络通信。\n该通信方式由WeiErLiTeo制作。";
 "preference.touchcontroller.staticlib.title" = "静态库模式";
-"preference.touchcontroller.staticlib.message" = "TouchController 将使用原生静态库进行高性能本地通信（Unix Domain Socket）。此模式性能更好，但需要静态库支持。\n该通信方式由Mod作者fifth_light与启动器作者制作。";
+"preference.touchcontroller.staticlib.message" = "TouchController 將使用原生靜態庫進行高效能本地通訊（Unix Domain Socket）。\n注意：TouchController 0.3.1-alpha14 的靜態庫分支在上游尚未完成，此模式會自動附加 UDP 通道（連接埠 12450）作為回落——觸控功能兩種情況都能正常運作。未來 mod 版本修復後將自動使用靜態通道。\n該通訊方式由Mod作者fifth_light與啟動器作者製作。";
 "preference.touchcontroller.about" = "关于 TouchController";
 "preference.touchcontroller.about.title" = "关于 TouchController";
 "preference.touchcontroller.about.message" = "TouchController 是一个为 Minecraft Java 版添加触摸控制的模组。本启动器支持两种通信模式：\n\n• UDP 协议：基于网络的通信\n• 静态库：高性能本地通信\n\n访问 GitHub 获取更多信息。";

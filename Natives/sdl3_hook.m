@@ -52,6 +52,8 @@
 extern void *hooked_dlopen(const char *path, int mode);
 extern void *hooked_dlsym(void *handle, const char *name);
 extern void *(*orig_dlopen)(const char *path, int mode);
+// Task 135：_dlsym 槽重绑定通道需要（CI 35512461717 教训：跨 TU 引用先声明）
+extern void *(*orig_dlsym)(void *handle, const char *name);
 
 #pragma mark - SDL3 常量（与 SDL_video.h 对齐，避免依赖 SDL 头文件）
 
@@ -1868,7 +1870,21 @@ static int amethyst_task132_rebind_jna_dlsym_ex(const struct mach_header_64 *ame
                     if (strcmp(sym_name, "_dlsym") != 0) continue;
                     void **slot = (void **)(ame132_slide + sect->addr +
                                             (uint64_t)j * stride);
-                    if (*slot == hook_fn) { ame132_hits++; continue; } // 幂等
+                    // Task 135：幂等命中不再静默——装机日志（6235baf 三会话）
+                    // 实证本函数被调用后零输出，而本函数唯一无日志出口就是
+                    // 这里（槽已是 hooked_dlsym）。加日志让下一轮装机日志能
+                    // 直接判读：若此行出现，说明 fishhook 的 add-image 回调
+                    // （或更早的扫描）已先一步重绑了该槽——JNA 解析绕行
+                    // hooked_dlsym 的机制必须另找；若不出现而走下方写路径，
+                    // 则历史静默另有其因。
+                    if (*slot == hook_fn) {
+                        ame132_hits++;
+                        NSLog(@"[SDLHook] Task135: _dlsym slot %p already == "
+                              @"hooked_dlsym (idempotent hit, %s,%s) -- fishhook "
+                              @"add-image callback or earlier pass won the race",
+                              (void *)slot, seg->segname, sect->sectname);
+                        continue;
+                    }
                     vm_address_t page = (vm_address_t)((uintptr_t)slot &
                         ~((uintptr_t)ame132_ps - 1));
                     kern_return_t kr = vm_protect(mach_task_self(), page,
@@ -1980,7 +1996,8 @@ void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn) {
 // 经典间接表遍历（符号名匹配）+ __DATA* 值扫描（chained fixups 兜底）。
 static void amethyst_task133_rebind_image_dlopen(const struct mach_header_64 *hdr,
                                                  intptr_t slide,
-                                                 void *hook_fn, void *orig_fn) {
+                                                 void *hook_fn, void *orig_fn,
+                                                 const char *t135_sym) {
     if (hdr == NULL || hdr->magic != MH_MAGIC_64 || hook_fn == NULL || orig_fn == NULL) {
         return;
     }
@@ -2057,7 +2074,7 @@ static void amethyst_task133_rebind_image_dlopen(const struct mach_header_64 *hd
                 if (symIdx >= t133_symtab.nsyms) continue;
                 uint32_t n_strx = t133_syms[symIdx].n_un.n_strx;
                 if (n_strx == 0 || n_strx >= t133_symtab.strsize) continue;
-                if (strcmp(t133_strs + n_strx, "_dlopen") != 0) continue;
+                if (strcmp(t133_strs + n_strx, t135_sym) != 0) continue;
                 void **slot = (void **)(slide + t133_sect->addr + (uint64_t)j * stride);
                 if (*slot == hook_fn) { t133_hits++; continue; } // 幂等
                 vm_address_t page = (vm_address_t)((uintptr_t)slot & ~((uintptr_t)t133_ps - 1));
@@ -2096,9 +2113,10 @@ static void amethyst_task133_rebind_image_dlopen(const struct mach_header_64 *hd
         }
         t133_cmd = (const struct load_command *)((const uint8_t *)t133_cmd + t133_cmd->cmdsize);
     }
-    NSLog(@"[SDLHook] Task133: _dlopen slots rebound for %s (hits=%d, "
-          @"classic+value-scan) -- JVM-side dlopen chain now routes through "
-          @"hooked_dlopen", hdr->magic == MH_MAGIC_64 ? "image" : "?", t133_hits);
+    NSLog(@"[SDLHook] Task133: %s slots rebound for %s (hits=%d, "
+          @"classic+value-scan) -- JVM-side %s chain now routes through "
+          @"the hook", t135_sym, hdr->magic == MH_MAGIC_64 ? "image" : "?",
+          t133_hits, t135_sym);
     (void)t133_hits;
 }
 
@@ -2216,7 +2234,14 @@ void amethyst_task133_ensure_jvm_chain(void) {
             NSLog(@"[SDLHook] Task133: %@ image detected (%s) -- rebinding its "
                   @"_dlopen slots", isJli ? @"libjli" : @"libjvm", path ?: "(null)");
             amethyst_task133_rebind_image_dlopen(hdr, slide,
-                (void *)hooked_dlopen, (void *)orig_dlopen);
+                (void *)hooked_dlopen, (void *)orig_dlopen, "_dlopen");
+            // Task 135：同一镜像的 _dlsym 槽也重绑——FFM loaderLookup / JVM
+            // 内部 os::dll_lookup 走 libjvm 自己的 dlsym 槽，此前只靠
+            // fishhook 的 add-image 回调覆盖（26.2 会话实证该路径已被拦，
+            // 但 26.1.2 会话 JNA 解析绕行说明回调覆盖存在盲区——这里补上
+            // 确定性直连）。
+            amethyst_task133_rebind_image_dlopen(hdr, slide,
+                (void *)hooked_dlsym, (void *)orig_dlsym, "_dlsym");
             // Task 134：JVM 家族镜像已出现——启动链路无关的看门狗扫描
             amethyst_task134_watchdog_maybe_start();
         } else if (isJna) {

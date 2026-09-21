@@ -1065,7 +1065,25 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         } else if (mode == 2) { // 静态库模式
             // 设置 Unix Domain Socket 路径
             setenv("TOUCH_CONTROLLER_PROXY_SOCKET", "/tmp/touchcontroller.sock", 1);
-            NSLog(@"[JavaLauncher] Enabled TouchController with Static Library mode");
+            // Task 135：追加 legacy UDP 环境变量作为自动回落。mod 0.3.1-alpha14
+            // 的 iOS 静态分支是上游重写传输层时留下的半成品：loadPlatform 里
+            // `if (isIos) { IosPlatform().also { resize } }` 创建实例后【没有
+            // return】（alpha13 是 `return { IosPlatform(socketPath) }` 完整形
+            // 态），随后 probeNativeLibraryInfo 按 os.name（本启动器伪装为
+            // "Mac OS X"）落入 Cocoa/Unknown 分支返回 null —— 静态模式在当前
+            // mod 版本下必然 "No platform loaded"，进世界后弹"不支持的操作系统
+            // iOS"警告（displayName 经 /var/mobile 探测判为 iOS，与 os.name
+            // 无关）。mod 的 loadPlatform 检查顺序：TOUCH_CONTROLLER_PROXY（
+            // legacy UDP，最优先）→ iOS 静态分支 → 按窗口类型探测。因此双环境
+            // 变量并存时 alpha14 自动走 ProxyPlatform（UDP 单向通道：启动器→
+            // mod 触点事件，协议已逐字节核对——AddPointer type=1 共 16 字节 /
+            // RemovePointer type=2 共 8 字节，大端，与 SurfaceViewController
+            // 的 TouchSender 完全匹配）。未来 mod 修复静态分支并调整检查顺序
+            // 后可移除该回落。
+            setenv("TOUCH_CONTROLLER_PROXY", "12450", 1);
+            NSLog(@"[JavaLauncher] Enabled TouchController with Static Library mode "
+                  @"(+ UDP fallback: mod 0.3.1-alpha14 iOS static branch is upstream "
+                  @"WIP, legacy UDP is the only working path)");
         }
     }
     // ------------------------------------------

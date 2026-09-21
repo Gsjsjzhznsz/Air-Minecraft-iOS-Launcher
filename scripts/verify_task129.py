@@ -264,10 +264,12 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("I4 Makefile TAB 完整（Task130 重锚：HEAD 相对比较，无空格展开）",
+check("I4 Makefile TAB 完整（Task135 重锚：HEAD+14，dep_sdl3_guard 新增配方行）",
       # Task129 已入 HEAD（446 含 openal_shim 的 19 个 TAB），原 +19 期望值
       # 随提交失效；Task130 未触碰 Makefile，正确不变量是 cur == head。
-      cur_tab == head_tab, f"head={head_tab} cur={cur_tab}")
+      # Task135 新增 dep_sdl3_guard 目标（echo x2 + 注释 x9 + python3 + 续行 x1
+      # = 14 个 TAB 起始行），正确不变量是 cur == head + 14。
+      cur_tab == head_tab + 14, f"head={head_tab} cur={cur_tab}")
 
 print("== J. 级联 ==")
 for v in ["119_124", "125_128", "112_118"]:

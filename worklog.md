@@ -1354,3 +1354,26 @@ Work Log:
 Stage Summary:
 - Task 134 全链闭环：六项修复（双 ABI 传输层 / 二级菜单恢复 / 屏蔽控件 / 头像实时刷新 / 崩溃链二次加固（直传 hdr+slide + 看门狗重试）/ JIT 多工具 + iOS26 脚本开关）+ 6.0.0 发布物（README/公告/发行版文案）+ 验证器链全绿（task134 68/68 + 八级联）+ CI 绿
 - 装机待验证锚点：①'[TouchControllerTransport] Task134: singleton transport created' + 'Task134: new-ABI mod detected (singleton Transport), first receive'（26.2 mod 功能恢复）；②'pick opened: control.mod_touch_enable' 后推入 TouchController 二级页 + 'Task134: clean layout applied'（屏蔽控件）；③首页头像自愈后实时刷新（无需重启）；④'[SDLHook] Task134: JVM image watchdog started' + Task132 行尾 'verified'（26.1.2 崩溃链读回验证闭环，若仍见 'still unverified' 即新断点证据）；⑤'[JIT] [RightPanel] Task134 enabler=<tool> noScript=<0/1>'
+
+---
+Task ID: 135
+Agent: main (Super Z)
+Task: 6235baf/63178f8 装机日志判读——26.2 TouchController"不支持的操作系统"根治 + 26.1.2 崩溃源头防御
+
+Work Log:
+- 判读三份新日志（latestlog.old.txt=26.1.2 崩溃会话 / latestlog.txt+latestlog=26.2 会话，1e3ba17 构建）：Task134 全链实证已通（libjli/libjvm 重绑 hits=1、看门狗启动、jnilib 按 install name 检出并调用 _ex）——但 _ex 之后零输出
+- 【TouchController 根因定案】设备日志实证 mod 侧走到 "System name: Mac OS X" → "No platform loaded"；clone 上游（TouchController/TouchController@touchcontroller-0.3.1-alpha14 tag 9b9a305）对照 alpha13：alpha13 有完整 iOS 分支（读 TOUCH_CONTROLLER_PROXY_SOCKET + return IosPlatform(socketPath)），alpha14 重写传输层时留下 WIP 回归——`if (isIos) { IosPlatform().also { resize } }` 创建后不 return，随后 probeNativeLibraryInfo 按 os.name 落入 Cocoa("macOS is not supported")/Unknown 分支返回 null → platform==null → 进世界时 ConnectionEvents 弹警告；WarningProvider 只认 Linux/Windows/Android（启动器伪装 os.name=Mac OS X 落入 else），displayName 经 /var/mobile 探测判为 "iOS"（与 os.name 无关）——即用户看到的"不支持的操作系统：iOS"
+- 【修复 A】JavaLauncher.m Static Library 模式追加 setenv TOUCH_CONTROLLER_PROXY=12450：mod 的 loadPlatform 检查顺序 UDP 环境变量最优先，alpha14 自动走 ProxyPlatform（legacy UDP 单向通道：启动器 TouchSender → mod LauncherSocketProxyServer，协议逐字节核对——AddPointer type=1 共 16B / RemovePointer type=2 共 8B 大端完全匹配）；保留 SOCKET 变量供未来 mod 修复静态分支后自动切换；六语言（en/ja/km/zh-CN/zh-Hans/zh-Hant）staticlib.message 文案更新（纯值变更，键基线 1916 不动）
+- 【26.1.2 崩溃链判读】崩溃签名与 3bcf8c4 会话一致：controlify 3.0.1 "Attempting to load SDL3 from SDL3" → mod 自带 macOS SDL3 必败 → JNA 按名回退加载 Frameworks 的 iOS 版 → SDL_SetEventFilter(JNA closure) → SDL 同步过滤 pending 队列 → 跳进 RW 不可执行 trampoline 页 → SIGBUS（pc=0x149804010 非镜像内存；26.2 会话 FFM 路径对照：解析走已 hook 调用方 → Task131 守卫触发 → 无崩溃）
+- 【_ex 静默之谜】函数唯一无日志出口是幂等命中（*slot==hook_fn）；JNA 5.13.0 jnilib（Maven 下载取证：经典布局、无 chained fixups、__la_symbol_ptr[8]=_dlsym、findSymbol 经 __stubs→槽调用）+ fishhook fork 源码（首次 rebind 注册 _dyld_register_func_for_add_image 自动重绑后续镜像）——理论上一致但 JNA 解析仍绕行（全会话零 SDL hook 解析日志），纯静态分析无法定案
+- 【修复 B：SDL3 二进制补丁——源头防御】不再追符号解析路径，把守卫下沉到 SDL 二进制自身：scripts/patch_sdl3_eventfilter_guard.py（Task 34/57 同款工艺）——SDL_SetEventFilter@0x27cbc / SDL_AddEventWatch@0x27db4 入口 b 进 __TEXT 尾部 cave（0x1e1c80/0x1e1cb0 全零区 9096B），非空回调指针一律置空/拒绝注册（启动器自身与 MC/LWJGL 均不用事件过滤器，全仓 grep 验证零误伤；与 Task131"全部拦截"策略一致）；keystone 生成 + capstone 往返验证；开发中发现并修正 cbz 目标偏移 bug（NULL 路径必须落在重定位原指令上，否则 SetEventFilter 移除路径栈损坏）；幂等 + --verify + 版本漂移哨兵；Makefile dep_sdl3_guard 接入 payload 依赖链（ldid -S 打包重签覆盖签名失效）；pristine 备份存 task135/libSDL3.dylib.bak
+- 【修复 C：取证加固】_ex 幂等命中加日志（Task135: _dlsym slot %p already == hooked_dlsym）——下一轮装机日志可直接判读 fishhook 竞态假说
+- 【修复 D：Task133 双通道】rebind_image_dlopen 参数化符号名（t135_sym），libjli/libjvm 检出时同时重绑 _dlopen 与 _dlsym 槽（FFM loaderLookup/JVM os::dll_lookup 的确定性直连）；sdl3_hook.m 补 extern orig_dlsym 声明（35512461717 教训类）
+- 【环境修复】沙箱清理掉上轮会话工件：重建 task116_l10n_audit.py（localize 全量 key 审计）/ task116c_precise_audit.py（hasDetail 行 detail 键审计）/ task132_jna_got_mirror.py（jnilib GOT 镜像验证，惰性下载 jna-5.13.0.jar）；my-project/worklog.md 补同步 Task 111-134 条目；verify_task129 I4 重锚 Makefile TAB 基线 head+14（dep_sdl3_guard 新增 14 个 TAB 配方行）
+- 验证：verify_task135 33/33（A TouchController 4 + B SDL3 补丁 6 含 cbz 目标回归守卫 + C 取证 4 + D 语法门 4 含四语言唯一键基线 1916 + E 级联 10）；九级级联全绿（112_118 49/49、119_124 62/62、125_128 52/52、129 47/47、130 60/60、131 37/37、132 53/53、133 44/44、134 68/68）
+
+Stage Summary:
+- 26.2 TouchController：Static Library 模式自动回落 UDP——mod 0.3.1-alpha14 唯一可用通道；装机锚点 '[JavaLauncher] Enabled TouchController with Static Library mode (+ UDP fallback...' + mod 侧 'TOUCH_CONTROLLER_PROXY set, use legacy UDP transport' + 触控恢复
+- 26.1.2 崩溃：SDL3 二进制入口守卫——无论 JNA/FFM/LWJGL 哪条解析路径，非空事件回调一律拦截；装机锚点：26.1.2 会话不再 SIGBUS（controlify 报 'Successfully loaded SDL3 natives' 或静默降级）
+- 取证锚点：'Task135: _dlsym slot ... idempotent hit'（出现=fishhook 竞态实锤，JNA 绕行另有机制）；'Task133: _dlsym slots rebound'（libjli/libjvm 双通道直连）
+- 遗留：JNA 解析绕行 hooked_dlsym 的确切机制未定案（SDL3 补丁已使该问题与崩溃解耦，纯学术问题留待日志判读）
