@@ -1377,3 +1377,14 @@ Stage Summary:
 - 26.1.2 崩溃：SDL3 二进制入口守卫——无论 JNA/FFM/LWJGL 哪条解析路径，非空事件回调一律拦截；装机锚点：26.1.2 会话不再 SIGBUS（controlify 报 'Successfully loaded SDL3 natives' 或静默降级）
 - 取证锚点：'Task135: _dlsym slot ... idempotent hit'（出现=fishhook 竞态实锤，JNA 绕行另有机制）；'Task133: _dlsym slots rebound'（libjli/libjvm 双通道直连）
 - 遗留：JNA 解析绕行 hooked_dlsym 的确切机制未定案（SDL3 补丁已使该问题与崩溃解耦，纯学术问题留待日志判读）
+
+---
+Task ID: 135 (续：CI 闭环)
+Agent: main (Super Z)
+
+Work Log:
+- run 35548388209（9d7100b）completed success —— Task 135 全链闭环，新 IPA 就绪
+- verify_task135 33/33 + 九级级联全绿随提交入库；环境重建的三工件（task116_l10n_audit / task116c_precise_audit / task132_jna_got_mirror）位于 /home/z/my-project/scripts/（会话工件，非 repo），沙箱再清理时可按 verify_task135 的调用约定重建
+
+Stage Summary:
+- 装机待验证锚点：①26.2 TouchController：'[JavaLauncher] Enabled TouchController with Static Library mode (+ UDP fallback' + mod 侧 'use legacy UDP transport' + 进世界不再弹"不支持的操作系统"警告 + 触控恢复；②26.1.2：controlify 初始化不再 SIGBUS（此前必崩点 'Attempting to load SDL3 from SDL3' 之后继续走完）；③取证：'Task135: _dlsym slot ... idempotent hit' 出现与否直接判读 fishhook 竞态假说
