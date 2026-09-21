@@ -22,6 +22,7 @@
 #import "CustomIconManager.h"
 #import "BackgroundSettingsViewController.h"
 #import "BackgroundManager.h"
+#import "NMToast.h"
 #import "UpdateChecker.h"
 #import "CurseForgeAPIKeyViewController.h"
 #import "CustomControlsViewController.h"
