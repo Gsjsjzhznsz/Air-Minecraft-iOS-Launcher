@@ -171,10 +171,7 @@ extern __weak UIWindow *mainWindow;
 - (void)sceneDidDisconnect:(UIScene *)scene {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"UIThemeChanged" object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AppLanguageChanged" object:nil];
-    // Task89：摘除 window traitCollection KVO
-    if (self.window) {
-        [self.window removeObserver:self forKeyPath:@"traitCollection" context:kNMSceneTraitKVOContext];
-    }
+    // Task137：window traitCollection KVO 已随 NMTheme 退役（注册与摘除同步移除）
 }
 
 - (void)sceneDidBecomeActive:(UIScene *)scene {
