@@ -317,10 +317,10 @@ static const NSInteger kNewsPageSize = 24;
         probe.summary = @"T";
         MCNewsCollectionViewCell *template = [[MCNewsCollectionViewCell alloc] initWithFrame:CGRectMake(0, 0, 320, 600)];
         [template configureWithItem:probe];
-        CGFloat measured = [template systemLayoutSizeFitting:CGSizeMake(320, 0)
+        CGFloat measured = [template systemLayoutSizeFittingSize:CGSizeMake(320, 0)
                              withHorizontalFittingPriority:UILayoutPriorityRequired
                                    verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
-        fixedHeight = (measured >= 200.0) ? measured : 280.0;  // 实测异常时兇底原估计值
+        fixedHeight = (measured >= 200.0) ? measured : 280.0;  // 实测异常时兜底原估计值
     });
     return fixedHeight;
 }
