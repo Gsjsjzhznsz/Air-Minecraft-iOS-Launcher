@@ -524,8 +524,8 @@
         [self.tableView reloadData];
         
         // 恢复默认背景色
-        self.view.backgroundColor = [UIColor systemBackgroundColor];
-        self.tableView.backgroundColor = [UIColor systemBackgroundColor];
+        self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+        self.tableView.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
         self.tableView.backgroundView = nil;
         
         [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
@@ -551,8 +551,8 @@
         [self.tableView reloadData];
         
         // Restore default background color
-        self.view.backgroundColor = [UIColor systemBackgroundColor];
-        self.tableView.backgroundColor = [UIColor systemBackgroundColor];
+        self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
+        self.tableView.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
         
         [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
     }]];

@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 #import "NeomorphKit/UIView+Neomorph.h"
 //
 //  AnnouncementDetailViewController.m
@@ -32,7 +33,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
 
     // 适配自定义启动器背景
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
@@ -86,7 +87,7 @@
     self.actionButton.layer.cornerCurve = kCACornerCurveContinuous;
     // Task89：全灰新拟态主按钮
     self.actionButton.clipsToBounds = NO;
-    [self.actionButton nm_convexRadius:10 shadowRadius:5];
+    [self.actionButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     [self.actionButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     [self.actionButton addTarget:self action:@selector(openActionURL) forControlEvents:UIControlEventTouchUpInside];
     self.actionButton.hidden = YES;

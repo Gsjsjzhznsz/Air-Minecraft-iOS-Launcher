@@ -14,9 +14,11 @@
 //    - 阴影偏移 = ±shadowRadius（暗阴影右下 (+r,+r)，亮阴影左上 (−r,−r)）
 //    - 暗阴影色默认黑、亮阴影色默认白（依底色亮度自动调节透明度）
 //
-//  双主题：跟随系统深浅色自动切换（用户选定），浅色 surface #ECF0F3（库 demo
-//  同款），深色 surface #262A2F。切换时广播 NMThemeDidChangeNotification，
-//  所有已应用 Neomorph 样式的视图自动重绘。
+//  双主题：跟随系统深浅色自动切换（用户选定）。Task136 起采用用户指定色板：
+//  浅色 surface #E0E0E0（暗影 #BEBEBE/亮影 #FFFFFF，主文字 #333333/次要 #888888），
+//  深色 surface #2C2C2C（暗影 #1E1E1E/亮影 #3A3A3A，主文字 #F5F5F5/次要 #A0A0A0），
+//  圆角基准 50px（超出元素半宽/半高时由引擎自动夹断）。切换时广播
+//  NMThemeDidChangeNotification，所有已应用 Neomorph 样式的视图自动重绘。
 //
 //  新拟态基本前提：元素与底色同色系（强制纯色底，见 BackgroundManager Task89
 //  改动），阴影才可见。

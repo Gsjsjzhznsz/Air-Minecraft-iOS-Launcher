@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 #import "PLTaskProgressViewController.h"
 #import "DownloadTaskItem.h"
 #import "DownloadTaskManager.h"
@@ -475,7 +476,7 @@ static __weak PLTaskProgressViewController *PLTaskProgressActiveInstance = nil;
     [super viewDidLoad];
     // 适配自定义启动器背景（与下载中心一致）
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
 
     // iPad：FormSheet 居中卡片（约 560pt 宽，内容超高内部滚动）；iPhone：PageSheet 近全屏
     if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPad) {

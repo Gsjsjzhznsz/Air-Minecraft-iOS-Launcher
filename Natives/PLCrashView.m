@@ -287,7 +287,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
 - (void)setupErrorCard {
     _errorCardView = [[UIView alloc] init];
     _errorCardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-    _errorCardView.layer.cornerRadius = 16;
+    _errorCardView.layer.cornerRadius = 50;  // Task136 新拟态基准
     _errorCardView.layer.cornerCurve = kCACornerCurveContinuous;
     _errorCardView.layer.borderWidth = 0.5;
     _errorCardView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
@@ -422,7 +422,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
 
     _suggestionsCardView = [[UIView alloc] init];
     _suggestionsCardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.06];
-    _suggestionsCardView.layer.cornerRadius = 16;
+    _suggestionsCardView.layer.cornerRadius = 50;  // Task136 新拟态基准
     _suggestionsCardView.layer.cornerCurve = kCACornerCurveContinuous;
     _suggestionsCardView.layer.borderWidth = 0.5;
     _suggestionsCardView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
@@ -866,7 +866,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
 - (void)setupLogCard {
     _logCardView = [[UIView alloc] init];
     _logCardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-    _logCardView.layer.cornerRadius = 16;
+    _logCardView.layer.cornerRadius = 50;  // Task136 新拟态基准
     _logCardView.layer.cornerCurve = kCACornerCurveContinuous;
     _logCardView.layer.masksToBounds = YES;
     _logCardView.layer.borderWidth = 0.5;

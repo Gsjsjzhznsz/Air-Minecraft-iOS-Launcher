@@ -147,7 +147,7 @@
         [_downloadButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
         _downloadButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
         _downloadButton.contentEdgeInsets = UIEdgeInsetsMake(5, 12, 5, 12);
-        [_downloadButton nm_convexRadius:13.0 shadowRadius:4];
+        [_downloadButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
         [_downloadButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [_downloadButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [_downloadButton addTarget:self action:@selector(downloadTapped) forControlEvents:UIControlEventTouchUpInside];

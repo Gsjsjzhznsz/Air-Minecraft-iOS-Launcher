@@ -189,7 +189,7 @@
     UIView *cardView = [[UIView alloc] init];
     cardView.translatesAutoresizingMaskIntoConstraints = NO;
     cardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10];
-    cardView.layer.cornerRadius = 16;
+    cardView.layer.cornerRadius = 50;  // Task136 新拟态基准
     cardView.layer.cornerCurve = kCACornerCurveContinuous;
     cardView.layer.borderWidth = 0.5;
     cardView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12].CGColor;
@@ -238,13 +238,14 @@
     subtitleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [cardView addSubview:subtitleLabel];
 
-    // 右侧账户类型徽章
+    // 右侧账户类型徽章（Task136：高 24 ≈ 两行 12pt 字、圆角随高取半、
+    // 宽度随字体自适应）
     UILabel *badgeLabel = [[UILabel alloc] init];
     badgeLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    badgeLabel.font = [UIFont systemFontOfSize:10 weight:UIFontWeightBold];
+    badgeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
     badgeLabel.textColor = [UIColor whiteColor];
     badgeLabel.textAlignment = NSTextAlignmentCenter;
-    badgeLabel.layer.cornerRadius = 8;
+    badgeLabel.layer.cornerRadius = 12;
     badgeLabel.layer.cornerCurve = kCACornerCurveContinuous;
     badgeLabel.layer.masksToBounds = YES;
     [cardView addSubview:badgeLabel];
@@ -321,8 +322,8 @@
         [subtitleLabel.bottomAnchor constraintEqualToAnchor:cardView.bottomAnchor constant:-18],
 
         [badgeLabel.trailingAnchor constraintEqualToAnchor:cardView.trailingAnchor constant:-14],
-        [badgeLabel.topAnchor constraintEqualToAnchor:cardView.topAnchor constant:14],
-        [badgeLabel.heightAnchor constraintEqualToConstant:20],
+        [badgeLabel.centerYAnchor constraintEqualToAnchor:usernameLabel.centerYAnchor],
+        [badgeLabel.heightAnchor constraintEqualToConstant:24],
         [badgeLabel.widthAnchor constraintGreaterThanOrEqualToConstant:52],
 
         [checkmark.trailingAnchor constraintEqualToAnchor:cardView.trailingAnchor constant:-14],

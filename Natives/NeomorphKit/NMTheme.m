@@ -10,14 +10,14 @@
 
 NSNotificationName const NMThemeDidChangeNotification = @"NMThemeDidChange";
 
-/// 浅色主题（库 demo 同款 #ECF0F3 表面；背景同族略深保证阴影可读）
-static NSString * const kLightSurface        = @"#ECF0F3";
-static NSString * const kLightSurfaceRaised  = @"#F5F8FB";
-static NSString * const kLightBackground     = @"#E3E8EF";
-/// 深色主题（夜间向；表面略亮于背景，暗阴影黑/亮阴影白仍由算法自动调透明度）
-static NSString * const kDarkSurface         = @"#262A2F";
-static NSString * const kDarkSurfaceRaised   = @"#2D3238";
-static NSString * const kDarkBackground      = @"#1E2227";
+/// 浅色主题（Task136：用户指定色板——表面 #E0E0E0；背景同族略深保证阴影可读）
+static NSString * const kLightSurface        = @"#E0E0E0";
+static NSString * const kLightSurfaceRaised  = @"#E8E8E8";
+static NSString * const kLightBackground     = @"#D6D6D6";
+/// 深色主题（Task136：用户指定色板——表面 #2C2C2C；背景同族略深）
+static NSString * const kDarkSurface         = @"#2C2C2C";
+static NSString * const kDarkSurfaceRaised   = @"#333333";
+static NSString * const kDarkBackground      = @"#252525";
 
 @implementation NMTheme
 
@@ -78,15 +78,16 @@ static NSString * const kDarkBackground      = @"#1E2227";
 }
 
 - (UIColor *)label {
-    // Task91：用户指定主文字色精确值——浅色 #222222 / 深色 #EEEEEE
-    // （替代原 rgb(0.22,0.25,0.30)/rgb(0.92,0.94,0.96) 偏蓝灰配色）
-    return self.isDark ? [UIColor colorWithRed:0xEE / 255.0 green:0xEE / 255.0 blue:0xEE / 255.0 alpha:1.0]
-                       : [UIColor colorWithRed:0x22 / 255.0 green:0x22 / 255.0 blue:0x22 / 255.0 alpha:1.0];
+    // Task136：用户指定主文字色精确值——浅色 #333333 / 深色 #F5F5F5
+    // （替代 Task91 的 #222222/#EEEEEE）
+    return self.isDark ? [UIColor colorWithRed:0xF5 / 255.0 green:0xF5 / 255.0 blue:0xF5 / 255.0 alpha:1.0]
+                       : [UIColor colorWithRed:0x33 / 255.0 green:0x33 / 255.0 blue:0x33 / 255.0 alpha:1.0];
 }
 
 - (UIColor *)secondaryLabel {
-    return self.isDark ? [UIColor colorWithWhite:0.70 alpha:1.0]
-                       : [UIColor colorWithWhite:0.42 alpha:1.0];
+    // Task136：用户指定次要文字色——浅色 #888888 / 深色 #A0A0A0
+    return self.isDark ? [UIColor colorWithRed:0xA0 / 255.0 green:0xA0 / 255.0 blue:0xA0 / 255.0 alpha:1.0]
+                       : [UIColor colorWithRed:0x88 / 255.0 green:0x88 / 255.0 blue:0x88 / 255.0 alpha:1.0];
 }
 
 - (UIColor *)placeholder {
@@ -95,13 +96,14 @@ static NSString * const kDarkBackground      = @"#1E2227";
 }
 
 - (UIColor *)darkShadowColor {
-    // 库默认 darkShadowColor = 'black'
-    return [UIColor blackColor];
+    // Task136：用户指定暗阴影色——浅色 #BEBEBE / 深色 #1E1E1E
+    // （CSS box-shadow 的暗影色，全透明度直绘，替代库默认黑色+算法透明度）
+    return [self colorFromHex:self.isDark ? @"#1E1E1E" : @"#BEBEBE"];
 }
 
 - (UIColor *)lightShadowColor {
-    // 库默认 lightShadowColor = 'white'（透明度由底色亮度自动压低，深浅色通用）
-    return [UIColor whiteColor];
+    // Task136：用户指定亮阴影色——浅色 #FFFFFF / 深色 #3A3A3A
+    return [self colorFromHex:self.isDark ? @"#3A3A3A" : @"#FFFFFF"];
 }
 
 #pragma mark - Brightness → Opacity（helpers.js 忠实移植）
@@ -132,15 +134,17 @@ static CGFloat NMBrightnessToOpacity(CGFloat brightness) {
 }
 
 - (CGFloat)lightShadowOpacityForSurfaceColor:(UIColor *)color {
-    // calcOpacityFromRange(opacity, 0.025, 1) = 0.025 + (1 − 0.025)·opacity
-    CGFloat opacity = NMBrightnessToOpacity(NMBrightnessOfColor(color));
-    return 0.025 + (1.0 - 0.025) * opacity;
+    // Task136：用户 CSS 的阴影色本身就是最终渲染色（#FFFFFF/#3A3A3A 全 alpha），
+    // 不再按表面亮度换算透明度——固定 1.0 忠实还原 neumorphism.io 观感。
+    // color 参数保留以兼容既有签名（校验器/调用方）。
+    (void)color;
+    return 1.0;
 }
 
 - (CGFloat)darkShadowOpacityForSurfaceColor:(UIColor *)color {
-    // calcOpacityFromRange(1 − opacity, 0, 0.35) = 0.35·(1 − opacity)
-    CGFloat opacity = NMBrightnessToOpacity(NMBrightnessOfColor(color));
-    return 0.35 * (1.0 - opacity);
+    // Task136：同上——#BEBEBE/#1E1E1E 全 alpha 直绘。
+    (void)color;
+    return 1.0;
 }
 
 #pragma mark - Broadcast

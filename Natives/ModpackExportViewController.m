@@ -402,7 +402,7 @@
     // Task89：全灰新拟态主按钮
     [self.exportButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     self.exportButton.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    [self.exportButton nm_convexRadius:12 shadowRadius:6];
+    [self.exportButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     self.exportButton.tintColor = [NMTheme nm_label];
     [self.exportButton addTarget:self action:@selector(startExport) forControlEvents:UIControlEventTouchUpInside];
 

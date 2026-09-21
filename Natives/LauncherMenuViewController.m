@@ -167,7 +167,7 @@
     btn.layer.cornerRadius = 10;
     // Task89：新拟态——初始选中项直接应用凸出面板（选中态在 updateButtonColors 维护）
     if (index == self.selectedIndex) {
-        [btn nm_convexRadius:12 shadowRadius:5];
+        [btn nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     }
 
     return btn;
@@ -314,7 +314,7 @@
                 // Task101：按钮无标题（纯图标），仅剩图标着色，原 setTitleColor 分支退场
                 // Task89：新拟态——选中项为凸出面板（surface 底 + 双阴影），
                 // 替代原半透明 accent 高亮；幂等重刷（重复调用安全）
-                [btn nm_convexRadius:12 shadowRadius:5];
+                [btn nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
                 // Task111：z 序保险——承载层重装后把图标子视图提回最前
                 UIView *iconView = btn.imageView;
                 if (iconView && iconView.superview == btn) {

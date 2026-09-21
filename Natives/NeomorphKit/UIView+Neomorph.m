@@ -194,11 +194,12 @@ static _NMNeomorphAttachment *NMInstallOnView(UIView *view,
 @implementation UIView (Neomorph)
 
 - (void)nm_convex {
-    [self nm_convexRadius:12 shadowRadius:6];
+    // Task136：用户指定基准样式——圆角 50px（超尺寸自动夹断）、阴影半径 10
+    [self nm_convexRadius:50 shadowRadius:10];
 }
 
 - (void)nm_convexRadius:(CGFloat)cornerRadius {
-    [self nm_convexRadius:cornerRadius shadowRadius:MAX(4.0, cornerRadius * 0.5)];
+    [self nm_convexRadius:cornerRadius shadowRadius:10];
 }
 
 - (void)nm_convexRadius:(CGFloat)cornerRadius shadowRadius:(CGFloat)shadowRadius {
@@ -260,7 +261,8 @@ static _NMNeomorphAttachment *NMInstallOnView(UIView *view,
 @implementation UIButton (Neomorph)
 
 - (void)nm_styleConvexButton {
-    [self nm_styleConvexButtonRadius:12 shadowRadius:6];
+    // Task136：全灰新拟态按钮基准样式（圆角 50、阴影半径 10）
+    [self nm_styleConvexButtonRadius:50 shadowRadius:10];
 }
 
 - (void)nm_styleConvexButtonRadius:(CGFloat)cornerRadius shadowRadius:(CGFloat)shadowRadius {

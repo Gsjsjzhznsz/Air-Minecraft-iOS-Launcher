@@ -75,6 +75,10 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 - (void)applyEffectToView:(UIView *)view;
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell;
 - (void)applyEffectToCell:(UITableViewCell *)cell;
+/// Task136：表格 cell 的"卡片化"新拟态样式（下载页模组加载器等与上级菜单
+/// 对齐的页面专用）——无自定义背景时 cell 整体应用凸出表面（圆角 50 基准、
+/// 双外阴影）；有自定义背景时行为与 applyEffectToCell: 一致（毛玻璃/半透明）。
+- (void)applyCardEffectToCell:(UITableViewCell *)cell;
 // 适配 UISearchBar：移除默认不透明背景，让 searchBar 透出底层自定义启动器背景
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar;
 

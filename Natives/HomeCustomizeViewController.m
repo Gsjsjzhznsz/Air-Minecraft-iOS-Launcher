@@ -119,6 +119,8 @@ static UIColor *hexColor(NSString *hex) {
             [self.visibilitySwitch.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-28],
         ]];
         
+        // Task136：新拟态卡片基准圆角 50（行卡随高度自动夹断）
+        self.contentView.layer.cornerRadius = 50;
         [[BackgroundManager sharedManager] applyEffectToView:self.contentView];
     }
     return self;

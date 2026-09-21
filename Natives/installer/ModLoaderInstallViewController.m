@@ -884,9 +884,10 @@
         _nameBar.layer.cornerRadius = 10;
         _nameBar.layer.masksToBounds = YES;
     } else {
-        _nameBar.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
-        _nameBar.layer.cornerRadius = 10;
-        _nameBar.layer.masksToBounds = YES;
+        // Task136：无背景时与上级菜单（版本卡列表）同语言——新拟态凸出卡片
+        // （surface 底色 + 暗/亮双外阴影），圆角基准 50（引擎按高度夹断）
+        _nameBar.layer.cornerRadius = 50;
+        [[BackgroundManager sharedManager] applyEffectToView:_nameBar];
     }
     [self.view addSubview:_nameBar];
 
@@ -947,6 +948,8 @@
     self.extendedLayoutIncludesOpaqueBars = YES;
     self.edgesForExtendedLayout = UIRectEdgeAll;
     _tableView.sectionHeaderTopPadding = 0;
+    _tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    _tableView.separatorInset = UIEdgeInsetsZero;
     [_tableView registerClass:[ModLoaderRowCell class] forCellReuseIdentifier:@"LoaderRowCell"];
     [_tableView registerClass:[ModLoaderSwitchCell class] forCellReuseIdentifier:@"SwitchCell"];
     [self.view addSubview:_tableView];
@@ -1215,20 +1218,38 @@
 #pragma mark - TableView
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 2;  // 0: 加载器列表, 1: 附加选项
+    // Task136：每个加载器一行独立 section（insetGrouped 渲染为独立圆角卡，
+    // 卡间 10pt 间距），附加选项仍为独立末节——与上级菜单（版本卡列表）的
+    // 卡片样式与间距对齐
+    return _loaders.count + ([self currentOptions].count > 0 ? 1 : 0);
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == 0) {
-        return _loaders.count;
+    if (section < (NSInteger)_loaders.count) {
+        return 1;  // Task136：每个加载器 section 仅一行卡片
     }
-    // section 1: 附加选项
+    // 附加选项 section
     return [self currentOptions].count;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return localize(@"i18n_str_160", nil);
-    return [self currentOptions].count > 0 ? localize(@"i18n_str_2048", nil) : nil;
+    if (section == (NSInteger)_loaders.count && [self currentOptions].count > 0) {
+        return localize(@"i18n_str_2048", nil);
+    }
+    return nil;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
+    // Task136：带标题的 section（首节/附加选项节）自动高度；
+    // 其余加载器卡间 section 头高 10pt = 卡片间距
+    if (section == 0) return UITableViewAutomaticDimension;
+    if (section < (NSInteger)_loaders.count) return 10;
+    return UITableViewAutomaticDimension;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {
+    return 0.01;
 }
 
 - (NSMutableArray *)currentOptions {
@@ -1243,9 +1264,9 @@
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    if (indexPath.section == 0) {
+    if (indexPath.section < (NSInteger)_loaders.count) {
         ModLoaderRowCell *cell = [tableView dequeueReusableCellWithIdentifier:@"LoaderRowCell" forIndexPath:indexPath];
-        ModLoaderRow *row = _loaders[indexPath.row];
+        ModLoaderRow *row = _loaders[indexPath.section];
 
         BOOL isSelected = [_selectedLoaderId isEqualToString:row.identifier];
 
@@ -1279,11 +1300,11 @@
           selectedVersionDisplay:versionDisplay
                     incompatible:incompatible
                          reason:reason];
-        // 适配自定义启动器背景：cell 应用毛玻璃/半透明效果
-        [[BackgroundManager sharedManager] applyEffectToCell:cell];
+        // Task136：与上级菜单卡片同语言的新拟态凸出样式
+        [[BackgroundManager sharedManager] applyCardEffectToCell:cell];
         return cell;
     } else {
-        // section 1: 附加选项（Fabric API / OptiFine 共存开关）
+        // 附加选项 section（Task136：末节，Fabric API / OptiFine 共存开关）
         ModLoaderSwitchCell *cell = [tableView dequeueReusableCellWithIdentifier:@"SwitchCell" forIndexPath:indexPath];
         NSMutableArray *opts = [self currentOptions];
         NSDictionary *opt = opts[indexPath.row];
@@ -1307,8 +1328,8 @@
         }
         [cell.switchControl removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.switchControl addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
-        // 适配自定义启动器背景：cell 应用毛玻璃/半透明效果
-        [[BackgroundManager sharedManager] applyEffectToCell:cell];
+        // Task136：与上级菜单卡片同语言的新拟态凸出样式
+        [[BackgroundManager sharedManager] applyCardEffectToCell:cell];
         return cell;
     }
 }
@@ -1320,15 +1341,15 @@
         _installOptiFine = sender.on;
     }
     [self refreshVersionName];
-    // 重新加载 section 0 让行选中状态和互斥状态同步刷新
-    [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationNone];
+    // Task136：逐节卡片布局下选中状态分布在不同 section，整体重载同步
+    [self.tableView reloadData];
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section != 0) return;
+    if (indexPath.section >= (NSInteger)_loaders.count) return;
 
-    ModLoaderRow *row = _loaders[indexPath.row];
+    ModLoaderRow *row = _loaders[indexPath.section];
     if (!row.compatible) return;
 
     NSString *reason = [self incompatibleReasonForLoaderId:row.identifier];

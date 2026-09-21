@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 #import "ModVersionViewController.h"
 #import "installer/modpack/ModrinthAPI.h"
 #import "installer/modpack/CurseForgeAPI.h"
@@ -89,7 +90,7 @@ static NSArray<NSDictionary *> *SortOptionItems(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = self.modItem.displayName;
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
     // 适配自定义启动器背景：透明化当前 VC，让全局背景图/毛玻璃透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 

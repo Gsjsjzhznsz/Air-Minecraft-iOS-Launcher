@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 #import "DownloadTasksViewController.h"
 #import "DownloadTaskManager.h"
 #import "DownloadTaskItem.h"
@@ -648,7 +649,7 @@ static const CGFloat kSectionInset = 16.0;
     // 适配自定义启动器背景：将当前视图控制器透明化，使全局背景壁纸能够透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
     self.filterState = DownloadTaskStatePending;
     self.filterType = nil;
 

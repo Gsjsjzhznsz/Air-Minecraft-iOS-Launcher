@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 //
 //  AssetVersionViewController.m
 //  Amethyst
@@ -83,7 +84,7 @@ static NSArray<NSDictionary *> *SortOptionItems(void) {
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
     self.title = self.projectDisplayName ?: [self titleForAssetType];
     // 适配自定义启动器背景：透明化当前 VC，让全局背景图/毛玻璃透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
@@ -212,7 +213,7 @@ static NSArray<NSDictionary *> *SortOptionItems(void) {
     self.filterContainerView = [[UIView alloc] init];
     self.filterContainerView.translatesAutoresizingMaskIntoConstraints = NO;
     self.filterContainerView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.06];
-    self.filterContainerView.layer.cornerRadius = 14;
+    self.filterContainerView.layer.cornerRadius = 50;  // Task136 新拟态基准
     self.filterContainerView.layer.cornerCurve = kCACornerCurveContinuous;
     self.filterContainerView.layer.borderWidth = 0.5;
     self.filterContainerView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;

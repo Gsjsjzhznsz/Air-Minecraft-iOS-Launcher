@@ -4,6 +4,7 @@
 //
 
 #import "MinecraftNewsViewController.h"
+#import "NeomorphKit/NMTheme.h"
 #import "MinecraftNewsService.h"
 #import "MinecraftNewsItem.h"
 #import "BackgroundManager.h"
@@ -17,8 +18,8 @@ static const CGFloat kNewsThumbnailTargetWidth = 400.0;
 static const CGFloat kNewsCardSpacing = 12.0;
 /// 卡片内边距
 static const CGFloat kNewsCardPadding = 12.0;
-/// 卡片圆角
-static const CGFloat kNewsCardCornerRadius = 12.0;
+/// 卡片圆角（Task136：新拟态基准 50，引擎按卡片实际尺寸自动夹断）
+static const CGFloat kNewsCardCornerRadius = 50.0;
 /// 缩略图圆角
 static const CGFloat kNewsThumbnailCornerRadius = 8.0;
 /// 每页条数
@@ -103,7 +104,6 @@ static const NSInteger kNewsPageSize = 24;
         _summaryLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
         _summaryLabel.textColor = [UIColor secondaryLabelColor];
         _summaryLabel.numberOfLines = 4;
-        [self.contentView addSubview:_summaryLabel];
 
         _readMoreLabel = [[UILabel alloc] init];
         _readMoreLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -111,7 +111,24 @@ static const NSInteger kNewsPageSize = 24;
         _readMoreLabel.textColor = [UIColor systemBlueColor];
         _readMoreLabel.text = localize(@"mc_news.read_more", nil);
         _readMoreLabel.textAlignment = NSTextAlignmentRight;
-        [self.contentView addSubview:_readMoreLabel];
+
+        // Task136：正文四行改为纵向 stack——卡片高度固定为原样式的最低高度后，
+        // 空间不足时按优先级截断（摘要先行→标题次之→作者/时间与查看详情保底），
+        // 不会产生约束冲突，也不会出现长文撑高卡片。
+        UIStackView *textStack = [[UIStackView alloc] initWithArrangedSubviews:@[_titleLabel, _metaLabel, _summaryLabel, _readMoreLabel]];
+        textStack.translatesAutoresizingMaskIntoConstraints = NO;
+        textStack.axis = UILayoutConstraintAxisVertical;
+        textStack.alignment = UIStackViewAlignmentFill;
+        textStack.distribution = UIStackViewDistributionFill;
+        textStack.spacing = 0;
+        [textStack setCustomSpacing:4 afterView:_titleLabel];
+        [textStack setCustomSpacing:6 afterView:_metaLabel];
+        [textStack setCustomSpacing:6 afterView:_summaryLabel];
+        [_readMoreLabel setContentCompressionResistancePriority:999 forAxis:UILayoutConstraintAxisVertical];
+        [_metaLabel setContentCompressionResistancePriority:998 forAxis:UILayoutConstraintAxisVertical];
+        [_titleLabel setContentCompressionResistancePriority:997 forAxis:UILayoutConstraintAxisVertical];
+        [_summaryLabel setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical];
+        [self.contentView addSubview:textStack];
 
         [NSLayoutConstraint activateConstraints:@[
             [_thumbnailView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:kNewsCardPadding],
@@ -122,22 +139,10 @@ static const NSInteger kNewsPageSize = 24;
             [_loadingIndicator.centerXAnchor constraintEqualToAnchor:_thumbnailView.centerXAnchor],
             [_loadingIndicator.centerYAnchor constraintEqualToAnchor:_thumbnailView.centerYAnchor],
 
-            [_titleLabel.topAnchor constraintEqualToAnchor:_thumbnailView.bottomAnchor constant:8],
-            [_titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:kNewsCardPadding],
-            [_titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-kNewsCardPadding],
-
-            [_metaLabel.topAnchor constraintEqualToAnchor:_titleLabel.bottomAnchor constant:4],
-            [_metaLabel.leadingAnchor constraintEqualToAnchor:_titleLabel.leadingAnchor],
-            [_metaLabel.trailingAnchor constraintEqualToAnchor:_titleLabel.trailingAnchor],
-
-            [_summaryLabel.topAnchor constraintEqualToAnchor:_metaLabel.bottomAnchor constant:6],
-            [_summaryLabel.leadingAnchor constraintEqualToAnchor:_titleLabel.leadingAnchor],
-            [_summaryLabel.trailingAnchor constraintEqualToAnchor:_titleLabel.trailingAnchor],
-
-            [_readMoreLabel.topAnchor constraintEqualToAnchor:_summaryLabel.bottomAnchor constant:6],
-            [_readMoreLabel.leadingAnchor constraintEqualToAnchor:_titleLabel.leadingAnchor],
-            [_readMoreLabel.trailingAnchor constraintEqualToAnchor:_titleLabel.trailingAnchor],
-            [_readMoreLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-kNewsCardPadding],
+            [textStack.topAnchor constraintEqualToAnchor:_thumbnailView.bottomAnchor constant:8],
+            [textStack.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:kNewsCardPadding],
+            [textStack.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-kNewsCardPadding],
+            [textStack.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-kNewsCardPadding],
         ]];
     }
     return self;
@@ -198,7 +203,7 @@ static const NSInteger kNewsPageSize = 24;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = localize(@"mc_news.title", nil);
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
 
     // 适配自定义启动器背景
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
@@ -300,7 +305,26 @@ static const NSInteger kNewsPageSize = 24;
     ]];
 }
 
-/// 双列自适应瀑布流布局（每列宽度相同，cell 高度由内容估算）
+/// 双列固定高度布局（Task136：所有卡片统一取原样式设定的最低高度——
+/// 即标题/摘要各单行时的自然高度，长文在固定高度内截断，不再逐卡自动调长）
+- (CGFloat)newsCardFixedHeight {
+    static CGFloat fixedHeight = 0;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        // 用原样式 cell 以最短内容（标题/摘要各 1 行）实测最低高度
+        MinecraftNewsItem *probe = [[MinecraftNewsItem alloc] init];
+        probe.title = @"T";
+        probe.summary = @"T";
+        MCNewsCollectionViewCell *template = [[MCNewsCollectionViewCell alloc] initWithFrame:CGRectMake(0, 0, 320, 600)];
+        [template configureWithItem:probe];
+        CGFloat measured = [template systemLayoutSizeFitting:CGSizeMake(320, 0)
+                             withHorizontalFittingPriority:UILayoutPriorityRequired
+                                   verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
+        fixedHeight = (measured >= 200.0) ? measured : 280.0;  // 实测异常时兇底原估计值
+    });
+    return fixedHeight;
+}
+
 - (UICollectionViewLayout *)createCompositionalLayout {
     UICollectionViewCompositionalLayoutConfiguration *config = [[UICollectionViewCompositionalLayoutConfiguration alloc] init];
     config.interSectionSpacing = kNewsCardSpacing;
@@ -308,14 +332,15 @@ static const NSInteger kNewsPageSize = 24;
 
     // section provider block 接收两个参数：sectionIndex 和 layoutEnvironment
     // 构造方法为 -initWithSectionProvider:configuration:（不是 +layoutWithConfiguration:sectionProvider:）
+    CGFloat cardHeight = [self newsCardFixedHeight];
     return [[UICollectionViewCompositionalLayout alloc] initWithSectionProvider:^NSCollectionLayoutSection *(NSInteger sectionIndex, id<NSCollectionLayoutEnvironment> env) {
-        // 双列布局，每列等宽
+        // 双列布局，每列等宽；高度为固定绝对值（不再用 estimated 触发自适应调长）
         NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:0.5]
-                                                                            heightDimension:[NSCollectionLayoutDimension estimatedDimension:280]];
+                                                                            heightDimension:[NSCollectionLayoutDimension absoluteDimension:cardHeight]];
         NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
 
         NSCollectionLayoutGroup *group = [NSCollectionLayoutGroup horizontalGroupWithLayoutSize:[NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:1.0]
-                                                                                                                                             heightDimension:[NSCollectionLayoutDimension estimatedDimension:280]]
+                                                                                                                                             heightDimension:[NSCollectionLayoutDimension absoluteDimension:cardHeight]]
                                                                                       subitems:@[item]];
         group.interItemSpacing = [NSCollectionLayoutSpacing fixedSpacing:kNewsCardSpacing];
 

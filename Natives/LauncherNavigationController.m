@@ -125,7 +125,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     // Task89：全灰新拟态主按钮（启动/安装）
     self.buttonInstall.layer.cornerRadius = 5;
     self.buttonInstall.frame = CGRectMake(self.toolbar.frame.size.width * 0.8, 4, self.toolbar.frame.size.width * 0.2, self.toolbar.frame.size.height - 8);
-    [self.buttonInstall nm_convexRadius:6 shadowRadius:3];
+    [self.buttonInstall nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     self.buttonInstall.tintColor = [NMTheme nm_label];
     self.buttonInstall.enabled = NO;
     [self.buttonInstall addTarget:self action:@selector(performInstallOrShowDetails:) forControlEvents:UIControlEventPrimaryActionTriggered];
@@ -145,7 +145,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     self.downloadCenterButton.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
     [self.downloadCenterButton setImage:[UIImage systemImageNamed:@"arrow.down.circle"] forState:UIControlStateNormal];
     self.downloadCenterButton.tintColor = [NMTheme nm_label];
-    [self.downloadCenterButton nm_convexRadius:6 shadowRadius:3];
+    [self.downloadCenterButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     // 图标固定在按钮左侧
     CGFloat iconSize = 22.0;
     [self.downloadCenterButton setImageEdgeInsets:UIEdgeInsetsMake(0, 4, 0, dcBtnWidth - iconSize - 4)];

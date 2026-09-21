@@ -108,8 +108,9 @@ static __weak NMToast *s_nm125_current = nil;
     // ---- 新拟物卡片 ----
     self.cardView = [[UIView alloc] initWithFrame:CGRectZero];
     self.cardView.translatesAutoresizingMaskIntoConstraints = NO;
-    // 平贴凸出表面：surfaceRaised 底 + 暗亮双外影（与设置页卡片同语言）
-    [self.cardView nm_flatRaisedSurfaceWithRadius:kNMToastCornerRadius];
+    // Task136：弹窗类新拟态凸出表面（surfaceRaised 底 + 暗亮双外影，
+    // 圆角基准 50 按实际尺寸夹断，随 NMTheme 深浅色自动重绘）
+    [self.cardView nm_convexRaisedRadius:50 shadowRadius:10];
 
     // ---- 正文 ----
     self.messageLabel = [[UILabel alloc] initWithFrame:CGRectZero];

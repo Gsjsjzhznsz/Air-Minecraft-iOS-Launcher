@@ -22,11 +22,8 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        // 修复"正式版/测试版"文字变成"……"的问题：
-        // 字号从 13pt 减小到 11pt，内边距从 (3,10,3,10) 减小到 (2,6,2,6)，
-        // 让 pill 标签更紧凑，减少与 versionLabel 的空间竞争。
-        // 同时设置 adjustsFontSizeToFitWidth 确保极端情况下也不会被截断。
-        _textInsets = UIEdgeInsetsMake(2, 6, 2, 6);
+        // Task136：胶囊内边距（左右 8pt）——宽度随字体自适应
+        _textInsets = UIEdgeInsetsMake(0, 8, 0, 8);
     }
     return self;
 }
@@ -39,6 +36,12 @@
 }
 - (void)drawTextInRect:(CGRect)rect {
     [super drawTextInRect:UIEdgeInsetsInsetRect(rect, self.textInsets)];
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    // Task136：胶囊边框随字体宽度/高度动态调整（圆角=高/2，任意文本长度均保持胶囊）
+    CGFloat h = self.bounds.size.height;
+    if (h > 0) self.layer.cornerRadius = h / 2.0;
 }
 @end
 
@@ -63,11 +66,11 @@
         self.contentView.backgroundColor = [UIColor clearColor];
         self.layer.masksToBounds = NO;
 
-        // ----- 卡片容器（Task89：新拟态凸出表面）-----
+        // ----- 卡片容器（Task89：新拟态凸出表面；Task136：新拟态基准圆角 50）-----
         // 保留圆角供 applyEffectToView 读取；底色/边框/旧阴影移交 NeomorphKit 管理
         self.cardContainer = [[UIView alloc] init];
         self.cardContainer.translatesAutoresizingMaskIntoConstraints = NO;
-        self.cardContainer.layer.cornerRadius = 12;
+        self.cardContainer.layer.cornerRadius = 50;
         self.cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
         [self.contentView addSubview:self.cardContainer];
 
@@ -103,31 +106,26 @@
         [self.versionLabel setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
         [self.versionLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
 
-        // ----- 类型标签（pill 样式，修复"正式版/测试版"文字变"……"的问题） -----
-        // 字号从 13pt 减小到 11pt，内边距从 (3,10,3,10) 减小到 (2,6,2,6)，
-        // cornerRadius 从 10 减小到 8，让 pill 更紧凑。
-        // 设置 adjustsFontSizeToFitWidth + minimumScaleFactor=0.8 作为兜底，
-        // 确保任何情况下文字都不会被截断成"……"。
+        // ----- 类型标签（Task136：右侧独立胶囊，按字体宽度自适应） -----
+        // 字号对齐左侧两行文字的次行（12pt）；宽度=文字+左右 8pt 内边距（随字体
+        // 动态），固定高 24（≈两行 12pt 字），圆角随高度取半（见 InsetTypeLabel
+        // layoutSubviews）；靠右固定在 chevron 左侧，永不贴近卡片边缘被裁剪；
+        // 不再压缩缩字（不再出现"……"）。
         self.typeLabel = [[InsetTypeLabel alloc] init];
         self.typeLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        self.typeLabel.font = [UIFont systemFontOfSize:11 weight:UIFontWeightBold];
+        self.typeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
         self.typeLabel.textColor = [UIColor whiteColor];
         self.typeLabel.textAlignment = NSTextAlignmentCenter;
-        self.typeLabel.adjustsFontSizeToFitWidth = YES;
-        self.typeLabel.minimumScaleFactor = 0.8;
-        self.typeLabel.lineBreakMode = NSLineBreakByClipping;
-        self.typeLabel.layer.cornerRadius = 8;
         self.typeLabel.layer.cornerCurve = kCACornerCurveContinuous;
         self.typeLabel.layer.masksToBounds = YES;
-        // 类型标签 hugging 高、compression 也高（保持完整 pill 形状，不被压缩）
+        // 类型标签 hugging/compression 均 Required：保持完整胶囊形状，空间不足时
+        // 由版本号侧压缩（adjustsFontSizeToFitWidth 机制退役）
         [self.typeLabel setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
         [self.typeLabel setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+        [self.cardContainer addSubview:self.typeLabel];
 
-        // ----- 顶行 stack：版本号 + 类型标签 水平排列 -----
-        // 修复"位置不对"问题：alignment 从 FirstBaseline 改为 Center，
-        // 避免 InsetTypeLabel 上下内边距导致 typeLabel 视觉偏移。
-        // distribution 改为 Fill 使 versionLabel 优先被压缩，typeLabel 保持完整。
-        self.topRowStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.versionLabel, self.typeLabel]];
+        // ----- 顶行 stack：仅版本号（Task136：类型胶囊移出 stack 独立靠右） -----
+        self.topRowStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.versionLabel]];
         self.topRowStack.translatesAutoresizingMaskIntoConstraints = NO;
         self.topRowStack.axis = UILayoutConstraintAxisHorizontal;
         self.topRowStack.alignment = UIStackViewAlignmentCenter;
@@ -197,10 +195,16 @@
             [self.iconImageView.heightAnchor constraintEqualToConstant:22],
 
             // 顶行 stack：紧跟图标容器右侧 +14，顶部对齐 cardContainer 顶部 +14
-            // 右侧到 chevron 之间留 8pt，stack 内部自动分配 versionLabel/typeLabel 宽度
+            // 右侧到类型胶囊之间留 8pt；胶囊靠右独立固定
             [self.topRowStack.leadingAnchor constraintEqualToAnchor:self.iconContainer.trailingAnchor constant:14],
             [self.topRowStack.topAnchor constraintEqualToAnchor:self.cardContainer.topAnchor constant:14],
-            [self.topRowStack.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
+            [self.topRowStack.trailingAnchor constraintLessThanOrEqualToAnchor:self.typeLabel.leadingAnchor constant:-8],
+
+            // Task136：类型胶囊——右侧锚定 chevron 左侧 8pt（不贴卡片边缘），
+            // 垂直居中于左侧两行文字块（版本号+日期），高 24（≈两行 12pt 字）
+            [self.typeLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
+            [self.typeLabel.centerYAnchor constraintEqualToAnchor:self.cardContainer.centerYAnchor],
+            [self.typeLabel.heightAnchor constraintEqualToConstant:24],
 
             // 日期：与顶行 stack 左对齐，紧跟顶行下方 +3
             [self.dateLabel.leadingAnchor constraintEqualToAnchor:self.topRowStack.leadingAnchor],
@@ -287,7 +291,7 @@
         self.iconContainer.backgroundColor = [typeColor colorWithAlphaComponent:0.85];
     }
 
-    // 类型标签：类型色背景 + 白字
+    // 类型标签：类型色底 + 白字（Task136：尺寸随字体动态，见布局注释）
     self.typeLabel.text = typeText;
     self.typeLabel.backgroundColor = typeColor;
 }

@@ -5,6 +5,7 @@
 #import "LauncherPreferences.h"
 #import "utils.h"
 #import "BackgroundManager.h"
+#import "NeomorphKit/NMTheme.h"
 
 extern NSMutableDictionary *prefDict;
 
@@ -20,11 +21,7 @@ extern NSMutableDictionary *prefDict;
     if ([[BackgroundManager sharedManager] hasBackground]) {
         self.view.backgroundColor = [UIColor clearColor];
     } else {
-        if (@available(iOS 13.0, *)) {
-            self.view.backgroundColor = [UIColor systemBackgroundColor];
-        } else {
-            self.view.backgroundColor = [UIColor blackColor];
-        }
+        self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色（随深浅色自适应）
     }
 
     if ([getPrefObject(@"control.control_safe_area") length] == 0) {
@@ -105,11 +102,7 @@ extern NSMutableDictionary *prefDict;
     if ([[BackgroundManager sharedManager] hasBackground]) {
         self.view.backgroundColor = [UIColor clearColor];
     } else {
-        if (@available(iOS 13.0, *)) {
-            self.view.backgroundColor = [UIColor systemBackgroundColor];
-        } else {
-            self.view.backgroundColor = [UIColor blackColor];
-        }
+        self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色（随深浅色自适应）
     }
 }
 

@@ -1871,12 +1871,8 @@
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [super tableView:tableView cellForRowAtIndexPath:indexPath];
 
-    // ===== iOS 设置 App 风格：彩色圆角图标背景 =====
-    // 参照 iOS 设置应用：每个设置项左侧图标用带颜色的圆角方块背景包裹，
-    // 图标本身渲染为白色 SF Symbol。不同 section 用不同颜色区分：
-    //   general=蓝 / video=紫 / control=绿 / java=橙 / debug=红
-    // destructive（危险操作）项统一用红色背景。
-    // 搜索结果模式下用蓝灰色背景。
+    // Task136：图标改用本体着色（去掉彩色圆角背景+白标的 iOS 设置风格）——
+    // 原 section 配色改作图标本身的 tint，section header 行保持 accentColor
     [self applySettingsAppStyleToCell:cell indexPath:indexPath];
 
     // Apply background styling if global background is active
@@ -1949,15 +1945,15 @@
     return cell;
 }
 
-/// iOS 设置 App 风格图标背景：给 cell.imageView 加圆角彩色背景 + 白色图标
-/// 参照 iOS 设置应用（General=灰、Display=蓝、Privacy=蓝 等彩色圆角图标）
-/// 在 cellForRow 中调用，仅做视觉装饰，不改变 cell 数据或交互逻辑
+/// Task136：设置项左侧 SF 图标改为"图标本体"——去掉彩色圆角背景与白色
+/// 图标渲染，改为图标直接以原 section 配色着色（原底色 → 现在的 tint 色）。
+/// 仅做视觉装饰，不改变 cell 数据或交互逻辑。
 - (void)applySettingsAppStyleToCell:(UITableViewCell *)cell indexPath:(NSIndexPath *)indexPath {
     UIImageView *iconView = cell.imageView;
     if (!iconView) return;
 
     // 判断是否为 section header 行（row 0 且有 prefSections）
-    // section header 行不加彩色背景，保持原始样式（避免与组内项视觉混淆）
+    // section header 行保持主题强调色，与组内项区分
     BOOL isSectionHeader = (indexPath.row == 0 && self.prefSections && !self.filteredItems);
     if (isSectionHeader) {
         // section header：恢复默认 tint（不加背景），让图标保持系统默认外观
@@ -1984,13 +1980,16 @@
     // 判断是否为危险操作项
     BOOL destructive = [item[@"destructive"] boolValue];
 
-    // 获取图标名，用 UIImageSymbolConfiguration 重新渲染为白色、合适大小的 SF Symbol
+    // 图标着色 = 原 section 背景色（Task136：颜底白标 → 图标本体色）
+    UIColor *iconColor = [self iconBackgroundColorForItem:item indexPath:indexPath destructive:destructive];
+
+    // 获取图标名，用 UIImageSymbolConfiguration 重新渲染为合适大小
     NSString *iconName = item[@"icon"];
     UIImage *styledIcon = nil;
     if (iconName.length > 0) {
-        // 用 UIImageSymbolConfiguration 控制图标大小和颜色
-        // pointSize 16 适配默认 UITableViewCell imageView 的 29pt 尺寸（留出内边距）
-        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:16
+        // 用 UIImageSymbolConfiguration 控制图标大小
+        // pointSize 20 适配默认 UITableViewCell imageView 的 29pt 尺寸
+        UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:20
                                                                                             weight:UIFontWeightMedium];
         styledIcon = [UIImage systemImageNamed:iconName withConfiguration:config];
         if (!styledIcon) {
@@ -1998,35 +1997,30 @@
         }
     }
 
-    // 设置图标：白色模板渲染，在彩色背景上显示
     if (styledIcon) {
-        // withTintColor 让 SF Symbol 以白色渲染（模板模式），与背景色搭配
-        UIImage *whiteIcon = [styledIcon imageWithTintColor:[UIColor whiteColor]
-                                               renderingMode:UIImageRenderingModeAlwaysOriginal];
-        iconView.image = whiteIcon;
+        // 模板渲染 + tintColor：图标本体直接以 section 色显示（无背景块）
+        iconView.image = styledIcon;
     }
-    iconView.tintColor = [UIColor whiteColor];
-    iconView.contentMode = UIViewContentModeCenter;
+    iconView.tintColor = iconColor;
+    iconView.contentMode = UIViewContentModeScaleAspectFit;
 
-    // 设置彩色圆角背景
-    UIColor *bgColor = [self iconBackgroundColorForItem:item indexPath:indexPath destructive:destructive];
-    iconView.backgroundColor = bgColor;
-    iconView.layer.cornerRadius = 7;
-    iconView.layer.cornerCurve = kCACornerCurveContinuous;
-    iconView.layer.masksToBounds = YES;
+    // 无背景块：清除原彩色圆角背景
+    iconView.backgroundColor = [UIColor clearColor];
+    iconView.layer.cornerRadius = 0;
+    iconView.layer.masksToBounds = NO;
 }
 
-/// 根据设置项所属 section 与图标名返回 iOS 设置 App 风格的彩色背景
-/// 参照 iOS 设置应用：不同功能模块用不同颜色区分，一眼可辨识归属
+/// 根据设置项所属 section 与图标名返回图标着色（Task136 前为图标背景色，
+/// 现作图标本体色）：destructive（危险操作）统一红色
 - (UIColor *)iconBackgroundColorForItem:(NSDictionary *)item
                               indexPath:(NSIndexPath *)indexPath
                              destructive:(BOOL)destructive {
-    // 危险操作项统一红色背景
+    // 危险操作项统一红色
     if (destructive) {
         return [UIColor systemRedColor];
     }
 
-    // 搜索结果模式：统一用蓝灰色背景
+    // 搜索结果模式：按原所属 section 着色
     if (self.filteredItems) {
         NSNumber *origSection = item[@"__origSection"];
         if (origSection) {

@@ -831,13 +831,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
     // Task89：新拟态改造（用户选定：凸出样式 + 纯色底）。
     // 原毛玻璃/半透明双模式在无自定义背景时由新拟态凸出表面替代
-    // （surface 底色 + 暗/亮双阴影），透明度按表面色亮度自动计算（NMTheme）。
-    // 调用点此前自行设置的 layer.cornerRadius 保留为卡片圆角（未设置时取 12）；
-    // 阴影半径取圆角的一半（上限 8），保持库 demo 的比例感。
+    // （surface 底色 + 暗/亮双阴影）。Task136：阴影半径改用用户指定基准 10
+    // （偏移=±10、模糊=10，颜色/透明度由 NMTheme 新色板提供）；
+    // 卡片圆角继续读调用点预先设置的 layer.cornerRadius（卡片类调用点已统一改 50）。
     CGFloat radius = view.layer.cornerRadius;
     if (radius <= 0) radius = 12;
-    CGFloat shadowRadius = MAX(4.0, MIN(8.0, radius * 0.5));
-    [view nm_convexRadius:radius shadowRadius:shadowRadius];
+    [view nm_convexRadius:radius shadowRadius:10];
 }
 
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
@@ -889,13 +888,11 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
     // Task89：新拟态改造（同 applyEffectToView）。卡片容器为 contentView 内
     // 第一个带圆角的子视图（各 cell 的既定结构）；找不到时退回 contentView
-    // 整体（radius 12）。
-    // Task 129i：候选排除"内容自绘"视图（UIImageView/UILabel/UITextView/
-    // UIControl 等）。它们的可见内容是 layer.contents，而 nm_convex 的 caster
-    // 是 host 的【子层】——CALayer 渲染序中子层画在 contents 之上，表面色
-    // caster 会把图片/文字整个盖住。用户实测："mc 公告的图片被新拟物覆盖"：
-    // MC 新闻 cell 的第一个带圆角子视图恰是缩略图 UIImageView，被启发式
-    // 误选为卡片容器。排除后该 cell 回退到 contentView（真正的卡片容器）。
+    // （优先读 contentView 自身圆角，未设置时取 12）。
+    // Task136：阴影半径基准 10；卡片圆角读 contentView 自身/子视图既定值
+    // （卡片类 cell 已统一改设 50）；同时放开 cell 级裁剪让双外阴影可见
+    // （此前 MC 新闻卡 self.clipsToBounds=YES 把承载层阴影全部裁掉，
+    // 用户实测"卡片不是新拟态"）。
     UIView *target = nil;
     CGFloat radius = 0;
     for (UIView *sub in cell.contentView.subviews) {
@@ -914,12 +911,35 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     }
     if (!target) {
         target = cell.contentView;
-        radius = 12;
+        radius = cell.contentView.layer.cornerRadius > 0
+            ? cell.contentView.layer.cornerRadius : 12;
     }
     cell.backgroundColor = [UIColor clearColor];
     cell.contentView.backgroundColor = [UIColor clearColor];
-    CGFloat shadowRadius = MAX(4.0, MIN(8.0, radius * 0.5));
-    [target nm_convexRadius:radius shadowRadius:shadowRadius];
+    // Task136：阴影在承载层帧外发散，cell 级裁剪必须放开（毛玻璃分支
+    // 的圆角由 blurView 自身 cornerRadius 保证，不依赖 cell 级裁剪）
+    cell.clipsToBounds = NO;
+    cell.layer.masksToBounds = NO;
+    [target nm_convexRadius:radius shadowRadius:10];
+}
+
+- (void)applyCardEffectToCell:(UITableViewCell *)cell {
+    if (!cell) return;
+
+    // 有自定义背景：与普通表格 cell 同管线（毛玻璃/半透明）
+    if ([self hasBackground]) {
+        [self applyEffectToCell:cell];
+        return;
+    }
+
+    // Task136：无背景时 cell 整体为凸出新拟态卡片（与上级菜单卡片同语言）。
+    // 圆角 50 基准（引擎按行高自动夹断到半高），阴影半径 10。
+    cell.backgroundView = nil;
+    cell.backgroundColor = [UIColor clearColor];
+    cell.contentView.backgroundColor = [UIColor clearColor];
+    cell.clipsToBounds = NO;
+    cell.layer.masksToBounds = NO;
+    [cell.contentView nm_convexRadius:50 shadowRadius:10];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

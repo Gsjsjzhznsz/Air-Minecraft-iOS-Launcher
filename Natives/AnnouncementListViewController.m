@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 //
 //  AnnouncementListViewController.m
 //  Amethyst
@@ -132,7 +133,7 @@ static const CGFloat kAnnHighPriorityBarWidth = 4.0;
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = localize(@"i18n_str_20", nil);
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
 
     // 适配自定义启动器背景
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];

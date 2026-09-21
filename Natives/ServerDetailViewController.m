@@ -4,6 +4,7 @@
 //
 
 #import "ServerDetailViewController.h"
+#import "NeomorphKit/NMTheme.h"
 #import "NeomorphKit/UIView+Neomorph.h"
 #import "BackgroundManager.h"
 #import "InlineMessageView.h"
@@ -43,7 +44,7 @@
     // 适配自定义启动器背景：将当前视图控制器透明化，使全局背景壁纸能够透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
     [[BackgroundManager sharedManager] applyEffectToView:self.view];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
     self.title = localize(@"i18n_str_958", nil);
 
     [self setupUI];
@@ -150,7 +151,7 @@
     [self.joinButton setTitle:localize(@"i18n_str_960", nil) forState:UIControlStateNormal];
     // Task89：全灰新拟态主按钮
     [self.joinButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    [self.joinButton nm_convexRadius:10 shadowRadius:5];
+    [self.joinButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     self.joinButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.joinButton addTarget:self action:@selector(joinServer) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.joinButton];
@@ -161,7 +162,7 @@
     [self.downloadPackButton setTitle:localize(@"i18n_str_961", nil) forState:UIControlStateNormal];
     // Task89：全灰新拟态次按钮
     [self.downloadPackButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    [self.downloadPackButton nm_convexRadius:10 shadowRadius:5];
+    [self.downloadPackButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     self.downloadPackButton.titleLabel.font = [UIFont boldSystemFontOfSize:16];
     [self.downloadPackButton addTarget:self action:@selector(downloadServerPack) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:self.downloadPackButton];

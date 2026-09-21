@@ -99,7 +99,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         // 行间分隔通过 rowHeight 内的上下 padding 实现（参照 FCL marginBottom 10dp）
         self.contentContainer = [[UIView alloc] init];
         self.contentContainer.translatesAutoresizingMaskIntoConstraints = NO;
-        [self.contentContainer nm_convexRadius:8 shadowRadius:4];
+        [self.contentContainer nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
         [self.contentView addSubview:self.contentContainer];
 
         // ----- 左侧图标：26x26（FCL 标准 30dp，紧凑模式略小）-----
@@ -822,7 +822,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     // Task89：全灰新拟态主按钮（用户选定：所有按钮与底同色，仅靠阴影分层）
     self.importModpackButton.tintColor = [NMTheme nm_label];
     [self.importModpackButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
-    [self.importModpackButton nm_convexRadius:10 shadowRadius:5];
+    [self.importModpackButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     self.importModpackButton.titleLabel.font = [UIFont boldSystemFontOfSize:14];
     self.importModpackButton.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
     self.importModpackButton.imageEdgeInsets = UIEdgeInsetsMake(0, -4, 0, 4);
@@ -1339,7 +1339,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     [self.sidebarResetButton setImage:[UIImage systemImageNamed:@"arrow.counterclockwise"] forState:UIControlStateNormal];
     self.sidebarResetButton.tintColor = [UIColor systemRedColor];
     // Task89：新拟态凸出按钮（重置图标保留语义红色）
-    [self.sidebarResetButton nm_convexRadius:8 shadowRadius:3];
+    [self.sidebarResetButton nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     [self.sidebarResetButton setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     self.sidebarResetButton.imageEdgeInsets = UIEdgeInsetsMake(0, -2, 0, 2);
     self.sidebarResetButton.titleEdgeInsets = UIEdgeInsetsMake(0, 2, 0, -2);
@@ -1375,7 +1375,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     // Task89：新拟态凸出按钮（全灰）
-    [button nm_convexRadius:8 shadowRadius:3];
+    [button nm_convexRadius:50 shadowRadius:10];  // Task136 基准样式
     [button setTitleColor:[NMTheme nm_label] forState:UIControlStateNormal];
     [button addTarget:self action:selector forControlEvents:UIControlEventTouchUpInside];
     button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;

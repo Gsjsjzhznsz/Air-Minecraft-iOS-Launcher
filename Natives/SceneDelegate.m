@@ -6,6 +6,7 @@
 #import "LauncherPreferences.h"
 #import "BackgroundManager.h"
 #import "NeomorphKit/NMTheme.h"
+#import "NeomorphKit/NMContrast.h"
 // Terracotta 暂时移除（排查启动崩溃）
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
@@ -34,15 +35,10 @@ extern __weak UIWindow *mainWindow;
     
     self.window = [[UIWindow alloc] initWithWindowScene:windowScene];
     self.window.frame = windowScene.coordinateSpace.bounds;
-    // 修复：使用 systemBackgroundColor 自适应浅色/深色模式。
-    // 之前硬编码深灰（0.08）在浅色模式下导致"中间一片黑"。
-    // systemBackgroundColor 在浅色模式为白、深色模式为黑，自动适配。
-    // BackgroundManager.applyBackgroundToWindow 会根据用户是否设置自定义壁纸覆盖此颜色。
-    if (@available(iOS 13.0, *)) {
-        self.window.backgroundColor = [UIColor systemBackgroundColor];
-    } else {
-        self.window.backgroundColor = [UIColor colorWithWhite:0.08 alpha:1.0];
-    }
+    // Task136：窗口底色改用 NMTheme 背景色（浅 #D6D6D6 / 深 #252525，随深浅色
+    // 自动切换），与新拟态表面同族保证阴影可读；用户设置自定义壁纸时仍由
+    // BackgroundManager.applyBackgroundToWindow 接管（Task111 检测并切换）。
+    self.window.backgroundColor = [NMTheme nm_background];
     mainWindow = self.window;
 
     // 根据设置选择布局：默认 VS 三栏布局，可切换为卡片式便当盒布局
@@ -81,6 +77,10 @@ extern __weak UIWindow *mainWindow;
     }
 
     [self.window makeKeyAndVisible];
+
+    // Task136：启动动态文字对比度修复器（监听主题/背景效果广播自动扫描；
+    // 幂等，只拦截黑字深底等不可读组合）
+    [NMContrast nm_startContrastSweep];
 
     // 立即应用背景（移除原来的 0.1s 延迟）：
     // 延迟会在启动时露出窗口底色形成"黑条"或"黑闪"。BackgroundManager 在其 init

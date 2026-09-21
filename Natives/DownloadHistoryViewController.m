@@ -1,4 +1,5 @@
 #import "utils.h"
+#import "NeomorphKit/NMTheme.h"
 #import "DownloadHistoryViewController.h"
 #import "DownloadHistoryStore.h"
 #import "DownloadTaskItem.h"
@@ -159,7 +160,7 @@ static NSString * const kHistoryCellReuseIdentifier = @"DownloadHistoryCell";
 
     // 适配自定义启动器背景：透明化当前视图控制器，使全局背景壁纸透出（与下载中心一致）
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [NMTheme nm_background]; // Task136：主题化页面底色
 
     self.title = localize(@"download.history.title", nil);
 

@@ -340,8 +340,8 @@ static NSString *festivalGreeting(void) {
     // 圆角：contentView 设置圆角 + masksToBounds，让 BackgroundManager 注入的
     // 毛玻璃 blurView 也获得一致的圆角（applyEffectToCollectionViewCell: 会读取
     // cell.contentView.layer.cornerRadius）。self.layer 保持 masksToBounds=NO
-    // 以便显示阴影，阴影路径在 layoutSubviews 中按 cornerRadius:16 生成。
-    self.contentView.layer.cornerRadius = 16;
+    // 以便显示阴影，阴影路径在 layoutSubviews 中按 Task136 新拟态基准 50 生成。
+    self.contentView.layer.cornerRadius = 50;
     self.contentView.layer.cornerCurve = kCACornerCurveContinuous;
     self.contentView.layer.masksToBounds = YES;
 
@@ -354,7 +354,7 @@ static NSString *festivalGreeting(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:16].CGPath;
+    self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:self.contentView.bounds cornerRadius:50].CGPath;
 }
 
 // 弹簧按压动画
@@ -384,10 +384,12 @@ static NSString *festivalGreeting(void) {
 // MARK: - HomeProfileTileCell
 
 @interface HomeProfileTileCell : HomeTileBaseCell
-@property (nonatomic, strong) UIImageView *skinImageView;
+// Task136：MC 头像接管原用户图标（皮肤全身预览）的最左位置；原 52×52
+// 小头像与 skinImageView 均已退场
 @property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UILabel *welcomeLabel;
 @property (nonatomic, strong) UILabel *greetingLabel;
+@property (nonatomic, strong) UIStackView *welcomeStack;
 @end
 
 @implementation HomeProfileTileCell
@@ -395,21 +397,13 @@ static NSString *festivalGreeting(void) {
 - (void)setupBaseViews {
     [super setupBaseViews];
     
-    // 皮肤全身预览
-    self.skinImageView = [[UIImageView alloc] init];
-    self.skinImageView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.skinImageView.contentMode = UIViewContentModeScaleAspectFit;
-    self.skinImageView.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.skinImageView.layer.shadowOffset = CGSizeMake(2, 4);
-    self.skinImageView.layer.shadowOpacity = 0.35;
-    self.skinImageView.layer.shadowRadius = 6;
-    [self.contentContainer addSubview:self.skinImageView];
-    
-    // 头像 (圆形)
+    // Task136：MC 头像（原右侧 52×52 小头像移过来接管最左位置）：
+    // 保留原样式——半透明白色边框 + 圆形（layoutSubviews 按尺寸动态取半）；
+    // 大小对齐原用户图标（约卡片高度一半、随卡高自适应）。
     self.avatarImageView = [[UIImageView alloc] init];
     self.avatarImageView.translatesAutoresizingMaskIntoConstraints = NO;
     self.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
-    self.avatarImageView.layer.cornerRadius = 26;
+    // 圆形裁剪：AspectFill 下图片必须裁进圆形边框（圆角值在 layoutSubviews 动态取半）
     self.avatarImageView.layer.masksToBounds = YES;
     self.avatarImageView.layer.borderWidth = 2.5;
     self.avatarImageView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.35].CGColor;
@@ -427,7 +421,6 @@ static NSString *festivalGreeting(void) {
     self.welcomeLabel.numberOfLines = 1;
     self.welcomeLabel.adjustsFontSizeToFitWidth = YES;
     self.welcomeLabel.minimumScaleFactor = 0.7;
-    [self.contentContainer addSubview:self.welcomeLabel];
     
     // 节日/时段问候
     self.greetingLabel = [[UILabel alloc] init];
@@ -435,31 +428,37 @@ static NSString *festivalGreeting(void) {
     self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
     self.greetingLabel.textColor = [UIColor secondaryLabelColor];
     self.greetingLabel.numberOfLines = 1;
-    [self.contentContainer addSubview:self.greetingLabel];
+    
+    // Task136：两行欢迎句组成纵向 stack，整体相对头像纵轴居中
+    // （不再沿用原先相对小头像的 -10pt 上偏链）
+    self.welcomeStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]];
+    self.welcomeStack.translatesAutoresizingMaskIntoConstraints = NO;
+    self.welcomeStack.axis = UILayoutConstraintAxisVertical;
+    self.welcomeStack.alignment = UIStackViewAlignmentLeading;
+    self.welcomeStack.spacing = 4;
+    [self.contentContainer addSubview:self.welcomeStack];
     
     [NSLayoutConstraint activateConstraints:@[
-        // 皮肤预览 (左侧)
-        [self.skinImageView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:18],
-        [self.skinImageView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:10],
-        [self.skinImageView.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-8],
-        [self.skinImageView.widthAnchor constraintEqualToAnchor:self.skinImageView.heightAnchor multiplier:0.55],
+        // MC 头像（最左）：高度 ≈ 卡片高度一半，宽度=高度（正圆基准），垂直居中
+        [self.avatarImageView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:18],
+        [self.avatarImageView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
+        [self.avatarImageView.heightAnchor constraintEqualToAnchor:self.contentContainer.heightAnchor multiplier:0.5],
+        [self.avatarImageView.widthAnchor constraintEqualToAnchor:self.avatarImageView.heightAnchor],
         
-        // 头像 (皮肤右侧)
-        [self.avatarImageView.leadingAnchor constraintEqualToAnchor:self.skinImageView.trailingAnchor constant:18],
-        [self.avatarImageView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor constant:-14],
-        [self.avatarImageView.widthAnchor constraintEqualToConstant:52],
-        [self.avatarImageView.heightAnchor constraintEqualToConstant:52],
-        
-        // 欢迎文本
-        [self.welcomeLabel.leadingAnchor constraintEqualToAnchor:self.avatarImageView.trailingAnchor constant:14],
-        [self.welcomeLabel.centerYAnchor constraintEqualToAnchor:self.avatarImageView.centerYAnchor constant:-10],
-        [self.welcomeLabel.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-18],
-        
-        // 问候语
-        [self.greetingLabel.leadingAnchor constraintEqualToAnchor:self.welcomeLabel.leadingAnchor],
-        [self.greetingLabel.topAnchor constraintEqualToAnchor:self.welcomeLabel.bottomAnchor constant:4],
-        [self.greetingLabel.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-18],
+        // 两行欢迎句：头像右侧，整体相对头像纵轴居中
+        [self.welcomeStack.leadingAnchor constraintEqualToAnchor:self.avatarImageView.trailingAnchor constant:14],
+        [self.welcomeStack.centerYAnchor constraintEqualToAnchor:self.avatarImageView.centerYAnchor],
+        [self.welcomeStack.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-18],
     ]];
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    // Task136：圆形 MC 头像——圆角随实际尺寸取半（原 26 固定值对应 52×52）
+    CGFloat side = self.avatarImageView.bounds.size.height;
+    if (side > 0) {
+        self.avatarImageView.layer.cornerRadius = side / 2.0;
+    }
 }
 
 @end
@@ -985,12 +984,14 @@ static NSString *festivalGreeting(void) {
             NSString *name = self.currentUsername ?: localize(@"i18n_str_351", nil);
             cell.welcomeLabel.text = [NSString stringWithFormat:localize(@"i18n_str_352", nil), name];
             cell.greetingLabel.text = festivalGreeting();
-            cell.skinImageView.image = self.currentSkin ?: [UIImage systemImageNamed:@"person.fill"];
+            // Task136：头像接管最左位置；有真实 MC 头像时铺满裁剪，占位符时完整显示
             if (self.currentAvatar) {
                 cell.avatarImageView.image = self.currentAvatar;
+                cell.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
             } else {
                 cell.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
                 cell.avatarImageView.tintColor = [UIColor systemGrayColor];
+                cell.avatarImageView.contentMode = UIViewContentModeScaleAspectFit;
             }
             return cell;
         }
@@ -1207,7 +1208,8 @@ static NSString *festivalGreeting(void) {
             self.currentUsername = localize(@"i18n_str_351", nil);
         }
         
-        // 加载头像 (与右侧面板相同来源)
+        // 加载头像 (与右侧面板相同来源)。Task136：皮肤全身预览退场，
+        // 不再请求全身渲染图，主页顶卡只显示 MC 头像
         NSString *avatarURL = auth.authData[@"profilePicURL"];
         if (avatarURL) {
             avatarURL = [avatarURL stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
@@ -1222,18 +1224,9 @@ static NSString *festivalGreeting(void) {
                 }
             });
         }
-        
-        // 加载皮肤全身图 (原有API)
-        NSString *uuid = auth.authData[@"uuid"];
-        if (uuid) {
-            [self loadSkinForUUID:uuid];
-        } else {
-            [self loadDefaultSkin];
-        }
     } else {
         self.currentUsername = localize(@"i18n_str_357", nil);
         self.currentAvatar = nil;
-        [self loadDefaultSkin];
     }
     
     [self reloadProfileSection];

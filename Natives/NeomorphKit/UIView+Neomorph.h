@@ -25,10 +25,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface UIView (Neomorph)
 
-/// 凸出新拟物（默认圆角 12、阴影半径 6）：surface 底色 + 暗亮双外阴影
+/// 凸出新拟物（Task136 基准样式：圆角 50、阴影半径 10，超出元素半宽/半高自动夹断）：
+/// surface 底色 + 暗亮双外阴影
 - (void)nm_convex;
 
-/// 凸出新拟物，指定圆角；阴影半径默认取 圆角×0.5（下限 4）
+/// 凸出新拟物，指定圆角；阴影半径默认取 Task136 基准 10
 - (void)nm_convexRadius:(CGFloat)cornerRadius;
 
 /// 凸出新拟物，完整参数（shadowRadius 即库 style.shadowRadius：

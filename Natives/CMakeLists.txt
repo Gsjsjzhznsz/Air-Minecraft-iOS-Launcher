@@ -307,6 +307,7 @@ add_executable(AngelAuraAmethyst
   NeomorphKit/UIView+Neomorph.m
   NeomorphKit/NMToast.m
   NeomorphKit/UIViewController+NMPanel.m
+  NeomorphKit/NMContrast.m
 
   authenticator/BaseAuthenticator.m
   authenticator/LocalAuthenticator.m

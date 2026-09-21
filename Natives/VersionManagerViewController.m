@@ -620,14 +620,15 @@ static NSInteger const kSectionVersions    = 1;
         self.subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
         [self addSubview:self.subtitleLabel];
 
-        // 规范 7.1：计数 pill 徽章（右上角，accentColor 浅底）
+        // Task136：计数胶囊——尺寸对齐左侧两行文字块（高 24 ≈ 两行 12pt 字，
+        // 垂直居中于整块），宽度随字体自适应，圆角随高度取半（胶囊恒定）
         self.countBadge = [[UILabel alloc] init];
         self.countBadge.translatesAutoresizingMaskIntoConstraints = NO;
-        self.countBadge.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightBold];
+        self.countBadge.font = [UIFont systemFontOfSize:[ScreenUtils sp:12] weight:UIFontWeightSemibold];
         self.countBadge.textColor = [UIColor whiteColor];
         self.countBadge.textAlignment = NSTextAlignmentCenter;
         self.countBadge.backgroundColor = accentColor();
-        self.countBadge.layer.cornerRadius = 9;
+        self.countBadge.layer.cornerRadius = 12;
         self.countBadge.layer.cornerCurve = kCACornerCurveContinuous;
         self.countBadge.layer.masksToBounds = YES;
         self.countBadge.hidden = YES;
@@ -657,10 +658,11 @@ static NSInteger const kSectionVersions    = 1;
             [self.subtitleLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:2],
             [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18],
             [self.subtitleLabel.bottomAnchor constraintLessThanOrEqualToAnchor:self.bottomAnchor constant:-4],
-            // 计数徽章：右侧 18pt，顶部 8pt，最小宽度 18，高度 18
+            // 计数徽章：右侧 18pt（远离卡片边缘），垂直居中对齐左侧两行文字块，
+            // 高 24；宽度由字体自适应（文本保留单空格内边距）
             [self.countBadge.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18],
-            [self.countBadge.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
-            [self.countBadge.heightAnchor constraintEqualToConstant:18]
+            [self.countBadge.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
+            [self.countBadge.heightAnchor constraintEqualToConstant:24]
         ]];
     }
     return self;
