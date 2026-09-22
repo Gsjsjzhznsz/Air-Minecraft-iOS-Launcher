@@ -2,7 +2,7 @@
 
 ## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 143（2026-09-22）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
+> 最后更新：Task 144（2026-09-22）。此前：Task 143（2026-09-22）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -11,8 +11,8 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | edc96f6f（Task 143 三修复；ca9d11bb 为用户上传的装机日志 latestlog.txt/latestlog.old.txt——勿删，下轮判读源），CI #344 起 ~10-12 分钟/次 |
-| 最新 Task 号 | **143**（双会话并行开发，开新任务前先 fetch 避让编号） |
+| 远端 HEAD | 171006ce（Task 144 七修复），CI run 35737215334 绿，IPA 产物可下载 |
+| 最新 Task 号 | **144**（双会话并行开发，开新任务前先 fetch 避让编号） |
 | 待用户装机验证 | Task 141 七项 UI + Task 142 渲染器分层七锚点 + **Task 143 三修复**（后端落盘 / FSR 常量 / 单 mg 列表，见 Task 143 Stage Summary） |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清），与基线对拍判读 |
 
@@ -26,7 +26,8 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - CI 轮询: `TOKEN=$(git remote get-url origin | sed -n 's\|https://[^:]*:\([^@]*\)@.*\|\1\|p')` + `/actions/runs?per_page=N` API；失败先拉 job log grep "error:"
 - 产物: artifact `com.air-devs.air-ios.ipa`（另有 trollstore .tipa / dSYM）
 - l10n: en/zh-CN/zh-Hans/zh-Hant 四语言键集一致，基线 1924
-- 用户日志: `/home/z/my-project/upload/`（hs_err_pid*.log / latestlog.txt）
+- 用户日志: 直接推仓库根 latestlog* 系列（勿删）；`/home/z/my-project/upload/` 为旧渠道（hs_err_pid*.log）
+- 装机日志轮换映射（Task 144 时点）：latestlog.txt=Mithril(4.0) 崩溃会话 / latestlog.old.txt=MobileGL-gles(ES) 会话 / latestlog=Forge 安装会话 / latestlog.old=OSMesa(zink) 会话
 
 ### 高频方法论（细节查 archive）
 - hs_err 判读：信号类型 / si_addr（ASCII 字节=UAF 或字符串当指针；地址截断=ABI 错位）/ pc 崩溃帧 / free stack 排除栈溢出；latestlog 管道会丢尾，截断点 ≠ 崩溃点
@@ -148,3 +149,35 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - 动作：① 速览节置顶（状态表/双会话协作规则/关键命令/方法论/检索指引）；② Tasks 34-140 原文归档 worklog-archive.md（2257 行）；③ Task 141/142 原文保留本文件
 - 配套重锚：9 个验证器的 worklog 内容检查改为兼容 worklog-archive.md（92/93/96/97/98/101/102/111/119_124，python 定点替换）
 - 验证：96/98/111/119_124 本地全绿；92/93/101/102 的条目在重构前即缺失（历史丢失，非本次回归，且不在 CI 集内）
+
+---
+
+## Task 144（本会话，装机日志四 bug 根修 + 渲染器 UX 七项）
+
+### 用户反馈（9aa15c8 构建装机实况，日志直接推仓库根 403a4597/5b38fd72/c8221ad3）
+"把mg改成全名。切换其他渲染器还是会变成mg。es后端方块不渲染。4.0后端闪退。forge安装闪退。还有优化一下自动渲染器机制。最后我排查软件自动选择mg问题发现为什么我版本有2个一模一样的版本，而这个版本不会回退mg可以使用zink等其他渲染器启动，赶快恢复一下为什么会有2个一模一样的版本。"
+
+### 根因（逐条日志/字节码实锤）
+1. **4.0(Mithril) 后端闪退**：`GL.createCapabilities` 抛 "There is no OpenGL context current in the current thread"（latestlog.txt）。反编译补丁版 lwjgl-opengl.jar（新工具 scripts/disasm.py，沙箱无 javap）：补丁 createCapabilities 在调渲染器 dylib 的 glGetString(GL_VERSION) 探针前，唯一重绑上下文的门是 `System.getenv("POJAV_RENDERER") != null -> GL.fixPojavGLContext()`（反射 GLFW.glfwMakeContextCurrent(GLFW.mainContext)）。我们只导出 AMETHYST_RENDERER -> 补丁是死代码 -> 渲染线程无上下文绑定时 Mithril（线程绑定模型）glGetString 返 NULL -> 抛异常。MobileGL-gles/OSMesa 全局单上下文模型混过探针（ES 方块不渲染 = 渲染线程状态未绑定的同根嫌疑）。
+2. **ES 后端方块不渲染**：同一根因家族；另 init_loadMobileGluesConfig 白名单（mobileglues/auto/vulkan）不含 mg/家族键 -> config.json + MG_DIR_PATH 从未写入（日志 "MobileGlues config not written"），MobileGlues 分区用户偏好对 mg 会话全失效。
+3. **Forge 安装闪退**：latestlog 14k 行 —— 处理器 4/4 全部成功、进度 0.85 时安装器 JVM 的 libjli 内部线程调 exit(0)，与启动器同进程 -> 整 app 被带走（Task 48 hooked_exit 取证栈实锤 libjli dummyTimer 帧）。
+4. **"切换渲染器还是变 mg"**：日志证据（latestlog.old 20:43）用户连选两次 `Task140: renderer written to PROFILE ONLY = mg / = libOSMesa.8.dylib`（zink 存储键即 libOSMesa.8.dylib，20:44 会话真用 Mesa 启动）—— 写入/启动链路实际已通；困惑源 = ①"mg" 名字不透明 ②follow-global OFF 默认给 mg ③与旧 App 行为对比。
+5. **"2 个一模一样的版本"**：commit 9659740a（2026-07-24）包名 org.angelauramcremastered.amethyst -> com.air-devs.air，iOS 视为不同 App，新 IPA 不覆盖旧装 -> 主屏双图标并存（旧图标 = 旧代码 + 旧偏好容器，所以它"能用 zink"）。非本仓库 bug；删除旧图标即消除。
+
+### 修复（8 代码文件 + 1 新工具 + 7 验证器重锚，l10n 键集 1924 不动；commit 171006ce）
+- **JavaLauncher.m**：①launchJVM 导出 `POJAV_RENDERER`（与 AMETHYST_RENDERER 同值：主导出点 + "Preset OpenGL libname" 处防御同步）激活 LWJGL fixPojavGLContext —— Mithril 闪退根修；②init_loadMobileGluesConfig 改读 ame_effective_renderer()，白名单 +家族三键（mg 家族 config.json + MG_DIR_PATH 修复）；③自动渲染器升级：minVersion>8（MC 1.17+）且 libMobileGL.dylib 在位 -> auto 解析为 MobileGL Vulkan 直连（装机验证最快路径；旧"always ANGLE"顾虑 = config 缺失已修），否则 ANGLE 回退；layerClass 侧 auto/MobileGL 均 CAMetalLayer，Task124 约束不受影响。
+- **egl_bridge.m**：④三处 setenv(AMETHYST_RENDERER) 同步导出 POJAV_RENDERER；⑤pojavGetCurrentContext 渲染线程上下文采纳兜底（TLS 空 + ame_brLastCurrent 非空 + 非主线程 -> pojavMakeCurrent 迁移上下文）；⑥ame_brCurrent/ame_brLastCurrent 唯一 TLS 定义点。
+- **bridge_tbl.h**：`static __thread currentBundle` 头文件定义退役（每 TU 一份副本、egl_bridge 那份恒 NULL -> pojavGetCurrentContext 恒空的病历见注释）-> extern 共享 TLS + br_get_current/br_set_current。
+- **gl_bridge.m / osm_bridge.mm**：currentBundle 全量改走 br_get_current/br_set_current（机械替换 18+21 处，括号 delta 与 HEAD 逐文件一致）。
+- **main_hook.m + JavaLauncher.h + ForgeProcessorExecutor.m**：⑦Forge 闪退根治 —— `atomic_int g_ame_suppressJvmExit`（launchHeadlessJVM 前后置位/清零），hooked_exit 命中标志且非主线程 -> pthread_exit(NULL) 只终结 JVM 线程（JLI ContinueInNewThread 的 join 正常返回 -> status.json 判定安装成败），游戏正常退出路径不受影响。
+- **l10n x4 + VersionManagerViewController**：⑧renderer.debug.mgfamily 值 "mg" -> "MobileGlues"（用户指令"把mg改成全名"；逻辑键 RENDERER_KEY_MG="mg" 不动）；VersionManager 短名映射同改。
+- **AppDelegate.m**：⑨旧包检测（NSClassFromString LSApplicationWorkspace + applicationIsInstalled:，@try 防御）—— 命中 org.angelauramcremastered.amethyst 打日志提示删旧图标（日志级，零 UI 噪音）。
+- **scripts/disasm.py**：新最小 JVM class 反汇编器（常量池 + 字节码取证，无 javap 环境）。
+- **验证器重锚（日志轮换 403a4597/5b38fd72/c8221ad3 所致）**：task140 G 块、task138 A1/A2/C1、task132 A1/A2、task133 B1/log 源、task134 E4b -> 锚定现日志映射与 Task143 修复生效证据；task137 G3 +mgfamily diff 分支；task142 F5 -> @"MobileGlues"。
+
+### 校验
+- 136=63/63、137=46/46、138=51/51、140=58/58、142=49/49、143=31/31 全绿；129/130/131/132(A15/F4/F5)/133(H1/H2)/134/141 剩余失败逐项核对 = 既有环境性同类（task116_l10n_audit.py / task132_jna_got_mirror.py 会话本地脚本被沙箱清除 + 112-118/119-124/125-128 级联 + task141 硬编码另一会话绝对路径），**零新增失败**。
+
+### Stage Summary
+- 装机待验证锚点：①选 Mithril(4.0 后端) 进游戏不再闪退（日志见 POJAV_RENDERER 导出 + 正常起图）；②ES 后端进世界方块渲染恢复（若仍复现，下轮抓 MGL 前端 GLES 行）；③Forge 安装走完 100%（不再 85% 闪退，日志出现 `Task144: exit(0) suppressed during headless JVM`）；④渲染器列表显示 "MobileGlues" 全名（不再裸 "mg"）；⑤选"自动" + MC 1.17+ -> 日志 `Auto renderer resolved to libMobileGL.dylib (modern MC...)`；⑥mg 会话日志不再出现 `MobileGlues config not written`；⑦旧包并存检测日志 `Task144: legacy bundle ... still installed`；⑧zink/gl4es/angle 切换保持 Task142/143 行为。
+- 用户须知：双图标在仓库侧不可修（旧 App 独立容器）——主屏删除旧版 "AngelAuraAmethyst" 即可；新 App 数据不受影响。
