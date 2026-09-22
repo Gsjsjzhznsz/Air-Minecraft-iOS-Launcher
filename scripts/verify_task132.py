@@ -233,8 +233,8 @@ for lang in langs:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
-check("F1 四语言键集一致（Task140 基线 1920 = Task139 的 1918 + 跟随全局/阴影提示 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1920,
+check("F1 四语言键集一致（Task141 基线 1922 = Task140 的 1920 + 内存弹窗 2）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1922,
       f"counts={[len(s) for s in sets]}")
 newkeys = ["preference.title.renderer_backend",
            "preference.detail.renderer_backend",

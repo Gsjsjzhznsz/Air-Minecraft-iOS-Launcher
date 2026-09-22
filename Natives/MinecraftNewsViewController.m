@@ -244,8 +244,12 @@ static const NSInteger kNewsPageSize = 24;
     self.collectionView.dataSource = self;
     self.collectionView.delegate = self;
     self.collectionView.alwaysBounceVertical = YES;
+    // Task141：确保不能左右滑（用户实测新闻页"左右也有点空隙"且疑似可横向拖动）
+    self.collectionView.alwaysBounceHorizontal = NO;
     [self.collectionView registerClass:[MCNewsCollectionViewCell class] forCellWithReuseIdentifier:@"NewsCell"];
-    self.collectionView.contentInset = UIEdgeInsetsMake(8, 8, 8, 8);
+    // Task141：左右贴边（用户要求"检测屏幕大小并贴于窗口"）——侧边 inset 退役，
+    // 仅保留上下 8pt 呼吸；卡片宽度由布局改为 fractional 1.0 随屏幕自适应
+    self.collectionView.contentInset = UIEdgeInsetsMake(8, 0, 8, 0);
     [self.view addSubview:self.collectionView];
 
     self.refreshControl = [[UIRefreshControl alloc] init];
@@ -333,8 +337,11 @@ static const NSInteger kNewsPageSize = 24;
     // 构造方法为 -initWithSectionProvider:configuration:（不是 +layoutWithConfiguration:sectionProvider:）
     CGFloat cardHeight = [self newsCardFixedHeight];
     return [[UICollectionViewCompositionalLayout alloc] initWithSectionProvider:^NSCollectionLayoutSection *(NSInteger sectionIndex, id<NSCollectionLayoutEnvironment> env) {
-        // 双列布局，每列等宽；高度为固定绝对值（不再用 estimated 触发自适应调长）
-        NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:0.5]
+        // Task141：单列贴边（用户实测旧双列布局组宽 1.0 但子项仅 0.5 且只有一项，
+        // 卡片贴左半宽、右侧留白，观感"不是连贯的上下滑动"）。现卡片宽度 =
+        // fractional 1.0（随屏幕尺寸自适应、贴于窗口），纵向连贯滚动；
+        // 高度仍为固定绝对值（Task136 等高机制不变，不再自适应调长）
+        NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:1.0]
                                                                             heightDimension:[NSCollectionLayoutDimension absoluteDimension:cardHeight]];
         NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
 

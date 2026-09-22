@@ -1363,15 +1363,9 @@ void ame139_fsr_heal_reset_input_scale(void) {
     // 必须与 JavaLauncher.m 中 launchJVM 的 allocmem 计算保持一致，
     // 否则会出现 Jetsam 上限 < JVM Xmx + native 开销 的情况，
     // 导致系统在 JVM 启动阶段 SIGKILL 进程（日志表现为 "XPC connection interrupted"）。
-    int allocmem;
-    if (getPrefBool(@"java.auto_ram")) {
-        // Task68: 与 JavaLauncher.m launchJVM 的 allocmem 计算同步 0.4 -> 0.5
-        // （MC 26.3 内存足迹上调自动内存默认；两处必须逐字一致，否则 Jetsam 上限错位 → 启动期 SIGKILL）。
-        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
-        allocmem = roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
-    } else {
-        allocmem = (int)getPrefInt(@"java.allocated_memory");
-    }
+    // Task141：两处现读同一共享助手 ame141_currentLaunchAllocMem（实例内存拉条
+    // 决定，未设置时回退自动比例）—— 从结构上保证一致，不再依赖人工逐字同步。
+    int allocmem = ame141_currentLaunchAllocMem();
     // 1024 MB 留给 JVM native 堆 + UIKit/Metal/EGL 等非 Java 堆开销。
     int limit = allocmem + 1024;
     if (memorystatus_control(MEMORYSTATUS_CMD_SET_JETSAM_TASK_LIMIT, getpid(), limit, NULL, 0) == -1) {

@@ -342,6 +342,20 @@ void ame67_sanitizeOptionsKeybinds(void);
 const bool *Ame66GetKbState(void);
 int Ame66GetKbNumKeys(void);
 
+// ============================================================================
+// Task141: launch-time memory resolution (single shared source of truth).
+// Returns the JVM -Xmx in MB for the CURRENT selected instance: the
+// per-instance memory slider (instance editor > Advanced > Memory) decides;
+// when the profile carries no value (0), fall back to the same auto ratio
+// as before (0.5 of physical memory with the memorystatus entitlement,
+// 0.25 without). The global Settings rows java.auto_ram /
+// java.allocated_memory are retired from the UI (user decree) — BOTH
+// call sites (JavaLauncher -Xmx and SurfaceViewController Jetsam limit)
+// MUST read through this helper so they stay in lockstep (Task68 lesson:
+// mismatched Jetsam limit vs Xmx = launch-time SIGKILL).
+// ============================================================================
+int ame141_currentLaunchAllocMem(void);
+
 #ifdef __cplusplus
 }
 #endif

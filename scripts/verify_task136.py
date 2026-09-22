@@ -161,7 +161,7 @@ check("E3  半透明边框样式保留（2.5pt white@0.35）+ 圆形裁剪 masks
       and "colorWithWhite:1.0 alpha:0.35" in home
       and "avatarImageView.layer.masksToBounds = YES" in home)
 check("E4  两行欢迎句 stack 相对头像纵轴居中（centerY = avatar.centerY）",
-      "initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]" in home
+      "initWithArrangedSubviews:@[self.welcomeLabel, self.announceRowStack]" in home
       and re.search(r"welcomeStack\.centerYAnchor constraintEqualToAnchor:self\.avatarImageView\.centerYAnchor\]", home))
 check("E5  头像圆角随尺寸取半（layoutSubviews 动态）",
       "avatarImageView.layer.cornerRadius = side / 2.0" in home)

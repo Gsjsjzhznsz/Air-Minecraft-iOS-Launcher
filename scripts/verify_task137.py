@@ -351,6 +351,11 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       # 提交后 diff 清空走第二分支自愈。
       or all(("renderer_follow_global" in l or "renderer_shadowed_by_profile" in l
               or "hide_controls" in l or "renderer_backend" in l)
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task141 重锚：本轮新增 memory.current/memory.apply 两键（4 语言 8 行
+      # + 注释行），提交前 diff 形态一并接受；提交后 diff 清空走第二分支自愈。
+      or all(("memory.current" in l or "memory.apply" in l
+              or l.lstrip("+").strip().startswith("/*") or l.strip() == "+")
              for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",

@@ -1352,20 +1352,12 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     setenv("JAVA_HOME", javaHome.UTF8String, 1);
     NSLog(@"[JavaLauncher] JAVA_HOME has been set to %@", javaHome);
 
-    int allocmem;
-    if (getPrefBool(@"java.auto_ram")) {
-        // Task68: auto_ratio 0.4 -> 0.5（memorystatus entitlement 设备）。
-        // 依据（Task60/67 日志实测）：MC 26.3 进世界进程内存 1.2GB -> 3.1GB（视距 32 会话），
-        // 恢复原生 2x 分辨率后预计峰值 3.6-4.0GB；旧默认 0.4（8GB 设备 = 2967MB）在区块加载
-        // 分配风暴期 heap 余量过薄，GC 停顿是「加载区块即卡顿」的候选主因之一。
-        // 0.5（8GB 设备 = 3709MB）后：Jetsam task limit = 3709 + 1024 = 4733MB，
-        // 仍低于物理内存（约 7.4GB）与 5GB increased-memory-limit 上限，安全边界不变。
-        // 注意：本计算必须与 SurfaceViewController.m updateJetsamControl 保持一致（Task68 同步修改）。
-        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
-        allocmem = roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
-    } else {
-        allocmem = getPrefInt(@"java.allocated_memory");
-    }
+    // Task141：启动内存由当前实例的内存分配决定（实例管理 > 高级设置 > 内存分配拉条）。
+    // 旧全局链 java.auto_ram / java.allocated_memory 退役（设置页两行已删）。
+    // 实例未设置时回退到原自动比例（0.5/0.25）。本计算与 SurfaceViewController
+    // updateJetsamControl 必须一致 —— 两处现读同一共享助手 ame141_currentLaunchAllocMem
+    // （Task68 教训：Jetsam 上限与 Xmx 错位 = 启动期 SIGKILL，从结构上消除漂移）。
+    int allocmem = ame141_currentLaunchAllocMem();
     NSLog(@"[JavaLauncher] Max RAM allocation is set to %d MB", allocmem);
     if (!validateVirtualMemorySpace(allocmem)) {
         UIKit_returnToSplitView();

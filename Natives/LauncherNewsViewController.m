@@ -387,7 +387,12 @@ static NSString *festivalGreeting(void) {
 // 小头像与 skinImageView 均已退场
 @property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UILabel *welcomeLabel;
-@property (nonatomic, strong) UILabel *greetingLabel;
+// Task141：第二行改为「公告标题行」——喇叭图标 + 公告标题（字号与欢迎语一致）
+// + 查看详情按钮（公告卡同款）；无公告数据时回退为原问候语（灰字）。
+@property (nonatomic, strong) UIImageView *announceIconView;
+@property (nonatomic, strong) UILabel *announceLabel;
+@property (nonatomic, strong) UIButton *detailButton;
+@property (nonatomic, strong) UIStackView *announceRowStack;
 @property (nonatomic, strong) UIStackView *welcomeStack;
 @end
 
@@ -429,16 +434,50 @@ static NSString *festivalGreeting(void) {
     self.welcomeLabel.adjustsFontSizeToFitWidth = YES;
     self.welcomeLabel.minimumScaleFactor = 0.7;
     
-    // 节日/时段问候
-    self.greetingLabel = [[UILabel alloc] init];
-    self.greetingLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    self.greetingLabel.textColor = [UIColor secondaryLabelColor];
-    self.greetingLabel.numberOfLines = 1;
+    // Task141：第二行 = 公告标题行（喇叭图标 + 标题 + 查看详情按钮）。
+    // 字号与欢迎语句一致（21pt bold）；按钮与公告卡片同款（蓝底白字圆角）。
+    // 无公告数据时由 cellForItem 回退为原问候语（14pt 灰字、图标按钮隐藏）。
+    self.announceIconView = [[UIImageView alloc] init];
+    self.announceIconView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.announceIconView.contentMode = UIViewContentModeScaleAspectFit;
+    self.announceIconView.image = [UIImage systemImageNamed:@"megaphone.fill"];
+    self.announceIconView.tintColor = colorFromHex(@"#3B82F6");
+    self.announceIconView.hidden = YES;
+    
+    self.announceLabel = [[UILabel alloc] init];
+    self.announceLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.announceLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];
+    self.announceLabel.textColor = [UIColor labelColor];
+    self.announceLabel.numberOfLines = 1;
+    // Task141 对齐用户指令：标题永不省略号截断，空间不足时缩小字号
+    self.announceLabel.adjustsFontSizeToFitWidth = YES;
+    self.announceLabel.minimumScaleFactor = 0.6;
+    
+    self.detailButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.detailButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.detailButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    self.detailButton.layer.cornerRadius = 8;
+    self.detailButton.layer.cornerCurve = kCACornerCurveContinuous;
+    self.detailButton.clipsToBounds = YES;
+    self.detailButton.hidden = YES;
+    
+    self.announceRowStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.announceIconView, self.announceLabel, self.detailButton]];
+    self.announceRowStack.translatesAutoresizingMaskIntoConstraints = NO;
+    self.announceRowStack.axis = UILayoutConstraintAxisHorizontal;
+    self.announceRowStack.alignment = UIStackViewAlignmentCenter;
+    self.announceRowStack.spacing = 8;
+    [self.announceIconView setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.announceIconView setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.detailButton.setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.detailButton.setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.detailButton.widthAnchor constraintGreaterThanOrEqualToConstant:88].active = YES;
+    [self.detailButton.heightAnchor constraintEqualToConstant:28].active = YES;
+    [self.announceIconView.widthAnchor constraintEqualToConstant:18].active = YES;
+    [self.announceIconView.heightAnchor constraintEqualToConstant:18].active = YES;
     
     // Task136：两行欢迎句组成纵向 stack，整体相对头像纵轴居中
-    // （不再沿用原先相对小头像的 -10pt 上偏链）
-    self.welcomeStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]];
+    // Task141：第二行由问候语换为公告标题行（见上）
+    self.welcomeStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.welcomeLabel, self.announceRowStack]];
     self.welcomeStack.translatesAutoresizingMaskIntoConstraints = NO;
     self.welcomeStack.axis = UILayoutConstraintAxisVertical;
     self.welcomeStack.alignment = UIStackViewAlignmentLeading;
@@ -1034,15 +1073,48 @@ static NSString *festivalGreeting(void) {
             
             NSString *name = self.currentUsername ?: localize(@"i18n_str_351", nil);
             cell.welcomeLabel.text = [NSString stringWithFormat:localize(@"i18n_str_352", nil), name];
-            cell.greetingLabel.text = festivalGreeting();
-            // Task136：头像接管最左位置；有真实 MC 头像时铺满裁剪，占位符时完整显示
+            // Task141：第二行改为公告标题行（喇叭图标 + 公告标题 21pt bold + 公告卡同款查看详情按钮）。
+            // 无公告数据时回退为原问候语（14pt 灰字，图标按钮隐藏）。
+            AnnouncementItem *ann = self.latestAnnouncement;
+            if (ann.title.length > 0) {
+                cell.announceIconView.hidden = NO;
+                cell.announceLabel.text = ann.title;
+                cell.announceLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];
+                cell.announceLabel.textColor = [UIColor labelColor];
+                if (ann.actionURL.length > 0 && ann.actionTitle.length > 0) {
+                    cell.detailButton.hidden = NO;
+                    [cell.detailButton setTitle:ann.actionTitle forState:UIControlStateNormal];
+                    [cell.detailButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+                    cell.detailButton.backgroundColor = colorFromHex(@"#3B82F6");
+                    [cell.detailButton removeTarget:nil action:nil forControlEvents:UIControlEventAllEvents];
+                    [cell.detailButton addTarget:self action:@selector(openAnnouncementActionURL) forControlEvents:UIControlEventTouchUpInside];
+                } else {
+                    cell.detailButton.hidden = YES;
+                }
+            } else {
+                cell.announceIconView.hidden = YES;
+                cell.detailButton.hidden = YES;
+                cell.announceLabel.text = festivalGreeting();
+                cell.announceLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+                cell.announceLabel.textColor = [UIColor secondaryLabelColor];
+            }
+            // Task136：头像接管最左位置；有真实 MC 头像时铺满裁剪。
+            // Task141：无头像（未选择账号/本地账户）时使用与应用列表同款的
+            // DefaultAccount 默认头像（此前 SF person 占位符在白卡上观感"空白"）
             if (self.currentAvatar) {
                 cell.avatarImageView.image = self.currentAvatar;
                 cell.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
             } else {
-                cell.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
-                cell.avatarImageView.tintColor = [UIColor systemGrayColor];
-                cell.avatarImageView.contentMode = UIViewContentModeScaleAspectFit;
+                UIImage *defaultAvatar = [UIImage imageNamed:@"DefaultAccount"];
+                if (defaultAvatar) {
+                    cell.avatarImageView.image = defaultAvatar;
+                    cell.avatarImageView.tintColor = nil;
+                    cell.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
+                } else {
+                    cell.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
+                    cell.avatarImageView.tintColor = [UIColor systemGrayColor];
+                    cell.avatarImageView.contentMode = UIViewContentModeScaleAspectFit;
+                }
             }
             return cell;
         }

@@ -73,7 +73,10 @@
         self.versionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
         self.versionLabel.textColor = [UIColor labelColor];
         self.versionLabel.adjustsFontSizeToFitWidth = YES;
-        self.versionLabel.minimumScaleFactor = 0.7;
+        // Task141：缩小下限 = 12/16 = 0.75 —— 用户实测"主标题字号比时间灰字还小"
+        // 根因：旧下限 0.7 允许标题缩到 11.2pt < 日期 12pt；现在标题最小渲染尺寸
+        // 与日期一致（极端长版本号时两者同字号），不再出现"标题比灰字小"。
+        self.versionLabel.minimumScaleFactor = 0.75;
         self.versionLabel.lineBreakMode = NSLineBreakByTruncatingTail;
         // 版本号 hugging 高（不主动拉伸），compression 低（空间不足时优先被压缩→触发字号缩小）
         [self.versionLabel setContentHuggingPriority:UILayoutPriorityDefaultHigh forAxis:UILayoutConstraintAxisHorizontal];
@@ -174,10 +177,13 @@
             [self.typeLabel.centerYAnchor constraintEqualToAnchor:self.cardContainer.centerYAnchor],
             [self.typeLabel.heightAnchor constraintEqualToConstant:24],
 
-            // 日期：与顶行 stack 左对齐，紧跟顶行下方 +3
+            // 日期：与顶行 stack 左对齐，紧跟顶行下方 +3。
+            // Task141：右侧改锚到 chevron 左侧 8pt（不再锚到顶行 stack 尾部——
+            // 旧约束让日期宽度被短版本号拖窄，"2026年5月1日"被截成"2026-…"；
+            // 贴齐卡片右缘后 12pt 日期完整显示，超出时缩字不截断）
             [self.dateLabel.leadingAnchor constraintEqualToAnchor:self.topRowStack.leadingAnchor],
             [self.dateLabel.topAnchor constraintEqualToAnchor:self.topRowStack.bottomAnchor constant:3],
-            [self.dateLabel.trailingAnchor constraintEqualToAnchor:self.topRowStack.trailingAnchor],
+            [self.dateLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
             [self.dateLabel.bottomAnchor constraintLessThanOrEqualToAnchor:self.cardContainer.bottomAnchor constant:-12],
 
             // chevron：右侧 -14，垂直居中，14x14

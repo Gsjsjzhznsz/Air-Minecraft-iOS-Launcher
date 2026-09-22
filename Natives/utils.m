@@ -15,6 +15,7 @@
 
 #include "utils.h"
 #import "LauncherPreferences.h"
+#import "PLProfiles.h"
 
 CFTypeRef SecTaskCopyValueForEntitlement(void* task, NSString* entitlement, CFErrorRef  _Nullable *error);
 void* SecTaskCreateFromSelf(CFAllocatorRef allocator);
@@ -659,4 +660,26 @@ BOOL DeviceHasJITFlags(JITFlags flags) {
 
 void dismissModalViewController(UIViewController *viewController) {
     [viewController.navigationController dismissViewControllerAnimated:YES completion:nil];
+}
+
+// ============================================================================
+// Task141: launch-time memory resolution (see utils.h for the contract).
+// Instance slider (profile allocatedMemory) first; untouched profiles fall
+// back to the pre-Task141 auto ratio (java.auto_ram UI retired).
+// ============================================================================
+int ame141_currentLaunchAllocMem(void) {
+    @try {
+        NSDictionary *profile = [PLProfiles current].selectedProfile;
+        NSInteger mem = [profile[@"allocatedMemory"] integerValue];
+        if (mem > 0) {
+            NSLog(@"[Task141] launch memory from instance profile: %ld MB", (long)mem);
+            return (int)mem;
+        }
+    } @catch (NSException *e) {
+        NSLog(@"[Task141] instance memory read failed (%@), falling back to auto ratio", e);
+    }
+    CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
+    int mem = (int)roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
+    NSLog(@"[Task141] launch memory from auto ratio: %d MB", mem);
+    return mem;
 }

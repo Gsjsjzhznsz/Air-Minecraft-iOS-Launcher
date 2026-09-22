@@ -1367,31 +1367,11 @@
                 @"type": self.typeTextField,
                 @"enableCondition": whenNotInGame
             },
-            @{@"key": @"auto_ram",
-                @"hasDetail": @YES,
-                @"icon": @"slider.horizontal.3",
-                @"type": self.typeSwitch,
-                @"enableCondition": whenNotInGame,
-                @"warnCondition": ^BOOL(){
-                    return !isJailbroken;
-                },
-                @"warnKey": @"auto_ram_warn",
-                @"requestReload": @YES
-            },
-            @{@"key": @"allocated_memory",
-                @"hasDetail": @YES,
-                @"icon": @"memorychip",
-                @"type": self.typeSlider,
-                @"min": @(250),
-                @"max": @((NSProcessInfo.processInfo.physicalMemory / 1048576) * 0.85),
-                @"enableCondition": ^BOOL(){
-                    return !getPrefBool(@"java.auto_ram") && whenNotInGame();
-                },
-                @"warnCondition": ^BOOL(DBNumberedSlider *view){
-                    return view.value >= NSProcessInfo.processInfo.physicalMemory / 1048576 * 0.37;
-                },
-                @"warnKey": @"mem_warn"
-            }
+            // Task141：全局内存两行（java.auto_ram「自动调整内存分配」开关 +
+            // java.allocated_memory「内存分配(MB)」滑条）按用户指令删除——
+            // 启动内存现由当前实例的内存分配拉条决定
+            //（实例管理 > 高级设置 > 内存分配；JavaLauncher/SurfaceVC 经
+            // ame141_currentLaunchAllocMem 读取），全局行不再参与决策。
         ], @[
             // Debug settings - only recommended for developer use
             @{@"icon": @"ladybug"},

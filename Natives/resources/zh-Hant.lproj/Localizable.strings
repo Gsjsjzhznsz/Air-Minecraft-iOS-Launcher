@@ -2082,3 +2082,7 @@
 /* Task 128：第三方帳戶令牌過期的優雅回退提示 */
 "login.3rdparty.stale.title" = "已選擇該帳戶（登入狀態已過期）";
 "login.3rdparty.stale.message" = "皮膚與聯機驗證可能不可用，重新登入該帳戶即可恢復完整功能。";
+
+/* Task 141: instance memory slider popup */
+"memory.current" = "目前記憶體：%ldMB";
+"memory.apply" = "確定";

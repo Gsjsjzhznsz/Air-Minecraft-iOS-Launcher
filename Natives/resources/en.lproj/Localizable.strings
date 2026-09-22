@@ -2086,3 +2086,7 @@
 /* Task 128: third-party account stale-token graceful fallback */
 "login.3rdparty.stale.title" = "Signed in with an expired session";
 "login.3rdparty.stale.message" = "Skins and server authentication may not work. Re-login on this account to restore full access.";
+
+/* Task 141: instance memory slider popup */
+"memory.current" = "Current memory: %ldMB";
+"memory.apply" = "Apply";
