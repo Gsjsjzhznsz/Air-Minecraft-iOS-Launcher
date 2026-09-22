@@ -201,7 +201,7 @@ check("G3 哈希防误伤（假想以 26 开头的十六进制哈希不吃年份
 
 print("===== H. 仓库卫生 =====")
 check("H1 工作日志含 Task 98 条目",
-      "Task ID: 98" in read("worklog.md"))
+      "Task ID: 98" in read("worklog.md") + read("worklog-archive.md"))
 check("H2 本验证器自身在 scripts/ 下",
       os.path.exists(os.path.join(REPO, "scripts", "verify_task98.py")))
 check("H3 verify_task87 B1/G1 已重锚（helper 调用 + 18 用例含 loader 前缀形态）",

@@ -186,7 +186,7 @@ print("===== F. 仓库卫生 =====")
 check("F1 三文件无 Task96/ame96 残留（改号干净）",
       not re.search(r"Task96|ame96_|task96", jl + helpvc + vh))
 check("F2 工作日志含 Task 97 条目",
-      "Task ID: 97" in read("worklog.md"))
+      "Task ID: 97" in read("worklog.md") + read("worklog-archive.md"))
 check("F3 本验证器自身在 scripts/ 下",
       os.path.exists(os.path.join(REPO, "scripts", "verify_task97.py")))
 

@@ -225,7 +225,7 @@ print("=" * 72)
 check("F1  math.h 导入（fabs 居中钳制依赖，显式声明不赌传递包含）",
       "#include <math.h>" in rp)
 check("F2  仓库 worklog 含 Task 102 条目",
-      os.path.exists(os.path.join(REPO, "worklog.md")) and "Task ID: 102" in read("worklog.md"))
+      os.path.exists(os.path.join(REPO, "worklog.md")) and "Task ID: 102" in read("worklog.md") + read("worklog-archive.md"))
 check("F3  无未提交改动（提交后自然通过）",
       git(["status", "--porcelain"]).stdout.strip() == "",
       git(["status", "--porcelain"]).stdout.strip()[:200])

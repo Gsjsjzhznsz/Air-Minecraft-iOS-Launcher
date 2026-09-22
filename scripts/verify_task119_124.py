@@ -160,9 +160,16 @@ check("D1 layerClass 注释含事故链（naturalDrawableSizeMVK -> NSInvalidArg
       "naturalDrawableSizeMVK" in gsv and "NSInvalidArgumentException" in gsv)
 check("D2 gl_bridge 诊断探针（MobileGL + drawableSize 零值预警）",
       "Task124 WARN: MobileGL CAMetalLayer drawableSize still zero" in gb)
-check("D3 崩溃判读入档 worklog（Task 124 条目）",
-      "Task ID: 124" in rd("../worklog.md") if os.path.exists(os.path.join(REPO, "../worklog.md")) else
-      "Task ID: 124" in rd("/home/z/my-project/worklog.md"))
+def _ame_read_worklog(path):
+    try:
+        return rd(path)
+    except OSError:
+        return ""
+
+check("D3 崩溃判读入档 worklog（Task 124 条目；2026-09-22 瘦身后明细在 worklog-archive.md）",
+      any("Task ID: 124" in _ame_read_worklog(p)
+          for p in ("../worklog.md", "/home/z/my-project/worklog.md",
+                    "worklog-archive.md")))
 
 print("== E. 语法门 ==")
 def balance(src):

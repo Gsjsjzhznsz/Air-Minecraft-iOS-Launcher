@@ -250,7 +250,7 @@ check("F4  七卡顺序与配色变量保持（cardGreen/cardBlue/cardOrange/car
 check("F5  ARC 出参签名保持（Task98 修复不被回退）",
       "UILabel * __strong *)outValueLabel" in rp)
 check("F6  仓库 worklog 含 Task 101 条目",
-      os.path.exists(os.path.join(REPO, "worklog.md")) and "Task ID: 101" in read("worklog.md"))
+      os.path.exists(os.path.join(REPO, "worklog.md")) and "Task ID: 101" in read("worklog.md") + read("worklog-archive.md"))
 check("F7  无未提交改动（提交后自然通过）",
       git(["status", "--porcelain"]).stdout.strip() == "",
       git(["status", "--porcelain"]).stdout.strip()[:200])

@@ -212,7 +212,7 @@ check("E1  无未提交改动（提交后自然通过）",
       git(["status", "--porcelain"]).stdout.strip()[:200])
 check("E2  仓库 worklog 含 Task 92 条目",
       os.path.exists(os.path.join(REPO, "worklog.md")) and
-      "Task ID: 92" in read("worklog.md"))
+      "Task ID: 92" in read("worklog.md") + read("worklog-archive.md"))
 
 print()
 print("=" * 72)

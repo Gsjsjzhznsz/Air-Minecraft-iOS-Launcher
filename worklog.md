@@ -11,7 +11,7 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | b99a692d（Task 142 repo entry），CI run #340 绿（~10-12 分钟/次） |
+| 远端 HEAD | 3400211d（worklog 瘦身 + verify 重锚），CI #340 前绿（~10-12 分钟/次） |
 | 最新 Task 号 | **142**（双会话并行开发，开新任务前先 fetch 避让编号） |
 | 待用户装机验证 | Task 141 七项 UI（欢迎卡/版本行/内存弹窗/JVM行/新闻页）+ Task 142 渲染器分层七锚点（见下文两条 Stage Summary） |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清），与基线对拍判读 |
@@ -116,3 +116,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 
 ## 附：追加区
 新任务记录直接追加在本文件**最末尾**（保持上面速览表的「当前状态/最新 Task 号」同步更新）。本文件增长到 ~400 行时，把最旧的任务段剪切进 worklog-archive.md 归档。
+
+## 会话记录（2026-09-22，worklog 瘦身重构，未占用 Task 编号）
+- 动机：worklog.md 膨胀至 2327 行，每次会话入场要消化全量历史，效率低
+- 动作：① 速览节置顶（状态表/双会话协作规则/关键命令/方法论/检索指引）；② Tasks 34-140 原文归档 worklog-archive.md（2257 行）；③ Task 141/142 原文保留本文件
+- 配套重锚：9 个验证器的 worklog 内容检查改为兼容 worklog-archive.md（92/93/96/97/98/101/102/111/119_124，python 定点替换）
+- 验证：96/98/111/119_124 本地全绿；92/93/101/102 的条目在重构前即缺失（历史丢失，非本次回归，且不在 CI 集内）

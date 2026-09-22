@@ -289,7 +289,7 @@ print("=" * 72)
 print("I. 仓库卫生")
 print("=" * 72)
 st = git(["status", "--porcelain"]).stdout
-worklog = read("worklog.md")
+worklog = read("worklog.md") + read("worklog-archive.md")
 check("I1  仓库 worklog 含 Task 111 条目（提交后补记亦计入）",
       "Task ID: 111" in worklog or "Task 111" in worklog)
 
