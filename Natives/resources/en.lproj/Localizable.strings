@@ -2044,11 +2044,13 @@
 "preference.detail.ui_theme" = "Choose light/dark/system appearance.";
 "preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
 "preference.title.renderer_backend" = "MobileGlues backend";
-"preference.detail.renderer_backend" = "Unified MobileGlues three-way switch (floating popup): Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan direct by default. The GLES backend translates desktop GL to OpenGL ES via the built-in ANGLE framework -- no separate ANGLE switch is needed (the old \"ANGLE ES Driver\" toggle was removed as redundant). Task 140: the selection writes the GLOBAL default renderer; each game can override it (or follow this global setting) in its own game settings page.";
+"preference.detail.renderer_backend" = "Backend selection for the mg renderer (floating popup): Vulkan direct (default) / GLES backend / OpenGL 4.0 experimental. Applies whenever the renderer is set to mg; the GLES backend translates desktop GL to OpenGL ES via the built-in ANGLE framework. Each game can pick mg or follow this global setting in its own game settings page.";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
-"preference.profile.renderer_follow_global" = "Follow Global Setting (currently: %@)";
+"preference.profile.renderer_follow_global_toggle" = "Follow Global Renderer";
+"preference.title.renderer.debug.mgfamily" = "mg";
+"preference.warning.mg_backend_missing_dylib" = "The rendering library for mg backend (%@) is missing; fell back to the default backend (Vulkan direct).";
 "preference.warning.renderer_shadowed_by_profile" = "Global default set to %@. This game keeps its own renderer (%@). Change it in the game's settings if needed.";
 "preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";
 

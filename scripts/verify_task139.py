@@ -105,10 +105,13 @@ check("E1 →Task140 全局单写 helper（双写退役 + 阴影提示）",
       "ame140_writeRendererGlobal" in lpvc and
       "renderer written to GLOBAL ONLY" in lpvc and
       "preference.warning.renderer_shadowed_by_profile" in lpvc)
-check("E2 两个渲染器行都走全局单写（定义 1 + 两处调用）",
-      lpvc.count("ame140_writeRendererGlobal(") >= 2)
-check("E3 两行都显示全局值（不再 profile 优先，Task139→140 语义反转）",
-      lpvc.count('ame140_global = getPrefObject(@"video.renderer")') >= 2 and
+check("E2 →Task142 渲染器行全局单写保留 + 后端行独立成键（定义 1 + 渲染器行调用）",
+      lpvc.count("ame140_writeRendererGlobal(") >= 1 and
+      'setPrefObject(@"mobileglues.renderer_backend", ame142_rbValue);' in lpvc and
+      'setPrefInt(@"mobileglues.mobilegl_backend", 0);' in lpvc)
+check("E3 →Task142 渲染器行显示全局存储键 + 后端行显示后端键（两层分居，均不 profile 优先）",
+      lpvc.count('ame140_global = getPrefObject(@"video.renderer")') >= 1 and
+      "return ame142_effective_backend_key();" in lpvc and
       re.search(r'\[key isEqualToString:@"renderer"\]\)\)[^}]*?resolveKeyForCurrentProfile:@"renderer"',
                 lpvc) is None)
 check("E4 →Task140 实例设置页只写 profile（同步全局退役，含跟随全局删键）",
@@ -164,10 +167,14 @@ r = subprocess.run([sys.executable, "/home/z/my-project/scripts/task139_syntax_g
                    capture_output=True, text=True, timeout=120)
 check("I1 十文件括号平衡（含宏续行跳过）",
       "all balanced" in r.stdout, r.stdout[-200:] if r.stdout else r.stderr[-200:])
-check("I2 l10n（Task140 基线 1920；Task139 的 renderer_missing_dylib 键仍在 + Task140 两新键已入）",
+check("I2 l10n（Task142 基线 1922；Task139 的 renderer_missing_dylib 键仍在 + Task142 开关/单mg/后端告警三键已入，旧 picker 键退役）",
       all('"preference.warning.renderer_missing_dylib"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
-      all('"preference.profile.renderer_follow_global"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+      all('"preference.profile.renderer_follow_global_toggle"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
+      all('"preference.title.renderer.debug.mgfamily"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
+      all('"preference.warning.mg_backend_missing_dylib"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 
 print("== J. 级联 ==")

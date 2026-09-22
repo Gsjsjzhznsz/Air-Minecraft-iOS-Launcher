@@ -2053,11 +2053,13 @@
 "i18n_str_2068" = "应用语言";
 "preference.title.renderer.debug.mithril" = "Mithril（1.17+）- OpenGL 3.3 核心，经 Vulkan/Metal，实验性";
 "preference.title.renderer_backend" = "MobileGlues 渲染后端";
-"preference.detail.renderer_backend" = "MobileGlues 三后端统一选择（原地悬浮浮窗）：Vulkan 直连 / GLES 后端 / OpenGL 4.0 实验性，默认 Vulkan 直连。GLES 后端经内置 ANGLE 框架把桌面 GL 翻译为 OpenGL ES——无需（也已移除）独立的 \"ANGLE ES 驱动\" 开关。Task 140：选择写入全局默认渲染器；每个游戏可在自己的游戏设置页独立选择或跟随全局。";
+"preference.detail.renderer_backend" = "mg 渲染器的后端选择（原地悬浮浮窗）：Vulkan 直连（默认）/ GLES 后端 / OpenGL 4.0 实验性。渲染器选择 mg 时按此启动；GLES 后端经内置 ANGLE 框架把桌面 GL 翻译为 OpenGL ES。每个游戏可在自己的游戏设置页选择 mg 或跟随全局。";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直连)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 后端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 实验性)";
-"preference.profile.renderer_follow_global" = "跟随全局设置（当前: %@）";
+"preference.profile.renderer_follow_global_toggle" = "跟随全局渲染器";
+"preference.title.renderer.debug.mgfamily" = "mg";
+"preference.warning.mg_backend_missing_dylib" = "mg 后端（%@）的渲染库缺失，已回落默认后端（Vulkan 直连）。";
 "preference.warning.renderer_shadowed_by_profile" = "已写入全局默认（%@）。当前游戏保留独立渲染器设置（%@），如需更改请在游戏设置页调整。";
 "preference.warning.renderer_missing_dylib" = "本构建未随包携带 %@，游戏将回退为 Auto（ANGLE）。如需启用，请把对应 dylib 放入 app 的 Frameworks 目录。";
 "preference.detail.announcement_preview_level" = "控制公告在主界面展示的详细程度。";

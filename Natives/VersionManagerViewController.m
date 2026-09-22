@@ -1050,6 +1050,10 @@ static NSInteger const kSectionVersions    = 1;
 /// 参照 FCL/HMCL 的渲染器选择面板，提供 7 个选项及对应描述
 /// 注意：名称使用简短标识，不使用 getRendererNames 返回的长本地化字符串
 - (void)setupRendererData {
+    // Task 142：读前迁移（幂等；旧版家族键直写 video.renderer/profile 的
+    // 存量数据入位——渲染器层 "mg" + 后端键），保证本面板取到的键表
+    // 与设置页/实例页同源。
+    ame142_migrateRendererStorage();
     self.rendererKeys = getRendererKeys(NO);
     // 简短渲染器名称（不使用 getRendererNames 的长本地化字符串）
     // Task 140：按【键值】映射而非按下标配对。旧实现硬编码 7 个短名并
@@ -1059,8 +1063,10 @@ static NSInteger const kSectionVersions    = 1;
     // 免疫过滤与顺序变化；未知名回退键值本身。
     // 注：本面板与 selectRendererAtIndex: 当前无调用者（渲染器编辑已
     // 移交 ProfileSettingsViewController），此处修正是防复活的地雷。
+    // Task 142：+"mg" 逻辑键（MobileGL 家族唯一渲染器层入口，不写后端）。
     NSDictionary *ame140_shortNames = @{
         @"auto": @"Auto",
+        @ RENDERER_KEY_MG: @"mg",
         @ RENDERER_NAME_GL4ES: @"GL4ES",
         @ RENDERER_NAME_MTL_ANGLE: @"ANGLE",
         @ RENDERER_NAME_MOBILEGLUES: @"MobileGlues",

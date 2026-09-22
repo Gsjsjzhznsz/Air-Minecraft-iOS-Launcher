@@ -68,6 +68,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     dispatch_once(&onceToken, ^{
         map = @{
             @"渲染器": @"preference.title.renderer",
+            @"跟随全局渲染器": @"preference.profile.renderer_follow_global_toggle",
             @"图形 API": @"i18n_str_2057",
             @"Java版本": @"i18n_str_2036",
             @"内存分配": @"i18n_str_2037",
@@ -478,7 +479,15 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 假装“auto”，实例页如实显示“跟随全局”态；启动链
     // resolveKeyForCurrentProfile 对无键 profile 自动回退全局 video.renderer，
     // 语义一致。用户想显式用 auto 可在选项表里选“自动”。）
+    // Task 142：读前迁移（幂等）+ legacy 家族键归一为 "mg"——渲染器层
+    // 不存后端（后端由 mg 设置 mobileglues.renderer_backend 决定，默认
+    // Vulkan 直连）。跟随全局（无键）由外置开关呈现，不再混进选择列表。
+    ame142_migrateRendererStorage();
     id ame140_rendererRaw = self.profile[@"renderer"];
+    if ([ame140_rendererRaw isKindOfClass:NSString.class] &&
+        [getRendererFamilyKeys() containsObject:ame140_rendererRaw]) {
+        ame140_rendererRaw = @ RENDERER_KEY_MG;
+    }
     self.selectedRenderer = [ame140_rendererRaw isKindOfClass:NSString.class] ? ame140_rendererRaw : nil;
 
     // 图形 API（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
@@ -520,8 +529,11 @@ static NSString * localizeProfileTitle(NSString *title) {
 #pragma mark - Sections
 
 - (void)setupSections {
-    // 高级设置 section：渲染器 + 图形 API（仅 MC 26.2+）+ Java/内存/JVM
-    NSMutableArray *advancedRows = [NSMutableArray arrayWithArray:@[@"渲染器"]];
+    // 高级设置 section：跟随全局渲染器开关（Task 142 外置）+ 渲染器 +
+    // 图形 API（仅 MC 26.2+）+ Java/内存/JVM。
+    // 用户明令：跟随全局不再是渲染器列表里的一项——开关开启时渲染器行
+    // 置灰不可选（值显示全局默认），关闭时才允许本游戏独立选择。
+    NSMutableArray *advancedRows = [NSMutableArray arrayWithArray:@[@"跟随全局渲染器", @"渲染器"]];
     if ([self isCurrentProfileModernVersion]) {
         [advancedRows addObject:@"图形 API"];
     }
@@ -724,9 +736,13 @@ static NSString * localizeProfileTitle(NSString *title) {
     cell.imageView.image = nil;
     cell.textLabel.text = nil;
     cell.detailTextLabel.text = nil;
-    // 重置可能被"清除JVM参数"修改过的颜色
+    // 重置可能被"清除JVM参数"修改过的颜色；detailTextLabel 一并复位
+    // （Task 142：跟随全局态的渲染器行会把值位染成 tertiary 灰，
+    // 复用流向其它行前必须还原，secondaryLabel 与 value1 样式的
+    // 原生灰同族且深色模式安全）
     cell.imageView.tintColor = nil;
     cell.textLabel.textColor = [UIColor labelColor];
+    cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
 
     NSInteger globalSection = [self globalSectionForTableView:tableView localSection:indexPath.section];
     if (globalSection < 0 || globalSection >= (NSInteger)self.sections.count) return cell;
@@ -786,10 +802,27 @@ static NSString * localizeProfileTitle(NSString *title) {
             break;
 
         case 3: // 高级设置
-            if ([title isEqualToString:@"渲染器"]) {
+            if ([title isEqualToString:@"跟随全局渲染器"]) {
+                // Task 142：外置开关行——开 = 本游戏跟随全局默认渲染器
+                // （profile 无 renderer 键），此时下方渲染器行置灰。
+                cell.imageView.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
+                cell.accessoryView = [self buildRendererFollowSwitch];
+                cell.detailTextLabel.text = nil;
+            } else if ([title isEqualToString:@"渲染器"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"cpu"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-                cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
+                if (self.selectedRenderer == nil) {
+                    // Task 142：跟随全局态——整行置灰不可选（用户明令
+                    // "只要为真，渲染器选择就变灰"）；值位显示全局默认
+                    // 的显示名，让用户看到将实际生效的渲染器。
+                    cell.textLabel.textColor = [UIColor tertiaryLabelColor];
+                    cell.imageView.tintColor = [UIColor tertiaryLabelColor];
+                    cell.detailTextLabel.textColor = [UIColor tertiaryLabelColor];
+                    cell.accessoryType = UITableViewCellAccessoryNone;
+                    cell.detailTextLabel.text = [self rendererDisplayName:nil];
+                } else {
+                    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                    cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
+                }
             } else if ([title isEqualToString:@"图形 API"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"rectangle.dashed"];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -1130,10 +1163,13 @@ static NSString * localizeProfileTitle(NSString *title) {
 //   - 经典键 → candidates 表显示名（ame_renderer_display_name 统一处理）。
 - (NSString *)rendererDisplayName:(NSString *)renderer {
     if (renderer == nil || renderer.length == 0) {
+        // Task 142：跟随全局态显示全局默认的显示名（mg/家族键 → "mg"，
+        // 其余 → 真实名）——"跟随全局"语义由外置开关行承载，值位只展示
+        // 将实际生效的渲染器。
+        ame142_migrateRendererStorage();
         NSString *ame140_global = getPrefObject(@"video.renderer");
         NSString *ame140_gval = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
-        return [NSString stringWithFormat:localize(@"preference.profile.renderer_follow_global", nil),
-                ame_renderer_display_name(ame140_gval)];
+        return ame_renderer_display_name(ame140_gval);
     }
     return ame_renderer_display_name(renderer);
 }
@@ -1188,8 +1224,24 @@ static NSString * localizeProfileTitle(NSString *title) {
             break;
 
         case 3: // 高级设置
-            if ([title isEqualToString:@"渲染器"]) {
-                [self showRendererSelector];
+            if ([title isEqualToString:@"跟随全局渲染器"]) {
+                // 点行即切开关（开关本体也可直接拨动）。
+                // 注意 UISwitch 是 accessoryView——挂在 cell 上而非
+                // contentView 里，遍历 cell.subviews 找它。
+                UITableViewCell *ame142_cell = [tableView cellForRowAtIndexPath:indexPath];
+                for (UIView *ame142_sub in ame142_cell.subviews) {
+                    if ([ame142_sub isKindOfClass:[UISwitch class]]) {
+                        UISwitch *ame142_sw = (UISwitch *)ame142_sub;
+                        [ame142_sw setOn:!ame142_sw.on animated:YES];
+                        [self rendererFollowSwitchChanged:ame142_sw];
+                        break;
+                    }
+                }
+            } else if ([title isEqualToString:@"渲染器"]) {
+                // Task 142：跟随全局态下本行置灰——点击不弹选择器
+                if (self.selectedRenderer != nil) {
+                    [self showRendererSelector];
+                }
             } else if ([title isEqualToString:@"图形 API"]) {
                 [self showGraphicsApiSelector];
             } else if ([title isEqualToString:@"Java版本"]) {
@@ -2021,50 +2073,31 @@ static NSString * localizeProfileTitle(NSString *title) {
 // 经典四项：用户无法给单个游戏选 MG 后端（只能在设置页选全局），而设置页
 // 的选择又被旧双写改到“当前游戏”——两头堵。现在实例页独占 per-game 选择，
 // 家族键直接写 profile（启动链 ame_effective_renderer 原样识别）。
+// Task 142：实例页渲染器选择器 —— 单一经典列表（auto/gl4es/angle/
+// mobileglues/zink/ltw/vulkan，按 dylib 存在性过滤，与设置页渲染器行
+// 同源）+ 唯一的 "mg" 条目（getRendererKeys 已含）。用户明令："渲染器
+// 选择只有一个 mg，而且不写什么后端，后端是根据 mg 设置选择的后端启动，
+// 默认 vulkan"——选中 mg 只写逻辑键 "mg"，后端在启动时按
+// mobileglues.renderer_backend 解析（设置页 MobileGlues 分区选择）。
+// "跟随全局"不再是列表选项：它是外置开关（buildRendererFollowSwitch），
+// 开启时渲染器行置灰不可点。legacy 家族键（迁移前残留）在 ✓ 匹配上
+// 归一到 "mg"。
 - (void)showRendererSelector {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_940", nil)
                                                                    message:nil
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
 
-    // 选项 0：跟随全局（删除 profile 键）——当前即跟随态时前置 ✓
-    NSString *ame140_followTitle = [self rendererDisplayName:nil];
-    if (self.selectedRenderer == nil) {
-        ame140_followTitle = [NSString stringWithFormat:@"✓ %@", ame140_followTitle];
-    }
-    [alert addAction:[UIAlertAction actionWithTitle:ame140_followTitle
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction * _Nonnull action) {
-        self.selectedRenderer = nil;
-        [self saveSettings];
-        [self reloadAllTableViews];
-    }]];
-
-    // 经典选项（auto/gl4es/zink/...，与设置页同源过滤）
     NSArray *renderers = getRendererKeys(NO);
     NSArray *displayNames = getRendererNames(NO);
     for (NSInteger i = 0; i < renderers.count; i++) {
         NSString *renderer = renderers[i];
         NSString *name = i < displayNames.count ? displayNames[i] : renderer;
-        if ([self.selectedRenderer isEqualToString:renderer]) {
-            name = [NSString stringWithFormat:@"✓ %@", name];
-        }
-        [alert addAction:[UIAlertAction actionWithTitle:name
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(UIAlertAction * _Nonnull action) {
-            self.selectedRenderer = renderer;
-            [self saveSettings];
-            [self reloadAllTableViews];
-        }]];
-    }
-
-    // MG 家族三后端（Task 132 用户指令：选项文案与设置页 mg 行同款；
-    // 此处按 dylib 存在性提示，Mithril 缺文件时仍列出但选中即提醒）
-    NSArray *familyKeys = getRendererFamilyKeys();
-    NSArray *familyNames = getRendererFamilyNames();
-    for (NSInteger i = 0; i < familyKeys.count; i++) {
-        NSString *renderer = familyKeys[i];
-        NSString *name = i < familyNames.count ? familyNames[i] : renderer;
-        if ([self.selectedRenderer isEqualToString:renderer]) {
+        // ✓ 匹配：精确命中，或 mg 条目命中 legacy 家族键（归一显示）
+        BOOL ame142_selected = [self.selectedRenderer isEqualToString:renderer] ||
+            ([renderer isEqualToString:@ RENDERER_KEY_MG] &&
+             self.selectedRenderer != nil &&
+             [getRendererFamilyKeys() containsObject:self.selectedRenderer]);
+        if (ame142_selected) {
             name = [NSString stringWithFormat:@"✓ %@", name];
         }
         [alert addAction:[UIAlertAction actionWithTitle:name
@@ -2079,14 +2112,42 @@ static NSString * localizeProfileTitle(NSString *title) {
     [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
 
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        UITableViewCell *cell = [self cellForGlobalSection:3 row:0];
+        // 渲染器行现在是高级设置 section 的第 2 行（第 1 行是跟随全局开关）
+        UITableViewCell *cell = [self cellForGlobalSection:3 row:1];
         alert.popoverPresentationController.sourceView = cell ?: self.view;
         alert.popoverPresentationController.sourceRect = cell ? cell.bounds : self.view.bounds;
     }
 
-    NSLog(@"[ProfileSettings] Task140: renderer picker opened (%ld classic + 3 family + follow-global)",
+    NSLog(@"[ProfileSettings] Task142: renderer picker opened (%ld options incl. single 'mg'; follow-global is an external switch)",
           (long)renderers.count);
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+#pragma mark - 渲染器跟随全局开关（Task 142）
+
+/// 跟随全局开关：开 = 删除 profile 渲染器键（启动链回退全局默认）；
+/// 关 = 本游戏独立选择（默认给 "mg"——唯一的 MG 家族入口，后端由
+/// mg 设置决定，默认 Vulkan 直连）。开关状态与 selectedRenderer
+/// 互为镜像：nil = 开。
+- (UISwitch *)buildRendererFollowSwitch {
+    UISwitch *ame142_sw = [[UISwitch alloc] init];
+    [ame142_sw setOn:(self.selectedRenderer == nil) animated:NO];
+    [ame142_sw addTarget:self
+                  action:@selector(rendererFollowSwitchChanged:)
+        forControlEvents:UIControlEventValueChanged];
+    return ame142_sw;
+}
+
+- (void)rendererFollowSwitchChanged:(UISwitch *)sender {
+    if (sender.isOn) {
+        self.selectedRenderer = nil;
+        NSLog(@"[ProfileSettings] Task142: follow-global ON (profile renderer key removed)");
+    } else {
+        self.selectedRenderer = @ RENDERER_KEY_MG;
+        NSLog(@"[ProfileSettings] Task142: follow-global OFF (per-game renderer defaults to 'mg')");
+    }
+    [self saveSettings];
+    [self reloadAllTableViews];
 }
 
 /// 判断当前 profile 的 MC 版本是否为 26.2+（需要图形 API 切换）

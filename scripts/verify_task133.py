@@ -164,8 +164,8 @@ def lkeys(lang):
 ks = [lkeys(l) for l in LANGS]
 # Task138 重锚：+2 键（preference.warning.renderer_missing_dylib +
 # preference.title.mirror_policy-speed_first），1916 -> 1918
-check("F1 四语言键集一致（Task141 基线 1922 = 1920 + Task141 内存弹窗 2）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1922, f"counts={[len(k) for k in ks]}")
+check("F1 四语言键集一致（Task142 基线 1924 = Task141 的 1922 + 渲染器层 单mg/开关/后端告警 3 - 旧跟随全局 1）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1924, f"counts={[len(k) for k in ks]}")
 check("F2 pickextra 三键已随机制退役；Task134 新 12 键在位（jit_enabler 7 + title/detail 4 + hide_controls）",
       all("preference.pickextra.edit_layout" not in k and
           "preference.pickextra.edit_gamepad" not in k and

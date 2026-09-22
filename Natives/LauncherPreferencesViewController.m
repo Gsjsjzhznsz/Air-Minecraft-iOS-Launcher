@@ -297,39 +297,26 @@
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
             keyFull = @"mobileglues.fsr_rcas_sharpness";
         }
-        // Task 132（MG 三端合并，现行）：MobileGlues 分区单一 pick 行。
-        // Task 140：设置行 = 【全局默认】语义——只写全局 video.renderer，
-        // 不再触碰 profile 层（Task139 的双写让设置页每次选择都覆写当前
-        // 游戏的独立渲染器，用户实例页改的值被“变回设置里选的那个”）。
+        // Task 132（MG 三端合并）-> Task 142（后端独立存储）：MobileGlues
+        // 分区的单一 pick 行现在是【mg 后端设置】本体（mobileglues.
+        // renderer_backend），与渲染器层（video.renderer：auto/mg/经典项）
+        // 分居——用户明令"渲染器选择只有一个 mg，不写什么后端，后端根据
+        // mg 设置启动，默认 vulkan"。历史：Task139 双写让设置页覆写当前
+        // 游戏的独立渲染器（"变回设置里选的那个"），Task140 改为只写全局
+        // video.renderer，Task142 起后端彻底独立成键。
         // 分层：设置页 = 全局默认；实例设置页（ProfileSettings）= 该游戏
-        // 自己的值（含“跟随全局”态，删键即回退到全局）；启动链
-        // ame_effective_renderer / JavaLauncher profile 优先不变。
-        // 非家族值（auto/gl4es/zink/...）显示真实名称（旧行为对任何
-        // 非家族值无条件显示“Vulkan 直连”假默认，用户看到“改了 zink
-        // 后端行还是 Vulkan 直连”的伪装）。
+        // 自己的值（含"跟随全局"开关）；启动链 ame_effective_renderer /
+        // JavaLauncher profile 优先不变。
         if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
-            NSString *ame140_global = getPrefObject(@"video.renderer");
-            NSString *ame140_val = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
-            // legacy 精化（保留自 Task132）：renderer=auto + mobilegl_backend
-            // 档位的存量设备实际以对应家族后端运行（ame_effective_renderer
-            // 的 legacy 解析路径）——行显示抬到实际后端，✓ 与运行态一致。
-            if ([ame140_val isEqualToString:@"auto"]) {
-                NSInteger ame140_backend = getPrefInt(@"mobileglues.mobilegl_backend");
-                if (ame140_backend == 1 || ame140_backend == 2) {
-                    return ame140_backend == 2 ? @ RENDERER_NAME_MOBILEGL_GLES : @ RENDERER_NAME_MOBILEGL;
-                }
-                if (ame140_backend == 3) {
-                    return @ RENDERER_NAME_MITHRIL;
-                }
-            }
-            BOOL ame140_isFamily =
-                [ame140_val isEqualToString:@ RENDERER_NAME_MOBILEGL] ||
-                [ame140_val isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
-                [ame140_val isEqualToString:@ RENDERER_NAME_MITHRIL];
-            if (ame140_isFamily) {
-                return ame140_val;   // 家族键原样返回：pickKeys ✓ 匹配 + pickList 本地化显示
-            }
-            return ame_renderer_display_name(ame140_val);   // 非家族：真实名（不匹配任何选项 ✓，诚实显示）
+            // Task 142：本行回归"mg 设置"本职——显示 mg 的当前后端
+            // （ame142_effective_backend_key：新键 → legacy 全局家族键 →
+            // legacy 档位 → 默认 Vulkan 直连）。Task140 曾在此显示全局
+            // 渲染器 video.renderer 的值（当时后端行直写渲染器键），
+            // 两层职责现已分居：渲染器行管渲染器（auto/mg/经典项），
+            // 本行管 mg 的后端，互不伪装。返回家族物理键：pickKeys ✓
+            // 匹配 + pickList 本地化显示。
+            ame142_migrateRendererStorage();
+            return ame142_effective_backend_key();
         }
         // Task138：模组镜像源行（已移入 download 分区）——统一粗控读数：
         // 读 assetDownloadSource 为准（写入时两键同值；细粒度分叉时以
@@ -346,15 +333,19 @@
         }
         // Task 140：主渲染器行（video.renderer）显示【全局默认】值。
         // Task139 曾改为 profile 优先显示（与启动链同源）——但设置行是
-        // “全局默认”语义，显示 profile 值会让用户把“当前游戏的独立设置”
+        // "全局默认"语义，显示 profile 值会让用户把"当前游戏的独立设置"
         // 误认为全局状态；与 mg 后端行、实例页三方互相伪装正是本轮
-        // “切了渲染器又变回”反馈的漏乱根源。现在：设置页两行一律显示
-        // 全局值（家族键→三后端文案，其余→真实名）；当前游戏的独立值
-        // （若存在）由实例设置页呈现与编辑。
+        // "切了渲染器又变回"反馈的漏乱根源。
+        // Task 142 审核（用户"最后再审核一下"）：返回【存储键】而非显示名
+        // ——Task140 返回 ame_renderer_display_name（本地化名），而
+        // openPicker 的 ✓ 按 pickKeys 精确比较存储值，auto/gl4es 等
+        // 经典值永远失配（✓ 丢失的隐性回归）；typePickField 的 ame132
+        // 分支本就支持"存储值命中 pickKeys → 显示 pickList 本地化标签"，
+        // 返回存储键两头都对：行显示标签 + ✓ 精确命中（含 "mg"）。
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
+            ame142_migrateRendererStorage();
             NSString *ame140_global = getPrefObject(@"video.renderer");
-            NSString *ame140_val = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
-            return ame_renderer_display_name(ame140_val);
+            return [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
         }
         return getPrefObject(keyFull);
     };
@@ -429,17 +420,24 @@
             [PLMirrorCenter startSpeedProbesIfNeeded];
             return;
         }
-        // Task 132（MG 三端合并）：统一后端行直接写渲染器键（与渲染器行
-        // 同一存储层 video.renderer；显式选择永远优先，profile 无覆盖时
-        // 即时生效——与 ame_effective_renderer 的解析一致）。
-        // Task 140：只写全局（见上方 ame140_writeRendererGlobal 注释）；
-        // Task139 的双写曾让本行覆写当前游戏的独立渲染器。
+        // Task 132（MG 三端合并）-> Task 142（后端独立存储）：本行只写
+        // 自己的键 mobileglues.renderer_backend（mg 的后端设置），不再
+        // 触碰渲染器层 video.renderer（Task132-140 曾直写渲染器键——
+        // "后端"与"渲染器"两层耦合正是"选了后端、渲染器行跟着变"的
+        // 伪装来源）。渲染器层的选择（auto/mg/经典项）由渲染器行独占；
+        // mg 启动时按本键解析后端（ame_effective_renderer 的 mg 分支，
+        // 默认 Vulkan 直连）。legacy 档位键 mobilegl_backend 同步退役
+        // （显式改选即 Task132 承诺的 legacy 终点；也避免 JavaLauncher
+        // 的档位环境变量分支与新键互相矛盾）。
         if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
-            NSString *ame140_rbValue = [value isKindOfClass:NSString.class] ? value : nil;
-            if (ame140_rbValue) {
-                ame140_writeRendererGlobal(ame140_rbValue);
+            NSString *ame142_rbValue = [value isKindOfClass:NSString.class] ? value : nil;
+            if (ame142_rbValue && [getRendererFamilyKeys() containsObject:ame142_rbValue]) {
+                setPrefObject(@"mobileglues.renderer_backend", ame142_rbValue);
+                setPrefInt(@"mobileglues.mobilegl_backend", 0);
+                NSLog(@"[PLPrefTable] Task142: renderer_backend written to OWN KEY = %@ "
+                      @"(video.renderer untouched; legacy tier retired)", ame142_rbValue);
             } else {
-                setPrefObject(@"video.renderer", value);
+                setPrefObject(@"mobileglues.renderer_backend", value);
             }
             // Task 138：选择即提示（dylib 缺失不再等到启动闪退才发现）。
             // 三个选项按用户指令无条件列出（Task132），Mithril 的
@@ -482,6 +480,11 @@
     
     self.prefSections = @[@"general", @"download", @"video", @"mobileglues", @"control", @"java", @"debug", @"ai"];
 
+    // Task 142：渲染器键读取前先做分层迁移（幂等；旧版家族键直写
+    // video.renderer/profile 的存量数据在此入位——渲染器层 "mg" +
+    // 后端键）。设置页是全局渲染器状态的首要展示面，必须先迁移再取键，
+    // 否则首帧显示原始家族 dylib 键名。
+    ame142_migrateRendererStorage();
     self.rendererKeys = getRendererKeys(NO);
     self.rendererList = getRendererNames(NO);
     

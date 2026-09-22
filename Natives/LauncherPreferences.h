@@ -68,19 +68,45 @@ void setSafeArea(CGSize screenSize, CGRect safeArea);
 
 NSString* getSelectedJavaHome(NSString* defaultJRETag, int minVersion);
 
+/// Task 142：一次性迁移渲染器存储分层——旧版（Task132-140）把 MobileGL
+/// 家族键（libMobileGL.dylib / libMobileGL-gles.dylib / libmithril.dylib）
+/// 直接写进全局 video.renderer 与各 profile 的 renderer 键；新版里渲染器
+/// 层只存逻辑键 "mg"（不写后端），后端独立存 mobileglues.renderer_backend。
+/// 迁移：全局家族键 → 后端键（若未设）+ video.renderer = "mg"；
+/// 各 profile 的家族键 → "mg"（后端自此统一由 mg 设置决定，用户本轮明令
+/// "渲染器选择只有一个 mg，不写什么后端"）。幂等（进程内 static 哨兵 +
+/// 值域判断），在 AppDelegate 启动早期调用，也可被任何读前路径安全重入。
+void ame142_migrateRendererStorage(void);
+
+/// Task 142：解析 mg 的当前后端（家族物理键）。
+/// 优先级：mobileglues.renderer_backend（合法家族键）→ legacy 全局
+/// video.renderer 里残留的家族键 → legacy renderer=auto +
+/// mobileglues.mobilegl_backend 档位（1/2/3）→ 默认 Vulkan 直连
+/// （libMobileGL.dylib，用户指定"默认vulkan"）。返回值永远是家族键；
+/// 调用方（ame_effective_renderer）负责 dylib 存在性守卫。
+NSString* ame142_effective_backend_key(void);
+
 NSArray* getRendererKeys(BOOL containsDefault);
 NSArray* getRendererNames(BOOL containsDefault);
 
-// Task 140：统一渲染器显示名（设置页两行 + 实例设置页共用；家族键 →
-// 三后端文案，经典键 → candidates 表显示名，未知值原样）。设置页显示
-// 全局默认值、实例页显示该游戏自身值（含"跟随全局"态）——分层语义见
-// LauncherPreferences.m 的 Task140 注释。
+// Task 140：统一渲染器显示名（设置页两行 + 实例设置页共用）。
+// Task 142 语义更新："mg" 逻辑键与 legacy 家族键统一显示为 "mg"
+// （渲染器层不呈现后端——后端由 MobileGlues 分区的 renderer_backend 行
+// 呈现）；经典键（auto/gl4es/zink/...）→ candidates 表显示名，
+// 未知值原样返回。设置页显示全局默认值、实例页显示该游戏自身值
+// （含"跟随全局"态）——分层语义见 LauncherPreferences.m 的 Task140 注释。
 NSString* ame_renderer_display_name(NSString *renderer);
 
 // Task 132（MG 三端合并）：MobileGL 家族三后端统一浮窗（MobileGlues 分区
-// renderer_backend pick 行）的数据源。keys 与渲染器值同一命名空间
-// （mobilegl / mobilegl_gles / mithril 逻辑键），names 为三选项本地化文案
-// （MobileGlues (Vulkan 直连) / (GLES 后端) / (OpenGL 4.0 实验性)，
-// 默认 Vulkan 直连）。索引两两配对。
+// renderer_backend pick 行）的数据源。keys 为物理键（libMobileGL.dylib /
+// libMobileGL-gles.dylib / libmithril.dylib），Task 142 起作为
+// mobileglues.renderer_backend 后端键的取值域（渲染器层只存 "mg"，
+// 后端在启动时按此键解析，默认 libMobileGL.dylib = Vulkan 直连），
+// names 为三选项本地化文案（MobileGlues (Vulkan 直连) / (GLES 后端) /
+// (OpenGL 4.0 实验性)，默认 Vulkan 直连）。索引两两配对。
 NSArray* getRendererFamilyKeys(void);
 NSArray* getRendererFamilyNames(void);
+
+// Task 142：逻辑渲染器键 "mg"（MobileGL 家族的唯一渲染器层入口，
+// 不写后端——后端由 mg 设置 mobileglues.renderer_backend 决定）。
+#define RENDERER_KEY_MG "mg"

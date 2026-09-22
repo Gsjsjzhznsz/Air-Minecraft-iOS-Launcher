@@ -1178,3 +1178,38 @@
 // dirs fall back to the mod's built-in full-button preset. l10n: 2 new
 // keys (renderer_follow_global, renderer_shadowed_by_profile) + hide_controls
 // + renderer_backend detail reworded x4 languages.
+
+// REVISION 17 addendum (Task 142, no bump): renderer selection collapsed to a
+// single "mg" entry + follow-global switch (the user's long-standing design,
+// restated this round: "renderer selection should have only one mg, no
+// backend written -- the backend follows the mg settings, Vulkan by
+// default"). The renderer layer (video.renderer global + per-profile
+// renderer key) now stores only logical keys (auto / mg / classic dylibs);
+// the MobileGL family keys (libMobileGL / libMobileGL-gles / libmithril)
+// moved to a dedicated backend key mobileglues.renderer_backend (default
+// libMobileGL.dylib = Vulkan direct), picked in Settings > MobileGlues.
+// ame_effective_renderer gains the mg branch: backend resolution via
+// ame142_effective_backend_key (new key -> legacy global family key ->
+// legacy mobilegl_backend tier -> Vulkan default) with a dylib guard that
+// falls back to the default backend before auto; ame142_migrateRendererStorage
+// one-time re-layers legacy direct-written family keys (global AND every
+// profile) into the new scheme and retires the legacy tier key at the same
+// time (explicit pick = the legacy end Task132 promised), keeping
+// JavaLauncher's MOBILEGL_BACKEND_TYPE env consistent. The game editor
+// (ProfileSettingsViewController) gets an EXTERNAL follow-global toggle row
+// above the renderer row: ON removes the profile key and grays the renderer
+// row out (value shows the global default's name); OFF enables the slim
+// picker (classic list + the single mg entry, family keys checkmarked onto
+// mg). The Settings backend row reads/writes its own key only (Task132-140
+// wrote the renderer key -- the two layers masquerading as each other was
+// the "picked a backend, the renderer row followed" confusion). Audit fix
+// included: the Settings renderer row getPreference now returns the STORAGE
+// key (Task140 returned the localized display name, which can never match
+// pickKeys -- the picker checkmark was silently lost for auto/gl4es/zink;
+// typePickField's ame132 branch maps the label). Device anchors:
+// "[Amethyst] Task142: global renderer <family> migrated to 'mg'",
+// "[PLPrefTable] Task142: renderer_backend written to OWN KEY", game editor
+// toggle row + grayed renderer row, picker with a single "mg" option.
+// l10n: -1 retired key (renderer_follow_global picker format) +3 new
+// (renderer_follow_global_toggle / renderer.debug.mgfamily /
+// mg_backend_missing_dylib) x4 languages.

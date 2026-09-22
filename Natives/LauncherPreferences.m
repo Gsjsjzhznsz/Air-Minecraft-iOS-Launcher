@@ -294,6 +294,13 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         @{@"key": @"auto",
           @"name": localize(@"preference.title.renderer.debug.auto", nil),
           @"file": @""},
+        // Task 142：MobileGL 家族的唯一渲染器层入口 "mg"（用户明令"渲染器
+        // 选择只有一个 mg，不写什么后端"）。file 留空 = 永远列出：默认
+        // 后端 libMobileGL.dylib 随包，家族变体的 dylib 缺失守卫在
+        // ame_effective_renderer 的 mg 分支处理（缺失回落默认后端）。
+        @{@"key": @ RENDERER_KEY_MG,
+          @"name": localize(@"preference.title.renderer.debug.mgfamily", nil),
+          @"file": @""},
         @{@"key": @ RENDERER_NAME_GL4ES,
           @"name": localize(@"preference.title.renderer.debug.gl4es", nil),
           @"file": @ RENDERER_NAME_GL4ES},
@@ -349,12 +356,53 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
 // 实际渲染器却是 MobileGL DirectVulkan，其内部 MoltenVK 在 swapchain 创建时
 // 向普通 CALayer 发送 naturalDrawableSizeMVK -> unrecognized selector 崩溃）。
 NSString *ame_effective_renderer(void) {
+    // Task 142：读前迁移（幂等，进程内哨兵）——把旧版直写的家族键
+    // 分层入位（video.renderer/profile → "mg"，家族键 → 后端键）。
+    ame142_migrateRendererStorage();
     NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
     if (![renderer isKindOfClass:NSString.class] || renderer.length == 0) {
         renderer = @"auto";
     }
+    // (1a) Task 142："mg" 逻辑键 —— 渲染器层不写后端，后端按 mg 设置
+    // （mobileglues.renderer_backend，默认 Vulkan 直连）在启动时解析。
+    if ([renderer isEqualToString:@ RENDERER_KEY_MG]) {
+        NSString *ame142_backend = ame142_effective_backend_key();
+        NSString *ame142_physical = @(ame_physical_renderer_dylib(ame142_backend.UTF8String));
+        if ([ame142_physical hasSuffix:@".dylib"] && rendererLibraryExists(ame142_physical)) {
+            return ame142_backend;
+        }
+        // 守卫回落：所选后端 dylib 缺失（现实命中 = Mithril 需另外下载）
+        // → 默认 Vulkan 直连（libMobileGL.dylib 随包）→ 仍缺才 auto。
+        static BOOL ame142_warned = NO;
+        NSLog(@"[Amethyst] Task142: mg backend %@ unavailable (%@ missing from bundle) -- falling back",
+              ame142_backend, ame142_physical);
+        if (!ame142_warned) {
+            ame142_warned = YES;
+            // 提示里显示后端真实名（家族键 → 三后端文案；不能用
+            // ame_renderer_display_name——Task142 起它把家族键显示为 "mg"）
+            NSString *ame142_bname = ame142_backend;
+            NSArray *ame142_fk = getRendererFamilyKeys();
+            NSArray *ame142_fn = getRendererFamilyNames();
+            NSUInteger ame142_bi = [ame142_fk indexOfObject:ame142_backend];
+            if (ame142_bi != NSNotFound && ame142_bi < ame142_fn.count) {
+                ame142_bname = ame142_fn[ame142_bi];
+            }
+            NSString *ame142_msg = [NSString stringWithFormat:
+                localize(@"preference.warning.mg_backend_missing_dylib", nil),
+                ame142_bname];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [NMToast showMessage:ame142_msg];
+            });
+        }
+        if (rendererLibraryExists(@ RENDERER_NAME_MOBILEGL)) {
+            return @ RENDERER_NAME_MOBILEGL;
+        }
+        return @"auto";
+    }
     // (1) 显式渲染器选择优先：zink/ANGLE/MobileGlues/LTW/MoltenVK/Mithril
     //     等任何非 auto 选择都原样生效，MobileGL 后端选项不干预。
+    // （legacy 家族键在此路径原样返回——迁移后不再出现，未迁移安装
+    // 保持 Task132-140 行为，与 Task138 dylib 守卫同构。）
     if (![renderer isEqualToString:@"auto"]) {
         // Task 138：dylib 缺失守卫。显式选中的渲染器物理文件不在 app
         // Frameworks 时回落 auto（当前唯一现实命中 = Mithril——
@@ -466,14 +514,14 @@ NSString *ame_renderer_display_name(NSString *renderer) {
     if (![renderer isKindOfClass:NSString.class] || renderer.length == 0) {
         return localize(@"preference.title.renderer.debug.auto", nil);
     }
-    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGL]) {
-        return localize(@"preference.title.renderer_backend-mobilegl", nil);
-    }
-    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]) {
-        return localize(@"preference.title.renderer_backend-mobilegl_gles", nil);
-    }
-    if ([renderer isEqualToString:@ RENDERER_NAME_MITHRIL]) {
-        return localize(@"preference.title.renderer_backend-mithril", nil);
+    // Task 142："mg" 逻辑键与 legacy 家族键统一显示 "mg"——渲染器层不
+    // 呈现后端（后端由 MobileGlues 分区 renderer_backend 行显示与选择，
+    // 用户明令"渲染器选择只有一个 mg，而且不写什么后端"）。
+    if ([renderer isEqualToString:@ RENDERER_KEY_MG] ||
+        [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL] ||
+        [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
+        [renderer isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+        return localize(@"preference.title.renderer.debug.mgfamily", nil);
     }
     if ([renderer isEqualToString:@"auto"]) {
         return localize(@"preference.title.renderer.debug.auto", nil);
@@ -493,6 +541,95 @@ NSString *ame_renderer_display_name(NSString *renderer) {
 // 指定的三选项文案（本地化键见四语言 Localizable.strings）。
 // 无条件列出三项（用户明令浮窗列出三选项；Mithril 的 dylib 缺失与否
 // 不再作为隐藏条件——渲染器菜单时代的老过滤已随条目退役）。
+// Task 142：mg 后端解析（单一事实源，供 ame_effective_renderer 的 mg 分支
+// 与设置页 renderer_backend 行的读取显示共用）。优先级：
+//   (a) mobileglues.renderer_backend（合法家族键——新版独立后端存储）；
+//   (b) legacy：全局 video.renderer 直接存家族键（Task132-140 形态；
+//       迁移前的瞬态/跨进程竞态兜底）；
+//   (c) legacy：renderer 为 auto/"mg" 且 mobileglues.mobilegl_backend 档位
+//       （Task120 形态）——老安装上档位代表用户的后端选择，如实抬升；
+//   (d) 默认 Vulkan 直连（libMobileGL.dylib，用户指定"默认vulkan"）。
+// 返回值恒为家族物理键；dylib 存在性守卫由调用方负责。
+NSString* ame142_effective_backend_key(void) {
+    NSArray *ame142_family = getRendererFamilyKeys();
+    id ame142_be = getPrefObject(@"mobileglues.renderer_backend");
+    if ([ame142_be isKindOfClass:NSString.class] && [ame142_family containsObject:ame142_be]) {
+        return ame142_be;
+    }
+    id ame142_vr = getPrefObject(@"video.renderer");
+    if ([ame142_vr isKindOfClass:NSString.class] && [ame142_family containsObject:ame142_vr]) {
+        return ame142_vr;
+    }
+    if (![ame142_vr isKindOfClass:NSString.class] ||
+        [ame142_vr isEqualToString:@"auto"] ||
+        [ame142_vr isEqualToString:@ RENDERER_KEY_MG]) {
+        NSInteger ame142_legacy = getPrefInt(@"mobileglues.mobilegl_backend");
+        if (ame142_legacy == 2) return @ RENDERER_NAME_MOBILEGL_GLES;
+        if (ame142_legacy == 3) return @ RENDERER_NAME_MITHRIL;
+        if (ame142_legacy == 1) return @ RENDERER_NAME_MOBILEGL;
+    }
+    return @ RENDERER_NAME_MOBILEGL;
+}
+
+// Task 142：一次性存储分层迁移（幂等；进程内 static 哨兵，可被任何读前
+// 路径安全重入——ame_effective_renderer / 设置页 / 实例页均会先行触达）。
+// 旧版（Task132-140）家族键直写 video.renderer 与 profile 的 renderer 键；
+// 新版渲染器层只存 "mg"，后端独立存 mobileglues.renderer_backend：
+//   - 全局：家族键 → 后端键（若未设）+ video.renderer = "mg"；
+//   - 各 profile：家族键 → "mg"（后端自此统一由 mg 设置决定）；
+//   - 迁移落位的同时退役 legacy 档位键 mobileglues.mobilegl_backend
+//     （写入后端键即"用户显式改选"，Task132 承诺的 legacy 终点），
+//     避免 JavaLauncher 的档位环境变量分支与新后端键互相矛盾。
+void ame142_migrateRendererStorage(void) {
+    static BOOL ame142_done = NO;
+    if (ame142_done) return;
+    ame142_done = YES;
+    NSArray *ame142_family = getRendererFamilyKeys();
+    // (1) 全局层
+    id ame142_vr = getPrefObject(@"video.renderer");
+    if ([ame142_vr isKindOfClass:NSString.class] && [ame142_family containsObject:ame142_vr]) {
+        id ame142_be = getPrefObject(@"mobileglues.renderer_backend");
+        if (![ame142_be isKindOfClass:NSString.class] ||
+            ![ame142_family containsObject:ame142_be]) {
+            setPrefObject(@"mobileglues.renderer_backend", ame142_vr);
+        }
+        setPrefObject(@"video.renderer", @ RENDERER_KEY_MG);
+        setPrefInt(@"mobileglues.mobilegl_backend", 0);
+        NSLog(@"[Amethyst] Task142: global renderer %@ migrated to 'mg' (backend key set, legacy tier retired)",
+              ame142_vr);
+    }
+    // (2) profile 层：逐个把家族键替换为 "mg"。
+    // profiles getter 返回 profileDict 内的活字典（非副本，VersionManager
+    // 同款口径）——原地改写后 [PLProfiles.current save] 一次落盘。
+    @try {
+        NSMutableDictionary *ame142_profiles = PLProfiles.current.profiles;
+        BOOL ame142_dirty = NO;
+        if ([ame142_profiles isKindOfClass:NSMutableDictionary.class]) {
+            for (NSString *ame142_name in ame142_profiles.allKeys.copy) {
+                NSMutableDictionary *ame142_prof =
+                    [ame142_profiles[ame142_name] isKindOfClass:NSDictionary.class]
+                        ? [ame142_profiles[ame142_name] mutableCopy] : nil;
+                if (!ame142_prof) continue;
+                id ame142_pr = ame142_prof[@"renderer"];
+                if ([ame142_pr isKindOfClass:NSString.class] &&
+                    [ame142_family containsObject:ame142_pr]) {
+                    ame142_prof[@"renderer"] = @ RENDERER_KEY_MG;
+                    ame142_profiles[ame142_name] = ame142_prof;
+                    ame142_dirty = YES;
+                    NSLog(@"[Amethyst] Task142: profile '%@' renderer %@ migrated to 'mg' (backend now follows mg settings)",
+                          ame142_name, ame142_pr);
+                }
+            }
+            if (ame142_dirty) {
+                [PLProfiles.current save];
+            }
+        }
+    } @catch (NSException *ame142_e) {
+        // profiles 文件异常时静默跳过（resolution 层仍兼容家族键原样返回）
+        NSLog(@"[Amethyst] Task142: profile migration skipped (%@)", ame142_e);
+    }
+}
+
 NSArray* getRendererFamilyKeys(void) {
     return @[
         @ RENDERER_NAME_MOBILEGL,

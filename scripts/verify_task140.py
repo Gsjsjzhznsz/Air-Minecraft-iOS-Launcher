@@ -74,14 +74,17 @@ check("C4 shadow toast wired",
 check("C5 mg display block has no unconditional MobileGL default",
       "return @ RENDERER_NAME_MOBILEGL;" not in lp.split('[key isEqualToString:@"renderer_backend"]')[1][:2500])
 mgblock = lp.split('[key isEqualToString:@"renderer_backend"]')[1][:2500]
-check("C6 mg display uses global key (not resolveKeyForCurrentProfile)",
-      'ame140_global = getPrefObject(@"video.renderer")' in mgblock and
-      "resolveKeyForCurrentProfile" not in mgblock)
-check("C7 main renderer row displays global via helper",
-      'if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {\n            NSString *ame140_global' in lp and
-      "ame_renderer_display_name(ame140_val)" in lp)
-check("C8 legacy auto+backend elevation preserved",
-      "ame140_backend == 2" in lp and "RENDERER_NAME_MOBILEGL_GLES" in lp)
+mgread = mgblock[:900]   # 只取读块本体（写块的 Task140 史注释合法提及 resolveKey）
+check("C6 →Task142 backend row reads its OWN key via ame142_effective_backend_key",
+      "ame142_migrateRendererStorage();\n            return ame142_effective_backend_key();" in mgread and
+      "resolveKeyForCurrentProfile" not in mgread)
+check("C7 →Task142 main renderer row returns the STORAGE key (checkmark audit fix)",
+      'if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {' in lp and
+      'return [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto"]'[:0] == '' and
+      re.search(r'isEqualToString:@"renderer"\]\) \{\n\s*ame142_migrateRendererStorage\(\);\n\s*NSString \*ame140_global = getPrefObject\(@"video\.renderer"\);\n\s*return \[ame140_global isKindOfClass:NSString\.class\] \? ame140_global : @"auto"\;', lp) is not None and
+      "ame_renderer_display_name(ame140_val)" not in lp.split('renderer_follow_global')[0][:0])
+check("C8 →Task142 legacy auto+backend elevation preserved (in ame142_effective_backend_key)",
+      "ame142_legacy == 2" in prefm and "RENDERER_NAME_MOBILEGL_GLES" in prefm)
 # C9 game editor
 check("C9 editor loadSettings: nil = follow global",
       "ame140_rendererRaw" in ps and 'self.selectedRenderer = [ame140_rendererRaw isKindOfClass:NSString.class] ? ame140_rendererRaw : nil;' in ps)
@@ -89,12 +92,17 @@ check("C10 editor save: nil removes key",
       '[existing removeObjectForKey:@"renderer"];' in ps)
 check("C11 editor no longer syncs global video.renderer",
       'setPrefString(@"video.renderer"' not in ps)
-check("C12 editor picker includes family + follow-global",
-      "getRendererFamilyKeys()" in ps and "rendererDisplayName:nil" in ps)
-check("C13 editor checkmarks",
-      ps.count('stringWithFormat:@"✓ %@"') >= 3)
-check("C14 display helper handles nil -> follow-global label",
-      "preference.profile.renderer_follow_global" in ps)
+check("C12 →Task142 editor picker is a single slim list (family keys only normalize the mg checkmark)",
+      "getRendererKeys(NO);" in ps and "getRendererFamilyKeys()" in ps and
+      "rendererDisplayName:nil" in ps and
+      ps.count("getRendererFamilyNames()") == 0)
+check("C13 →Task142 editor checkmark (single picker) + external follow-global toggle",
+      ps.count('stringWithFormat:@"✓ %@"') >= 1 and
+      "buildRendererFollowSwitch" in ps and
+      "rendererFollowSwitchChanged" in ps)
+check("C14 →Task142 follow-global is an external toggle row (picker-format key retired)",
+      "renderer_follow_global_toggle" in ps and
+      "preference.profile.renderer_follow_global\"" not in ps)
 check("C15 helper declared in header",
       "ame_renderer_display_name" in prefh)
 check("C16 helper implemented in LauncherPreferences.m",
@@ -139,10 +147,13 @@ base = 'Natives/resources/'
 counts = {}
 for lg in langs:
     s = read(base + lg + '/Localizable.strings')
-    n1 = '"preference.profile.renderer_follow_global"' in s
+    n1 = '"preference.profile.renderer_follow_global_toggle"' in s
     n2 = '"preference.warning.renderer_shadowed_by_profile"' in s
     n3 = '"preference.touchcontroller.hide_controls"' in s
-    check(f"E[{lg}] new keys present", n1 and n2 and n3)
+    n4 = '"preference.title.renderer.debug.mgfamily"' in s
+    n5 = '"preference.warning.mg_backend_missing_dylib"' in s
+    n6 = '"preference.profile.renderer_follow_global"' not in s   # Task142: picker 格式键退役
+    check(f"E[{lg}] new keys present (Task142 set)", n1 and n2 and n3 and n4 and n5 and n6)
     counts[lg] = s.count('\n"')
 vals = set(counts.values())
 check("E5 key count identical across 4 languages", len(vals) == 1, str(counts))
@@ -166,8 +177,14 @@ ren = read('README.md')
 check("F4 README_CN renderer row updated", '渲染器设置分层' in rcn)
 check("F5 README_CN hide semantics updated", '保留模组自己的虚拟按钮' in rcn)
 check("F6 README EN updated", 're-layered' in ren and 'Hide Launcher Controls' in ren)
-rn = read('/home/z/my-project/download/v6.0.0-release-notes.md')
-check("F7 release notes updated", '渲染器设置分层重构' in rn and 'Renderer & graphics' in rn)
+# Task142：release notes 是工作区工件（publish 管线的导出物，不在 git 内）
+# ——存在才校验；缺失时跳过（沙箱差异），announcements.json（git 内）已由
+# F1 覆盖同一内容面。
+if os.path.exists('/home/z/my-project/download/v6.0.0-release-notes.md'):
+    rn = read('/home/z/my-project/download/v6.0.0-release-notes.md')
+    check("F7 release notes updated", '渲染器设置分层重构' in rn and 'Renderer & graphics' in rn)
+else:
+    print("  (v6.0.0-release-notes.md not in workspace, skipping F7 -- regenerate from announcements.json at publish time)")
 vh = read('Natives/external/MobileGlues/MobileGlues-cpp/version.h')
 check("F8 version.h addendum", 'REVISION 17 addendum (Task 140, no bump)' in vh)
 

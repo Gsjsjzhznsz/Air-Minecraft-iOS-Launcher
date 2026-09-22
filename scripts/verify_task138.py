@@ -267,8 +267,8 @@ ks = []
 for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     s = rd(f"Natives/resources/{l}.lproj/Localizable.strings")
     ks.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
-check("I-l10n 四语言键集一致（Task141 基线 1922 = 1920 + 2）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1922,
+check("I-l10n 四语言键集一致（Task142 基线 1924 = Task141 的 1922 + 渲染器层 单mg/开关/后端告警 3 - 旧跟随全局 1）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1924,
       f"counts={[len(k) for k in ks]}")
 gram_ok = True
 for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:

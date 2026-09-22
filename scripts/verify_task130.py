@@ -300,8 +300,8 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
-check("H3 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1922,
+check("H3 四语言键集一致（Task142 基线 1924 = Task141 的 1922 + 渲染器层 单mg/开关/后端告警 3 - 旧跟随全局 1）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1924,
       f"counts={[len(s) for s in sets]}")
 
 delta_ok = True
