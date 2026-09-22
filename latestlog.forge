@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 5.1.0
-[Pre-Init] Commit: 171006c (main)
+[Pre-Init] Commit: a82c14f (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -18,14 +18,14 @@
 [Pre-init] Restored game directory preference (default)
 [SceneDelegate] Failed to update geometry: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
 [SceneDelegate] Terracotta temporarily disabled for crash investigation
-[PLPreferences] Setter could not find preference download.speed_probe.mcim
-2026-09-22 22:20:29.988 AngelAuraAmethyst[19551:2865251] [PLMirrorCenter] Task138 speed probe (family=1): official won (official=152ms mirror=389ms)
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Library/Caches/IconLoader, mirror enabled: YES
+[PLPreferences] Setter could not find preference download.speed_probe.mcim
+2026-09-22 23:37:48.597 AngelAuraAmethyst[20006:2898699] [PLMirrorCenter] Task138 speed probe (family=1): official won (official=188ms mirror=1018ms)
 [LauncherRootVC] Loaded 917 remote versions
 [PLPreferences] Setter could not find preference download.speed_probe.bmclapi
-2026-09-22 22:20:33.343 AngelAuraAmethyst[19551:2865256] [PLMirrorCenter] Task138 speed probe (family=0): official won (official=759ms mirror=3745ms)
-2026-09-22 22:20:40.896 AngelAuraAmethyst[19551:2865248] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
-2026-09-22 22:20:40.896 AngelAuraAmethyst[19551:2865248] CoreText note: Set a breakpoint on CTFontLogSystemFontNameRequest to debug.
+2026-09-22 23:37:51.387 AngelAuraAmethyst[20006:2898699] [PLMirrorCenter] Task138 speed probe (family=0): official won (official=1050ms mirror=3808ms)
+2026-09-22 23:37:55.444 AngelAuraAmethyst[20006:2898698] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
+2026-09-22 23:37:55.444 AngelAuraAmethyst[20006:2898698] CoreText note: Set a breakpoint on CTFontLogSystemFontNameRequest to debug.
 [ModpackDownload] Modpack download attempt 1: https://cdn.modrinth.com/data/WgY8x86a/versions/xXLsxVSL/Forgeulously%20Optimized%201.0.6.mrpack
 [DownloadVC] Vanilla 1.20.1 already installed (JSON + jar exist), skip preinstall
 [ModpackDL] Extracted overrides/config/NoChatReports/NCR-Client.json
@@ -192,6 +192,9 @@
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt failed (candidate 1, retry 0/3): 下载失败（https://cdn.modrinth.com/data/nmDcB62a/versions/scXW7F8Q/modernfix-forge-5.25.2%2Bmc1.20.1.jar）：网络连接已中断。
+[PLDownload] Attempt failed (candidate 1, retry 0/3): 下载失败（https://cdn.modrinth.com/data/qANg5Jrr/versions/hhjrLvn9/e4mc_minecraft-forge-5.5.4.jar）：网络连接已中断。
+[PLDownload] Attempt failed (candidate 1, retry 0/3): 下载失败（https://cdn.modrinth.com/data/u58R1TMW/versions/XoBmts8o/Connector-1.0.0-beta.47%2B1.20.1.jar）：网络连接已中断。
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
@@ -200,6 +203,9 @@
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=1 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=1 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=1 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
 [PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
@@ -222,8 +228,8 @@
 [ModpackImport] Mod download completed: 48/48 succeeded, 0 failed, 0 skipped(404), 41.76 MB transferred
 [ModpackImport] Task95: import report written to import_report.json (total=48 success=48 failed=0 skipped=0)
 [PLDownload] Attempt 1/2 retry=0 maven.minecraftforge.net
-[ModpackImport] Forge installer.jar download completed: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/tmp/1.20.1-forge-47.4.13-5ea1e5ef-installer.jar
-[ForgeDirect] Starting installation: 1.20.1-forge-47.4.13-5ea1e5ef
+[ModpackImport] Forge installer.jar download completed: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/tmp/1.20.1-forge-47.4.13-5a23bdbe-installer.jar
+[ForgeDirect] Starting installation: 1.20.1-forge-47.4.13-5a23bdbe
 [ForgeDirect] Progress: 0.00 - 开始安装
 [ForgeDirect] Reading install_profile.json
 [ForgeDirect] Progress: 0.05 - 正在读取 install_profile.json
@@ -234,7 +240,7 @@
 [ForgeDirect] JSON parsing completed, error=none
 [ForgeDirect] Detecting installer format
 [ForgeDirect] Format detection: new=1, old=0
-[ForgeDirect] Game directory (user.dir): /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/custom_gamedir/modrinth_1CC6C221-F4DF-4CF1-91F5-4C1A1459AF74
+[ForgeDirect] Game directory (user.dir): /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/custom_gamedir/modrinth_E011942D-E410-4E58-B698-AA7D5287B791
 [ForgeDirect] Main game directory (versions/libraries): /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft
 [ForgeDirect] Libraries directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries
 [ForgeDirect] Progress: 0.15 - 正在准备版本目录
@@ -246,7 +252,7 @@
 [ForgeDirect] Successfully read version.json (16554 bytes)
 [ForgeDirect] Parsing version.json
 [ForgeDirect] version.json parsed successfully
-[ForgeDirect] Version directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/versions/1.20.1-forge-47.4.13-5ea1e5ef
+[ForgeDirect] Version directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/versions/1.20.1-forge-47.4.13-5a23bdbe
 [ForgeDirect] Extracting all maven entries from installer jar
 [ForgeDirect] Progress: 0.20 - 正在解压内嵌 maven 依赖
 [ForgeDirect] Extracted 23 maven entries
@@ -265,8 +271,8 @@
 [ForgeProcExec] Var MC_UNPACKED = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-unpacked.jar
 [ForgeProcExec] Var MAPPINGS = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412-mappings.txt
 [ForgeProcExec] Var MERGED_MAPPINGS = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412-mappings-merged.txt
-[ForgeProcExec] Extracted installer entry data/client.lzma -> /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/A1EF50A3-8C24-4118-B396-7F4A6E044626
-[ForgeProcExec] Var BINPATCH = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/A1EF50A3-8C24-4118-B396-7F4A6E044626
+[ForgeProcExec] Extracted installer entry data/client.lzma -> /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/332D91ED-2871-4726-B7B9-AA84879FE12A
+[ForgeProcExec] Var BINPATCH = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/332D91ED-2871-4726-B7B9-AA84879FE12A
 [ForgeProcExec] Var MOJMAPS = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-mappings.txt
 [ForgeProcExec] Var MC_SLIM = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-slim.jar
 [ForgeProcExec] Var MC_SLIM_SHA = de86b035d2da0f78940796bb95c39a932ed84834
@@ -296,7 +302,7 @@
 sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [UI] Dialog shown: 等待 JIT: 请启用 JIT
 [IconLoader] App entered background: cancelled all ongoing downloads
-2026-09-22 22:20:50.437 AngelAuraAmethyst[19551:2865248] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
+2026-09-22 23:38:10.989 AngelAuraAmethyst[20006:2898698] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
 [JavaLauncher] launchHeadlessJVM: Task139 JIT became enabled, continuing
 [JavaLauncher] MoltenVK performance tracking + IMMEDIATE present mode requested for VSync diagnosis
 [JavaLauncher] Framerate unlock configuration:
@@ -317,7 +323,7 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
 [SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
 [SDLHook] Task134: JVM image watchdog started (200ms dyld scan, chain-independent JNA rebind backstop)
-[LWJGLSel] Task98: MC major 26 extracted from version id "fabric-loader-0.19.5-26.2-fefb9109" -> LWJGL 341 (SDL3 bindings)
+[LWJGLSel] Task98: MC major 26 extracted from version id "fabric-loader-0.19.2-26.1.2-6a9931bb" -> LWJGL 341 (SDL3 bindings)
 [JavaLauncher] headless JVM using LWJGL 341
 [CwdAlign] Task97: process CWD aligned to game dir: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/instances/default
 [JavaLauncher] Calling JLI_Launch (headless, 22 args)
@@ -325,8 +331,8 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
 [SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
 [JIT26] Requesting 64 MB for JIT mapping
-[JIT26] Got JIT mapping 0x13bc5c000 from debugger
-[JIT26] mapping at RW=0x13fc5c000, RX=0x13bc5c000
+[JIT26] Got JIT mapping 0x13b05c000 from debugger
+[JIT26] mapping at RW=0x142c00000, RX=0x13b05c000
 [ForgeProcessorRunner] Running net.minecraftforge.installertools.ConsoleTool with 8 classpath entries, args=[--task, MCP_DATA, --input, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412.zip, --output, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/de/oceanlabs/mcp/mcp_config/1.20.1-20230612.114412/mcp_config-1.20.1-20230612.114412-mappings.txt, --key, mappings]
 [ForgeProcExec] Progress: 0.69 - 正在执行安装任务 (0/4): net.minecraftforge:installertools:1.4.1
 Task: MCP_DATA
@@ -368,17 +374,17 @@ Adding input to inheritence map
 Processing entries
 Cant Find Class: org/slf4j/Logger
 Cant Find Class: javax/annotation/Nullable
-Cant Find Class: com/google/common/collect/Sets
-Cant Find Class: com/google/common/collect/Lists
 Cant Find Class: com/google/gson/JsonObject
+Cant Find Class: com/google/common/collect/Lists
+Cant Find Class: com/google/common/collect/Sets
 Cant Find Class: com/google/gson/JsonParser
 Cant Find Class: com/google/gson/JsonElement
-Cant Find Class: com/google/gson/JsonArray
 Cant Find Class: com/mojang/logging/LogUtils
+Cant Find Class: com/google/gson/JsonArray
 Cant Find Class: com/google/gson/annotations/SerializedName
+Cant Find Class: com/google/common/annotations/VisibleForTesting
 Cant Find Class: com/google/common/collect/ComparisonChain
 Cant Find Class: com/google/common/collect/Maps
-Cant Find Class: com/google/common/annotations/VisibleForTesting
 Cant Find Class: com/mojang/brigadier/Message
 Cant Find Class: javax/annotation/ParametersAreNonnullByDefault
 Cant Find Class: com/google/gson/Gson
@@ -389,44 +395,44 @@ Cant Find Class: com/google/common/cache/CacheLoader
 Cant Find Class: com/mojang/authlib/minecraft/MinecraftSessionService
 Cant Find Class: com/google/common/cache/LoadingCache
 Cant Find Class: com/mojang/authlib/GameProfile
-Cant Find Class: com/mojang/util/UUIDTypeAdapter
-Cant Find Class: org/lwjgl/system/MemoryUtil
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectMap
+Cant Find Class: com/mojang/util/UUIDTypeAdapter
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectOpenHashMap
 Cant Find Class: com/google/common/cache/CacheBuilder
-Cant Find Class: com/google/common/base/Strings
 Cant Find Class: org/apache/commons/io/output/CountingOutputStream
+Cant Find Class: com/google/common/base/Strings
 Cant Find Class: org/apache/http/entity/InputStreamEntity
+Cant Find Class: org/apache/http/util/Args
+Cant Find Class: org/lwjgl/system/MemoryUtil
+Cant Find Class: org/apache/commons/io/IOUtils
 Cant Find Class: org/apache/http/client/config/RequestConfig$Builder
 Cant Find Class: org/apache/http/client/config/RequestConfig
-Cant Find Class: org/apache/http/util/Args
-Cant Find Class: org/apache/http/client/methods/HttpGet
+Cant Find Class: org/apache/http/client/methods/HttpPost
 Cant Find Class: org/apache/http/impl/client/HttpClientBuilder
 Cant Find Class: org/apache/http/impl/client/CloseableHttpClient
 Cant Find Class: org/apache/http/client/methods/HttpUriRequest
 Cant Find Class: org/apache/http/client/methods/CloseableHttpResponse
+Cant Find Class: org/apache/http/HttpResponse
+Cant Find Class: org/apache/http/client/methods/HttpGet
+Cant Find Class: com/google/common/hash/Hashing
+Cant Find Class: org/apache/http/HttpEntity
+Cant Find Class: com/google/common/hash/HashFunction
 Cant Find Class: org/apache/http/Header
-Cant Find Class: org/apache/commons/io/IOUtils
+Cant Find Class: com/google/common/io/Files
+Cant Find Class: org/apache/http/StatusLine
+Cant Find Class: com/google/common/hash/HashCode
+Cant Find Class: org/apache/commons/io/FileUtils
+Cant Find Class: org/apache/http/util/EntityUtils
+Cant Find Class: com/mojang/datafixers/util/Pair
+Cant Find Class: org/apache/http/NameValuePair
 Cant Find Class: org/apache/commons/lang3/StringUtils
 Cant Find Class: org/apache/commons/compress/archivers/tar/TarArchiveInputStream
 Cant Find Class: org/apache/commons/compress/compressors/gzip/GzipCompressorInputStream
-Cant Find Class: com/google/common/hash/Hashing
-Cant Find Class: com/google/common/hash/HashFunction
-Cant Find Class: com/google/common/io/Files
 Cant Find Class: org/apache/commons/compress/archivers/tar/TarArchiveEntry
-Cant Find Class: com/google/common/hash/HashCode
-Cant Find Class: org/apache/commons/io/FileUtils
-Cant Find Class: org/apache/http/HttpResponse
-Cant Find Class: org/apache/http/StatusLine
-Cant Find Class: org/apache/http/HttpEntity
-Cant Find Class: com/mojang/datafixers/util/Pair
-Cant Find Class: org/apache/http/client/methods/HttpPost
 Cant Find Class: com/mojang/datafixers/util/Either
-Cant Find Class: org/apache/http/util/EntityUtils
-Cant Find Class: org/apache/http/NameValuePair
 Cant Find Class: com/google/common/util/concurrent/RateLimiter
-Cant Find Class: org/apache/commons/compress/archivers/tar/TarArchiveOutputStream
 Cant Find Class: com/google/common/collect/ImmutableList
+Cant Find Class: org/apache/commons/compress/archivers/tar/TarArchiveOutputStream
 Cant Find Class: org/apache/commons/compress/archivers/ArchiveEntry
 Cant Find Class: org/apache/commons/compress/utils/IOUtils
 Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectMap
@@ -437,80 +443,86 @@ Cant Find Class: com/mojang/serialization/codecs/RecordCodecBuilder$Instance
 Cant Find Class: com/mojang/serialization/codecs/RecordCodecBuilder
 Cant Find Class: com/mojang/datafixers/Products$P1
 Cant Find Class: com/mojang/datafixers/Products
-Cant Find Class: com/mojang/serialization/MapCodec
 Cant Find Class: org/lwjgl/stb/STBTTFontinfo
+Cant Find Class: com/mojang/serialization/MapCodec
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntArraySet
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntCollection
-Cant Find Class: com/mojang/datafixers/kinds/App
 Cant Find Class: org/lwjgl/stb/STBTruetype
-Cant Find Class: com/mojang/serialization/Codec
 Cant Find Class: org/lwjgl/system/MemoryStack
-Cant Find Class: com/mojang/serialization/codecs/PrimitiveCodec
-Cant Find Class: com/mojang/serialization/codecs/UnboundedMapCodec
+Cant Find Class: it/unimi/dsi/fastutil/ints/IntOpenHashSet
 Cant Find Class: org/lwjgl/openal/ALC10
 Cant Find Class: org/lwjgl/openal/ALC
 Cant Find Class: org/lwjgl/openal/ALCCapabilities
-Cant Find Class: com/mojang/datafixers/kinds/Applicative
-Cant Find Class: org/lwjgl/BufferUtils
 Cant Find Class: org/lwjgl/glfw/GLFW
 Cant Find Class: org/lwjgl/openal/AL
+Cant Find Class: org/lwjgl/openal/ALCapabilities
+Cant Find Class: com/mojang/datafixers/kinds/App
+Cant Find Class: org/lwjgl/openal/AL10
+Cant Find Class: org/lwjgl/openal/SOFTHRTF
+Cant Find Class: com/mojang/serialization/Codec
+Cant Find Class: com/mojang/serialization/codecs/PrimitiveCodec
+Cant Find Class: com/mojang/serialization/codecs/UnboundedMapCodec
+Cant Find Class: org/lwjgl/openal/ALUtil
+Cant Find Class: org/joml/Vector3f
+Cant Find Class: com/mojang/datafixers/kinds/Applicative
 Cant Find Class: org/lwjgl/stb/STBVorbis
 Cant Find Class: org/lwjgl/stb/STBVorbisAlloc
 Cant Find Class: org/lwjgl/stb/STBVorbisInfo
-Cant Find Class: org/lwjgl/openal/AL10
-Cant Find Class: org/joml/Vector3f
 Cant Find Class: org/lwjgl/PointerBuffer
-Cant Find Class: org/lwjgl/openal/ALCapabilities
+Cant Find Class: org/lwjgl/openal/ALC11
+Cant Find Class: org/lwjgl/BufferUtils
 Cant Find Class: javax/annotation/Nonnull
 Cant Find Class: javax/annotation/meta/TypeQualifierDefault
-Cant Find Class: org/joml/Quaternionf
-Cant Find Class: it/unimi/dsi/fastutil/ints/IntOpenHashSet
 Cant Find Class: org/lwjgl/glfw/GLFWVidMode$Buffer
 Cant Find Class: org/lwjgl/glfw/GLFWVidMode
 Cant Find Class: org/lwjgl/system/CustomBuffer
-Cant Find Class: org/lwjgl/openal/SOFTHRTF
-Cant Find Class: org/lwjgl/openal/ALUtil
-Cant Find Class: org/lwjgl/openal/ALC11
+Cant Find Class: org/joml/Quaternionf
 Cant Find Class: org/lwjgl/system/Pointer
 Cant Find Class: org/lwjgl/glfw/GLFWImage$Buffer
 Cant Find Class: org/lwjgl/glfw/GLFWImage
-Cant Find Class: org/lwjgl/opengl/GL20
 Cant Find Class: org/lwjgl/glfw/GLFWErrorCallback
+Cant Find Class: org/lwjgl/opengl/GL20
 Cant Find Class: org/lwjgl/opengl/GL11
 Cant Find Class: org/lwjgl/glfw/GLFWErrorCallbackI
-Cant Find Class: org/lwjgl/opengl/GLDebugMessageCallback
+Cant Find Class: org/lwjgl/glfw/GLFWMonitorCallbackI
 Cant Find Class: org/lwjgl/opengl/GL14
+Cant Find Class: org/lwjgl/glfw/GLFWMonitorCallback
+Cant Find Class: com/google/common/base/Charsets
 Cant Find Class: org/lwjgl/opengl/GL
 Cant Find Class: org/lwjgl/opengl/GLCapabilities
-Cant Find Class: com/google/common/base/Charsets
-Cant Find Class: org/lwjgl/glfw/GLFWMonitorCallbackI
 Cant Find Class: org/lwjgl/glfw/GLFWFramebufferSizeCallbackI
-Cant Find Class: org/lwjgl/opengl/KHRDebug
 Cant Find Class: org/lwjgl/opengl/GL20C
-Cant Find Class: org/lwjgl/glfw/GLFWMonitorCallback
 Cant Find Class: org/lwjgl/glfw/GLFWFramebufferSizeCallback
-Cant Find Class: org/lwjgl/opengl/GLDebugMessageCallbackI
+Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectCollection
 Cant Find Class: org/lwjgl/glfw/GLFWWindowPosCallbackI
+Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectIterator
 Cant Find Class: org/lwjgl/glfw/GLFWWindowPosCallback
 Cant Find Class: org/lwjgl/glfw/GLFWWindowSizeCallbackI
-Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectCollection
 Cant Find Class: org/lwjgl/glfw/GLFWWindowSizeCallback
-Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectIterator
-Cant Find Class: org/lwjgl/opengl/ARBDebugOutput
+Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectFunction
 Cant Find Class: org/lwjgl/glfw/GLFWWindowFocusCallbackI
-Cant Find Class: org/lwjgl/opengl/GLDebugMessageARBCallbackI
 Cant Find Class: org/lwjgl/glfw/GLFWWindowFocusCallback
-Cant Find Class: org/lwjgl/opengl/GLDebugMessageARBCallback
 Cant Find Class: org/lwjgl/glfw/GLFWCursorEnterCallbackI
 Cant Find Class: org/lwjgl/glfw/GLFWCursorEnterCallback
-Cant Find Class: com/google/common/collect/EvictingQueue
-Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectFunction
+Cant Find Class: org/lwjgl/opengl/GL15
+Cant Find Class: org/lwjgl/opengl/GL30
+Cant Find Class: org/lwjgl/opengl/GL32C
+Cant Find Class: org/lwjgl/opengl/GL13
+Cant Find Class: org/joml/Matrix4f
+Cant Find Class: org/joml/Vector4f
+Cant Find Class: org/joml/Vector3fc
+Cant Find Class: org/apache/commons/lang3/ArrayUtils
 Cant Find Class: org/lwjgl/util/tinyfd/TinyFileDialogs
 Cant Find Class: org/lwjgl/glfw/Callbacks
-Cant Find Class: org/apache/commons/lang3/ArrayUtils
 Cant Find Class: org/lwjgl/system/MemoryUtil$MemoryAllocator
+Cant Find Class: org/lwjgl/opengl/GLDebugMessageCallback
 Cant Find Class: org/lwjgl/stb/STBIWriteCallback
-Cant Find Class: org/joml/Matrix4f
+Cant Find Class: org/lwjgl/opengl/KHRDebug
+Cant Find Class: org/lwjgl/opengl/GLDebugMessageCallbackI
+Cant Find Class: org/lwjgl/opengl/ARBDebugOutput
+Cant Find Class: org/lwjgl/opengl/GLDebugMessageARBCallbackI
+Cant Find Class: org/lwjgl/opengl/GLDebugMessageARBCallback
+Cant Find Class: com/google/common/collect/EvictingQueue
 Cant Find Class: org/lwjgl/glfw/GLFWKeyCallbackI
 Cant Find Class: org/lwjgl/glfw/GLFWCharModsCallbackI
 Cant Find Class: org/lwjgl/glfw/GLFWKeyCallback
@@ -525,73 +537,67 @@ Cant Find Class: org/lwjgl/glfw/GLFWScrollCallback
 Cant Find Class: org/lwjgl/glfw/GLFWDropCallback
 Cant Find Class: oshi/hardware/CentralProcessor$ProcessorIdentifier
 Cant Find Class: oshi/hardware/CentralProcessor
-Cant Find Class: ca/weblite/objc/NSObject
-Cant Find Class: org/lwjgl/glfw/GLFWNativeCocoa
-Cant Find Class: com/sun/jna/Pointer
 Cant Find Class: org/lwjgl/Version
-Cant Find Class: ca/weblite/objc/Client
-Cant Find Class: ca/weblite/objc/Proxy
 Cant Find Class: oshi/SystemInfo
-Cant Find Class: org/lwjgl/opengl/GL32C
 Cant Find Class: oshi/hardware/HardwareAbstractionLayer
-Cant Find Class: org/joml/Matrix3f
 Cant Find Class: org/lwjgl/stb/STBImage
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntConsumer
+Cant Find Class: ca/weblite/objc/NSObject
+Cant Find Class: org/joml/Matrix3f
+Cant Find Class: org/lwjgl/glfw/GLFWNativeCocoa
 Cant Find Class: org/lwjgl/opengl/ARBTimerQuery
-Cant Find Class: org/lwjgl/stb/STBImageWrite
-Cant Find Class: org/joml/Vector3fc
-Cant Find Class: org/lwjgl/stb/STBImageResize
+Cant Find Class: com/sun/jna/Pointer
+Cant Find Class: ca/weblite/objc/Client
+Cant Find Class: ca/weblite/objc/Proxy
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntComparator
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntArrays
 Cant Find Class: com/google/common/primitives/Floats
 Cant Find Class: org/joml/Matrix4fc
 Cant Find Class: org/joml/Matrix3fc
+Cant Find Class: org/lwjgl/stb/STBImageWrite
+Cant Find Class: org/lwjgl/stb/STBImageResize
 Cant Find Class: com/google/common/collect/Queues
-Cant Find Class: org/joml/Quaternionfc
-Cant Find Class: org/joml/Vector4f
 Cant Find Class: org/apache/commons/lang3/mutable/MutableInt
-Cant Find Class: com/google/common/collect/ImmutableMap$Builder
+Cant Find Class: org/joml/Quaternionfc
 Cant Find Class: com/google/common/collect/ImmutableMap
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntList
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntArrayList
 Cant Find Class: com/google/common/collect/ImmutableCollection
-Cant Find Class: org/lwjgl/opengl/GL15
+Cant Find Class: com/google/common/collect/ImmutableMap$Builder
 Cant Find Class: com/google/common/collect/UnmodifiableIterator
-Cant Find Class: org/lwjgl/opengl/GL30
 Cant Find Class: com/google/common/collect/ImmutableSet
-Cant Find Class: org/lwjgl/opengl/GL13
 Cant Find Class: io/netty/channel/SimpleChannelInboundHandler
 Cant Find Class: com/google/common/collect/ForwardingList
-Cant Find Class: com/mojang/authlib/minecraft/MinecraftProfileTexture$Type
-Cant Find Class: com/mojang/authlib/minecraft/MinecraftProfileTexture
-Cant Find Class: com/mojang/authlib/properties/PropertyMap
-Cant Find Class: com/mojang/authlib/properties/Property
-Cant Find Class: com/google/common/io/ByteSource
 Cant Find Class: com/mojang/serialization/Keyable
+Cant Find Class: com/mojang/authlib/minecraft/MinecraftProfileTexture$Type
+Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntMap
+Cant Find Class: com/google/common/io/ByteSource
 Cant Find Class: org/apache/commons/io/filefilter/TrueFileFilter
 Cant Find Class: org/apache/commons/io/filefilter/IOFileFilter
 Cant Find Class: org/apache/commons/io/comparator/LastModifiedFileComparator
-Cant Find Class: it/unimi/dsi/fastutil/Hash$Strategy
-Cant Find Class: it/unimi/dsi/fastutil/Hash
-Cant Find Class: org/apache/commons/lang3/tuple/Pair
-Cant Find Class: it/unimi/dsi/fastutil/objects/Object2ObjectOpenCustomHashMap
 Cant Find Class: com/google/common/base/Splitter
-Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntMap
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntOpenHashMap
+Cant Find Class: com/google/common/collect/HashMultimap
+Cant Find Class: com/google/common/collect/Multimap
 Cant Find Class: com/google/gson/JsonParseException
+Cant Find Class: it/unimi/dsi/fastutil/Hash$Strategy
+Cant Find Class: org/apache/commons/lang3/tuple/Pair
+Cant Find Class: it/unimi/dsi/fastutil/Hash
 Cant Find Class: com/ibm/icu/lang/UCharacter
 Cant Find Class: it/unimi/dsi/fastutil/ints/Int2IntFunction
 Cant Find Class: com/ibm/icu/text/Bidi
 Cant Find Class: com/ibm/icu/text/BidiRun
 Cant Find Class: com/ibm/icu/text/ArabicShaping
+Cant Find Class: it/unimi/dsi/fastutil/objects/Object2ObjectOpenCustomHashMap
 Cant Find Class: com/mojang/datafixers/Products$P3
 Cant Find Class: com/mojang/datafixers/util/Function3
-Cant Find Class: com/google/common/collect/HashMultimap
-Cant Find Class: com/google/common/collect/Multimap
 Cant Find Class: com/google/gson/JsonDeserializer
+Cant Find Class: it/unimi/dsi/fastutil/objects/Object2ObjectArrayMap
 Cant Find Class: com/google/gson/JsonDeserializationContext
 Cant Find Class: org/apache/commons/lang3/Validate
-Cant Find Class: it/unimi/dsi/fastutil/objects/Object2ObjectArrayMap
+Cant Find Class: com/mojang/authlib/minecraft/MinecraftProfileTexture
+Cant Find Class: com/mojang/authlib/properties/PropertyMap
+Cant Find Class: com/mojang/authlib/properties/Property
 Cant Find Class: com/google/common/collect/ImmutableList$Builder
 Cant Find Class: com/google/common/collect/Iterables
 Cant Find Class: com/mojang/authlib/minecraft/InsecurePublicKeyException
@@ -599,17 +605,17 @@ Cant Find Class: com/mojang/authlib/minecraft/UserApiService$UserProperties
 Cant Find Class: com/mojang/authlib/minecraft/UserApiService
 Cant Find Class: com/mojang/authlib/minecraft/UserApiService$UserFlag
 Cant Find Class: com/mojang/datafixers/DataFixer
-Cant Find Class: org/slf4j/Marker
+Cant Find Class: com/mojang/authlib/yggdrasil/YggdrasilAuthenticationService
 Cant Find Class: com/google/gson/reflect/TypeToken
 Cant Find Class: com/google/gson/JsonSerializer
-Cant Find Class: org/slf4j/MarkerFactory
+Cant Find Class: it/unimi/dsi/fastutil/objects/Object2BooleanFunction
 Cant Find Class: com/google/gson/GsonBuilder
-Cant Find Class: com/mojang/authlib/yggdrasil/YggdrasilAuthenticationService
+Cant Find Class: org/slf4j/Marker
+Cant Find Class: com/mojang/authlib/minecraft/BanDetails
+Cant Find Class: org/slf4j/MarkerFactory
+Cant Find Class: com/mojang/authlib/exceptions/AuthenticationException
 Cant Find Class: org/apache/commons/lang3/tuple/Triple
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2IntLinkedOpenHashMap
-Cant Find Class: it/unimi/dsi/fastutil/objects/Object2BooleanFunction
-Cant Find Class: com/mojang/authlib/minecraft/BanDetails
-Cant Find Class: com/mojang/authlib/exceptions/AuthenticationException
 Cant Find Class: org/joml/Vector4fc
 Cant Find Class: com/google/common/collect/Streams
 Cant Find Class: com/google/common/base/MoreObjects$ToStringHelper
@@ -625,23 +631,23 @@ Cant Find Class: com/google/gson/JsonSyntaxException
 Found extra RuntimeVisibleParameterAnnotations entries in <init>(Lnet/minecraft/client/renderer/texture/SpriteContents;Lnet/minecraft/client/renderer/texture/SpriteContents$AnimatedTexture;Lnet/minecraft/client/renderer/texture/SpriteContents$InterpolationData;)V in net/minecraft/client/renderer/texture/SpriteContents$Ticker: removing 1
 Cant Find Class: com/google/common/collect/BiMap
 Cant Find Class: com/mojang/serialization/DataResult
-Cant Find Class: com/mojang/datafixers/Products$P2
 Cant Find Class: com/google/common/collect/HashBiMap
 Cant Find Class: com/mojang/serialization/Dynamic
 Cant Find Class: com/mojang/serialization/JsonOps
 Cant Find Class: com/mojang/serialization/DynamicOps
+Cant Find Class: com/mojang/datafixers/Products$P2
 Cant Find Class: com/google/common/base/Supplier
 Cant Find Class: com/google/common/base/Suppliers
-Cant Find Class: it/unimi/dsi/fastutil/ints/Int2IntOpenHashMap
-Cant Find Class: it/unimi/dsi/fastutil/ints/Int2IntMap
 Cant Find Class: com/mojang/datafixers/Products$P5
 Cant Find Class: com/mojang/datafixers/Products$P4
+Cant Find Class: it/unimi/dsi/fastutil/ints/Int2IntOpenHashMap
+Cant Find Class: it/unimi/dsi/fastutil/ints/Int2IntMap
 Cant Find Class: com/mojang/datafixers/util/Function5
-Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectSet
 Cant Find Class: com/mojang/datafixers/util/Function4
-Cant Find Class: com/google/common/collect/Ordering
+Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectSet
 Cant Find Class: it/unimi/dsi/fastutil/longs/LongOpenHashSet
 Cant Find Class: it/unimi/dsi/fastutil/longs/LongSet
+Cant Find Class: com/google/common/collect/Ordering
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectMap$Entry
 Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectArrayList
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2ObjectLinkedOpenHashMap
@@ -649,13 +655,13 @@ Cant Find Class: org/joml/Vector3d
 Cant Find Class: it/unimi/dsi/fastutil/objects/Reference2ObjectArrayMap
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectFunction
 Cant Find Class: com/google/common/primitives/Doubles
-Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectListIterator
 Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectArraySet
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntArrayFIFOQueue
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntPriorityQueue
-Cant Find Class: org/joml/FrustumIntersection
+Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectListIterator
 Cant Find Class: it/unimi/dsi/fastutil/objects/ReferenceArraySet
 Found extra RuntimeVisibleParameterAnnotations entries in <init>(Lnet/minecraft/client/renderer/chunk/ChunkRenderDispatcher$RenderChunk;DLnet/minecraft/client/renderer/chunk/RenderChunkRegion;Z)V in net/minecraft/client/renderer/chunk/ChunkRenderDispatcher$RenderChunk$RebuildTask: removing 1
+Cant Find Class: org/joml/FrustumIntersection
 Cant Find Class: org/apache/commons/compress/utils/Lists
 Cant Find Class: com/mojang/serialization/DataResult$PartialResult
 Cant Find Class: com/google/gson/stream/JsonReader
@@ -663,6 +669,7 @@ Cant Find Class: com/google/common/collect/HashBasedTable
 Cant Find Class: com/google/common/collect/Table
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectLinkedOpenHashMap
 Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectArrayMap
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
 Cant Find Class: com/mojang/authlib/properties/PropertyMap$Serializer
 Cant Find Class: com/google/common/base/Ticker
 Cant Find Class: com/google/common/base/Stopwatch
@@ -680,6 +687,7 @@ Cant Find Class: com/google/common/collect/PeekingIterator
 Cant Find Class: com/google/common/collect/Iterators
 Cant Find Class: it/unimi/dsi/fastutil/Swapper
 Cant Find Class: it/unimi/dsi/fastutil/Arrays
+Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectOpenHashSet
 Cant Find Class: com/mojang/text2speech/Narrator
 Cant Find Class: org/apache/commons/lang3/mutable/MutableFloat
 Cant Find Class: org/apache/commons/lang3/mutable/MutableObject
@@ -687,29 +695,28 @@ Cant Find Class: io/netty/buffer/ByteBuf
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectMap$FastEntrySet
 Cant Find Class: com/mojang/authlib/minecraft/InsecurePublicKeyException$MissingException
 Cant Find Class: com/mojang/brigadier/suggestion/Suggestions
+Cant Find Class: com/mojang/authlib/yggdrasil/response/KeyPairResponse
 Cant Find Class: com/mojang/brigadier/suggestion/SuggestionsBuilder
 Cant Find Class: com/mojang/brigadier/context/CommandContext
-Cant Find Class: com/mojang/authlib/exceptions/MinecraftClientException$ErrorType
 Cant Find Class: com/mojang/authlib/exceptions/MinecraftClientException
+Cant Find Class: com/mojang/authlib/exceptions/MinecraftClientException$ErrorType
 Cant Find Class: com/mojang/authlib/yggdrasil/request/AbuseReportRequest$ClientInfo
 Cant Find Class: com/mojang/authlib/yggdrasil/request/AbuseReportRequest
-Cant Find Class: com/mojang/authlib/yggdrasil/response/KeyPairResponse
 Cant Find Class: com/mojang/authlib/yggdrasil/request/AbuseReportRequest$ThirdPartyServerInfo
 Cant Find Class: com/mojang/authlib/yggdrasil/request/AbuseReportRequest$RealmInfo
+Cant Find Class: com/mojang/authlib/minecraft/report/AbuseReportLimits
 Cant Find Class: com/mojang/authlib/minecraft/report/AbuseReport
 Cant Find Class: com/mojang/datafixers/util/Unit
 Cant Find Class: com/mojang/authlib/exceptions/MinecraftClientHttpException
-Cant Find Class: com/mojang/authlib/minecraft/report/AbuseReportLimits
-Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectOpenHashSet
-Cant Find Class: it/unimi/dsi/fastutil/ints/IntRBTreeSet
-Cant Find Class: it/unimi/dsi/fastutil/ints/IntSortedSet
 Cant Find Class: com/mojang/authlib/minecraft/report/ReportEvidence
 Cant Find Class: com/mojang/authlib/minecraft/report/ReportedEntity
-Cant Find Class: com/mojang/authlib/minecraft/report/ReportChatMessage
+Cant Find Class: it/unimi/dsi/fastutil/ints/IntRBTreeSet
+Cant Find Class: it/unimi/dsi/fastutil/ints/IntSortedSet
 Cant Find Class: io/netty/channel/ChannelInitializer
 Cant Find Class: io/netty/bootstrap/Bootstrap
 Cant Find Class: io/netty/channel/EventLoopGroup
 Cant Find Class: io/netty/bootstrap/AbstractBootstrap
+Cant Find Class: com/mojang/authlib/minecraft/report/ReportChatMessage
 Cant Find Class: io/netty/channel/ChannelHandler
 Cant Find Class: io/netty/channel/socket/nio/NioSocketChannel
 Cant Find Class: io/netty/channel/ChannelFuture
@@ -720,14 +727,14 @@ Cant Find Class: io/netty/channel/ChannelHandlerContext
 Cant Find Class: io/netty/buffer/Unpooled
 Cant Find Class: io/netty/channel/ChannelFutureListener
 Cant Find Class: io/netty/util/concurrent/GenericFutureListener
+Cant Find Class: com/mojang/brigadier/arguments/ArgumentType
 Cant Find Class: com/google/common/util/concurrent/ListeningExecutorService
 Cant Find Class: com/google/common/util/concurrent/ListenableFuture
+Cant Find Class: com/mojang/brigadier/CommandDispatcher
 Cant Find Class: com/mojang/authlib/exceptions/AuthenticationUnavailableException
 Cant Find Class: com/mojang/authlib/exceptions/InvalidCredentialsException
 Cant Find Class: com/mojang/authlib/exceptions/InsufficientPrivilegesException
 Cant Find Class: com/mojang/authlib/exceptions/UserBannedException
-Cant Find Class: com/mojang/brigadier/arguments/ArgumentType
-Cant Find Class: com/mojang/brigadier/CommandDispatcher
 Cant Find Class: it/unimi/dsi/fastutil/objects/ReferenceOpenHashSet
 Cant Find Class: io/netty/channel/ChannelException
 Cant Find Class: io/netty/channel/ChannelConfig
@@ -738,26 +745,25 @@ Cant Find Class: it/unimi/dsi/fastutil/bytes/ByteArrayList
 Cant Find Class: it/unimi/dsi/fastutil/bytes/ByteList
 Cant Find Class: com/mojang/brigadier/tree/RootCommandNode
 Cant Find Class: com/ibm/icu/text/ArabicShapingException
-[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
-Cant Find Class: com/mojang/brigadier/ParseResults
 Cant Find Class: org/jetbrains/annotations/Nullable
+Cant Find Class: it/unimi/dsi/fastutil/ints/IntIterator
+Cant Find Class: com/mojang/brigadier/ParseResults
 Cant Find Class: com/mojang/brigadier/suggestion/Suggestion
 Cant Find Class: com/mojang/brigadier/context/StringRange
 Cant Find Class: com/mojang/brigadier/ImmutableStringReader
 Cant Find Class: com/mojang/brigadier/StringReader
+Cant Find Class: com/google/common/base/Function
 Cant Find Class: com/mojang/brigadier/exceptions/CommandSyntaxException
 Cant Find Class: com/mojang/brigadier/exceptions/CommandExceptionType
 Cant Find Class: com/mojang/brigadier/exceptions/BuiltInExceptionProvider
 Cant Find Class: com/mojang/brigadier/exceptions/DynamicCommandExceptionType
+Cant Find Class: org/joml/Vector2ic
 Cant Find Class: com/mojang/brigadier/exceptions/SimpleCommandExceptionType
 Cant Find Class: com/mojang/brigadier/tree/CommandNode
 Cant Find Class: com/mojang/brigadier/context/CommandContextBuilder
 Cant Find Class: com/mojang/brigadier/context/SuggestionContext
 Cant Find Class: com/mojang/brigadier/tree/LiteralCommandNode
 Cant Find Class: com/mojang/brigadier/context/ParsedArgument
-Cant Find Class: it/unimi/dsi/fastutil/ints/IntIterator
-Cant Find Class: com/google/common/base/Function
-Cant Find Class: org/joml/Vector2ic
 Cant Find Class: it/unimi/dsi/fastutil/longs/LongSets$EmptySet
 Cant Find Class: it/unimi/dsi/fastutil/longs/LongSets
 Cant Find Class: com/mojang/datafixers/DataFixUtils
@@ -767,38 +773,38 @@ Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectLinkedOpenHashSet
 Found extra RuntimeVisibleParameterAnnotations entries in <init>(Lnet/minecraft/client/gui/screens/reporting/ChatSelectionScreen$ChatSelectionList;ILnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/Component;Lnet/minecraft/client/GuiMessageTag;ZZ)V in net/minecraft/client/gui/screens/reporting/ChatSelectionScreen$ChatSelectionList$MessageEntry: removing 1
 Cant Find Class: org/apache/commons/lang3/mutable/MutableBoolean
 Found extra RuntimeVisibleParameterAnnotations entries in <init>(Lnet/minecraft/client/gui/screens/worldselection/EditGameRulesScreen;Ljava/util/List;Lnet/minecraft/network/chat/Component;)V in net/minecraft/client/gui/screens/worldselection/EditGameRulesScreen$GameRuleEntry: removing 1
-Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntOpenCustomHashMap
 Cant Find Class: com/mojang/serialization/Lifecycle
+Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntOpenCustomHashMap
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2BooleanMap
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2BooleanLinkedOpenHashMap
-Cant Find Class: com/google/common/util/concurrent/ThreadFactoryBuilder
 Cant Find Class: com/google/common/math/LongMath
+Cant Find Class: com/google/common/util/concurrent/ThreadFactoryBuilder
 Cant Find Class: org/joml/Math
 Cant Find Class: it/unimi/dsi/fastutil/booleans/BooleanList
 Cant Find Class: it/unimi/dsi/fastutil/booleans/BooleanArrayList
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntStack
-Found extra RuntimeVisibleParameterAnnotations entries in <init>(Ljava/lang/String;ILjava/lang/String;CILjava/lang/Integer;)V in net/minecraft/ChatFormatting: removing 2
-Found extra RuntimeVisibleParameterAnnotations entries in <init>(Ljava/lang/String;ILjava/lang/String;CZILjava/lang/Integer;)V in net/minecraft/ChatFormatting: removing 2
 Cant Find Class: org/apache/commons/lang3/StringEscapeUtils
 Cant Find Class: io/netty/util/ResourceLeakDetector$Level
 Cant Find Class: io/netty/util/ResourceLeakDetector
 Cant Find Class: com/mojang/datafixers/DSL$TypeReference
 Cant Find Class: com/mojang/datafixers/DSL
-Cant Find Class: org/apache/commons/io/FilenameUtils
 Cant Find Class: oshi/hardware/PhysicalMemory
-Cant Find Class: com/google/common/util/concurrent/MoreExecutors
-Cant Find Class: com/mojang/datafixers/types/Type
-Cant Find Class: com/mojang/datafixers/schemas/Schema
-Cant Find Class: com/google/gson/JsonSerializationContext
-Cant Find Class: com/google/gson/JsonNull
-Cant Find Class: com/google/gson/JsonPrimitive
-Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectList
+Cant Find Class: org/apache/commons/io/FilenameUtils
 Cant Find Class: oshi/hardware/VirtualMemory
 Cant Find Class: oshi/hardware/GlobalMemory
 Cant Find Class: oshi/hardware/GraphicsCard
+Found extra RuntimeVisibleParameterAnnotations entries in <init>(Ljava/lang/String;ILjava/lang/String;CILjava/lang/Integer;)V in net/minecraft/ChatFormatting: removing 2
+Found extra RuntimeVisibleParameterAnnotations entries in <init>(Ljava/lang/String;ILjava/lang/String;CZILjava/lang/Integer;)V in net/minecraft/ChatFormatting: removing 2
+Cant Find Class: com/google/gson/JsonSerializationContext
+Cant Find Class: com/google/gson/JsonPrimitive
+Cant Find Class: com/google/gson/JsonNull
 Cant Find Class: com/google/common/collect/ImmutableSet$Builder
+Cant Find Class: com/google/common/util/concurrent/MoreExecutors
 Cant Find Class: com/google/common/collect/ImmutableBiMap$Builder
 Cant Find Class: com/google/common/collect/ImmutableBiMap
+Cant Find Class: com/mojang/datafixers/types/Type
+Cant Find Class: com/mojang/datafixers/schemas/Schema
+Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectList
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2BooleanMap$Entry
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2BooleanOpenHashMap
 Cant Find Class: com/mojang/brigadier/exceptions/Dynamic2CommandExceptionType$Function
@@ -809,21 +815,21 @@ Cant Find Class: com/mojang/brigadier/Command
 Cant Find Class: com/mojang/brigadier/builder/RequiredArgumentBuilder
 Cant Find Class: com/mojang/brigadier/suggestion/SuggestionProvider
 Cant Find Class: com/mojang/brigadier/builder/LiteralArgumentBuilder
+Cant Find Class: com/mojang/brigadier/AmbiguityConsumer
 Cant Find Class: com/mojang/brigadier/exceptions/Dynamic3CommandExceptionType$Function
 Cant Find Class: com/mojang/brigadier/exceptions/Dynamic3CommandExceptionType
-Cant Find Class: com/mojang/brigadier/AmbiguityConsumer
-Cant Find Class: com/mojang/brigadier/arguments/BoolArgumentType
-Cant Find Class: com/mojang/brigadier/arguments/FloatArgumentType
 Cant Find Class: com/mojang/brigadier/tree/ArgumentCommandNode
 Cant Find Class: com/mojang/brigadier/arguments/DoubleArgumentType
+Cant Find Class: com/mojang/brigadier/arguments/BoolArgumentType
+Cant Find Class: com/mojang/brigadier/arguments/FloatArgumentType
 Cant Find Class: com/mojang/brigadier/arguments/IntegerArgumentType
 Cant Find Class: com/mojang/brigadier/arguments/LongArgumentType
 Cant Find Class: com/mojang/brigadier/arguments/StringArgumentType
 Cant Find Class: com/mojang/brigadier/arguments/StringArgumentType$StringType
 Cant Find Class: javax/annotation/concurrent/Immutable
-Cant Find Class: org/jetbrains/annotations/VisibleForTesting
 Cant Find Class: com/google/common/base/Predicate
 Cant Find Class: com/google/common/collect/Sets$SetView
+Cant Find Class: org/jetbrains/annotations/VisibleForTesting
 Cant Find Class: it/unimi/dsi/fastutil/longs/LongConsumer
 Cant Find Class: com/google/common/hash/HashingOutputStream
 Cant Find Class: com/google/gson/stream/JsonWriter
@@ -840,8 +846,8 @@ Cant Find Class: com/mojang/serialization/RecordBuilder$AbstractStringBuilder
 Cant Find Class: it/unimi/dsi/fastutil/bytes/ByteCollection
 Cant Find Class: it/unimi/dsi/fastutil/bytes/ByteOpenHashSet
 Cant Find Class: io/netty/handler/codec/MessageToMessageDecoder
-Cant Find Class: io/netty/buffer/ByteBufAllocator
 Cant Find Class: io/netty/handler/codec/MessageToByteEncoder
+Cant Find Class: io/netty/buffer/ByteBufAllocator
 Cant Find Class: io/netty/handler/codec/ByteToMessageDecoder
 Cant Find Class: io/netty/handler/timeout/ReadTimeoutHandler
 Cant Find Class: io/netty/handler/codec/DecoderException
@@ -854,45 +860,45 @@ Cant Find Class: io/netty/handler/codec/EncoderException
 Cant Find Class: io/netty/handler/timeout/TimeoutException
 Cant Find Class: io/netty/channel/EventLoop
 Cant Find Class: io/netty/util/concurrent/Future
-Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectMaps
 Cant Find Class: io/netty/channel/local/LocalChannel
 Cant Find Class: io/netty/channel/local/LocalServerChannel
-Cant Find Class: io/netty/handler/codec/MessageToMessageEncoder
 Cant Find Class: io/netty/channel/epoll/Epoll
 Cant Find Class: io/netty/channel/epoll/EpollSocketChannel
 Cant Find Class: io/netty/channel/socket/SocketChannel
-Cant Find Class: io/netty/handler/codec/CorruptedFrameException
+Cant Find Class: io/netty/handler/codec/MessageToMessageEncoder
+Cant Find Class: io/netty/channel/ChannelHandler$Sharable
 Cant Find Class: io/netty/buffer/ByteBufOutputStream
 Cant Find Class: io/netty/buffer/ByteBufInputStream
-Cant Find Class: io/netty/channel/ChannelHandler$Sharable
-Cant Find Class: com/google/gson/TypeAdapter
-Cant Find Class: com/google/gson/TypeAdapterFactory
+Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectMaps
+Cant Find Class: io/netty/handler/codec/CorruptedFrameException
 Cant Find Class: io/netty/util/ByteProcessor
+Cant Find Class: com/google/gson/TypeAdapter
 Cant Find Class: io/netty/util/ReferenceCounted
+Cant Find Class: com/google/gson/TypeAdapterFactory
 Cant Find Class: com/google/common/primitives/Ints
 Cant Find Class: com/google/common/base/Preconditions
 Cant Find Class: com/mojang/brigadier/context/ParsedCommandNode
 Cant Find Class: com/google/common/primitives/Longs
 Cant Find Class: com/mojang/datafixers/Products$P8
-Cant Find Class: com/mojang/datafixers/util/Function8
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntMap$Entry
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntPredicate
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntMaps
 Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectIterable
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntFunction
+Cant Find Class: com/mojang/datafixers/util/Function8
 Cant Find Class: it/unimi/dsi/fastutil/shorts/ShortSet
 Cant Find Class: it/unimi/dsi/fastutil/shorts/ShortIterator
+Cant Find Class: org/apache/commons/lang3/ObjectUtils
 Cant Find Class: com/mojang/serialization/ListBuilder$Builder
 Cant Find Class: com/mojang/serialization/ListBuilder
-Cant Find Class: it/unimi/dsi/fastutil/ints/IntListIterator
 Cant Find Class: com/mojang/serialization/RecordBuilder$MapBuilder
+Cant Find Class: it/unimi/dsi/fastutil/ints/IntListIterator
 Cant Find Class: com/mojang/serialization/Decoder
 Cant Find Class: com/google/common/collect/MapMaker
 Cant Find Class: com/google/gson/internal/Streams
 Cant Find Class: com/mojang/serialization/OptionalDynamic
-Found extra RuntimeVisibleParameterAnnotations entries in <init>(Lnet/minecraft/server/ServerFunctionManager;Lnet/minecraft/server/ServerFunctionManager$TraceCallbacks;)V in net/minecraft/server/ServerFunctionManager$ExecutionContext: removing 1
 Cant Find Class: it/unimi/dsi/fastutil/longs/LongIterator
-Cant Find Class: org/apache/commons/lang3/ObjectUtils
+Found extra RuntimeVisibleParameterAnnotations entries in <init>(Lnet/minecraft/server/ServerFunctionManager;Lnet/minecraft/server/ServerFunctionManager$TraceCallbacks;)V in net/minecraft/server/ServerFunctionManager$ExecutionContext: removing 1
 Cant Find Class: it/unimi/dsi/fastutil/Stack
 Cant Find Class: com/google/common/net/InetAddresses
 Cant Find Class: com/mojang/brigadier/RedirectModifier
@@ -900,9 +906,9 @@ Cant Find Class: com/mojang/brigadier/SingleRedirectModifier
 Cant Find Class: com/mojang/brigadier/exceptions/Dynamic4CommandExceptionType$Function
 Cant Find Class: com/mojang/brigadier/exceptions/Dynamic4CommandExceptionType
 Cant Find Class: it/unimi/dsi/fastutil/shorts/ShortOpenHashSet
-Cant Find Class: it/unimi/dsi/fastutil/longs/LongCollection
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectSortedMap$FastSortedEntrySet
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectSortedMap
+Cant Find Class: it/unimi/dsi/fastutil/longs/LongCollection
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ByteMap
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2LongMap
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ByteOpenHashMap
@@ -914,6 +920,7 @@ Cant Find Class: it/unimi/dsi/fastutil/longs/Long2IntOpenHashMap
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2IntMaps
 Cant Find Class: com/google/common/base/Objects
 Cant Find Class: it/unimi/dsi/fastutil/objects/Object2IntMap$FastEntrySet
+Cant Find Class: com/mojang/logging/LogQueues
 Cant Find Class: io/netty/channel/ChannelInboundHandlerAdapter
 Cant Find Class: io/netty/util/Timer
 Cant Find Class: io/netty/util/Timeout
@@ -925,20 +932,20 @@ Cant Find Class: io/netty/bootstrap/ServerBootstrap
 Cant Find Class: io/netty/channel/socket/ServerSocketChannel
 Cant Find Class: io/netty/channel/local/LocalAddress
 Cant Find Class: it/unimi/dsi/fastutil/ints/Int2ObjectMap$Entry
-Cant Find Class: com/mojang/logging/LogQueues
 Cant Find Class: com/google/common/base/Functions
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
 Cant Find Class: com/mojang/authlib/ProfileLookupCallback
 Cant Find Class: com/mojang/authlib/Agent
 Cant Find Class: com/mojang/authlib/yggdrasil/ProfileNotFoundException
 Cant Find Class: com/google/common/collect/Interner
 Cant Find Class: com/google/common/collect/Interners
+Cant Find Class: com/google/common/base/Predicates
 Cant Find Class: it/unimi/dsi/fastutil/bytes/ByteArrays
 Cant Find Class: it/unimi/dsi/fastutil/floats/FloatList
 Cant Find Class: it/unimi/dsi/fastutil/floats/FloatArrayList
-Cant Find Class: com/google/common/base/Predicates
 Cant Find Class: com/mojang/serialization/Codec$ResultFunction
-Cant Find Class: org/joml/AxisAngle4f
 Unexpected lack of synthetic args to the constructor: expected [Lnet/minecraft/util/ExtraCodecs;] at the start of <init>(Ljava/util/function/Function;)V in net/minecraft/util/ExtraCodecs$1ContextRetrievalCodec
+Cant Find Class: org/joml/AxisAngle4f
 Cant Find Class: org/jetbrains/annotations/Contract
 Cant Find Class: com/google/gson/stream/JsonToken
 Cant Find Class: org/apache/commons/lang3/math/NumberUtils
@@ -952,8 +959,8 @@ Cant Find Class: com/sun/jna/platform/win32/Version
 Cant Find Class: com/sun/jna/Native
 Cant Find Class: com/sun/jna/platform/win32/Win32Exception
 Cant Find Class: com/sun/jna/Memory
-Cant Find Class: io/netty/util/internal/ThreadLocalRandom
 Cant Find Class: com/sun/jna/ptr/PointerByReference
+Cant Find Class: io/netty/util/internal/ThreadLocalRandom
 Cant Find Class: com/mojang/authlib/yggdrasil/ServicesKeyInfo
 Cant Find Class: it/unimi/dsi/fastutil/objects/ObjectArrays
 Cant Find Class: com/mojang/datafixers/DataFix
@@ -1008,9 +1015,9 @@ Cant Find Class: com/mojang/datafixers/kinds/OptionalBox$Mu
 Cant Find Class: com/mojang/datafixers/kinds/OptionalBox
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2LongMap$Entry
 Cant Find Class: com/mojang/datafixers/kinds/Applicative$Mu
+Cant Find Class: com/mojang/datafixers/kinds/Const$Mu
 Cant Find Class: com/mojang/datafixers/kinds/IdF$Mu
 Cant Find Class: com/mojang/datafixers/kinds/IdF
-Cant Find Class: com/mojang/datafixers/kinds/Const$Mu
 Cant Find Class: com/mojang/datafixers/kinds/Const
 Cant Find Class: it/unimi/dsi/fastutil/shorts/Short2ObjectMap
 Cant Find Class: it/unimi/dsi/fastutil/shorts/Short2ObjectOpenHashMap
@@ -1028,7 +1035,6 @@ Cant Find Class: com/google/common/collect/Multiset
 Cant Find Class: com/google/common/collect/Multisets
 Cant Find Class: com/google/common/collect/ImmutableMultiset
 Cant Find Class: it/unimi/dsi/fastutil/ints/IntComparators
-[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
 Cant Find Class: com/mojang/serialization/codecs/SimpleMapCodec
 Cant Find Class: com/mojang/datafixers/Products$P12
 Cant Find Class: com/mojang/datafixers/util/Function12
@@ -1054,11 +1060,11 @@ Cant Find Class: com/google/common/collect/ContiguousSet
 Cant Find Class: it/unimi/dsi/fastutil/longs/Long2ObjectMaps
 Cant Find Class: org/apache/commons/lang3/mutable/MutableDouble
 Cant Find Class: com/mojang/datafixers/Products$P6
-Cant Find Class: it/unimi/dsi/fastutil/doubles/Double2DoubleFunction
 Cant Find Class: com/mojang/datafixers/util/Function6
+Cant Find Class: it/unimi/dsi/fastutil/doubles/Double2DoubleFunction
 Cant Find Class: com/mojang/datafixers/Products$P11
-Cant Find Class: it/unimi/dsi/fastutil/longs/Long2IntFunction
 Cant Find Class: com/mojang/datafixers/util/Function11
+Cant Find Class: it/unimi/dsi/fastutil/longs/Long2IntFunction
 Cant Find Class: com/mojang/serialization/codecs/RecordCodecBuilder$Mu
 Cant Find Class: com/mojang/datafixers/Products$P13
 Cant Find Class: com/mojang/datafixers/Products$P9
@@ -1234,6 +1240,7 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   com/mojang/blaze3d/vertex/package-info.class
   com/mojang/math/
   com/mojang/math/Axis.class
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   com/mojang/math/Constants.class
   com/mojang/math/Divisor.class
   com/mojang/math/FieldsAreNonnullByDefault.class
@@ -1842,7 +1849,6 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/client/gui/components/Tooltip.class
   net/minecraft/client/gui/components/Whence.class
   net/minecraft/client/gui/components/events/
-[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/client/gui/components/events/AbstractContainerEventHandler.class
   net/minecraft/client/gui/components/events/ContainerEventHandler.class
   net/minecraft/client/gui/components/events/GuiEventListener.class
@@ -2325,6 +2331,7 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/client/model/ChestedHorseModel.class
   net/minecraft/client/model/ChickenModel.class
   net/minecraft/client/model/CodModel.class
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/client/model/ColorableAgeableListModel.class
   net/minecraft/client/model/ColorableHierarchicalModel.class
   net/minecraft/client/model/CowModel.class
@@ -3735,7 +3742,6 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/data/advancements/packs/VanillaAdvancementProvider.class
   net/minecraft/data/advancements/packs/VanillaAdventureAdvancements.class
   net/minecraft/data/advancements/packs/VanillaHusbandryAdvancements.class
-[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/data/advancements/packs/VanillaNetherAdvancements.class
   net/minecraft/data/advancements/packs/VanillaStoryAdvancements.class
   net/minecraft/data/advancements/packs/VanillaTheEndAdvancements.class
@@ -3982,6 +3988,7 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/gametest/framework/TestFunction.class
   net/minecraft/gametest/framework/TestFunctionArgument.class
   net/minecraft/gametest/framework/TestReporter.class
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/gametest/framework/package-info.class
   net/minecraft/locale/
   net/minecraft/locale/Language$1.class
@@ -5762,6 +5769,7 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/world/entity/ai/behavior/declarative/BehaviorBuilder$Instance$5.class
   net/minecraft/world/entity/ai/behavior/declarative/BehaviorBuilder$Instance$Mu.class
   net/minecraft/world/entity/ai/behavior/declarative/BehaviorBuilder$Instance.class
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/world/entity/ai/behavior/declarative/BehaviorBuilder$Mu.class
   net/minecraft/world/entity/ai/behavior/declarative/BehaviorBuilder$PureMemory$1.class
   net/minecraft/world/entity/ai/behavior/declarative/BehaviorBuilder$PureMemory.class
@@ -5812,7 +5820,6 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/world/entity/ai/goal/DolphinJumpGoal.class
   net/minecraft/world/entity/ai/goal/DoorInteractGoal.class
   net/minecraft/world/entity/ai/goal/EatBlockGoal.class
-[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/world/entity/ai/goal/FleeSunGoal.class
   net/minecraft/world/entity/ai/goal/FloatGoal.class
   net/minecraft/world/entity/ai/goal/FollowBoatGoal.class
@@ -7424,6 +7431,7 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/world/level/block/entity/SculkSensorBlockEntity$VibrationUser.class
   net/minecraft/world/level/block/entity/SculkSensorBlockEntity.class
   net/minecraft/world/level/block/entity/SculkShriekerBlockEntity$VibrationUser.class
+[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/world/level/block/entity/SculkShriekerBlockEntity.class
   net/minecraft/world/level/block/entity/ShulkerBoxBlockEntity$1.class
   net/minecraft/world/level/block/entity/ShulkerBoxBlockEntity$AnimationStatus.class
@@ -7839,7 +7847,6 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/world/level/levelgen/WorldGenSettings.class
   net/minecraft/world/level/levelgen/WorldGenerationContext.class
   net/minecraft/world/level/levelgen/WorldOptions.class
-[ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
   net/minecraft/world/level/levelgen/WorldgenRandom$Algorithm.class
   net/minecraft/world/level/levelgen/WorldgenRandom.class
   net/minecraft/world/level/levelgen/Xoroshiro128PlusPlus.class
@@ -8853,7 +8860,8 @@ Writing Output: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-
   net/minecraft/world/ticks/package-info.class
 [ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
 [ForgeProcExec] Progress: 0.77 - 正在执行安装任务 (2/4): net.minecraftforge:ForgeAutoRenamingTool:0.1.22:all
-[ForgeProcessorRunner] Running net.minecraftforge.binarypatcher.ConsoleTool with 12 classpath entries, args=[--clean, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar, --output, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraftforge/forge/1.20.1-47.4.13/forge-1.20.1-47.4.13-client.jar, --apply, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/A1EF50A3-8C24-4118-B396-7F4A6E044626]
+[ForgeProcessorRunner] Running net.minecraftforge.binarypatcher.ConsoleTool with 12 classpath entries, args=[--clean, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar, --output, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraftforge/forge/1.20.1-47.4.13/forge-1.20.1-47.4.13-client.jar, --apply, /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/332D91ED-2871-4726-B7B9-AA84879FE12A]
+[ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
 Applying: 
   Clean:     /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/1.20.1-20230612.114412/client-1.20.1-20230612.114412-srg.jar
   Output:    /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/libraries/net/minecraftforge/forge/1.20.1-47.4.13/forge-1.20.1-47.4.13-client.jar
@@ -8861,8 +8869,7 @@ Applying:
   Unpatched: false
   Pack200:   false
   Legacy:    false
-Loading patches file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/A1EF50A3-8C24-4118-B396-7F4A6E044626
-[ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
+Loading patches file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/65C83894-2D46-40D5-B73D-C604E4874D67/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/332D91ED-2871-4726-B7B9-AA84879FE12A
 [ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
 [ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
   Reading patch com.mojang.blaze3d.pipeline.RenderTarget.binpatch
@@ -11972,6 +11979,7 @@ Processing: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2
   Patching net/minecraft/client/multiplayer/ServerStatusPinger$1 1/1
   Patching net/minecraft/client/multiplayer/ServerStatusPinger$2$1 1/1
   Patching net/minecraft/client/multiplayer/ServerStatusPinger$2 1/1
+[ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
   Patching net/minecraft/client/multiplayer/ServerStatusPinger 1/1
   Patching net/minecraft/client/multiplayer/chat/ChatListener$Message 1/1
   Patching net/minecraft/client/multiplayer/chat/ChatListener 1/1
@@ -12584,7 +12592,6 @@ Processing: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2
   Patching net/minecraft/world/entity/animal/MushroomCow$MushroomType 1/1
   Patching net/minecraft/world/entity/animal/MushroomCow 1/1
   Patching net/minecraft/world/entity/animal/Ocelot$OcelotAvoidEntityGoal 1/1
-[ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
   Patching net/minecraft/world/entity/animal/Ocelot$OcelotTemptGoal 1/1
   Patching net/minecraft/world/entity/animal/Ocelot 1/1
   Patching net/minecraft/world/entity/animal/Parrot$1 1/1
@@ -13032,6 +13039,7 @@ Processing: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2
   Patching net/minecraft/world/level/block/WebBlock 1/1
   Patching net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity$1 1/1
   Patching net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity 1/1
+[ForgeProcExec] Progress: 0.81 - 正在执行安装任务 (3/4): net.minecraftforge:binarypatcher:1.1.1
   Patching net/minecraft/world/level/block/entity/BaseContainerBlockEntity 1/1
   Patching net/minecraft/world/level/block/entity/BeaconBlockEntity$1 1/1
   Patching net/minecraft/world/level/block/entity/BeaconBlockEntity$BeaconBeamSection 1/1
@@ -13191,17 +13199,16 @@ Processing: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2
   Patching net/minecraft/world/level/block/entity/AbstractFurnaceBlockEntity$2 1/1
   Patching net/minecraft/world/item/Items$1 1/1
 [ForgeProcessorRunner] All 4 processor(s) finished
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
 [RenderDiag] exit(0) snapshot: swapOK=0 swapFail=0
 exit(0) called
 [Amethyst] Task144: exit(0) suppressed during headless JVM (thread exits, process lives)
 
-===== [Amethyst fatal trace] 2026-09-22 22:21:00.985 =====
+===== [Amethyst fatal trace] 2026-09-22 23:38:21.945 =====
 reason: Task144: exit(0) suppressed during headless JVM (thread exits, process lives)
 thread: (unnamed)
-  #00 0x10d37cd28  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 85288
-  #01 0x10d37d554  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 87380
-  #02 0x10dd0a078  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/libjli.dylib  dummyTimer + 57464
+  #00 0x108120d28  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 68904
+  #01 0x108121554  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 70996
+  #02 0x108ad6078  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-17-openjdk/lib/libjli.dylib  dummyTimer + 57464
   #03 0x1a0186038  /usr/lib/system/libsystem_pthread.dylib  _pthread_start + 16440
   #04 0x1a018291c  /usr/lib/system/libsystem_pthread.dylib  thread_start + 2332
 
@@ -13364,123 +13371,5 @@ thread: (unnamed)
 [ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
 [ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
 [ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
 [IconLoader] App entered background: cancelled all ongoing downloads
-[ForgeProcExec] Progress: 0.85 - 正在执行安装任务 (4/4)
-2026-09-22 22:23:20.711 AngelAuraAmethyst[19551:2865248] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
+2026-09-22 23:39:46.550 AngelAuraAmethyst[20006:2898698] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
