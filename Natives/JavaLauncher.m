@@ -1706,7 +1706,28 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // DYLIB 正则（开头不是 lib），于是统一走 System.mapLibraryName 补回，得到与磁盘
         // 完全一致的文件名。
         NSString *openglLibBareName = lwjglBareLibName(openglLibName);
-        PUSH_MARGV_FORMAT(@"-Dorg.lwjgl.opengl.libname=%s", openglLibBareName.UTF8String);
+        // Task146：Mithril（OpenGL 4.0 档）libname 从裸名升级为绝对路径。
+        // 病历：Mithril 会话 make-current 探针证实渲染器自身 glGetString 正常
+        // 返回版本号（dlsym 自 dlsym_EGL 记录的句柄），但 LWJGL
+        // GL.createCapabilities 拿到的同名解析返回 NULL → "no OpenGL context"。
+        // 唯一未定因素：裸名 libname 的 dlopen 能否命中 dlsym_EGL 已加载的
+        // 实例取决于 dyld 的路径/安装名匹配。绝对路径使 LWJGL 的 dlopen 与
+        // @rpath 预加载指向同一物理文件（dyld 按规范路径去重 → 同一实例），
+        // 函数解析必然落在 Mithril 自身实现上。三指针对比探针（gl_bridge
+        // make-current 分支）同场留证：修复生效则 RESOLVED-SAME 且 ver 非空。
+        // 文件不存在时回退裸名（原行为），其余渲染器路径零改动。
+        NSString *openglLibPush = openglLibBareName;
+        if (strcmp(glLibName, RENDERER_NAME_MITHRIL) == 0) {
+            NSString *ame146_abs = [[[NSBundle mainBundle] bundlePath]
+                stringByAppendingPathComponent:@"Frameworks/libmithril.dylib"];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:ame146_abs]) {
+                openglLibPush = ame146_abs;
+                NSLog(@"[JavaLauncher] Task146: Mithril libname -> absolute path %@ (dedupe into dlsym_EGL instance)", ame146_abs);
+            } else {
+                NSLog(@"[JavaLauncher] Task146: Mithril abs path missing (%@), fallback to bare name", ame146_abs);
+            }
+        }
+        PUSH_MARGV_FORMAT(@"-Dorg.lwjgl.opengl.libname=%s", openglLibPush.UTF8String);
 
         // 关键修复（参照 FCL，阶段4：26.2 图形 API 切换无效）：
         // 之前仅在 renderer=libMoltenVK.dylib 时由 PojavLauncher.java 通过 System.setProperty 设置

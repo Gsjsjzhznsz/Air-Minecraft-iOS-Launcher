@@ -4,6 +4,7 @@
 #import "LauncherPreferences.h"
 
 #include <dlfcn.h>
+#include <pthread.h>
 #include <string.h>
 #include <time.h>
 #include <stdatomic.h>
@@ -227,6 +228,15 @@ typedef struct {
     ame_es_fbtex2d_t   framebufferTexture2D; // Task 49 几何自愈
     ame_es_checkfb_t   checkFramebufferStatus; // Task 49 几何自愈
 } ame_es_t;
+
+// Task146：渲染器 EGL dylib 的 dlopen 句柄（dlsym_EGL 内赋值，定义原在
+// 1220 行一带——swap 取证与 make_current 取证都先于该行使用，上移至此）。
+// 用途：
+//   1. gl_make_current 成功分支的同源 glGetString 探测（Task145）；
+//   2. Task146 三指针 glGetString 对比（裁决 LWJGL 全局域解析落点）；
+//   3. ame_task41_swap_forensics 的渲染器侧 dispatch（自 EGL 渲染器会话
+//      中 ame_es() 固定解析到 ANGLE，读数全是别家库的状态）。
+static void *ame145_rendererHandle = NULL;
 
 static ame_es_t ame_es(void) {
     static ame_es_t s_es;
@@ -666,6 +676,28 @@ static BOOL ame_task53_realign_surface(void) {
 // 0 = undecided, 1 = normal, 2 = geo-heal blit
 static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapIndex) {
     ame_es_t es = ame_es();
+    // Task146：自 EGL 渲染器（Mithril / MobileGL 家族）改走渲染器自身 dispatch。
+    // 病历：ame_es() 固定从 Task41 候选（ANGLE libGLESv2）解析；自 EGL 渲染
+    // 器的上下文不属于 ANGLE，ANGLE 的 glGetIntegerv/eglQuerySurface 在其
+    // 上调用返回空读数——Magma(Vulkan) 会话 "viewport 恒 0x0"、Mithril 会话
+    // 几何读数失真皆此假象。渲染器句柄已由 dlsym_EGL 记录，同名 dlsym 即得
+    // 正确实现；单个符号缺失时保留 ame_es() 原值兜底（行为不劣于现状）。
+    const char *ame146_renderer = getenv("AMETHYST_RENDERER");
+    if (ame145_rendererHandle != NULL && isSelfEglRenderer(ame146_renderer)) {
+        void *ame146_giv = dlsym(ame145_rendererHandle, "glGetIntegerv");
+        void *ame146_bfb = dlsym(ame145_rendererHandle, "glBindFramebuffer");
+        void *ame146_qs  = dlsym(ame145_rendererHandle, "eglQuerySurface");
+        if (ame146_giv) es.getIntegerv    = (ame_es_getint_t)ame146_giv;
+        if (ame146_bfb) es.bindFramebuffer = (ame_es_bindfb_t)ame146_bfb;
+        if (ame146_qs)  es.querySurface   = (EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint *))ame146_qs;
+        static int ame146_dspLogs = 0;
+        if (ame146_dspLogs < 2) {
+            ame146_dspLogs++;
+            NSLog(@"[GLGeo] Task146 renderer-side dispatch ON (%s): getIntegerv=%p bindFramebuffer=%p querySurface=%p (was ANGLE-pinned ame_es())",
+                  ame146_renderer ?: "<?>", (void *)es.getIntegerv,
+                  (void *)es.bindFramebuffer, (void *)es.querySurface);
+        }
+    }
     if (es.getIntegerv == NULL || es.bindFramebuffer == NULL) return;
 
     static int s_mode = 0;          // 0 undecided / 1 normal / 2 blit
@@ -1215,9 +1247,9 @@ static ame_fn_create_pbuffer       ame_raw_create_pbuffer = NULL;
 static ame_fn_egl_query_surface    ame_raw_query_surface = NULL;
 static PFNEGLCREATECONTEXTPROC     ame_raw_create_context = NULL;
 static PFNEGLMAKECURRENTPROC       ame_raw_make_current = NULL;
-// Task145：渲染器 EGL dylib 的 dlopen 句柄（dlsym_EGL 内赋值），
-// 供 gl_make_current 取证读回用同源 glGetString 探测。
-static void *ame145_rendererHandle = NULL;
+// Task145/146：渲染器 EGL dylib 句柄（ame145_rendererHandle）的定义已
+// 上移至 ame_es() 之前——ame_task41_swap_forensics 与 gl_make_current 的
+// 取证代码都先于此处使用它。
 static PFNEGLDESTROYCONTEXTPROC    ame_raw_destroy_context = NULL;
 static PFNEGLDESTROYSURFACEPROC    ame_raw_destroy_surface = NULL;
 static PFNEGLSWAPINTERVALPROC      ame_raw_swap_interval = NULL;   // Task 76 双保险
@@ -1701,6 +1733,16 @@ void gl_make_current(gl_render_window_t* bundle) {
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
         br_set_current((basic_render_window_t *)bundle);
+        // Task146：make_current 全量取证（限频 8 条）。跨会话比对 ES/Vulkan/
+        // Mithril 三类会话的 surface/context 指针形态与绑定线程，配合下方
+        // 三指针对比一次日志裁决全部渲染器的解析与绑定行为。
+        static int ame146_mcLogs = 0;
+        if (ame146_mcLogs < 8) {
+            ame146_mcLogs++;
+            NSLog(@"[gl_bridge] Task146 make-current #%d: self=%p surface=%p ctx=%p thread=%p main=%d",
+                  ame146_mcLogs, (void *)bundle, (void *)bundle->surface,
+                  (void *)bundle->context, pthread_self(), [NSThread isMainThread] ? 1 : 0);
+        }
         // Task 140/145：MakeCurrent 成功后的读回取证。Mithril 病历（ab9670d：
         // MakeCurrent 返回 TRUE 但 GL.createCapabilities 报 no current
         // context）后，此处把渲染器侧 eglGetCurrentContext 的读回值留进
@@ -1722,15 +1764,28 @@ void gl_make_current(gl_render_window_t* bundle) {
                       : @"current context confirmed");
                 if (ame140_readback != EGL_NO_CONTEXT) {
                     typedef const char *(*ame_gl_getstring_t)(unsigned int);
-                    ame_gl_getstring_t ame145_gs = ame145_rendererHandle
+                    // Task146：三指针对比——LWJGL 端函数解析落点的裁决证据。
+                    //   default  = dlsym(RTLD_DEFAULT)：GL 类 provider 若走全局域
+                    //              （MacOSXLibrary RTLD 语义），这就是它拿到的指针；
+                    //   renderer = dlsym(ame145_rendererHandle)：渲染器自身实现
+                    //              （Task145 已证可返回版本号）。
+                    // 两指针不同且 default 调用返回 NULL = 实锤"解析命中先加载
+                    // 的别家实现（ANGLE）"，修复方向即让解析命中渲染器实例
+                    // （绝对路径 libname / SharedLibrary 注入二选一）。
+                    ame_gl_getstring_t ame146_def =
+                        (ame_gl_getstring_t)dlsym(RTLD_DEFAULT, "glGetString");
+                    ame_gl_getstring_t ame146_ren = ame145_rendererHandle
                         ? (ame_gl_getstring_t)dlsym(ame145_rendererHandle, "glGetString")
                         : NULL;
-                    const char *ame145_ver =
-                        ame145_gs ? ame145_gs(0x1F02 /* GL_VERSION */) : NULL;
-                    NSLog(@"[gl_bridge] Task145 glGetString-probe: version=%s "
-                          @"(NULL == renderer's glGetString disagrees with its "
-                          @"eglGetCurrentContext -- thread-bound model desync)",
-                          ame145_ver ?: "<NULL>");
+                    const char *ame146_verDef = ame146_def ? ame146_def(0x1F02) : NULL;
+                    const char *ame146_verRen = ame146_ren ? ame146_ren(0x1F02) : NULL;
+                    NSLog(@"[gl_bridge] Task146 glGetString tri-probe: "
+                          @"default=%p ver=%s | renderer=%p ver=%s | %s",
+                          (void *)ame146_def, ame146_verDef ?: "<NULL>",
+                          (void *)ame146_ren, ame146_verRen ?: "<NULL>",
+                          ame146_def == ame146_ren
+                              ? @"RESOLVED-SAME (global domain lands on renderer)"
+                              : @"RESOLVED-DIFFERENT (LWJGL global-domain picks a foreign implementation!)");
                 }
             }
         }

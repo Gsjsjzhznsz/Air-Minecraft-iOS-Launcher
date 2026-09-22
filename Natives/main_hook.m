@@ -35,6 +35,8 @@ void* (*orig_dlsym)(void* handle, const char* name);
 // 调用线程（JVM 自身线程），ObjC 侧继续读 status.json 判定成败。
 // 游戏正常退出路径（标志未置位）不受影响。
 atomic_int g_ame_suppressJvmExit = 0;
+// Task 146：headless JVM 终结信号（语义与置位点见 JavaLauncher.h 注释）。
+atomic_int g_ame_headlessJvmFinished = 0;
 
 // MARK: - SDL3 grab 状态同步（MC 26.3）
 //
@@ -315,6 +317,11 @@ void hooked_exit(int code) {
         snprintf(supMsg, sizeof(supMsg), "Task144: exit(%d) suppressed during headless JVM (thread exits, process lives)", code);
         NSLog(@"[Amethyst] %s", supMsg);
         ame_write_fatal_trace(supMsg);
+        // Task 146：exit 被拦截 = 安装器 JVM 已跑完（libjli 的 exit(0) 就是
+        // 它的"正常收尾"）。先置终结信号再 pthread_exit，等待方据此继续
+        // 读 status.json 判定安装成败（不再依赖 join —— libjli 的终止设计
+        // 就是杀进程，JLI_Launch 永远不会返回，装机日志 0.85 (4/4) 刷屏实锤）。
+        atomic_store(&g_ame_headlessJvmFinished, 1);
         pthread_exit(NULL);
     }
     // Task 48：exit(0) 也写回溯。此前只有非零退出才落 fatal_trace.txt；而

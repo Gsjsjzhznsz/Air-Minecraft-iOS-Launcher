@@ -48,3 +48,14 @@ BOOL JVMUsedInProcess(void);
 // hooked_exit 命中标志时改为 pthread_exit 仅终结 JVM 线程，进程存活。
 #include <stdatomic.h>
 extern atomic_int g_ame_suppressJvmExit;
+
+// Task 146：headless JVM 终结信号（定义在 main_hook.m）。
+// 装机日志实锤（2026-09-22 23:38 会话，构建 a82c14f4）：libjli 的终止设计
+// 本身就是"dummyTimer 线程调用 exit(0) 终结整个进程"——它永远不会返回到
+// JLI_Launch 的调用方。exit 被抑制成 pthread_exit 后，launchHeadlessJVM
+// 卡死在 JLI 内部，pthread_join 永远等不到（装机表现为 0.85 (4/4) 无限
+// 刷屏）。本标志在两条终结路径上都会置位：
+//   ① hooked_exit 抑制分支（exit(0) 被拦截 = JVM 正常跑完）；
+//   ② ame146 线程函数在 launchHeadlessJVM 真返回时（JLI 启动失败语义）。
+// ForgeProcessorExecutor 改为等待本标志而非 pthread_join。
+extern atomic_int g_ame_headlessJvmFinished;

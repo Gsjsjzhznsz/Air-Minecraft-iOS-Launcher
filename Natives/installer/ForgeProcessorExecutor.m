@@ -35,10 +35,13 @@ NSString *const ForgeProcessorExecutorErrorDomain = @"ForgeProcessorExecutorErro
 // headless JVM 中运行的 processor runner 主类
 static NSString *const kProcessorRunnerMainClass = @"net.kdt.pojavlaunch.tools.ForgeProcessorRunner";
 
-// Task 145：headless JVM 专用线程上下文（见 runProcessorsWithProfile 内注释）。
-// exit(0) 抑制路径下 hooked_exit 会 pthread_exit 本线程，launchHeadlessJVM
-// 永不返回；改跑在独立可 join 的 pthread 上后，pthread_join 两边都能等到
-// 线程终结（正常 return 或被抑制的 exit），返回码仅保留启动失败语义。
+// Task 145/146：headless JVM 专用线程上下文（见 runProcessorsWithProfile 内注释）。
+// Task 146 语义修正：libjli 的终止设计 = dummyTimer 线程调 exit(0) 杀进程，
+// JLI_Launch 永远不会返回调用方；exit 被抑制后本线程卡死在 JLI 内部，
+// pthread_join 永远等不到（装机 2026-09-22 23:38 会话实锤：抑制日志之后
+// 直接无限 0.85 (4/4) 刷屏，"launchHeadlessJVM returned" 从未出现）。
+// 等待方改看 g_ame_headlessJvmFinished 标志（hooked_exit 抑制分支置位 /
+// 本函数正常返回时置位）；本线程允许永久滞留 JLI，pthread_detach 兜底。
 typedef struct {
     NSString *mainClass;
     NSArray<NSString *> *args;
@@ -49,6 +52,8 @@ typedef struct {
 static void *ame145_headlessJvmThread(void *raw) {
     ame145_headlessCtx *ctx = (ame145_headlessCtx *)raw;
     ctx->ret = launchHeadlessJVM(ctx->mainClass, ctx->args, ctx->minJava);
+    // Task 146：正常返回路径（JLI 启动失败 -1~-6 等）也置终结信号。
+    atomic_store(&g_ame_headlessJvmFinished, 1);
     return NULL;
 }
 
@@ -242,7 +247,7 @@ static const double kInnerProcessorsStart = 0.45;
     // hooked_exit 改为只终结调用线程；JLI_Launch 正常返回，下方照常读
     // status.json 判定安装成败。
     atomic_store(&g_ame_suppressJvmExit, 1);
-    // Task 145：headless JVM 移到独立可 join 的 pthread 上执行。
+    // Task 145：headless JVM 移到独立 pthread 上执行。
     //
     // Task 144 病历补充（装机 latestlog.forge 22:21 会话实锤）：JLI_Launch 在
     // JVM main 返回后由 libjli 启动线程（fatal-trace 栈帧 dummyTimer）调用
@@ -250,9 +255,14 @@ static const double kInnerProcessorsStart = 0.45;
     // 成 pthread_exit，结果 launchHeadlessJVM 永不返回，下方 status.json 终态
     // 判定与收尾代码永远不执行，轮询线程挂死（装机表现为进度恒 0.85、
     // "正在执行安装任务 (4/4)" 刷屏直到用户切后台）。
-    // 专用线程 + pthread_join 后：无论 JLI 正常返回还是 exit 被转成线程退出，
-    // join 都能等到，调用方照常读 status.json 判定安装成败；ret 仅保留
-    // JLI 启动失败语义（-1~-6，无 exit 发生的路径）。
+    //
+    // Task 146（装机 2026-09-22 23:38 会话二次实锤）：专用线程 + pthread_join
+    // 依旧挂死 —— libjli 的终止设计本身就是"dummyTimer 线程 exit(0) 杀进程"，
+    // exit 被抑制成 pthread_exit 后，launchHeadlessJVM 卡死在 JLI 内部等待
+    // 一个永远不会到来的进程终止，join 等不到线程终结。改为等待
+    // g_ame_headlessJvmFinished 终结信号（hooked_exit 抑制分支 / 线程函数
+    // 正常返回两个路径都会置位）；本线程 detach 兜底，允许永久滞留 JLI
+    //（一次性安装流程，泄漏 64MB 虚拟内存可接受，旧设计里整个进程都会死）。
     ame145_headlessCtx ame145_ctx = {
         .mainClass = kProcessorRunnerMainClass,
         .args = @[commandsPath, statusPath],
@@ -267,7 +277,21 @@ static const double kInnerProcessorsStart = 0.45;
     int ame145_rc = pthread_create(&ame145_tid, &ame145_attr, ame145_headlessJvmThread, &ame145_ctx);
     pthread_attr_destroy(&ame145_attr);
     if (ame145_rc == 0) {
-        pthread_join(ame145_tid, NULL);
+        // Task 146：等终结信号而非 join（理由见上）。0.5s 轮询 + 20 分钟
+        // 上限（超时 = 极端异常路径漏置信号，照常走 status.json 判定，
+        // 与旧行为相比不会更坏；轮询线程仍在打印实时进度）。
+        int ame146_waited = 0;
+        while (!atomic_load(&g_ame_headlessJvmFinished) && ame146_waited < 2400) {
+            usleep(500 * 1000);
+            ame146_waited++;
+        }
+        if (atomic_load(&g_ame_headlessJvmFinished)) {
+            NSLog(@"[ForgeProcExec] Task146: headless JVM finished (%s), reading status.json",
+                  ame146_waited > 0 ? "exit-suppressed or returned" : "already done");
+        } else {
+            NSLog(@"[ForgeProcExec] Task146: headless JVM wait timeout (%d s), reading status.json anyway", ame146_waited / 2);
+        }
+        pthread_detach(ame145_tid);
     } else {
         // 兜底：线程创建失败时保持旧行为（同线程执行）。
         NSLog(@"[ForgeProcExec] Task145: pthread_create failed (%d), running headless JVM inline", ame145_rc);
