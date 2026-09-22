@@ -1215,6 +1215,9 @@ static ame_fn_create_pbuffer       ame_raw_create_pbuffer = NULL;
 static ame_fn_egl_query_surface    ame_raw_query_surface = NULL;
 static PFNEGLCREATECONTEXTPROC     ame_raw_create_context = NULL;
 static PFNEGLMAKECURRENTPROC       ame_raw_make_current = NULL;
+// Task145：渲染器 EGL dylib 的 dlopen 句柄（dlsym_EGL 内赋值），
+// 供 gl_make_current 取证读回用同源 glGetString 探测。
+static void *ame145_rendererHandle = NULL;
 static PFNEGLDESTROYCONTEXTPROC    ame_raw_destroy_context = NULL;
 static PFNEGLDESTROYSURFACEPROC    ame_raw_destroy_surface = NULL;
 static PFNEGLSWAPINTERVALPROC      ame_raw_swap_interval = NULL;   // Task 76 双保险
@@ -1244,6 +1247,10 @@ static bool dlsym_EGL() {
             eglPath, renderer ?: "<unset>", dlerror() ?: "unknown dlopen error");
         return false;
     }
+    // Task145：留下渲染器 EGL dylib 的句柄（与 handle.eglMakeCurrent 同库），
+    // 供 gl_make_current 的取证读回用同源 glGetString 探测（避免
+    // RTLD_DEFAULT 撞上先加载的 ANGLE，见 Task 140 病历）。
+    ame145_rendererHandle = dl_handle;
 
     // Task 36：MobileGlues 前端 EGL 准备（不改变任何行为，仅记录句柄/符号，
     // 真正的指针切换发生在 ame_mgBootstrap 成功之后）。
@@ -1694,12 +1701,16 @@ void gl_make_current(gl_render_window_t* bundle) {
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
         br_set_current((basic_render_window_t *)bundle);
-        // Task 140：MakeCurrent 成功后的读回取证。Mithril 病历（ab9670d：
+        // Task 140/145：MakeCurrent 成功后的读回取证。Mithril 病历（ab9670d：
         // MakeCurrent 返回 TRUE 但 GL.createCapabilities 报 no current
         // context）后，此处把渲染器侧 eglGetCurrentContext 的读回值留进
         // 日志——attribs 修复后 Mithril 会话应出现 "readback ctx != EGL_NO_CONTEXT"；
         // 若再出现 readback=0x0 + 后续 createCapabilities 崩溃，则说明
         // Mithril 的 MakeCurrent 假成功另有机制（下一轮日志一眼定位）。
+        // Task145 补充：再读回一次 glGetString(GL_VERSION) —— 补丁版
+        // createCapabilities 的探针是直接调渲染器的 glGetString 函数指针
+        // （不查 TLS/eglGetCurrentContext），此处同线程同点探测若为 NULL
+        // 即证明 Mithril 内部 eglGetCurrentContext 与 glGetString 分叉。
         if (handle.eglGetCurrentContext != NULL) {
             static int ame140_rbLogs = 0;
             if (ame140_rbLogs < 3) {
@@ -1709,6 +1720,18 @@ void gl_make_current(gl_render_window_t* bundle) {
                       (void *)ame140_readback,
                       ame140_readback == EGL_NO_CONTEXT ? @"EGL_NO_CONTEXT -- renderer reports NO current context!"
                       : @"current context confirmed");
+                if (ame140_readback != EGL_NO_CONTEXT) {
+                    typedef const char *(*ame_gl_getstring_t)(unsigned int);
+                    ame_gl_getstring_t ame145_gs = ame145_rendererHandle
+                        ? (ame_gl_getstring_t)dlsym(ame145_rendererHandle, "glGetString")
+                        : NULL;
+                    const char *ame145_ver =
+                        ame145_gs ? ame145_gs(0x1F02 /* GL_VERSION */) : NULL;
+                    NSLog(@"[gl_bridge] Task145 glGetString-probe: version=%s "
+                          @"(NULL == renderer's glGetString disagrees with its "
+                          @"eglGetCurrentContext -- thread-bound model desync)",
+                          ame145_ver ?: "<NULL>");
+                }
             }
         }
         if (ame_mgFrontendActive) {

@@ -203,16 +203,14 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         // At this point, if renderer is still auto (unspecified major version), pick gl4es
         renderer = @ RENDERER_NAME_GL4ES;
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
-        // Task 144：POJAV_RENDERER 与 AMETHYST_RENDERER 同步导出 —— LWJGL
-        // 补丁版 GL.createCapabilities 检测到前者时会在 glGetString 探针前调
-        // fixPojavGLContext()（反射 glfwMakeContextCurrent(mainContext)），
-        // 把上下文绑到当前线程。详见 JavaLauncher.m 主导出处。
-        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        // Task 144：POJAV_RENDERER 同步导出 —— 已于 Task 145 撤销：Sodium 0.9.2
+        // 的 PostLaunchChecks.isUsingPojavLauncher 检测到该变量即在首帧抛异常
+        // （详见 JavaLauncher.m Task145 主导出处）。gl4es 全局上下文模型无需重绑定门。
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
         renderer = @ RENDERER_NAME_MOBILEGLUES;
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
-        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        // Task 145：同上，不再导出 POJAV_RENDERER。
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE]) {
         set_gl_bridge_tbl();
@@ -341,13 +339,13 @@ void pojavSetWindowHint(int hint, int value) {
             case 1:
             case 2:
                 setenv("AMETHYST_RENDERER", RENDERER_NAME_GL4ES, 1);
-                setenv("POJAV_RENDERER", RENDERER_NAME_GL4ES, 1);
+                // Task 145：不再导出 POJAV_RENDERER（Sodium 反 Pojav 检测，见主导出处）。
                 JNI_LWJGL_changeRenderer(RENDERER_NAME_GL4ES);
                 break;
             // case 4: use Zink?
             default:
                 setenv("AMETHYST_RENDERER", RENDERER_NAME_MOBILEGLUES, 1);
-                setenv("POJAV_RENDERER", RENDERER_NAME_MOBILEGLUES, 1);
+                // Task 145：同上。
                 JNI_LWJGL_changeRenderer(RENDERER_NAME_MOBILEGLUES);
                 break;
         }

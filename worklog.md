@@ -181,3 +181,21 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### Stage Summary
 - 装机待验证锚点：①选 Mithril(4.0 后端) 进游戏不再闪退（日志见 POJAV_RENDERER 导出 + 正常起图）；②ES 后端进世界方块渲染恢复（若仍复现，下轮抓 MGL 前端 GLES 行）；③Forge 安装走完 100%（不再 85% 闪退，日志出现 `Task144: exit(0) suppressed during headless JVM`）；④渲染器列表显示 "MobileGlues" 全名（不再裸 "mg"）；⑤选"自动" + MC 1.17+ -> 日志 `Auto renderer resolved to libMobileGL.dylib (modern MC...)`；⑥mg 会话日志不再出现 `MobileGlues config not written`；⑦旧包并存检测日志 `Task144: legacy bundle ... still installed`；⑧zink/gl4es/angle 切换保持 Task142/143 行为。
 - 用户须知：双图标在仓库侧不可修（旧 App 独立容器）——主屏删除旧版 "AngelAuraAmethyst" 即可；新 App 数据不受影响。
+
+## Task 145（本会话，Sodium 全崩根修 + 4.0 门补丁 + Forge 线程化）
+
+装机日志（0297d0c7/d8295412 两批共 5 份，全部 171006c 构建）：22:16 libmithril 会话 IllegalStateException "no OpenGL context"（4.0 依旧崩）；22:19 libMobileGL / 22:20 libOSMesa 两会话 Sodium `PostLaunchChecks.isUsingPojavLauncher` 首帧抛异常（"not supported when using Sodium"）＝用户"你一改全部失效"；22:21 forge 会话 exit(0) 抑制生效但进度恒 0.85 挂死。
+
+诊断（反汇编实锤）：
+1. **Sodium 全崩根因**：Modrinth 拉 sodium-fabric-0.9.2+mc26.2.jar 反编译 `PostLaunchChecks` —— `System.getenv("POJAV_RENDERER") != null` 即判 PojavLauncher 抛异常（常量池无 isEmpty，空值也躲不过）。Task144 无条件导出该变量＝全渲染器全崩。
+2. **4.0 崩因再进一层**：补丁版 lwjgl-opengl.jar `GL.createCapabilities` 的重绑定门是 `Platform.get() == Platform.LINUX && getenv("POJAV_RENDERER") != null -> fixPojavGLContext()`；本启动器伪装 `os.name=Mac OS X`（JNA 兼容，JavaLauncher.m:725）→ Platform != LINUX → **门永不触发**，Task144 的变量导出白导。运行时 GLFW 类＝Amethyst overlay（JavaApp/Makefile lwjgl-%.jar 规则，libs/*/*.jar 之上覆盖 build/lwjgl），源码已含 `mainContext` 字段+赋值（GLFW.java:513/1030），无需补字段；libs/lwjgl-341/lwjgl-glfw.jar 的 GL.class 是 stub（不进 classpath 主链）。
+3. **Forge 挂死根因**：JLI_Launch 在 JVM main 返回后由【调用线程】（fatal-trace 栈帧 libjli dummyTimer）调 exit(0) 终结进程；Task144 把它转 pthread_exit → launchHeadlessJVM 永不返回 → status.json 终态判定/收尾代码永不到达 → 轮询挂死。
+
+修复（本提交）：
+- `JavaLauncher.m`：POJAV_RENDERER 仅 `isMithrilRenderer()` 时导出，其它渲染器 unsetenv（同会话先 Mithril 后其它渲染器的残留也清掉）；auto 分支与防御同步同步收紧。
+- `egl_bridge.m`：gl4es/MOBILEGLUES 分支与 pojavSetWindowHint 两处共 4 个无条件 setenv("POJAV_RENDERER") 全部移除。
+- `scripts/patch_lwjgl_gate.py` + 两个二进制：lwjgl-341/333 的 lwjgl-opengl.jar `GL.class` 把门里 `invokestatic Platform.get / getstatic Platform.LINUX / if_acmpne` 9 字节 NOP 掉（栈平衡、目标帧不变），门改为纯由 POJAV_RENDERER 控制（仅 Mithril 导出，非 Mithril 零行为变化）。
+- `ForgeProcessorExecutor.m`：headless JVM 改跑 64MB 栈专用 pthread + pthread_join；exit 被转线程退出后 join 照常返回，status.json 终态判定恢复，轮询不再挂死。ret 仅保留启动失败语义。
+- `gl_bridge.m`（取证，无行为变化）：dlsym_EGL 处捕获渲染器 dylib 句柄；gl_make_current 成功分支在 Task140 readback 后追加同源 `glGetString(GL_VERSION)` 探针——下轮 Mithril 日志可一锤判定「renderer 内部 eglGetCurrentContext 与 glGetString 分叉」还是「创建后被动解绑」。
+
+装机验证锚点：① 带 Sodium 整合包 + MobileGL/OSMesa/zink/ANGLE 启动不再出现 "not supported when using Sodium"；② 4.0 后端（若再崩）日志必现 `Task140 make-current readback` + `Task145 glGetString-probe: version=...` 两行——NULL 值即 Mithril 内部分叉实锤；③ Forge 安装越过 0.85 后出现 status.json 终态判定日志（成功或明确报错），不再无限刷 (4/4)。

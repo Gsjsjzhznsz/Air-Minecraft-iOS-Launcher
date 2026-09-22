@@ -1217,17 +1217,28 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         }
         NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
-        // Task 144：POJAV_RENDERER 与 AMETHYST_RENDERER 同步导出。
-        // LWJGL 补丁版（JavaApp/libs/lwjgl-341/lwjgl-opengl.jar，Pojav patch）
-        // GL.createCapabilities 里有且仅有这扇门：System.getenv("POJAV_RENDERER")
-        // 非空 -> 反射调 fixPojavGLContext() -> glfwMakeContextCurrent(mainContext)
-        // 把上下文绑到渲染线程，然后才跑 glGetString(GL_VERSION) 探针。
-        // 未设置时探针直接打在渲染器 dylib 上 —— Mithril（4.0 后端，线程绑定
-        // 模型）在渲染线程返回 NULL -> IllegalStateException "There is no OpenGL
-        // context current in the current thread"（装机 latestlog.txt 20:40 会话
-        // 实锤）；MobileGL-gles/OSMesa 全局模型混过但渲染线程上下文其实也没绑。
-        // 变量值本身补丁只判空不解析，取有效渲染器键保持语义一致。
-        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        // Task 145：POJAV_RENDERER 仅对 Mithril（4.0 后端）导出，其它渲染器
+        // 一律 unsetenv。Task 144 曾无条件同步导出，结果触发了 Sodium 0.9.2
+        // 的反 PojavLauncher 检测（装机反汇编实锤：net.caffeinemc.mods.sodium
+        // .client.compatibility.checks.PostLaunchChecks.isUsingPojavLauncher
+        // 的第一个条件就是 System.getenv("POJAV_RENDERER") != null -> 抛
+        // "It appears that you are using PojavLauncher, which is not supported
+        // when using Sodium"）——所有带 Sodium 的整合包在第一帧全崩（装机
+        // latestlog 22:19 MobileGL / 22:20 OSMesa 两个会话同因）。而 LWJGL
+        // 补丁的重绑定门只有 Mithril（线程绑定 EGL 模型）真正需要：
+        // GL.createCapabilities 里 System.getenv("POJAV_RENDERER") 非空 ->
+        // 反射调 fixPojavGLContext() -> glfwMakeContextCurrent(mainContext)，
+        // 未设置时渲染线程 glGetString 探针返回 NULL -> IllegalStateException
+        // "There is no OpenGL context current in the current thread"（22:16
+        // 会话 libmithril 实锤）。MobileGL/OSMesa/zink/ANGLE 全局模型本来
+        // 就不需要它（Task 144 之前无此变量时全部可玩）。unsetenv 兜底：
+        // 同一 app 会话内先启 Mithril 再启其它渲染器时，清掉上一次残留，
+        // 防止新 JVM 的环境快照把变量带给 Sodium。
+        if (isMithrilRenderer(renderer.UTF8String)) {
+            setenv("POJAV_RENDERER", renderer.UTF8String, 1);
+        } else {
+            unsetenv("POJAV_RENDERER");
+        }
 
         // Apply Zink-specific environment variables if Zink renderer is selected
         // Mesa 25.0.7 zink 升级配套：根据设备 GPU 代际自动调优 MESA_GL_VERSION_OVERRIDE、
@@ -1624,14 +1635,16 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                 NSLog(@"[JavaLauncher] Auto renderer resolved to %s (ANGLE fallback: minVersion=%d or libMobileGL missing)",
                       glLibName, minVersion);
             }
+            // Task 145：auto 解析结果只会是 libMobileGL/ANGLE（见上），两者都是
+            // 全局上下文模型，不再导出 POJAV_RENDERER（导出会触发 Sodium
+            // 反 Pojav 检测，见 launchJVM 主导出处 Task145 注释）。
+        } else if (isMithrilRenderer(glLibName) && getenv("POJAV_RENDERER") == NULL) {
+            // Task 145：仅 Mithril 需要防御补漏（LWJGL 补丁只认这个变量名来
+            // 激活 fixPojavGLContext —— Mithril 4.0 装机闪退根修）。主导出处
+            // 见上方 AMETHYST_RENDERER 的 setenv（launchJVM ~1219），此处只
+            // 覆盖 AMETHYST_RENDERER 被外部注入而主路径没跑到的场景。
             setenv("POJAV_RENDERER", glLibName, 1);
-        } else if (getenv("POJAV_RENDERER") == NULL) {
-            // Task 144：非 auto 渲染器也要有 POJAV_RENDERER（LWJGL 补丁只认这个
-            // 变量名来激活 fixPojavGLContext —— Mithril 4.0 装机闪退根修）。
-            // 主导出处见上方 AMETHYST_RENDERER 的 setenv（launchJVM ~1219），
-            // 此处防御补漏（AMETHYST_RENDERER 可能由外部注入而非本函数写出）。
-            setenv("POJAV_RENDERER", glLibName, 1);
-            NSLog(@"[JavaLauncher] Task144: POJAV_RENDERER synced from AMETHYST_RENDERER (%s)", glLibName);
+            NSLog(@"[JavaLauncher] Task145: POJAV_RENDERER exported for Mithril (%s)", glLibName);
         }
         if (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0) {
             // 对齐 Ynnyny 仓库：Vulkan 模式下 OpenGL 回退库使用 MobileGlues
