@@ -2058,7 +2058,7 @@
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 實驗性)";
 "preference.profile.renderer_follow_global_toggle" = "跟隨全域渲染器";
-"preference.title.renderer.debug.mgfamily" = "mg";
+"preference.title.renderer.debug.mgfamily" = "MobileGlues";
 "preference.warning.mg_backend_missing_dylib" = "mg 後端（%@）的渲染庫缺失，已回落預設後端（Vulkan 直連）。";
 "preference.warning.renderer_shadowed_by_profile" = "已寫入全域預設（%@）。目前遊戲保留獨立渲染器設定（%@），如需變更請在遊戲設定頁調整。";
 "preference.warning.renderer_missing_dylib" = "本構建未隨包攜帶 %@，遊戲將回退為 Auto（ANGLE）。如需啟用，請把對應 dylib 放入 app 的 Frameworks 目錄。";

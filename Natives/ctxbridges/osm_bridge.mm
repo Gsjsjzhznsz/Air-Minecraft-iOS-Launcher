@@ -1078,34 +1078,34 @@ void osm_apply_current_ll() {
     int bufW = (ame_surfaceWidth > 0) ? ame_surfaceWidth : windowWidth;
     int bufH = (ame_surfaceHeight > 0) ? ame_surfaceHeight : windowHeight;
     if (bufW <= 0 || bufH <= 0) return;
-    if (currentBundle->osm.width == (uint32_t)bufW && currentBundle->osm.height == (uint32_t)bufH) {
+    if (br_get_current()->osm.width == (uint32_t)bufW && br_get_current()->osm.height == (uint32_t)bufH) {
         return;
     }
 
-    currentBundle->osm.width = bufW;
-    currentBundle->osm.height = bufH;
-    currentBundle->osm.buffer = reallocf(currentBundle->osm.buffer, bufW * bufH * 4);
+    br_get_current()->osm.width = bufW;
+    br_get_current()->osm.height = bufH;
+    br_get_current()->osm.buffer = reallocf(br_get_current()->osm.buffer, bufW * bufH * 4);
 
-    handle.OSMesaMakeCurrent(currentBundle->osm.context, currentBundle->osm.buffer, GL_UNSIGNED_BYTE, bufW, bufH);
+    handle.OSMesaMakeCurrent(br_get_current()->osm.context, br_get_current()->osm.buffer, GL_UNSIGNED_BYTE, bufW, bufH);
     handle.OSMesaPixelStore(OSMESA_ROW_LENGTH, bufW);
     handle.OSMesaPixelStore(OSMESA_Y_UP, 0);
 }
 
 void osm_make_current(osm_render_window_t* bundle) {
     if(!bundle) {
-        free(currentBundle->osm.buffer);
-        CGColorSpaceRelease(currentBundle->osm.color_space);
-        currentBundle->osm.buffer = NULL;
-        currentBundle->osm.color_space = NULL;
-        currentBundle->osm.width = currentBundle->osm.height = 0;
-        currentBundle = NULL;
+        free(br_get_current()->osm.buffer);
+        CGColorSpaceRelease(br_get_current()->osm.color_space);
+        br_get_current()->osm.buffer = NULL;
+        br_get_current()->osm.color_space = NULL;
+        br_get_current()->osm.width = br_get_current()->osm.height = 0;
+        br_set_current(NULL);
         //technically this does nothing as its not possible to unbind a context in OSMesa
         handle.OSMesaMakeCurrent(NULL, NULL, 0, 0, 0);
         return;
     }
 
-    currentBundle = (basic_render_window_t *)bundle;
-    currentBundle->osm.color_space = CGColorSpaceCreateDeviceRGB();
+    br_set_current((basic_render_window_t *)bundle);
+    br_get_current()->osm.color_space = CGColorSpaceCreateDeviceRGB();
     osm_apply_current_ll();
 }
 
@@ -1152,15 +1152,15 @@ void osm_swap_buffers() {
     int vp105W = 0, vp105H = 0;                    // MC 真实视口（证据/心跳）
     bool vp105Adapted = false;
     if (ame83_resolve_gl() && ame83_fsr.gl.glGetIntegerv &&
-        currentBundle != NULL &&
-        currentBundle->osm.width > 0 && currentBundle->osm.height > 0) {
+        br_get_current() != NULL &&
+        br_get_current()->osm.width > 0 && br_get_current()->osm.height > 0) {
         int vp105[4] = {0, 0, 0, 0};
         ame83_fsr.gl.glGetIntegerv(GL_VIEWPORT, vp105);
         vp105W = vp105[2]; vp105H = vp105[3];
         bool anchored105 = (vp105[0] == 0 && vp105[1] == 0);
         bool fits105 = (vp105[2] > 0 && vp105[3] > 0 &&
-                        (uint32_t)vp105[2] <= currentBundle->osm.width &&
-                        (uint32_t)vp105[3] <= currentBundle->osm.height);
+                        (uint32_t)vp105[2] <= br_get_current()->osm.width &&
+                        (uint32_t)vp105[3] <= br_get_current()->osm.height);
         bool area105 = (windowWidth > 0 && windowHeight > 0 &&
                         (long long)vp105[2] * (long long)vp105[3] * 4ll
                             >= (long long)windowWidth * (long long)windowHeight);
@@ -1203,9 +1203,9 @@ void osm_swap_buffers() {
         double gapAvg106 = ame106.gapSumUs / (double)g106 / 1000.0;
         NSLog(@"[OSMBridge] Task99 swap#%ld: win=%dx%d osm=%ux%u bundle=%p easuFrames=%ld probe=%d/%d verdict=%d present=%d drvProbe=%d/%d mk=%d/%d far=%d/%d vp=%dx%d%s bd=%ld/%ld t=swap %.1f(max %.1f) [pre+easu %.1f glFinish %.1f readback %.1f]ms frame=%.1f MC-side=%.1fms",
               ame99_fsrdiag.swaps, windowWidth, windowHeight,
-              currentBundle ? currentBundle->osm.width : 0,
-              currentBundle ? currentBundle->osm.height : 0,
-              (void *)currentBundle, ame83_fsr.frames,
+              br_get_current() ? br_get_current()->osm.width : 0,
+              br_get_current() ? br_get_current()->osm.height : 0,
+              (void *)br_get_current(), ame83_fsr.frames,
               ame99_fsrdiag.probeHits, ame99_fsrdiag.probeFrames, ame99_fsrdiag.verdict,
               (int)!ame100_present.broken, ame100_present.drvHits, ame100_present.drvFrames,
               ame99_fsrdiag.mkHits, ame99_fsrdiag.probeFrames,
@@ -1236,23 +1236,23 @@ void osm_swap_buffers() {
     // 正序：EASU 先把窗口区域升采样铺满 GPU 侧帧缓冲 → glFinish 一次性
     // 回读完整升采样结果 → CGImage 上屏即全幅。
     bool fsrActiveThisFrame = false;
-    if (currentBundle->osm.width > 0 && currentBundle->osm.height > 0 &&
+    if (br_get_current()->osm.width > 0 && br_get_current()->osm.height > 0 &&
         (effW > 0 && effH > 0) &&
-        ((uint32_t)effW < currentBundle->osm.width || (uint32_t)effH < currentBundle->osm.height)) {
+        ((uint32_t)effW < br_get_current()->osm.width || (uint32_t)effH < br_get_current()->osm.height)) {
         // Task 105：输入区域 = effW×effH（自适应 MC 真实呈现视口；正常
         // 路径 == windowWidth 信仰，零回归）。upscale 内部 glCopyTexSubImage2D
         // 从 fb0 (0,0) 取同区域——正是 MC 本帧 blit 的落点。
         bool ok = ame83_fsr_upscale(effW, effH,
-                                    (int)currentBundle->osm.width, (int)currentBundle->osm.height);
+                                    (int)br_get_current()->osm.width, (int)br_get_current()->osm.height);
         if (ok) fsrActiveThisFrame = true;
         if (!ok && !ame83_fsr.healed) {
             ame83_fsr.healed = true;
             NSLog(@"[OSMBridge] Task83 FSR upscale unavailable -- restoring MC window to surface %ux%u (direct full-res render)",
-                  currentBundle->osm.width, currentBundle->osm.height);
+                  br_get_current()->osm.width, br_get_current()->osm.height);
             // Task 83b：nativeSendScreenSize 现已带 SDL3 路径（推 0x207 窗口
             // 尺寸事件）——MC 会真正切回全分辨率渲染，不再出现"小窗渲染 +
             // 未初始化缓冲区域上屏"的绿色花屏。
-            CallbackBridge_nativeSendScreenSize((int)currentBundle->osm.width, (int)currentBundle->osm.height);
+            CallbackBridge_nativeSendScreenSize((int)br_get_current()->osm.width, (int)br_get_current()->osm.height);
             // Task 139：输入侧同步复位（同 mgl_fsr Task119 兜底）——
             // MC 窗口信念已变为全表面，sendTouchPoint 的 mgFsrScale
             // 除数必须归一，否则触点坐标只发一半 = 输入错位。
@@ -1268,7 +1268,7 @@ void osm_swap_buffers() {
     if (!ame109Trial) {
         handle.glFinish(); // this will force osmesa to write the last rendered image into the buffer
     }
-    osm_render_window_t bundle = currentBundle->osm;
+    osm_render_window_t bundle = br_get_current()->osm;
     double t106_2 = ame106_us(mach_absolute_time());
     ame106.tPreUs += t106_1 - t106_0;
     if (t106_1 - t106_0 > ame106.tPreMax) ame106.tPreMax = t106_1 - t106_0;

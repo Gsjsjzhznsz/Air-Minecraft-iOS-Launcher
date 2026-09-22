@@ -172,7 +172,9 @@ check("F3 layerClass uses the same single source (Task124 discipline)",
 check("F4 JavaLauncher MobileGL env keys off the RESOLVED family key",
       '[renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]' in jl)
 check("F5 VersionManager maps the mg key + migrates before reading keys",
-      '@ RENDERER_KEY_MG: @"mg",' in vm and
+      # Task 144 re-anchor：显示名 "mg" -> "MobileGlues"（用户指令"把mg改成全名"；
+      # 逻辑键 RENDERER_KEY_MG="mg" 不变，仅短名映射改为全名）。
+      '@ RENDERER_KEY_MG: @"MobileGlues",' in vm and
       vm.index('ame142_migrateRendererStorage();') < vm.index('self.rendererKeys = getRendererKeys(NO);'))
 check("F6 verify_task140 fully green (re-anchored to Task142)",
       subprocess.run([sys.executable, 'scripts/verify_task140.py'],

@@ -1066,7 +1066,7 @@ static NSInteger const kSectionVersions    = 1;
     // Task 142：+"mg" 逻辑键（MobileGL 家族唯一渲染器层入口，不写后端）。
     NSDictionary *ame140_shortNames = @{
         @"auto": @"Auto",
-        @ RENDERER_KEY_MG: @"mg",
+        @ RENDERER_KEY_MG: @"MobileGlues",
         @ RENDERER_NAME_GL4ES: @"GL4ES",
         @ RENDERER_NAME_MTL_ANGLE: @"ANGLE",
         @ RENDERER_NAME_MOBILEGLUES: @"MobileGlues",

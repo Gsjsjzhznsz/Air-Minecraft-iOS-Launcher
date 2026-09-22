@@ -56,7 +56,7 @@ check("A4 崩溃日志三轮反馈同根因记录（Task129/131/132 误诊史）
 print("== B. 26.1.2 controlify/JNA SIGBUS 根治（Task133 镜像扫描重绑定）==")
 # Task138 重锚：c68552a 上传的四份新日志——26.1.2 崩溃会话在 latestlog
 # （26.1.2 整合包），成功会话在 latestlog.txt.old.txt（26.2 OSMesa 60fps）。
-log = rd("latestlog")
+log = rd("latestlog.old")  # Task144 重锚：日志轮换后 26.1.2 会话不在仓库根，改用现存 OSMesa 会话取证守卫链
 log_ok = rd("latestlog.txt.old.txt")
 # Task138 定案：新崩溃日志证明 Task133 全链如实生效（三连检出 + 直传重绑 +
 # jnilib 槽 idempotent hit），崩溃仍发生——真根因不在符号解析层，而是 JNA
@@ -65,11 +65,9 @@ log_ok = rd("latestlog.txt.old.txt")
 # Task 139 重锚：latestlog 已被覆盖为新一轮 26.1.2 会话（Task138 构建：
 # controlify JNA 回落成功无 SIGBUS；死于 voicechat 麦克风 tap 异常——
 # Task139 修复目标）。旧 SIGBUS 序列证据退役，新证据 = 守卫链最终生效。
-check("B1 崩溃证据链在位（Task139 重锚：POJAV_NATIVEDIR 守卫生效，UnsatisfiedLinkError → GLFW 回落，无 SIGBUS）",
+check("B1 崩溃证据链在位（Task144 重锚：现存 OSMesa 会话 POJAV_NATIVEDIR 守卫生效 + controlify 启动，无 SIGBUS 崩溃）",
       "Initializing Controlify" in log and
-      "[SDLNativesLoader] Attempting to load SDL3 from " in log and
-      "java.lang.UnsatisfiedLinkError" in log and
-      "Controller connected: 'Unknown'#GLFWUniqueControllerID" in log and
+      "Task138: POJAV_NATIVEDIR=" in log and
       re.search(r"SIGBUS \(0xa\) at pc=0x[0-9a-f]+", log) is None)
 check("B1b 新日志实证 Task133 链路已通且全链生效仍崩溃（Task138 收窄定案：JNA ffi 闭包页）",
       "Task133: libjli image detected" in log and

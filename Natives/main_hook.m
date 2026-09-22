@@ -26,6 +26,16 @@ void (*orig_exit)(int code);
 void* (*orig_dlopen)(const char* path, int mode);
 void* (*orig_dlsym)(void* handle, const char* name);
 
+// Task 144：headless JVM（Forge/NeoForge 直装的 processors）执行期 exit 抑制。
+// 病历（装机 latestlog 20:42 会话，9aa15c8 构建）：Forge 处理器全部跑完、
+// 进度 0.85 时，安装器 JVM 的 libjli 内部线程调用 exit(0) 结束自身 ——
+// 但 JVM 与启动器同进程，整个 app 被带走（用户视角"forge安装闪退"，
+// modpack 安装在 85% 处中断）。ForgeProcessorExecutor 在 launchHeadlessJVM
+// 前后置位/清零本标志；hooked_exit 命中标志时改为 pthread_exit 仅终结
+// 调用线程（JVM 自身线程），ObjC 侧继续读 status.json 判定成败。
+// 游戏正常退出路径（标志未置位）不受影响。
+atomic_int g_ame_suppressJvmExit = 0;
+
 // MARK: - SDL3 grab 状态同步（MC 26.3）
 //
 // input_bridge_v3.m 提供统一的抓取状态同步入口。MC 26.3 改用 SDL3 后不再
@@ -295,6 +305,18 @@ void hooked_exit(int code) {
         NSLog(@"[RenderDiag] exit(%d) snapshot: swapOK=%lu swapFail=%lu", code, swapOK, swapFail);
     }
     NSLog(@"exit(%d) called", code);
+    // Task 144：headless JVM 执行期的 exit 抑制（Forge 安装"闪退"根治）。
+    // 命中标志时：仅终结调用线程（libjli/JVM 内部线程），进程存活，
+    // launchHeadlessJVM 的调用方继续读 status.json 判定安装成败。
+    // 主线程豁免：主线程上若有极端路径 exit，走原逻辑（不能 pthread_exit
+    // 主线程把 app 挂死）。
+    if (atomic_load(&g_ame_suppressJvmExit) && !pthread_main_np()) {
+        char supMsg[96];
+        snprintf(supMsg, sizeof(supMsg), "Task144: exit(%d) suppressed during headless JVM (thread exits, process lives)", code);
+        NSLog(@"[Amethyst] %s", supMsg);
+        ame_write_fatal_trace(supMsg);
+        pthread_exit(NULL);
+    }
     // Task 48：exit(0) 也写回溯。此前只有非零退出才落 fatal_trace.txt；而
     // 实测黑屏约 20 秒后的静默 exit(0)（渲染循环仍在交换）来源不明——
     // MC 窗口可见性看门狗 / JVM 主线程 / 启动器超时都有可能。回溯写入

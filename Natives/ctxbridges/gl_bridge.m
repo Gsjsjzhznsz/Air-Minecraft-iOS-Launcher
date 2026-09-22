@@ -152,7 +152,7 @@ static void ame77_record_present(uint64_t dur_us, uint64_t now_us) {
 // ============================================================================
 // Task 50：GL 呈现层所有权标志（跨线程）。
 //
-// currentBundle（bridge_tbl.h）是 __thread 的——只在渲染线程非空，
+// ame_brCurrent（bridge_tbl.h，Task144 起跨编译单元共享）是 __thread 的——只在渲染线程非空，
 // 主线程（updateSavedResolution）读它永远得到 NULL。因此需要一个跨线程
 // 的原子标志：GL 路径在 gl_init_context 成功创建 surface 后置位，
 // gl_terminate 清零。SurfaceViewController 据此判断"GL 拥有呈现层"，
@@ -519,7 +519,7 @@ static BOOL ame_task53_realign_surface(void) {
     g_ame53_last_ms = now;
     g_ame53_attempts++;
 
-    basic_render_window_t *bundle = currentBundle;
+    basic_render_window_t *bundle = br_get_current();
     CALayer *layer = (__bridge CALayer *)g_ame48_layer_cf;
     if (bundle == NULL || layer == nil || ![layer isKindOfClass:CAMetalLayer.class]) {
         NSLog(@"[GLGeo] Task55 realign: prerequisites missing (bundle/layer) -- fused off");
@@ -808,8 +808,8 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             g_ame53_transposed = 0;
             // 刷新本地 surfW/surfH：下方探针 / hierarchy / guard 全部输出新
             // 表面的真实状态。surface 形参此时是已销毁的旧句柄，改查
-            // currentBundle 里的新表面。
-            basic_render_window_t *b53 = currentBundle;
+            // ame_brCurrent 里的新表面。
+            basic_render_window_t *b53 = br_get_current();
             if (b53 != NULL && es.querySurface != NULL && b53->gl.surface != EGL_NO_SURFACE) {
                 EGLint sw53 = 0, sh53 = 0;
                 // Task 58：常量修正（0x3056=EGL_HEIGHT、0x3057=EGL_WIDTH，
@@ -1687,13 +1687,13 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
 void gl_make_current(gl_render_window_t* bundle) {
     if(!bundle) {
         if(handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
-            currentBundle = NULL;
+            br_set_current(NULL);
         }
         return;
     }
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
-        currentBundle = (basic_render_window_t *)bundle;
+        br_set_current((basic_render_window_t *)bundle);
         // Task 140：MakeCurrent 成功后的读回取证。Mithril 病历（ab9670d：
         // MakeCurrent 返回 TRUE 但 GL.createCapabilities 报 no current
         // context）后，此处把渲染器侧 eglGetCurrentContext 的读回值留进
@@ -1779,11 +1779,11 @@ void gl_make_current(gl_render_window_t* bundle) {
 }
 
 void gl_swap_buffers() {
-    // currentBundle 只在 eglMakeCurrent 成功后赋值。若 MC 在 MakeCurrent 之前
+    // ame_brCurrent 只在 eglMakeCurrent 成功后赋值。若 MC 在 MakeCurrent 之前
     // （或 MakeCurrent(NULL) 释放之后）调用 swap，这里解引用空指针会直接段错误。
     // SDL3 路径下 SDL_GL_SwapWindow 由我们接管，调用时机不再由 GLFW 约束，
     // 所以必须显式防护。
-    if (currentBundle == NULL) {
+    if (br_get_current() == NULL) {
         NSLog(@"EGLBridge: gl_swap_buffers called with no current context, ignored");
         return;
     }
@@ -1793,8 +1793,8 @@ void gl_swap_buffers() {
     uint64_t ame77_t_entry = ame77_now_us();
     ame77_record_build(ame77_t_entry);
     // Task 48 呈现几何卫兵：先于一切交换动作执行（可能在内部重建表面，
-    // 重建后 currentBundle->gl.surface 已更新，后续探针/交换都作用于新表面）。
-    ame48_swap_geometry_guard(currentBundle);
+    // 重建后 ame_brCurrent->gl.surface 已更新，后续探针/交换都作用于新表面）。
+    ame48_swap_geometry_guard(br_get_current());
     // Task 119：MobileGL 预交换 FSR1 EASU——渲染器为 MobileGL 且 FSR 联动
     // 激活时，把 MC 的半分辨率帧升采样铺满默认帧缓冲（= MobileGL 内部
     // swapchain image），eglSwapBuffers 直呈。其余渲染器零开销返回。
@@ -1805,11 +1805,11 @@ void gl_swap_buffers() {
     // 由 SurfaceViewController 的 [RenderDiag] 5 秒心跳汇总上报。
     // 失败：任意错误码都打（去掉旧版 EGL_BAD_SURFACE 过滤），前 10 次逐条打，
     // 之后每 100 次打一条，避免日志爆炸。
-    ame_task41_swap_forensics(currentBundle->gl.surface,
+    ame_task41_swap_forensics(br_get_current()->gl.surface,
                               atomic_load(&g_eglSwapOK) + atomic_load(&g_eglSwapFail) + 1);
     // Task 77：present 相位计时——只包 eglSwapBuffers 本体。
     uint64_t ame77_t_present0 = ame77_now_us();
-    EGLBoolean swapResult = handle.eglSwapBuffers(g_EglDisplay, currentBundle->gl.surface);
+    EGLBoolean swapResult = handle.eglSwapBuffers(g_EglDisplay, br_get_current()->gl.surface);
     uint64_t ame77_t_present1 = ame77_now_us();
     ame77_record_present((uint32_t)(ame77_t_present1 - ame77_t_present0), ame77_t_present1);
     if (!swapResult) {
@@ -1817,14 +1817,14 @@ void gl_swap_buffers() {
         unsigned int eglErr = (unsigned int)(uintptr_t)handle.eglGetError();
         if (fails <= 10 || fails % 100 == 0) {
             NSLog(@"[RenderDiag] eglSwapBuffers FAILED #%lu eglError=0x%x surface=%p (render loop alive, presentation broken)",
-                  fails, eglErr, (void *)currentBundle->gl.surface);
+                  fails, eglErr, (void *)br_get_current()->gl.surface);
         }
         return;
     }
     unsigned long oks = atomic_fetch_add(&g_eglSwapOK, 1) + 1;
     if (oks == 1) {
         NSLog(@"[RenderDiag] first eglSwapBuffers OK surface=%p (presentation path confirmed)",
-              (void *)currentBundle->gl.surface);
+              (void *)br_get_current()->gl.surface);
     }
     // Task 76：帧间隔尖峰跟踪（见文件头计数器块注释）。
     ame76_record_swap(ame53_now_ms());
@@ -1838,12 +1838,12 @@ void gl_terminate() {
     // Task 50：GL 不再拥有呈现层（下次 updateSavedResolution 回到 2x 默认）。
     atomic_store(&g_ame50_gl_owns_layer, 0);
     handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-    handle.eglDestroySurface(g_EglDisplay, currentBundle->gl.surface);
-    handle.eglDestroyContext(g_EglDisplay, currentBundle->gl.context);
+    handle.eglDestroySurface(g_EglDisplay, br_get_current()->gl.surface);
+    handle.eglDestroyContext(g_EglDisplay, br_get_current()->gl.context);
     handle.eglTerminate(g_EglDisplay);
     handle.eglReleaseThread();
-    free(currentBundle);
-    currentBundle = nil;
+    free(br_get_current());
+    br_set_current(NULL);
 }
 
 void set_gl_bridge_tbl() {

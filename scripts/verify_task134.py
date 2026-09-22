@@ -159,8 +159,9 @@ check("E4 Task132 重绑定读回验证（写后槽值校验 + READBACK FAILED �
 # =26.2 成功）——Task132 直传重绑被调用 + jnilib 槽 idempotent hit（fishhook
 # 抢先，Task135 取证假说落定），崩溃链最终定案为 JNA ffi 闭包页（Task138 修复）。
 check("E4b 新日志取证闭环（c68552a：直传重绑调用 + idempotent hit，Task138 定案 JNA ffi 闭包页）",
-      rd("latestlog").count("invoking Task132 dlsym rebind") >= 1 and
-      "idempotent hit" in rd("latestlog") and
+      # Task144 重锚：日志轮换后直传重绑证据在 latestlog.old（OSMesa 会话）
+      rd("latestlog.old").count("invoking Task132 dlsym rebind") >= 1 and
+      "idempotent hit" in rd("latestlog.old") and
       "hooked SDL_SetEventFilter" in rd("latestlog.txt.old.txt"))
 check("E4c 静默早退根治（核心改直传 hdr+slide + 旧入口句柄查找失败落日志）",
       "amethyst_task132_rebind_jna_dlsym_ex(const struct mach_header_64 *ame132_hdr" in sdl and

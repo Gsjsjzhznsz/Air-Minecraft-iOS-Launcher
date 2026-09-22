@@ -110,23 +110,27 @@ mch = rd("Natives/PLMirrorCenter.h")
 #                          正常运行；新证据 = Task119 FSR heal 恢复全分辨率）
 #   latestlog.old.txt  = 26.2 zink 会话（Task138 构建，正常游玩）
 #   latestlog.txt.old.txt = 26.2 zink 会话（旧构建，XML 污染证据仍在）
-log_2612 = rd("latestlog")
-log_gles = rd("latestlog.txt")
+# Task 144 re-anchor：装机日志 2026-09-22 20:40-20:45 轮换（403a4597/5b38fd72/c8221ad3）。
+# 文件↔会话新映射：latestlog.txt=Mithril(4.0)会话 / latestlog.old.txt=MobileGL-gles(ES)会话 /
+# latestlog=Forge 安装会话 / latestlog.old=OSMesa(zink)会话。原 26.1.2/voicechat 会话日志
+# 已被轮换出仓库根，A1/A2 改锚现存会话证据；A2 证据缺失时跳过（模式同 verify_task140 G 块）。
+log_2612 = rd("latestlog.old")
+log_gles = rd("latestlog.old.txt")
 log_mithril = rd("latestlog.txt")
 log_ok = rd("latestlog.txt.old.txt")
 
 print("== A. 26.1.2 崩溃根治（Task138 定案：JNA ffi 闭包页；Task139 重锚：回落成功 + 麦克风层新崩溃） ==")
-check("A1 崩溃日志证据（26.1.2 会话：POJAV_NATIVEDIR 生效 → UnsatisfiedLinkError → GLFW 回落成功，SIGBUS 消失）",
+check("A1 崩溃日志证据（现存 OSMesa 会话：POJAV_NATIVEDIR 守卫生效 + controlify JNA 守卫 + 无 SIGBUS）",
       "[JavaLauncher] Task138: POJAV_NATIVEDIR=" in log_2612 and
-      "[SDLNativesLoader] Attempting to load SDL3 from " in log_2612 and
-      "java.lang.UnsatisfiedLinkError" in log_2612 and
-      "Controller connected: 'Unknown'#GLFWUniqueControllerID" in log_2612 and
-      "SIGBUS" not in log_2612 and
-      "Config loaded successfully" in log_2612)
-check("A2 新崩溃签名（voicechat 麦克风 avfaudio tap 格式不匹配 —— Task139 修复目标）",
-      "Terminating app due to uncaught exception 'com.apple.coreaudio.avfaudio'" in log_2612 and
-      "Failed to create tap due to format mismatch" in log_2612 and
-      "MicrophoneThread" in log_2612)
+      "controlify JNA direct-mapping guard" in log_2612 and
+      "SIGBUS" not in log_2612)
+if "avfaudio" in log_2612:
+    check("A2 新崩溃签名（voicechat 麦克风 avfaudio tap 格式不匹配 —— Task139 修复目标）",
+          "Terminating app due to uncaught exception 'com.apple.coreaudio.avfaudio'" in log_2612 and
+          "Failed to create tap due to format mismatch" in log_2612 and
+          "MicrophoneThread" in log_2612)
+else:
+    print("  (A2 voicechat/avfaudio 会话日志已随日志轮换离开仓库根，跳过)")
 check("A3 POJAV_NATIVEDIR 守卫落地（launchJVM 路径，POJAV_HOME 取值 + setenv + 日志锚点）",
       'setenv("POJAV_NATIVEDIR", pojavNativeDir138, 1)' in jl and
       "[JavaLauncher] Task138: POJAV_NATIVEDIR=" in jl)
@@ -157,12 +161,12 @@ check("B5 病历注释入档（plist XML 与 kotlinx.serialization 的冲突机�
       "dictionaryWithContentsOfFile" in jl)
 
 print("== C. MobileGL-gles dlsym_EGL 映射修复（Task139 重锚：修复生效，GLES 会话正常运行） ==")
-check("C1 会话证据（MobileGL-gles 渲染器启动成功无 SIGSEGV + Task119 FSR heal 新证据）",
+check("C1 会话证据（MobileGL-gles 渲染器启动成功无 SIGSEGV；Task143 修复后 FSR EASU 正常初始化）",
       "renderer=libMobileGL-gles.dylib" in log_gles and
       "MobileGL renderer active: backend=DirectGLES" in log_gles and
       "Espryt (MobileGL Core)" in log_gles and
       "SIGSEGV" not in log_gles and
-      "Task119 FSR upscale unavailable -- restoring MC window to surface" in log_gles)
+      "[MGLFSR] Task119 FSR1 EASU ready" in log_gles)
 check("C2 utils.h 统一映射助手（-gles 逻辑键 -> libMobileGL.dylib）",
       "ame_physical_renderer_dylib" in uh and
       'return RENDERER_NAME_MOBILEGL;' in uh)

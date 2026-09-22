@@ -218,9 +218,16 @@ static const double kInnerProcessorsStart = 0.45;
     // 按原版 MC 版本推断 processor 所需 Java 大版本（对齐游戏运行时要求）
     int minJava = [self inferJavaMajorForMinecraft:minecraftVersion];
     NSLog(@"[ForgeProcExec] Launching headless JVM (minJava=%d)", minJava);
+    // Task 144：headless JVM 执行期抑制进程级 exit —— 安装器 JVM 结束时
+    // libjli 内部线程会 exit(0) 结束自身，但 JVM 与启动器同进程，此前整个
+    // app 被带走（用户视角"forge安装闪退"，modpack 卡在 85%）。置位后
+    // hooked_exit 改为只终结调用线程；JLI_Launch 正常返回，下方照常读
+    // status.json 判定安装成败。
+    atomic_store(&g_ame_suppressJvmExit, 1);
     int ret = launchHeadlessJVM(kProcessorRunnerMainClass,
                                 @[commandsPath, statusPath],
                                 minJava);
+    atomic_store(&g_ame_suppressJvmExit, 0);
     pollDone = YES;
 
     if (ret != 0) {

@@ -2049,7 +2049,7 @@
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
 "preference.profile.renderer_follow_global_toggle" = "Follow Global Renderer";
-"preference.title.renderer.debug.mgfamily" = "mg";
+"preference.title.renderer.debug.mgfamily" = "MobileGlues";
 "preference.warning.mg_backend_missing_dylib" = "The rendering library for mg backend (%@) is missing; fell back to the default backend (Vulkan direct).";
 "preference.warning.renderer_shadowed_by_profile" = "Global default set to %@. This game keeps its own renderer (%@). Change it in the game's settings if needed.";
 "preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";

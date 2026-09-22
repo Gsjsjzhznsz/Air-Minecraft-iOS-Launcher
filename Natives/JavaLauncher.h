@@ -40,3 +40,11 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
 // 当前进程是否已创建过 JVM（游戏或 headless 任一次）。
 // 进程内 JVM 只能创建一次，再次 JLI_Launch 会崩溃；调用方据此提示用户重启 app。
 BOOL JVMUsedInProcess(void);
+
+// Task 144：headless JVM 执行期 exit 抑制标志（定义在 main_hook.m）。
+// Forge/NeoForge 直装的 processors 与启动器同进程，安装器 JVM 跑完时
+// libjli 内部线程会 exit(0) 把整个 app 带走（用户视角"forge安装闪退"）。
+// launchHeadlessJVM 的调用方（ForgeProcessorExecutor）置位/清零本标志；
+// hooked_exit 命中标志时改为 pthread_exit 仅终结 JVM 线程，进程存活。
+#include <stdatomic.h>
+extern atomic_int g_ame_suppressJvmExit;

@@ -189,15 +189,25 @@ vh = read('Natives/external/MobileGlues/MobileGlues-cpp/version.h')
 check("F8 version.h addendum", 'REVISION 17 addendum (Task 140, no bump)' in vh)
 
 print("== G. log-evidence anchors (d089745 logs, root cause documentation) ==")
-cur = read('latestlog.txt') if os.path.exists('latestlog.txt') else ''
-old = read('latestlog.old.txt') if os.path.exists('latestlog.old.txt') else ''
+# Task 144 re-anchor：用户 2026-09-22 20:40-20:45 上传的新装机日志轮换了根目录
+# 文件（ca9d11bb/403a4597/5b38fd72/c8221ad3）。文件↔会话新映射：
+#   latestlog.txt      = Mithril（4.0 后端）会话：createCapabilities 崩溃证据
+#                        （Task144 POJAV_RENDERER/上下文重绑的修复对象）
+#   latestlog.old.txt  = MobileGL-gles（ES 后端）会话：Task142 后端落盘生效 +
+#                        FSR1 EASU ready（Task143 FSR 修复的装机实证）
+#   latestlog（无扩展名）= Forge modpack 安装会话（exit(0) 闪退证据，Task144 修复对象）
+#   latestlog.old（无扩展名）= OSMesa/zink 会话
+# 原 G1/G2（d089745 日志的"旧故障形态"断言）在新日志里自然消失（正是修复
+# 生效的表现），改为锚定新日志中的"修复生效"证据；G3 崩溃签名跟随文件轮换。
+cur = read('latestlog.old.txt') if os.path.exists('latestlog.old.txt') else ''
+old = read('latestlog.txt') if os.path.exists('latestlog.txt') else ''
 if cur:
-    check("G1 GLES session shows the old broken resolve log form",
-          "41/41 symbols (eglGetProcAddress=" in cur)
-    check("G2 GLES session FSR unavailable (pre-fix evidence)",
-          "Task119 FSR upscale unavailable" in cur)
+    check("G1 GLES session backend pick persisted (Task143 registration fix effective)",
+          "renderer_backend written to OWN KEY = libMobileGL-gles.dylib" in cur)
+    check("G2 GLES session FSR EASU ready (Task143 fragment-shader constant fix effective)",
+          "[MGLFSR] Task119 FSR1 EASU ready" in cur)
 else:
-    print("  (latestlog.txt not present, skipping G1/G2)")
+    print("  (latestlog.old.txt not present, skipping G1/G2)")
 if old:
     check("G3 Mithril session crash signature",
           "There is no OpenGL context current in the current thread" in old)

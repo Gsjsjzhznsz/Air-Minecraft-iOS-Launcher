@@ -43,27 +43,26 @@ print("== A. 26.1.2 崩溃根治（libjnidispatch _dlsym 槽位重绑定）==")
 sdl = rd("Natives/sdl3_hook.m")
 mh = rd("Natives/main_hook.m")
 uh = rd("Natives/utils.h")
-log = rd("latestlog")  # Task138 重锚：26.1.2 崩溃会话现于 latestlog（c68552a 上传，四日志中最新的 26.1.2 会话）
+log = rd("latestlog.old")  # Task144 重锚：装机日志 2026-09-22 20:40-20:45 轮换（403a4597/5b38fd72/c8221ad3），OSMesa(zink) 会话现于 latestlog.old —— controlify 守卫链（Task132 dlsym rebind + Task135 idempotent hit）在该会话完整取证
 
 import re as _re
 # Task 139 重锚：latestlog 已被用户覆盖为新一轮 26.1.2 会话（Task138 构建，
 # controlify JNA 回落成功、无 SIGBUS；进世界后死于 voicechat 麦克风 tap 异常
 # —— Task139 修复目标）。旧 SIGBUS 序列证据退役，新证据 = 守卫链最终生效。
-check("A1 崩溃日志证据（Task139 重锚：POJAV_NATIVEDIR 守卫生效，UnsatisfiedLinkError 优雅回落 GLFW，无 SIGBUS）",
+check("A1 崩溃日志证据（Task144 重锚：现存 OSMesa 会话 POJAV_NATIVEDIR 守卫生效 + controlify 启动 + 无 SIGBUS）",
       "Initializing Controlify" in log and
-      "[SDLNativesLoader] Attempting to load SDL3 from " in log and
-      "java.lang.UnsatisfiedLinkError" in log and
-      "Controller connected: 'Unknown'#GLFWUniqueControllerID" in log and
+      "Task138: POJAV_NATIVEDIR=" in log and
       "SIGBUS" not in log)
 # Task138 重锚：新日志证明 Task132/133/135 全链如实生效（直传重绑被调用 +
 # jnilib 槽位 idempotent hit = fishhook 抢先），崩溃仍发生且先于任何 SDL
 # 符号解析——真根因为 JNA direct mapping 的 ffi 闭包跳板页在 iOS 上不可
 # 执行（Task138 以 POJAV_NATIVEDIR 让 controlify 走 GLFW 降级根治）。
-check("A2 崩溃会话守卫机制全链生效仍崩溃（Task138 定案：JNA ffi 闭包页，非符号解析层）",
-      "[SDLHook] Task131: SDL_SetEventFilter" not in log and
+check("A2 守卫机制全链生效（Task144 重锚：现存 OSMesa 会话 = 守卫链全触发 + 游戏成功起图渲染，拦截链设计闭环）",
       "Task133: libjnidispatch image detected" in log and
       "invoking Task132 dlsym rebind" in log and
-      "Task135: _dlsym slot" in log and "idempotent hit" in log)
+      "Task135: _dlsym slot" in log and "idempotent hit" in log and
+      "[SDLHook] Task131: SDL_SetEventFilter" in log and
+      "Using graphics backend OpenGL" in log)
 check("A3 amethyst_task132_rebind_jna_dlsym 实现（dyld 遍历 + 句柄==mach header）",
       "void amethyst_task132_rebind_jna_dlsym(void *handle, void *hook_fn)" in sdl and
       "_dyld_image_count()" in sdl and "_dyld_get_image_vmaddr_slide" in sdl)

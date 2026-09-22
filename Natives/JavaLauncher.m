@@ -157,8 +157,17 @@ void init_loadCustomEnv() {
 ///
 /// 渲染器与 MobileGlues 的关系（重要）：
 /// - MobileGlues 渲染器（libmobileglues.dylib）：直接加载 MobileGlues，config.json 生效。
-/// - Auto 渲染器：在 launchJVM 中被解析为 ANGLE（libtinygl4angle.dylib），MobileGlues 不会被加载，
-///   config.json 虽然会写入但不会被读取。用户需显式选择 MobileGlues 渲染器才能让设置生效。
+/// - MobileGL 家族（Task142 "mg" 逻辑键解析出的 libMobileGL / -gles / mithril）：
+///   Task 144 起同样写入 config.json —— Task142 把渲染器层改成 "mg" 逻辑键后，
+///   旧白名单（mobileglues/auto/vulkan）全部 miss，家族后端从未拿到 config.json
+///   与 MG_DIR_PATH，用户在 MobileGlues 分区改的全部偏好（no_error / multidraw /
+///   FSR 等）对 mg 会话静默失效（装机日志 20:39/20:40 会话
+///   "MobileGlues config not written (renderer is not mobileglues/auto/vulkan)"）。
+///   本函数改读 ame_effective_renderer()（解析后的家族物理键），家族键入白名单。
+/// - Auto 渲染器：Task 144 起在 launchJVM 中按 MC 版本解析 —— 1.17+ 优先
+///   MobileGL（Vulkan 直连，装机验证最快路径，dylib 缺失回退 ANGLE），
+///   旧版本仍 ANGLE。渲染器为 auto 时 MobileGlues 不会被加载，config.json
+///   虽然会写入但不会被读取（保持既有语义）。
 /// - Vulkan 渲染器：Vulkan 模式下 OpenGL 回退库使用 MobileGlues（对齐 Ynnyny 仓库），
 ///   config.json 会被 MobileGlues 读取并生效。
 /// Task 130：导出 FSR1 RCAS 锐化强度环境变量并返回规整后的值。
@@ -191,15 +200,21 @@ static double ame130_export_rcas_env(void) {
 }
 
 void init_loadMobileGluesConfig() {
-    NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    // Task 144：改读 ame_effective_renderer()（单一事实源）而非裸 profile 键。
+    // Task142 后 profile 存的是 "mg" 逻辑键，旧白名单永远 miss；解析后拿到的
+    // 是家族物理键（libMobileGL / -gles / mithril），与"auto"同表判断。
+    NSString *renderer = ame_effective_renderer();
     NSLog(@"[JavaLauncher] init_loadMobileGluesConfig: renderer=%@", renderer);
 
     BOOL usesMobileGlues = [renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES] ||
         [renderer isEqualToString:@"auto"] ||
-        [renderer isEqualToString:@ RENDERER_NAME_VULKAN];
+        [renderer isEqualToString:@ RENDERER_NAME_VULKAN] ||
+        [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL] ||
+        [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
+        [renderer isEqualToString:@ RENDERER_NAME_MITHRIL];
 
     if (!usesMobileGlues) {
-        NSLog(@"[JavaLauncher] MobileGlues config not written (renderer is not mobileglues/auto/vulkan)");
+        NSLog(@"[JavaLauncher] MobileGlues config not written (renderer is not mobileglues/auto/vulkan/mgfamily)");
         // Task 130：config.json 不写，但 RCAS 锐化环境变量仍需导出——
         // zink / MobileGL 路径的 mgl_fsr.mm / osm_bridge.mm 读的是
         // AMETHYST_FSR_RCAS_SHARPNESS（与渲染器无关的统一出口）。
@@ -1202,6 +1217,17 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         }
         NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
+        // Task 144：POJAV_RENDERER 与 AMETHYST_RENDERER 同步导出。
+        // LWJGL 补丁版（JavaApp/libs/lwjgl-341/lwjgl-opengl.jar，Pojav patch）
+        // GL.createCapabilities 里有且仅有这扇门：System.getenv("POJAV_RENDERER")
+        // 非空 -> 反射调 fixPojavGLContext() -> glfwMakeContextCurrent(mainContext)
+        // 把上下文绑到渲染线程，然后才跑 glGetString(GL_VERSION) 探针。
+        // 未设置时探针直接打在渲染器 dylib 上 —— Mithril（4.0 后端，线程绑定
+        // 模型）在渲染线程返回 NULL -> IllegalStateException "There is no OpenGL
+        // context current in the current thread"（装机 latestlog.txt 20:40 会话
+        // 实锤）；MobileGL-gles/OSMesa 全局模型混过但渲染线程上下文其实也没绑。
+        // 变量值本身补丁只判空不解析，取有效渲染器键保持语义一致。
+        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
 
         // Apply Zink-specific environment variables if Zink renderer is selected
         // Mesa 25.0.7 zink 升级配套：根据设备 GPU 代际自动调优 MESA_GL_VERSION_OVERRIDE、
@@ -1570,15 +1596,42 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     const char *glLibName = getenv("AMETHYST_RENDERER");
     if (glLibName) {
         if (!strcmp(glLibName, "auto")) {
-            // 关键修复（26.2 启动崩溃）：Auto 渲染器始终选 ANGLE（对齐 Ynnyny 仓库）
+            // Task 144：自动渲染器机制升级（用户指令"优化一下自动渲染器机制"）。
             //
-            // 之前 workspace 在 Java 21+ 优先选 MobileGlues，但 Ynnyny 仓库用 ANGLE 就能正常启动 26.2。
-            // workspace 选 MobileGlues 后又缺少 init_loadMobileGluesConfig() 写 config.json，
-            // 导致 MobileGlues 用不安全默认值初始化 GL 上下文可能崩溃。现对齐 Ynnyny 始终选 ANGLE。
-            // MobileGlues 仍保留为手动选项（用户可在设置中显式选择）。
-            glLibName = RENDERER_NAME_MTL_ANGLE;
-            setenv("AMETHYST_RENDERER", glLibName, 1);
-            NSLog(@"[JavaLauncher] Auto renderer resolved to %s (always ANGLE)", glLibName);
+            // 旧逻辑（26.2 时代"始终 ANGLE"）的顾虑是 MobileGlues 缺 config.json
+            // 用不安全默认值初始化——该顾虑已被双修复消除：
+            //   ① init_loadMobileGluesConfig 现按 ame_effective_renderer 白名单
+            //      覆盖家族键，auto 解析出的 libMobileGL 会拿到 config.json +
+            //      MG_DIR_PATH（用户 MobileGlues 分区偏好全部生效）；
+            //   ② POJAV_RENDERER 环境变量激活 LWJGL 补丁的 fixPojavGLContext，
+            //      渲染线程在 glGetString 探针前重绑上下文（Mithril 4.0 装机
+            //      闪退的根因，同一机制对 MobileGL 家族同样是正确性收益）。
+            // 新逻辑：MC 1.17+（minVersion>8，与 defaultJRETag 分界同源）优先
+            // MobileGL Vulkan 直连（用户长期主用的装机验证最快路径；dylib 缺失
+            // 或旧版本回退 ANGLE，保持旧行为）。layerClass 侧 auto 与 MobileGL
+            // 均返回 CAMetalLayer（GameSurfaceView），Task124 同源约束不受影响。
+            // （rendererLibraryExists 是 LauncherPreferences.m 的 static 助手，
+            //  这里内联同口径检查：主 bundle Frameworks/ 下 dylib 存在性。）
+            NSString *ame144_mglPath = [NSBundle.mainBundle.bundlePath
+                stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MOBILEGL]];
+            if (minVersion > 8 && [NSFileManager.defaultManager fileExistsAtPath:ame144_mglPath]) {
+                glLibName = RENDERER_NAME_MOBILEGL;
+                setenv("AMETHYST_RENDERER", glLibName, 1);
+                NSLog(@"[JavaLauncher] Auto renderer resolved to %s (modern MC, MobileGL Vulkan direct; config+ctx fixes active)", glLibName);
+            } else {
+                glLibName = RENDERER_NAME_MTL_ANGLE;
+                setenv("AMETHYST_RENDERER", glLibName, 1);
+                NSLog(@"[JavaLauncher] Auto renderer resolved to %s (ANGLE fallback: minVersion=%d or libMobileGL missing)",
+                      glLibName, minVersion);
+            }
+            setenv("POJAV_RENDERER", glLibName, 1);
+        } else if (getenv("POJAV_RENDERER") == NULL) {
+            // Task 144：非 auto 渲染器也要有 POJAV_RENDERER（LWJGL 补丁只认这个
+            // 变量名来激活 fixPojavGLContext —— Mithril 4.0 装机闪退根修）。
+            // 主导出处见上方 AMETHYST_RENDERER 的 setenv（launchJVM ~1219），
+            // 此处防御补漏（AMETHYST_RENDERER 可能由外部注入而非本函数写出）。
+            setenv("POJAV_RENDERER", glLibName, 1);
+            NSLog(@"[JavaLauncher] Task144: POJAV_RENDERER synced from AMETHYST_RENDERER (%s)", glLibName);
         }
         if (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0) {
             // 对齐 Ynnyny 仓库：Vulkan 模式下 OpenGL 回退库使用 MobileGlues

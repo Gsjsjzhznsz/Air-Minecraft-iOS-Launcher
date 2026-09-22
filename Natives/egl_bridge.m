@@ -24,6 +24,19 @@
 // 默认 GL 路径，pojavInit() 会重新设置
 int clientAPI = GLFW_OPENGL_API;
 
+// ----------------------------------------------------------------------------
+// Task 144：线程级"当前上下文"的唯一 TLS 实例（bridge_tbl.h 里 extern 的
+// 定义点；egl_bridge.m 必然链接，保证符号恰好一份）。病历见 bridge_tbl.h
+// Task144 注释块 —— 此前 static __thread 写在头文件里，每个包含它的编译
+// 单元各持一份，egl_bridge.m 这份永远为 NULL，pojavGetCurrentContext() 恒
+// 返回空。ame_brLastCurrent：进程级"最近一次 current"登记（br_set_current
+// 写入），供 pojavGetCurrentContext 的渲染线程采纳兜底。
+__thread basic_render_window_t* ame_brCurrent = NULL;
+basic_render_window_t* ame_brLastCurrent = NULL;
+
+// pojavMakeCurrent 定义在本文件后部（Task144 采纳路径前向引用）。
+void pojavMakeCurrent(basic_render_window_t* window);
+
 // FPS 计数器（参照 FCL egl_bridge.c 的 atomic_uint 实现）
 // 在 pojavSwapBuffers() 中累加，在 SurfaceViewController 读取时重置
 static atomic_uint _pojavFpsCounter = 0;
@@ -130,6 +143,18 @@ void pojavTerminate() {
 }
 
 void* pojavGetCurrentContext() {
+    // Task 144：渲染线程上下文采纳（defense-in-depth）。
+    // POJAV_RENDERER 修复（JavaLauncher 侧 setenv 激活 LWJGL 补丁的
+    // fixPojavGLContext）已让 createCapabilities 前主动重绑；此处兜底其余
+    // 调用方（MC/mod 的 GLFW.glfwGetCurrentContext）：本线程 TLS 为空但
+    // 进程里存在"最近一次 current"的上下文时，直接在本线程重新 make current
+    // （EGL 语义 = 上下文从旧线程迁移到本线程，MC 单渲染线程模型安全）。
+    // pthread_main_np 排除主线程：主线程即便查询也只该读到，不该抢占。
+    if (br_get_current() == NULL && ame_brLastCurrent != NULL && pthread_main_np() == 0) {
+        NSLog(@"[egl_bridge] Task144: adopting last-current context %p onto calling thread (no TLS binding yet)",
+              (void *)ame_brLastCurrent);
+        pojavMakeCurrent(ame_brLastCurrent);
+    }
     return br_get_current();
 }
 
@@ -178,10 +203,16 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         // At this point, if renderer is still auto (unspecified major version), pick gl4es
         renderer = @ RENDERER_NAME_GL4ES;
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
+        // Task 144：POJAV_RENDERER 与 AMETHYST_RENDERER 同步导出 —— LWJGL
+        // 补丁版 GL.createCapabilities 检测到前者时会在 glGetString 探针前调
+        // fixPojavGLContext()（反射 glfwMakeContextCurrent(mainContext)），
+        // 把上下文绑到当前线程。详见 JavaLauncher.m 主导出处。
+        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
         renderer = @ RENDERER_NAME_MOBILEGLUES;
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
+        setenv("POJAV_RENDERER", renderer.UTF8String, 1);
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE]) {
         set_gl_bridge_tbl();
@@ -310,11 +341,13 @@ void pojavSetWindowHint(int hint, int value) {
             case 1:
             case 2:
                 setenv("AMETHYST_RENDERER", RENDERER_NAME_GL4ES, 1);
+                setenv("POJAV_RENDERER", RENDERER_NAME_GL4ES, 1);
                 JNI_LWJGL_changeRenderer(RENDERER_NAME_GL4ES);
                 break;
             // case 4: use Zink?
             default:
                 setenv("AMETHYST_RENDERER", RENDERER_NAME_MOBILEGLUES, 1);
+                setenv("POJAV_RENDERER", RENDERER_NAME_MOBILEGLUES, 1);
                 JNI_LWJGL_changeRenderer(RENDERER_NAME_MOBILEGLUES);
                 break;
         }

@@ -356,6 +356,11 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       # + 注释行），提交前 diff 形态一并接受；提交后 diff 清空走第二分支自愈。
       or all(("memory.current" in l or "memory.apply" in l
               or l.lstrip("+").strip().startswith("/*") or l.strip() == "+")
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task144 重锚：mgfamily 显示名 "mg" -> "MobileGlues"（用户指令"把mg改成
+      # 全名"，4 语言各 1 行值改写，键集计数 1924 不变）；提交后 diff 清空走
+      # 第二分支自愈。
+      or all("preference.title.renderer.debug.mgfamily" in l
              for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",
