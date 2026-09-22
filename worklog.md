@@ -2,7 +2,7 @@
 
 ## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 142（2026-09-22）。此前记录：2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
+> 最后更新：Task 143（2026-09-22）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -11,9 +11,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 3400211d（worklog 瘦身 + verify 重锚），CI #340 前绿（~10-12 分钟/次） |
-| 最新 Task 号 | **142**（双会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 141 七项 UI（欢迎卡/版本行/内存弹窗/JVM行/新闻页）+ Task 142 渲染器分层七锚点（见下文两条 Stage Summary） |
+| 远端 HEAD | edc96f6f（Task 143 三修复；ca9d11bb 为用户上传的装机日志 latestlog.txt/latestlog.old.txt——勿删，下轮判读源），CI #344 起 ~10-12 分钟/次 |
+| 最新 Task 号 | **143**（双会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 141 七项 UI + Task 142 渲染器分层七锚点 + **Task 143 三修复**（后端落盘 / FSR 常量 / 单 mg 列表，见 Task 143 Stage Summary） |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -111,6 +111,32 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### Stage Summary
 - 提交 1c23bab（rebase 于另一会话 649609f 之上），CI 已触发。
 - 装机待验证锚点：①实例页"跟随全局渲染器"开关行，开启时渲染器行置灰、值显示全局默认；②渲染器选择器仅"mg / 自动 / 经典项"（无三后端、无跟随全局）；③设置页 MobileGlues 渲染后端行独立变化，渲染器行不再跟着变；④✓ 标记在设置页渲染器行正确显示（含 auto/gl4es/zink——Task140 起丢失，本轮修复）；⑤旧设备首启日志 '[Amethyst] Task142: global renderer <family> migrated to 'mg''；⑥后端行改选日志 '[PLPrefTable] Task142: renderer_backend written to OWN KEY'；⑦渲染器选 mg + 后端选 GLES/OpenGL4.0 启动，日志 RENDERER is set to 对应家族 dylib。
+
+---
+
+## Task 143（本会话，装机日志三修复）
+
+### 用户反馈（4ecc256 构建，日志 = 仓库根 latestlog.txt，用户经 GitHub 网页上传）
+"现在无论切换什么渲染器都会变成mg。fsr没有生效。而且mg是MobileGlues，为什么列表有个mg又有个MobileGlues"。
+
+### 根因（日志逐行实锤）
+1. **后端永不落盘**：Task142 引入 `mobileglues.renderer_backend` 但漏在 PLPreferences.m setDefaultsForPref 注册；PLPreferences 只能读写已存在键。装机日志 L30-31：选 GLES 后端 → "Setter could not find preference mobileglues.renderer_backend" 写入静默丢弃 → 启动恒回落默认 libMobileGL.dylib（DirectVulkan）= "切什么都是 mg"。
+2. **FSR 从未生效**：mgl_fsr.mm 把 GL_FRAGMENT_SHADER 定义为 0x8B92（实为 GL_PALETTE4_R5_G6_B5_OES，GLES1 调色板格式；规范值 0x8B30，mesa glext.h:599）。考古：Task83 原值正确 → Task84 据装机日志 stage=35632 误诊反向"勘误"成 0x8B92 → Task119 复制同错值 → MobileGL/zink 两链片元着色器恒 glCreateShader=0 + GL_INVALID_ENUM（日志 L818-820：顶点 0x8B31 成功、片元 35730 失败）→ 恒自愈回全分辨率。附带 GL_ARRAY_BUFFER_BINDING 0x8B8C（实为 GL_SHADING_LANGUAGE_VERSION）→ 0x8894——RCAS 路径 glGetIntegerv 实际引用它，VBO 保存静默失效。
+3. **mg 与 MobileGlues 并列**：mg=libMobileGL.dylib 家族（Vulkan直呈/GLES/Mithril 后端），MobileGlues=libmobileglues.dylib 独立渲染器（源码构建、自带 FSR1）——本就是两个渲染器，Task142 未把后者从选择列表隐退导致命名撞车。
+
+### 修复（4 文件 + 验证器，零 l10n 变更、基线 1924 不动）
+- PLPreferences.m：mobileglues 分区注册 `@"renderer_backend": @""`——刻意空串：实体默认会让解析链第一层恒命中、legacy 档位（renderer=auto + mobilegl_backend=2/3）永久失明；空串保住"键未设"语义与 legacy 层，顺带消 Getter 噪音。
+- ctxbridges/mgl_fsr.mm：GL_FRAGMENT_SHADER 0x8B92→0x8B30；GL_ARRAY_BUFFER_BINDING →0x8894。
+- ctxbridges/osm_bridge.mm：同款两常量 + Task84 错误勘误注释改写为 Task143 再勘误（教训：勿据日志反推枚举规范值）。
+- LauncherPreferences.m：availableRendererCandidates 规则 3——libmobileglues 条目仅当其为当前选中值时可见（存量设备照常显示/启动，legacy 显式键路径不变，dylib 仍随包），新选择一律七项列表；ame_renderer_display_name 对该键映射回既有 debug.mg 文案（存量 profile 裸键名防御，零新 l10n 键）。
+- scripts/verify_task143.py：31 项（A5/B7/C5/D7/E4/F2/G1）。
+
+### 校验
+- verify_task143 31/31；task142 49/49；136=63、137=46、138=52、140=58 全绿；129-135/139/141 失败逐项 = 已记录环境性同类（会话本地审计脚本被沙箱清除 + 旧级联 + task141 硬编码另一会话路径），零新增；四文件括号平衡 (0,0,0)。
+
+### Stage Summary
+- 装机验证锚点：①后端改选 GLES/Mithril 重启后保持，启动日志 `RENDERER is set to libMobileGL-gles.dylib`（不再恒 DirectVulkan）；②不再出现 "Setter could not find preference mobileglues.renderer_backend"；③FSR1 开启后不再有 glCreateShader(stage=35730)=0 / "restoring MC window" 自愈，画面为 EASU 上采样；④选择列表不再同时出现 mg 与 MobileGlues（存量选过者除外）；⑤Task142 七锚点继续有效。
+- 用户侧：mg 与 MobileGlues 本就是两个渲染器；按"渲染器选择只有一个 mg"指令把后者隐退为存量兼容项。
 
 ---
 
