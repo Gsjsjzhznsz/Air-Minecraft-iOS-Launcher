@@ -1936,12 +1936,13 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
     });
 }
 
-// Task 139：屏蔽控件门控 —— mod 已启用且开启屏蔽控件时，启动器【自身】的
-// 虚拟控件层（ctrlView，经典 Pojav 屏幕按钮）也必须一并隐藏。
-// 病历：Task134/138 只向 mod 写入了空布局预设（mod 侧控件确实隐藏了，
-// 反编译 + 装机日志双验证：config.json/preset 解析零报错、status=ENABLED
-// 时 currentPreset=空布局），但启动器自己的 ctrlView 照常显示 —— 用户
-// 看到“屏蔽控件开了但控件还在”。此门控同时作用于：初始加载（loadCustomControls）、
+// Task 139 → Task 140：屏蔽控件门控 —— mod 已启用且开启屏蔽控件时，启动器
+// 【自身】的虚拟控件层（ctrlView，经典 Pojav 屏幕按钮）隐藏。
+// Task140 语义更新：此开关【只隐藏启动器自身控件】，mod 的虚拟按钮保留
+// （上游内置预设自带完整按钮——Task134-139 曾同时给 mod 写空布局导致
+// 全屏无按钮，用户反馈“虚拟按钮没有显示”；mod 侧写入已在 Task140
+// 退役，存量污染由 JavaLauncher.ame140_remediateTouchControllerConfig
+// 一次性修复）。此门控同时作用于：初始加载（loadCustomControls）、
 // 鼠标/手柄连接断开时的 hardware_hide 恢复路径（防止意外重新显示）。
 // updateControlHiddenState 只改逐按钮 hidden，ctrlView 整层隐藏优先级更高，
 // 无需改动。

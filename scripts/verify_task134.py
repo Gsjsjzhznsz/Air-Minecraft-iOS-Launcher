@@ -116,20 +116,20 @@ check("C1 pane 开关行在位（mod_touch_hide_controls，位于 moveview 与 a
       tcpane.index('@"mod_touch_moveview_enable"') < tcpane.index('@"mod_touch_hide_controls"') < tcpane.index('@"mod_touch_about"'))
 check("C2 PLPreferences 默认值",
       '@"mod_touch_hide_controls": @NO' in plp)
-check("C3 空布局预设写入器（固定 uuid + preset/order/config 三文件 + 与 mod 源码逐字段核对注释）",
-      "ame134_applyTouchControllerCleanLayout" in jl and
+check("C3 →Task140 终态：mod 侧空布局写入器退役，一次性修复器接管（只动污染指针）",
+      "ame140_remediateTouchControllerConfig" in jl and
       '0196a1ba-6e9a-7b4c-8d5e-3f2a1c0e9b7d' in jl and
-      'stringByPathComponent:@"config/touchcontroller"' if False else
-      'stringByAppendingPathComponent:@"config/touchcontroller"' in jl and
-      'stringByAppendingPathComponent:@"order.json"' in jl and
-      '@"type": @"custom", @"uuid": cleanUuid' in jl)
-check("C4 可逆性（备份 control.mod_touch_prev_preset_json + 关闭时恢复/移除 preset 字段）",
+      'config/touchcontroller' in jl and
+      'pointsToClean' in jl and
+      '@"type": @"custom", @"uuid": cleanUuid' not in jl)
+check("C4 可逆性 →Task140：备份恢复路径保留在修复器内（control.mod_touch_prev_preset_json）",
       "control.mod_touch_prev_preset_json" in jl and
       "removeObjectForKey:@\"preset\"" in jl)
 check("C5 调用点在 gameDir 解析后（JLI_Launch 前，当次启动生效）",
-      jl.index("ame134_applyTouchControllerCleanLayout(gameDir)") > jl.index("ame95_warnIncompleteImport(gameDir)"))
-check("C6 布局 JSON 形态正确（LayoutPreset：name + 空数组 layout，controlInfo 全默认省略）",
-      '\\"name\\" : \\"Amethyst Clean\\"' in jl and '\\"layout\\" : [' in jl)
+      jl.index("ame140_remediateTouchControllerConfig(gameDir)") > jl.index("ame95_warnIncompleteImport(gameDir)"))
+check("C6 →Task140：空布局 JSON 载荷已删（presetJson/Amethyst Clean 字面量写入清零）",
+      '\\"name\\" : \\"Amethyst Clean\\"' not in jl and
+      'presetJson writeToFile' not in jl)
 
 print("== D. 右上角头像实时刷新 ==")
 check("D1 通知助手定义（主线程广播 UpdateAccountInfo + 病历注释：磁贴只在 viewDidLoad 读一次）",
@@ -216,8 +216,8 @@ def lkeys(lang):
 
 ks = [lkeys(l) for l in LANGS]
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
-check("G1 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + 2）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1918, f"counts={[len(k) for k in ks]}")
+check("G1 四语言键集一致（Task140 基线 1920 = 1918 + Task140 跟随全局/阴影提示 2）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1920, f"counts={[len(k) for k in ks]}")
 check("G2 Task134 新键齐备（jit_enabler 7 + title/detail 4 + hide_controls；pickextra 3 键已删）",
       all("preference.debug.jit_enabler.auto" in k and
           "preference.debug.jit_enabler.manual" in k and

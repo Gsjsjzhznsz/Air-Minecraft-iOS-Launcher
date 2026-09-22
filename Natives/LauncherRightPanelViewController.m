@@ -1483,12 +1483,14 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
             NSDictionary *profile = PLProfiles.current.profiles[profileName];
             
             if (profile) {
-                // 应用渲染器设置
-                NSString *renderer = profile[@"renderer"] ?: @"auto";
-                if (![renderer isEqualToString:@"auto"]) {
-                    setPrefString(@"video.renderer", renderer);
-                }
-
+                // Task 140：移除“应用渲染器设置”的全局回写。旧代码把当前
+                // 游戏 profile 的 renderer 写进全局 video.renderer——启动链
+                // （ame_effective_renderer / JavaLauncher / SurfaceVC）本就
+                // profile 优先（resolveKeyForCurrentProfile），此回写纯冗余，
+                // 且会把“上一个启动的游戏的渲染器”污染成全局默认，其它
+                // “跟随全局”的游戏被动切换渲染器。全局默认现在只由设置页
+                // 两行写入（Task140 分居语义）。graphicsApi/java/内存的回写
+                // 维持原状（不在本轮病灶内，最小改动）。
                 // 应用图形 API 设置（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
                 // 由 JavaLauncher.m 读取并设置 AMETHYST_GRAPHICS_API 环境变量，
                 // PojavLauncher.java 写入 options.txt 的 graphicsApi 字段

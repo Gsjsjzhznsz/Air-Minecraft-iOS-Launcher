@@ -215,6 +215,8 @@ typedef struct {
 
 static struct {
     ame119_gl_t gl;
+    void *mgHandle;         // Task 140：libMobileGL.dylib 句柄（符号直连源）
+    int srcHandle, srcProc, srcDefault;  // Task 140：解析来源计数（装机取证）
     void *(*eglGetProcAddress)(const char *);
     bool resolved;      // 符号表已解析（无论成败不再重试）
     bool initFailed;    // shader/program 初始化失败（不再每帧重试编译）
@@ -248,8 +250,30 @@ static float ame130_rcas_sharpness(void) {
     return v;
 }
 
-// 符号解析：优先 eglGetProcAddress（上游实证路径），失败回退 dlsym 直连。
+// 符号解析（Task 140 重写）。
+//
+// 病历（ab9670d GLES 会话 latestlog.txt 07:30:57 实锤）：旧顺序
+// eglGetProcAddress 优先 + dlsym(RTLD_DEFAULT) 兜底，实测 FSR 从未在
+// MobileGL 两后端上成功初始化——resolve 41/41 全非空却 "upscale
+// unavailable"，且 init 链上唯一无日志的失败点是 glCreateShader()==0。
+// 根因：MobileGL 的 eglGetProcAddress 对核心 gl* 名称返回 NULL（它只服务
+// 扩展入口），兜底 dlsym(RTLD_DEFAULT) 在平命名空间全局搜索里【先命中
+// app 自动链接的 ANGLE】（libGLESv2.framework 由 Makefile 链入主程序，
+// 进程启动即入全局符号表，早于 egl_bridge 对 libMobileGL 的 RTLD_GLOBAL
+// dlopen）——全部 41 个入口实际是 ANGLE 的实现，而当前上下文是
+// MobileGL 的，ANGLE 侧无 current context，glCreateShader 返回 0，
+// 静默失败 → FSR 永远不可用。
+//
+// 修复：直接从 libMobileGL.dylib 的 dlopen 句柄 dlsym（其 LC_DYLD_EXPORTS
+//_TRIE 已逐一验证导出全部所需 gl* 符号——2851 个 _gl* / 45 个 _egl*），
+// dyld 对句柄 dlsym 先查镜像自身 trie，绝不外溢到 ANGLE。
+// eglGetProcAddress 降为次选（仅 handle 缺失时），RTLD_DEFAULT 保底末位，
+// 并记录每个符号的解析来源（handle/proc/default），装机日志一眼判读。
 static void *ame119_resolve(const char *name) {
+    if (ame119_fsr.mgHandle != NULL) {
+        void *p = dlsym(ame119_fsr.mgHandle, name);
+        if (p != NULL) return p;
+    }
     if (ame119_fsr.eglGetProcAddress != NULL) {
         void *p = ame119_fsr.eglGetProcAddress(name);
         if (p != NULL) return p;
@@ -261,11 +285,14 @@ static bool ame119_resolve_gl(void) {
     if (ame119_fsr.resolved) return ame119_fsr.gl.glCreateShader != NULL;
     ame119_fsr.resolved = true;
     // libMobileGL.dylib 已由 egl_bridge 预装载（RTLD_GLOBAL）；dlopen 同名
-    // 返回既有句柄，仅为拿 eglGetProcAddress 的稳定入口。
+    // 返回既有句柄，仅作符号直连源 + 拿 eglGetProcAddress 备用入口。
+    // Task 140：句柄存进 ame119_fsr.mgHandle，ame119_resolve 优先从它
+    // dlsym（见该函数注释的 ANGLE 窃符号病历）。
     void *mg = dlopen("@rpath/" RENDERER_NAME_MOBILEGL, RTLD_NOW | RTLD_NOLOAD);
     if (mg == NULL) {
         mg = dlopen("@rpath/" RENDERER_NAME_MOBILEGL, RTLD_NOW | RTLD_LOCAL);
     }
+    ame119_fsr.mgHandle = mg;
     if (mg != NULL) {
         ame119_fsr.eglGetProcAddress =
             (void *(*)(const char *))dlsym(mg, "eglGetProcAddress");
@@ -315,13 +342,25 @@ static bool ame119_resolve_gl(void) {
         {"glGetError",                (void **)&ame119_fsr.gl.glGetError},
     };
     int ok = 0;
+    ame119_fsr.srcHandle = ame119_fsr.srcProc = ame119_fsr.srcDefault = 0;
     for (auto &s : kSym) {
         *s.slot = ame119_resolve(s.name);
-        if (*s.slot != NULL) ++ok;
+        if (*s.slot != NULL) {
+            ++ok;
+            // 解析来源分桶计数（Task 140 取证：handle 应独占全部 41 项）
+            if (mg != NULL && dlsym(mg, s.name) == *s.slot) {
+                ++ame119_fsr.srcHandle;
+            } else if (ame119_fsr.eglGetProcAddress != NULL &&
+                       ame119_fsr.eglGetProcAddress(s.name) == *s.slot) {
+                ++ame119_fsr.srcProc;
+            } else {
+                ++ame119_fsr.srcDefault;
+            }
+        }
     }
-    NSLog(@"[MGLFSR] Task119 GL resolve: %d/%zu symbols (eglGetProcAddress=%p via %s)",
-          ok, sizeof(kSym) / sizeof(kSym[0]), (void *)ame119_fsr.eglGetProcAddress,
-          mg != NULL ? "libMobileGL handle" : "RTLD_DEFAULT");
+    NSLog(@"[MGLFSR] Task119 GL resolve: %d/%zu symbols (mgHandle=%p eglGetProcAddress=%p; sources: handle=%d proc=%d default=%d)",
+          ok, sizeof(kSym) / sizeof(kSym[0]), mg, (void *)ame119_fsr.eglGetProcAddress,
+          ame119_fsr.srcHandle, ame119_fsr.srcProc, ame119_fsr.srcDefault);
     return ok == (int)(sizeof(kSym) / sizeof(kSym[0]));
 }
 
@@ -335,7 +374,17 @@ static std::string ame119_adapt_shader_version(const char *src, const char *stag
     // GL_SHADING_LANGUAGE_VERSION 0x8B8C 需要当前上下文——解析期在首个
     // swap 前调用，MC 上下文已 current（gl_swap_buffers 运行于渲染线程）。
     ame119_fsr.gl.glGetIntegerv(0x8B8C, &ver);
-    if (ver == 0) return out;   // 查询失败：原样（编译错误走兜底）
+    if (ver == 0) {
+        // Task 140：ver==0 曾是无日志静默路径（源保持 #version 450 直接编）。
+        // 现在留痕：ver==0 意味着查询未写入（无当前上下文或 pname 不支持），
+        // 装机日志可直接判读上下文状态。
+        static bool s_logged = false;
+        if (!s_logged) {
+            s_logged = true;
+            NSLog(@"[MGLFSR] Task140 GLSL version query (pname 0x8B8C) returned 0 (%s stage) -- no current context on this thread or unsupported pname", stageName);
+        }
+        return out;   // 查询失败：原样（编译错误走兜底）
+    }
     if (ver >= 450) return out;
     if (ver < 400) {
         static bool s_logged = false;
@@ -362,7 +411,16 @@ static std::string ame119_adapt_shader_version(const char *src, const char *stag
 static unsigned int ame119_compile(unsigned int stage, const std::string &src) {
     ame119_gl_t *g = &ame119_fsr.gl;
     unsigned int sh = g->glCreateShader(stage);
-    if (sh == 0) return 0;
+    if (sh == 0) {
+        // Task 140：glCreateShader()==0 曾是全链唯一无日志的静默失败点
+        //（ab9670d GLES 会话 "resolve 41/41 后直接 unavailable" 实锤）。
+        // 现在带 glGetError 留痕——0x3006 无当前上下文 = 符号解析命中了
+        // 错误镜像（ANGLE 窃符号病历，见 ame119_resolve 注释）。
+        unsigned int err = g->glGetError != NULL ? g->glGetError() : 0;
+        NSLog(@"[MGLFSR] Task140 glCreateShader(stage=%u) returned 0, glGetError=0x%x -- no current context on the resolved image? (symbol-theft check: sources handle=%d proc=%d default=%d)",
+              stage, err, ame119_fsr.srcHandle, ame119_fsr.srcProc, ame119_fsr.srcDefault);
+        return 0;
+    }
     const char *p = src.c_str();
     int len = (int)src.size();
     g->glShaderSource(sh, 1, &p, &len);

@@ -469,8 +469,12 @@ static NSString * localizeProfileTitle(NSString *title) {
 #pragma mark - Load Settings
 
 - (void)loadSettings {
-    // 渲染器
-    self.selectedRenderer = self.profile[@"renderer"] ?: @"auto";
+    // 渲染器（Task 140：nil = 跟随全局——profile 无 renderer 键时不再
+    // 假装“auto”，实例页如实显示“跟随全局”态；启动链
+    // resolveKeyForCurrentProfile 对无键 profile 自动回退全局 video.renderer，
+    // 语义一致。用户想显式用 auto 可在选项表里选“自动”。）
+    id ame140_rendererRaw = self.profile[@"renderer"];
+    self.selectedRenderer = [ame140_rendererRaw isKindOfClass:NSString.class] ? ame140_rendererRaw : nil;
 
     // 图形 API（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
     self.selectedGraphicsApi = self.profile[@"graphicsApi"] ?: @"default";
@@ -616,12 +620,19 @@ static NSString * localizeProfileTitle(NSString *title) {
     if (!existing) {
         existing = [NSMutableDictionary dictionary];
     }
-    existing[@"renderer"] = self.selectedRenderer;
-    // Task 139：渲染器四处写入同构（设置页主行/renderer_backend 行/版本
-    // 管理器/本实例设置页）——本页此前只写 profile，全局 video.renderer
-    // 停在旧值，与设置页的双写读者形成层级间漂移。同步全局，两层恒一致。
-    if ([self.selectedRenderer isKindOfClass:NSString.class] && self.selectedRenderer.length > 0) {
-        setPrefString(@"video.renderer", self.selectedRenderer);
+    // Task 140：渲染器分居重构 —— 实例页只写【profile】层：
+    // - selectedRenderer == nil（跟随全局）→ 移除键，启动链回退全局默认；
+    // - 显式值（含 MG 家族三后端）→ 写 profile 键。
+    // Task139 曾在此同步全局 video.renderer（四处写入同构）——那会让
+    // 编辑单个游戏的渲染器改写其它游戏的默认值（跨游戏污染），且与
+    // 设置页的双写互相打架（用户“改了实例渲染器被设置页变回”反馈
+    // 的另一半根源）。全局层现在由设置页独占写入。
+    if (self.selectedRenderer == nil) {
+        [existing removeObjectForKey:@"renderer"];
+        NSLog(@"[ProfileSettings] Task140: renderer key removed (follow global) for '%@'", profName);
+    } else {
+        existing[@"renderer"] = self.selectedRenderer;
+        NSLog(@"[ProfileSettings] Task140: renderer written to PROFILE ONLY '%@' = %@", profName, self.selectedRenderer);
     }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
     existing[@"javaVersion"] = self.selectedJavaVersion;
@@ -1101,14 +1112,19 @@ static NSString * localizeProfileTitle(NSString *title) {
 
 #pragma mark - Helpers
 
+// Task 140：渲染器显示名（实例页专用）。三层：
+//   - nil（跟随全局）→ “跟随全局设置（当前: X）”，X = 全局默认的显示名；
+//   - MG 家族键 → 三后端文案（旧版显示原始 dylib 名“libMobileGL-gles.dylib”，
+//     用户不认识）；
+//   - 经典键 → candidates 表显示名（ame_renderer_display_name 统一处理）。
 - (NSString *)rendererDisplayName:(NSString *)renderer {
-    NSArray *keys = getRendererKeys(NO);
-    NSArray *names = getRendererNames(NO);
-    NSUInteger idx = [keys indexOfObject:renderer];
-    if (idx != NSNotFound && idx < names.count) {
-        return names[idx];
+    if (renderer == nil || renderer.length == 0) {
+        NSString *ame140_global = getPrefObject(@"video.renderer");
+        NSString *ame140_gval = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
+        return [NSString stringWithFormat:localize(@"preference.profile.renderer_follow_global", nil),
+                ame_renderer_display_name(ame140_gval)];
     }
-    return renderer ?: @"auto";
+    return ame_renderer_display_name(renderer);
 }
 
 - (NSString *)currentProfileName {
@@ -1989,17 +2005,57 @@ static NSString * localizeProfileTitle(NSString *title) {
     });
 }
 
+// Task 140：实例页渲染器选择器 —— 选项全量：跟随全局（删键）+ 经典可用项
+//（auto/gl4es/zink/...，按 dylib 存在性过滤）+ MG 家族三后端。旧版只有
+// 经典四项：用户无法给单个游戏选 MG 后端（只能在设置页选全局），而设置页
+// 的选择又被旧双写改到“当前游戏”——两头堵。现在实例页独占 per-game 选择，
+// 家族键直接写 profile（启动链 ame_effective_renderer 原样识别）。
 - (void)showRendererSelector {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_940", nil)
                                                                    message:nil
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
 
+    // 选项 0：跟随全局（删除 profile 键）——当前即跟随态时前置 ✓
+    NSString *ame140_followTitle = [self rendererDisplayName:nil];
+    if (self.selectedRenderer == nil) {
+        ame140_followTitle = [NSString stringWithFormat:@"✓ %@", ame140_followTitle];
+    }
+    [alert addAction:[UIAlertAction actionWithTitle:ame140_followTitle
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        self.selectedRenderer = nil;
+        [self saveSettings];
+        [self reloadAllTableViews];
+    }]];
+
+    // 经典选项（auto/gl4es/zink/...，与设置页同源过滤）
     NSArray *renderers = getRendererKeys(NO);
     NSArray *displayNames = getRendererNames(NO);
-
     for (NSInteger i = 0; i < renderers.count; i++) {
         NSString *renderer = renderers[i];
         NSString *name = i < displayNames.count ? displayNames[i] : renderer;
+        if ([self.selectedRenderer isEqualToString:renderer]) {
+            name = [NSString stringWithFormat:@"✓ %@", name];
+        }
+        [alert addAction:[UIAlertAction actionWithTitle:name
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction * _Nonnull action) {
+            self.selectedRenderer = renderer;
+            [self saveSettings];
+            [self reloadAllTableViews];
+        }]];
+    }
+
+    // MG 家族三后端（Task 132 用户指令：选项文案与设置页 mg 行同款；
+    // 此处按 dylib 存在性提示，Mithril 缺文件时仍列出但选中即提醒）
+    NSArray *familyKeys = getRendererFamilyKeys();
+    NSArray *familyNames = getRendererFamilyNames();
+    for (NSInteger i = 0; i < familyKeys.count; i++) {
+        NSString *renderer = familyKeys[i];
+        NSString *name = i < familyNames.count ? familyNames[i] : renderer;
+        if ([self.selectedRenderer isEqualToString:renderer]) {
+            name = [NSString stringWithFormat:@"✓ %@", name];
+        }
         [alert addAction:[UIAlertAction actionWithTitle:name
                                                   style:UIAlertActionStyleDefault
                                                 handler:^(UIAlertAction * _Nonnull action) {
@@ -2017,6 +2073,8 @@ static NSString * localizeProfileTitle(NSString *title) {
         alert.popoverPresentationController.sourceRect = cell ? cell.bounds : self.view.bounds;
     }
 
+    NSLog(@"[ProfileSettings] Task140: renderer picker opened (%ld classic + 3 family + follow-global)",
+          (long)renderers.count);
     [self presentViewController:alert animated:YES completion:nil];
 }
 

@@ -297,31 +297,39 @@
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"fsr_rcas_sharpness"]) {
             keyFull = @"mobileglues.fsr_rcas_sharpness";
         }
-        // Task 132（MG 三端合并）：MobileGlues 分区统一后端行——读有效渲染器，
-        // 家族键原样返回（含 legacy auto+backend 解析结果），非家族
-        // （auto/zink/…）回落默认 Vulkan 直连（用户指定默认选中项）。
-        // legacy 精化（仅显示层）：renderer=auto + mobilegl_backend=2 的存量
-        // 设备实际以 DirectGLES 运行（JavaLauncher 按 backend=2 设 env），
-        // ame_effective_renderer 返回的是共享二进制键 libMobileGL.dylib——
-        // 此处按 backend 抬到 -gles 逻辑键，浮窗 ✓ 与实际后端一致；
-        // 显式选过家族键（非 auto）的设备不受影响。
+        // Task 132（MG 三端合并，现行）：MobileGlues 分区单一 pick 行。
+        // Task 140：设置行 = 【全局默认】语义——只写全局 video.renderer，
+        // 不再触碰 profile 层（Task139 的双写让设置页每次选择都覆写当前
+        // 游戏的独立渲染器，用户实例页改的值被“变回设置里选的那个”）。
+        // 分层：设置页 = 全局默认；实例设置页（ProfileSettings）= 该游戏
+        // 自己的值（含“跟随全局”态，删键即回退到全局）；启动链
+        // ame_effective_renderer / JavaLauncher profile 优先不变。
+        // 非家族值（auto/gl4es/zink/...）显示真实名称（旧行为对任何
+        // 非家族值无条件显示“Vulkan 直连”假默认，用户看到“改了 zink
+        // 后端行还是 Vulkan 直连”的伪装）。
         if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
-            NSString *ame132_eff = ame_effective_renderer();
-            BOOL ame132_isFamily =
-                [ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL] ||
-                [ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
-                [ame132_eff isEqualToString:@ RENDERER_NAME_MITHRIL];
-            if (ame132_isFamily) {
-                NSString *ame132_raw = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-                BOOL ame132_auto = ![ame132_raw isKindOfClass:NSString.class] ||
-                    ame132_raw.length == 0 || [ame132_raw isEqualToString:@"auto"];
-                if (ame132_auto && [ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL] &&
-                    getPrefInt(@"mobileglues.mobilegl_backend") == 2) {
-                    return @ RENDERER_NAME_MOBILEGL_GLES;
+            NSString *ame140_global = getPrefObject(@"video.renderer");
+            NSString *ame140_val = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
+            // legacy 精化（保留自 Task132）：renderer=auto + mobilegl_backend
+            // 档位的存量设备实际以对应家族后端运行（ame_effective_renderer
+            // 的 legacy 解析路径）——行显示抬到实际后端，✓ 与运行态一致。
+            if ([ame140_val isEqualToString:@"auto"]) {
+                NSInteger ame140_backend = getPrefInt(@"mobileglues.mobilegl_backend");
+                if (ame140_backend == 1 || ame140_backend == 2) {
+                    return ame140_backend == 2 ? @ RENDERER_NAME_MOBILEGL_GLES : @ RENDERER_NAME_MOBILEGL;
                 }
-                return ame132_eff;
+                if (ame140_backend == 3) {
+                    return @ RENDERER_NAME_MITHRIL;
+                }
             }
-            return @ RENDERER_NAME_MOBILEGL;
+            BOOL ame140_isFamily =
+                [ame140_val isEqualToString:@ RENDERER_NAME_MOBILEGL] ||
+                [ame140_val isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
+                [ame140_val isEqualToString:@ RENDERER_NAME_MITHRIL];
+            if (ame140_isFamily) {
+                return ame140_val;   // 家族键原样返回：pickKeys ✓ 匹配 + pickList 本地化显示
+            }
+            return ame_renderer_display_name(ame140_val);   // 非家族：真实名（不匹配任何选项 ✓，诚实显示）
         }
         // Task138：模组镜像源行（已移入 download 分区）——统一粗控读数：
         // 读 assetDownloadSource 为准（写入时两键同值；细粒度分叉时以
@@ -336,60 +344,49 @@
             }
             return @"speed_first";
         }
-        // Task 132：渲染器行显示映射——存储值是家族键时，行右侧显示对应
-        // 后端文案（存储值不变；非家族值原样走通用路径）。
-        // Task 139：显示源从全局键改为【profile 优先】——游戏启动链
-        // （ame_effective_renderer / JavaLauncher / SurfaceViewController）
-        // 全部读 resolveKeyForCurrentProfile，若实例 profile 里存有 renderer
-        // （版本管理器/实例设置页写入），全局值只是旧值；设置行显示全局值
-        // 会与游戏实际用渲染器不一致（用户看到“切了渲染器又变回 auto”的
-        // 一半真相）。显示与启动同源。
+        // Task 140：主渲染器行（video.renderer）显示【全局默认】值。
+        // Task139 曾改为 profile 优先显示（与启动链同源）——但设置行是
+        // “全局默认”语义，显示 profile 值会让用户把“当前游戏的独立设置”
+        // 误认为全局状态；与 mg 后端行、实例页三方互相伪装正是本轮
+        // “切了渲染器又变回”反馈的漏乱根源。现在：设置页两行一律显示
+        // 全局值（家族键→三后端文案，其余→真实名）；当前游戏的独立值
+        // （若存在）由实例设置页呈现与编辑。
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
-            NSString *ame132_val = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-            if (![ame132_val isKindOfClass:NSString.class]) {
-                ame132_val = getPrefObject(@"video.renderer");
-            }
-            if ([ame132_val isKindOfClass:NSString.class]) {
-                if ([ame132_val isEqualToString:@ RENDERER_NAME_MOBILEGL]) {
-                    return localize(@"preference.title.renderer_backend-mobilegl", nil);
-                }
-                if ([ame132_val isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]) {
-                    return localize(@"preference.title.renderer_backend-mobilegl_gles", nil);
-                }
-                if ([ame132_val isEqualToString:@ RENDERER_NAME_MITHRIL]) {
-                    return localize(@"preference.title.renderer_backend-mithril", nil);
-                }
-            }
+            NSString *ame140_global = getPrefObject(@"video.renderer");
+            NSString *ame140_val = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
+            return ame_renderer_display_name(ame140_val);
         }
         return getPrefObject(keyFull);
     };
     self.setPreference = ^(NSString *section, NSString *key, id value){
-        // Task 139：渲染器双写 helper —— 设置页的两个渲染器行（video.renderer
-        // 主行 + mobileglues.renderer_backend 后端行）此前【只写全局键】
-        // video.renderer，而所有启动链读者（ame_effective_renderer、
-        // JavaLauncher、SurfaceViewController、ZinkConfig）都走
-        // resolveKeyForCurrentProfile【profile 优先】：实例 profile 里只要存过
-        // renderer（版本管理器选过/实例设置页保存过/建实例时写入），设置页的
-        // 选择就被 profile 阴影永久覆盖 —— 用户看到“切换渲染器，退出再回来
-        // 又变回 auto”。现在与版本管理器同款双写：profile + 全局同步落盘。
-        void (^ame139_writeRendererBoth)(NSString *) = ^(NSString *ame139_value){
-            setPrefObject(@"video.renderer", ame139_value);
-            @try {
-                NSString *ame139_profName = PLProfiles.current.selectedProfileName;
-                NSMutableDictionary *ame139_profiles = PLProfiles.current.profiles;
-                NSMutableDictionary *ame139_profile = [ame139_profiles[ame139_profName] mutableCopy];
-                if (ame139_profile) {
-                    ame139_profile[@"renderer"] = ame139_value;
-                    ame139_profiles[ame139_profName] = ame139_profile;
-                    [PLProfiles.current save];
-                    NSLog(@"[PLPrefTable] Task139: renderer written to both layers (profile '%@' + global) = %@",
-                          ame139_profName, ame139_value);
-                } else {
-                    NSLog(@"[PLPrefTable] Task139: no current profile '%@', renderer written to global only",
-                          ame139_profName);
-                }
-            } @catch (NSException *ame139_e) {
-                NSLog(@"[PLPrefTable] Task139: profile renderer write failed: %@", ame139_e);
+        // Task 140：渲染器写入分居重构 —— 设置页两行（video.renderer 主行 +
+        // mobileglues.renderer_backend 后端行）只写【全局】video.renderer，
+        // 不再触碰 profile 层。Task139 的双写（profile + 全局）让设置页
+        // 每次选择都覆写当前游戏的独立渲染器：用户在实例设置页改的值
+        // 被设置页“变回设置里选的那个”（本轮 d089745 装机日志实锤）。
+        // 分层语义（FCL/HMCL 同款）：设置页 = 全局默认；实例设置页 =
+        // 该游戏自己的值（含“跟随全局”删键态）；启动链 profile 优先
+        // （resolveKeyForCurrentProfile：profile 键 → 全局 → auto）不变。
+        // 若当前游戏存在独立设置且与新选值不同，NMToast 提示一层覆盖关系
+        // （防止“全局改了怎么游戏没变”的下一轮困惑）。
+        void (^ame140_writeRendererGlobal)(NSString *) = ^(NSString *ame140_value){
+            NSString *ame140_profName = PLProfiles.current.selectedProfileName;
+            NSDictionary *ame140_prof = PLProfiles.current.profiles[ame140_profName];
+            NSString *ame140_override = [ame140_prof isKindOfClass:NSDictionary.class]
+                ? ame140_prof[@"renderer"] : nil;
+            setPrefObject(@"video.renderer", ame140_value);
+            NSLog(@"[PLPrefTable] Task140: renderer written to GLOBAL ONLY = %@ (profile '%@' override: %@)",
+                  ame140_value, ame140_profName,
+                  [ame140_override isKindOfClass:NSString.class] ? ame140_override : @"<none>");
+            if ([ame140_override isKindOfClass:NSString.class] && ame140_override.length > 0 &&
+                ![ame140_override isEqualToString:ame140_value]) {
+                NSString *ame140_msg = [NSString stringWithFormat:
+                    localize(@"preference.warning.renderer_shadowed_by_profile", nil),
+                    ame_renderer_display_name(ame140_value),
+                    ame_renderer_display_name(ame140_override)];
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    [NMToast showMessage:ame140_msg];
+                });
             }
         };
         // AI 助手分区：回写到 AiSettings
@@ -435,12 +432,12 @@
         // Task 132（MG 三端合并）：统一后端行直接写渲染器键（与渲染器行
         // 同一存储层 video.renderer；显式选择永远优先，profile 无覆盖时
         // 即时生效——与 ame_effective_renderer 的解析一致）。
-        // Task 139：改双写（profile + 全局）——见上方 ame139_writeRendererBoth
-        // 注释；单写全局会被实例 profile 阴影覆盖。
+        // Task 140：只写全局（见上方 ame140_writeRendererGlobal 注释）；
+        // Task139 的双写曾让本行覆写当前游戏的独立渲染器。
         if ([section isEqualToString:@"mobileglues"] && [key isEqualToString:@"renderer_backend"]) {
-            NSString *ame139_rbValue = [value isKindOfClass:NSString.class] ? value : nil;
-            if (ame139_rbValue) {
-                ame139_writeRendererBoth(ame139_rbValue);
+            NSString *ame140_rbValue = [value isKindOfClass:NSString.class] ? value : nil;
+            if (ame140_rbValue) {
+                ame140_writeRendererGlobal(ame140_rbValue);
             } else {
                 setPrefObject(@"video.renderer", value);
             }
@@ -466,11 +463,12 @@
             }
             return;
         }
-        // Task 139：主渲染器行同样双写（profile + 全局），与
-        // renderer_backend 行、版本管理器、实例设置页四处写入全部同构。
+        // Task 140：主渲染器行同样只写全局（分居语义见
+        // ame140_writeRendererGlobal 注释）；实例层由 ProfileSettings 页
+        // 独占写入（含“跟随全局”删键态）。
         if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
             if ([value isKindOfClass:NSString.class]) {
-                ame139_writeRendererBoth(value);
+                ame140_writeRendererGlobal(value);
             } else {
                 setPrefObject(keyFull, value);
             }

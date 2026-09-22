@@ -869,27 +869,23 @@ static void ame99_installAppKitMenuStubs(void) {
 }
 
 // ---------------------------------------------------------------------------
-// Task 134：TouchController 屏蔽控件——把整个游戏界面换成没有任何屏幕控件
-// 的样式。mod 的配置体系（fifthlight/TouchController，kotlinx.serialization）：
+// Task 134 → Task 140：TouchController mod 侧配置处理的历史与现状。
+//
+// Task134 曾在此向 mod 写入空布局预设（"Amethyst Clean"，layout=[]）+
+// config.json 指针，配合 mod_touch_hide_controls 开关达成"界面无控件"；
+// Task138 修复了 plist→JSON 序列化使 mod 真正读到；Task139 又叠加隐藏
+// 启动器自身 ctrlView —— 最终效果是屏幕上一个按钮都没有，而用户期望
+// "屏蔽启动器自带控件、保留模组自己的虚拟按钮"（上游内置预设自带
+// 完整按钮：摇杆/跳跃/聊天/暂停等，见 BuiltinPresetsProviderImpl）。
+//
+// Task140（现行）：mod 的配置启动器【永不写入】——屏蔽控件开关只作用于
+// 启动器自身控件层（SurfaceViewController.ame139_modControlsHidden）；
+// 本文件仅保留 ame140_remediateTouchControllerConfig 的一次性修复：把
+// Task134-139 污染的空布局指针恢复/移除，让 mod 回落内置默认预设。
+// mod 的配置体系（fifthlight/TouchController，kotlinx.serialization）：
 //   <gameDir>/config/touchcontroller/config.json          全局配置（preset 字段选预设）
 //   <gameDir>/config/touchcontroller/preset/<uuid>.json   自定义布局预设
 //   <gameDir>/config/touchcontroller/order.json           预设顺序表（uuid 数组）
-// 预设指向一个【空布局】（layout: []，零层零控件）即达成"界面无控件"；
-// 触屏手势（点挖、滑动转视角）、震动、文本输入全部保留（手势不受布局影响）。
-//
-// 写入格式与 mod 源码逐字段核对（2026-09-21 clone 上游 master）：
-//   - LayoutPreset: name/controlInfo/layout；encodeDefaults=false 下 controlInfo
-//     全默认可省略，layout 空数组显式写出
-//   - PresetConfig 多态：{"type":"custom","uuid":"<8-4-4-4-12 小写hex>"}
-//   - order.json：uuid 字符串数组（PresetsContainer 按 order 排序）
-//   - mod 启动时 GlobalConfigHolder.load() 一次性读取——本函数在 JLI_Launch
-//     之前调用，当次启动即生效；jsonFormat isLenient + ignoreUnknownKeys，
-//     NSJSONSerialization 写出的任意合法 JSON 均可解析
-//
-// 可逆性：开启时把 config.json 原有的 preset 字段备份到
-// control.mod_touch_prev_preset_json；关闭时恢复（无备份则移除 preset 字段，
-// mod 回落默认内置预设）。空布局预设文件保留（在 mod 配置界面可见
-// "Amethyst Clean"，用户也可在游戏内手动选用）。
 // ---------------------------------------------------------------------------
 // Task 138：JSON 读写全面替换 Task134 的 plist 序列化。
 //
@@ -921,6 +917,9 @@ static NSArray *ame138_readJSONArray(NSString *path) {
         options:0 error:nil];
     return [ame138_obj isKindOfClass:NSArray.class] ? ame138_obj : nil;
 }
+// Task 140 注：ame138_readJSONArray 暂无调用者（Task134 的 order.json 读写
+// 随 mod 侧空布局写入一并退役）；保留为 JSON 工具集的一部分（与
+// ame138_readJSONDictionary/ame138_writeJSON 同族，未来 mod 配置类功能复用）。
 
 static BOOL ame138_writeJSON(id obj, NSString *path) {
     if (![NSJSONSerialization isValidJSONObject:obj]) return NO;
@@ -930,83 +929,67 @@ static BOOL ame138_writeJSON(id obj, NSString *path) {
     return [ame138_out writeToFile:path options:NSDataWritingAtomic error:nil];
 }
 
-static void ame134_applyTouchControllerCleanLayout(NSString *gameDir) {
+// Task 140：mod 侧配置处理重构 —— 从“写空布局”改为“只修复”。
+//
+// 病历（用户本轮反馈“静态库的触碰可以使用了，但是虚拟按钮没有显示”）：
+// Task134 起本函数在 mod_touch_hide_controls 开启时向 mod 写入空布局
+// 预设（"Amethyst Clean"，layout=[]）+ config.json 指针；Task139 又叠加
+// 隐藏启动器自身 ctrlView —— 两层一起 = 屏幕上一个按钮都没有。用户要的
+// 是“屏蔽启动器自带控件、用模组自己的按钮”（TouchController 的内置
+// 预设自带完整虚拟按钮：摇杆/跳跃/聊天/暂停等，见上游
+// BuiltinPresetsProviderImpl）。此外备份键 control.mod_touch_prev_preset_json
+// 在真实设备上从未落盘（装机日志 "Getter could not find preference"），
+// 关闭开关后无从恢复 —— mod 被永久锁死在空布局上，虚拟按钮再也不显示。
+//
+// 新语义（Task140）：
+//   - 屏蔽控件开关只作用于启动器自身控件层（SurfaceViewController 的
+//     ame139_modControlsHidden 门控），mod 的布局/配置启动器【永不触碰】；
+//   - 本函数仅做一次性修复：config.json 的 preset 指针若指向我们写过的
+//     空布局 uuid（Task134-139 污染），恢复备份或直接移除指针（mod 回落
+//     内置默认预设 = 完整虚拟按钮）；用户手动在 mod 界面选的其它预设
+//     一律不动。空布局预设文件保留（用户仍可在 mod 配置界面选用）。
+static void ame140_remediateTouchControllerConfig(NSString *gameDir) {
     if (gameDir.length == 0) {
         return;
     }
-    NSFileManager *ame134_fm = [NSFileManager defaultManager];
-    NSString *configDir = [gameDir stringByAppendingPathComponent:@"config/touchcontroller"];
-    NSString *presetDir = [configDir stringByAppendingPathComponent:@"preset"];
-    NSString *configFile = [configDir stringByAppendingPathComponent:@"config.json"];
-    // Task 139：order.json 在 mod 的 PresetManager 里是 presetDir.resolve(
-    // "order.json")——即【preset 目录内】，不是 config 根目录。旧路径写入的
-    // 文件 mod 永远读不到（仅影响预设列表排序展示，不影响选中，但既然发现
-    // 就一并修正）。
-    NSString *orderFile = [presetDir stringByAppendingPathComponent:@"order.json"];
-    // 固定 uuid（v7 形态、小写 hex、8-4-4-4-12——Uuid.parse 接受的规范形态）
+    NSString *configFile = [gameDir stringByAppendingPathComponent:
+        @"config/touchcontroller/config.json"];
+    // Task134-139 曾写入的空布局预设 uuid（识别污染指针用）
     NSString *cleanUuid = @"0196a1ba-6e9a-7b4c-8d5e-3f2a1c0e9b7d";
-    NSString *presetFile =
-        [presetDir stringByAppendingPathComponent:[cleanUuid stringByAppendingPathExtension:@"json"]];
 
-    // 读现有全局配置（Task 138：JSON 读，保留 mod 已有的其它设置；
-    // 存量 XML 污染文件在此按无既有配置处理）
     NSMutableDictionary *config = [NSMutableDictionary dictionary];
     NSDictionary *ame138_loaded = ame138_readJSONDictionary(configFile);
     if (ame138_loaded) {
         config = ame138_loaded.mutableCopy;
     }
 
-    if (getPrefBool(@"control.mod_touch_hide_controls")) {
-        // —— 开启：写空布局预设 + order + preset 指向 ——
-        [ame134_fm createDirectoryAtPath:presetDir withIntermediateDirectories:YES attributes:nil error:nil];
-        NSString *presetJson = @"{\n  \"name\" : \"Amethyst Clean\",\n  \"layout\" : [\n  ]\n}";
-        [presetJson writeToFile:presetFile atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    // 只在指针指向【我们的】空布局时动手（用户自选预设不动）
+    NSDictionary *preset = [config[@"preset"] isKindOfClass:NSDictionary.class]
+        ? config[@"preset"] : nil;
+    BOOL pointsToClean = [preset isKindOfClass:NSDictionary.class] &&
+        [preset[@"uuid"] isKindOfClass:NSString.class] &&
+        [preset[@"uuid"] isEqualToString:cleanUuid];
 
-        // order.json（Task 138：JSON 数组）：保留已有条目，追加本预设
-        // （mod 的 PresetsContainer 按 order 排序；缺 order.json 时按
-        // uuid 排序兜底，写入只为整洁）
-        NSMutableArray *order = [NSMutableArray array];
-        NSArray *ame138_orderLoaded = ame138_readJSONArray(orderFile);
-        if (ame138_orderLoaded) {
-            [order addObjectsFromArray:ame138_orderLoaded];
-        }
-        if (![order containsObject:cleanUuid]) {
-            [order addObject:cleanUuid];
-            ame138_writeJSON(order, orderFile);
-        }
+    if (!pointsToClean) {
+        // 从未污染，或用户已自选其它预设：不动配置
+        return;
+    }
 
-        // 备份原 preset 值（仅一次——重复启动不覆盖首次备份，保证还原语义）
-        NSString *backup = getPrefObject(@"control.mod_touch_prev_preset_json");
-        if (![backup isKindOfClass:NSString.class] && config[@"preset"] != nil) {
-            NSError *jsonErr = nil;
-            NSData *raw = [NSJSONSerialization dataWithJSONObject:config[@"preset"]
-                                                          options:0 error:&jsonErr];
-            if (raw && !jsonErr) {
-                setPrefObject(@"control.mod_touch_prev_preset_json",
-                              [[NSString alloc] initWithData:raw encoding:NSUTF8StringEncoding]);
-            }
+    // 有备份（Task134 语义下存的）→ 恢复原值；无备份 → 移除指针回落内置默认
+    NSString *backup = getPrefObject(@"control.mod_touch_prev_preset_json");
+    if ([backup isKindOfClass:NSString.class] && backup.length > 0) {
+        NSData *raw = [backup dataUsingEncoding:NSUTF8StringEncoding];
+        id restored = [NSJSONSerialization JSONObjectWithData:raw options:0 error:nil];
+        if (restored) {
+            config[@"preset"] = restored;
         }
-        config[@"preset"] = @{@"type": @"custom", @"uuid": cleanUuid};
+        setPrefObject(@"control.mod_touch_prev_preset_json", @"");
         ame138_writeJSON(config, configFile);
-        NSLog(@"[TouchController] Task134: clean layout applied (empty preset %@)"
-              @" [Task138: config.json/order.json now written as JSON, was plist XML]", cleanUuid);
+        NSLog(@"[TouchController] Task140: polluted empty-layout pointer remediated (backup restored) -- mod default/custom buttons return");
     } else {
-        // —— 关闭：恢复备份的 preset（无备份则移除字段回落 mod 默认） ——
-        NSString *backup = getPrefObject(@"control.mod_touch_prev_preset_json");
-        if ([backup isKindOfClass:NSString.class] && backup.length > 0) {
-            NSData *raw = [backup dataUsingEncoding:NSUTF8StringEncoding];
-            id restored = [NSJSONSerialization JSONObjectWithData:raw options:0 error:nil];
-            if (restored) {
-                config[@"preset"] = restored;
-            }
-            setPrefObject(@"control.mod_touch_prev_preset_json", @"");
-        } else if (config[@"preset"] != nil) {
-            [config removeObjectForKey:@"preset"];
-        } else {
-            return; // 未开启也从未开启过：不动配置
-        }
+        [config removeObjectForKey:@"preset"];
         ame138_writeJSON(config, configFile);
-        NSLog(@"[TouchController] Task134: clean layout reverted (preset restored)");
+        NSLog(@"[TouchController] Task140: polluted empty-layout pointer removed -- mod falls back to built-in default preset (full virtual buttons)");
     }
 }
 
@@ -1322,9 +1305,10 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // ——读实例根目录的 import_report.json，有未确认缺失时一次性提醒，不阻断启动。
         ame95_warnIncompleteImport(gameDir);
 
-        // Task 134：TouchController 屏蔽控件——按开关写入/还原空布局预设
-        // （mod 在 JVM 启动早期读取 config/touchcontroller/，此处调用当次生效）
-        ame134_applyTouchControllerCleanLayout(gameDir);
+        // Task 140：TouchController mod 侧配置一次性修复（Task134-139 污染的
+        // 空布局指针恢复/移除；mod 在 JVM 启动早期读取 config/touchcontroller/，
+        // 此处调用当次生效。启动器不再向 mod 写入任何配置）
+        ame140_remediateTouchControllerConfig(gameDir);
     } else {
         defaultJRETag = @"execute_jar";
         gameDir = @(getenv("POJAV_GAME_DIR"));

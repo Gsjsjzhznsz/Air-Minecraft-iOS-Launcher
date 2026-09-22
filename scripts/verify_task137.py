@@ -345,7 +345,13 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
            for l in _ame138_added + _ame138_removed))
       or (not _ame138_added and not _ame138_removed
           and _ame138_strings.count("renderer_missing_dylib") >= 4
-          and _ame138_strings.count("mirror_policy-speed_first") >= 4),
+          and _ame138_strings.count("mirror_policy-speed_first") >= 4)
+      # Task140 重锚：本轮新增 renderer_follow_global/renderer_shadowed_by_profile 两键
+      # + hide_controls/renderer_backend detail 改写（4 语言 ×4 行），提交前形态一并接受；
+      # 提交后 diff 清空走第二分支自愈。
+      or all(("renderer_follow_global" in l or "renderer_shadowed_by_profile" in l
+              or "hide_controls" in l or "renderer_backend" in l)
+             for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md"))

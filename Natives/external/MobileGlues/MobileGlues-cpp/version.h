@@ -1117,3 +1117,64 @@
 // streamlined: 168pt full-content column -> 96pt icon rail (username + info
 // cards retired on phone, launch/version/jar buttons icon-only, avatar 44pt),
 // matching the 56pt left sidebar's FCL-style language.
+
+// REVISION 17 addendum (Task 140, no bump): four fixes from the d089745
+// two-log install feedback (latestlog.txt = 26.2 MobileGL-gles session with
+// FSR unavailable + blocks-not-rendering report / latestlog.old.txt = 26.2
+// Mithril session crashing at GL.createCapabilities). (a) Renderer settings
+// layering rebuilt (the "edited a game's renderer, it reverted to whatever
+// Settings->MobileGlues had" report): the Task139 dual-write made every
+// Settings renderer pick OVERWRITE the current game's per-profile renderer,
+// while the game editor's picker never offered the MobileGL family backends
+// (Task132 retired them from rendererCandidates and three dylibs missing
+// from the bundle filtered the classic list down to 4) -- four writers
+// fighting over one storage key. New FCL/HMCL-style split: Settings rows
+// (video.renderer + mobileglues.renderer_backend) write the GLOBAL default
+// only (ame140_writeRendererGlobal, with an NMToast when the current game's
+// override shadows the pick); the game editor (ProfileSettingsViewController)
+// owns per-game selection with the FULL option list (follow-global key
+// removal + classic + MG family three, each marked with a checkmark) and
+// writes profile-only; the RightPanel launch-time global rewrite is removed
+// (launch reads profile-first via resolveKeyForCurrentProfile, the rewrite
+// only polluted the global with the last launched game); the version
+// manager's dead-code short-name array now maps by key value instead of
+// index (the dylib filter made the old 7-name hardcode misalign with the
+// 4-entry key list -- a "tap ANGLE, write Zink" landmine). (b) Mithril
+// OpenGL 4.0 crash "There is no OpenGL context current in the current
+// thread": gl_init_context selected context attribs by the mobileGL flag,
+// so Mithril (desktopGL=YES, mobileGL=NO) got the ES attribs
+// (EGL_CONTEXT_CLIENT_VERSION=3) AFTER eglBindAPI(EGL_OPENGL_API) -- the
+// context MakeCurrent reported TRUE but the renderer's GL TLS never bound,
+// and GlDevice.createCapabilities died. Attribs now select by desktopGL;
+// a Task140 eglGetCurrentContext readback log after MakeCurrent (first 3)
+// closes the forensic loop. (c) FSR "unavailable" on both MobileGL
+// backends: mgl_fsr resolved its GL entry points via eglGetProcAddress
+// (which returns NULL for core gl on MobileGL) with a dlsym(RTLD_DEFAULT)
+// fallback -- the flat-namespace search hits the app's auto-linked ANGLE
+// (libGLESv2.framework, in the global symbol table since process start,
+// before libMobileGL's RTLD_GLOBAL dlopen), so all 41 "resolved" symbols
+// were ANGLE's while the current context was MobileGL's; glCreateShader
+// returned 0 through the only log-less failure path and the heal fired.
+// ame119_resolve now dlsyms from the libMobileGL dylib handle directly
+// (its export trie carries all 2851 gl/45 egl symbols -- verified), with
+// source-bucket counters (handle/proc/default) in the resolve log and
+// forensic logs on the two formerly-silent paths (glCreateShader==0 with
+// glGetError, GLSL version query returning 0). With FSR actually engaging,
+// the GLES session's mid-boot window flip-flop (Task83 linkage halves, heal
+// restores full) also disappears -- a suspected contributor to the
+// blocks-not-rendering report; if blocks still fail on DirectGLES after
+// this build, the remaining cause is inside MobileGL's GL4.6-on-ES
+// translation (upstream issue, report with the new log anchors). (d)
+// TouchController virtual buttons missing ("static-lib touch works but no
+// virtual buttons"): Task134 wrote an empty "Amethyst Clean" preset into
+// the mod's config whenever the hide-controls switch was on, Task139 also
+// hid the launcher's own ctrlView -- zero buttons on screen, while the
+// user wanted the MOD's buttons (the upstream built-in preset ships a full
+// set: joystick/dpad/jump/chat/pause). The mod-side write is retired
+// entirely (the launcher never touches the mod's config now); the switch
+// hides only the launcher's own classic controls; and
+// ame140_remediateTouchControllerConfig one-time-removes the polluted
+// empty-layout pointer (or restores the Task134 backup) so existing game
+// dirs fall back to the mod's built-in full-button preset. l10n: 2 new
+// keys (renderer_follow_global, renderer_shadowed_by_profile) + hide_controls
+// + renderer_backend detail reworded x4 languages.

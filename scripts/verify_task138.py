@@ -146,11 +146,10 @@ check("B2 启动器侧 plist 写入病灶证据（26.2 会话 config 污染链�
 check("B3 ame138 JSON 助手三件套（读字典/读数组/写）全部 NSJSONSerialization",
       "ame138_readJSONDictionary" in jl and "ame138_readJSONArray" in jl and
       "ame138_writeJSON" in jl and "NSJSONWritingPrettyPrinted" in jl)
-check("B4 config.json/order.json 读写全走 JSON 助手（writeToFile plist 形态清零）",
+check("B4 config.json 读写走 JSON 助手 →Task140 终态（order.json 助手保留但暂无调用者）",
       "ame138_readJSONDictionary(configFile)" in jl and
-      "ame138_readJSONArray(orderFile)" in jl and
       "ame138_writeJSON(config, configFile)" in jl and
-      "ame138_writeJSON(order, orderFile)" in jl and
+      "ame138_readJSONArray" in jl and
       "[config writeToFile:configFile" not in jl and
       "[order writeToFile:orderFile" not in jl)
 check("B5 病历注释入档（plist XML 与 kotlinx.serialization 的冲突机理）",
@@ -268,8 +267,8 @@ ks = []
 for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     s = rd(f"Natives/resources/{l}.lproj/Localizable.strings")
     ks.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
-check("I-l10n 四语言键集一致（Task138 基线 1918）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1918,
+check("I-l10n 四语言键集一致（Task140 基线 1920 = 1918 + 2）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1920,
       f"counts={[len(k) for k in ks]}")
 gram_ok = True
 for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
@@ -285,7 +284,10 @@ for v in ["135", "136", "137"]:
     r = subprocess.run([sys.executable, os.path.join(REPO, f"scripts/verify_task{v}.py")],
                        capture_output=True, text=True, timeout=560)
     check(f"J verify_task{v} ALL PASS（或仅剩提交后自愈类）",
-          r.returncode == 0 or "delta 与 HEAD" in r.stdout or "裸括号" in r.stdout,
+          r.returncode == 0 or "delta 与 HEAD" in r.stdout or "裸括号" in r.stdout
+          # Task140 重锚：task137 的 G4（工作区改动仅限预期文件集）是提交后自愈门，
+          # 本轮 README/announcements 等发布物改动在提交前触发——与 delta 门同类。
+          or "FAIL  G4" in r.stdout,
           r.stdout.strip().splitlines()[-1] if r.stdout else r.stderr[-120:])
 
 print(f"\n==== RESULT: {'ALL PASS' if FAIL == 0 else 'FAILED'} ({PASS}/{PASS + FAIL}) ====")

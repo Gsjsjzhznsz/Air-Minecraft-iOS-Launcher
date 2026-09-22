@@ -451,6 +451,42 @@ NSArray* getRendererNames(BOOL containsDefault) {
     return array;
 }
 
+// Task 140：统一渲染器显示名——设置页两行（video.renderer 主行 +
+// mobileglues.renderer_backend 后端行）与实例设置页（ProfileSettings
+// 渲染器行）共用。家族键 → 三后端文案；经典键（auto/gl4es/zink/...）
+// → rendererCandidates 表的显示名（getRendererKeys/Names 同源配对）；
+// 未知值原样返回。
+//
+// 病历：Task139 让设置行 profile 优先显示后，两行与实例页互相"扮演"
+// 对方层级的状态（mg 行对非家族值还无条件显示"Vulkan 直连"假默认），
+// 用户看到"改了实例渲染器，设置 mg 行没变 / 改了设置，实例页被覆写"。
+// Task140 起分层明确：设置页 = 全局默认（本函数显示全局值），实例页 =
+// 该游戏自己的值（含"跟随全局"态），互不伪装。
+NSString *ame_renderer_display_name(NSString *renderer) {
+    if (![renderer isKindOfClass:NSString.class] || renderer.length == 0) {
+        return localize(@"preference.title.renderer.debug.auto", nil);
+    }
+    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGL]) {
+        return localize(@"preference.title.renderer_backend-mobilegl", nil);
+    }
+    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]) {
+        return localize(@"preference.title.renderer_backend-mobilegl_gles", nil);
+    }
+    if ([renderer isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+        return localize(@"preference.title.renderer_backend-mithril", nil);
+    }
+    if ([renderer isEqualToString:@"auto"]) {
+        return localize(@"preference.title.renderer.debug.auto", nil);
+    }
+    NSArray *keys = getRendererKeys(NO);
+    NSArray *names = getRendererNames(NO);
+    NSUInteger idx = [keys indexOfObject:renderer];
+    if (idx != NSNotFound && idx < names.count) {
+        return names[idx];
+    }
+    return renderer;
+}
+
 // Task 132（MG 三端合并）：MobileGL 家族三后端的统一浮窗数据源。
 // keys 为逻辑键（与 ame_effective_renderer / egl_bridge / JavaLauncher 的
 // 渲染器值同一命名空间，直接写入 video.renderer 即生效）；names 为用户

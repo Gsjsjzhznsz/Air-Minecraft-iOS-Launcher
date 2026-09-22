@@ -1660,8 +1660,20 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
         EGL_NONE
     };
+    // Task 140：attribs 选择器从 mobileGL 改为 desktopGL。
+    // 病历（ab9670d Mithril 会话 latestlog.old.txt 实锤）：Mithril 是
+    // desktopGL=YES / mobileGL=NO —— 旧选择器让它拿到 gles_ctx_attribs
+    // （EGL_CONTEXT_CLIENT_VERSION=3），而上方 eglBindAPI(EGL_OPENGL_API)
+    // 已按 desktopGL 绑定。ES 形态的 attribs 在已绑定桌面 GL API 的
+    // 显示上创建出的上下文是残缺的：eglMakeCurrent 返回 TRUE 但渲染器
+    // 内部 TLS 未绑定 GL 状态，MC 26.2 GlDevice.<init> → GL.createCapabilities
+    // 直接 IllegalStateException "There is no OpenGL context current in the
+    // current thread"（07:30:28 崩溃报告，swapchain 已建、MakeCurrent 已过，
+    // 唯一可疑点即此）。MobileGL 两变体（mobileGL=YES）本就是 desktopGL=YES
+    // （isDesktopGLRenderer 覆盖家族三键），行为零变化；gl4es/MobileGlues/LTW
+    // desktopGL=NO 维持 ES attribs 零变化。
     bundle->context = handle.eglCreateContext(g_EglDisplay, bundle->config, share ? share->context : EGL_NO_CONTEXT,
-        mobileGL ? desktop_ctx_attribs : gles_ctx_attribs);
+        desktopGL ? desktop_ctx_attribs : gles_ctx_attribs);
     if (!bundle->context) {
         NSDebugLog(@"EGLBridge: Error eglCreateContext finished with error: 0x%x", handle.eglGetError());
         free(bundle);
@@ -1682,6 +1694,23 @@ void gl_make_current(gl_render_window_t* bundle) {
 
     if(handle.eglMakeCurrent(g_EglDisplay, bundle->surface, bundle->surface, bundle->context)) {
         currentBundle = (basic_render_window_t *)bundle;
+        // Task 140：MakeCurrent 成功后的读回取证。Mithril 病历（ab9670d：
+        // MakeCurrent 返回 TRUE 但 GL.createCapabilities 报 no current
+        // context）后，此处把渲染器侧 eglGetCurrentContext 的读回值留进
+        // 日志——attribs 修复后 Mithril 会话应出现 "readback ctx != EGL_NO_CONTEXT"；
+        // 若再出现 readback=0x0 + 后续 createCapabilities 崩溃，则说明
+        // Mithril 的 MakeCurrent 假成功另有机制（下一轮日志一眼定位）。
+        if (handle.eglGetCurrentContext != NULL) {
+            static int ame140_rbLogs = 0;
+            if (ame140_rbLogs < 3) {
+                ame140_rbLogs++;
+                EGLContext ame140_readback = handle.eglGetCurrentContext();
+                NSLog(@"[gl_bridge] Task140 make-current readback: ctx=%p (%@)",
+                      (void *)ame140_readback,
+                      ame140_readback == EGL_NO_CONTEXT ? @"EGL_NO_CONTEXT -- renderer reports NO current context!"
+                      : @"current context confirmed");
+            }
+        }
         if (ame_mgFrontendActive) {
             NSLog(@"[MG-Bridge] eglMakeCurrent via frontend OK (ctx=%p) -- "
                   @"MGContext tracked, per-context state bound",

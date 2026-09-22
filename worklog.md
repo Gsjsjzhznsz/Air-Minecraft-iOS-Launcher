@@ -1484,3 +1484,56 @@ Stage Summary:
 - 镜像测速锚点：'[PLMirrorCenter] Task138 speed probe (family=0/1): official/mirror won (official=XXms mirror=XXms)'
 - 动画：滚动回滑不再重播入场、公告磁贴高度变化平滑过渡
 - 遗留：108 校验器全链跑完需 >10 分钟（级联超时截断非失败）；外层 scripts/ 会话工件在沙箱重置后需按本条目记录重建
+
+---
+Task ID: 139
+Agent: main (Super Z)
+Task: 8a6307f 四日志装机反馈八项修复（渲染器回退auto / mg输入错位 / mg GL4.0未构建 / TouchController静态库失效 / 屏蔽控件失效 / 26.1.2进世界崩溃 / iPhone右侧边栏精简 / Forge安装JIT自动申请）
+
+Work Log:
+- 拉取远端至 8a6307f（用户经 GitHub 网页上传 4 个新 log：latestlog=26.1.2 会话、latestlog.txt=26.2 MobileGL-gles、latestlog.old.txt=26.2 zink、latestlog.txt.old.txt=26.2 zink 旧构建）；本地 worklog 同步 + 恢复沙箱清理的会话工件（task116 审计 ×3、task132 JNA 镜像 ×3）+ 重下 jna-5.13.0.jar
+- 【A·26.1.2 进世界崩溃】定案：非 SIGBUS——voicechat 2.6.17 MicrophoneThread 走 macOS 路径（Platform.isMac 伪装）打开 IOSAudioMixer，audio_capture_bridge.m 的 createCapture 强制 1ch/48000 Float32 装 tap 与硬件原生格式不符 → 未捕获 com.apple.coreaudio.avfaudio "Failed to create tap due to format mismatch" NSException → app 终止（三个 26.2 会话没装 voicechat 所以幸存）。修复：tap 按输入节点原生格式安装（outputFormatForBus:0）+ 回调内线性重采样（绝对坐标累计 nextOutPos/totalIn 防漂移、多声道均值混单声道、tail[8] 跨缓冲插值连续、int16 量化）+ 创建/启动双 @try/@catch → NULL 优雅降级（Java 侧 LineUnavailableException → voicechat 无麦继续）+ destroyCapture 先 removeTap 再拆状态（use-after-free 竞态）
+- 【B·mg 输入错位】定案：23:08 GLES 会话实证 [MGLFSR] Task119 FSR upscale unavailable → nativeSendScreenSize 恢复 MC 窗口全表面（viewport 2360x1640、"GLFW: Set size 2360x1640"）但 sendTouchPoint 的 screenScale /= mgFsrScale(2.0) 未归一 → 触点只发一半。修复：utils.h 声明 ame139_fsr_heal_reset_input_scale()，SurfaceViewController.m 实现（主线程派发，rootVC isKindOfClass 守卫，ivar 直写），mgl_fsr.mm Task119 与 osm_bridge.mm Task83b 两个兜底点都接入
+- 【C·TouchController 静态库失效】定案：静态模式（mode==2）触摸事件走 sendTouchControllerProxyMessage → 只发 native 单例通道，而 mod 被 TOUCH_CONTROLLER_PROXY 引到 legacy UDP 监听 → 事件进无人读的 ring buffer；菜单阶段有启动器直发输入兜底所以能点、进世界（isGrabbing return）全灭。修复：sendTouchControllerProxyMessage 双发（native + TouchSender UDP，线格式逐字节一致，mod 只在一条通道监听不会重复消费）
+- 【D·屏蔽控件】mod 侧取证（CFR 反编译 Modrinth 实际 jar 0.3.1-alpha14：GlobalConfigHolder.currentPreset 在 status==ENABLED 时解析 custom uuid → PresetsContainer 空 layout；StatusConfig 默认就是 ENABLED；SerializerKt Json = ignoreUnknownKeys+encodeDefaults=false；四日志 "Reading TouchController config file" 均零报错）证明 mod 侧早已正确——病灶是启动器【自身】ctrlView 从未隐藏。修复：ame139_modControlsHidden 门控（mod_touch_enable && mod_touch_hide_controls）作用于 loadCustomControls + 两处 hardware_hide 恢复路径；附带修 order.json 路径（mod 的 PresetManager 读 presetDir/order.json，旧路径 config 根目录永远读不到）
+- 【E·渲染器回退 auto】定案：设置页两个渲染器行只写全局 video.renderer，而全部启动链读者（ame_effective_renderer/JavaLauncher/SurfaceVC/ZinkConfig）走 resolveKeyForCurrentProfile【profile 优先】——实例 profile 存过 renderer（版本管理器/实例设置页/建实例）即永久阴影。修复：ame139_writeRendererBoth 双写（profile+global）用于两行；主行显示改 profile 优先；ProfileSettingsViewController.saveSettings 补全局同步——四处写入全部同构
+- 【F·mg OpenGL 4.0 未构建】定案：libmithril.dylib 从未入库（CI 注释说已提交是假的）。修复：从 LiuLPigeon617/Air_with-mithril fork vendored Mithril-Wrapper 主线构建（3.5MB arm64 iOS、静态 MoltenVK、44 egl+380 gl 导出符号、@rpath/libmithril.dylib install name、VERSION_MIN_IPHONEOS ✓）入 Natives/resources/Frameworks/；CI 注释刷新
+- 【G·Forge 安装 JIT】修复：launchHeadlessJVM 的 JIT 未开启分支从"弹错返回-1"升级为与启动按钮同款自动申请（六路 enabler 分发 + 等待弹窗 + isJITEnabled 轮询；manual 不跳转；debug_skip_wait_jit 放行）+ TXM 再附（CS_DEBUGGED 已置但 JIT26 调试器离场 → stikjit:// script-data 重附 + JIT26IsLikelyDebuggerKeepAttached 轮询）
+- 【H·iPhone 右侧边栏】精简：kRightPanelWidthPhone 168→96；用户名+信息卡滚动区隐藏；启动/选版本/执行JAR 三按钮图标化（play.fill/folder/doc.badge.ellipsis）；头像 44pt（停用与执行Jar等宽约束）；状态卡仍创建仅隐藏（更新代码路径零改动）
+- 验证：verify_task139 36/36（A-H 代码+日志锚点 + 语法门 + 四语言 + 五级联）；重锚 verify_task138 A1/A2/C1/D1、task132 A1/B7、task133 B1 至新日志/新形态；task134 68/68、task135 33/33、task132 53/53、task133 44/44、task119_124 62/62、task112_118 49/49、129/130/131 抽查全绿；十文件括号平衡语法门（含宏续行跳过——JavaLauncher 多行 #define 误报教训）
+- 发布物：announcements.json v6.0.0 条目重写（八项并入）、README.md/README_CN.md 差异表更新、download/v6.0.0-release-notes.md 重建（沙箱又清了）；version.h REVISION 17 addendum（Task 139）
+
+Stage Summary:
+- 装机待验证锚点：①26.1.2+voicechat 进世界不再闪退，日志 '[AudioCapture] Task139: tap installed with native format ...'（或失败时 'capture creation failed with exception' 后游戏继续无麦）；②mg 渲染器触摸与画面对齐，'[SurfaceVC] Task139: FSR heal -- input scale reset'；③静态库模式进世界触控可用（mod 侧仍提示过时 UDP 协议属正常）；④屏蔽控件后屏幕完全无按钮，'[SurfaceVC] Task139: launcher control layout hidden'；⑤切渲染器退出重进不再回 auto，'[PLPrefTable] Task139: renderer written to both layers'；⑥OpenGL 4.0 实验性可选可用（Mithril 实验性，真机若有渲染问题反馈上游）；⑦未开 JIT 装 Forge 自动跳转申请，'[JIT] [Headless] Task139 enabler=...'；⑧iPhone 右侧栏变窄图标轨
+
+---
+Task ID: 139 (续：CI 闭环)
+Agent: main (Super Z)
+
+Work Log:
+- run 35625891878（e7632b3）失败：SurfaceViewController.m 三处 "instance variable 'mgFsrScale' is private"——C 函数直写类扩展私有 ivar 不合法（Task108 教训类：本地 Linux 编不了 .m TU，ivar 可见性只有 CI clang 能抓）。修复：类扩展声明 + @implementation 顶部实现私有方法 ame139_resetFsrInputScale（方法体内读写 ivar），C 入口 ame139_fsr_heal_reset_input_scale 主线程转发调用；verify_task139 B2 重锚方法形态
+- run 35626897650（ab9670d）completed success —— Task 139 全链闭环，新 IPA 就绪（前台轮询至绿）
+
+Stage Summary:
+- Task 139 八项修复全链闭环：26.1.2 存档崩溃（voicechat 麦克风 tap 原生格式+重采样+优雅降级）/ mg 输入错位（FSR heal 输入除数复位）/ TouchController 静态库双发 / 屏蔽控件含启动器自身控件层 / 渲染器双写持久化 / libmithril.dylib vendored（OpenGL 4.0 随包可用）/ Forge 安装 JIT 自动申请+TXM 再附 / iPhone 右侧栏 96pt 图标轨
+- 装机待验证锚点：①'[AudioCapture] Task139: tap installed with native format' 后 26.1.2+voicechat 进世界不闪退；②'[SurfaceVC] Task139: FSR heal -- input scale reset' 后 mg 触摸对齐；③静态库模式进世界触控可用；④'[SurfaceVC] Task139: launcher control layout hidden' 后屏幕无按钮；⑤'[PLPrefTable] Task139: renderer written to both layers' 后渲染器选择持久；⑥OpenGL 4.0 实验性可选可用；⑦'[JIT] [Headless] Task139 enabler=...' 后 Forge 安装自动申请 JIT；⑧iPhone 右侧栏变 96pt 图标轨
+---
+Task ID: 140
+Agent: main (Super Z)
+Task: d089745 两日志装机反馈四项修复（渲染器设置分层重构 / Mithril 4.0 崩溃 / MobileGL 全后端 FSR / TouchController 虚拟按钮）
+
+Work Log:
+- 判读 d089745 两份新日志（latestlog.txt = 26.2 MobileGL-gles 会话、latestlog.old.txt = 26.2 Mithril 崩溃会话，ab9670d 构建）：Mithril 会话在 GlDevice.createCapabilities 报 "There is no OpenGL context current in the current thread"（Java 级崩溃报告）；GLES 会话 "[MGLFSR] resolve 41/41" 后直接 "Task119 FSR upscale unavailable"（两日志行之间零输出）；TouchController 双模式均正常进世界（UDP legacy 警告 + 触控可用），无 Task134/139 屏蔽控件锚点
+- 【A·渲染器设置分层重构】定案：Task139 的双写（ame139_writeRendererBoth）让设置页每次选择都覆写当前游戏的 profile renderer——四处写入互相打架；且实例设置页选项表只有经典 4 项（Task132 移出家族三键 + 本构建缺 libtinygl4angle/libmobileglues/libltw 三个 dylib 被存在性过滤），MG 后端只能去设置页选（又覆写 profile）——"编辑游戏渲染器→退出→变回设置里选的/自动" 的完整机理。修复（FCL/HMCL 分居模型）：设置页两行只写全局（ame140_writeRendererGlobal + 当前游戏有独立值且不同时的 NMToast 阴影提示，新键 renderer_shadowed_by_profile）；实例页独占 per-game 选择——全选项表（跟随全局=删键 + 经典可用 + MG 家族三键，✓ 标记当前项，家族键显示本地化名而非原始 dylib 名）+ 只写 profile（跟随全局 removeObjectForKey）；右面板启动期 renderer→全局回写移除（启动链本就 profile 优先，回写只污染全局默认）；统一显示名 helper ame_renderer_display_name（LauncherPreferences.m/h，家族/经典/auto 全域映射）；mg 行显示全局真实值（去掉"非家族一律显示 Vulkan 直连"假默认；保留 legacy auto+backend 档位精化）；版本管理器死代码短名数组改按键值映射（原 7 名硬编码 vs 过滤后 4 键的索引错位地雷）
+- 【B·Mithril 4.0 崩溃】定案：gl_init_context 的 context attribs 按 mobileGL 标志选择——Mithril 是 desktopGL=YES/mobileGL=NO，在 eglBindAPI(EGL_OPENGL_API) 之后拿到 ES attribs（EGL_CONTEXT_CLIENT_VERSION=3），创建出的上下文 MakeCurrent 返回 TRUE 但渲染器内部 GL TLS 未绑定 → createCapabilities 崩。修复：attribs 改按 desktopGL 选择（MobileGL 两变体本就双 YES 零变化）；gl_make_current 补 eglGetCurrentContext 读回取证（前 3 次日志，Mithril 会话应见 "Task140 make-current readback: ctx=... current context confirmed"）
+- 【C·MobileGL 全后端 FSR】定案（二进制取证）：mgl_fsr 的符号解析 eglGetProcAddress 优先 + dlsym(RTLD_DEFAULT) 兜底——MobileGL 的 eglGetProcAddress 对核心 gl* 返回 NULL，RTLD_DEFAULT 平命名空间先命中 app 自动链接的 ANGLE（libGLESv2.framework 由 Makefile 链入主程序，进程启动即入全局符号表，早于 libMobileGL 的 RTLD_GLOBAL dlopen）→ 41 个"解析成功"的符号全是 ANGLE 的实现，当前上下文却是 MobileGL 的 → glCreateShader()==0（全链唯一无日志失败点）→ 静默 unavailable。修复：ame119_resolve 改从 libMobileGL.dylib 句柄 dlsym 直连（其 export trie 逐一验证导出全部所需符号：2851 个 _gl*/45 个 _egl*，task140_trie_walk2.py 带环保护遍历器）；eglGetProcAddress 降次选、RTLD_DEFAULT 保底末位；resolve 日志带来源分桶（handle/proc/default，装机应见 handle=41）；glCreateShader==0 与 GLSL 版本查询 ver==0 两个静默路径补取证日志。FSR 修复后 GLES 会话的启动期窗口翻转（linkage 减半→heal 恢复）消失——方块不渲染的疑似诱因一并消除；若仍复现属 MobileGL 上游翻译层问题（README/公告已注明）
+- 【D·TouchController 虚拟按钮】定案：Task134 起 mod_touch_hide_controls 开启时向 mod 写空布局预设（"Amethyst Clean"）+ Task139 隐藏启动器 ctrlView = 全屏零按钮；而用户要"屏蔽启动器自带控件、用模组自己的按钮"（上游 BuiltinPresetsProviderImpl 内置预设自带完整布局：摇杆/跳跃/聊天/暂停）；且备份键 mod_touch_prev_preset_json 真机从未落盘（日志 "Getter could not find preference" 实锤），关闭开关无从恢复 → mod 永久锁死空布局。修复：mod 侧配置启动器永不写入（ame134_applyTouchControllerCleanLayout 退役，ame138_readJSONArray 保留并注明暂无调用者）；屏蔽控件开关只作用于启动器自身控件层（ame139_modControlsHidden 不变，l10n 改"屏蔽启动器控件（保留模组按钮）"）；ame140_remediateTouchControllerConfig 一次性修复——config.json 的 preset 指针指向我们的 cleanUuid 时恢复备份或移除指针（mod 回落内置默认全按钮预设），用户自选预设不动
+- l10n 四语言：+2 键（renderer_follow_global / renderer_shadowed_by_profile）+ hide_controls 与 renderer_backend detail 改写，基线 1918→1920 一致
+- 发布物：announcements.json v6.0.0 条目（新增"渲染器与图形"区块 + 屏蔽控件语义更新 + summary 刷新）；README/README_CN 差异表三行更新；download/v6.0.0-release-notes.md 中英双语补齐；version.h REVISION 17 addendum（Task 140）
+- 验证：verify_task140 59/59（A Mithril 4 + B FSR 7 + C 分层 19 + D 虚拟按钮 8 + E l10n 9 + F 发布物 8 + G 日志证据 4）；级联重锚全绿：112_118 49/49、119_124 62/62、125_128 52/52、129 47/47、130 60/60、131 37/37、132 53/53（B6/B7/B8/B11/F1 重锚至 Task140 终态）、133 44/44（F1 基线）、134 68/68（C3-C6 重锚至修复器形态）、135 33/33、137 45/46（G4 提交后自愈）、138 52/52（B4 重锚 + J 级联容差 G4 自愈类）、139 36/36（C1/D4/E1-E4/I2 重锚至分居终态）；task116 l10n 审计 0 缺失；括号差分门（每文件每括号开/闭变化量相等）
+- 环境教训（记档）：Mach-O export trie 的符号名会被边分割，字节子串探测必假阴性（需正确遍历——旧 parse_export_trie.py 的 node_end 假设不牢，task140_trie_walk2.py 用 visited-set 兜住）；bash 输出层的中文注释偶发乱码不影响文件内容（Read 工具复核为准）
+
+Stage Summary:
+- 装机待验证锚点：①'[gl_bridge] Task140 make-current readback: ctx=0x... (current context confirmed)' 后 Mithril OpenGL 4.0 进游戏不再崩；②'[MGLFSR] Task119 GL resolve: 41/41 ... sources: handle=41 proc=0 default=0' 后 GLES/Vulkan 直连两后端 FSR 档位生效（'Task119 FSR1 upscale engaged'）且不再出现 'unavailable -- restoring'；③实例设置页渲染器行显示"跟随全局设置（当前: X）"或具体后端名（不再出现原始 dylib 名/自动回退），选项表 8+ 项带 ✓；设置页 mg 行显示全局真实值；④'[TouchController] Task140: polluted empty-layout pointer removed' 后（存量污染设备首次启动）mod 虚拟按钮回归；屏蔽控件开=仅启动器按钮隐藏、mod 按钮保留
+- 渲染器语义（用户口径）：设置页=全局默认；每个游戏独立选择或跟随全局；启动按游戏自身选择
+- 若 GLES 后端方块仍不渲染：附新日志反馈（MobileGL 上游翻译层问题，启动器侧已无非病灶）

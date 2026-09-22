@@ -1052,16 +1052,30 @@ static NSInteger const kSectionVersions    = 1;
 - (void)setupRendererData {
     self.rendererKeys = getRendererKeys(NO);
     // 简短渲染器名称（不使用 getRendererNames 的长本地化字符串）
-    // 顺序必须与 getRendererKeys() 完全一致（索引配对）
-    self.rendererNames = @[
-        @"Auto",
-        @"GL4ES",
-        @"ANGLE",
-        @"MobileGlues",
-        @"Zink",
-        @"LTW",
-        @"MoltenVK"
-    ];
+    // Task 140：按【键值】映射而非按下标配对。旧实现硬编码 7 个短名并
+    // 假设与 getRendererKeys() 顺序一致——但该列表按 dylib 存在性动态
+    // 过滤（本构建缺 libtinygl4angle/libmobileglues/libltw，实际只有
+    // 4 项），下标错位会让“点 ANGLE 写 zink”式静默错写。键值映射天然
+    // 免疫过滤与顺序变化；未知名回退键值本身。
+    // 注：本面板与 selectRendererAtIndex: 当前无调用者（渲染器编辑已
+    // 移交 ProfileSettingsViewController），此处修正是防复活的地雷。
+    NSDictionary *ame140_shortNames = @{
+        @"auto": @"Auto",
+        @ RENDERER_NAME_GL4ES: @"GL4ES",
+        @ RENDERER_NAME_MTL_ANGLE: @"ANGLE",
+        @ RENDERER_NAME_MOBILEGLUES: @"MobileGlues",
+        @ RENDERER_NAME_VK_ZINK: @"Zink",
+        @ RENDERER_NAME_LTW: @"LTW",
+        @ RENDERER_NAME_VULKAN: @"MoltenVK",
+        @ RENDERER_NAME_MOBILEGL: @"MobileGL",
+        @ RENDERER_NAME_MOBILEGL_GLES: @"MobileGL GLES",
+        @ RENDERER_NAME_MITHRIL: @"Mithril",
+    };
+    NSMutableArray *ame140_names = [NSMutableArray array];
+    for (NSString *ame140_key in self.rendererKeys) {
+        [ame140_names addObject:ame140_shortNames[ame140_key] ?: ame140_key];
+    }
+    self.rendererNames = ame140_names;
     self.rendererIcons = @[
         @"wand.and.stars",
         @"cpu",

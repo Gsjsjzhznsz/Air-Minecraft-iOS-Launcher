@@ -136,21 +136,21 @@ check("B4 统一 pick 行（renderer_backend，typePickField，非 ChildPane）"
 check("B5 浮窗数据源接线（pickKeys=getRendererFamilyKeys，pickList=getRendererFamilyNames）",
       '"pickKeys": getRendererFamilyKeys()' in lpvc and
       '"pickList": getRendererFamilyNames()' in lpvc)
-check("B6 读映射（有效渲染器家族键原样返回，否则默认 Vulkan 直连）",
-      re.search(r'\[key isEqualToString:@"renderer_backend"\][^}]*?ame_effective_renderer\(\)', lpvc) is not None and
-      "return @ RENDERER_NAME_MOBILEGL;" in lpvc)
-check("B7 写映射（Task139 双写：renderer_backend 分支经 ame139_writeRendererBoth 同写 profile+global）",
-      re.search(r'isEqualToString:@"renderer_backend"\]\) \{[^}]*?ame139_writeRendererBoth\(', lpvc) is not None)
-check("B8 渲染器行显示映射（家族键 -> 后端文案）",
-      'preference.title.renderer_backend-mobilegl"' in lpvc and
-      lpvc.count("RENDERER_NAME_MOBILEGL_GLES") >= 1)
+check("B6 读映射 →Task140 终态：全局值 + 家族键原样，非家族真实名（不再假默认 Vulkan 直连）",
+      re.search(r'\[key isEqualToString:@"renderer_backend"\]\)[^}]*?getPrefObject\(@"video\.renderer"\)', lpvc) is not None and
+      "return @ RENDERER_NAME_MOBILEGL;" not in lpvc.split('[key isEqualToString:@"renderer_backend"]')[1][:2500])
+check("B7 写映射 →Task140 终态：renderer_backend 分支经 ame140_writeRendererGlobal 全局单写",
+      re.search(r'isEqualToString:@"renderer_backend"\]\) \{[^}]*?ame140_writeRendererGlobal\(', lpvc) is not None)
+check("B8 渲染器行显示映射 →Task140 终态：家族键文案统一在 ame_renderer_display_name helper",
+      'preference.title.renderer_backend-mobilegl"' in lp and
+      lp.count("RENDERER_NAME_MOBILEGL_GLES") >= 1)
 check("B9 无二级页面入口（renderer 相关无 pushViewController 新路径）",
       lpvc.count("pushViewController") == 0 or
       not re.search(r'renderer[^{]*\n[^}]*pushViewController', lpvc))
 check("B10 形态变迁四段史注释（113->120->131->132）",
       "Task 113 -> Task 120 -> Task 131 -> Task 132" in lp)
-check("B11 legacy GLES 显示精化（auto + backend=2 -> -gles 逻辑键，仅显示层）",
-      re.search(r'ame132_auto && \[ame132_eff isEqualToString:@ RENDERER_NAME_MOBILEGL\] &&\s*\n\s*getPrefInt\(@"mobileglues\.mobilegl_backend"\) == 2', lpvc) is not None and
+check("B11 →Task140 终态：legacy auto+backend 显示精化保留（backend 档位抬到实际后端）",
+      re.search(r'ame140_backend == 2 \? @ RENDERER_NAME_MOBILEGL_GLES : @ RENDERER_NAME_MOBILEGL', lpvc) is not None and
       "PLProfiles.h" in lpvc)
 
 print("== C. TouchController（Task 134 已按用户指令回退——断言恢复后的 pane 形态）==")
@@ -233,8 +233,8 @@ for lang in langs:
     sets.append(set(re.findall(r'^"([^"]+)"\s*=',
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
-check("F1 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1918,
+check("F1 四语言键集一致（Task140 基线 1920 = Task139 的 1918 + 跟随全局/阴影提示 2）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1920,
       f"counts={[len(s) for s in sets]}")
 newkeys = ["preference.title.renderer_backend",
            "preference.detail.renderer_backend",

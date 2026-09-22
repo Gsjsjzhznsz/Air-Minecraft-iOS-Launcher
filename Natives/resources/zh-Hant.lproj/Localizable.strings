@@ -588,7 +588,7 @@
 "preference.detail.jit_enabler" = "選擇用於開啟 JIT 的工具。沒有安裝 StikDebug 的使用者請改選 SideStore、StosDebug、JitStreamer-EB 或 TrollStore，否則點擊啟動可能沒有任何反應。預設自動：依裝置狀態依序嘗試 TrollStore、StikDebug、SideStore。";
 "preference.title.jit26_script_disable" = "停用 iOS 26 JS 指令碼 JIT";
 "preference.detail.jit26_script_disable" = "啟動遊戲時不再向 JIT 工具傳送 UniversalJIT26.js 指令碼（純除錯器附加式 JIT）。僅當你的工具不支援指令碼、或指令碼導致異常時才需要開啟；依賴系統級記憶體映射的裝置（TXM）開啟後可能無法啟動遊戲。";
-"preference.touchcontroller.hide_controls" = "遮蔽控制項（介面無控制項）";
+"preference.touchcontroller.hide_controls" = "遮蔽啟動器控制項（保留模組按鈕）";
 "preference.touchcontroller.ok" = "确定";
 "preference.touchcontroller.cancel" = "取消";
 "preference.touchcontroller.vibrate.enable" = "启用震动反馈";
@@ -2053,10 +2053,12 @@
 "i18n_str_2068" = "应用語言";
 "preference.title.renderer.debug.mithril" = "Mithril（1.17+）- OpenGL 3.3 核心，经 Vulkan/Metal，实验性";
 "preference.title.renderer_backend" = "MobileGlues 渲染後端";
-"preference.detail.renderer_backend" = "MobileGlues 三後端統一選擇（原地懸浮浮窗）：Vulkan 直連 / GLES 後端 / OpenGL 4.0 實驗性，預設 Vulkan 直連。GLES 後端經內建 ANGLE 框架把桌面 GL 翻譯為 OpenGL ES——無需（也已移除）獨立的 \"ANGLE ES 驅動\" 開關。選擇直接寫渲染器設定（顯式選擇優先）。";
+"preference.detail.renderer_backend" = "MobileGlues 三後端統一選擇（原地懸浮浮窗）：Vulkan 直連 / GLES 後端 / OpenGL 4.0 實驗性，預設 Vulkan 直連。GLES 後端經內建 ANGLE 框架把桌面 GL 翻譯為 OpenGL ES——無需（也已移除）獨立的 \"ANGLE ES 驅動\" 開關。Task 140：選擇寫入全域預設渲染器；每個遊戲可在自己的遊戲設定頁獨立選擇或跟隨全域。";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直連)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 實驗性)";
+"preference.profile.renderer_follow_global" = "跟隨全域設定（目前: %@）";
+"preference.warning.renderer_shadowed_by_profile" = "已寫入全域預設（%@）。目前遊戲保留獨立渲染器設定（%@），如需變更請在遊戲設定頁調整。";
 "preference.warning.renderer_missing_dylib" = "本構建未隨包攜帶 %@，遊戲將回退為 Auto（ANGLE）。如需啟用，請把對應 dylib 放入 app 的 Frameworks 目錄。";
 "preference.detail.announcement_preview_level" = "控制公告在主介面展示的詳細程度。";
 "preference.detail.app_language" = "設定啟動器介面語言，選擇“系統”时跟随裝置語言。";

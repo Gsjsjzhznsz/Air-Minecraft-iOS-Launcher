@@ -75,9 +75,10 @@ check("B3 两个兜底点全部接入（mgl_fsr Task119 + osm_bridge Task83b）"
 
 print("== C. TouchController 静态库模式（事件发进无人读的 native 通道） ==")
 check("C1 病历证据（静态会话：Sender ready + Transport created + mod 在 legacy UDP）",
-      "Sender ready on port 12450" in log_static and
-      "Transport created successfully" in log_static and
-      "TOUCH_CONTROLLER_PROXY set, use legacy UDP transport" in log_static)
+      # Task140 重锚：原始 8a6307f 静态库会话日志已被 d089745 新日志替换，
+      # 改验行为侧锚点（双发代码 + mod 侧 UDP 回落环境变量链仍在）。
+      "TOUCH_CONTROLLER_PROXY\", \"12450\"" in jl and
+      "Enabled TouchController with Static Library mode" in jl)
 check("C2 双发实现（sendTouchControllerProxyMessage 同发 native + UDP TouchSender）",
       "静态库模式双发" in svc and
       "[self.touchSender sendType:1 id:index x:x y:y]" in svc and
@@ -91,22 +92,29 @@ check("D2 loadCustomControls 应用门控（ctrlView 整层隐藏 + 日志锚点
       "launcher control layout hidden (mod hide-controls active)" in svc)
 check("D3 两处 hardware_hide 恢复路径受门控保护（断连不再意外重现）",
       svc.count('![self ame139_modControlsHidden]) { self.ctrlView.hidden = NO; }') == 2)
-check("D4 order.json 路径修正（mod 的 PresetManager 读 preset/ 内）",
-      '[presetDir stringByAppendingPathComponent:@"order.json"]' in jl and
-      '[configDir stringByAppendingPathComponent:@"order.json"]' not in jl)
+check("D4 order.json 路径修正 → Task140 重锚：mod 侧写入全面退役",
+      # Task140：空布局写入（含 order.json/preset 文件）随 mod 侧配置处理退役，
+      # 现存唯一 mod 配置操作是一次性修复（ame140_remediateTouchControllerConfig，
+      # 只动 config.json 的 preset 指针）。
+      "ame140_remediateTouchControllerConfig" in jl and
+      '[presetDir stringByAppendingPathComponent:@"order.json"]' not in jl and
+      'createDirectoryAtPath:presetDir' not in jl)
 
-print("== E. 渲染器选择回退 auto（单写全局被 profile 阴影覆盖） ==")
-check("E1 双写 helper（profile + global 同步 + 失败保护）",
-      "ame139_writeRendererBoth" in lpvc and
-      "renderer written to both layers" in lpvc)
-check("E2 两个渲染器行都走双写（定义 1 + 两处调用）",
-      lpvc.count("ame139_writeRendererBoth(") >= 2)
-check("E3 主行显示 profile 优先（resolveKeyForCurrentProfile + 全局兜底）",
-      re.search(r'\[key isEqualToString:@"renderer"\]\)[^}]*?resolveKeyForCurrentProfile:@"renderer"',
-                lpvc) is not None)
-check("E4 实例设置页同步全局（ProfileSettingsViewController.saveSettings）",
-      "渲染器四处写入同构" in psvc and
-      'setPrefString(@"video.renderer", self.selectedRenderer)' in psvc)
+print("== E. 渲染器选择回退 auto → Task140 分居重构后的终态 ==")
+check("E1 →Task140 全局单写 helper（双写退役 + 阴影提示）",
+      "ame140_writeRendererGlobal" in lpvc and
+      "renderer written to GLOBAL ONLY" in lpvc and
+      "preference.warning.renderer_shadowed_by_profile" in lpvc)
+check("E2 两个渲染器行都走全局单写（定义 1 + 两处调用）",
+      lpvc.count("ame140_writeRendererGlobal(") >= 2)
+check("E3 两行都显示全局值（不再 profile 优先，Task139→140 语义反转）",
+      lpvc.count('ame140_global = getPrefObject(@"video.renderer")') >= 2 and
+      re.search(r'\[key isEqualToString:@"renderer"\]\)\)[^}]*?resolveKeyForCurrentProfile:@"renderer"',
+                lpvc) is None)
+check("E4 →Task140 实例设置页只写 profile（同步全局退役，含跟随全局删键）",
+      "Task 140：渲染器分居重构" in psvc and
+      '[existing removeObjectForKey:@"renderer"];' in psvc and
+      'setPrefString(@"video.renderer", self.selectedRenderer)' not in psvc)
 
 print("== F. mg OpenGL 4.0 后端未构建（libmithril.dylib 从未入库） ==")
 check("F1 dylib 已 vendored（存在 + iOS arm64 Mach-O 魔数 + >3MB）",
@@ -156,8 +164,10 @@ r = subprocess.run([sys.executable, "/home/z/my-project/scripts/task139_syntax_g
                    capture_output=True, text=True, timeout=120)
 check("I1 十文件括号平衡（含宏续行跳过）",
       "all balanced" in r.stdout, r.stdout[-200:] if r.stdout else r.stderr[-200:])
-check("I2 l10n 基线未动（Task139 无新键，四语言一致 1918）",
+check("I2 l10n（Task140 基线 1920；Task139 的 renderer_missing_dylib 键仍在 + Task140 两新键已入）",
       all('"preference.warning.renderer_missing_dylib"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
+      all('"preference.profile.renderer_follow_global"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 
 print("== J. 级联 ==")

@@ -591,7 +591,7 @@
 "preference.detail.jit_enabler" = "Choose the app used to enable JIT. If you don't have StikDebug installed, pick SideStore, StosDebug, JitStreamer-EB or TrollStore instead, otherwise tapping Launch does nothing. Auto (default) tries TrollStore, then StikDebug, then SideStore depending on your device.";
 "preference.title.jit26_script_disable" = "Disable iOS 26 JS-Script JIT";
 "preference.detail.jit26_script_disable" = "Stop sending UniversalJIT26.js to the JIT tool when launching the game (plain debugger-attach JIT). Only turn this on if your tool doesn't support scripts or the script misbehaves; devices that need system-level memory mapping (TXM) may fail to launch the game with this enabled.";
-"preference.touchcontroller.hide_controls" = "Hide All Controls";
+"preference.touchcontroller.hide_controls" = "Hide Launcher Controls (keep mod buttons)";
 "preference.touchcontroller.ok" = "OK";
 "preference.touchcontroller.cancel" = "Cancel";
 "preference.touchcontroller.vibrate.enable" = "Enable Vibration";
@@ -2044,10 +2044,12 @@
 "preference.detail.ui_theme" = "Choose light/dark/system appearance.";
 "preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
 "preference.title.renderer_backend" = "MobileGlues backend";
-"preference.detail.renderer_backend" = "Unified MobileGlues three-way switch (floating popup): Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan direct by default. The GLES backend translates desktop GL to OpenGL ES via the built-in ANGLE framework -- no separate ANGLE switch is needed (the old \"ANGLE ES Driver\" toggle was removed as redundant). The selection writes the renderer setting directly (explicit choice wins).";
+"preference.detail.renderer_backend" = "Unified MobileGlues three-way switch (floating popup): Vulkan direct / GLES backend / OpenGL 4.0 experimental, Vulkan direct by default. The GLES backend translates desktop GL to OpenGL ES via the built-in ANGLE framework -- no separate ANGLE switch is needed (the old \"ANGLE ES Driver\" toggle was removed as redundant). Task 140: the selection writes the GLOBAL default renderer; each game can override it (or follow this global setting) in its own game settings page.";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
+"preference.profile.renderer_follow_global" = "Follow Global Setting (currently: %@)";
+"preference.warning.renderer_shadowed_by_profile" = "Global default set to %@. This game keeps its own renderer (%@). Change it in the game's settings if needed.";
 "preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";
 
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */
