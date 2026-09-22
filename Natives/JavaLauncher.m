@@ -1217,28 +1217,18 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         }
         NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
-        // Task 145：POJAV_RENDERER 仅对 Mithril（4.0 后端）导出，其它渲染器
-        // 一律 unsetenv。Task 144 曾无条件同步导出，结果触发了 Sodium 0.9.2
-        // 的反 PojavLauncher 检测（装机反汇编实锤：net.caffeinemc.mods.sodium
-        // .client.compatibility.checks.PostLaunchChecks.isUsingPojavLauncher
-        // 的第一个条件就是 System.getenv("POJAV_RENDERER") != null -> 抛
-        // "It appears that you are using PojavLauncher, which is not supported
-        // when using Sodium"）——所有带 Sodium 的整合包在第一帧全崩（装机
-        // latestlog 22:19 MobileGL / 22:20 OSMesa 两个会话同因）。而 LWJGL
-        // 补丁的重绑定门只有 Mithril（线程绑定 EGL 模型）真正需要：
-        // GL.createCapabilities 里 System.getenv("POJAV_RENDERER") 非空 ->
-        // 反射调 fixPojavGLContext() -> glfwMakeContextCurrent(mainContext)，
-        // 未设置时渲染线程 glGetString 探针返回 NULL -> IllegalStateException
-        // "There is no OpenGL context current in the current thread"（22:16
-        // 会话 libmithril 实锤）。MobileGL/OSMesa/zink/ANGLE 全局模型本来
-        // 就不需要它（Task 144 之前无此变量时全部可玩）。unsetenv 兜底：
-        // 同一 app 会话内先启 Mithril 再启其它渲染器时，清掉上一次残留，
-        // 防止新 JVM 的环境快照把变量带给 Sodium。
-        if (isMithrilRenderer(renderer.UTF8String)) {
-            setenv("POJAV_RENDERER", renderer.UTF8String, 1);
-        } else {
-            unsetenv("POJAV_RENDERER");
-        }
+        // Task 147：彻底不再导出 POJAV_RENDERER（含 Mithril）。Task 145 的
+        // "Mithril 需要重绑门"前提被 Run #356 实测推翻：make-current #1/#2 的
+        // Task140 读回 + Task146 三指针探针证明绑定健康（renderer 侧
+        // glGetString 返回 "3.3.0 Mithril-Wrapper (Vulkan 1.2 / MoltenVK)"），
+        // 而 POJAV_RENDERER 在场时 createCapabilities 反而崩——补丁门在
+        // make-current #2 之后触发 fixPojavGLContext 重绑，日志无 make-current
+        // #3、且桥的 make_current(NULL) 释放分支当时不留痕：重绑以隐式释放/
+        // 异路线重绑收场，上下文在 createCapabilities 读取前丢失 ->
+        // "no OpenGL context"（latestlog.txt 07:25:25 实锤）。绑定健康时
+        // 门没有任何正向价值；unsetenv 兜底同时清掉同 app 会话内上一次
+        // 残留，Sodium 反 Pojav 检测（env 存在即抛）继续安全。
+        unsetenv("POJAV_RENDERER");
 
         // Apply Zink-specific environment variables if Zink renderer is selected
         // Mesa 25.0.7 zink 升级配套：根据设备 GPU 代际自动调优 MESA_GL_VERSION_OVERRIDE、

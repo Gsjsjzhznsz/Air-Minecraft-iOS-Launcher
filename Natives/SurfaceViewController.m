@@ -256,8 +256,15 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     if (renderer.length == 0) return NO;
     if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;
     if ([renderer hasPrefix:@"libOSMesa"]) return YES;
-    // Task 119：MobileGL 两后端共体（libMobileGL.dylib / libMobileGL-gles.dylib）
-    if (isMobileGLRenderer(renderer.UTF8String)) return YES;
+    // Task 147：MobileGL 两后端（libMobileGL.dylib / libMobileGL-gles.dylib）
+    // 退出 FSR 联动。Run #356 双会话实锤：mgl_fsr 预交换链（EASU 1180x820 ->
+    // offscreen 2360x1640 -> RCAS -> swapchain）在 DirectVulkan 呈现花屏+倒转、
+    // 在 DirectGLES 会话伴随方块不渲染；设置期还有 "GLSL version query
+    // returned 0 -- no current context"（Task140）警示。两个后端都退回
+    // 全分辨率直呈（mgFsrScale=1.0 -> MC 窗口=全表面 -> before_swap 的
+    // inW>=surfW 零开销跳过），正确性优先于性能；MobileGlues 自带 FSR1
+    // 与 zink EASU（osm_bridge，走自家管线）不受影响。
+    // if (isMobileGLRenderer(renderer.UTF8String)) return YES;  // Task 147 撤销
     return NO;
 }
 

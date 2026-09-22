@@ -1093,11 +1093,21 @@ void osm_apply_current_ll() {
 
 void osm_make_current(osm_render_window_t* bundle) {
     if(!bundle) {
-        free(br_get_current()->osm.buffer);
-        CGColorSpaceRelease(br_get_current()->osm.color_space);
-        br_get_current()->osm.buffer = NULL;
-        br_get_current()->osm.color_space = NULL;
-        br_get_current()->osm.width = br_get_current()->osm.height = 0;
+        // Task 147：br_get_current() 在从未绑定过窗口时返回 NULL——Forge
+        // 整合包（OSMesa/zink 渲染器）游戏启动路径的 makeCurrent(NULL)
+        // 直达此处，原代码无条件解引用 br_get_current()->osm.buffer，
+        // SIGSEGV @ osm_make_current+0x28（Run #356 latestlog.forge 的
+        // hs_err 实锤，JVM fatal "Problematic frame"）。空指针守卫后
+        // 释放调用安全走完，安装完成（Task 146 标志位已验证生效）之后
+        // 的启动崩溃即解。
+        basic_render_window_t *ame147_cur = br_get_current();
+        if (ame147_cur) {
+            free(ame147_cur->osm.buffer);
+            CGColorSpaceRelease(ame147_cur->osm.color_space);
+            ame147_cur->osm.buffer = NULL;
+            ame147_cur->osm.color_space = NULL;
+            ame147_cur->osm.width = ame147_cur->osm.height = 0;
+        }
         br_set_current(NULL);
         //technically this does nothing as its not possible to unbind a context in OSMesa
         handle.OSMesaMakeCurrent(NULL, NULL, 0, 0, 0);

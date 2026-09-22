@@ -1725,6 +1725,17 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
 
 void gl_make_current(gl_render_window_t* bundle) {
     if(!bundle) {
+        // Task 147：释放路径补日志（限频 4 条）。Run #356 Mithril 病历：
+        // make-current #2 后绑定健康，createCapabilities 却报 no-context 且
+        // 无 make-current #3——fixPojavGLContext 的重绑若以 glfwMakeCurrent(0)
+        // 收场，只会走本分支且完全不可见。下一轮日志此行若出现在崩溃前，
+        // "隐式释放"链路即实锤（配合 JavaLauncher 的 POJAV_RENDERER 撤销）。
+        static int ame147_relLogs = 0;
+        if (ame147_relLogs < 4) {
+            ame147_relLogs++;
+            NSLog(@"[gl_bridge] Task147 make-current(NULL): context release requested on thread=%p main=%d",
+                  pthread_self(), [NSThread isMainThread] ? 1 : 0);
+        }
         if(handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
             br_set_current(NULL);
         }
