@@ -2250,3 +2250,35 @@ Work Log:
 Stage Summary:
 - Task 140 四项修复全链闭环：渲染器设置分层重构（设置=全局默认 / 实例=per-game 全选项+跟随全局）/ Mithril OpenGL 4.0 上下文 attribs 崩溃根治 / MobileGL 全后端 FSR 符号解析根治 / TouchController 虚拟按钮（mod 侧空布局退役+存量修复）；验证器 59/59 + 十三验证器级联重锚全绿 + CI 绿，新 IPA 就绪（ecb49b1 构建）
 - 装机待验证锚点：①Mithril 会话 '[gl_bridge] Task140 make-current readback: ctx=0x... (current context confirmed)' 后不再 "no OpenGL context current" 崩溃；②GLES/Vulkan 直连会话 '[MGLFSR] Task119 GL resolve: 41/41 ... sources: handle=41 proc=0 default=0' + 'Task119 FSR1 upscale engaged'（不再出现 'unavailable -- restoring'）；③实例设置页渲染器行 '跟随全局设置（当前: X）'/后端名（不再原始 dylib 名），选项 8+ 项带 ✓；④污染设备首次启动 '[TouchController] Task140: polluted empty-layout pointer removed' 后 mod 虚拟按钮回归；⑤GLES 后端方块渲染若仍异常→附新日志（上游 MobileGL 翻译层问题）
+
+---
+
+## Task 141（本会话）
+
+### 用户七项需求
+1. 未选择账号时主页欢迎卡显示空白 → 应显示右边栏同款默认头像。
+2. 欢迎卡灰字问候语改为公告标题（喇叭图标 + 标题）+ 公告卡同款"查看详情"按钮；字号与欢迎语一致。
+3. 下载页版本行主标题字号比时间灰字小 → 改成一致。
+4. 实例管理"内存分配"枚举列表改弹出小窗口：顶部灰字（当前内存：xMB）+ 拉条 512MB→启动器检测最大可分配。
+5. 排查"…"截断改缩字（至少：实例管理 JVM启动参数行、下载页版本列表时间 2026-…）。
+6. 排查启动内存由实例内存分配还是全局"Java 内存分配(MB)"决定；改为实例决定；后者（及其自动调整选项）删除。
+7. MC 新闻页贴边单列、禁左右滑（检测屏幕大小贴于窗口）。
+注：另一会话并行提交 CI，编号避让至 141（远端已推进 138/139/140），推送前 fetch 对齐。
+
+### 根因与实施
+- **Item1/2（LauncherNewsViewController.HomeProfileTileCell）**：无头像分支改用 `DefaultAccount` 资产（账户列表同源；缺失回退 SF 占位）；greetingLabel 退役，第二行改为 announceRowStack（megaphone.fill 图标 + 公告标题 21pt bold 与欢迎语一致、缩字不截断 minScale 0.6 + detailButton 公告卡同款 #3B82F6 白字圆角 8，条件与公告卡一致 actionURL+actionTitle，复用 openAnnouncementActionURL）；无公告回退 festivalGreeting 14pt 灰字、图标按钮隐藏；welcomeStack 仍相对头像 centerY 居中。
+- **Item3/5（VersionCardCell）**：版本号 minimumScaleFactor 0.7→0.75（16×0.75=12pt=日期字号，标题永不再小于灰字）；日期右锚从 topRowStack 尾部（被短版本号拖窄 → "2026-…"截断根因）改锚 chevron 左侧 8pt，12pt 日期完整显示。
+- **Item4/5（ProfileSettingsViewController）**：showMemoryAllocator 由 actionSheet 枚举列表重写为原生弹出小窗口（遮罩点击取消 + ame 卡片表面 16pt + 顶部灰字 memory.current 实时刷新 + UISlider 512MB→self.maxMemory（物理×0.8 随设备自适应，用户参考值 6116MB 即此口径）+ 取消/确定，确定写回 allocatedMemory→saveSettings）；cell 创建时 textLabel/detailTextLabel 加 adjustsFontSizeToFitWidth + minScale 0.6（JVM 启动参数行被 200pt accessoryView 挤压的"JVM启动…"根治）。
+- **Item6（内存决策链）**：旧链 = 全局 java.auto_ram/java.allocated_memory 决定 -Xmx，实例 allocatedMemory 写 general.ram_allocation 但全仓无读取方（死项）。按用户指令反转为实例决定：utils.h/.m 新增共享助手 `ame141_currentLaunchAllocMem`（读当前实例 profile[@"allocatedMemory"]，未设置回退原自动比例 0.5/0.25），JavaLauncher -Xmx 与 SurfaceViewController updateJetsamControl 两处同源（Task68 的"必须逐字一致"从结构上保证）；LauncherPreferencesViewController 全局两行（auto_ram 开关 + allocated_memory 滑条）删除；validateVirtualMemorySpace 校验与启动日志锚点保留。
+- **Item7（MinecraftNewsViewController）**：旧布局组宽 1.0 但子项 0.5 且仅一项 → 卡片贴左半宽右侧留白（"不是连贯的上下滑动"根因）；改子项 fractional 1.0 贴于窗口随屏幕自适应 + contentInset 左右 0 + alwaysBounceHorizontal NO；Task136 等高机制不变。
+- **l10n**：+2 键（memory.current/memory.apply）× en/zh-CN/zh-Hans/zh-Hant（基线 1920→1922，四语言键集一致）。
+
+### 校验
+- verify_task141 新增 35 项（A 欢迎卡 7/B 版本行 3/C 实例设置 7/D 内存决策链 7/E 新闻页 4/F l10n 3/G 语法 4，含 UIColor 白名单审计）。
+- 重锚：task136 E4（welcomeStack 第二行）；l10n 基线门 1920→1922 ×7（task129 I3/130 H3/131 G3/132 F1/133 F1/134 G1/135 D3/138 I-l10n）；task137 G3 增加 Task141 diff 形态分支（修复 diff 行 `+` 前缀未剥离的谓词漏洞）。
+- 全量级联 stash 基线对拍（129-141 + 103/105）：**零新增失败**；基线独有 20 条为 103/105 的 g++ 环境闪失（本轮反而全过）；task132 A15/F4/F5 为被沙箱清除的会话本地审计脚本所致（与基线一致，环境性）。
+- 口径护栏零变化：getEntitlementValue ×2 / isJITEnabled(NO)+TXM / 七卡工厂 / 侧栏自愈 / 新闻等高 / AmeBadgeLabel / 原生表面 API 全部原位。
+
+### Stage Summary
+- 用户预期：①无账号显示 DefaultAccount 默认头像 ②欢迎卡第二行=公告标题行（同字号+同款按钮，可点查看详情）③版本标题最坏情况与时间同字号 ④内存分配弹窗拉条（灰字实时显示当前内存，512→设备最大）⑤JVM 启动参数行与版本时间不再截断 ⑥启动内存由实例拉条决定，全局两行删除 ⑦新闻页贴边单列不可左右滑。
+- 待用户安装新 CI 工件实机验证；另一会话并行开发期间推送前需 fetch 对齐。
