@@ -468,8 +468,8 @@ static NSString *festivalGreeting(void) {
     self.announceRowStack.spacing = 8;
     [self.announceIconView setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.announceIconView setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [self.detailButton.setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [self.detailButton.setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.detailButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.detailButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
     [self.detailButton.widthAnchor constraintGreaterThanOrEqualToConstant:88].active = YES;
     [self.detailButton.heightAnchor constraintEqualToConstant:28].active = YES;
     [self.announceIconView.widthAnchor constraintEqualToConstant:18].active = YES;
