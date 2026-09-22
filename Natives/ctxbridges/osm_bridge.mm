@@ -84,15 +84,20 @@ osm_render_window_t* osm_init_context(osm_render_window_t* share) {
 // ============================================================================
 
 // GL 2.0+ 枚举（GL/gl.h 只有 1.1；OSMesa 桌面 GL 4.6 全量支持）。
-// Task 84 勘误：GL_FRAGMENT_SHADER 的规范值是 0x8B92（35730）——Task83
-// 误写 0x8B30（35632，非任何 shader 类型枚举；75c5e14 装机日志的
-// stage=35632 实锤此错值在跑）。虽然该会话的编译链仍产出了真实的编译
-// 错误信息（MobileGlues 封装层对未知枚举的容错），规范错值不可依赖。
+// Task 143 勘误（对 Task 84 错误"勘误"的再勘误）：GL_FRAGMENT_SHADER
+// 规范值是 0x8B30（35632）——mesa glext.h:599 同款；Task83 的原值才是
+// 对的。0x8B92（35730）是 GL_PALETTE4_R5_G6_B5_OES（GLES1 调色板纹理
+// 格式），不是任何 shader 类型枚举。Task84 把装机日志里 stage=35632
+// 的编译失败误诊为"错值在跑"（真实败因另有其他），反向"勘误"成
+// 0x8B92 后 zink 链 FSR 的片元着色器从此 glCreateShader 恒返回 0 +
+// GL_INVALID_ENUM，静默自愈回全分辨率——与 mgl_fsr（Task119 复制了
+// 同一错值）一起构成"FSR 从未在启动器侧两条链上工作过"的完整病历。
+// 75c5e14 会话当年的编译错误信息来自别处，勿再据日志反推枚举规范值。
 #ifndef GL_VERTEX_SHADER
 #define GL_VERTEX_SHADER    0x8B31
 #endif
 #ifndef GL_FRAGMENT_SHADER
-#define GL_FRAGMENT_SHADER  0x8B92
+#define GL_FRAGMENT_SHADER  0x8B30
 #endif
 #ifndef GL_COMPILE_STATUS
 #define GL_COMPILE_STATUS   0x8B81
@@ -109,8 +114,12 @@ osm_render_window_t* osm_init_context(osm_render_window_t* share) {
 #ifndef GL_ARRAY_BUFFER
 #define GL_ARRAY_BUFFER     0x8892
 #endif
+// Task 143：0x8B8C 实为 GL_SHADING_LANGUAGE_VERSION；GL_ARRAY_BUFFER_
+// BINDING 规范值 0x8894——ame83_rcas_engage 的 glGetIntegerv(
+// GL_ARRAY_BUFFER_BINDING, &saveVbo) 实际引用了本定义，旧错值让 VBO
+// 绑定保存恒查到 GLSL 版本语义的 pname（静默失效），与 mgl_fsr 同源同修。
 #ifndef GL_ARRAY_BUFFER_BINDING
-#define GL_ARRAY_BUFFER_BINDING 0x8B8C
+#define GL_ARRAY_BUFFER_BINDING 0x8894
 #endif
 #ifndef GL_VERTEX_ARRAY_BINDING
 #define GL_VERTEX_ARRAY_BINDING 0x85B5

@@ -166,6 +166,21 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             // （旧 mobilegl_vulkan 布尔开关退役，见 Task120 注释）。
             // 默认 1（Vulkan）：用户实测上游 DirectVulkan 后端流畅度最高
             // （CAMetalLayer 直呈 + IMMEDIATE 呈现 + 无逐帧回读）。
+            // Task 142：mg 后端独立存储键（渲染器层只存 "mg"，后端由此键
+            // 决定，默认 Vulkan 直连）。Task 143 注册默认值——Task142 漏注册，
+            // 而 PLPreferences 只能读写已存在的键（本函数头注释同款规矩），
+            // 装机日志 4ecc256 实锤两向皆哑：
+            //   "[PLPreferences] Setter could not find preference
+            //    mobileglues.renderer_backend"（用户选 GLES 后端写入被静默
+            //    丢弃）→ 启动永远回落默认 libMobileGL.dylib —— 用户反馈
+            //    "无论切换什么渲染器都会变成mg" 的根因。
+            // 默认值刻意为空串而非 libMobileGL.dylib：ame142_effective_
+            // backend_key 的解析链（新键 → legacy 全局家族键 → legacy 档位
+            // → 默认 Vulkan）依赖"键未设"语义落到 legacy 档位层——存量设备
+            // renderer=auto + mobilegl_backend=2/3 的 GLES/Mithril 选择必须
+            // 继续生效；注册成实体默认值会让空键恒命中第一层、legacy 档位
+            // 永久失明。空串同样消除每帧 "Getter could not find" 日志噪音。
+            @"renderer_backend": @"",
             @"mobilegl_backend": @(1),
             @"enable_no_error": @(0),
             @"enable_ext_timer_query": @YES,

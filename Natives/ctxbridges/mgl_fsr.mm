@@ -68,8 +68,16 @@ extern const char* FSR_FSSource;
 #ifndef GL_VERTEX_SHADER
 #define GL_VERTEX_SHADER    0x8B31
 #endif
+// Task 143 勘误：GL_FRAGMENT_SHADER 规范值是 0x8B30（35632，mesa
+// glext.h:599 同款；Task119 从 osm_bridge 的 Task84 错误"勘误"复制了
+// 0x8B92——那是 GL_PALETTE4_R5_G6_B5_OES，GLES1 调色板纹理格式，根本
+// 不是 shader 类型）。装机日志 4ecc256 实锤：MobileGL 顶点着色器
+// （0x8B31）创建成功、片元（0x8B92）glCreateShader 返回 0 +
+// glGetError=0x500（GL_INVALID_ENUM）→ EASU 链初始化失败 → 恒自愈回
+// 全分辨率 → 用户反馈"fsr没有生效"（FSR 预设 4 的半分辨率渲染从未被
+// 上采样，Task83 联动几何每次都白白触发一轮 heal）。
 #ifndef GL_FRAGMENT_SHADER
-#define GL_FRAGMENT_SHADER  0x8B92
+#define GL_FRAGMENT_SHADER  0x8B30
 #endif
 #ifndef GL_COMPILE_STATUS
 #define GL_COMPILE_STATUS   0x8B81
@@ -86,8 +94,13 @@ extern const char* FSR_FSSource;
 #ifndef GL_ARRAY_BUFFER
 #define GL_ARRAY_BUFFER     0x8892
 #endif
+// Task 143：0x8B8C 实为 GL_SHADING_LANGUAGE_VERSION（本文件 ame119_
+// adapt_shader_version 的版本查询用的正是它）；GL_ARRAY_BUFFER_BINDING
+// 规范值 0x8894。旧错值并非死定义——RCAS 路径 ame119_rcas_engage 的
+// glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &saveVbo) 实际引用了它，查询
+// 到的是 GLSL 版本语义的 pname（恒 0/错误），VBO 绑定保存静默失效。
 #ifndef GL_ARRAY_BUFFER_BINDING
-#define GL_ARRAY_BUFFER_BINDING 0x8B8C
+#define GL_ARRAY_BUFFER_BINDING 0x8894
 #endif
 #ifndef GL_VERTEX_ARRAY_BINDING
 #define GL_VERTEX_ARRAY_BINDING 0x85B5

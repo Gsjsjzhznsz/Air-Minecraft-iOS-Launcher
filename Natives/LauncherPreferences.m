@@ -463,6 +463,14 @@ static NSString *currentRendererKey(void) {
 //   2. 但当前已选中的值永远保留 —— 否则用户选了某个渲染器、之后该 dylib 被移除
 //      （例如换了个不含 MobileGL 的构建），设置页会失去这一项，pick 控件拿不到
 //      对应下标，显示为空白或错选中第一项，用户无从察觉当前到底是什么渲染器。
+//   3. Task 143：独立 MobileGlues 条目（libmobileglues.dylib，Task 131 时代
+//      的经典渲染器）从选择列表隐退，仅当它是当前选中值时保留可见——用户
+//      装机反馈"mg 是 MobileGlues，为什么列表有个 mg 又有个 MobileGlues"：
+//      Task142 的单一 mg 入口（MobileGL 家族）与经典 libmobileglues 条目
+//      并列，命名撞车让用户无从分辨。现行语义：渲染器层的 MG 语义由 "mg"
+//      独占；libmobileglues 降级为存量兼容项（已选设备照常显示/启动，
+//      ame_effective_renderer 的 legacy 显式键路径不变，dylib 仍随包构建），
+//      新选择一律走七项列表（auto/mg/gl4es/angle/zink/ltw/vulkan）。
 static NSArray<NSDictionary *> *availableRendererCandidates(void) {
     NSString *current = currentRendererKey();
     NSMutableArray *result = [NSMutableArray array];
@@ -470,6 +478,10 @@ static NSArray<NSDictionary *> *availableRendererCandidates(void) {
         NSString *file = entry[@"file"];
         NSString *key = entry[@"key"];
         if (file.length > 0 && !rendererLibraryExists(file) && ![key isEqualToString:current]) {
+            continue;
+        }
+        if ([key isEqualToString:@ RENDERER_NAME_MOBILEGLUES] &&
+            ![key isEqualToString:current]) {
             continue;
         }
         [result addObject:entry];
@@ -525,6 +537,14 @@ NSString *ame_renderer_display_name(NSString *renderer) {
     }
     if ([renderer isEqualToString:@"auto"]) {
         return localize(@"preference.title.renderer.debug.auto", nil);
+    }
+    // Task 143：独立 MobileGlues（libmobileglues.dylib）自选择列表隐退
+    // （见 availableRendererCandidates 规则 3）后，存量 profile 存储值不再
+    // 出现在 getRendererKeys 里，此处若走"未命中原样返回"会裸显 dylib 键名。
+    // 显式映射回它的既有文案（preference.title.renderer.debug.mg，四语言
+    // 现成键，零 l10n 变更）——存量设备行显示与迁移前完全一致。
+    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
+        return localize(@"preference.title.renderer.debug.mg", nil);
     }
     NSArray *keys = getRendererKeys(NO);
     NSArray *names = getRendererNames(NO);
