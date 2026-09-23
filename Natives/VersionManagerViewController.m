@@ -50,6 +50,9 @@ static NSInteger const kSectionVersions    = 1;
     self.layer.shadowOpacity = 0.12;
     self.layer.shadowRadius = 6;
     self.layer.masksToBounds = NO;
+    // Task152：cell 自身透明 + 无 shadowPath 时 CALayer 回退为直角 bounds 阴影，
+    // 圆角卡片四角外露出黑色直角（用户实测"圆角有黑直边"）。
+    // 具体路径在 layoutSubviews 中随 contentContainer 实际 frame 更新。
 
     self.contentContainer = [[UIView alloc] initWithFrame:self.contentView.bounds];
     self.contentContainer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -66,6 +69,17 @@ static NSInteger const kSectionVersions    = 1;
 
     // 规范 6.2：第 2 层 BackgroundManager 毛玻璃
     [[BackgroundManager sharedManager] applyEffectToCollectionViewCell:self];
+}
+
+// Task152：阴影路径随卡片实际 frame 更新——透明 cell 的黑色阴影若无
+// shadowPath 会以直角 bounds 绘制，在圆角卡片四角外露出黑色直角。
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGRect shadowRect = self.contentContainer.frame;
+    if (!CGRectIsEmpty(shadowRect)) {
+        self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:shadowRect
+                                                           cornerRadius:12.0].CGPath;
+    }
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {

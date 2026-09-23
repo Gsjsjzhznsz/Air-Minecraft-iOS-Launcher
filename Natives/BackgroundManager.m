@@ -479,6 +479,62 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 #pragma mark - Transparency Helpers with UI Effect Support
 
+// Task152：背景"从无到有"时对整棵 VC 树重放透明化。首次启动时 Bing 壁纸尚未
+// 下载完成，全部已加载 VC 在"无背景"时期经 makeViewControllerTransparent 的
+// hasBackground 守卫直接 return（保持不透明 systemBackgroundColor）；数秒后
+// setBingBackgroundImageAtPath 插入背景容器时没有任何机制通知这些既有 VC，
+// 背景被完全盖住，用户实测表现为"Bing 壁纸加载完成需重启软件才正常"。
+// 递归覆盖 childViewControllers（nav/split/tab 子栈均注册为 child）、
+// presentedViewController；nav 栏/工具栏效果单独补刷。幂等，可安全重复调用。
+- (void)refreshTransparencyForWindowUI {
+    UIViewController *root = nil;
+    if (self.currentSplitVC && self.currentSplitVC.view.window) {
+        root = self.currentSplitVC;
+    } else if (self.currentWindow && self.currentWindow.rootViewController) {
+        root = self.currentWindow.rootViewController;
+    }
+    if (!root) {
+        NSLog(@"[BackgroundManager] Task152: refreshTransparency skipped (no live root)");
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self ame_applyTransparencyRecursive:root];
+        NSLog(@"[BackgroundManager] Task152: transparency refreshed for live VC tree");
+    });
+}
+
+- (void)ame_applyTransparencyRecursive:(UIViewController *)vc {
+    if (!vc) return;
+    [self makeViewControllerTransparent:vc];
+
+    if ([vc isKindOfClass:[UISplitViewController class]]) {
+        for (UIViewController *child in [(UISplitViewController *)vc viewControllers]) {
+            [self ame_applyTransparencyRecursive:child];
+        }
+    } else if ([vc isKindOfClass:[UINavigationController class]]) {
+        UINavigationController *nav = (UINavigationController *)vc;
+        for (UIViewController *child in nav.viewControllers) {
+            [self ame_applyTransparencyRecursive:child];
+        }
+        nav.view.backgroundColor = [UIColor clearColor];
+        [self applyEffectToNavigationBar:nav.navigationBar];
+        [self applyEffectToToolbar:nav.toolbar];
+    } else if ([vc isKindOfClass:[UITabBarController class]]) {
+        for (UIViewController *child in [(UITabBarController *)vc viewControllers]) {
+            [self ame_applyTransparencyRecursive:child];
+        }
+    }
+
+    for (UIViewController *child in [vc childViewControllers]) {
+        if (child != vc.presentedViewController) {
+            [self ame_applyTransparencyRecursive:child];
+        }
+    }
+    if (vc.presentedViewController) {
+        [self ame_applyTransparencyRecursive:vc.presentedViewController];
+    }
+}
+
 - (void)makeViewControllerTransparent:(UIViewController *)viewController {
     if (!viewController) return;
 
@@ -560,7 +616,22 @@ static const NSInteger kDefaultBackgroundTag = 99995;
                 }
             }
 
-            cell.backgroundView = blurView;
+            // Task152：卡片化 cell（contentView 自带圆角，如下载页模组加载器列表）
+            // 不能用直角 backgroundView 铺 blur——卡片圆角四角外会露出深色直角
+            // （用户实测"圆角有黑直边"）。改为插入 contentView 底层并继承圆角；
+            // 普通矩形行维持 backgroundView 原路径。
+            CGFloat contentRadius = cell.contentView.layer.cornerRadius;
+            if (contentRadius > 0) {
+                blurView.frame = cell.contentView.bounds;
+                blurView.layer.cornerRadius = contentRadius;
+                blurView.layer.cornerCurve = cell.contentView.layer.cornerCurve;
+                blurView.layer.masksToBounds = YES;
+                blurView.userInteractionEnabled = NO;
+                [cell.contentView insertSubview:blurView atIndex:0];
+                cell.backgroundView = nil;
+            } else {
+                cell.backgroundView = blurView;
+            }
         } else {
             cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
         }
@@ -569,12 +640,25 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         // 半透明效果 - simple semi-transparent background
         // 修复：使用 secondarySystemBackgroundColor 替代硬编码 0.1 黑色
         if (@available(iOS 13.0, *)) {
-            cell.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
+            // Task152：卡片化 cell（圆角 > 0）把半透明底作用到 contentView，
+            // 避免直角 cell 底色在卡片圆角外露直角。
+            CGFloat contentRadius = cell.contentView.layer.cornerRadius;
+            if (contentRadius > 0) {
+                cell.backgroundColor = [UIColor clearColor];
+                cell.contentView.backgroundColor = [[UIColor secondarySystemBackgroundColor]
+                    colorWithAlphaComponent:self.uiOpacity];
+                cell.contentView.layer.masksToBounds = YES;
+                cell.backgroundView = nil;
+            } else {
+                cell.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
+                cell.contentView.backgroundColor = [UIColor clearColor];
+                cell.backgroundView = nil;
+            }
         } else {
             cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            cell.contentView.backgroundColor = [UIColor clearColor];
+            cell.backgroundView = nil;
         }
-        cell.contentView.backgroundColor = [UIColor clearColor];
-        cell.backgroundView = nil;
     }
 }
 
@@ -858,9 +942,40 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // Task111：检测并切换——有自定义背景时恢复 Task89 之前的毛玻璃/半透明
     // cell 效果；无背景时维持新拟态凸出表面。
     if ([self hasBackground]) {
+        // Task152：探测卡片容器（contentView 内第一个带圆角的非文本/控件子视图）。
+        // 此前 blur/半透明一律铺满直角 contentView，而 VMTileBaseCell 等的圆角在
+        // contentContainer 上 → 深色毛玻璃直角铺满 cell，卡片圆角四角外露出深色
+        // 直角（用户实测"圆角有黑直边"）。现改为把效果作用到卡片容器本身，
+        // 位置/尺寸/圆角全部对齐；无容器时回退 contentView（行为同旧）。
+        UIView *cardTarget = nil;
+        CGFloat cardRadius = 0;
+        for (UIView *subview in cell.contentView.subviews) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
+                continue; // blur 层不参与容器探测
+            }
+            if (!cardTarget && subview.layer.cornerRadius > 0 &&
+                ![subview isKindOfClass:[UIImageView class]] &&
+                ![subview isKindOfClass:[UILabel class]] &&
+                ![subview isKindOfClass:[UITextView class]] &&
+                ![subview isKindOfClass:[UIControl class]]) {
+                cardTarget = subview;
+                cardRadius = subview.layer.cornerRadius;
+            }
+        }
+        if (!cardTarget) {
+            cardTarget = cell.contentView;
+            cardRadius = cell.contentView.layer.cornerRadius > 0
+                ? cell.contentView.layer.cornerRadius : 12;
+        }
+
         if (self.uiEffect == BackgroundUIEffectBlur) {
             // 毛玻璃
             for (UIView *subview in cell.contentView.subviews) {
+                if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
+                    [subview removeFromSuperview];
+                }
+            }
+            for (UIView *subview in cardTarget.subviews) {
                 if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
                     [subview removeFromSuperview];
                 }
@@ -874,12 +989,16 @@ static const NSInteger kDefaultBackgroundTag = 99995;
             }
             UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
             blurView.tag = kBackgroundBlurTag;
-            blurView.frame = cell.contentView.bounds;
+            blurView.frame = cardTarget.bounds;
             blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            blurView.layer.cornerRadius = cell.contentView.layer.cornerRadius;
+            blurView.layer.cornerRadius = cardRadius;
+            blurView.layer.cornerCurve = cardTarget.layer.cornerCurve;
             blurView.layer.masksToBounds = YES;
+            blurView.alpha = 0.3 + (self.blurIntensity * 0.7);
+            blurView.userInteractionEnabled = NO;
 
-            [cell.contentView insertSubview:blurView atIndex:0];
+            [cardTarget insertSubview:blurView atIndex:0];
+            cardTarget.backgroundColor = [UIColor clearColor];
             cell.backgroundColor = [UIColor clearColor];
             cell.contentView.backgroundColor = [UIColor clearColor];
         } else {
@@ -889,11 +1008,18 @@ static const NSInteger kDefaultBackgroundTag = 99995;
                     [subview removeFromSuperview];
                 }
             }
-            if (@available(iOS 13.0, *)) {
-                cell.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
-            } else {
-                cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            for (UIView *subview in cardTarget.subviews) {
+                if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
+                    [subview removeFromSuperview];
+                }
             }
+            if (@available(iOS 13.0, *)) {
+                cardTarget.backgroundColor = [[UIColor secondarySystemBackgroundColor]
+                    colorWithAlphaComponent:self.uiOpacity];
+            } else {
+                cardTarget.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            }
+            cell.backgroundColor = [UIColor clearColor];
             cell.contentView.backgroundColor = [UIColor clearColor];
         }
         return;
@@ -1115,7 +1241,9 @@ static const NSInteger kDefaultBackgroundTag = 99995;
                 } else if (self.currentWindow) {
                     [self applyBackgroundToWindow:self.currentWindow];
                 }
-                
+                // Task152：无背景 → 有背景的同款即时生效刷新（用户首次设置图片/视频）
+                [self refreshTransparencyForWindowUI];
+
                 if (completion) completion(YES, nil);
             });
         } else {
@@ -1157,6 +1285,9 @@ static const NSInteger kDefaultBackgroundTag = 99995;
             } else if (self.currentWindow) {
                 [self applyBackgroundToWindow:self.currentWindow];
             }
+            // Task152：首次拉到 Bing 壁纸时既有 VC 是"无背景"时期建的（不透明），
+            // 必须重放透明化，否则壁纸被盖住直到重启。
+            [self refreshTransparencyForWindowUI];
             if (completion) completion(YES, nil);
         });
     });
@@ -1194,7 +1325,9 @@ static const NSInteger kDefaultBackgroundTag = 99995;
                 } else if (self.currentWindow) {
                     [self applyBackgroundToWindow:self.currentWindow];
                 }
-                
+                // Task152：无背景 → 有背景的同款即时生效刷新（用户首次设置图片/视频）
+                [self refreshTransparencyForWindowUI];
+
                 if (completion) completion(YES, nil);
             });
         } else {

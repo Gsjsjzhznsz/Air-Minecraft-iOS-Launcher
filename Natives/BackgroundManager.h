@@ -80,6 +80,11 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 - (void)makeViewControllerTransparent:(UIViewController *)viewController;
 - (void)makeSplitViewControllerTransparent:(UISplitViewController *)splitVC;
 
+// Task152：背景"从无到有"时（Bing 首次联网拉到图 / 用户首次设置图片或视频）
+// 对当前窗口整棵 VC 树重新执行透明化管线——否则已加载的 VC 保持不透明底色，
+// 新插入的背景容器被完全盖住，表现为"壁纸要重启软件后才显示"。
+- (void)refreshTransparencyForWindowUI;
+
 // Apply UI effect to any UIView (blur or translucent based on settings)
 - (void)applyEffectToView:(UIView *)view;
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell;
