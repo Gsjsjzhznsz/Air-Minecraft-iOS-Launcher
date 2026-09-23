@@ -184,6 +184,11 @@ static NSString * localizeProfileTitle(NSString *title) {
     [self.ameAutoSwitch addTarget:self action:@selector(ame157AutoSwitchChanged:) forControlEvents:UIControlEventValueChanged];
     [self.ameCardView addSubview:self.ameAutoSwitch];
 
+    // 卡宽：优先 340pt，窄屏时被 ≤屏宽-48 的必需约束压低
+    // （Task157 CI 修复：赋值表达式不是对象，不能直接写进 NSArray 字面量）
+    NSLayoutConstraint *ame157_width = [self.ameCardView.widthAnchor constraintEqualToConstant:340];
+    ame157_width.priority = 999;
+
     [NSLayoutConstraint activateConstraints:@[
         [self.ameDimmingView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [self.ameDimmingView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
@@ -192,7 +197,7 @@ static NSString * localizeProfileTitle(NSString *title) {
 
         [self.ameCardView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.ameCardView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        [self.ameCardView.widthAnchor constraintEqualToConstant:340].priority = 999,
+        ame157_width,
         [self.ameCardView.widthAnchor constraintLessThanOrEqualToAnchor:self.view.widthAnchor constant:-48],
 
         [ame157_close.topAnchor constraintEqualToAnchor:self.ameCardView.topAnchor constant:10],
