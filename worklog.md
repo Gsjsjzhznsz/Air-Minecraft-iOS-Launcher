@@ -1,6 +1,8 @@
 # Worklog
 
-## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
+## ⚡ READ ME FIRST —— 会话速览（只读本节> Task 141 全文已挪入 worklog-archive.md（Task 157 收尾时行数控制，`grep -n "Task 141" worklog-archive.md` 检索）。
+
+ + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
 > 最后更新：Task 153（2026-09-23，渲染器三案 + Forge 模块层根修）。此前：Task 152/152b（另一会话，Mithril FunctionProvider 钉扎）；151（Bing 每日壁纸）；150（渲染器全局控制退役）；144-149（2026-09-22/23）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
@@ -11,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | d36a24f8（Task 151 Bing 每日壁纸，CI 绿 run 35848334214）；此前 6d73fc11（Task 150） |
-| 最新 Task 号 | **153**（双会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 153 渲染器三案（Vulkan 花屏/ES 方块/Forge ResolutionException）+ Task 152b 4.0 崩溃（pin 生效待证）+ Task 151 Bing 壁纸 + Task 149 六项返工 |
+| 远端 HEAD | 本会话 Task 157 提交（内存分配居中卡片弹窗 + Sodium+Iris Shaders，CI 盯绿中）；此前 8b6ec05f（Task 156） |
+| 最新 Task 号 | **157**（多会话并行开发，开新任务前先 fetch 避让编号；154-156 已被并行会话占用，本任务由 154 重编号为 157） |
+| 待用户装机验证 | Task 157（内存卡片弹窗/自动分配开关/Sodium+Iris Shaders 三 jar）+ Task 156 四案根修+三 UI + Task 154（并行，渲染器/Forge）+ Task 153 渲染器三案 + Task 151 Bing 壁纸 + Task 149 六项返工 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -39,36 +41,6 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - 找 commit：`git log --oneline --grep "Task N"`
 
 ---
-
-## Task 141（本会话）
-
-### 用户七项需求
-1. 未选择账号时主页欢迎卡显示空白 → 应显示右边栏同款默认头像。
-2. 欢迎卡灰字问候语改为公告标题（喇叭图标 + 标题）+ 公告卡同款"查看详情"按钮；字号与欢迎语一致。
-3. 下载页版本行主标题字号比时间灰字小 → 改成一致。
-4. 实例管理"内存分配"枚举列表改弹出小窗口：顶部灰字（当前内存：xMB）+ 拉条 512MB→启动器检测最大可分配。
-5. 排查"…"截断改缩字（至少：实例管理 JVM启动参数行、下载页版本列表时间 2026-…）。
-6. 排查启动内存由实例内存分配还是全局"Java 内存分配(MB)"决定；改为实例决定；后者（及其自动调整选项）删除。
-7. MC 新闻页贴边单列、禁左右滑（检测屏幕大小贴于窗口）。
-注：另一会话并行提交 CI，编号避让至 141（远端已推进 138/139/140），推送前 fetch 对齐。
-
-### 根因与实施
-- **Item1/2（LauncherNewsViewController.HomeProfileTileCell）**：无头像分支改用 `DefaultAccount` 资产（账户列表同源；缺失回退 SF 占位）；greetingLabel 退役，第二行改为 announceRowStack（megaphone.fill 图标 + 公告标题 21pt bold 与欢迎语一致、缩字不截断 minScale 0.6 + detailButton 公告卡同款 #3B82F6 白字圆角 8，条件与公告卡一致 actionURL+actionTitle，复用 openAnnouncementActionURL）；无公告回退 festivalGreeting 14pt 灰字、图标按钮隐藏；welcomeStack 仍相对头像 centerY 居中。
-- **Item3/5（VersionCardCell）**：版本号 minimumScaleFactor 0.7→0.75（16×0.75=12pt=日期字号，标题永不再小于灰字）；日期右锚从 topRowStack 尾部（被短版本号拖窄 → "2026-…"截断根因）改锚 chevron 左侧 8pt，12pt 日期完整显示。
-- **Item4/5（ProfileSettingsViewController）**：showMemoryAllocator 由 actionSheet 枚举列表重写为原生弹出小窗口（遮罩点击取消 + ame 卡片表面 16pt + 顶部灰字 memory.current 实时刷新 + UISlider 512MB→self.maxMemory（物理×0.8 随设备自适应，用户参考值 6116MB 即此口径）+ 取消/确定，确定写回 allocatedMemory→saveSettings）；cell 创建时 textLabel/detailTextLabel 加 adjustsFontSizeToFitWidth + minScale 0.6（JVM 启动参数行被 200pt accessoryView 挤压的"JVM启动…"根治）。
-- **Item6（内存决策链）**：旧链 = 全局 java.auto_ram/java.allocated_memory 决定 -Xmx，实例 allocatedMemory 写 general.ram_allocation 但全仓无读取方（死项）。按用户指令反转为实例决定：utils.h/.m 新增共享助手 `ame141_currentLaunchAllocMem`（读当前实例 profile[@"allocatedMemory"]，未设置回退原自动比例 0.5/0.25），JavaLauncher -Xmx 与 SurfaceViewController updateJetsamControl 两处同源（Task68 的"必须逐字一致"从结构上保证）；LauncherPreferencesViewController 全局两行（auto_ram 开关 + allocated_memory 滑条）删除；validateVirtualMemorySpace 校验与启动日志锚点保留。
-- **Item7（MinecraftNewsViewController）**：旧布局组宽 1.0 但子项 0.5 且仅一项 → 卡片贴左半宽右侧留白（"不是连贯的上下滑动"根因）；改子项 fractional 1.0 贴于窗口随屏幕自适应 + contentInset 左右 0 + alwaysBounceHorizontal NO；Task136 等高机制不变。
-- **l10n**：+2 键（memory.current/memory.apply）× en/zh-CN/zh-Hans/zh-Hant（基线 1920→1922，四语言键集一致）。
-
-### 校验
-- verify_task141 新增 35 项（A 欢迎卡 7/B 版本行 3/C 实例设置 7/D 内存决策链 7/E 新闻页 4/F l10n 3/G 语法 4，含 UIColor 白名单审计）。
-- 重锚：task136 E4（welcomeStack 第二行）；l10n 基线门 1920→1922 ×7（task129 I3/130 H3/131 G3/132 F1/133 F1/134 G1/135 D3/138 I-l10n）；task137 G3 增加 Task141 diff 形态分支（修复 diff 行 `+` 前缀未剥离的谓词漏洞）。
-- 全量级联 stash 基线对拍（129-141 + 103/105）：**零新增失败**；基线独有 20 条为 103/105 的 g++ 环境闪失（本轮反而全过）；task132 A15/F4/F5 为被沙箱清除的会话本地审计脚本所致（与基线一致，环境性）。
-- 口径护栏零变化：getEntitlementValue ×2 / isJITEnabled(NO)+TXM / 七卡工厂 / 侧栏自愈 / 新闻等高 / AmeBadgeLabel / 原生表面 API 全部原位。
-
-### Stage Summary
-- 用户预期：①无账号显示 DefaultAccount 默认头像 ②欢迎卡第二行=公告标题行（同字号+同款按钮，可点查看详情）③版本标题最坏情况与时间同字号 ④内存分配弹窗拉条（灰字实时显示当前内存，512→设备最大）⑤JVM 启动参数行与版本时间不再截断 ⑥启动内存由实例拉条决定，全局两行删除 ⑦新闻页贴边单列不可左右滑。
-- 待用户安装新 CI 工件实机验证；另一会话并行开发期间推送前需 fetch 对齐。
 
 ---
 
@@ -397,3 +369,31 @@ Work Log:
 Stage Summary:
 - Task156 全链闭环：四案根修（ES multidraw 保守档 / Mithril GL shim / Forge android 模块层桩 / iPadOS 27 IME 双路径）+ 三案 UI（滑块命名 / FSR 诚实化 / 侧边栏深链）+ 验证器 52/52 + 级联零新增失败 + CI 绿
 - 下一轮装机反馈关注：①ES 方块是否恢复（若仍透明 → 二分试 basevertex/ext 档）②Mithril 是否越过 /0（若新崩点 → 附日志）③Forge 是否进 mod 加载④拼音组字/候选上屏⑤毛玻璃两行标题⑥侧边栏卡片点击
+
+## Task 157（本会话，内存分配卡片弹窗 + Sodium + Iris Shaders；原编号 154 被并行会话占用，按协作规则重编号）
+
+### 用户需求（Task 149/150 实装后的两项返工）
+1. 实例设置 > 内存分配：行右侧去除"最大可分配内存"、加与 Java 版本同款右箭头；弹窗高度/顶部抓手条不对 → 改居中卡片（类放大 alert，右上角✕ = 实例页同款关闭语义），原生观感出入场动画；"当前内存：xMB"简介升为标题字号、"内存分配"弹窗标题删除；拉条下保持间距加"自动分配内存"开关，开启后拉条变灰、右侧显示"自动分配内存"；用原启动器自动分配逻辑。
+2. 组件安装 Sodium → Sodium + Iris Shaders：功能同步改；"仅 Fabric 有效"弹窗改为 Fabric API 同文案结构（换模组名）；组件安装区灰字加一行"Sodium + Iris Shaders：优化模组 + 光影加载器 (附带安装Podium)"。
+
+### 用户问答定稿（AskUserQuestion）
+弹窗形态=居中卡片；保存时机=即改即存（✕/点外部仅关闭）；自动挡拉条=显示自动比例实值（置灰）；新实例默认态=默认手动（仅显式拨过开关才为自动）；安装内容=三个 jar（Sodium+Iris+Podium）；统一下载任务显示名=Sodium + Iris Shaders + Podium。
+
+### 实施（ProfileSettingsViewController.m 单文件主战场 + l10n x4 + announcements.json）
+- **内存行（A）**：detailTextLabel 改 `memoryAutoEnabled ? memory.auto_row : "%ld MB"`（去 "/ 最大值"）；accessoryType 改 DisclosureIndicator（Java 版本同款）。
+- **Ame157MemoryAllocatorCard（B）**：Task149 的 Ame149MemoryAllocatorController sheet 整体退役（mediumDetent/grabber/formSheet 回退清零）。居中卡片 340pt（≤ 屏宽-48）圆角 18 + 窗口式投影（masksToBounds NO，手绘不走 ame_applyCardSurfaceWithRadius——该助手裁剪会吃掉阴影）；右上角 xmark.circle.fill ✕ + 点外部 UIControl 关闭；"当前内存：xMB"（memory.current）升为 17pt semibold 标题、i18n_str_2037 弹窗标题退役（仅保留表格行名映射）；拉条 512→MAX(1024,maxMemory) 不变；下方 16pt 间距新增 memory.auto_row 标签 + UISwitch。自动挡：`enabled=NO` 置灰 + 显示 `MAX(512, ameAutoMemory)` 实值 + 标题切"自动分配内存"；关自动还原最近手动值。Ame157CardTransitionAnimator 自绘转场：入场 spring 缩放 1.14→1 + 遮罩淡入 0.38s，出场 1.08 缩放淡出 0.26s（UIModalPresentationCustom + 自持 transitioningDelegate）。
+- **即改即存（C）**：ame157SliderReleased（TouchUpInside|UpOutside）与 ame157AutoSwitchChanged 当下回调 ameOnChange → 父层 `memoryAutoEnabled = autoEnabled; allocatedMemory = autoEnabled ? 0 : memoryMB;` → saveSettings → reloadAllTableViews；拖动中 ValueChanged 仅刷标题不落盘。
+- **持久化**：profile 新键 `memoryAuto`（仅显式拨过为 YES——"默认手动"）；saveSettings 分支：自动 = `allocatedMemory=0 + memoryAuto@YES`，手动 = 数值 + 清键。`allocatedMemory=0` 恰为启动链 ame141_currentLaunchAllocMem 既有自动语义（0.5/0.25 比例）→ **JavaLauncher/SurfaceViewController/utils 零改动**，Jetsam 链自动一致。自动实值计算与 utils.m 同口径（getEntitlementValue memorystatus ? 0.5 : 0.25 × 物理 MB）。
+- **Sodium + Iris Shaders（D）**：行名/映射/isEqual 判断 ×2 升级；火焰图标保留；门槛弹窗改 i18n_str_899 + 新键 component.sodium.fabric_only（Fabric API i18n_str_900 同构换名）；一键装三 jar：ame150 助手沿用，链 = sodium → iris shaders → iris 回退（防官方改名）→ podium，ame157_downloadAll 三下载串行（dlError1/2/3）+ 三文件落盘（ok1/2/3 级联守卫），done 提示三文件并列，失败码扩至 11/12；任务 displayName=Sodium + Iris Shaders + Podium、resourceName=sodium-iris-podium-<版本>。
+- **l10n（E）**：+2 键（memory.auto_row / component.sodium.fabric_only）×4 门语言（ja/km 沿 Task150 口径不涉）；i18n_str_882 footer 加用户原文行；sodium 六键文案改写含 Iris（confirm_title/confirm_message/searching/not_found/download_failed/done）。基线 1946→1948。
+- **发布资产（F）**：announcements.json 四处同步（summary/content bullet/EN 尾段/内存分配口径改"居中卡片弹窗（右上角✕关闭，新增自动分配内存开关）"）。
+
+### 校验
+- verify_task157 新增 44 项全绿（A 内存行 3 / B 卡片弹窗 10 / C 持久化与启动链 6 / D Sodium+Iris 9 / E l10n 7 / F 发布资产 4 / G 配平+白名单 2 / H 回归锚点 3）。
+- 门禁重锚：l10n 计数门 1946→1948 共 14 处（129-135/138/139/142/143/150/151 + 并行新增的 verify_task156 F1，描述算式同步改真）；verify_task149 E 块重锚 Task157 卡片形态（35/35）；verify_task150 D1/D7/D8/F4 重锚三 jar + 行名（43/43）；verify_task141 C2/C3/C5/D5/D5b 重锚即改即存+自绘转场（36/36）。
+- 级联对拍：129=44/47（基线 44/47；A9 为并行 Task156 改 Makefile payload 行的显见重锚，本任务顺手修复并注明）、130=59/60、131=34/37、132=IndexError、133=41/44、134=64/68、138=49/51、139=26/36、142=1、143=1——**与基线逐项一致**；151/135/153/154(并行)/156-G 块的失败均为 MyRemastered 沙箱环境性（156 的 G 块子进程 36P/3F 基线口径不变，其 l10n 计数门已随本任务提升 1948）。**零新增失败**。
+
+### Stage Summary
+- 产出：本地 main 提交（推送后 CI 出包）；verify_task157 44/44 绿。
+- 用户验证锚点（装机后）：①内存行右侧只有 "xxxx MB" 且带右箭头；②点开 = 居中卡片（右上角✕、大字当前内存、拉条、"自动分配内存"开关），缩放+淡入出入场，无抓手条；③拨开开关 → 拉条变灰显示自动实值、行右侧变"自动分配内存"、✕ 关闭即生效（启动日志 `[Task141] launch memory from auto ratio: xxxx MB`）；④关开关 → 还原手动值；⑤组件区行名"Sodium + Iris Shaders"，非 Fabric 实例点按弹 Fabric API 同构长文案；⑥Fabric 实例一键装 3 jar（下载任务名 Sodium + Iris Shaders + Podium），装完 mods/ 含 sodium/iris/podium 三个文件；⑦组件区灰字含"Sodium + Iris Shaders：优化模组 + 光影加载器 (附带安装Podium)"。
+- 技术要点：allocatedMemory=0 与 memoryAuto=YES 双写保证启动链无需感知新键；旧实例（无标记）显示与启动行为错位为用户定稿接受项（显示手动缺省值、实际按自动比例启动——与 Task141 以来行为一致）；本任务开工时远端被并行会话推进至 156（含另一 verify_task154.py），全部 ame154/Task154 前缀与验证器名重编号为 157 后 rebase（零冲突自动合并），l10n 键数 1946+2=1948。

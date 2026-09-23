@@ -160,8 +160,8 @@ for lg in langs:
     keys = set(re.findall(r'^"([^"]+)"\s*=', s, re.M))
     sets.append(keys)
     check(f"F[{lg}] footer 键在位", "background.effect.footer" in keys)
-check("F1 四主语言键集一致（1946 = Task151 的 1945 + Task156 footer 1）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1946,
+check("F1 四主语言键集一致（1948 = Task156 基线 1946 + Task157 组件键 2）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1948,
       f"counts={[len(x) for x in sets]}")
 for f in ["Natives/BackgroundSettingsViewController.m", "Natives/JavaLauncher.m",
           "Natives/egl_bridge.m", "Natives/SurfaceViewController.m",

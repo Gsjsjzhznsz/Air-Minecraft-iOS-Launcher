@@ -58,8 +58,8 @@ check("A8 Makefile dep_openal_shim 目标（re-export + LC_ID 修正）",
       "dep_openal_shim:" in mk
       and "-Wl,-reexport_library,$(WORKINGDIR)/libopenal_impl.dylib" in mk
       and "install_name_tool -id @rpath/libopenal_impl.dylib" in mk)
-check("A9 payload 依赖链接入 dep_openal_shim",
-      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_angle_freeze" in mk)
+check("A9 payload 依赖链接入 dep_openal_shim（Task157 重锚：并行 Task156 在 payload 行插入 dep_mithril_glshim）",
+      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_angle_freeze" in mk)
 check("A10 Task112 钉子保留（绝对路径直载）",
       '-Dorg.lwjgl.openal.libname=%@' in jl and 'stringByAppendingPathComponent:@"libopenal.dylib"' in jl)
 check("A11 JavaLauncher Task129 论断修正入档",
@@ -260,7 +260,7 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     sets.append(ks)
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
 check("I3 四语言键集一致（Task138 基线 1918 = Task134 的 1916 + 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1946,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1948,
       f"counts={[len(s) for s in sets]}")
 
 # Makefile TAB 完整性（9e6fc27/129 双教训）

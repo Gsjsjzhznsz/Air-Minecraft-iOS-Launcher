@@ -154,34 +154,40 @@ check("D2  其余卡片结构零变化（标题 16pt semibold / 日期 11pt / �
 
 print()
 print("=" * 72)
-print("E. 内存分配原生底部面板（Item 6）")
+print("E. 内存分配弹窗（Item 6；Task157 重锚：sheet → 居中卡片）")
 print("=" * 72)
 ps = read("Natives/ProfileSettingsViewController.m")
 ps_code = strip_objc(ps)
-check("E1  原生面板控制器（Ame149MemoryAllocatorController 定义 + 实现）",
-      "@interface Ame149MemoryAllocatorController : UIViewController" in ps_code
-      and "@implementation Ame149MemoryAllocatorController" in ps_code)
-check("E2  UISheetPresentationController 呈现（iOS 15+ medium 档 + 抓手）",
-      "UISheetPresentationControllerDetent.mediumDetent" in ps_code
-      and "prefersGrabberVisible = YES" in ps_code
-      and "if (@available(iOS 15.0, *)) {" in ps_code)
-check("E3  低版本兼容回退（formSheet）",
-      "ame149_vc.modalPresentationStyle = UIModalPresentationFormSheet;" in ps_code)
-check("E4  旧遮罩自绘弹窗退役（UIControl *dimming / 0.4 黑遮罩 / 关联对象键清零）",
-      "UIControl *dimming" not in ps_code
-      and "colorWithWhite:0 alpha:0.4" not in ps_code
-      and "kAme141MemorySliderKey" not in ps_code
+check("E1  居中卡片控制器（Ame157MemoryAllocatorCard 定义 + 实现，Task157 换装）",
+      "@interface Ame157MemoryAllocatorCard : UIViewController" in ps_code
+      and "@implementation Ame157MemoryAllocatorCard" in ps_code)
+check("E2  居中卡片呈现（UIModalPresentationCustom + 自持 transitioningDelegate；Task149 sheet 退役）",
+      "ame157_vc.modalPresentationStyle = UIModalPresentationCustom;" in ps_code
+      and "ame157_vc.transitioningDelegate = ame157_vc;" in ps_code
+      and "UISheetPresentationControllerDetent.mediumDetent" not in ps_code
+      and "prefersGrabberVisible" not in ps_code)
+check("E3  自绘出入场转场（缩放+淡入动画器，原生 alert 观感）",
+      "@interface Ame157CardTransitionAnimator : NSObject" in ps_code
+      and "animationControllerForPresentedController" in ps_code
+      and "animationControllerForDismissedController" in ps_code
+      and "CGAffineTransformMakeScale(1.14, 1.14)" in ps_code)
+check("E4  Task141 遗留键清零 + 卡片规格（右上角✕ / 大标题 / 自动分配开关）",
+      "kAme141MemorySliderKey" not in ps_code
       and "- (void)dismissMemoryAllocator" not in ps_code
-      and "- (void)applyMemoryAllocation" not in ps_code)
-check("E5  拉条区间与写回链路不变（512 → maxMemory；ameOnApply → allocatedMemory → saveSettings）",
+      and "- (void)applyMemoryAllocation" not in ps_code
+      and '[ame157_close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];' in ps
+      and "memory.auto_row" in ps
+      and "ame157AutoSwitchChanged" in ps_code)
+check("E5  拉条区间与写回链路（512 → maxMemory；ameOnChange → allocatedMemory/memoryAuto → saveSettings）",
       "self.ameSlider.minimumValue = 512;" in ps_code
       and "self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);" in ps_code
-      and "strongSelf.allocatedMemory = memoryMB;" in ps_code
+      and "strongSelf.allocatedMemory = autoEnabled ? 0 : memoryMB;" in ps_code
       and "[strongSelf saveSettings];" in ps_code
       and "[strongSelf reloadAllTableViews];" in ps_code)
-check("E6  当前内存灰字实时刷新（memory.current + ame147SliderChanged）",
+check("E6  标题实时刷新（memory.current + memory.auto_row + ame157SliderChanged）",
       'localize(@"memory.current", nil)' in ps
-      and "- (void)ame147SliderChanged:(UISlider *)sender" in ps_code)
+      and "- (void)ame157SliderChanged:(UISlider *)sender" in ps_code
+      and "- (void)ame157RefreshTitle" in ps_code)
 
 print()
 print("=" * 72)

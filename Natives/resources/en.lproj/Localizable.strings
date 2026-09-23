@@ -1514,7 +1514,7 @@
 "i18n_str_879" = "Advanced settings";
 "i18n_str_880" = "Server";
 "i18n_str_881" = "The game directory determines the isolated location of saves/mods/config files.\n\".\" keeps the current game directory for the selected instance;\ntap to change it to a relative/absolute path for per-version isolation.";
-"i18n_str_882" = "Fabric API: dependency library for Fabric mods (only works with the Fabric loader)\nOptiFine: OptiFine optimization mod (only works with Vanilla/Forge)";
+"i18n_str_882" = "Fabric API: dependency library for Fabric mods (only works with the Fabric loader)\nSodium + Iris Shaders: optimization mod + shader loader (Podium installed alongside)\nOptiFine: OptiFine optimization mod (only works with Vanilla/Forge)";
 "i18n_str_885" = "Only works with Fabric";
 "i18n_str_886" = "Only works with Vanilla/Forge";
 "i18n_str_889" = "(no arguments)";
@@ -1552,12 +1552,13 @@
 "i18n_str_926" = "Write failed";
 
 // Task 150：Sodium + Podium 组件安装
-"component.sodium.confirm_title" = "Install Sodium";
-"component.sodium.confirm_message" = "Sodium is a high-performance rendering mod, and Podium disables the Sodium third-party launcher check.\n\nThe latest builds for Minecraft %@ will be downloaded into the mods directory (Fabric).";
-"component.sodium.searching" = "Searching for Sodium / Podium for %@...";
-"component.sodium.not_found" = "No matching Sodium / Podium project or version found (%@)";
-"component.sodium.download_failed" = "Failed to download Sodium / Podium: %@";
-"component.sodium.done" = "Sodium and Podium installed to the mods directory:\n%@";
+"component.sodium.confirm_title" = "Install Sodium + Iris Shaders";
+"component.sodium.confirm_message" = "Sodium is a high-performance rendering mod, Iris is the shader loader (they work together), and Podium disables the Sodium third-party launcher check.\n\nThe latest builds for Minecraft %@ will be downloaded into the mods directory (Fabric).";
+"component.sodium.fabric_only" = "Sodium + Iris Shaders only works with the Fabric loader.\n\nThe current version is not a Fabric loader, so it cannot be installed.\n\nTo use Fabric, install the Fabric loader from the download page.";
+"component.sodium.searching" = "Searching for Sodium / Iris / Podium for %@...";
+"component.sodium.not_found" = "No matching Sodium / Iris / Podium project or version found (%@)";
+"component.sodium.download_failed" = "Failed to download Sodium / Iris / Podium: %@";
+"component.sodium.done" = "Sodium, Iris and Podium installed to the mods directory:\n%@";
 "i18n_str_927" = "Failed to write the file: %@";
 "i18n_str_928" = "Querying OptiFine versions compatible with %@...";
 "i18n_str_929" = "No OptiFine version for Minecraft %@ found";
@@ -2097,6 +2098,7 @@
 
 /* Task 141: instance memory slider popup */
 "memory.current" = "Current memory: %ldMB";
+"memory.auto_row" = "Auto-allocate memory";
 "memory.apply" = "Apply";
 
 /* Task 151: Bing daily wallpaper */

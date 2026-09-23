@@ -29,6 +29,7 @@
 @property (nonatomic, strong) NSString *selectedJavaVersion;
 @property (nonatomic, assign) NSInteger allocatedMemory;
 @property (nonatomic, assign) NSInteger maxMemory;
+@property (nonatomic, assign) BOOL memoryAutoEnabled;  // Task157：自动分配内存开关（profile memoryAuto 标记，仅显式拨过为 YES）
 // 服务器地址（FCL 风格：留空则不自动加入）
 @property (nonatomic, strong) NSString *serverIp;
 // JVM 启动参数（如 -Dfoo=bar -Xnoclassgc 等；Xms/Xmx/d32/d64 由内存分配控制会被过滤）
@@ -82,8 +83,8 @@ static NSString * localizeProfileTitle(NSString *title) {
             @"数据包管理": @"i18n_str_2041",
             @"世界管理": @"i18n_str_2042",
             @"Fabric API": @"Fabric API",
-            // Task 150：Sodium 组件安装入口（火焰图标；与 Fabric API 同逻辑）
-            @"Sodium": @"Sodium",
+            // Task 157：Sodium + Iris Shaders 组件安装入口（火焰图标；与 Fabric API 同逻辑）
+            @"Sodium + Iris Shaders": @"Sodium + Iris Shaders",
             @"OptiFine": @"OptiFine",
         };
     });
@@ -91,97 +92,238 @@ static NSString * localizeProfileTitle(NSString *title) {
     return localize(key, nil);
 }
 
-// Task149：内存分配原生底部面板（用户指定"能使用 iOS 原生 UI 的就使用"）——
-// 取代 Task141 的"遮罩+居中卡片"自绘弹窗（全屏 40% 黑色遮罩观感"一整片黑"、
-// 卡片无投影生硬）。UISheetPresentationController 系统呈现：iOS 15+ medium
-// 档位 + 抓手，更低版本回退 formSheet；内容仅标题/当前内存灰字/拉条/
-// 取消-确定，写回链路（allocatedMemory → saveSettings）与 Task141 一致。
-@interface Ame149MemoryAllocatorController : UIViewController
-@property (nonatomic, copy) void (^ameOnApply)(NSInteger memoryMB);
-@property (nonatomic, assign) NSInteger ameInitialMemory;
-@property (nonatomic, assign) NSInteger ameMaxMemory;
-@property (nonatomic, strong) UILabel *ameCurrentLabel;
+// Task157：内存分配居中卡片弹窗（用户定稿"类放大 alert 形态"）——Task149 的
+// 底部 sheet 退役（用户实测：高度不符预期且多出顶部抓手条"顶部条"）。卡片
+// 右上角 ✕（同实例设置页关闭钮语义），"当前内存"灰字升为标题字号、"内存
+// 分配"标题删除；拉条下方保持间距新增"自动分配内存"开关（即 profile 的
+// memoryAuto 标记，开启后 allocatedMemory 落 0 → 启动链
+// ame141_currentLaunchAllocMem 走原版自动比例 0.5/0.25，拉条置灰并显示自动
+// 实值）。保存语义 = 即改即存（ameOnChange 实时写回 → saveSettings →
+// reloadAllTableViews；✕/点外部仅关闭，任何关闭路径都不丢数据）。
+// 出入场为自绘缩放+淡入转场（原生 alert 观感；iPhone 上原生 API 给不出
+// 紧凑居中卡，用户已确认此取舍）。
+@interface Ame157MemoryAllocatorCard : UIViewController <UIViewControllerTransitioningDelegate>
+@property (nonatomic, copy) void (^ameOnChange)(NSInteger memoryMB, BOOL autoEnabled);
+@property (nonatomic, assign) NSInteger ameInitialMemory;   // 打开时的手动值
+@property (nonatomic, assign) NSInteger ameMaxMemory;       // 物理×0.8 上限
+@property (nonatomic, assign) NSInteger ameAutoMemory;      // 自动比例实值（置灰展示）
+@property (nonatomic, assign) BOOL ameAutoEnabled;          // 打开时开关状态
+@property (nonatomic, strong) UIControl *ameDimmingView;
+@property (nonatomic, strong) UIView *ameCardView;
+@property (nonatomic, strong) UILabel *ameTitleLabel;
 @property (nonatomic, strong) UISlider *ameSlider;
+@property (nonatomic, strong) UISwitch *ameAutoSwitch;
+@property (nonatomic, assign) NSInteger ameCurrentManual;   // 最近一次手动值（关自动后还原）
 @end
 
-@implementation Ame149MemoryAllocatorController
+// Task157：卡片出入场动画器（缩放+淡入，原生 alert 观感；声明在卡片
+// 控制器之后、实现之前——卡片实现内的 transitioning delegate 会先构造它）
+@interface Ame157CardTransitionAnimator : NSObject <UIViewControllerAnimatedTransitioning>
+@property (nonatomic, assign) BOOL amePresenting;
+@end
+
+@implementation Ame157MemoryAllocatorCard
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
+    self.view.backgroundColor = [UIColor clearColor];
+    self.ameCurrentManual = self.ameInitialMemory;
 
-    UILabel *titleLabel = [[UILabel alloc] init];
-    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    titleLabel.text = localize(@"i18n_str_2037", nil);
-    titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    titleLabel.textColor = [UIColor labelColor];
-    titleLabel.textAlignment = NSTextAlignmentCenter;
-    [self.view addSubview:titleLabel];
+    // 点外部 = 关闭（即改即存，改动早已实时落盘）
+    self.ameDimmingView = [[UIControl alloc] init];
+    self.ameDimmingView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ameDimmingView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
+    [self.ameDimmingView addTarget:self action:@selector(ame157Close) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.ameDimmingView];
 
-    self.ameCurrentLabel = [[UILabel alloc] init];
-    self.ameCurrentLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ameCurrentLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    self.ameCurrentLabel.textColor = [UIColor secondaryLabelColor];
-    self.ameCurrentLabel.textAlignment = NSTextAlignmentCenter;
-    self.ameCurrentLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)self.ameInitialMemory];
-    [self.view addSubview:self.ameCurrentLabel];
+    // 卡片外观手绘而非走 ame_applyCardSurfaceWithRadius：该助手会置
+    // masksToBounds=YES 裁掉投影，"窗口式黑色阴影"需要 layer 同持圆角+阴影
+    self.ameCardView = [[UIView alloc] init];
+    self.ameCardView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ameCardView.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+    self.ameCardView.layer.cornerRadius = 18.0;
+    self.ameCardView.layer.masksToBounds = NO;
+    self.ameCardView.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.ameCardView.layer.shadowOffset = CGSizeMake(0, 10);
+    self.ameCardView.layer.shadowOpacity = 0.3;
+    self.ameCardView.layer.shadowRadius = 30.0;
+    [self.view addSubview:self.ameCardView];
+
+    UIButton *ame157_close = [UIButton buttonWithType:UIButtonTypeSystem];
+    ame157_close.translatesAutoresizingMaskIntoConstraints = NO;
+    [ame157_close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];
+    ame157_close.tintColor = [UIColor secondaryLabelColor];
+    [ame157_close addTarget:self action:@selector(ame157Close) forControlEvents:UIControlEventTouchUpInside];
+    [self.ameCardView addSubview:ame157_close];
+
+    self.ameTitleLabel = [[UILabel alloc] init];
+    self.ameTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    // 用户指令："当前内存"行升为标题字号、"内存分配"标题删除
+    self.ameTitleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    self.ameTitleLabel.textColor = [UIColor labelColor];
+    self.ameTitleLabel.textAlignment = NSTextAlignmentCenter;
+    [self.ameCardView addSubview:self.ameTitleLabel];
 
     self.ameSlider = [[UISlider alloc] init];
     self.ameSlider.translatesAutoresizingMaskIntoConstraints = NO;
     self.ameSlider.minimumValue = 512;
     self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);
-    self.ameSlider.value = (float)self.ameInitialMemory;
-    [self.ameSlider addTarget:self action:@selector(ame147SliderChanged:) forControlEvents:UIControlEventValueChanged];
-    [self.view addSubview:self.ameSlider];
+    [self.ameSlider addTarget:self action:@selector(ame157SliderChanged:) forControlEvents:UIControlEventValueChanged];
+    [self.ameSlider addTarget:self action:@selector(ame157SliderReleased) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
+    [self.ameCardView addSubview:self.ameSlider];
 
-    UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [cancelButton setTitle:localize(@"resman.common.cancel", nil) forState:UIControlStateNormal];
-    cancelButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-    [cancelButton addTarget:self action:@selector(ame147Cancel) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:cancelButton];
+    UILabel *ame157_autoTitle = [[UILabel alloc] init];
+    ame157_autoTitle.translatesAutoresizingMaskIntoConstraints = NO;
+    ame157_autoTitle.text = localize(@"memory.auto_row", nil);
+    ame157_autoTitle.font = [UIFont systemFontOfSize:15];
+    ame157_autoTitle.textColor = [UIColor labelColor];
+    [self.ameCardView addSubview:ame157_autoTitle];
 
-    UIButton *applyButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    applyButton.translatesAutoresizingMaskIntoConstraints = NO;
-    applyButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
-    [applyButton setTitle:localize(@"memory.apply", @"确定") forState:UIControlStateNormal];
-    [applyButton setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
-    [applyButton addTarget:self action:@selector(ame147Apply) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:applyButton];
+    self.ameAutoSwitch = [[UISwitch alloc] init];
+    self.ameAutoSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.ameAutoSwitch addTarget:self action:@selector(ame157AutoSwitchChanged:) forControlEvents:UIControlEventValueChanged];
+    [self.ameCardView addSubview:self.ameAutoSwitch];
 
     [NSLayoutConstraint activateConstraints:@[
-        [titleLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8],
-        [titleLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
-        [titleLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+        [self.ameDimmingView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [self.ameDimmingView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.ameDimmingView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.ameDimmingView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
 
-        [self.ameCurrentLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:22],
-        [self.ameCurrentLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
-        [self.ameCurrentLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+        [self.ameCardView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.ameCardView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
+        [self.ameCardView.widthAnchor constraintEqualToConstant:340].priority = 999,
+        [self.ameCardView.widthAnchor constraintLessThanOrEqualToAnchor:self.view.widthAnchor constant:-48],
 
-        [self.ameSlider.topAnchor constraintEqualToAnchor:self.ameCurrentLabel.bottomAnchor constant:16],
-        [self.ameSlider.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:24],
-        [self.ameSlider.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-24],
+        [ame157_close.topAnchor constraintEqualToAnchor:self.ameCardView.topAnchor constant:10],
+        [ame157_close.trailingAnchor constraintEqualToAnchor:self.ameCardView.trailingAnchor constant:-10],
+        [ame157_close.widthAnchor constraintEqualToConstant:32],
+        [ame157_close.heightAnchor constraintEqualToConstant:32],
 
-        [cancelButton.topAnchor constraintEqualToAnchor:self.ameSlider.bottomAnchor constant:18],
-        [cancelButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:24],
-        [cancelButton.bottomAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
+        [self.ameTitleLabel.topAnchor constraintEqualToAnchor:self.ameCardView.topAnchor constant:26],
+        [self.ameTitleLabel.leadingAnchor constraintEqualToAnchor:self.ameCardView.leadingAnchor constant:20],
+        [self.ameTitleLabel.trailingAnchor constraintEqualToAnchor:ame157_close.leadingAnchor constant:-8],
 
-        [applyButton.centerYAnchor constraintEqualToAnchor:cancelButton.centerYAnchor],
-        [applyButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-24],
+        [self.ameSlider.topAnchor constraintEqualToAnchor:self.ameTitleLabel.bottomAnchor constant:22],
+        [self.ameSlider.leadingAnchor constraintEqualToAnchor:self.ameCardView.leadingAnchor constant:22],
+        [self.ameSlider.trailingAnchor constraintEqualToAnchor:self.ameCardView.trailingAnchor constant:-22],
+
+        [ame157_autoTitle.centerYAnchor constraintEqualToAnchor:self.ameAutoSwitch.centerYAnchor],
+        [ame157_autoTitle.leadingAnchor constraintEqualToAnchor:self.ameCardView.leadingAnchor constant:22],
+
+        [self.ameAutoSwitch.topAnchor constraintEqualToAnchor:self.ameSlider.bottomAnchor constant:16],
+        [self.ameAutoSwitch.trailingAnchor constraintEqualToAnchor:self.ameCardView.trailingAnchor constant:-22],
+        [self.ameAutoSwitch.bottomAnchor constraintEqualToAnchor:self.ameCardView.bottomAnchor constant:-20],
     ]];
+
+    [self ame157SyncAutoVisual];
 }
 
-- (void)ame147SliderChanged:(UISlider *)sender {
-    self.ameCurrentLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(sender.value)];
+#pragma mark - Task157 视觉同步
+
+- (void)ame157SyncAutoVisual {
+    BOOL ame157_on = self.ameAutoEnabled;
+    self.ameAutoSwitch.on = ame157_on;
+    self.ameSlider.enabled = !ame157_on;
+    if (ame157_on) {
+        // 自动挡：置灰展示原版自动比例实值（与 ame141_currentLaunchAllocMem
+        // 同口径，见 showMemoryAllocator 的 ameAutoMemory 计算）
+        self.ameSlider.value = (float)MAX(512, self.ameAutoMemory);
+    } else {
+        self.ameSlider.value = (float)self.ameCurrentManual;
+    }
+    [self ame157RefreshTitle];
 }
 
-- (void)ame147Cancel {
+- (void)ame157RefreshTitle {
+    if (self.ameAutoEnabled) {
+        self.ameTitleLabel.text = localize(@"memory.auto_row", nil);
+    } else {
+        self.ameTitleLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(self.ameSlider.value)];
+    }
+}
+
+#pragma mark - Task157 交互（即改即存）
+
+- (void)ame157SliderChanged:(UISlider *)sender {
+    // 拖动中只刷标题；落点由 ame157SliderReleased 统一写回（避免逐帧落盘）
+    if (!self.ameAutoEnabled) {
+        self.ameTitleLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(sender.value)];
+    }
+}
+
+- (void)ame157SliderReleased {
+    if (self.ameAutoEnabled) return;
+    self.ameCurrentManual = (NSInteger)lroundf(self.ameSlider.value);
+    if (self.ameOnChange) self.ameOnChange(self.ameCurrentManual, NO);
+}
+
+- (void)ame157AutoSwitchChanged:(UISwitch *)sender {
+    self.ameAutoEnabled = sender.on;
+    [self ame157SyncAutoVisual];
+    // 即改即存：开 → 父层落 0 + memoryAuto 标记；关 → 当前拉条值落为手动值
+    if (self.ameOnChange) self.ameOnChange((NSInteger)lroundf(self.ameSlider.value), self.ameAutoEnabled);
+}
+
+- (void)ame157Close {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
-- (void)ame147Apply {
-    if (self.ameOnApply) self.ameOnApply((NSInteger)lroundf(self.ameSlider.value));
-    [self dismissViewControllerAnimated:YES completion:nil];
+#pragma mark - Task157 自绘转场（缩放 + 淡入，原生 alert 观感）
+
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented presentingController:(UIViewController *)presenting sourceController:(UIViewController *)source {
+    Ame157CardTransitionAnimator *ame157_animator = [[Ame157CardTransitionAnimator alloc] init];
+    ame157_animator.amePresenting = YES;
+    return ame157_animator;
+}
+
+- (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
+    Ame157CardTransitionAnimator *ame157_animator = [[Ame157CardTransitionAnimator alloc] init];
+    ame157_animator.amePresenting = NO;
+    return ame157_animator;
+}
+
+@end
+
+@implementation Ame157CardTransitionAnimator
+
+- (NSTimeInterval)transitionDuration:(id<UIViewControllerContextTransitioning>)transitionContext {
+    return self.amePresenting ? 0.38 : 0.26;
+}
+
+- (void)animateTransition:(id<UIViewControllerContextTransitioning>)transitionContext {
+    if (self.amePresenting) {
+        Ame157MemoryAllocatorCard *ame157_toVC = (Ame157MemoryAllocatorCard *)[transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
+        ame157_toVC.view.frame = transitionContext.containerView.bounds;
+        [transitionContext.containerView addSubview:ame157_toVC.view];
+        ame157_toVC.ameDimmingView.alpha = 0.0;
+        ame157_toVC.ameCardView.alpha = 0.0;
+        ame157_toVC.ameCardView.transform = CGAffineTransformMakeScale(1.14, 1.14);
+        [UIView animateWithDuration:[self transitionDuration:transitionContext]
+                              delay:0.0
+             usingSpringWithDamping:0.9
+              initialSpringVelocity:0.4
+                            options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionAllowUserInteraction
+                         animations:^{
+            ame157_toVC.ameDimmingView.alpha = 1.0;
+            ame157_toVC.ameCardView.alpha = 1.0;
+            ame157_toVC.ameCardView.transform = CGAffineTransformIdentity;
+        } completion:^(BOOL finished) {
+            [transitionContext completeTransition:!transitionContext.transitionWasCancelled];
+        }];
+    } else {
+        Ame157MemoryAllocatorCard *ame157_fromVC = (Ame157MemoryAllocatorCard *)[transitionContext viewControllerForKey:UITransitionContextFromViewControllerKey];
+        [UIView animateWithDuration:[self transitionDuration:transitionContext]
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseIn
+                         animations:^{
+            ame157_fromVC.ameDimmingView.alpha = 0.0;
+            ame157_fromVC.ameCardView.alpha = 0.0;
+            ame157_fromVC.ameCardView.transform = CGAffineTransformMakeScale(1.08, 1.08);
+        } completion:^(BOOL finished) {
+            [transitionContext completeTransition:YES];
+        }];
+    }
 }
 
 @end
@@ -610,6 +752,9 @@ static NSString * localizeProfileTitle(NSString *title) {
     if (self.allocatedMemory > self.maxMemory) {
         self.allocatedMemory = self.maxMemory;
     }
+    // Task157：自动分配内存标记（仅显式拨过开关的实例为 YES；老实例无
+    // 标记 = 手动态，沿用缺省值展示——用户定稿"默认手动"）
+    self.memoryAutoEnabled = [self.profile[@"memoryAuto"] boolValue];
 
     // 服务器地址（默认空字符串，留空不自动加入）
     NSString *profName = self.profile[@"name"] ?: self.profileName;
@@ -642,13 +787,13 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 顺序与横屏布局对应：左侧（0,1）+ 右侧（2,3,4）
     //   0: 版本信息  - 名称 / 游戏版本 / 游戏目录
     //   1: 资源管理  - 模组 / 光影 / 资源包 / 数据包 / 世界
-    //   2: 组件安装  - Fabric API / Sodium（Task150）/ OptiFine
+    //   2: 组件安装  - Fabric API / Sodium + Iris Shaders（Task157）/ OptiFine
     //   3: 高级设置  - 渲染器 / 图形 API / Java / 内存 / JVM 参数
     //   4: 服务器    - 服务器地址
     self.sections = @[
         @[@"名称", @"游戏版本", @"游戏目录"],
         @[@"模组管理", @"光影管理", @"资源包管理", @"数据包管理", @"世界管理"],
-        @[@"Fabric API", @"Sodium", @"OptiFine"],
+        @[@"Fabric API", @"Sodium + Iris Shaders", @"OptiFine"],
         [advancedRows copy],
         @[localize(@"i18n_str_730", nil)]
     ];
@@ -748,7 +893,16 @@ static NSString * localizeProfileTitle(NSString *title) {
     }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
     existing[@"javaVersion"] = self.selectedJavaVersion;
-    existing[@"allocatedMemory"] = @(self.allocatedMemory);
+    // Task157：自动分配内存——开启时 allocatedMemory 落 0（启动链
+    // ame141_currentLaunchAllocMem 的 0 = 原版自动比例语义）并打 memoryAuto
+    // 标记；关闭时写拉条值并清标记（无标记 = 手动态，用户定稿"默认手动"）
+    if (self.memoryAutoEnabled) {
+        existing[@"allocatedMemory"] = @(0);
+        existing[@"memoryAuto"] = @YES;
+    } else {
+        existing[@"allocatedMemory"] = @(self.allocatedMemory);
+        [existing removeObjectForKey:@"memoryAuto"];
+    }
     existing[@"serverIp"] = self.serverIp ?: @"";
     // 参照 main 分支：javaArgs 为空时移除 key，让 profile 回退到全局 java.java_args
     if (self.javaArgs.length > 0) {
@@ -888,9 +1042,10 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.imageView.tintColor = [UIColor systemOrangeColor];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                 cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);
-            } else if ([title isEqualToString:@"Sodium"]) {
-                // Task 150：Sodium 组件安装（火焰图标；与 Fabric API 同逻辑，
-                // 一键装 Sodium + Podium 双模组，仅 Fabric 实例可用）
+            } else if ([title isEqualToString:@"Sodium + Iris Shaders"]) {
+                // Task 157：Sodium + Iris Shaders 组件安装（火焰图标；与 Fabric
+                // API 同逻辑，一键装 Sodium + Iris + Podium 三模组，仅 Fabric
+                // 实例可用）
                 cell.imageView.image = [UIImage systemImageNamed:@"flame.fill"];
                 cell.imageView.tintColor = [UIColor systemOrangeColor];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -919,9 +1074,13 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                 cell.detailTextLabel.text = [self.selectedJavaVersion isEqualToString:@"0"] ? localize(@"preference.auto", nil) : [NSString stringWithFormat:@"Java %@", self.selectedJavaVersion];
             } else if ([title isEqualToString:@"内存分配"]) {
+                // Task157：右侧只显示当前分配值（去"/ 最大可分配内存"）+
+                // 与 Java版本同款箭头；自动分配态显示"自动分配内存"
                 cell.imageView.image = [UIImage systemImageNamed:@"memorychip"];
-                cell.accessoryType = UITableViewCellAccessoryNone;
-                cell.detailTextLabel.text = [NSString stringWithFormat:@"%ld MB / %ld MB", (long)self.allocatedMemory, (long)self.maxMemory];
+                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.detailTextLabel.text = self.memoryAutoEnabled
+                    ? localize(@"memory.auto_row", nil)
+                    : [NSString stringWithFormat:@"%ld MB", (long)self.allocatedMemory];
             } else if ([title isEqualToString:@"JVM 启动参数"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"slider.vertical.3"];
                 cell.accessoryView = [self buildJavaArgsTextField];
@@ -1300,8 +1459,8 @@ static NSString * localizeProfileTitle(NSString *title) {
         case 2: // 组件安装
             if ([title isEqualToString:@"Fabric API"]) {
                 [self installFabricAPIStandalone];
-            } else if ([title isEqualToString:@"Sodium"]) {
-                // Task 150：Sodium（+ Podium）一键安装
+            } else if ([title isEqualToString:@"Sodium + Iris Shaders"]) {
+                // Task 157：Sodium + Iris Shaders（+ Podium）一键安装
                 [self installSodiumStandalone];
             } else if ([title isEqualToString:@"OptiFine"]) {
                 [self installOptiFineStandalone];
@@ -1784,11 +1943,12 @@ static NSString * localizeProfileTitle(NSString *title) {
     });
 }
 
-#pragma mark - 组件独立安装（Sodium + Podium，Task 150）
+#pragma mark - 组件独立安装（Sodium + Iris Shaders + Podium，Task 157）
 
-/// Task 150：Modrinth 搜索 → 标题【精确】匹配 → 按游戏版本 + 加载器选版本
-/// → primaryFile。与 Fabric API 流程同逻辑，但匹配用全等比较——
-/// containsString 会误命中 "Sodium Extra" / "Podium Port" 等衍生项目。
+/// Task 150 引入、Task 157 沿用：Modrinth 搜索 → 标题【精确】匹配 →
+/// 按游戏版本 + 加载器选版本 → primaryFile。与 Fabric API 流程同逻辑，
+/// 但匹配用全等比较——containsString 会误命中 "Sodium Extra" /
+/// "Podium Port" 等衍生项目。
 - (void)ame150_fetchModrinthPrimaryFileWithQuery:(NSString *)query
                                       exactTitle:(NSString *)exactTitle
                                      gameVersion:(NSString *)gameVersion
@@ -1863,11 +2023,12 @@ static NSString * localizeProfileTitle(NSString *title) {
 }
 
 - (void)installSodiumStandalone {
-    // Task 150：与 Fabric API 同门槛——仅 Fabric 实例可用（Sodium/Podium
-    // 均为 Fabric 模组；实例页组件安装的既定口径）
+    // Task 157：与 Fabric API 同门槛、同弹窗文案结构（模组名换成
+    // Sodium + Iris Shaders）——仅 Fabric 实例可用（Sodium/Iris/Podium
+    // 均为 Fabric 模组；用户指令：不再用简短"仅 Fabric 有效"提示）
     if (![self isFabricProfile]) {
         [self showComponentAlert:localize(@"i18n_str_899", nil)
-                          message:localize(@"i18n_str_885", nil)];
+                          message:localize(@"component.sodium.fabric_only", nil)];
         return;
     }
     NSString *gameVersion = [self currentGameVersion];
@@ -1886,16 +2047,16 @@ static NSString * localizeProfileTitle(NSString *title) {
 }
 
 - (void)startInstallSodiumWithGameVersion:(NSString *)gameVersion {
-    // Task 150：与 Fabric API 同链路（统一下载任务 + Modrinth 搜索 → 版本匹配
-    // → 下载进 mods/），一键安装两个模组：Sodium（高性能渲染）+ Podium
-    // （禁用 Sodium 的 PojavLauncher 检查——与 Task145 的 POJAV_RENDERER
-    // 导出收敛互为双保险：非 Mithril 会话不导出该变量，Podium 再兜底
-    // 屏蔽模组侧检查）。
+    // Task 157：与 Fabric API 同链路（统一下载任务 + Modrinth 搜索 → 版本匹配
+    // → 下载进 mods/），一键安装三个模组：Sodium（高性能渲染）+ Iris（光影
+    // 加载器，与 Sodium 配合）+ Podium（禁用 Sodium 的 PojavLauncher 检查
+    // ——与 Task145 的 POJAV_RENDERER 导出收敛互为双保险：非 Mithril 会话
+    // 不导出该变量，Podium 再兜底屏蔽模组侧检查）。
     DownloadTaskManager *manager = [DownloadTaskManager sharedManager];
     DownloadTaskItem *taskItem = [manager
         registerTaskWithResourceType:DownloadTaskResourceTypeMod
-                        resourceName:[NSString stringWithFormat:@"sodium-podium-%@", gameVersion]
-                         displayName:@"Sodium + Podium"
+                        resourceName:[NSString stringWithFormat:@"sodium-iris-podium-%@", gameVersion]
+                         displayName:@"Sodium + Iris Shaders + Podium"
                       downloadSource:@"modrinth"
                              rawTask:nil
                       supportsResume:NO
@@ -1914,7 +2075,7 @@ static NSString * localizeProfileTitle(NSString *title) {
                                                       message:[NSString stringWithFormat:localize(@"component.sodium.searching", nil), gameVersion]];
     }
     __weak typeof(self) weakSelf = self;
-    void (^ame150_failBlock)(NSError *) = ^(NSError *failError) {
+    void (^ame157_failBlock)(NSError *) = ^(NSError *failError) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [[DownloadTaskManager sharedManager] updateTaskWithId:taskId stageAtIndex:0 status:PLTaskStageStatusFailed];
             [[DownloadTaskManager sharedManager] updateTaskWithId:taskId error:failError];
@@ -1923,7 +2084,8 @@ static NSString * localizeProfileTitle(NSString *title) {
                                  message:failError.localizedDescription ?: localize(@"i18n_str_97", nil)];
         });
     };
-    void (^ame150_downloadBoth)(NSString *, NSString *, NSString *, NSString *) = ^(NSString *sodiumURL, NSString *sodiumFile, NSString *podiumURL, NSString *podiumFile) {
+    void (^ame157_downloadAll)(NSString *, NSString *, NSString *, NSString *, NSString *, NSString *) =
+        ^(NSString *sodiumURL, NSString *sodiumFile, NSString *irisURL, NSString *irisFile, NSString *podiumURL, NSString *podiumFile) {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             __strong typeof(weakSelf) strongSelf = weakSelf;
             if (!strongSelf) return;
@@ -1931,22 +2093,27 @@ static NSString * localizeProfileTitle(NSString *title) {
             NSError *dlError1 = nil;
             NSData *sodiumData = [strongSelf downloadDataWithURL:[NSURL URLWithString:sodiumURL] error:&dlError1];
             NSError *dlError2 = nil;
-            NSData *podiumData = sodiumData ? [strongSelf downloadDataWithURL:[NSURL URLWithString:podiumURL] error:&dlError2] : nil;
+            NSData *irisData = sodiumData ? [strongSelf downloadDataWithURL:[NSURL URLWithString:irisURL] error:&dlError2] : nil;
+            NSError *dlError3 = nil;
+            NSData *podiumData = irisData ? [strongSelf downloadDataWithURL:[NSURL URLWithString:podiumURL] error:&dlError3] : nil;
             dispatch_async(dispatch_get_main_queue(), ^{
-                if (!sodiumData || !podiumData) {
+                if (!sodiumData || !irisData || !podiumData) {
                     NSError *failError = [NSError errorWithDomain:@"SodiumComponent" code:6
                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.download_failed", nil),
-                            (dlError1 ?: dlError2).localizedDescription ?: localize(@"i18n_str_97", nil)]}];
-                    ame150_failBlock(failError);
+                            (dlError1 ?: dlError2 ?: dlError3).localizedDescription ?: localize(@"i18n_str_97", nil)]}];
+                    ame157_failBlock(failError);
                     return;
                 }
                 NSString *sodiumPath = [modsDir stringByAppendingPathComponent:sodiumFile ?: @"sodium.jar"];
+                NSString *irisPath = [modsDir stringByAppendingPathComponent:irisFile ?: @"iris.jar"];
                 NSString *podiumPath = [modsDir stringByAppendingPathComponent:podiumFile ?: @"podium.jar"];
                 NSError *writeError1 = nil;
                 NSError *writeError2 = nil;
+                NSError *writeError3 = nil;
                 BOOL ok1 = [sodiumData writeToFile:sodiumPath options:NSDataWritingAtomic error:&writeError1];
-                BOOL ok2 = ok1 ? [podiumData writeToFile:podiumPath options:NSDataWritingAtomic error:&writeError2] : NO;
-                if (ok1 && ok2) {
+                BOOL ok2 = ok1 ? [irisData writeToFile:irisPath options:NSDataWritingAtomic error:&writeError2] : NO;
+                BOOL ok3 = ok2 ? [podiumData writeToFile:podiumPath options:NSDataWritingAtomic error:&writeError3] : NO;
+                if (ok1 && ok2 && ok3) {
                     [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
                                                              stageAtIndex:0
                                                                  progress:1.0
@@ -1955,11 +2122,14 @@ static NSString * localizeProfileTitle(NSString *title) {
                     [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateCompleted];
                     [weakSelf showComponentAlert:localize(@"i18n_str_253", nil)
                                          message:[NSString stringWithFormat:localize(@"component.sodium.done", nil),
-                                             [NSString stringWithFormat:@"%@ + %@", sodiumFile ?: @"sodium.jar", podiumFile ?: @"podium.jar"]]];
+                                             [NSString stringWithFormat:@"%@ + %@ + %@",
+                                                 sodiumFile ?: @"sodium.jar",
+                                                 irisFile ?: @"iris.jar",
+                                                 podiumFile ?: @"podium.jar"]]];
                 } else {
                     NSError *failError = [NSError errorWithDomain:@"SodiumComponent" code:7
-                        userInfo:@{NSLocalizedDescriptionKey: (writeError1 ?: writeError2).localizedDescription ?: localize(@"i18n_str_926", nil)}];
-                    ame150_failBlock(failError);
+                        userInfo:@{NSLocalizedDescriptionKey: (writeError1 ?: writeError2 ?: writeError3).localizedDescription ?: localize(@"i18n_str_926", nil)}];
+                    ame157_failBlock(failError);
                 }
             });
         });
@@ -1970,19 +2140,44 @@ static NSString * localizeProfileTitle(NSString *title) {
                                             loader:@"fabric"
                                         completion:^(NSString *sodiumURL, NSString *sodiumFile, NSError *error) {
         if (error || sodiumURL.length == 0) {
-            ame150_failBlock(error ?: [NSError errorWithDomain:@"SodiumComponent" code:10 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+            ame157_failBlock(error ?: [NSError errorWithDomain:@"SodiumComponent" code:10 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
             return;
         }
-        [weakSelf ame150_fetchModrinthPrimaryFileWithQuery:@"podium"
-                                                exactTitle:@"podium"
+        // Task 157：Iris 光影加载器。Modrinth 项目标题为 "Iris Shaders"，
+        // 先精确匹配全名，失败回退短名 "Iris"（防官方改名/搜索排序差异）
+        void (^ame157_fetchPodium)(NSString *, NSString *) = ^(NSString *irisURL, NSString *irisFile) {
+            [weakSelf ame150_fetchModrinthPrimaryFileWithQuery:@"podium"
+                                                    exactTitle:@"podium"
+                                                   gameVersion:gameVersion
+                                                        loader:@"fabric"
+                                                    completion:^(NSString *podiumURL, NSString *podiumFile, NSError *error3) {
+                if (error3 || podiumURL.length == 0) {
+                    ame157_failBlock(error3 ?: [NSError errorWithDomain:@"SodiumComponent" code:12 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+                    return;
+                }
+                ame157_downloadAll(sodiumURL, sodiumFile, irisURL, irisFile, podiumURL, podiumFile);
+            }];
+        };
+        [weakSelf ame150_fetchModrinthPrimaryFileWithQuery:@"iris shaders"
+                                                exactTitle:@"iris shaders"
                                                gameVersion:gameVersion
                                                     loader:@"fabric"
-                                                completion:^(NSString *podiumURL, NSString *podiumFile, NSError *error2) {
-            if (error2 || podiumURL.length == 0) {
-                ame150_failBlock(error2 ?: [NSError errorWithDomain:@"SodiumComponent" code:11 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+                                                    completion:^(NSString *irisURL, NSString *irisFile, NSError *error2) {
+            if (error2 || irisURL.length == 0) {
+                [weakSelf ame150_fetchModrinthPrimaryFileWithQuery:@"iris"
+                                                        exactTitle:@"iris"
+                                                       gameVersion:gameVersion
+                                                            loader:@"fabric"
+                                                        completion:^(NSString *irisURL2, NSString *irisFile2, NSError *error2b) {
+                    if (error2b || irisURL2.length == 0) {
+                        ame157_failBlock(error2b ?: error2 ?: [NSError errorWithDomain:@"SodiumComponent" code:11 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+                        return;
+                    }
+                    ame157_fetchPodium(irisURL2, irisFile2);
+                }];
                 return;
             }
-            ame150_downloadBoth(sodiumURL, sodiumFile, podiumURL, podiumFile);
+            ame157_fetchPodium(irisURL, irisFile);
         }];
     }];
 }
@@ -2505,31 +2700,29 @@ static NSString * localizeProfileTitle(NSString *title) {
 }
 
 - (void)showMemoryAllocator {
-    // Task149：Task141 的"遮罩+居中卡片"自绘弹窗退役（用户反馈遮罩是
-    // "一整片黑色背景"、卡片观感生硬）——改用 iOS 原生底部面板呈现；
-    // 拉条区间（512MB → maxMemory = 物理×0.8）与写回链路不变。
-    Ame149MemoryAllocatorController *ame149_vc = [[Ame149MemoryAllocatorController alloc] init];
-    ame149_vc.ameInitialMemory = self.allocatedMemory;
-    ame149_vc.ameMaxMemory = self.maxMemory;
+    // Task157：Task149 的底部 sheet 退役（用户实测"高度不符预期且多出顶部
+    // 抓手条"）——改用居中卡片（类放大 alert，右上角✕、"当前内存"升为
+    // 标题、拉条下"自动分配内存"开关）；即改即存（ameOnChange 实时写回
+    // allocatedMemory / memoryAuto → saveSettings → reloadAllTableViews）。
+    // 自动实值与 utils.m ame141_currentLaunchAllocMem 同口径（0.5/0.25）。
+    Ame157MemoryAllocatorCard *ame157_vc = [[Ame157MemoryAllocatorCard alloc] init];
+    ame157_vc.ameInitialMemory = self.allocatedMemory;
+    ame157_vc.ameMaxMemory = self.maxMemory;
+    CGFloat ame157_ratio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
+    ame157_vc.ameAutoMemory = (NSInteger)roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * ame157_ratio);
+    ame157_vc.ameAutoEnabled = self.memoryAutoEnabled;
     __weak typeof(self) weakSelf = self;
-    ame149_vc.ameOnApply = ^(NSInteger memoryMB) {
+    ame157_vc.ameOnChange = ^(NSInteger memoryMB, BOOL autoEnabled) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
-        strongSelf.allocatedMemory = memoryMB;
+        strongSelf.memoryAutoEnabled = autoEnabled;
+        strongSelf.allocatedMemory = autoEnabled ? 0 : memoryMB;
         [strongSelf saveSettings];
         [strongSelf reloadAllTableViews];
     };
-    ame149_vc.modalPresentationStyle = UIModalPresentationFormSheet;
-    ame149_vc.preferredContentSize = CGSizeMake(360, 240);
-    if (@available(iOS 15.0, *)) {
-        UISheetPresentationController *ame149_sheet = ame149_vc.sheetPresentationController;
-        if (ame149_sheet) {
-            ame149_sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
-            ame149_sheet.prefersGrabberVisible = YES;
-            ame149_sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
-        }
-    }
-    [self presentViewController:ame149_vc animated:YES completion:nil];
+    ame157_vc.modalPresentationStyle = UIModalPresentationCustom;
+    ame157_vc.transitioningDelegate = ame157_vc;
+    [self presentViewController:ame157_vc animated:YES completion:nil];
 }
 
 #pragma mark - Done / Close

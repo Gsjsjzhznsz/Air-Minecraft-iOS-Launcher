@@ -1513,7 +1513,7 @@
 "i18n_str_879" = "高级设置";
 "i18n_str_880" = "服务器";
 "i18n_str_881" = "游戏目录决定存档/模组/配置文件的隔离位置\n\".\" = 使用当前游戏目录切换选中的实例\n点击可修改为相对/绝对路径实现版本隔离";
-"i18n_str_882" = "Fabric API：Fabric 模组的依赖库（仅 Fabric 加载器有效）\nOptiFine：OptiFine 优化模组（仅原版/Forge 有效）";
+"i18n_str_882" = "Fabric API：Fabric 模组的依赖库（仅 Fabric 加载器有效）\nSodium + Iris Shaders：优化模组 + 光影加载器 (附带安装Podium)\nOptiFine：OptiFine 优化模组（仅原版/Forge 有效）";
 "i18n_str_885" = "仅 Fabric 有效";
 "i18n_str_886" = "仅原版/Forge 有效";
 "i18n_str_889" = "(无参数)";
@@ -1551,12 +1551,13 @@
 "i18n_str_926" = "写入失败";
 
 // Task 150：Sodium + Podium 组件安装
-"component.sodium.confirm_title" = "安装 Sodium";
-"component.sodium.confirm_message" = "Sodium 是高性能渲染模组，Podium 用于解除 Sodium 对第三方启动器的限制。\n\n将下载适配 Minecraft %@ 的最新版本到 mods 目录（Fabric）。";
-"component.sodium.searching" = "正在搜索适配 %@ 的 Sodium / Podium...";
-"component.sodium.not_found" = "未找到匹配的 Sodium / Podium 项目或版本（%@）";
-"component.sodium.download_failed" = "下载 Sodium / Podium 失败：%@";
-"component.sodium.done" = "Sodium 与 Podium 已安装到 mods 目录：\n%@";
+"component.sodium.confirm_title" = "安装 Sodium + Iris Shaders";
+"component.sodium.confirm_message" = "Sodium 是高性能渲染模组，Iris 是光影加载器（两者配合使用），Podium 用于解除 Sodium 对第三方启动器的限制。\n\n将下载适配 Minecraft %@ 的最新版本到 mods 目录（Fabric）。";
+"component.sodium.fabric_only" = "Sodium + Iris Shaders 仅对 Fabric 加载器有效。\n\n当前版本不是 Fabric 加载器，无法安装。\n\n如需使用 Fabric，请到下载页面安装 Fabric 加载器。";
+"component.sodium.searching" = "正在搜索适配 %@ 的 Sodium / Iris / Podium...";
+"component.sodium.not_found" = "未找到匹配的 Sodium / Iris / Podium 项目或版本（%@）";
+"component.sodium.download_failed" = "下载 Sodium / Iris / Podium 失败：%@";
+"component.sodium.done" = "Sodium、Iris 与 Podium 已安装到 mods 目录：\n%@";
 "i18n_str_927" = "写入文件失败：%@";
 "i18n_str_928" = "正在查询适配 %@ 的 OptiFine 版本...";
 "i18n_str_929" = "未找到适配 Minecraft %@ 的 OptiFine 版本";
@@ -2095,6 +2096,7 @@
 
 /* Task 141: instance memory slider popup */
 "memory.current" = "当前内存：%ldMB";
+"memory.auto_row" = "自动分配内存";
 "memory.apply" = "确定";
 
 /* Task 151: Bing daily wallpaper */
