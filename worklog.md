@@ -2,7 +2,7 @@
 
 ## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 144（2026-09-22）。此前：Task 143（2026-09-22）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
+> 最后更新：Task 149（2026-09-23）。此前：Task 144-146（2026-09-22，另一会话）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -11,10 +11,10 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 171006ce（Task 144 七修复），CI run 35737215334 绿，IPA 产物可下载 |
-| 最新 Task 号 | **144**（双会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 141 七项 UI + Task 142 渲染器分层七锚点 + **Task 143 三修复**（后端落盘 / FSR 常量 / 单 mg 列表，见 Task 143 Stage Summary） |
-| 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清），与基线对拍判读 |
+| 远端 HEAD | 2775e2f（Task 148，另一会话）；Task 149 推送后更新此行 |
+| 最新 Task 号 | **149**（另一会话已占用 147/148）（双会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 149 六项返工（头像首帧/欢迎卡问候语+等边距/公告卡新闻卡等高重排/取消阴影/蓝条/原生底部面板/新闻双列）+ Task 144-146 渲染器与 Forge/Mithril 锚点 |
+| 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
 - 推送前必须 `git fetch origin && git rebase origin/main`；Task 编号冲突避让下一空号并在记录里注明
@@ -221,3 +221,32 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 1. Vulkan/ES 会话必现 `Task148 builtin-FSR1 arbitration ... REDIRECTED -- builtin FSR1 owns upscale+present, launcher chain RETIRED`，且不再出现 `Task119 FSR1 upscale engaged` / `Task130 RCAS engaged (MobileGL)`；
 2. Vulkan 花屏+倒转消失、画面正常且为 FSR 档位渲染分辨率（内置 ApplyFSR 呈现）；ES 方块渲染情况随毁帧链退休一并观察（若仍缺方块 = 独立问题，抓 MGL 前端 GLES 行）；
 3. 若出现 `no redirect -- launcher chain stays as fallback`：说明该渲染器二进制未含内置 FSR1 或 config 未生效——启动器链接管（旧路径），需抓 config.json 内容与 [MG] FSR1 行再判。
+---
+
+## Task 149（本会话，UI 六项返工；编号避让注明：动工时远端为 Task 146，本任务按 147 开发；推送前 fetch 发现另一会话已占用 147/148，避让重编号为 149）
+
+### 用户需求（Task 141 实装实测反馈，五点疑点已经用户确认）
+1. 欢迎卡头像**还是**不加载默认头像，点击后才会加载。
+2. 欢迎卡删掉更新语句（公告标题行）及按钮；头像移到左边居中（到左边缘 = 到上下边缘距离，**不调整大小**）；文字与头像间距 = 头像距边缘距离。
+3. 更新卡片（公告磁贴）与 MC 新闻磁贴高度都和"最新正式版"磁贴一样；高度不够就把简介截断到能显示的行；新闻卡缩略图及文字按第 2 项模式移动；标题及简介样式改成和新闻卡片一样；喇叭图标放在中间的高度位置；查看详情按钮移到标题后面（调整大小）；核查新闻卡版本号是死版本还是动态检测（结论：announcements.json 驱动，用户确认保持）；新闻页简介全部显示而非截断；新闻恢复横轴两个并列排（Task141 单列退役）。
+4. 主页面所有卡片全部取消阴影。
+5. 公告卡片页面公告周围"不知用途的蓝色圆角矩形边边"删掉。
+6. 内存分配弹窗"一整片黑色背景"改掉，能用 iOS 原生 UI 就用（用户确认：**原生底部面板**）。
+
+### 根因与实施
+- **Item1（HomeProfileTileCell）**：首帧路径封死——cell init 直接呈现 DefaultAccount（缺失回退 SF 占位；此前 init 用 SF 占位、等 cellForItem 换装的时序缝隙即"点击前空白"观感源）+ viewWillAppear 再跑 updateSkinDisplay 补账号态（标签页往返/返回前台）。
+- **Item2**：announceRowStack 四件套（announceIconView/announceLabel/detailButton/announceRowStack）整体退役；greetingLabel 复位（14pt medium secondary + festivalGreeting，cellForItem 填充）；头像等边距 = 新增 avatarLeadingConstraint/textLeadingConstraint 两条动态约束，layoutSubviews 按头像实际边长（=卡高×0.5）取半刷新（左边距=文字间距=上/下边距=side/2；卡片 170/头像尺寸零变化）。
+- **Item3**：heightForTileConfig 公告/新闻磁贴固定 100（ame138_announcementTileHeight 自适应机制退役）；HomeAnnouncementTileCell 重排——喇叭图标 centerY 居中、titleRowStack（标题 15pt semibold + 内联 actionButton 12pt/28pt 高/edgeInsets 自适应宽）、summaryLabel 12pt tertiary、压缩序 750<998（简介优先截断）、预览档位仅控简介显隐；HomeNewsTileCell——缩略图等边距（leading 20 = (100-60)/2）、文字 stack 相对缩略图居中 + 上下钳制、简介 numberOfLines 0；MinecraftNewsViewController 恢复双列（两个 0.5 子项 + 12pt 间距 + (8,8,8,8) 边距）、newsCardFixedHeight 固定等高退役改 estimated 280 自 sizing（简介不截断）、禁横向滑保留。**版本号核查结论**：公告卡标题/按钮文案来自仓库根 announcements.json（服务端 JSON、用户手动发布），App 无写死、不自动检测 GitHub——用户确认保持。
+- **Item4**：HomeTileBaseCell.setupBaseViews 阴影四件套（shadowColor/Offset/Opacity/Radius + masksToBounds NO）删除；BackgroundManager 管线零变化。
+- **Item5（AnnouncementCardCell）**：priorityBarView 整体退役（属性/创建/约束/configure + kAnnHighPriorityBarWidth 常量）——announcements.json priority=high 时的左侧 4pt 蓝条即用户所见"蓝色边边"。
+- **Item6（ProfileSettingsViewController）**：showMemoryAllocator 重写为 Ame149MemoryAllocatorController 原生底部面板（UISheetPresentationController medium 档 + prefersGrabberVisible，iOS 15 以下回退 formSheet）；遮罩自绘卡片/关联对象键 kAme141MemorySliderKey/dismissMemoryAllocator/applyMemoryAllocation/memorySliderChanged 全删；拉条区间（512→maxMemory）与写回链路（allocatedMemory→saveSettings→reloadAllTableViews）不变。
+
+### 校验
+- verify_task147 新增 35 项全绿（A 欢迎卡 8 / B 高度阴影 4 / C 公告卡 6 / D 蓝条 2 / E 内存弹窗 6 / F 新闻页 4 / G 配平+UIColor 白名单 5）。
+- 重锚：task136（D2/D3/E2/E4 → Task149 形态）、task137 F7（自 sizing + 双列）、task138 F1/F2（自适应高度退役 → 等高 100）、task141（A2-A6 问候语回归 / C2-C5 原生面板 / D5 写回链路 / E1-E4 双列自 sizing）。
+- 级联 stash 基线对拍（在远端 HEAD 2775e2f 上重跑）：136=63/63、137=46/46、141=36/36、149=35/35 全绿；138 剩余失败（C1=另一会话 Task147/148 日志轮换未重锚的远端既有 + J-135 环境性）与基线逐项一致；139（H 块 Task146 撤销精简既有 + I1 环境性）、132/135（另一会话沙箱路径/会话本地脚本被清）均既有环境性；**零新增失败**。
+- 四改动 ObjC 文件括号配平全 0；UIColor 白名单审计通过。
+
+### Stage Summary
+- 用户预期：①头像首帧即默认头像（不点击也显示）②欢迎卡=头像等边距居左+欢迎语+灰字问候语（无公告行无按钮）③公告卡/新闻卡与最新正式版卡等高（简介截断适配）、喇叭居中、按钮内联标题后、样式对齐新闻卡、新闻页双列+简介完整、版本号保持 announcements.json 驱动 ④主页卡片零阴影 ⑤公告列表蓝条消失 ⑥内存分配=原生底部面板（拉条+写回不变）。
+- 待用户安装新 CI 工件实机验证；推送前 fetch 对齐（双会话并行）。

@@ -15,8 +15,6 @@
 #import "UIKit+NativeSurface.h"
 #import <objc/runtime.h>
 
-// Task141：内存弹窗拉条的关联对象键（dismiss/apply 时从遮罩层取回 slider）
-static void *kAme141MemorySliderKey = &kAme141MemorySliderKey;
 #import "BackgroundManager.h"
 #import "DownloadTaskManager.h"
 #import "DownloadTaskItem.h"
@@ -89,6 +87,101 @@ static NSString * localizeProfileTitle(NSString *title) {
     NSString *key = map[title] ?: title;
     return localize(key, nil);
 }
+
+// Task149：内存分配原生底部面板（用户指定"能使用 iOS 原生 UI 的就使用"）——
+// 取代 Task141 的"遮罩+居中卡片"自绘弹窗（全屏 40% 黑色遮罩观感"一整片黑"、
+// 卡片无投影生硬）。UISheetPresentationController 系统呈现：iOS 15+ medium
+// 档位 + 抓手，更低版本回退 formSheet；内容仅标题/当前内存灰字/拉条/
+// 取消-确定，写回链路（allocatedMemory → saveSettings）与 Task141 一致。
+@interface Ame149MemoryAllocatorController : UIViewController
+@property (nonatomic, copy) void (^ameOnApply)(NSInteger memoryMB);
+@property (nonatomic, assign) NSInteger ameInitialMemory;
+@property (nonatomic, assign) NSInteger ameMaxMemory;
+@property (nonatomic, strong) UILabel *ameCurrentLabel;
+@property (nonatomic, strong) UISlider *ameSlider;
+@end
+
+@implementation Ame149MemoryAllocatorController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor systemBackgroundColor];
+
+    UILabel *titleLabel = [[UILabel alloc] init];
+    titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    titleLabel.text = localize(@"i18n_str_2037", nil);
+    titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    titleLabel.textColor = [UIColor labelColor];
+    titleLabel.textAlignment = NSTextAlignmentCenter;
+    [self.view addSubview:titleLabel];
+
+    self.ameCurrentLabel = [[UILabel alloc] init];
+    self.ameCurrentLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ameCurrentLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
+    self.ameCurrentLabel.textColor = [UIColor secondaryLabelColor];
+    self.ameCurrentLabel.textAlignment = NSTextAlignmentCenter;
+    self.ameCurrentLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)self.ameInitialMemory];
+    [self.view addSubview:self.ameCurrentLabel];
+
+    self.ameSlider = [[UISlider alloc] init];
+    self.ameSlider.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ameSlider.minimumValue = 512;
+    self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);
+    self.ameSlider.value = (float)self.ameInitialMemory;
+    [self.ameSlider addTarget:self action:@selector(ame147SliderChanged:) forControlEvents:UIControlEventValueChanged];
+    [self.view addSubview:self.ameSlider];
+
+    UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [cancelButton setTitle:localize(@"resman.common.cancel", nil) forState:UIControlStateNormal];
+    cancelButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    [cancelButton addTarget:self action:@selector(ame147Cancel) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:cancelButton];
+
+    UIButton *applyButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    applyButton.translatesAutoresizingMaskIntoConstraints = NO;
+    applyButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
+    [applyButton setTitle:localize(@"memory.apply", @"确定") forState:UIControlStateNormal];
+    [applyButton setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
+    [applyButton addTarget:self action:@selector(ame147Apply) forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:applyButton];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [titleLabel.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8],
+        [titleLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
+        [titleLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+
+        [self.ameCurrentLabel.topAnchor constraintEqualToAnchor:titleLabel.bottomAnchor constant:22],
+        [self.ameCurrentLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:20],
+        [self.ameCurrentLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-20],
+
+        [self.ameSlider.topAnchor constraintEqualToAnchor:self.ameCurrentLabel.bottomAnchor constant:16],
+        [self.ameSlider.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:24],
+        [self.ameSlider.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-24],
+
+        [cancelButton.topAnchor constraintEqualToAnchor:self.ameSlider.bottomAnchor constant:18],
+        [cancelButton.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:24],
+        [cancelButton.bottomAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor constant:-12],
+
+        [applyButton.centerYAnchor constraintEqualToAnchor:cancelButton.centerYAnchor],
+        [applyButton.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-24],
+    ]];
+}
+
+- (void)ame147SliderChanged:(UISlider *)sender {
+    self.ameCurrentLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(sender.value)];
+}
+
+- (void)ame147Cancel {
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)ame147Apply {
+    if (self.ameOnApply) self.ameOnApply((NSInteger)lroundf(self.ameSlider.value));
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+@end
 
 @implementation ProfileSettingsViewController
 
@@ -2252,118 +2345,31 @@ static NSString * localizeProfileTitle(NSString *title) {
 }
 
 - (void)showMemoryAllocator {
-    // Task141：枚举列表改弹窗拉条（用户指定）——顶部灰字显示当前内存，
-    // 下方 UISlider 从 512MB 调到启动器检测的最大可分配（calculateMaxMemory
-    // 的 maxMemory = 物理内存 x 0.8，随设备自适应）。
-    NSInteger minMemory = 512;
-    
-    // ---- 遮罩层（点击空白处取消）----
-    UIControl *dimming = [[UIControl alloc] initWithFrame:self.view.bounds];
-    dimming.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    dimming.backgroundColor = [UIColor colorWithWhite:0 alpha:0.4];
-    [dimming addTarget:self action:@selector(dismissMemoryAllocator) forControlEvents:UIControlEventTouchUpInside];
-    dimming.alpha = 0.0;
-    [self.view addSubview:dimming];
-    
-    // ---- 弹窗卡片（原生表面，无自绘阴影）----
-    UIView *card = [[UIView alloc] init];
-    card.translatesAutoresizingMaskIntoConstraints = NO;
-    [card ame_applyCardSurfaceWithRadius:16];
-    [dimming addSubview:card];
-    
-    // 顶部灰字：当前内存：xxxxMB（拖动拉条实时刷新）
-    UILabel *currentLabel = [[UILabel alloc] init];
-    currentLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    currentLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    currentLabel.textColor = [UIColor secondaryLabelColor];
-    currentLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)self.allocatedMemory];
-    [card addSubview:currentLabel];
-    
-    // 拉条：512MB → maxMemory
-    UISlider *slider = [[UISlider alloc] init];
-    slider.translatesAutoresizingMaskIntoConstraints = NO;
-    slider.minimumValue = (float)minMemory;
-    slider.maximumValue = (float)self.maxMemory;
-    slider.value = (float)self.allocatedMemory;
-    [card addSubview:slider];
-    [slider addTarget:self action:@selector(memorySliderChanged:) forControlEvents:UIControlEventValueChanged];
-    
-    // 按钮行：取消 / 确定
-    UIButton *cancelButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    cancelButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [cancelButton setTitle:localize(@"resman.common.cancel", nil) forState:UIControlStateNormal];
-    cancelButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
-    [cancelButton addTarget:self action:@selector(dismissMemoryAllocator) forControlEvents:UIControlEventTouchUpInside];
-    [card addSubview:cancelButton];
-    
-    UIButton *applyButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    applyButton.translatesAutoresizingMaskIntoConstraints = NO;
-    applyButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightBold];
-    [applyButton setTitle:localize(@"memory.apply", @"确定") forState:UIControlStateNormal];
-    [applyButton setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
-    [applyButton addTarget:self action:@selector(applyMemoryAllocation:) forControlEvents:UIControlEventTouchUpInside];
-    [card addSubview:applyButton];
-    
-    objc_setAssociatedObject(dimming, &kAme141MemorySliderKey, slider, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    
-    [NSLayoutConstraint activateConstraints:@[
-        [card.centerXAnchor constraintEqualToAnchor:dimming.centerXAnchor],
-        [card.centerYAnchor constraintEqualToAnchor:dimming.centerYAnchor],
-        [card.widthAnchor constraintEqualToConstant:280],
-        
-        [currentLabel.topAnchor constraintEqualToAnchor:card.topAnchor constant:18],
-        [currentLabel.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:18],
-        [currentLabel.trailingAnchor constraintLessThanOrEqualToAnchor:card.trailingAnchor constant:-18],
-        
-        [slider.topAnchor constraintEqualToAnchor:currentLabel.bottomAnchor constant:16],
-        [slider.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:18],
-        [slider.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-18],
-        
-        [cancelButton.topAnchor constraintEqualToAnchor:slider.bottomAnchor constant:16],
-        [cancelButton.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:18],
-        [cancelButton.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
-        
-        [applyButton.centerYAnchor constraintEqualToAnchor:cancelButton.centerYAnchor],
-        [applyButton.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-18],
-        [applyButton.heightAnchor constraintEqualToAnchor:cancelButton.heightAnchor],
-    ]];
-    
-    // 淡入
-    card.transform = CGAffineTransformMakeScale(0.92, 0.92);
-    [UIView animateWithDuration:0.22 delay:0 options:UIViewAnimationOptionCurveEaseOut animations:^{
-        dimming.alpha = 1.0;
-        card.transform = CGAffineTransformIdentity;
-    } completion:nil];
-}
-
-- (void)memorySliderChanged:(UISlider *)sender {
-    // 实时刷新顶部灰字（取整 MB）；label 与 slider 同在卡片层
-    for (UIView *sub in sender.superview.subviews) {
-        if ([sub isKindOfClass:[UILabel class]]) {
-            ((UILabel *)sub).text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(sender.value)];
+    // Task149：Task141 的"遮罩+居中卡片"自绘弹窗退役（用户反馈遮罩是
+    // "一整片黑色背景"、卡片观感生硬）——改用 iOS 原生底部面板呈现；
+    // 拉条区间（512MB → maxMemory = 物理×0.8）与写回链路不变。
+    Ame149MemoryAllocatorController *ame149_vc = [[Ame149MemoryAllocatorController alloc] init];
+    ame149_vc.ameInitialMemory = self.allocatedMemory;
+    ame149_vc.ameMaxMemory = self.maxMemory;
+    __weak typeof(self) weakSelf = self;
+    ame149_vc.ameOnApply = ^(NSInteger memoryMB) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        strongSelf.allocatedMemory = memoryMB;
+        [strongSelf saveSettings];
+        [strongSelf reloadAllTableViews];
+    };
+    ame149_vc.modalPresentationStyle = UIModalPresentationFormSheet;
+    ame149_vc.preferredContentSize = CGSizeMake(360, 240);
+    if (@available(iOS 15.0, *)) {
+        UISheetPresentationController *ame149_sheet = ame149_vc.sheetPresentationController;
+        if (ame149_sheet) {
+            ame149_sheet.detents = @[UISheetPresentationControllerDetent.mediumDetent];
+            ame149_sheet.prefersGrabberVisible = YES;
+            ame149_sheet.prefersScrollingExpandsWhenScrolledToEdge = NO;
         }
     }
-}
-
-- (void)dismissMemoryAllocator {
-    for (UIView *sub in self.view.subviews) {
-        if ([sub isKindOfClass:[UIControl class]]) {
-            [UIView animateWithDuration:0.18 animations:^{ sub.alpha = 0.0; } completion:^(BOOL finished) {
-                [sub removeFromSuperview];
-            }];
-        }
-    }
-}
-
-- (void)applyMemoryAllocation:(UIButton *)sender {
-    UIControl *dimming = (UIControl *)sender.superview.superview;
-    UISlider *slider = objc_getAssociatedObject(dimming, &kAme141MemorySliderKey);
-    if (slider) {
-        self.allocatedMemory = (NSInteger)lroundf(slider.value);
-        [self saveSettings];
-        [self reloadAllTableViews];
-    }
-    [self dismissMemoryAllocator];
+    [self presentViewController:ame149_vc animated:YES completion:nil];
 }
 
 #pragma mark - Done / Close

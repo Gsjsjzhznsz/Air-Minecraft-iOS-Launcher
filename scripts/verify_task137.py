@@ -249,9 +249,10 @@ check("F5  侧栏几何零变化（50×50 按钮 / 圆角 10 / 图标自愈机�
 check("F6  NMToast 通知 API 零变化（showMessage 四重载 + dismiss 保留）",
       read("Natives/NMToast.h").count("+ (void)showMessage:") == 3
       and "+ (void)dismiss;" in read("Natives/NMToast.h"))
-check("F7  新闻卡固定高度机制零变化（模板实测 + dispatch_once + absoluteDimension）",
-      "newsCardFixedHeight" in read("Natives/MinecraftNewsViewController.m")
-      and read("Natives/MinecraftNewsViewController.m").count("absoluteDimension:cardHeight]") == 2)
+check("F7  Task149 重锚：新闻卡等高机制改自 sizing（固定模板实测代码清零 + 双列恢复）",
+      "newsCardFixedHeight" not in strip_objc(read("Natives/MinecraftNewsViewController.m"))
+      and read("Natives/MinecraftNewsViewController.m").count("absoluteDimension:cardHeight]") == 0
+      and "subitems:@[ame149_itemA, ame149_itemB]" in read("Natives/MinecraftNewsViewController.m"))
 check("F8  顶卡头像交换幸存（半透明边框 2.5 + 正圆 + 欢迎语纵轴居中）",
       "layer.borderWidth = 2.5" in read("Natives/LauncherNewsViewController.m")
       and "welcomeStack.centerYAnchor constraintEqualToAnchor:self.avatarImageView.centerYAnchor" in read("Natives/LauncherNewsViewController.m"))

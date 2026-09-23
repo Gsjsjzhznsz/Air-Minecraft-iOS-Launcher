@@ -129,13 +129,13 @@ print("=" * 72)
 mcnews = read("Natives/MinecraftNewsViewController.m")
 check("D1  卡片圆角回归原生 12（Task137 重锚：kNewsCardCornerRadius = 12.0）",
       "kNewsCardCornerRadius = 12.0" in mcnews)
-check("D2  固定高度 = 原样式最低高度（模板 cell 实测，dispatch_once 缓存）",
-      "newsCardFixedHeight" in mcnews
-      and "systemLayoutSizeFitting" in mcnews
-      and "dispatch_once" in mcnews)
-check("D3  布局改用绝对高度（absoluteDimension），旧 estimated 280 退役",
-      mcnews.count("absoluteDimension:cardHeight]") == 2
-      and "estimatedDimension:280" not in mcnews)
+check("D2  Task149 重锚：固定等高机制退役（newsCardFixedHeight 代码引用清零），高度 estimated 自 sizing",
+      "newsCardFixedHeight" not in strip_objc(mcnews)
+      and "estimatedDimension:280" in mcnews)
+check("D3  Task149 重锚：恢复双列并列排（每组两个 0.5 宽子项）+ 简介行数不限",
+      "fractionalWidthDimension:0.5]" in mcnews
+      and "subitems:@[ame149_itemA, ame149_itemB]" in mcnews
+      and "_summaryLabel.numberOfLines = 0" in mcnews)
 check("D4  正文纵向 stack + 截断优先级（摘要 750 先截断，标题/作者/查看详情保底）",
       "initWithArrangedSubviews:@[_titleLabel, _metaLabel, _summaryLabel, _readMoreLabel]" in mcnews
       and "setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical" in mcnews
@@ -151,17 +151,18 @@ print("=" * 72)
 home = read("Natives/LauncherNewsViewController.m")
 check("E1  皮肤全身预览退场（skinImageView 代码引用清零，仅留档注释）",
       len(re.findall(r"self\.skinImageView", home)) == 0)
-check("E2  MC 头像接管最左位（leading 18 + 尺寸随卡高 0.5 倍 + 正圆 width=height）",
-      "avatarImageView.leadingAnchor ... constant:18" not in home
-      and re.search(r"avatarImageView\.leadingAnchor constraintEqualToAnchor:self\.contentContainer\.leadingAnchor constant:18\]", home)
+check("E2  Task149 重锚：头像等边距（leading/文字间距 = 上下边距，layoutSubviews 按 side/2 动态刷新；尺寸不变）",
+      "avatarLeadingConstraint" in home
+      and "self.avatarLeadingConstraint.constant = side / 2.0;" in home
+      and "self.textLeadingConstraint.constant = side / 2.0;" in home
       and "heightAnchor constraintEqualToAnchor:self.contentContainer.heightAnchor multiplier:0.5" in home
       and "avatarImageView.widthAnchor constraintEqualToAnchor:self.avatarImageView.heightAnchor" in home)
 check("E3  半透明边框样式保留（2.5pt white@0.35）+ 圆形裁剪 masksToBounds",
       "layer.borderWidth = 2.5" in home
       and "colorWithWhite:1.0 alpha:0.35" in home
       and "avatarImageView.layer.masksToBounds = YES" in home)
-check("E4  两行欢迎句 stack 相对头像纵轴居中（centerY = avatar.centerY）",
-      "initWithArrangedSubviews:@[self.welcomeLabel, self.announceRowStack]" in home
+check("E4  Task149 重锚：两行欢迎句 stack（第二行 = 问候语 greetingLabel；相对头像纵轴居中保留）",
+      "initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]" in home
       and re.search(r"welcomeStack\.centerYAnchor constraintEqualToAnchor:self\.avatarImageView\.centerYAnchor\]", home))
 check("E5  头像圆角随尺寸取半（layoutSubviews 动态）",
       "avatarImageView.layer.cornerRadius = side / 2.0" in home)

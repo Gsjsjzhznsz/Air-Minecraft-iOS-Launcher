@@ -16,13 +16,12 @@ static const CGFloat kAnnCardSpacing = 12.0;
 static const CGFloat kAnnCardPadding = 14.0;
 /// 卡片圆角
 static const CGFloat kAnnCardCornerRadius = 14.0;
-/// 高优先级卡片左侧条宽度
-static const CGFloat kAnnHighPriorityBarWidth = 4.0;
 
 #pragma mark - AnnouncementCardCell
 
 @interface AnnouncementCardCell : UICollectionViewCell
-@property (nonatomic, strong) UIView *priorityBarView;
+// Task149：高优先级左侧蓝条（priorityBarView）整体退役——用户实测
+// "公告周围露出不知用途的蓝色圆角矩形边边"即此物，删掉
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *dateLabel;
 @property (nonatomic, strong) UILabel *summaryLabel;
@@ -35,7 +34,6 @@ static const CGFloat kAnnHighPriorityBarWidth = 4.0;
     self.titleLabel.text = nil;
     self.dateLabel.text = nil;
     self.summaryLabel.text = nil;
-    self.priorityBarView.hidden = YES;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -49,13 +47,6 @@ static const CGFloat kAnnHighPriorityBarWidth = 4.0;
         self.contentView.layer.cornerRadius = kAnnCardCornerRadius;
         self.contentView.layer.cornerCurve = kCACornerCurveContinuous;
         self.contentView.clipsToBounds = YES;
-
-        // 高优先级左侧条（默认隐藏）
-        _priorityBarView = [[UIView alloc] init];
-        _priorityBarView.translatesAutoresizingMaskIntoConstraints = NO;
-        _priorityBarView.backgroundColor = [UIColor systemBlueColor];
-        _priorityBarView.hidden = YES;
-        [self.contentView addSubview:_priorityBarView];
 
         _titleLabel = [[UILabel alloc] init];
         _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -79,11 +70,6 @@ static const CGFloat kAnnHighPriorityBarWidth = 4.0;
         [self.contentView addSubview:_summaryLabel];
 
         [NSLayoutConstraint activateConstraints:@[
-            [_priorityBarView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
-            [_priorityBarView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
-            [_priorityBarView.widthAnchor constraintEqualToConstant:kAnnHighPriorityBarWidth],
-            [_priorityBarView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
-
             [_titleLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:kAnnCardPadding],
             [_titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:kAnnCardPadding],
             [_titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-kAnnCardPadding],
@@ -105,12 +91,8 @@ static const CGFloat kAnnHighPriorityBarWidth = 4.0;
     self.titleLabel.text = item.title ?: @"";
     self.dateLabel.text = item.formattedDateString ?: @"";
     self.summaryLabel.text = item.summary ?: @"";
-    // priority=high 时显示左侧蓝色条
-    if ([item.priority caseInsensitiveCompare:@"high"] == NSOrderedSame) {
-        self.priorityBarView.hidden = NO;
-    } else {
-        self.priorityBarView.hidden = YES;
-    }
+    // Task149：priority=high 蓝条逻辑随 priorityBarView 一并退役
+    (void)item;
 }
 
 @end

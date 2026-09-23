@@ -198,13 +198,13 @@ check("E1 胶囊常量圆角（999 + 钳制原理注释 + layoutSubviews 兜底�
       "Task138：胶囊常量圆角" in nvc and
       "cornerRadius = side / 2.0" in nvc)
 
-print("== F. 公告磁贴自适应高度 ==")
-check("F1 自适应高度函数（预览档位实测文本 + 按钮叠加 + 下限 90）",
-      "ame138_announcementTileHeight" in nvc and
-      "boundingRectWithSize" in nvc and
-      "MAX(ame138_base, ame138_needed)" in nvc)
-check("F2 heightForTileConfig 接入（Announcement 分支改调自适应）",
-      "return [self ame138_announcementTileHeight];" in nvc)
+print("== F. 公告磁贴高度（Task149 重锚：等高 100 机制） ==")
+check("F1 Task149 重锚：公告磁贴自适应高度机制退役（ame138_announcementTileHeight 代码引用清零）",
+      "ame138_announcementTileHeight" not in strip_sc(nvc) and
+      "boundingRectWithSize" not in strip_sc(nvc))
+check("F2 Task149 重锚：公告/新闻磁贴与最新正式版卡片等高（固定 100，简介压缩截断）",
+      nvc.count("Task149：与最新正式版卡片等高") == 2 and
+      "setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical" in nvc)
 
 print("== G. 下载镜像策略（speed_first + mod_mirror 迁移 + FCL 测速） ==")
 check("G1 PLMirrorPolicy 枚举新增 SpeedFirst",

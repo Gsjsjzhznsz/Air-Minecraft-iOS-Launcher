@@ -67,33 +67,31 @@ def check(name, ok, detail=""):
 
 
 print("=" * 72)
-print("A. 欢迎卡：默认头像 + 公告标题行（Item 1 + 2）")
+print("A. 欢迎卡：默认头像首帧 + 问候语回归（Task149 重锚：Item 1 + 2 返工）")
 print("=" * 72)
 home = read("Natives/LauncherNewsViewController.m")
 home_code = strip_objc(home)
 check("A1  无头像分支使用 DefaultAccount 默认头像（账户列表同源；Asset 缺失回退 SF 占位）",
       'UIImage *defaultAvatar = [UIImage imageNamed:@"DefaultAccount"];' in home
       and "cell.avatarImageView.tintColor = nil;" in home)
-check("A2  公告标题行三件套进欢迎卡（喇叭图标 + 标题 + 查看详情按钮）",
-      all(x in home for x in [
+check("A2  Task149 重锚：公告标题行整体退役（icon/label/button/rowStack 引用清零）",
+      all(x not in home for x in [
           'self.announceIconView = [[UIImageView alloc] init];',
           'self.announceLabel = [[UILabel alloc] init];',
-          'self.detailButton = [UIButton buttonWithType:UIButtonTypeSystem];']) and
-      'systemImageNamed:@"megaphone.fill"' in home)
-check("A3  公告标题字号与欢迎语一致（21pt bold）且缩字不截断（minScale 0.6）",
-      "cell.announceLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];" in home
-      and "self.announceLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];" in home
-      and "self.announceLabel.minimumScaleFactor = 0.6;" in home_code)
-check("A4  查看详情按钮与公告卡同款（蓝底 #3B82F6 白字 + openAnnouncementActionURL 复用）",
-      'cell.detailButton.backgroundColor = colorFromHex(@"#3B82F6");' in home
-      and "[cell.detailButton addTarget:self action:@selector(openAnnouncementActionURL)" in home_code
-      and "if (ann.actionURL.length > 0 && ann.actionTitle.length > 0)" in home_code)
-check("A5  欢迎堆叠第二行 = 公告标题行；无公告回退问候语（14pt 灰字，图标按钮隐藏）",
-      "initWithArrangedSubviews:@[self.welcomeLabel, self.announceRowStack]" in home
-      and "cell.announceLabel.text = festivalGreeting();" in home
-      and "cell.announceLabel.textColor = [UIColor secondaryLabelColor];" in home)
-check("A6  旧 greetingLabel 属性退场（代码引用清零）",
-      "greetingLabel" not in home_code)
+          'self.detailButton = [UIButton buttonWithType:UIButtonTypeSystem];',
+          'announceRowStack']))
+check("A3  Task149 重锚：问候语行回归（14pt medium secondaryLabelColor，cellForItem 填充 festivalGreeting）",
+      "self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];" in home
+      and "self.greetingLabel.textColor = [UIColor secondaryLabelColor];" in home
+      and "cell.greetingLabel.text = festivalGreeting();" in home)
+check("A4  Task149 重锚：公告预览回归主页公告卡（cellForItem 不再引用 detailButton；公告卡标题行/内联按钮在位）",
+      "cell.detailButton" not in home
+      and "cell.titleLabel.text = ann.title;" in home
+      and "cell.actionButton addTarget:self action:@selector(openAnnouncementActionURL)" in home)
+check("A5  Task149 重锚：欢迎堆叠第二行 = 问候语（greetingLabel 入栈）",
+      "initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]" in home)
+check("A6  Task149 重锚：greetingLabel 属性复位（旧退役断言反转）",
+      "@property (nonatomic, strong) UILabel *greetingLabel;" in home)
 check("A7  欢迎堆叠仍相对头像纵轴居中（Task136 语义保留）",
       "welcomeStack.centerYAnchor constraintEqualToAnchor:self.avatarImageView.centerYAnchor" in home_code)
 
@@ -120,21 +118,23 @@ ps_code = strip_objc(ps)
 check("C1  枚举 actionSheet 列表退役（旧 for-options 循环不再存在）",
       "NSMutableArray *options = [NSMutableArray array];" not in ps_code
       and "for (NSNumber *memNum in options)" not in ps_code)
-check("C2  弹窗：遮罩 + 原生卡片表面（ame_applyCardSurfaceWithRadius:16）",
-      "UIControl *dimming = [[UIControl alloc] initWithFrame:self.view.bounds];" in ps_code
-      and "[card ame_applyCardSurfaceWithRadius:16];" in ps_code)
-check("C3  弹窗顶部灰字（memory.current，secondaryLabelColor）实时刷新",
+check("C2  Task149 重锚：原生底部面板（Ame149MemoryAllocatorController + UISheetPresentationController medium + 抓手；遮罩自绘卡片退役）",
+      "@interface Ame149MemoryAllocatorController : UIViewController" in ps_code
+      and "UISheetPresentationControllerDetent.mediumDetent" in ps_code
+      and "prefersGrabberVisible = YES" in ps_code
+      and "UIControl *dimming" not in ps_code)
+check("C3  Task149 重锚：当前内存灰字实时刷新（memory.current + ame147SliderChanged）",
       'localize(@"memory.current", nil)' in ps
-      and "currentLabel.textColor = [UIColor secondaryLabelColor];" in ps_code
-      and "- (void)memorySliderChanged:(UISlider *)sender" in ps_code)
-check("C4  拉条 512MB → maxMemory（启动器检测的最大可分配，随设备自适应）",
-      "slider.minimumValue = (float)minMemory;" in ps_code
-      and "slider.maximumValue = (float)self.maxMemory;" in ps_code
-      and "NSInteger minMemory = 512;" in ps_code)
-check("C5  取消/确定 + 确定写回（allocatedMemory + saveSettings + 刷新表格）",
-      "- (void)applyMemoryAllocation:(UIButton *)sender" in ps_code
-      and "self.allocatedMemory = (NSInteger)lroundf(slider.value);" in ps_code
-      and "[self saveSettings];" in ps_code.split("- (void)applyMemoryAllocation")[1].split("- (void)dismissMemoryAllocator")[-1] or True)
+      and "self.ameCurrentLabel.textColor = [UIColor secondaryLabelColor];" in ps_code
+      and "- (void)ame147SliderChanged:(UISlider *)sender" in ps_code)
+check("C4  Task149 重锚：拉条 512MB → maxMemory（启动器检测的最大可分配，随设备自适应）",
+      "self.ameSlider.minimumValue = 512;" in ps_code
+      and "self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);" in ps_code)
+check("C5  Task149 重锚：取消/确定 + 确定写回（ameOnApply → allocatedMemory + saveSettings + reloadAllTableViews）",
+      "- (void)ame147Apply {" in ps_code
+      and "strongSelf.allocatedMemory = memoryMB;" in ps_code
+      and "[strongSelf saveSettings];" in ps_code
+      and "[strongSelf reloadAllTableViews];" in ps_code)
 check("C6  行标题/详情永不截断改缩字（JVM 启动参数行修复）",
       "cell.textLabel.adjustsFontSizeToFitWidth = YES;" in ps_code
       and "cell.textLabel.minimumScaleFactor = 0.6;" in ps_code
@@ -169,9 +169,12 @@ check("D4  全局设置两行删除（auto_ram 开关 + allocated_memory 滑条�
       '@{@"key": @"auto_ram",' not in prefs_code
       and '@{@"key": @"allocated_memory",' not in prefs_code
       and "Task141" in prefs)
-check("D5  实例内存弹窗写回的 profile 字段即启动读取的字段（allocatedMemory 闭环）",
-      "self.allocatedMemory = (NSInteger)lroundf(slider.value);" in ps_code
+check("D5  Task149 重锚：实例内存弹窗写回链路不变（ame147Apply → allocatedMemory → saveSettings；读取字段同前）",
+      "if (self.ameOnApply) self.ameOnApply((NSInteger)lroundf(self.ameSlider.value));" in ps_code
       and 'self.allocatedMemory = [self.profile[@"allocatedMemory"] integerValue];' in ps)
+check("D5b Task149 重锚：iOS 15 以下回退 formSheet（兼容性门）",
+      "if (@available(iOS 15.0, *)) {" in ps_code
+      and "ame149_vc.modalPresentationStyle = UIModalPresentationFormSheet;" in ps_code)
 check("D6  validateVirtualMemorySpace 口径保留（虚存校验不回退）",
       "if (!validateVirtualMemorySpace(allocmem)) {" in jl_code)
 check("D7  启动日志锚点保留（Max RAM allocation 行在）",
@@ -179,21 +182,22 @@ check("D7  启动日志锚点保留（Max RAM allocation 行在）",
 
 print()
 print("=" * 72)
-print("E. MC 新闻页：贴边单列 + 禁横向滑（Item 7）")
+print("E. MC 新闻页：双列恢复 + 简介完整显示 + 禁横向滑（Task149 重锚）")
 print("=" * 72)
 mcnews = read("Natives/MinecraftNewsViewController.m")
 mcnews_code = strip_objc(mcnews)
-check("E1  卡片宽度 fractional 1.0（随屏幕尺寸自适应贴于窗口）",
-      "fractionalWidthDimension:1.0]" in mcnews_code
-      and "fractionalWidthDimension:0.5]" not in mcnews_code)
-check("E2  侧边 inset 退役（仅上下 8pt）",
-      "UIEdgeInsetsMake(8, 0, 8, 0)" in mcnews_code
-      and "UIEdgeInsetsMake(8, 8, 8, 8)" not in mcnews_code)
-check("E3  禁横向回弹（alwaysBounceHorizontal = NO）",
+check("E1  Task149 重锚：恢复双列并列排（每组两个 0.5 宽子项 + interItemSpacing）",
+      "fractionalWidthDimension:0.5]" in mcnews_code
+      and "subitems:@[ame149_itemA, ame149_itemB]" in mcnews_code)
+check("E2  Task149 重锚：双列侧边距（8,8,8,8，公告列表页同款语言）",
+      "UIEdgeInsetsMake(8, 8, 8, 8)" in mcnews_code
+      and "UIEdgeInsetsMake(8, 0, 8, 0)" not in mcnews_code)
+check("E3  禁横向回弹（alwaysBounceHorizontal = NO，Task141 用户指令幸存）",
       "self.collectionView.alwaysBounceHorizontal = NO;" in mcnews_code)
-check("E4  等高机制不变（固定绝对高度 + 模板实测）",
-      mcnews_code.count("absoluteDimension:cardHeight]") == 2
-      and "newsCardFixedHeight" in mcnews_code)
+check("E4  Task149 重锚：等高机制改自 sizing（简介不截断：numberOfLines 0 + estimated 高度；固定模板实测删除）",
+      "newsCardFixedHeight" not in mcnews_code
+      and "_summaryLabel.numberOfLines = 0;" in mcnews_code
+      and "estimatedDimension:280" in mcnews_code)
 
 print()
 print("=" * 72)

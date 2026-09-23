@@ -320,12 +320,8 @@ static NSString *festivalGreeting(void) {
 }
 
 - (void)setupBaseViews {
-    // 阴影
-    self.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.layer.shadowOffset = CGSizeMake(0, 4);
-    self.layer.shadowOpacity = 0.15;
-    self.layer.shadowRadius = 10;
-    self.layer.masksToBounds = NO;
+    // Task149：主页面所有卡片取消阴影（用户指令）——阴影四件套退役，
+    // 卡片视觉由 contentView 圆角裁剪 + 原生表面呈现，层级/尺寸零变化
     
     // Task90：卡片顶部渐变装饰条已移除（用户反馈去掉红框色条），
     // 卡片视觉统一交给新拟态表面 + 图标语义色。
@@ -387,13 +383,15 @@ static NSString *festivalGreeting(void) {
 // 小头像与 skinImageView 均已退场
 @property (nonatomic, strong) UIImageView *avatarImageView;
 @property (nonatomic, strong) UILabel *welcomeLabel;
-// Task141：第二行改为「公告标题行」——喇叭图标 + 公告标题（字号与欢迎语一致）
-// + 查看详情按钮（公告卡同款）；无公告数据时回退为原问候语（灰字）。
-@property (nonatomic, strong) UIImageView *announceIconView;
-@property (nonatomic, strong) UILabel *announceLabel;
-@property (nonatomic, strong) UIButton *detailButton;
-@property (nonatomic, strong) UIStackView *announceRowStack;
+// Task149：第二行回归原灰字问候语（Task141 的公告标题行+查看详情按钮
+// 按用户指令整体退役；公告预览回归主页面公告卡片本体）。
+@property (nonatomic, strong) UILabel *greetingLabel;
 @property (nonatomic, strong) UIStackView *welcomeStack;
+// Task149：头像等边距（到左边缘 = 到上/下边缘）动态约束——头像高度
+// = 卡高 × 0.5，上/下边距恒等于 side/2，左边距与文字间距同步取该值
+// （layoutSubviews 随实际尺寸刷新；卡片/头像尺寸均不变，仅挪位置）。
+@property (nonatomic, strong) NSLayoutConstraint *avatarLeadingConstraint;
+@property (nonatomic, strong) NSLayoutConstraint *textLeadingConstraint;
 @end
 
 @implementation HomeProfileTileCell
@@ -421,8 +419,19 @@ static NSString *festivalGreeting(void) {
     self.avatarImageView.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.35].CGColor;
     // Task137：原生占位底色
     self.avatarImageView.backgroundColor = [UIColor tertiarySystemFillColor];
-    self.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
-    self.avatarImageView.tintColor = [UIColor systemGrayColor];
+    // Task149：首帧即默认头像（用户实测“不点击不加载”——init 先用 SF
+    // 占位、等 cellForItem 才换 DefaultAccount 的时序路径封死：无账号
+    // 首帧直接呈现账户列表同款 DefaultAccount；账号态仍由 cellForItem
+    // 的 currentAvatar 分支接管）
+    UIImage *ame149_defaultAvatar = [UIImage imageNamed:@"DefaultAccount"];
+    if (ame149_defaultAvatar) {
+        self.avatarImageView.image = ame149_defaultAvatar;
+        self.avatarImageView.tintColor = nil;
+        self.avatarImageView.contentMode = UIViewContentModeScaleAspectFill;
+    } else {
+        self.avatarImageView.image = [UIImage systemImageNamed:@"person.circle.fill"];
+        self.avatarImageView.tintColor = [UIColor systemGrayColor];
+    }
     [self.contentContainer addSubview:self.avatarImageView];
     
     // 欢迎文本
@@ -434,65 +443,36 @@ static NSString *festivalGreeting(void) {
     self.welcomeLabel.adjustsFontSizeToFitWidth = YES;
     self.welcomeLabel.minimumScaleFactor = 0.7;
     
-    // Task141：第二行 = 公告标题行（喇叭图标 + 标题 + 查看详情按钮）。
-    // 字号与欢迎语句一致（21pt bold）；按钮与公告卡片同款（蓝底白字圆角）。
-    // 无公告数据时由 cellForItem 回退为原问候语（14pt 灰字、图标按钮隐藏）。
-    self.announceIconView = [[UIImageView alloc] init];
-    self.announceIconView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.announceIconView.contentMode = UIViewContentModeScaleAspectFit;
-    self.announceIconView.image = [UIImage systemImageNamed:@"megaphone.fill"];
-    self.announceIconView.tintColor = colorFromHex(@"#3B82F6");
-    self.announceIconView.hidden = YES;
-    
-    self.announceLabel = [[UILabel alloc] init];
-    self.announceLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.announceLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];
-    self.announceLabel.textColor = [UIColor labelColor];
-    self.announceLabel.numberOfLines = 1;
-    // Task141 对齐用户指令：标题永不省略号截断，空间不足时缩小字号
-    self.announceLabel.adjustsFontSizeToFitWidth = YES;
-    self.announceLabel.minimumScaleFactor = 0.6;
-    
-    self.detailButton = [UIButton buttonWithType:UIButtonTypeSystem];
-    self.detailButton.translatesAutoresizingMaskIntoConstraints = NO;
-    self.detailButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
-    self.detailButton.layer.cornerRadius = 8;
-    self.detailButton.layer.cornerCurve = kCACornerCurveContinuous;
-    self.detailButton.clipsToBounds = YES;
-    self.detailButton.hidden = YES;
-    
-    self.announceRowStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.announceIconView, self.announceLabel, self.detailButton]];
-    self.announceRowStack.translatesAutoresizingMaskIntoConstraints = NO;
-    self.announceRowStack.axis = UILayoutConstraintAxisHorizontal;
-    self.announceRowStack.alignment = UIStackViewAlignmentCenter;
-    self.announceRowStack.spacing = 8;
-    [self.announceIconView setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [self.announceIconView setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [self.detailButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [self.detailButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
-    [self.detailButton.widthAnchor constraintGreaterThanOrEqualToConstant:88].active = YES;
-    [self.detailButton.heightAnchor constraintEqualToConstant:28].active = YES;
-    [self.announceIconView.widthAnchor constraintEqualToConstant:18].active = YES;
-    [self.announceIconView.heightAnchor constraintEqualToConstant:18].active = YES;
+    // Task149：第二行回归原灰字问候语（14pt，festivalGreeting 由 cellForItem 填充）
+    self.greetingLabel = [[UILabel alloc] init];
+    self.greetingLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    self.greetingLabel.textColor = [UIColor secondaryLabelColor];
+    self.greetingLabel.numberOfLines = 1;
     
     // Task136：两行欢迎句组成纵向 stack，整体相对头像纵轴居中
-    // Task141：第二行由问候语换为公告标题行（见上）
-    self.welcomeStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.welcomeLabel, self.announceRowStack]];
+    // Task149：第二行 = 原问候语（公告标题行退役）
+    self.welcomeStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]];
     self.welcomeStack.translatesAutoresizingMaskIntoConstraints = NO;
     self.welcomeStack.axis = UILayoutConstraintAxisVertical;
     self.welcomeStack.alignment = UIStackViewAlignmentLeading;
     self.welcomeStack.spacing = 4;
     [self.contentContainer addSubview:self.welcomeStack];
     
+    // Task149：头像等边距——左边距与文字间距的常量由 layoutSubviews 按
+    // 头像实际边长（= 卡高/2）取半刷新，与上/下边距恒等；初始常量仅占位。
+    self.avatarLeadingConstraint = [self.avatarImageView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:42.5];
+    self.textLeadingConstraint = [self.welcomeStack.leadingAnchor constraintEqualToAnchor:self.avatarImageView.trailingAnchor constant:42.5];
+    
     [NSLayoutConstraint activateConstraints:@[
         // MC 头像（最左）：高度 ≈ 卡片高度一半，宽度=高度（正圆基准），垂直居中
-        [self.avatarImageView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:18],
+        self.avatarLeadingConstraint,
         [self.avatarImageView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
         [self.avatarImageView.heightAnchor constraintEqualToAnchor:self.contentContainer.heightAnchor multiplier:0.5],
         [self.avatarImageView.widthAnchor constraintEqualToAnchor:self.avatarImageView.heightAnchor],
         
-        // 两行欢迎句：头像右侧，整体相对头像纵轴居中
-        [self.welcomeStack.leadingAnchor constraintEqualToAnchor:self.avatarImageView.trailingAnchor constant:14],
+        // 两行欢迎句：头像右侧（间距 = 头像距卡片边缘的距离），纵轴居中
+        self.textLeadingConstraint,
         [self.welcomeStack.centerYAnchor constraintEqualToAnchor:self.avatarImageView.centerYAnchor],
         [self.welcomeStack.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-18],
     ]];
@@ -504,6 +484,10 @@ static NSString *festivalGreeting(void) {
     CGFloat side = self.avatarImageView.bounds.size.height;
     if (side > 0) {
         self.avatarImageView.layer.cornerRadius = side / 2.0;
+        // Task149：等边距刷新——头像高度 = 卡高 × 0.5，上/下边距 = side/2，
+        // 左边距与文字间距同步取 side/2（到四边距离一致，头像/卡片尺寸均不变）
+        self.avatarLeadingConstraint.constant = side / 2.0;
+        self.textLeadingConstraint.constant = side / 2.0;
     }
 }
 
@@ -566,8 +550,13 @@ static NSString *festivalGreeting(void) {
 
 @interface HomeAnnouncementTileCell : HomeTileBaseCell
 @property (nonatomic, strong) UIImageView *iconView;
-@property (nonatomic, strong) UILabel *messageLabel;
+// Task149：公告卡重排——标题/简介分离，样式对齐新闻卡片（标题 15pt
+// semibold / 简介 12pt tertiary）；喇叭图标垂直居中；查看详情按钮内联标题后
+@property (nonatomic, strong) UILabel *titleLabel;
+@property (nonatomic, strong) UILabel *summaryLabel;
 @property (nonatomic, strong) UIButton *actionButton;
+@property (nonatomic, strong) UIStackView *titleRowStack;
+@property (nonatomic, strong) UIStackView *textStack;
 @end
 
 @implementation HomeAnnouncementTileCell
@@ -582,37 +571,67 @@ static NSString *festivalGreeting(void) {
     self.iconView.tintColor = colorFromHex(@"#3B82F6");
     [self.contentContainer addSubview:self.iconView];
     
-    self.messageLabel = [[UILabel alloc] init];
-    self.messageLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.messageLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    self.messageLabel.textColor = [UIColor labelColor];
-    self.messageLabel.numberOfLines = 0;
-    [self.contentContainer addSubview:self.messageLabel];
+    // Task149：标题样式对齐新闻卡片（15pt semibold）；查看详情按钮内联到
+    // 标题后面并缩小（contentEdgeInsets 自适应宽 + 28pt 高胶囊圆角）
+    self.titleRowStack = [[UIStackView alloc] init];
+    self.titleRowStack.translatesAutoresizingMaskIntoConstraints = NO;
+    self.titleRowStack.axis = UILayoutConstraintAxisHorizontal;
+    self.titleRowStack.alignment = UIStackViewAlignmentCenter;
+    self.titleRowStack.spacing = 8;
+    
+    self.titleLabel = [[UILabel alloc] init];
+    self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    self.titleLabel.textColor = [UIColor labelColor];
+    self.titleLabel.numberOfLines = 1;
+    [self.titleRowStack addArrangedSubview:self.titleLabel];
     
     self.actionButton = [UIButton buttonWithType:UIButtonTypeSystem];
     self.actionButton.translatesAutoresizingMaskIntoConstraints = NO;
-    self.actionButton.titleLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
+    self.actionButton.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
     self.actionButton.layer.cornerRadius = 8;
     self.actionButton.layer.cornerCurve = kCACornerCurveContinuous;
     self.actionButton.clipsToBounds = YES;
     self.actionButton.hidden = YES;
-    [self.contentContainer addSubview:self.actionButton];
+    self.actionButton.contentEdgeInsets = UIEdgeInsetsMake(4, 12, 4, 12);
+    [self.actionButton setContentHuggingPriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.actionButton setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+    [self.actionButton.heightAnchor constraintEqualToConstant:28].active = YES;
+    [self.titleRowStack addArrangedSubview:self.actionButton];
+    
+    // Task149：简介样式对齐新闻卡片（12pt tertiary）；高度不够时优先截断
+    // （与 MC 新闻页 cell 同序：简介 750 < 标题行 998）
+    self.summaryLabel = [[UILabel alloc] init];
+    self.summaryLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.summaryLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    self.summaryLabel.textColor = [UIColor tertiaryLabelColor];
+    self.summaryLabel.numberOfLines = 0;
+    [self.summaryLabel setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical];
+    [self.titleRowStack setContentCompressionResistancePriority:998 forAxis:UILayoutConstraintAxisVertical];
+    
+    self.textStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.titleRowStack, self.summaryLabel]];
+    self.textStack.translatesAutoresizingMaskIntoConstraints = NO;
+    self.textStack.axis = UILayoutConstraintAxisVertical;
+    self.textStack.alignment = UIStackViewAlignmentFill;
+    self.textStack.spacing = 4;
+    [self.contentContainer addSubview:self.textStack];
     
     [NSLayoutConstraint activateConstraints:@[
-        [self.iconView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:16],
+        // Task149：喇叭图标放在中间的高度位置（垂直居中，尺寸不变）
         [self.iconView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:16],
+        [self.iconView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
         [self.iconView.widthAnchor constraintEqualToConstant:22],
         [self.iconView.heightAnchor constraintEqualToConstant:22],
         
-        [self.messageLabel.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:16],
-        [self.messageLabel.leadingAnchor constraintEqualToAnchor:self.iconView.trailingAnchor constant:10],
-        [self.messageLabel.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-16],
-        
-        [self.actionButton.topAnchor constraintEqualToAnchor:self.messageLabel.bottomAnchor constant:10],
-        [self.actionButton.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:16],
-        [self.actionButton.widthAnchor constraintEqualToConstant:100],
-        [self.actionButton.heightAnchor constraintEqualToConstant:30],
+        // 文本块：不足时钳制在上下 14pt 内（简介优先截断），短内容整体居中
+        [self.textStack.leadingAnchor constraintEqualToAnchor:self.iconView.trailingAnchor constant:10],
+        [self.textStack.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-16],
+        [self.textStack.topAnchor constraintGreaterThanOrEqualToAnchor:self.contentContainer.topAnchor constant:14],
+        [self.textStack.bottomAnchor constraintLessThanOrEqualToAnchor:self.contentContainer.bottomAnchor constant:-14],
     ]];
+    NSLayoutConstraint *ame149_textCenter = [self.textStack.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor];
+    ame149_textCenter.priority = 999;
+    ame149_textCenter.active = YES;
 }
 
 @end
@@ -668,23 +687,38 @@ static NSString *festivalGreeting(void) {
     self.placeholderLabel.text = localize(@"i18n_str_346", nil);
     [self.contentContainer addSubview:self.placeholderLabel];
     
+    // Task149：文字块参照欢迎卡模式重排——标题+简介纵向 stack 相对缩略图
+    // 纵轴居中；高度不够时简介优先截断（750 < 标题 997）
+    [self.summaryLabel setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical];
+    [self.titleLabel setContentCompressionResistancePriority:997 forAxis:UILayoutConstraintAxisVertical];
+    self.summaryLabel.numberOfLines = 0;
+    UIStackView *ame149_textStack = [[UIStackView alloc] initWithArrangedSubviews:@[self.titleLabel, self.summaryLabel]];
+    ame149_textStack.translatesAutoresizingMaskIntoConstraints = NO;
+    ame149_textStack.axis = UILayoutConstraintAxisVertical;
+    ame149_textStack.alignment = UIStackViewAlignmentFill;
+    ame149_textStack.spacing = 4;
+    [self.contentContainer addSubview:ame149_textStack];
+    
     [NSLayoutConstraint activateConstraints:@[
-        [self.thumbnailView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:14],
+        // Task149：缩略图等边距——卡高 100、缩略图高 60，上/下边距恒为 20，
+        // 左边距与文字间距同步取 20（到左/上/下边缘距离一致，尺寸不变）
+        [self.thumbnailView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:20],
         [self.thumbnailView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
         [self.thumbnailView.widthAnchor constraintEqualToConstant:80],
         [self.thumbnailView.heightAnchor constraintEqualToConstant:60],
         
-        [self.titleLabel.topAnchor constraintEqualToAnchor:self.thumbnailView.topAnchor],
-        [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.thumbnailView.trailingAnchor constant:14],
-        [self.titleLabel.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
-        
-        [self.summaryLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor constant:4],
-        [self.summaryLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-        [self.summaryLabel.trailingAnchor constraintEqualToAnchor:self.titleLabel.trailingAnchor],
+        // 文字块：相对缩略图居中，不足时钳制（简介优先截断到能显示的行）
+        [ame149_textStack.leadingAnchor constraintEqualToAnchor:self.thumbnailView.trailingAnchor constant:20],
+        [ame149_textStack.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
+        [ame149_textStack.topAnchor constraintGreaterThanOrEqualToAnchor:self.contentContainer.topAnchor constant:14],
+        [ame149_textStack.bottomAnchor constraintLessThanOrEqualToAnchor:self.contentContainer.bottomAnchor constant:-14],
         
         [self.placeholderLabel.bottomAnchor constraintEqualToAnchor:self.thumbnailView.bottomAnchor],
         [self.placeholderLabel.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
     ]];
+    NSLayoutConstraint *ame149_newsTextCenter = [ame149_textStack.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor];
+    ame149_newsTextCenter.priority = 999;
+    ame149_newsTextCenter.active = YES;
 }
 
 @end
@@ -836,6 +870,14 @@ static NSString *festivalGreeting(void) {
                                                object:nil];
 }
 
+// Task149：首帧默认头像保险——viewWillAppear 再跑一次 updateSkinDisplay
+// （标签页往返/返回前台时补齐账号态；无账号时 avatarImageView 首帧
+// 已由 setupBaseViews 直接呈现 DefaultAccount，点击前不再出现空白）
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self updateSkinDisplay];
+}
+
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
@@ -940,61 +982,22 @@ static NSString *festivalGreeting(void) {
     ]];
 }
 
-/// Task138：公告磁贴自适应高度（用户报告"公告的高度太小，导致按钮被藏在
-/// 下面"）。原 90pt 固定高度只容纳单行消息：summary 档两行、full 档三行
-/// 时动作按钮（消息底 + 10 间距 + 30 高）被直接裁出磁贴底缘。现按当前
-/// 预览档位对实际文本做行高测量，叠加按钮与上下边距得出所需高度，
-/// 下限保留原 90（短消息观感不变）。announcement_preview_level 改动或
-/// 公告数据到达（reloadAnnouncementSection 触发 reloadData）都会重新
-/// 走 sectionProvider 取到新高度。
-- (CGFloat)ame138_announcementTileHeight {
-    const CGFloat ame138_base = 90;
-    NSString *ame138_message = nil;
-    BOOL ame138_hasButton = NO;
-    if (self.latestAnnouncement) {
-        AnnouncementItem *ann = self.latestAnnouncement;
-        NSString *ame138_level = getPrefObject(@"general.announcement_preview_level") ?: @"summary";
-        if ([ame138_level isEqualToString:@"title_only"]) {
-            ame138_message = ann.title;
-        } else if ([ame138_level isEqualToString:@"full"]) {
-            ame138_message = [NSString stringWithFormat:@"%@\n%@\n%@",
-                ann.title, ann.formattedDateString, ann.summary];
-        } else {
-            ame138_message = [NSString stringWithFormat:@"%@\n%@", ann.title, ann.summary];
-        }
-        ame138_hasButton = ann.actionURL.length > 0 && ann.actionTitle.length > 0;
-    } else {
-        ame138_message = self.announcementText;
-        ame138_hasButton = self.hasUpdate;
-    }
-    if (ame138_message.length == 0) return ame138_base;
-    // 可用文本宽度：全宽磁贴 - 区块内边距(15x2) - 条目内边距(5x2)
-    // - 左边距 16 - 图标 22 - 间距 10 - 右边距 16
-    CGFloat ame138_tileWidth = self.collectionView.bounds.size.width > 0
-        ? self.collectionView.bounds.size.width : UIScreen.mainScreen.bounds.size.width;
-    CGFloat ame138_textWidth = ame138_tileWidth - 15 * 2 - 5 * 2 - 16 - 22 - 10 - 16;
-    if (ame138_textWidth < 80) ame138_textWidth = 80;
-    NSAttributedString *ame138_attr = [[NSAttributedString alloc] initWithString:ame138_message
-        attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:14 weight:UIFontWeightMedium]}];
-    CGRect ame138_rect = [ame138_attr boundingRectWithSize:CGSizeMake(ame138_textWidth, CGFLOAT_MAX)
-        options:NSStringDrawingUsesLineFragmentOrigin context:nil];
-    CGFloat ame138_needed = 16 + ceil(CGRectGetHeight(ame138_rect))
-        + (ame138_hasButton ? (10 + 30) : 0) + 16;
-    return MAX(ame138_base, ame138_needed);
-}
-
+/// Task149：公告磁贴自适应高度机制退役（ame138_announcementTileHeight 删除）
+/// ——公告/新闻磁贴与「最新正式版」磁贴等高（用户指令，固定 100），
+/// 高度不够时简介优先截断到能显示的行（各 cell 内压缩序已就位）。
 - (CGFloat)heightForTileConfig:(HomeTileConfig *)config {
     switch (config.tileType) {
         case HomeTileTypeProfile:
             return config.tileSize == HomeTileSizeFull ? 170 : 140;
         case HomeTileTypeAnnouncement:
-            // Task138：自适应（病历见 ame138_announcementTileHeight 注释）
-            return [self ame138_announcementTileHeight];
+            // Task149：与最新正式版卡片等高
+            return 100;
         case HomeTileTypeVersionRelease:
         case HomeTileTypeVersionSnapshot:
             return 100;
         case HomeTileTypeNews:
-            return config.tileSize == HomeTileSizeFull ? 120 : 100;
+            // Task149：与最新正式版卡片等高（原 120/100 双档退役）
+            return 100;
         case HomeTileTypeShortcut:
             return 76;
         default:
@@ -1073,31 +1076,9 @@ static NSString *festivalGreeting(void) {
             
             NSString *name = self.currentUsername ?: localize(@"i18n_str_351", nil);
             cell.welcomeLabel.text = [NSString stringWithFormat:localize(@"i18n_str_352", nil), name];
-            // Task141：第二行改为公告标题行（喇叭图标 + 公告标题 21pt bold + 公告卡同款查看详情按钮）。
-            // 无公告数据时回退为原问候语（14pt 灰字，图标按钮隐藏）。
-            AnnouncementItem *ann = self.latestAnnouncement;
-            if (ann.title.length > 0) {
-                cell.announceIconView.hidden = NO;
-                cell.announceLabel.text = ann.title;
-                cell.announceLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];
-                cell.announceLabel.textColor = [UIColor labelColor];
-                if (ann.actionURL.length > 0 && ann.actionTitle.length > 0) {
-                    cell.detailButton.hidden = NO;
-                    [cell.detailButton setTitle:ann.actionTitle forState:UIControlStateNormal];
-                    [cell.detailButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-                    cell.detailButton.backgroundColor = colorFromHex(@"#3B82F6");
-                    [cell.detailButton removeTarget:nil action:nil forControlEvents:UIControlEventAllEvents];
-                    [cell.detailButton addTarget:self action:@selector(openAnnouncementActionURL) forControlEvents:UIControlEventTouchUpInside];
-                } else {
-                    cell.detailButton.hidden = YES;
-                }
-            } else {
-                cell.announceIconView.hidden = YES;
-                cell.detailButton.hidden = YES;
-                cell.announceLabel.text = festivalGreeting();
-                cell.announceLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-                cell.announceLabel.textColor = [UIColor secondaryLabelColor];
-            }
+            // Task149：第二行回归原灰字问候语（Task141 公告标题行+按钮已退役，
+            // 公告预览回归主页面公告卡片本体）
+            cell.greetingLabel.text = festivalGreeting();
             // Task136：头像接管最左位置；有真实 MC 头像时铺满裁剪。
             // Task141：无头像（未选择账号/本地账户）时使用与应用列表同款的
             // DefaultAccount 默认头像（此前 SF person 占位符在白卡上观感"空白"）
@@ -1143,22 +1124,18 @@ static NSString *festivalGreeting(void) {
             HomeAnnouncementTileCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"AnnouncementCell" forIndexPath:indexPath];
             [cell setAccentColor:[config accentColor]];
 
+            // Task149：公告卡重排——标题/简介分离（样式对齐新闻卡片），
+            // 查看详情按钮内联标题后；预览档位仅控制简介是否显示
             if (self.latestAnnouncement) {
                 AnnouncementItem *ann = self.latestAnnouncement;
                 NSString *previewLevel = getPrefObject(@"general.announcement_preview_level") ?: @"summary";
 
-                if ([previewLevel isEqualToString:@"title_only"]) {
-                    // 仅标题
-                    cell.messageLabel.text = ann.title;
-                } else if ([previewLevel isEqualToString:@"full"]) {
-                    // 完整：标题 + 日期 + 摘要
-                    cell.messageLabel.text = [NSString stringWithFormat:@"%@\n%@\n%@", ann.title, ann.formattedDateString, ann.summary];
-                } else {
-                    // summary（默认）：标题 + 摘要
-                    cell.messageLabel.text = [NSString stringWithFormat:@"%@\n%@", ann.title, ann.summary];
-                }
+                cell.titleLabel.text = ann.title;
+                BOOL ame149_showSummary = (![previewLevel isEqualToString:@"title_only"] && ann.summary.length > 0);
+                cell.summaryLabel.text = ame149_showSummary ? ann.summary : nil;
+                cell.summaryLabel.hidden = !ame149_showSummary;
 
-                // 如果有 actionURL，显示按钮
+                // 如果有 actionURL，内联按钮显示在标题后
                 if (ann.actionURL.length > 0 && ann.actionTitle.length > 0) {
                     cell.actionButton.hidden = NO;
                     [cell.actionButton setTitle:ann.actionTitle forState:UIControlStateNormal];
@@ -1171,7 +1148,9 @@ static NSString *festivalGreeting(void) {
                 }
             } else {
                 // 无公告数据时显示更新检测结果
-                cell.messageLabel.text = self.announcementText;
+                cell.titleLabel.text = self.announcementText;
+                cell.summaryLabel.text = nil;
+                cell.summaryLabel.hidden = YES;
 
                 if (self.hasUpdate) {
                     cell.actionButton.hidden = NO;
@@ -1538,10 +1517,9 @@ static NSString *festivalGreeting(void) {
     for (NSInteger s = 0; s < self.displaySections.count; s++) {
         for (HomeTileConfig *tile in self.displaySections[s]) {
             if (tile.tileType == HomeTileTypeAnnouncement) {
-                // Task138：reloadSections 改 performBatchUpdates——公告磁贴
-                // 高度现为自适应（ame138_announcementTileHeight），数据到达
-                // 或预览档位变化引起的高度变化会以 0.3s 平滑过渡呈现，
-                // 不再瞬间跳变把后续磁贴顶下去。
+                // Task149：reloadSections 走 performBatchUpdates——公告数据
+                // 到达或预览档位变化时以 0.3s 平滑过渡呈现（自适应高度机制
+                // 已退役，保留平滑刷新体验）。
                 [self.collectionView performBatchUpdates:^{
                     [self.collectionView reloadSections:[NSIndexSet indexSetWithIndex:s]];
                 } completion:^(BOOL finished) {

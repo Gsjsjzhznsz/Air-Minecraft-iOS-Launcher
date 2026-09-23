@@ -102,7 +102,9 @@ static const NSInteger kNewsPageSize = 24;
         _summaryLabel.translatesAutoresizingMaskIntoConstraints = NO;
         _summaryLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
         _summaryLabel.textColor = [UIColor secondaryLabelColor];
-        _summaryLabel.numberOfLines = 4;
+        // Task149：新闻简介全部显示而非截断（用户指令）——行数不限制，
+        // 卡片高度随内容自 sizing（布局侧 estimated 尺寸）
+        _summaryLabel.numberOfLines = 0;
 
         _readMoreLabel = [[UILabel alloc] init];
         _readMoreLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -244,12 +246,11 @@ static const NSInteger kNewsPageSize = 24;
     self.collectionView.dataSource = self;
     self.collectionView.delegate = self;
     self.collectionView.alwaysBounceVertical = YES;
-    // Task141：确保不能左右滑（用户实测新闻页"左右也有点空隙"且疑似可横向拖动）
+    // Task149：双列恢复——左右 8pt 侧边距 + 卡片 0.5 宽（公告列表页同款
+    // 语言）；保持不能左右滑（用户 Task141 指令沿用）
     self.collectionView.alwaysBounceHorizontal = NO;
     [self.collectionView registerClass:[MCNewsCollectionViewCell class] forCellWithReuseIdentifier:@"NewsCell"];
-    // Task141：左右贴边（用户要求"检测屏幕大小并贴于窗口"）——侧边 inset 退役，
-    // 仅保留上下 8pt 呼吸；卡片宽度由布局改为 fractional 1.0 随屏幕自适应
-    self.collectionView.contentInset = UIEdgeInsetsMake(8, 0, 8, 0);
+    self.collectionView.contentInset = UIEdgeInsetsMake(8, 8, 8, 8);
     [self.view addSubview:self.collectionView];
 
     self.refreshControl = [[UIRefreshControl alloc] init];
@@ -308,26 +309,6 @@ static const NSInteger kNewsPageSize = 24;
     ]];
 }
 
-/// 双列固定高度布局（Task136：所有卡片统一取原样式设定的最低高度——
-/// 即标题/摘要各单行时的自然高度，长文在固定高度内截断，不再逐卡自动调长）
-- (CGFloat)newsCardFixedHeight {
-    static CGFloat fixedHeight = 0;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        // 用原样式 cell 以最短内容（标题/摘要各 1 行）实测最低高度
-        MinecraftNewsItem *probe = [[MinecraftNewsItem alloc] init];
-        probe.title = @"T";
-        probe.summary = @"T";
-        MCNewsCollectionViewCell *template = [[MCNewsCollectionViewCell alloc] initWithFrame:CGRectMake(0, 0, 320, 600)];
-        [template configureWithItem:probe];
-        CGFloat measured = [template systemLayoutSizeFittingSize:CGSizeMake(320, 0)
-                             withHorizontalFittingPriority:UILayoutPriorityRequired
-                                   verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
-        fixedHeight = (measured >= 200.0) ? measured : 280.0;  // 实测异常时兜底原估计值
-    });
-    return fixedHeight;
-}
-
 - (UICollectionViewLayout *)createCompositionalLayout {
     UICollectionViewCompositionalLayoutConfiguration *config = [[UICollectionViewCompositionalLayoutConfiguration alloc] init];
     config.interSectionSpacing = kNewsCardSpacing;
@@ -335,19 +316,19 @@ static const NSInteger kNewsPageSize = 24;
 
     // section provider block 接收两个参数：sectionIndex 和 layoutEnvironment
     // 构造方法为 -initWithSectionProvider:configuration:（不是 +layoutWithConfiguration:sectionProvider:）
-    CGFloat cardHeight = [self newsCardFixedHeight];
     return [[UICollectionViewCompositionalLayout alloc] initWithSectionProvider:^NSCollectionLayoutSection *(NSInteger sectionIndex, id<NSCollectionLayoutEnvironment> env) {
-        // Task141：单列贴边（用户实测旧双列布局组宽 1.0 但子项仅 0.5 且只有一项，
-        // 卡片贴左半宽、右侧留白，观感"不是连贯的上下滑动"）。现卡片宽度 =
-        // fractional 1.0（随屏幕尺寸自适应、贴于窗口），纵向连贯滚动；
-        // 高度仍为固定绝对值（Task136 等高机制不变，不再自适应调长）
-        NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:1.0]
-                                                                            heightDimension:[NSCollectionLayoutDimension absoluteDimension:cardHeight]];
-        NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
+        // Task149：恢复双列并列排（用户指令：Task141 单列退役），布局与
+        // 公告列表页同款语言——每组两个 0.5 宽子项 + 12pt 间距；高度改
+        // estimated 随内容自 sizing（简介不再截断，Task136 固定等高机制
+        // 随 newsCardFixedHeight 一并退役）
+        NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:0.5]
+                                                                            heightDimension:[NSCollectionLayoutDimension estimatedDimension:280]];
+        NSCollectionLayoutItem *ame149_itemA = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
+        NSCollectionLayoutItem *ame149_itemB = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
 
         NSCollectionLayoutGroup *group = [NSCollectionLayoutGroup horizontalGroupWithLayoutSize:[NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:1.0]
-                                                                                                                                             heightDimension:[NSCollectionLayoutDimension absoluteDimension:cardHeight]]
-                                                                                      subitems:@[item]];
+                                                                                                                                             heightDimension:[NSCollectionLayoutDimension estimatedDimension:280]]
+                                                                                      subitems:@[ame149_itemA, ame149_itemB]];
         group.interItemSpacing = [NSCollectionLayoutSpacing fixedSpacing:kNewsCardSpacing];
 
         NSCollectionLayoutSection *section = [NSCollectionLayoutSection sectionWithGroup:group];
