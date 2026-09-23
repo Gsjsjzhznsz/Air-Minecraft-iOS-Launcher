@@ -199,3 +199,25 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - `gl_bridge.m`（取证，无行为变化）：dlsym_EGL 处捕获渲染器 dylib 句柄；gl_make_current 成功分支在 Task140 readback 后追加同源 `glGetString(GL_VERSION)` 探针——下轮 Mithril 日志可一锤判定「renderer 内部 eglGetCurrentContext 与 glGetString 分叉」还是「创建后被动解绑」。
 
 装机验证锚点：① 带 Sodium 整合包 + MobileGL/OSMesa/zink/ANGLE 启动不再出现 "not supported when using Sodium"；② 4.0 后端（若再崩）日志必现 `Task140 make-current readback` + `Task145 glGetString-probe: version=...` 两行——NULL 值即 Mithril 内部分叉实锤；③ Forge 安装越过 0.85 后出现 status.json 终态判定日志（成功或明确报错），不再无限刷 (4/4)。
+
+## Task 148（本会话，MobileGL 双后端 FSR 复活——内置 FSR1 独家接管）
+
+用户指令（Run #356 判读后的否决）："不行那2个端必须可以使用fsr"——Task 147 把 Vulkan/ES 退回全分辨率直呈（FSR 停用）的方案被否，这两端必须可用 FSR。
+
+### 根因（Run #356 五日志 + MobileGlues-cpp 源码实锤，花屏+倒转完整机理）
+1. **libMobileGL.dylib / libMobileGL-gles.dylib = MobileGlues-cpp 共体构建**：iOS settings 分支读 config.json 的 fsr1Setting（Task78/130 每次启动写入，Run #356 双会话 config.json 实锤 fsr1Setting:4）→ **渲染器内置 FSR1 在这两后端本就激活**：glBindFramebuffer(fb0) 的 DRAW 绑定被重定向到 FSR1 渲染目标（framebuffer.cpp:186 `draw_fb = FSR1_Context::g_renderFBO`），呈现由 presentSurface→ApplyFSR 在 eglSwapBuffers 内收口。
+2. **双重管线打架 = 毁帧**：启动器侧 Task119 预交换链（EASU→离屏→RCAS→"fb0"）在此架构下，RCAS 的 fb0 绘制经同一重定向灌进 FSR1 渲染目标——每帧把 MC 刚画好的帧摧毁成"RCAS(上一帧拷贝)按 2360x1640 视口裁进 1180x820 目标"的错位拼图，再被 ApplyFSR 2x 放大上屏 = 用户所见花屏+倒转。双会话日志（EASU/RCAS ready + 600 帧 steady）与"损坏但持续输出"完全吻合。
+3. **勘误（Task147 判读错误）**：RCAS sharpness=1.000 在 mpv 口径是【最大锐化】（FSRRCASSource.h stops=2*(1-S)：S=1→0 stops→最锐），不是"无锐化"；该值为用户 pick 所选（pickKeys 含 @"1"），非默认值 bug（PLPreferences 默认 @0.2）。zink 会话 FSR 端到端 LANDED（Task103 哨兵 3/3 + bundle-direct present）——"zink fsr 不生效"的感知与 sharpness=1.0 的过锐观感需在 UI 侧引导（建议 0.2-0.5），非管线问题。latestlog.old 的"zink 无 EASU"会话实为 Forge 启动崩溃会话（OSMesa 渲染器 + JVM SIGSEGV 尾帧，Task147 osm_make_current 空指针守卫已修）。
+
+### 修复（本提交，2 文件）
+- `SurfaceViewController.m`：ame83_fsr_capable_renderer 恢复 isMobileGLRenderer（Task147 撤销块反转）——Task83 联动（MC 窗口=surface/档位）复位，这正是内置 FSR1 预期几何（与 mg 同构）；mgFsrScale 触控缩放随之恢复。
+- `mgl_fsr.mm`（Task148 仲裁）：启动器预交换链不再是 MobileGL 后端的默认服务方——
+  - 新增 `ame148_detect_builtin_fsr_redirect()`：GL_DRAW_FRAMEBUFFER_BINDING getter 会隐藏重定向（getter.cpp:147 回 0），改走附件查询——DRAW 绑定显式指回 fb0 后查 COLOR_ATTACHMENT0 的 OBJECT_NAME：重定向时非零（FSR1 目标颜色纹理），无重定向时按规范拒绝 NAME 查询且名字保持 0；
+  - `ame_mgl_fsr_before_swap` 入口仲裁：判内置接管 → 启动器链永久退休（探测停止、零开销）；判无重定向（渲染器过旧/内置 FSR1 初始化失败未重试成功）→ 链作兜底继续活跃且逐帧复探（InitFSRResources 失败后会重试，重定向中途出现即 Retirement，杜绝晚到毁帧）；导出表缺失保守判接管；
+  - 新增符号 glGetFramebufferAttachmentParameteriv（gl_native.cpp NATIVE 导出已验证）；状态位 ame148_arbitrated/ame148_builtin_owns；
+  - 日志锚点：`[MGLFSR] Task148 builtin-FSR1 arbitration: fb0 draw color0 type=0x... name=... -> REDIRECTED ... RETIRED`（防刷屏：明细行仅首探/翻转时打印）。
+
+### 装机验证锚点（下轮日志判读）
+1. Vulkan/ES 会话必现 `Task148 builtin-FSR1 arbitration ... REDIRECTED -- builtin FSR1 owns upscale+present, launcher chain RETIRED`，且不再出现 `Task119 FSR1 upscale engaged` / `Task130 RCAS engaged (MobileGL)`；
+2. Vulkan 花屏+倒转消失、画面正常且为 FSR 档位渲染分辨率（内置 ApplyFSR 呈现）；ES 方块渲染情况随毁帧链退休一并观察（若仍缺方块 = 独立问题，抓 MGL 前端 GLES 行）；
+3. 若出现 `no redirect -- launcher chain stays as fallback`：说明该渲染器二进制未含内置 FSR1 或 config 未生效——启动器链接管（旧路径），需抓 config.json 内容与 [MG] FSR1 行再判。

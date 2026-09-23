@@ -223,6 +223,10 @@ typedef struct {
     void (*glViewport)(int, int, int, int);
     void (*glDisable)(unsigned int);
     void (*glGetIntegerv)(unsigned int, int*);
+    // Task 148：内置 FSR1 仲裁探测——GL_DRAW_FRAMEBUFFER_BINDING 的 getter 会
+    // 隐藏 fb0 重定向（getter.cpp 特意回 0），只能走附件查询看 DRAW 目标上
+    // 是否挂了真实颜色对象。
+    void (*glGetFramebufferAttachmentParameteriv)(unsigned int, unsigned int, unsigned int, int*);
     unsigned int (*glGetError)(void);
 } ame119_gl_t;
 
@@ -248,6 +252,9 @@ static struct {
     bool rcasFailed;               // RCAS 不可用 → EASU 直画 fb0（旧路径）
     bool rcasEngaged;              // RCAS 首帧一次性日志
     long rcasFrames;               // RCAS 帧计数（低频日志）
+    // ---- Task 148：内置 FSR1 仲裁 ----
+    bool ame148_arbitrated;        // 已执行过仲裁探测（首帧日志）
+    bool ame148_builtin_owns;      // 渲染器内置 FSR1 接管 → 启动器链退休
 } ame119_fsr = {0};
 
 // Task 130：RCAS 锐化强度（mpv 口径 [0,1] 越大越锐，默认 0.2；负值 = 关闭
@@ -352,6 +359,10 @@ static bool ame119_resolve_gl(void) {
         {"glViewport",                (void **)&ame119_fsr.gl.glViewport},
         {"glDisable",                 (void **)&ame119_fsr.gl.glDisable},
         {"glGetIntegerv",             (void **)&ame119_fsr.gl.glGetIntegerv},
+        // Task 148：内置 FSR1 仲裁探测入口（MobileGL 导出表核心项，
+        // gl_native.cpp NATIVE_FUNCTION_HEAD 已验证存在）
+        {"glGetFramebufferAttachmentParameteriv",
+                                      (void **)&ame119_fsr.gl.glGetFramebufferAttachmentParameteriv},
         {"glGetError",                (void **)&ame119_fsr.gl.glGetError},
     };
     int ok = 0;
@@ -707,6 +718,58 @@ static bool ame119_fsr_upscale(int srcW, int srcH, int dstW, int dstH) {
 }
 
 // ============================================================================
+// Task 148：内置 FSR1 仲裁探测。
+//
+// 病机（Run #356 Vulkan 花屏+倒转实锤）：libMobileGL 两后端是 MobileGlues-cpp
+// 共体构建，config.json 的 fsr1Setting（Task78/130 每次启动写入）令渲染器
+// 内置 FSR1 生效——glBindFramebuffer(fb0) 的 DRAW 绑定被重定向到 FSR1 渲染
+// 目标（framebuffer.cpp:186），呈现由 presentSurface→ApplyFSR 在
+// eglSwapBuffers 内收口。启动器侧预交换链此时若照跑，RCAS 的"画进 fb0"
+// 会经同一重定向灌进 FSR1 目标，每帧摧毁 MC 刚渲染好的帧——这正是 Run #356
+// 双会话（EASU/RCAS 全部就绪、600 帧稳定运行）却输出花屏+倒转的完整机理。
+//
+// 探测原理：GL_DRAW_FRAMEBUFFER_BINDING 的 getter 会隐藏重定向
+// （getter.cpp:147 特意回 0，防应用保存重定向句柄），改走附件查询——
+// 把 DRAW 绑定显式指回 fb0（重定向生效时后端真实绑定 = FSR1 渲染目标），
+// 查其 COLOR_ATTACHMENT0 的 OBJECT_NAME：重定向时非零（FSR1 目标的颜色
+// 纹理）；无重定向（真默认帧缓冲）时按规范拒绝 NAME 查询（报错）且名字
+// 保持 0。探测开销 ≈ 4 次状态查询，仅在启动器链仍活跃时逐帧执行；
+// 一旦判内置接管，本链永久退休、探测停止。错误位读走不留痕。
+// ============================================================================
+static bool ame148_detect_builtin_fsr_redirect(void) {
+    if (!ame119_resolve_gl()) return false;   // 符号不可用：链无从服务，也探不到重定向
+    ame119_gl_t *g = &ame119_fsr.gl;
+    if (g->glGetFramebufferAttachmentParameteriv == NULL) {
+        // 导出表缺失 = 渲染器过旧。保守判内置接管：宁可退休（半分辨率直呈
+        // 下一轮可诊断），不可重演每帧毁帧。
+        NSLog(@"[MGLFSR] Task148 arbitration: attachment-query entry missing -- assuming builtin FSR1 owns fb0 (chain retired)");
+        return true;
+    }
+    GLint saveDraw = 0;
+    g->glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &saveDraw);
+    if (g->glGetError) g->glGetError();   // 清残留错误位，保证探测结果干净
+    g->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);   // fb0 的 DRAW 绑定（重定向生效点）
+    GLint objType = 0, objName = 0;
+    g->glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER,
+                                             0x8CE0 /*GL_COLOR_ATTACHMENT0*/,
+                                             0x8210 /*GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE*/, &objType);
+    g->glGetFramebufferAttachmentParameteriv(GL_DRAW_FRAMEBUFFER,
+                                             0x8CE0 /*GL_COLOR_ATTACHMENT0*/,
+                                             0x8C66 /*GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME*/, &objName);
+    unsigned int err = g->glGetError ? g->glGetError() : 0;
+    g->glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (unsigned int)saveDraw);   // saveDraw=0 时重定向照常重放，状态无损
+    bool owns = (objName != 0);
+    // 兜底模式下本函数逐帧复探——明细行只在首探或判定翻转时打印，防刷屏。
+    if (!ame119_fsr.ame148_arbitrated || owns != ame119_fsr.ame148_builtin_owns) {
+        NSLog(@"[MGLFSR] Task148 builtin-FSR1 arbitration: fb0 draw color0 type=0x%x name=%u err=0x%x -> %s",
+              (unsigned)objType, (unsigned)objName, err,
+              owns ? "REDIRECTED -- builtin FSR1 owns upscale+present, launcher chain RETIRED"
+                   : "no redirect -- launcher chain stays as fallback");
+    }
+    return owns;
+}
+
+// ============================================================================
 // 对外入口（gl_bridge.m 调用）。
 // ============================================================================
 
@@ -720,6 +783,22 @@ extern "C" bool ame_mgl_fsr_before_swap(void) {
 
     int surfW = ame_surfaceWidth, surfH = ame_surfaceHeight;
     if (surfW <= 0 || surfH <= 0) return false;   // 表面未初始化（非 FSR 场景）
+
+    // ---- Task 148：内置 FSR1 仲裁（见 ame148_detect_builtin_fsr_redirect）----
+    // 判内置接管 → 永久退休（探测停止，零开销）；判无重定向 → 本链作为
+    // 兜底继续活跃，且逐帧复探（渲染器侧 InitFSRResources 失败后会重试，
+    // 重定向可能中途出现——出现即 Retirement，杜绝晚到毁帧）。
+    if (!ame119_fsr.ame148_arbitrated || !ame119_fsr.ame148_builtin_owns) {
+        bool owns = ame148_detect_builtin_fsr_redirect();
+        if (!ame119_fsr.ame148_arbitrated || owns != ame119_fsr.ame148_builtin_owns) {
+            NSLog(@"[MGLFSR] Task148 arbitration verdict: builtin FSR1 %s -- launcher pre-swap chain %s",
+                  owns ? "OWNS fb0 (redirect detected)" : "not active (no fb0 redirect)",
+                  owns ? "RETIRED" : "ACTIVE (fallback upscale)");
+        }
+        ame119_fsr.ame148_builtin_owns = owns;
+        ame119_fsr.ame148_arbitrated = true;
+    }
+    if (ame119_fsr.ame148_builtin_owns) return false;
 
     // 输入区域：优先 MC 真实呈现视口（Task105 同款自适应——BMC2 类模组
     // 铺进 fb0 的区域可能小于告知窗口），闸门不符则回退 windowWidth 信仰。

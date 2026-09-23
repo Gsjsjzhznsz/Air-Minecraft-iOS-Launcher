@@ -256,15 +256,17 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     if (renderer.length == 0) return NO;
     if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;
     if ([renderer hasPrefix:@"libOSMesa"]) return YES;
-    // Task 147：MobileGL 两后端（libMobileGL.dylib / libMobileGL-gles.dylib）
-    // 退出 FSR 联动。Run #356 双会话实锤：mgl_fsr 预交换链（EASU 1180x820 ->
-    // offscreen 2360x1640 -> RCAS -> swapchain）在 DirectVulkan 呈现花屏+倒转、
-    // 在 DirectGLES 会话伴随方块不渲染；设置期还有 "GLSL version query
-    // returned 0 -- no current context"（Task140）警示。两个后端都退回
-    // 全分辨率直呈（mgFsrScale=1.0 -> MC 窗口=全表面 -> before_swap 的
-    // inW>=surfW 零开销跳过），正确性优先于性能；MobileGlues 自带 FSR1
-    // 与 zink EASU（osm_bridge，走自家管线）不受影响。
-    // if (isMobileGLRenderer(renderer.UTF8String)) return YES;  // Task 147 撤销
+    // Task 148：MobileGL 两后端恢复 FSR 联动（用户硬性要求：这两端必须可用
+    // FSR）。架构裁决——libMobileGL.dylib / libMobileGL-gles.dylib 是
+    // MobileGlues-cpp 共体构建，内置 FSR1（config.json fsr1Setting，Task78/130
+    // 每次启动写入）在 eglSwapBuffers 内部完成 EASU+RCAS 全程：fb0 的 DRAW
+    // 绑定被重定向到 FSR1 渲染目标（gl/framebuffer.cpp glBindFramebuffer），
+    // 呈现由 presentSurface→ApplyFSR 收口。Task 147 判定的"预交换链花屏"
+    // 根因正是启动器侧 Task119 链在该架构下经同一重定向把 RCAS 输出画进
+    // FSR1 目标、每帧摧毁 MC 刚渲染的帧（Run #356 Vulkan 花屏+倒转实证），
+    // Task148 已将启动器链退休（mgl_fsr.mm 内置仲裁探测），联动几何
+    // （MC 窗口=surface/档位）本就是内置 FSR1 的预期形态，与 mg 同构。
+    if (isMobileGLRenderer(renderer.UTF8String)) return YES;
     return NO;
 }
 
