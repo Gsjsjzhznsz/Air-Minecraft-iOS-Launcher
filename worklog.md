@@ -2,7 +2,7 @@
 
 ## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 150（2026-09-23）。此前：Task 149（2026-09-23，本会话）；144-146（2026-09-22，另一会话）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
+> 最后更新：Task 151（2026-09-23，另一会话，Bing 每日壁纸）。此前：Task 150（2026-09-23）；149（2026-09-23）；144-146（2026-09-22）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -11,9 +11,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | daa4e3c（Task 149，本会话，CI 绿）；Task 150 推送后更新此行 |
-| 最新 Task 号 | **150**（另一会话占用 147/148；Task 149 已推送 CI 绿）（双会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 149 六项返工（头像首帧/欢迎卡问候语+等边距/公告卡新闻卡等高重排/取消阴影/蓝条/原生底部面板/新闻双列）+ Task 144-146 渲染器与 Forge/Mithril 锚点 |
+| 远端 HEAD | 86239549（Task 151，Bing 每日壁纸，另一会话）；此前 6d73fc11（Task 150，CI 绿） |
+| 最新 Task 号 | **151**（双会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 151 Bing 壁纸（默认开启/画廊/刷新/保存相册）+ Task 149 六项返工 + Task 144-146 渲染器与 Forge/Mithril 锚点 + Task 148 FSR 双后端 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -277,3 +277,26 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - 用户预期：①设置页无渲染器选择、实例页无跟随全局开关、实例渲染器行永远可选、未设置实例走 auto（装机日志锚：无键实例启动日志 RENDERER is set to libMobileGL.dylib=auto 解析路径）②实例页组件安装出现火焰图标 Sodium 行，Fabric 实例一键下载 Sodium+Podium 进 mods/（非 Fabric 实例点击提示"仅 Fabric 有效"）。
 - [可撤销] 说明：git revert 单提交即可整体还原；代码内注释标注了各退役点的恢复方式（PLProfiles prefDefaults 映射行 / 实例页 pragma 区 / 设置页行字典）。
 - 待用户安装新 CI 工件实机验证；推送前 fetch 对齐（双会话并行）。
+
+---
+Task ID: 151
+Agent: Super Z (main agent, 另一会话)
+Task: 壁纸设置新增 Bing 每日壁纸（用户指定：搜索第三方接入方案 → 默认开启 → 基础功能完全）
+
+Work Log:
+- 搜索确认接入方案：业界第三方通用 = Bing 官方无鉴权接口 HPImageArchive.aspx?format=js&idx=0&n=8&mkt=zh-CN（返回 images[]：url/urlbase/copyright/title/startdate），图片 URL 补 host 即可下载；1920x1080→UHD 替换取 4K（404 静默回退）；th 服务附加 &w= 做缩略图（不支持则原样返回大图，零失败模式）
+- 新增 BingWallpaperManager.h/.m：cn.bing.com 主源 + www.bing.com 备源兜底；元数据 plist 持久化于 Application Support/BingWallpaper（避开 Caches 清理）；UHD→原图两级下载回退（>4KB 防 截断占位）；4h 节流 + 跨天检测；NSCache 缩略图 + 磁盘 _thumb.jpg；回前台自动补拉；BingWallpaperDidUpdate 通知
+- 默认开启语义：bing_wallpaper_enabled 键 nil→YES（显式默认，不依赖 registerDefaults 时序）；BackgroundManager 新增 background_source 标记（user/bing，历史数据→user 保证老用户自定义壁纸不被覆盖）；用户自定义永远优先；清除背景后立即回补 Bing；彻底关掉 = 关开关
+- BackgroundManager：isBingSource + setBingBackgroundImageAtPath（不重编码不复制，来源=bing，画廊勾选靠文件名前缀 startdate 匹配）；clearBackgroundInternal 删除守卫（仅 backgrounds/ 目录内文件，Bing 缓存保留离线回退）
+- 设置页 section 2 = Bing（开关行 Value1+UISwitch+今日状态副标题 / 浏览壁纸库 / 立即刷新），原图片/视频与恢复/清除顺延 3/4；footer 说明；BingWallpaperDidUpdate 监听刷新状态行
+- 新增 BingWallpaperGalleryViewController：近 8 天自适应 2/3/4 列网格（16:9 缩略图+日期+标题），异步缩略图（可见 indexPath 回填防复用错位），当前应用项蓝框，点按→操作面板（设为壁纸/保存到相册，message=版权+标题），下载 HUD，导航栏刷新，首进无缓存自动补同步，空态提示
+- 启动链：SceneDelegate applyBackgroundToWindow 之后 fire autoRefreshAndApplyIfEnabled（全异步不阻塞）
+- 基建：CMakeLists +2 源文件；Info.plist 加 NSPhotoLibraryAddUsageDescription（此前无相册权限键，保存相册功能必须）；l10n 17 个 bing.* 键 x6 语言（en/zh-CN/zh-Hans/zh-Hant 门禁基线 1928→1945）
+- 门禁重锚：12 个 verify 脚本 `== 1928`→`== 1945`（含 verify_task135.py vals=={1945} 代码级硬编码）+ 消息文本同步；新 verify_task151.py 46 项 ALL GREEN
+- 级联对拍：129-143/150 当前 vs HEAD~1 基线 FAIL 集合逐项 diff = **零新增失败**（现存失败均为既有环境性：112_118 括号 delta/139 H 块 Task146 撤销精简/132 135 沙箱路径）
+
+Stage Summary:
+- 产出：commit 86239549（本地 main，推送后由 CI 出包）；verify_task151 46/46 绿
+- 用户验证锚点（装机后）：① 首启/未设自定义壁纸 → 启动器背景自动变为 Bing 今日图（需联网）② 壁纸设置新增「Bing 壁纸」区块，开关默认开 ③「浏览壁纸库」网格 = 近 8 天，点按可设为壁纸/保存相册，当前项蓝框 ④ 设自定义壁纸后 Bing 让位（开关行副标题仍显示今日标题）⑤ 清除背景 → Bing 立即回来 ⑥ 关开关 → Bing 背景清除且不再自动应用 ⑦ 断网启动 → 上次缓存图兜底
+- 技术要点：HPImageArchive url 为相对路径需补 host；th?id 链接可直接附加 &w= 缩放；UHD 变体 = 替换 _1920x1080→_UHD；Application Support 而非 Caches 存图（防系统清理致离线首启无图）
+- 未动：FSR/渲染链（另一会话 Task148 已按用户硬性要求修复双后端 FSR）；用户上传的 3 份 latestlog（09-16 时间戳）尚未逐行判读，Task148 记录称 zink FSR 已 sentinel-verified landed、花屏倒转根因已修，待装机复核
