@@ -349,3 +349,16 @@ Stage Summary:
 - 装机锚点：①vulkan/es 会话 "[MGLFSR] Task154 MobileGL pre-swap FSR chain RETIRED (renderer=...)" + 输入复位（触点全屏准确）+ ES 方块渲染恢复 + 全分辨率直呈画面干净；②Mithril 会话越过 NativeLibrariesBootstrap（无 "Failed to locate library"）且 GlDevice 过 createCapabilities（sodium 0.9.2 包不再被 POJAV_RENDERER 触发）；③Forge 会话 "[JavaLauncher] Task154 Forge ignoreList shield: '...launcher.jar'" 且无 ResolutionException/无 AmethystAccountJNI 闪退
 - 关键决策：mg 系列 FSR 彻底退休（8 轮修补失败的架构性裁决——伪 EGL 下启动器侧链无可靠几何信号源；用户 da5918a 基准即无 FSR 态）；FSR 仍可用渲染器 = MobileGlues/zink；mg 想要画质/帧率权衡用 video.resolution
 - 遗留：ES 方块不渲染若在 Task154 构建上仍复现（理论上不可能——链已 #if 0），下一轮需其会话日志；26.1.2 存档崩溃/FSR(MobileGlues 侧)/虚拟按钮等既有遗留不动
+
+---
+Task ID: 154 (续)
+Agent: Super Z (main agent, 本会话)
+Task: CI 确认
+
+Work Log:
+- CI run 35884635001（0a22f51）completed success（完整 SHA 轮询：15:51 触发，约 5 分钟完成——本会话改动无 iOS 编译新增面，.m/.mm 均为纯 ObjC 语法内改动）
+- 轮询经验：GitHub actions API 的 head_sha 过滤需完整 40 位 SHA（短 7 位恒返回空）
+
+Stage Summary:
+- Task154 全链闭环：三案根修（mg-FSR 退休 / Mithril 双加载器+Delegate 补丁 / Forge ignoreList v2）+ 验证器 39/39 + 级联零新增失败 + CI 绿，新 IPA 就绪
+- 装机待验证锚点见 Task154 主条目：①vulkan/es "Task154 ... RETIRED" + 触点全屏准确 + ES 方块渲染；②Mithril 越过 NativeLibrariesBootstrap 进 GlDevice（sodium 0.9.2 包）；③Forge "Task154 Forge ignoreList shield" 且无 ResolutionException/AmethystAccountJNI 闪退
