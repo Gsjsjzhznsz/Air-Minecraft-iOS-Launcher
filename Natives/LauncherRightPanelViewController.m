@@ -19,7 +19,9 @@
 #import "utils.h"
 #import "AvatarManager.h"
 #import "ImageCropperViewController.h"
+#import "LauncherPreferencesViewController.h"
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
+#import <objc/runtime.h> // Task156：信息卡手势的 associated-object 路由
 
 #include <sys/time.h>
 #include <math.h> // Task102：fabs（居中偏移钳制比较）
@@ -466,6 +468,19 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     UIView *memLimitCard = [self makeInfoCardWithIcon:@"memorychip.fill" accent:cardOrange title:@"扩展内存限制" valueLabel:&_memLimitCardValue];
     UIView *extVMCard = [self makeInfoCardWithIcon:@"memorychip" accent:cardAmber title:@"扩展虚拟内存" valueLabel:&_extVMCardValue];
 
+    // Task156：信息卡点击直达对应入口（用户反馈"右边侧边栏的信息能不能点击
+    // 直达对应的入口"）。映射：启动器版本→设置·检查更新（深链）、游戏版本→
+    // 版本管理页、JIT→设置·JIT 开启工具（深链）、内存两卡→设置·内存分配
+    // （深链）、设备/系统→设置首页（无更精确入口）。深链经
+    // LauncherPreferencesViewController.ameDeepLinkKey 滚动到行并高亮。
+    [self ame156_attachInfoCardTap:launcherVersionCard route:@"settings:check_update"];
+    [self ame156_attachInfoCardTap:gameVersionCard       route:@"versionManager"];
+    [self ame156_attachInfoCardTap:deviceCard            route:@"settings"];
+    [self ame156_attachInfoCardTap:systemCard            route:@"settings"];
+    [self ame156_attachInfoCardTap:jitCard               route:@"settings:jit_enabler"];
+    [self ame156_attachInfoCardTap:memLimitCard          route:@"settings:memory_limit_help"];
+    [self ame156_attachInfoCardTap:extVMCard             route:@"settings:memory_limit_help"];
+
     [self.infoStackView addArrangedSubview:launcherVersionCard];
     [self.infoStackView addArrangedSubview:gameVersionCard];
     [self.infoStackView addArrangedSubview:deviceCard];
@@ -855,6 +870,77 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         self.jitCardValue.text = @"已开启";
     } else {
         self.jitCardValue.text = @"未开启";
+    }
+}
+
+#pragma mark - Task156：信息卡点击直达对应入口
+
+// 挂点击手势（卡片是普通 UIView，用 tap gesture 而非改造成按钮——
+// makeInfoCardWithIcon 的内部层级/约束零改动）。
+- (void)ame156_attachInfoCardTap:(UIView *)card route:(NSString *)route {
+    if (card == nil || route.length == 0) return;
+    card.userInteractionEnabled = YES;
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
+        initWithTarget:self action:@selector(ame156_infoCardTapped:)];
+    // 路由标识随身携带（多张卡共用同一 selector）
+    objc_setAssociatedObject(tap, "ame156_route", route, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [card addGestureRecognizer:tap];
+}
+
+// 沿父链找最近的导航宿主（LauncherRoot / LauncherCardLayout 都实现了
+// showSettings / showVersionManager；不 import 具体类，respondsToSelector
+// 动态判定避免布局层耦合）。
+- (void)ame156_navigateToRoute:(NSString *)route {
+    NSString *target = route;
+    NSString *deepLinkKey = nil;
+    NSRange colon = [route rangeOfString:@":"];
+    if (colon.location != NSNotFound) {
+        target = [route substringToIndex:colon.location];
+        deepLinkKey = [route substringFromIndex:colon.location + 1];
+    }
+
+    UIViewController *host = self.parentViewController;
+    while (host != nil && ![host respondsToSelector:@selector(showSettings)]) {
+        host = host.parentViewController;
+    }
+    if (host == nil) {
+        NSLog(@"[RightPanel] Task156: no navigation host found for route %@", route);
+        return;
+    }
+
+    if ([target isEqualToString:@"versionManager"]) {
+        if ([host respondsToSelector:@selector(showVersionManager)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            [host performSelector:@selector(showVersionManager)];
+#pragma clang diagnostic pop
+        }
+        return;
+    }
+
+    // settings[:deepLinkKey]
+    LauncherPreferencesViewController *prefsVC = [[LauncherPreferencesViewController alloc] init];
+    prefsVC.ameDeepLinkKey = deepLinkKey;
+    UINavigationController *navVC = [[UINavigationController alloc] initWithRootViewController:prefsVC];
+    navVC.navigationBar.prefersLargeTitles = YES;
+    if ([host respondsToSelector:@selector(setContentViewController:animated:)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        [host performSelector:@selector(setContentViewController:animated:)
+                   withObject:navVC
+                   withObject:@(YES)];
+#pragma clang diagnostic pop
+    } else {
+        // 宿主无 setContentViewController：直接弹设置页（降级但仍可用）
+        [self presentViewController:navVC animated:YES completion:nil];
+    }
+    NSLog(@"[RightPanel] Task156: info card -> %@ (deepLink=%@)", target, deepLinkKey ?: @"<none>");
+}
+
+- (void)ame156_infoCardTapped:(UITapGestureRecognizer *)tap {
+    NSString *route = objc_getAssociatedObject(tap, "ame156_route");
+    if (route != nil) {
+        [self ame156_navigateToRoute:route];
     }
 }
 

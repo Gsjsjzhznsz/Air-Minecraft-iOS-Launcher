@@ -1283,11 +1283,27 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                 NSString *logPath = [NSString stringWithFormat:@"%s/mobilegl.log", pojavHome];
                 setenv("MOBILEGL_LOG_FILE_PATH", logPath.UTF8String, 1);
             }
+            // Task156：ES（DirectGLES）后端的 multidraw 换保守档。
+            // 病历：ES 档自 Task131 上架以来方块一直不渲染/透明（天空/实体/UI 正常、
+            // swap 链健康、零 GL 报错）——Task140/153/154 修完启动器侧全部嫌疑后
+            // 仍复现，定案为 MobileGL 26.08-dev Espryt(ANGLE) 翻译层的 native/ext
+            // multidraw 路径静默丢绘制（地形批绘制走 glMultiDraw* 家族，恰好只剩
+            // 方块消失）。二进制 strings 实锤其运行时开关：
+            // MOBILEGL_ESPRYT_MULTIDRAW_MODE（值域 ext|multiindirect|indirect|
+            // basevertex|drawelements|compute|auto）——强制 drawelements（逐子绘制
+            // glDrawElements 循环，最保守）避开坏档。Vulkan(Magma) 后端有独立的
+            // MOBILEGL_MAGMA_MULTIDRAW_MODE 且装机验证正常，不触碰。
+            // 已有值不覆盖（设备上可用环境变量自由实验其他档位）。
+            if (strcmp(backend, "DirectGLES") == 0 && getenv("MOBILEGL_ESPRYT_MULTIDRAW_MODE") == NULL) {
+                setenv("MOBILEGL_ESPRYT_MULTIDRAW_MODE", "drawelements", 1);
+                NSLog(@"[JavaLauncher] Task156: Espryt multidraw tier forced to 'drawelements' (ES blocks-invisible workaround)");
+            }
             NSLog(@"[JavaLauncher] MobileGL renderer active: backend=%s", backend);
         } else {
             // 切换渲染器后清掉，避免残留影响后续启动
             unsetenv("MOBILEGL_BACKEND_TYPE");
             unsetenv("MOBILEGL_LOG_FILE_PATH");
+            unsetenv("MOBILEGL_ESPRYT_MULTIDRAW_MODE");
         }
 
         // Mithril 渲染器（libmithril.dylib）自带 EGL + GL 3.3 Core（Vulkan backend），
@@ -1707,13 +1723,27 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // 文件不存在时回退裸名（原行为），其余渲染器路径零改动。
         NSString *openglLibPush = openglLibBareName;
         if (strcmp(glLibName, RENDERER_NAME_MITHRIL) == 0) {
-            NSString *ame146_abs = [[[NSBundle mainBundle] bundlePath]
-                stringByAppendingPathComponent:@"Frameworks/libmithril.dylib"];
-            if ([[NSFileManager defaultManager] fileExistsAtPath:ame146_abs]) {
-                openglLibPush = ame146_abs;
-                NSLog(@"[JavaLauncher] Task146: Mithril libname -> absolute path %@ (dedupe into dlsym_EGL instance)", ame146_abs);
+            // Task156：Mithril 的 opengl.libname 优先指向 GL 垫片 libmithril_glshim.dylib
+            //（re-export libmithril 全部符号 + 本地 glGetIntegerv/glGetInteger64v 对
+            // limit 枚举 0 值补下限——MC 26.2 DynamicUniformStorage 的
+            // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT 除零崩溃根修，见
+            // Natives/mithril_gl_shim.c 病历）。垫片缺失时回退 Task146 绝对路径
+            //（dlsym-direct 解析仍成立，仅 /0 补底失效），再回退裸名（原行为）。
+            NSString *ame156_shim = [[[NSBundle mainBundle] bundlePath]
+                stringByAppendingPathComponent:@"Frameworks/libmithril_glshim.dylib"];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:ame156_shim]) {
+                openglLibPush = ame156_shim;
+                NSLog(@"[JavaLauncher] Task156: Mithril libname -> GL shim %@ (re-export + limit floors)", ame156_shim);
             } else {
-                NSLog(@"[JavaLauncher] Task146: Mithril abs path missing (%@), fallback to bare name", ame146_abs);
+                NSLog(@"[JavaLauncher] Task156: Mithril GL shim missing (%@), falling back to direct dylib", ame156_shim);
+                NSString *ame146_abs = [[[NSBundle mainBundle] bundlePath]
+                    stringByAppendingPathComponent:@"Frameworks/libmithril.dylib"];
+                if ([[NSFileManager defaultManager] fileExistsAtPath:ame146_abs]) {
+                    openglLibPush = ame146_abs;
+                    NSLog(@"[JavaLauncher] Task146: Mithril libname -> absolute path %@ (dedupe into dlsym_EGL instance)", ame146_abs);
+                } else {
+                    NSLog(@"[JavaLauncher] Task146: Mithril abs path missing (%@), fallback to bare name", ame146_abs);
+                }
             }
         }
         PUSH_MARGV_FORMAT(@"-Dorg.lwjgl.opengl.libname=%s", openglLibPush.UTF8String);

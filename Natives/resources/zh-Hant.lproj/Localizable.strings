@@ -313,7 +313,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 超分辨率";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超解析度（Task 83 起支援多渲染器）。選擇檔位即自動降低渲染解析度（超高品質 77%／高品質 67%／平衡 59%／效能優先 50%），再由渲染器放大回全解析度表面——無需再手動降低解析度。支援：MobileGlues（內建 FSR1）、Zink（EASU 升採樣，與 MobileGlues 同款演算法）。MoltenVK/自動/gl4es 暫不支援（需要 FSR 請選 MobileGlues 或 Zink）。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超解析度。選擇檔位即自動降低渲染解析度（超高品質 77%／高品質 67%／均衡 59%／效能優先 50%），再由渲染器放大回全解析度表面。僅對 MobileGlues（內建 FSR1）與 Zink（EASU 昇採樣）渲染器生效；mg 系列（Vulkan／ES／OpenGL 4.0 後端）、MoltenVK、gl4es 均不支援啟動器側 FSR——這些渲染器需要畫質／幀率取捨時，請改用影片設定中的「解析度」縮放。";
 "preference.title.mg_fsr1_setting-0" = "关闭";
 "preference.title.mg_fsr1_setting-1" = "超高品质";
 "preference.title.mg_fsr1_setting-2" = "高品质";
@@ -2103,6 +2103,7 @@
 "bing.gallery.title" = "瀏覽壁紙庫";
 "bing.refresh.title" = "立即重新整理";
 "bing.footer.hint" = "開啟後，若未設定自訂壁紙，將自動套用 Bing 每日壁紙並每天更新；設定自訂壁紙會暫時停用，清除背景後自動恢復。";
+"background.effect.footer" = "上方「透明度」控制介面材質的不透明程度（數值越低，桌布透出越多）；下方「模糊程度」控制背景高斯模糊的強度（數值越低，背景越清晰）。僅在「UI效果」選擇毛玻璃或半透明時生效。";
 "bing.gallery.nav.title" = "Bing 壁紙庫";
 "bing.setwallpaper.title" = "設為壁紙";
 "bing.save.title" = "儲存到相簿";

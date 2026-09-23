@@ -1280,3 +1280,49 @@
 // realignment + blocks rendering; Mithril past NativeLibrariesBootstrap
 // with "[JavaLauncher] Task154 Forge ignoreList shield: '...launcher.jar'"
 // on Forge sessions.
+
+// REVISION 17 addendum (Task 156, no bump): four-render family + IME + UI.
+// (1) ES (DirectGLES) blocks-invisible: pinned as an upstream MobileGL
+//     26.08-dev Espryt translation-layer fault (every launcher-side suspect
+//     was cleared across Tasks 140/153/154 -- d089745 already showed the
+//     symptom pre-regression; Task113's "GLES variant misbehaves upstream"
+//     warning was right). Binary strings expose the runtime tier switch:
+//     MOBILEGL_ESPRYT_MULTIDRAW_MODE now forced to 'drawelements' (per-draw
+//     glDrawElements loop) for the ES backend at both JavaLauncher and
+//     egl_bridge selection sites -- chunk batches avoid the silently
+//     dropping native/ext multi-draw tier. Vulkan (Magma) keeps its own
+//     MOBILEGL_MAGMA_MULTIDRAW_MODE and is untouched. Device anchor:
+//     "[JavaLauncher] Task156: Espryt multidraw tier forced to 'drawelements'".
+// (2) Mithril (4.0) / by zero: decompiled MC 26.2 GlHeuristics -- DeviceLimits
+//     reads GL33C.glGetInteger(35380) (GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT);
+//     Mithril answers 0 -> DynamicUniformStorage's Mth.roundToward divides
+//     by zero. New Natives/mithril_gl_shim.c builds libmithril_glshim.dylib
+//     (Makefile dep_mithril_glshim, openal_shim re-export pattern): re-exports
+//     every libmithril symbol, local glGetIntegerv/glGetInteger64v floor
+//     zero limit enums (3379/34852/35361/35380 + 64-bit variants), and the
+//     eglGetProcAddress funnel keeps dlsym-direct semantics under both GL$1
+//     Delegate states. JavaLauncher points Mithril's
+//     -Dorg.lwjgl.opengl.libname at the shim (existence-guarded). Anchor:
+//     "[JavaLauncher] Task156: Mithril libname -> GL shim ...".
+// (3) Forge android.util.ArrayMap: GLFW.class (the lwjgl overlay) declares
+//     ArrayMap fields; the MC-BOOTSTRAP ModuleClassLoader parents to the boot
+//     layer, so the -cp stub in launcher.jar is invisible to it (0d45e3f
+//     latestlog.forge: GLFWErrorCallback$1 -> apiClassTokens ->
+//     NoClassDefFoundError). The five android/util stubs are now ALSO
+//     compiled into the lwjgl overlay (JavaApp/src/lwjgl/android/util/) so
+//     both lwjgl-333 and lwjgl-341 merged jars carry them in the module
+//     layer. Anchor: Forge reaches past DisplayWindow.initWindow.
+// (4) IME (iPadOS 27): TrackedTextField gains the public UIKeyInput
+//     insertText: catch-all (80 ms same-text dedup vs the private
+//     insertFilteredText:/replaceRange paths) and nil-guarded/clamped
+//     setAttributedMarkedText (NSNotFound backspace floods). The
+//     TouchController text field is now the Ame156TCIMEAwareTextField
+//     subclass: marked-text updates fire didChange and sendTextInputStatus
+//     reports real markedTextRange composition bounds instead of 0/0.
+// (5) UI: blur/opacity sliders get their (already localized) row titles
+//     displayed + a semantics footer (background.effect.footer, l10n
+//     1945->1946); the FSR row detail now states honestly that the mg
+//     family (Vulkan/ES/4.0) has no launcher-side FSR and points to the
+//     video Resolution scaler; the right panel's 7 info cards are tappable
+//     and deep-link into settings (LauncherPreferencesViewController
+//     ameDeepLinkKey scroll+flash; game version card -> VersionManager).

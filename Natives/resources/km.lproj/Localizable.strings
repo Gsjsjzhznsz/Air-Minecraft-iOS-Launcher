@@ -299,7 +299,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling (multi-renderer since Task 83). Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales back to the full surface. Supported: MobileGlues (built-in FSR1), Zink (EASU, same shader as MobileGlues). MoltenVK/Auto/gl4es are not supported yet -- pick MobileGlues or Zink when you need FSR.";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales it back to the full-resolution surface. Only works with the MobileGlues (built-in FSR1) and Zink (EASU) renderers. The mg family (Vulkan / ES / OpenGL 4.0 backends), MoltenVK and gl4es do not support launcher-side FSR -- for those renderers use the Resolution scaler in Video settings instead.";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";
@@ -1964,6 +1964,7 @@
 "bing.gallery.title" = "មើលវិចិត្រសាល";
 "bing.refresh.title" = "ធ្វើឱ្យថ្មីឥឡូវនេះ";
 "bing.footer.hint" = "នៅពេលបើក ប្រសិនបើមិនបានកំណត់រូបភាពផ្ទាល់ខ្លួន រូបភាពប្រចាំថ្ងៃរបស់ Bing នឹងត្រូវបានអនុវត្តស្វ័យប្រវត្តិ និងធ្វើឱ្យថ្មីរាល់ថ្ងៃ។";
+"background.effect.footer" = "Opacity គ្រប់គ្រងភាពស្រអាប់នៃវត្ថុ UI (កាន់តែទាប = ផ្ទាំងរូបភាពបង្ហាញច្រើនជាង)។ Blur Level គ្រប់គ្រងកម្រិតនៃការធ្វើឱ្យព្រិល Gaussian នៃផ្ទៃខាងក្រោយ (កាន់តែទាប = ផ្ទៃខាងក្រោយច្បាស់ជាង)។ មានប្រសិទ្ធភាពនៅពេល UI Effect ត្រូវបានកំណត់ទៅ Blur ឬ Translucent ប៉ុណ្ណោះ។";
 "bing.gallery.nav.title" = "វិចិត្រសាល Bing";
 "bing.setwallpaper.title" = "កំណត់ជារូបភាពផ្ទៃខាងក្រោយ";
 "bing.save.title" = "រក្សាទុកទៅរូបភាព";

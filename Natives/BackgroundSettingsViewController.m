@@ -184,9 +184,15 @@
 }
 
 // Task151：Bing 部分页脚说明（默认开启语义：用户自定义优先，清除背景后自动回到 Bing 每日图）
+// Task156：section 0 页脚——两个滑块的语义说明（用户反馈“两个百分比不知道
+// 干什么的”：上=透明度（材质不透明程度，越低越透），下=模糊程度（背景高斯
+// 模糊强度，越低越清晰）。
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 2) {
         return localize(@"bing.footer.hint", nil);
+    }
+    if (section == 0) {
+        return localize(@"background.effect.footer", nil);
     }
     return nil;
 }
@@ -220,13 +226,25 @@
             
         } else if (indexPath.row == 1) {
             // 透明度滑块
+            // Task156：行内标题（用户反馈“毛玻璃下两个百分比无名”）——
+            // sections[0][1]（i18n_str_1296“透明度”）此前从未被显示（原代码
+            // textLabel.text = nil，只有滑块+百分比）。标题 UILabel 固定在
+            // 图标之后，滑块右移让位。
             UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:sliderCellIdentifier];
             if (!cell) {
                 cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:sliderCellIdentifier];
                 cell.selectionStyle = UITableViewCellSelectionStyleNone;
                 
-                // 创建滑块
-                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(16, 0, cell.bounds.size.width - 120, 30)];
+                // 标题标签（Task156：位于图标右侧，固定宽度，垂直居中）
+                UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 0, 95, 30)];
+                titleLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
+                titleLabel.font = [UIFont systemFontOfSize:15];
+                titleLabel.textColor = [UIColor labelColor];
+                titleLabel.tag = 202;
+                [cell.contentView addSubview:titleLabel];
+                
+                // 创建滑块（Task156：起点右移到标题之后）
+                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(150, 0, cell.bounds.size.width - 230, 30)];
                 slider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
                 slider.minimumValue = 0.1f;
                 slider.maximumValue = 1.0f;
@@ -248,6 +266,9 @@
             
             [self styleCell:cell hasBackground:hasBackground];
             
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:202];
+            titleLabel.text = self.sections[0][1];
+            
             UISlider *slider = [cell.contentView viewWithTag:200];
             slider.value = manager.uiOpacity;
             
@@ -257,19 +278,28 @@
             self.opacityValueLabel = valueLabel;
             
             cell.textLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"slider.horizontal.3"];
+            cell.imageView.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
             
             return cell;
             
         } else if (indexPath.row == 2) {
             // 模糊程度滑块
+            // Task156：行内标题（同透明度行，sections[0][2]“模糊程度”首次显示）。
             UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:blurSliderCellIdentifier];
             if (!cell) {
                 cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:blurSliderCellIdentifier];
                 cell.selectionStyle = UITableViewCellSelectionStyleNone;
                 
-                // 创建滑块
-                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(16, 0, cell.bounds.size.width - 120, 30)];
+                // 标题标签（Task156）
+                UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 0, 95, 30)];
+                titleLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
+                titleLabel.font = [UIFont systemFontOfSize:15];
+                titleLabel.textColor = [UIColor labelColor];
+                titleLabel.tag = 302;
+                [cell.contentView addSubview:titleLabel];
+                
+                // 创建滑块（Task156：起点右移到标题之后）
+                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(150, 0, cell.bounds.size.width - 230, 30)];
                 slider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
                 slider.minimumValue = 0.0f;
                 slider.maximumValue = 1.0f;
@@ -291,6 +321,9 @@
             
             [self styleCell:cell hasBackground:hasBackground];
             
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:302];
+            titleLabel.text = self.sections[0][2];
+            
             UISlider *slider = [cell.contentView viewWithTag:300];
             slider.value = manager.blurIntensity;
             
@@ -299,7 +332,7 @@
             valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
             
             cell.textLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"slider.horizontal.3"];
+            cell.imageView.image = [UIImage systemImageNamed:@"drop.halffull"];
             
             return cell;
         }

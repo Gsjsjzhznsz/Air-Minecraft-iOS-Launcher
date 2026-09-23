@@ -315,7 +315,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling (multi-renderer since Task 83). Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales back to the full surface. Supported: MobileGlues (built-in FSR1), Zink (EASU, same shader as MobileGlues). MoltenVK/Auto/gl4es are not supported yet -- pick MobileGlues or Zink when you need FSR.";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales it back to the full-resolution surface. Only works with the MobileGlues (built-in FSR1) and Zink (EASU) renderers. The mg family (Vulkan / ES / OpenGL 4.0 backends), MoltenVK and gl4es do not support launcher-side FSR -- for those renderers use the Resolution scaler in Video settings instead.";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";
@@ -2107,6 +2107,7 @@
 "bing.gallery.title" = "Browse Gallery";
 "bing.refresh.title" = "Refresh Now";
 "bing.footer.hint" = "When enabled and no custom wallpaper is set, the Bing daily wallpaper is applied automatically and refreshed every day. Setting a custom wallpaper pauses it; clearing the background brings it back.";
+"background.effect.footer" = "Opacity controls how translucent the UI material is (lower = more wallpaper shows through). Blur Level controls the strength of the background Gaussian blur (lower = sharper background). Both only take effect when UI Effect is set to Blur or Translucent.";
 "bing.gallery.nav.title" = "Bing Gallery";
 "bing.setwallpaper.title" = "Set as Wallpaper";
 "bing.save.title" = "Save to Photos";

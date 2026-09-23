@@ -274,6 +274,28 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     return NO;
 }
 
+// ============================================================================
+// Task156：TouchController 文本输入的 IME（拼音等输入法）组字感知。
+//
+// 病历：设备 iPadOS 27.0 报“输入法无法正常输入”。touchControllerTextField
+// 原是纯 UITextField：① IME 组字（marked text）更新在 iOS 27 上不触发
+// UIControlEventEditingChanged，mod 侧看不到组字过程；② sendTextInputStatus
+// 硬编码 compositionStart/Length = 0，mod 把拼音字母当已提交文本。子类化后：
+// 组字更新同样回调 didChange；状态上报真实 markedTextRange 边界，mod 可
+// 正确渲染组字下划线/候选替换。
+// ============================================================================
+@interface Ame156TCIMEAwareTextField : UITextField
+@end
+
+@implementation Ame156TCIMEAwareTextField
+- (void)setAttributedMarkedText:(NSAttributedString *)markedText selectedRange:(NSRange)selectedRange {
+    [super setAttributedMarkedText:markedText selectedRange:selectedRange];
+    // 组字更新也走 didChange → sendTextInputStatus（EditingChanged 对 marked
+    // text 不触发，iOS 27 实测）；sendActions 与系统触发路径同队列，无重入风险。
+    [self sendActionsForControlEvents:UIControlEventEditingChanged];
+}
+@end
+
 @interface SurfaceViewController ()<UITextFieldDelegate, UIGestureRecognizerDelegate> {
     // Task 78：MobileGlues FSR 渲染分辨率联动系数（1.0=关闭/非 MG）。
     // updateSavedResolution 每次重算（旋转/分辨率变更安全）；sendTouchPoint
@@ -639,13 +661,26 @@ void ame139_fsr_heal_reset_input_scale(void) {
     if (self.touchControllerTransportHandle < 0) return;
 
     NSString *text = self.touchControllerTextField.text ?: @"";
+    // Task156：上报真实组字（marked text）边界——此前硬编码 0/0，mod 侧把
+    // 拼音字母当已提交文本，候选上屏时整段替换异常。markedTextRange 为 nil
+    // （无组字）时边界为零，与旧语义一致。
+    NSInteger compositionStart = 0, compositionLength = 0;
+    UITextRange *markedRange = self.touchControllerTextField.markedTextRange;
+    if (markedRange != nil) {
+        compositionStart = [self.touchControllerTextField offsetFromPosition:self.touchControllerTextField.beginningOfDocument
+                                                                  toPosition:markedRange.start];
+        compositionLength = [self.touchControllerTextField offsetFromPosition:markedRange.start
+                                                                     toPosition:markedRange.end];
+        if (compositionStart < 0 || (NSUInteger)compositionStart > text.length) compositionStart = 0;
+        if (compositionLength < 0 || (NSUInteger)(compositionStart + compositionLength) > text.length) compositionLength = 0;
+    }
     UITextRange *selectedRange = self.touchControllerTextField.selectedTextRange;
     // Bug fix: 当 TextField 不是 firstResponder 时 selectedTextRange 可能为 nil，
     // 此时 offsetFromPosition:toPosition:nil 会抛出 NSInternalInconsistencyException。
     if (!selectedRange) {
         NSData *messageData = [self encodeInputStatusMessageWithText:text
-                                                  compositionStart:0
-                                                  compositionLength:0
+                                                  compositionStart:(int)compositionStart
+                                                  compositionLength:(int)compositionLength
                                                   selectionStart:0
                                                   selectionLength:0
                                                   selectionLeft:NO];
@@ -658,8 +693,8 @@ void ame139_fsr_heal_reset_input_scale(void) {
                                                                     toPosition:selectedRange.end];
 
     NSData *messageData = [self encodeInputStatusMessageWithText:text
-                                              compositionStart:0
-                                              compositionLength:0
+                                              compositionStart:(int)compositionStart
+                                              compositionLength:(int)compositionLength
                                               selectionStart:(int)selectionStart
                                               selectionLength:(int)selectionLength
                                               selectionLeft:NO];
@@ -992,7 +1027,8 @@ void ame139_fsr_heal_reset_input_scale(void) {
 
 - (void)setupTouchControllerTextInput {
     if (!self.touchControllerTextField) {
-        self.touchControllerTextField = [[UITextField alloc] initWithFrame:CGRectZero];
+        // Task156：Ame156TCIMEAwareTextField——IME 组字感知（见类声明处病历）。
+        self.touchControllerTextField = [[Ame156TCIMEAwareTextField alloc] initWithFrame:CGRectZero];
         self.touchControllerTextField.hidden = YES;
         self.touchControllerTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
         self.touchControllerTextField.autocorrectionType = UITextAutocorrectionTypeNo;

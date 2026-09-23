@@ -1703,6 +1703,40 @@
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"OpenCurseForgeAPIKeySettings" object:nil];
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+
+    // Task156：右侧边栏信息卡深链——滚动到目标行并高亮（一次性）。
+    // prefContents 在 super 的加载流程完成后可用；搜索态下目标行必然
+    // 在表内（深链键都是普通行），不做搜索态特判。
+    if (self.ameDeepLinkKey.length > 0) {
+        NSString *target = self.ameDeepLinkKey;
+        self.ameDeepLinkKey = nil;  // 只消费一次，返回本页不再跳
+        [self.tableView layoutIfNeeded];
+        for (NSInteger s = 0; s < (NSInteger)self.prefContents.count; s++) {
+            NSArray<NSDictionary *> *rows = self.prefContents[s];
+            for (NSInteger r = 0; r < (NSInteger)rows.count; r++) {
+                NSString *k = rows[r][@"key"];
+                if (k != nil && [k isEqualToString:target]) {
+                    NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
+                    [self.tableView scrollToRowAtIndexPath:ip
+                                             atScrollPosition:UITableViewScrollPositionMiddle
+                                                     animated:YES];
+                    [self.tableView selectRowAtIndexPath:ip animated:NO scrollPosition:UITableViewScrollPositionNone];
+                    // 短暂高亮后取消选中（系统 deselect 动画）
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)),
+                                   dispatch_get_main_queue(), ^{
+                        [self.tableView deselectRowAtIndexPath:ip animated:YES];
+                    });
+                    NSLog(@"[LauncherPrefs] Task156: deep-linked to row '%@' (section %ld row %ld)", target, (long)s, (long)r);
+                    return;
+                }
+            }
+        }
+        NSLog(@"[LauncherPrefs] Task156: deep-link target '%@' not found in prefContents (plain open)", target);
+    }
+}
+
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
 

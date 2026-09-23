@@ -444,6 +444,23 @@ dep_openal_shim:
 		$(SOURCEDIR)/Natives/openal_shim.c || exit 1
 	echo '[Amethyst v$(VERSION)] dep_openal_shim - end'
 
+dep_mithril_glshim:
+	echo '[Amethyst v$(VERSION)] dep_mithril_glshim - start'
+	# Task 156: Mithril GL provider shim (libmithril_glshim.dylib).
+	# - re-export every libmithril.dylib symbol (dep_openal_shim pattern;
+	#   its install name is already @rpath/libmithril.dylib -- no LC_ID fix
+	#   needed). LWJGL points -Dorg.lwjgl.opengl.libname at the shim, so the
+	#   Delegate per-name dlsym lands on Mithril's own implementations.
+	# - local glGetIntegerv/glGetInteger64v win over the re-exports and floor
+	#   zero limit enums (GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT=0 caused MC 26.2
+	#   DynamicUniformStorage divide-by-zero; see Natives/mithril_gl_shim.c).
+	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
+		-install_name @rpath/libmithril_glshim.dylib \
+		-Wl,-reexport_library,$(SOURCEDIR)/Natives/resources/Frameworks/libmithril.dylib \
+		-o $(WORKINGDIR)/libmithril_glshim.dylib \
+		$(SOURCEDIR)/Natives/mithril_gl_shim.c || exit 1
+	echo '[Amethyst v$(VERSION)] dep_mithril_glshim - end'
+
 assets:
 	echo '[Amethyst v$(VERSION)] assets - start'
 	if [ '$(IOS)' = '0' ] && [ '$(DETECTPLAT)' = 'Darwin' ]; then \
@@ -568,7 +585,7 @@ dep_sdl3_guard:
 		$(SOURCEDIR)/Natives/resources/Frameworks/libSDL3.dylib || exit 1
 	echo '[Amethyst v$(VERSION)] dep_sdl3_guard - end'
 
-payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_angle_freeze dep_sdl3_guard
+payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_angle_freeze dep_sdl3_guard
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)

@@ -245,6 +245,14 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         setenv("MOBILEGL_BACKEND_TYPE",
             [renderer isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ? "DirectGLES" : "DirectVulkan",
             1);
+        // Task156：ES 后端 multidraw 保守档（与 JavaLauncher 主导出处同步；
+        // 本路径是无 Java 侧初始化的兑底，已有值不覆盖）。
+        const char *ame156_backend = getenv("MOBILEGL_BACKEND_TYPE");
+        if (ame156_backend != NULL && strcmp(ame156_backend, "DirectGLES") == 0 &&
+            getenv("MOBILEGL_ESPRYT_MULTIDRAW_MODE") == NULL) {
+            setenv("MOBILEGL_ESPRYT_MULTIDRAW_MODE", "drawelements", 1);
+            NSLog(@"[egl_bridge] Task156: Espryt multidraw tier forced to 'drawelements' (ES blocks-invisible workaround)");
+        }
         NSLog(@"[egl_bridge] MobileGL renderer: backend=%s",
             getenv("MOBILEGL_BACKEND_TYPE") ?: "<unset>");
         set_gl_bridge_tbl();
@@ -291,6 +299,7 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         // 切换渲染器后清掉 MobileGL 专用环境变量，避免残留影响下一次启动
         unsetenv("MOBILEGL_BACKEND_TYPE");
         unsetenv("MOBILEGL_LOG_FILE_PATH");
+        unsetenv("MOBILEGL_ESPRYT_MULTIDRAW_MODE");
     }
     if (setLwjglProperty && strcmp(renderer.UTF8String, RENDERER_NAME_VULKAN) != 0) {
         // Task 131：-gles 变体是逻辑键（物理 dylib 不随包，共享 libMobileGL.dylib

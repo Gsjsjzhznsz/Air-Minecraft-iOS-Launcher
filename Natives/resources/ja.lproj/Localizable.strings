@@ -299,7 +299,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 アップスケーリング（Task 83 からマルチレンダラー対応）。プリセットを選ぶと描画解像度が低下し（Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%）、レンダラーがフル解像度へ拡大します。対応: MobileGlues（内蔵 FSR1）、Zink（MobileGlues と同一の EASU）。MoltenVK/Auto/gl4es は未対応 -- FSR が必要な場合は MobileGlues か Zink を選んでください。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 アップスケーリング。プリセットを選ぶと描画解像度が下がり（超高品質 77%／高品質 67%／バランス 59%／パフォーマンス 50%）、レンダラーがフル解像度表面へ拡大します。MobileGlues（内蔵 FSR1）と Zink（EASU）レンダラーのみ有効。mg ファミリー（Vulkan／ES／OpenGL 4.0 バックエンド）、MoltenVK、gl4es はランチャー側 FSR 非対応です--これらのレンダラーでは映像設定の「解像度」スケーラーを使用してください。";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";
@@ -1971,6 +1971,7 @@
 "bing.gallery.title" = "ギャラリーを見る";
 "bing.refresh.title" = "今すぐ更新";
 "bing.footer.hint" = "有効にすると、カスタム壁紙未設定の場合は Bing の毎日壁紙が自動で適用され、毎日更新されます。カスタム壁紙を設定すると一時停止し、背景を消去すると自動的に再開します。";
+"background.effect.footer" = "「不透明度」はUI素材の不透明度を制御します（低いほど壁紙が透けて見えます）。「ぼかしレベル」は背景のガウスぼかしの強さを制御します（低いほど背景が鮮明になります）。UI効果がぼかし/半透明に設定されている場合のみ有効です。";
 "bing.gallery.nav.title" = "Bing ギャラリー";
 "bing.setwallpaper.title" = "壁紙に設定";
 "bing.save.title" = "写真に保存";
