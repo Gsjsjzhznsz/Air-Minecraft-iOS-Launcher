@@ -101,22 +101,22 @@ check("D4 order.json 路径修正 → Task140 重锚：mod 侧写入全面退役
       'createDirectoryAtPath:presetDir' not in jl)
 
 print("== E. 渲染器选择回退 auto → Task140 分居重构后的终态 ==")
-check("E1 →Task140 全局单写 helper（双写退役 + 阴影提示）",
-      "ame140_writeRendererGlobal" in lpvc and
-      "renderer written to GLOBAL ONLY" in lpvc and
-      "preference.warning.renderer_shadowed_by_profile" in lpvc)
-check("E2 →Task142 渲染器行全局单写保留 + 后端行独立成键（定义 1 + 渲染器行调用）",
-      lpvc.count("ame140_writeRendererGlobal(") >= 1 and
+check("E1 Task150: 全局单写 helper 与遮蔽提示一并退役（设置页不再写 video.renderer）",
+      'setPrefObject(@"video.renderer"' not in lpvc and
+      '"preference.warning.renderer_shadowed_by_profile"' not in lpvc)
+check("E2 Task150: 后端行独立成键保留（写自己的键 + legacy 档位退役；渲染器写路径清零）",
       'setPrefObject(@"mobileglues.renderer_backend", ame142_rbValue);' in lpvc and
-      'setPrefInt(@"mobileglues.mobilegl_backend", 0);' in lpvc)
-check("E3 →Task142 渲染器行显示全局存储键 + 后端行显示后端键（两层分居，均不 profile 优先）",
-      lpvc.count('ame140_global = getPrefObject(@"video.renderer")') >= 1 and
+      'setPrefInt(@"mobileglues.mobilegl_backend", 0);' in lpvc and
+      'ame140_writeRendererGlobal(' not in lpvc)
+check("E3 Task150: 渲染器行 getPreference 分支退役（后端行仍显示后端键）",
+      lpvc.count('ame140_global = getPrefObject(@"video.renderer")') == 0 and
       "return ame142_effective_backend_key();" in lpvc and
       re.search(r'\[key isEqualToString:@"renderer"\]\)\)[^}]*?resolveKeyForCurrentProfile:@"renderer"',
                 lpvc) is None)
-check("E4 →Task140 实例设置页只写 profile（同步全局退役，含跟随全局删键）",
+check("E4 Task150: 实例设置页只写 profile（缺失防御性写 auto，删键态退役）",
       "Task 140：渲染器分居重构" in psvc and
-      '[existing removeObjectForKey:@"renderer"];' in psvc and
+      'existing[@"renderer"] = @"auto";' in psvc and
+      '[existing removeObjectForKey:@"renderer"];' not in psvc and
       'setPrefString(@"video.renderer", self.selectedRenderer)' not in psvc)
 
 print("== F. mg OpenGL 4.0 后端未构建（libmithril.dylib 从未入库） ==")
@@ -167,10 +167,12 @@ r = subprocess.run([sys.executable, "/home/z/my-project/scripts/task139_syntax_g
                    capture_output=True, text=True, timeout=120)
 check("I1 十文件括号平衡（含宏续行跳过）",
       "all balanced" in r.stdout, r.stdout[-200:] if r.stdout else r.stderr[-200:])
-check("I2 l10n（Task142 基线 1922；Task139 的 renderer_missing_dylib 键仍在 + Task142 开关/单mg/后端告警三键已入，旧 picker 键退役）",
+check("I2 Task150 l10n（基线 1928；renderer_missing_dylib/mgfamily/mg_backend 仍在，Task142 开关键退役，Sodium 六键已入）",
       all('"preference.warning.renderer_missing_dylib"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
-      all('"preference.profile.renderer_follow_global_toggle"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+      all('"preference.profile.renderer_follow_global_toggle"' not in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
+      all('"component.sodium.confirm_title"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and
       all('"preference.title.renderer.debug.mgfamily"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]) and

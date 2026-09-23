@@ -217,8 +217,8 @@ def lkeys(lang):
 
 ks = [lkeys(l) for l in LANGS]
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
-check("G1 四语言键集一致（Task142 基线 1924 = Task141 的 1922 + 渲染器层 单mg/开关/后端告警 3 - 旧跟随全局 1）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1924, f"counts={[len(k) for k in ks]}")
+check("G1 四语言键集一致（Task150 基线 1928 = Task142 的 1924 - 退役 2（跟随全局开关/遮蔽告警）+ Sodium 组件 6）",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 1928, f"counts={[len(k) for k in ks]}")
 check("G2 Task134 新键齐备（jit_enabler 7 + title/detail 4 + hide_controls；pickextra 3 键已删）",
       all("preference.debug.jit_enabler.auto" in k and
           "preference.debug.jit_enabler.manual" in k and

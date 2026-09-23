@@ -32,7 +32,8 @@
 #import "AI/AiSettings.h"
 
 @interface LauncherPreferencesViewController()
-@property(nonatomic) NSArray<NSString*> *rendererKeys, *rendererList;
+// Task 150（[可撤销] 删除渲染器全局控制）：rendererKeys/rendererList 属性
+// 退役（唯一消费者 = 设置页渲染器行，行删后无读取方）
 @property(nonatomic) BOOL pickingMousePointer;
 // 当前正在选择的颜色偏好键（general.text_color / general.card_color）
 @property(nonatomic, copy, nullable) NSString *pickingColorPrefKey;
@@ -331,55 +332,15 @@
             }
             return @"speed_first";
         }
-        // Task 140：主渲染器行（video.renderer）显示【全局默认】值。
-        // Task139 曾改为 profile 优先显示（与启动链同源）——但设置行是
-        // "全局默认"语义，显示 profile 值会让用户把"当前游戏的独立设置"
-        // 误认为全局状态；与 mg 后端行、实例页三方互相伪装正是本轮
-        // "切了渲染器又变回"反馈的漏乱根源。
-        // Task 142 审核（用户"最后再审核一下"）：返回【存储键】而非显示名
-        // ——Task140 返回 ame_renderer_display_name（本地化名），而
-        // openPicker 的 ✓ 按 pickKeys 精确比较存储值，auto/gl4es 等
-        // 经典值永远失配（✓ 丢失的隐性回归）；typePickField 的 ame132
-        // 分支本就支持"存储值命中 pickKeys → 显示 pickList 本地化标签"，
-        // 返回存储键两头都对：行显示标签 + ✓ 精确命中（含 "mg"）。
-        if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
-            ame142_migrateRendererStorage();
-            NSString *ame140_global = getPrefObject(@"video.renderer");
-            return [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
-        }
+        // Task 150（[可撤销] 删除渲染器全局控制）：主渲染器行（video.renderer）
+        // 随设置页渲染器选择一并退役——每个实例强制单独选择（实例页独占写
+        // profile 键），无键实例由 ame_effective_renderer 落 auto。
         return getPrefObject(keyFull);
     };
     self.setPreference = ^(NSString *section, NSString *key, id value){
-        // Task 140：渲染器写入分居重构 —— 设置页两行（video.renderer 主行 +
-        // mobileglues.renderer_backend 后端行）只写【全局】video.renderer，
-        // 不再触碰 profile 层。Task139 的双写（profile + 全局）让设置页
-        // 每次选择都覆写当前游戏的独立渲染器：用户在实例设置页改的值
-        // 被设置页“变回设置里选的那个”（本轮 d089745 装机日志实锤）。
-        // 分层语义（FCL/HMCL 同款）：设置页 = 全局默认；实例设置页 =
-        // 该游戏自己的值（含“跟随全局”删键态）；启动链 profile 优先
-        // （resolveKeyForCurrentProfile：profile 键 → 全局 → auto）不变。
-        // 若当前游戏存在独立设置且与新选值不同，NMToast 提示一层覆盖关系
-        // （防止“全局改了怎么游戏没变”的下一轮困惑）。
-        void (^ame140_writeRendererGlobal)(NSString *) = ^(NSString *ame140_value){
-            NSString *ame140_profName = PLProfiles.current.selectedProfileName;
-            NSDictionary *ame140_prof = PLProfiles.current.profiles[ame140_profName];
-            NSString *ame140_override = [ame140_prof isKindOfClass:NSDictionary.class]
-                ? ame140_prof[@"renderer"] : nil;
-            setPrefObject(@"video.renderer", ame140_value);
-            NSLog(@"[PLPrefTable] Task140: renderer written to GLOBAL ONLY = %@ (profile '%@' override: %@)",
-                  ame140_value, ame140_profName,
-                  [ame140_override isKindOfClass:NSString.class] ? ame140_override : @"<none>");
-            if ([ame140_override isKindOfClass:NSString.class] && ame140_override.length > 0 &&
-                ![ame140_override isEqualToString:ame140_value]) {
-                NSString *ame140_msg = [NSString stringWithFormat:
-                    localize(@"preference.warning.renderer_shadowed_by_profile", nil),
-                    ame_renderer_display_name(ame140_value),
-                    ame_renderer_display_name(ame140_override)];
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [NMToast showMessage:ame140_msg];
-                });
-            }
-        };
+        // Task 150（[可撤销] 删除渲染器全局控制）：旧 ame140_writeRendererGlobal
+        // 块（全局 video.renderer 写入 + profile 遮蔽提示）随渲染器行一并退役；
+        // 渲染器选择唯一入口 = 实例设置页（profile 键）。
         // AI 助手分区：回写到 AiSettings
         if ([section isEqualToString:@"ai"]) {
             if ([key isEqualToString:@"safety_mode"]) {
@@ -461,17 +422,8 @@
             }
             return;
         }
-        // Task 140：主渲染器行同样只写全局（分居语义见
-        // ame140_writeRendererGlobal 注释）；实例层由 ProfileSettings 页
-        // 独占写入（含“跟随全局”删键态）。
-        if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {
-            if ([value isKindOfClass:NSString.class]) {
-                ame140_writeRendererGlobal(value);
-            } else {
-                setPrefObject(keyFull, value);
-            }
-            return;
-        }
+        // Task 150（[可撤销] 删除渲染器全局控制）：video.renderer 写入分支
+        // 退役（行已删，此分支不再可达）。
         setPrefObject(keyFull, value);
     };
     
@@ -482,11 +434,9 @@
 
     // Task 142：渲染器键读取前先做分层迁移（幂等；旧版家族键直写
     // video.renderer/profile 的存量数据在此入位——渲染器层 "mg" +
-    // 后端键）。设置页是全局渲染器状态的首要展示面，必须先迁移再取键，
-    // 否则首帧显示原始家族 dylib 键名。
+    // 后端键）。Task150：设置页渲染器行退役，迁移仍保留（实例页与
+    // 启动链读前仍需归一家族键）。
     ame142_migrateRendererStorage();
-    self.rendererKeys = getRendererKeys(NO);
-    self.rendererList = getRendererNames(NO);
     
     // 检查是否在游戏中：如果当前可见视图控制器是 SurfaceViewController，则在游戏中
     BOOL(^whenNotInGame)() = ^BOOL(){
@@ -921,14 +871,8 @@
         ], @[
             // Video and renderer settings
             @{@"icon": @"video"},
-            @{@"key": @"renderer",
-              @"hasDetail": @YES,
-              @"icon": @"cpu",
-              @"type": self.typePickField,
-              @"enableCondition": whenNotInGame,
-              @"pickKeys": self.rendererKeys,
-              @"pickList": self.rendererList
-            },
+            // Task 150（[可撤销] 删除渲染器全局控制）：渲染器选择行退役——
+            // 全局默认概念随之取消，每个实例在实例设置页单独选择渲染器。
             @{@"key": @"resolution",
               @"hasDetail": @YES,
               @"icon": @"viewfinder",

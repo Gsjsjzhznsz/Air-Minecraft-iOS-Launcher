@@ -2,7 +2,7 @@
 
 ## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 149（2026-09-23）。此前：Task 144-146（2026-09-22，另一会话）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
+> 最后更新：Task 150（2026-09-23）。此前：Task 149（2026-09-23，本会话）；144-146（2026-09-22，另一会话）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -11,8 +11,8 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 2775e2f（Task 148，另一会话）；Task 149 推送后更新此行 |
-| 最新 Task 号 | **149**（另一会话已占用 147/148）（双会话并行开发，开新任务前先 fetch 避让编号） |
+| 远端 HEAD | daa4e3c（Task 149，本会话，CI 绿）；Task 150 推送后更新此行 |
+| 最新 Task 号 | **150**（另一会话占用 147/148；Task 149 已推送 CI 绿）（双会话并行开发，开新任务前先 fetch 避让编号） |
 | 待用户装机验证 | Task 149 六项返工（头像首帧/欢迎卡问候语+等边距/公告卡新闻卡等高重排/取消阴影/蓝条/原生底部面板/新闻双列）+ Task 144-146 渲染器与 Forge/Mithril 锚点 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
@@ -249,4 +249,31 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 
 ### Stage Summary
 - 用户预期：①头像首帧即默认头像（不点击也显示）②欢迎卡=头像等边距居左+欢迎语+灰字问候语（无公告行无按钮）③公告卡/新闻卡与最新正式版卡等高（简介截断适配）、喇叭居中、按钮内联标题后、样式对齐新闻卡、新闻页双列+简介完整、版本号保持 announcements.json 驱动 ④主页卡片零阴影 ⑤公告列表蓝条消失 ⑥内存分配=原生底部面板（拉条+写回不变）。
+- 待用户安装新 CI 工件实机验证；推送前 fetch 对齐（双会话并行）。
+
+---
+
+## Task 150（本会话，[可撤销] 删除渲染器全局控制 + Sodium 组件安装）
+
+### 用户需求（两点疑点已经用户确认：缺省渲染器=auto；Sodium 入口=一键装双模组）
+1. 启动器设置页面的渲染器选择删掉；实例页面的"跟随全局渲染器"开关删掉；有相关代码的也可删除——**每个实例强制单独选择渲染器**（初衷：促进玩家多更改渲染器以体现效果及兼容差异）。
+2. 实例页面组件安装：读取 Fabric API 安装逻辑，用相同逻辑开一个 Sodium 选项（火焰图标），安装 **Podium 和 Sodium** 模组（Podium = 禁用 Sodium 的 PojavLauncher 检查，Modrinth 实锤存在、与 Task145 的 POJAV_RENDERER 导出收敛互为双保险）。
+
+### 实施（撤销路径全部注释留档）
+- **设置页（LauncherPreferencesViewController）**：video.renderer 行字典/getPreference 分支/setPreference 分支 + ame140_writeRendererGlobal 块 + shadow toast + rendererKeys/rendererList 属性全删；MobileGlues 后端行（renderer_backend）原位幸存。
+- **实例页（ProfileSettingsViewController）**：advancedRows 去掉"跟随全局渲染器"；开关映射/构建器/回调三删；渲染器行永远可选（置灰态退役）；didSelect 直接弹选择器；popover 锚点 row 1→0；loadSettings 无键缺省 `@"auto"`；saveSettings 防御性写 auto（键永不再被删除）；rendererDisplayName nil→auto。
+- **启动链（PLProfiles.m）**：prefDefaults 的 `renderer→video.renderer` 全局回退退役（注释留档撤销路径）+ 新增 nil 守卫（getPrefObject(nil) 会抛 NSInvalidArgumentException）——ame_effective_renderer 解析链变为【profile 键 → auto】（用户确认缺省；1.17+ 经 Task144 升级逻辑解析为 MobileGL Vulkan 直连）。
+- **Sodium 组件安装（ProfileSettingsViewController）**：组件安装区新增 Sodium 行（flame.fill 火焰图标 + systemOrange，Fabric 门槛文案与 Fabric API 行同构）；`ame150_fetchModrinthPrimaryFileWithQuery:exactTitle:gameVersion:loader:completion:` ——Modrinth 搜索→**标题全等匹配**（containsString 会误命中 Sodium Extra / Podium Port）→getVersionsForModWithID→**gameVersions+loaders(fabric) 双过滤**→primaryFile；`startInstallSodiumWithGameVersion:` 注册统一下载任务（Sodium + Podium 单阶段）→两次取文件→串行下载→写实例 mods/ 目录→成功/失败 alert 与任务状态机对齐 Fabric API 流程。
+- **l10n**：退役 preference.profile.renderer_follow_global_toggle / preference.warning.renderer_shadowed_by_profile；新增 component.sodium.confirm_title/confirm_message/searching/not_found/download_failed/done——四语言键集一致，**基线 1924→1928**。
+- **发布资产**：announcements.json v6.0.0 渲染器 bullet/summary/英文尾段重写为"每游戏强制单选（无全局默认，缺省自动）+ Sodium+Podium 一键安装"；主页卡片 bullet 同步 Task149 语义；README/README_CN 渲染器行重写；version.h 追加 REVISION 17 addendum (Task 150, no bump)。
+
+### 校验
+- verify_task150 新增 43 项全绿（A 设置页 6 / B 实例页 9 / C 启动链 4 / D Sodium 8 / E l10n 5 / F 发布资产 6 / G 配平+UIColor 白名单 5）。
+- 重锚：task142（B4/B5/B6、C1-C4/C8-C11、D1/D5、E2/E4/E5/E6 —— Task142 的开关/置灰/删键/全局行锚点全面转 Task150 形态）、task140（C2/C4/C7/C9/C10/C12、E1/E2、F1/F4/F6 + G1 日志轮换重锚）、task139（E1-E4、I2）、task137（G3 增加 Task150 l10n diff 形态分支）、l10n 计数门 ×9（129-135/138/143 → 1928）。
+- 级联 stash 基线对拍（远端 HEAD 2775e2f）：**零新增失败**；顺带修复另一会话 Task147/148 日志轮换造成的 task140 G1 断链（142 F6/143 G1 级联随之自愈：140=58/58、142=49/49、143=31/31）；task139 26/36 与基线一致；129-135/138 环境性失败逐项一致；task132/135 沙箱路径环境性。
+- 四改动 ObjC 文件括号配平全 0；UIColor 白名单审计通过；ObjC 改动集中 4 文件，与另一会话 Task147/148 触及面（JavaLauncher/mgl_fsr/SurfaceViewController/egl_bridge/osm_bridge）零重叠。
+
+### Stage Summary
+- 用户预期：①设置页无渲染器选择、实例页无跟随全局开关、实例渲染器行永远可选、未设置实例走 auto（装机日志锚：无键实例启动日志 RENDERER is set to libMobileGL.dylib=auto 解析路径）②实例页组件安装出现火焰图标 Sodium 行，Fabric 实例一键下载 Sodium+Podium 进 mods/（非 Fabric 实例点击提示"仅 Fabric 有效"）。
+- [可撤销] 说明：git revert 单提交即可整体还原；代码内注释标注了各退役点的恢复方式（PLProfiles prefDefaults 映射行 / 实例页 pragma 区 / 设置页行字典）。
 - 待用户安装新 CI 工件实机验证；推送前 fetch 对齐（双会话并行）。

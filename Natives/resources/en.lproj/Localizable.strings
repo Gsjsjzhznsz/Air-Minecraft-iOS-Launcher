@@ -1550,6 +1550,14 @@
 "i18n_str_924" = "Saved: %@";
 "i18n_str_925" = "Fabric API has been installed into the mods directory:\n%@";
 "i18n_str_926" = "Write failed";
+
+// Task 150：Sodium + Podium 组件安装
+"component.sodium.confirm_title" = "Install Sodium";
+"component.sodium.confirm_message" = "Sodium is a high-performance rendering mod, and Podium disables the Sodium third-party launcher check.\n\nThe latest builds for Minecraft %@ will be downloaded into the mods directory (Fabric).";
+"component.sodium.searching" = "Searching for Sodium / Podium for %@...";
+"component.sodium.not_found" = "No matching Sodium / Podium project or version found (%@)";
+"component.sodium.download_failed" = "Failed to download Sodium / Podium: %@";
+"component.sodium.done" = "Sodium and Podium installed to the mods directory:\n%@";
 "i18n_str_927" = "Failed to write the file: %@";
 "i18n_str_928" = "Querying OptiFine versions compatible with %@...";
 "i18n_str_929" = "No OptiFine version for Minecraft %@ found";
@@ -2048,10 +2056,8 @@
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
-"preference.profile.renderer_follow_global_toggle" = "Follow Global Renderer";
 "preference.title.renderer.debug.mgfamily" = "MobileGlues";
 "preference.warning.mg_backend_missing_dylib" = "The rendering library for mg backend (%@) is missing; fell back to the default backend (Vulkan direct).";
-"preference.warning.renderer_shadowed_by_profile" = "Global default set to %@. This game keeps its own renderer (%@). Change it in the game's settings if needed.";
 "preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";
 
 /* Task 121 (l10n completion) + Task 120 (mobilegl_backend) -- added by scripts/task121_l10n_completion.py; do not edit by hand. */

@@ -1547,6 +1547,14 @@
 "i18n_str_924" = "已保存：%@";
 "i18n_str_925" = "Fabric API 已安装到 mods 目录：\n%@";
 "i18n_str_926" = "写入失败";
+
+// Task 150：Sodium + Podium 组件安装
+"component.sodium.confirm_title" = "安裝 Sodium";
+"component.sodium.confirm_message" = "Sodium 是高效能渲染模組，Podium 用於解除 Sodium 對第三方啟動器的限制。\n\n將下載適配 Minecraft %@ 的最新版本到 mods 目錄（Fabric）。";
+"component.sodium.searching" = "正在搜尋適配 %@ 的 Sodium / Podium...";
+"component.sodium.not_found" = "未找到符合的 Sodium / Podium 專案或版本（%@）";
+"component.sodium.download_failed" = "下載 Sodium / Podium 失敗：%@";
+"component.sodium.done" = "Sodium 與 Podium 已安裝到 mods 目錄：\n%@";
 "i18n_str_927" = "写入文件失败：%@";
 "i18n_str_928" = "正在查询适配 %@ 的 OptiFine 版本...";
 "i18n_str_929" = "未找到适配 Minecraft %@ 的 OptiFine 版本";
@@ -2057,10 +2065,8 @@
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直連)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 實驗性)";
-"preference.profile.renderer_follow_global_toggle" = "跟隨全域渲染器";
 "preference.title.renderer.debug.mgfamily" = "MobileGlues";
 "preference.warning.mg_backend_missing_dylib" = "mg 後端（%@）的渲染庫缺失，已回落預設後端（Vulkan 直連）。";
-"preference.warning.renderer_shadowed_by_profile" = "已寫入全域預設（%@）。目前遊戲保留獨立渲染器設定（%@），如需變更請在遊戲設定頁調整。";
 "preference.warning.renderer_missing_dylib" = "本構建未隨包攜帶 %@，遊戲將回退為 Auto（ANGLE）。如需啟用，請把對應 dylib 放入 app 的 Frameworks 目錄。";
 "preference.detail.announcement_preview_level" = "控制公告在主介面展示的詳細程度。";
 "preference.detail.app_language" = "設定啟動器介面語言，選擇“系統”时跟随裝置語言。";

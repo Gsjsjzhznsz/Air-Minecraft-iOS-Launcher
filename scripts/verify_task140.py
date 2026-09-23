@@ -61,16 +61,14 @@ prefh = read('Natives/LauncherPreferences.h')
 # C1 settings rows write global only
 check("C1 ame140_writeRendererGlobal exists (dual-write retired)",
       "ame140_writeRendererGlobal" in lp and "ame139_writeRendererBoth" not in lp)
-check("C2 global write helper writes video.renderer only (profile read is toast-only)",
-      'setPrefObject(@"video.renderer", ame140_value);' in lp and
-      'ame140_profile[@"renderer"] = ' not in lp and
-      'ame140_prof[@"renderer"]' in lp)   # toast reads the override, never writes it
+check("C2 Task150: settings page no longer writes video.renderer at all",
+      'setPrefObject(@"video.renderer"' not in lp)
 check("C2b profile-write code fully gone from settings page",
       "ame139_profile[\"renderer\"] = ame139_value;" not in lp)
 check("C3 no [PLProfiles.current save] in the settings renderer write",
       "PLProfiles.current save" not in lp.split("ame140_writeRendererGlobal")[1].split("};")[0])
-check("C4 shadow toast wired",
-      "preference.warning.renderer_shadowed_by_profile" in lp and "NMToast showMessage:ame140_msg" in lp)
+check("C4 Task150: shadow toast retired with the global renderer row",
+      "preference.warning.renderer_shadowed_by_profile" not in lp)
 check("C5 mg display block has no unconditional MobileGL default",
       "return @ RENDERER_NAME_MOBILEGL;" not in lp.split('[key isEqualToString:@"renderer_backend"]')[1][:2500])
 mgblock = lp.split('[key isEqualToString:@"renderer_backend"]')[1][:2500]
@@ -78,23 +76,21 @@ mgread = mgblock[:900]   # 只取读块本体（写块的 Task140 史注释合�
 check("C6 →Task142 backend row reads its OWN key via ame142_effective_backend_key",
       "ame142_migrateRendererStorage();\n            return ame142_effective_backend_key();" in mgread and
       "resolveKeyForCurrentProfile" not in mgread)
-check("C7 →Task142 main renderer row returns the STORAGE key (checkmark audit fix)",
-      'if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {' in lp and
-      'return [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto"]'[:0] == '' and
-      re.search(r'isEqualToString:@"renderer"\]\) \{\n\s*ame142_migrateRendererStorage\(\);\n\s*NSString \*ame140_global = getPrefObject\(@"video\.renderer"\);\n\s*return \[ame140_global isKindOfClass:NSString\.class\] \? ame140_global : @"auto"\;', lp) is not None and
-      "ame_renderer_display_name(ame140_val)" not in lp.split('renderer_follow_global')[0][:0])
+check("C7 Task150: main renderer row getPreference branch retired (no STORAGE-key read)",
+      'if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {' not in lp and
+      'ame140_global' not in lp)
 check("C8 →Task142 legacy auto+backend elevation preserved (in ame142_effective_backend_key)",
       "ame142_legacy == 2" in prefm and "RENDERER_NAME_MOBILEGL_GLES" in prefm)
 # C9 game editor
-check("C9 editor loadSettings: nil = follow global",
-      "ame140_rendererRaw" in ps and 'self.selectedRenderer = [ame140_rendererRaw isKindOfClass:NSString.class] ? ame140_rendererRaw : nil;' in ps)
-check("C10 editor save: nil removes key",
-      '[existing removeObjectForKey:@"renderer"];' in ps)
+check("C9 Task150: editor loadSettings defaults missing keys to auto",
+      "ame140_rendererRaw" in ps and '? ame140_rendererRaw : @"auto";' in ps)
+check("C10 Task150: editor save writes explicit values (missing -> auto)",
+      'existing[@"renderer"] = @"auto";' in ps)
 check("C11 editor no longer syncs global video.renderer",
       'setPrefString(@"video.renderer"' not in ps)
-check("C12 →Task142 editor picker is a single slim list (family keys only normalize the mg checkmark)",
+check("C12 Task150: editor picker is a single slim list (no nil display state)",
       "getRendererKeys(NO);" in ps and "getRendererFamilyKeys()" in ps and
-      "rendererDisplayName:nil" in ps and
+      "rendererDisplayName:nil" not in ps and
       ps.count("getRendererFamilyNames()") == 0)
 check("C13 →Task142 editor checkmark (single picker) + external follow-global toggle",
       ps.count('stringWithFormat:@"✓ %@"') >= 1 and
@@ -147,13 +143,14 @@ base = 'Natives/resources/'
 counts = {}
 for lg in langs:
     s = read(base + lg + '/Localizable.strings')
-    n1 = '"preference.profile.renderer_follow_global_toggle"' in s
-    n2 = '"preference.warning.renderer_shadowed_by_profile"' in s
+    n1 = '"preference.profile.renderer_follow_global_toggle"' not in s   # Task150 retired
+    n2 = '"preference.warning.renderer_shadowed_by_profile"' not in s   # Task150 retired
+    n7 = '"component.sodium.confirm_title"' in s                        # Task150 sodium set
     n3 = '"preference.touchcontroller.hide_controls"' in s
     n4 = '"preference.title.renderer.debug.mgfamily"' in s
     n5 = '"preference.warning.mg_backend_missing_dylib"' in s
     n6 = '"preference.profile.renderer_follow_global"' not in s   # Task142: picker 格式键退役
-    check(f"E[{lg}] new keys present (Task142 set)", n1 and n2 and n3 and n4 and n5 and n6)
+    check(f"E[{lg}] key set (Task150: 142 toggle/toast retired, sodium added)", n1 and n2 and n3 and n4 and n5 and n6 and n7)
     counts[lg] = s.count('\n"')
 vals = set(counts.values())
 check("E5 key count identical across 4 languages", len(vals) == 1, str(counts))
@@ -166,17 +163,17 @@ print("== F. publish assets ==")
 import json
 ann = json.load(open('announcements.json', encoding='utf-8'))
 e = ann['announcements'][0]
-check("F1 announcement updated with renderer layering",
-      '渲染器设置分层' in e['content'] or '分层重构' in e['summary'])
+check("F1 Task150: announcement updated with per-game mandatory selection",
+      '每游戏强制单选' in e['content'] or '每游戏强制单选' in e['summary'])
 check("F2 announcement hide-controls revised",
       '屏蔽启动器控件' in e['content'] or '保留模组自己的虚拟按钮' in e['content'])
 check("F3 announcement mentions FSR fix",
       'FSR' in e['summary'])
 rcn = read('README_CN.md')
 ren = read('README.md')
-check("F4 README_CN renderer row updated", '渲染器设置分层' in rcn)
+check("F4 Task150: README_CN renderer row per-game mandatory", '每游戏强制单选' in rcn)
 check("F5 README_CN hide semantics updated", '保留模组自己的虚拟按钮' in rcn)
-check("F6 README EN updated", 're-layered' in ren and 'Hide Launcher Controls' in ren)
+check("F6 Task150: README EN per-game mandatory (hide-controls wording kept)", 'per-game mandatory' in ren and 'Hide Launcher Controls' in ren)
 # Task142：release notes 是工作区工件（publish 管线的导出物，不在 git 内）
 # ——存在才校验；缺失时跳过（沙箱差异），announcements.json（git 内）已由
 # F1 覆盖同一内容面。
@@ -201,9 +198,18 @@ print("== G. log-evidence anchors (d089745 logs, root cause documentation) ==")
 # 生效的表现），改为锚定新日志中的"修复生效"证据；G3 崩溃签名跟随文件轮换。
 cur = read('latestlog.old.txt') if os.path.exists('latestlog.old.txt') else ''
 old = read('latestlog.txt') if os.path.exists('latestlog.txt') else ''
+# Task150 重锚：另一会话（Task147/148）推入新装机日志发生轮换——GLES 后端
+# 选择持久化证据（Task143 注册修复生效）现位于 latestlog（Forge 安装会话
+# 文件内含该 GLES 会话行）。存在才校验，缺失跳过（沙箱差异容忍）。
+gles_log = ''
+for cand in ('latestlog', 'latestlog.old.txt'):
+    p = cand
+    if os.path.exists(p) and 'renderer_backend written to OWN KEY = libMobileGL-gles.dylib' in read(p):
+        gles_log = read(p)
+        break
 if cur:
-    check("G1 GLES session backend pick persisted (Task143 registration fix effective)",
-          "renderer_backend written to OWN KEY = libMobileGL-gles.dylib" in cur)
+    check("G1 GLES session backend pick persisted (Task143 registration fix effective; Task150: file rotated to latestlog)",
+          ("renderer_backend written to OWN KEY = libMobileGL-gles.dylib" in cur) or (gles_log != ''))
     check("G2 GLES session FSR EASU ready (Task143 fragment-shader constant fix effective)",
           "[MGLFSR] Task119 FSR1 EASU ready" in cur)
 else:

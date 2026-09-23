@@ -73,27 +73,32 @@ check("B2 backend row writes ONLY its own key + retires the legacy tier",
       'setPrefInt(@"mobileglues.mobilegl_backend", 0);' in backend_write)
 check("B3 backend write no longer routes through ame140_writeRendererGlobal",
       'ame140_writeRendererGlobal' not in backend_write)
-check("B4 main renderer row returns the STORAGE key (checkmark audit fix)",
-      re.search(r'isEqualToString:@"renderer"\]\) \{\s*ame142_migrateRendererStorage\(\);\s*NSString \*ame140_global = getPrefObject\(@"video\.renderer"\);\s*return \[ame140_global isKindOfClass:NSString\.class\] \? ame140_global : @"auto"\;', lp) is not None)
-check("B5 main renderer row write still global-only (shadow toast intact)",
-      'ame140_writeRendererGlobal(value);' in lp and
-      'preference.warning.renderer_shadowed_by_profile' in lp)
-check("B6 viewDidLoad migrates before taking renderer keys",
-      lp.index('ame142_migrateRendererStorage();') < lp.index('self.rendererKeys = getRendererKeys(NO);'))
+check("B4 Task150: settings renderer row retired (getPreference video.renderer branch gone)",
+      'if ([section isEqualToString:@"video"] && [key isEqualToString:@"renderer"]) {' not in lp and
+      'getPrefObject(@"video.renderer")' not in lp)
+check("B5 Task150: global renderer write + shadow toast retired",
+      'setPrefObject(@"video.renderer"' not in lp and
+      '"preference.warning.renderer_shadowed_by_profile"' not in lp)
+check("B6 Task150: migration still runs in viewDidLoad; rendererKeys/rendererList properties retired",
+      'ame142_migrateRendererStorage();' in lp and
+      'self.rendererKeys' not in lp and
+      '@property(nonatomic) NSArray<NSString*> *rendererKeys' not in lp)
 
 print("== C. Game editor (ProfileSettingsViewController.m) ==")
 ps = read('Natives/ProfileSettingsViewController.m')
-check("C1 toggle row sits above the renderer row in the advanced section",
-      '@[@"跟随全局渲染器", @"渲染器"]' in ps)
-check("C2 toggle title localized via the new key",
-      '@"跟随全局渲染器": @"preference.profile.renderer_follow_global_toggle",' in ps)
-check("C3 switch builder mirrors selectedRenderer==nil; OFF defaults to 'mg'",
-      'buildRendererFollowSwitch' in ps and
-      '[ame142_sw setOn:(self.selectedRenderer == nil) animated:NO];' in ps and
-      'self.selectedRenderer = @ RENDERER_KEY_MG;' in ps)
-check("C4 renderer row grays out while following (tertiary + no chevron + no picker)",
-      '[UIColor tertiaryLabelColor]' in ps and
-      'if (self.selectedRenderer != nil) {\n                    [self showRendererSelector];' in ps)
+check("C1 Task150: advanced rows start at the renderer row (follow-global toggle retired)",
+      '@[@"渲染器"]' in ps and
+      '@"跟随全局渲染器"' not in ps)
+check("C2 Task150: toggle title mapping gone (renderer row keeps its own key)",
+      '"preference.profile.renderer_follow_global_toggle"' not in ps and
+      '@"渲染器": @"preference.title.renderer",' in ps)
+check("C3 Task150: follow-global switch builder/handler retired",
+      '- (UISwitch *)buildRendererFollowSwitch' not in ps and
+      '- (void)rendererFollowSwitchChanged' not in ps)
+check("C4 Task150: renderer row always active (no gray state, no nil guard)",
+      'cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];' in ps and
+      '[self rendererDisplayName:nil]' not in ps and
+      'if (self.selectedRenderer != nil) {' not in ps)
 check("C5 picker is the single slim classic list (no family loop, no follow action)",
       ps.count('NSArray *renderers = getRendererKeys(NO);') == 1 and
       ps.count('NSArray *familyKeys = getRendererFamilyKeys();') == 0 and
@@ -104,16 +109,16 @@ check("C6 legacy family keys checkmark onto the single mg entry",
 check("C7 loadSettings migrates first and normalizes family keys to 'mg'",
       ps.index('ame142_migrateRendererStorage();') < ps.index('id ame140_rendererRaw = self.profile[@"renderer"];') and
       'ame140_rendererRaw = @ RENDERER_KEY_MG;' in ps)
-check("C8 follow state still saves by removing the profile key",
-      '[existing removeObjectForKey:@"renderer"];' in ps)
-check("C9 row tap flips the switch (searches cell.subviews, not contentView)",
-      'for (UIView *ame142_sub in ame142_cell.subviews) {' in ps and
-      'ame142_cell.contentView.subviews' not in ps)
-check("C10 popover anchor moved to row 1 (toggle occupies row 0)",
-      '[self cellForGlobalSection:3 row:1];' in ps)
-check("C11 grayed value shows the GLOBAL default's display name",
-      'cell.detailTextLabel.text = [self rendererDisplayName:nil];' in ps and
-      'ame140_gval' in ps)
+check("C8 Task150: saveSettings writes explicit values (missing -> auto, key never removed)",
+      'existing[@"renderer"] = @"auto";' in ps and
+      '[existing removeObjectForKey:@"renderer"];' not in ps)
+check("C9 Task150: renderer row tap opens the picker unconditionally",
+      '[self showRendererSelector];' in ps)
+check("C10 Task150: popover anchor moved to row 0 (renderer row is first again)",
+      '[self cellForGlobalSection:3 row:0];' in ps)
+check("C11 Task150: loadSettings defaults missing keys to auto; display helper nil->auto",
+      '? ame140_rendererRaw : @"auto";' in ps and
+      'return ame_renderer_display_name(@"auto");' in ps)
 check("C12 follow-global picker-format l10n key no longer referenced",
       'preference.profile.renderer_follow_global"' not in ps)
 
@@ -123,7 +128,7 @@ base = 'Natives/resources/'
 sets = []
 for lg in langs:
     s = read(base + lg + '/Localizable.strings')
-    n1 = '"preference.profile.renderer_follow_global_toggle"' in s
+    n1 = '"preference.profile.renderer_follow_global_toggle"' not in s
     n2 = '"preference.title.renderer.debug.mgfamily"' in s
     n3 = '"preference.warning.mg_backend_missing_dylib"' in s
     n4 = '"preference.profile.renderer_follow_global"' not in s
@@ -131,8 +136,8 @@ for lg in langs:
     check(f"D[{lg}] key set (toggle + mg + backend-warn; picker key retired; detail reworded)",
           n1 and n2 and n3 and n4 and n5)
     sets.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
-check("D5 four-language key sets identical (1924 = Task141 1922 + renderer 3 - 1)",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1924,
+check("D5 Task150: four-language key sets identical (1928 = Task142 1924 - retired 2 + sodium 6)",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1928,
       f"counts={[len(x) for x in sets]}")
 
 print("== E. Publish assets ==")
@@ -141,17 +146,17 @@ ann = json.load(open('announcements.json', encoding='utf-8'))
 e = ann['announcements'][0]
 check("E1 announcements summary mentions mg single entry",
       'mg 单入口' in e['summary'])
-check("E2 announcements bullet describes toggle + gray-out + single mg",
-      '跟随全局渲染器' in e['content'] and '置灰' in e['content'] and '唯一的 **mg** 条目' in e['content'])
+check("E2 Task150: announcements bullet describes per-game mandatory selection + sodium install",
+      '每游戏强制单选' in e['content'] and '缺省\"自动\"' in e['content'] and '唯一的 **mg** 条目' in e['content'] and 'Sodium' in e['content'])
 check("E3 stale Task139 dual-write bullet removed",
       '设置页的选择现在与实例配置同步写入' not in e['content'])
-check("E4 English tail re-worded to the follow-global switch model",
-      'per-game follow-global switch' in e['content'])
+check("E4 Task150: English tail re-worded to per-game mandatory selection",
+      'per-game mandatory' in e['content'] and 'no global default' in e['content'])
 rcn = read('README_CN.md'); ren = read('README.md')
-check("E5 README_CN renderer row updated",
-      '跟随全局渲染器' in rcn and '唯一的 mg 条目' in rcn)
-check("E6 README EN renderer row updated",
-      'follow-global switch' in ren and 'single mg entry' in ren)
+check("E5 Task150: README_CN renderer row per-game mandatory",
+      '每游戏强制单选' in rcn and '缺省\"自动\"' in rcn and '唯一的 mg 条目' in rcn)
+check("E6 Task150: README EN renderer row per-game mandatory",
+      'per-game mandatory' in ren and 'single mg entry' in ren)
 vh = read('Natives/external/MobileGlues/MobileGlues-cpp/version.h')
 check("E7 version.h Task 142 addendum",
       'REVISION 17 addendum (Task 142, no bump)' in vh and

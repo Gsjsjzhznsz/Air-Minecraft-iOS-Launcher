@@ -66,7 +66,8 @@ static NSString * localizeProfileTitle(NSString *title) {
     dispatch_once(&onceToken, ^{
         map = @{
             @"渲染器": @"preference.title.renderer",
-            @"跟随全局渲染器": @"preference.profile.renderer_follow_global_toggle",
+            // Task 150（[可撤销] 删除渲染器全局控制）：跟随全局渲染器开关退役，
+            // 映射项同步删除（l10n 键 preference.profile.renderer_follow_global_toggle 退役）
             @"图形 API": @"i18n_str_2057",
             @"Java版本": @"i18n_str_2036",
             @"内存分配": @"i18n_str_2037",
@@ -81,6 +82,8 @@ static NSString * localizeProfileTitle(NSString *title) {
             @"数据包管理": @"i18n_str_2041",
             @"世界管理": @"i18n_str_2042",
             @"Fabric API": @"Fabric API",
+            // Task 150：Sodium 组件安装入口（火焰图标；与 Fabric API 同逻辑）
+            @"Sodium": @"Sodium",
             @"OptiFine": @"OptiFine",
         };
     });
@@ -581,7 +584,11 @@ static NSString * localizeProfileTitle(NSString *title) {
         [getRendererFamilyKeys() containsObject:ame140_rendererRaw]) {
         ame140_rendererRaw = @ RENDERER_KEY_MG;
     }
-    self.selectedRenderer = [ame140_rendererRaw isKindOfClass:NSString.class] ? ame140_rendererRaw : nil;
+    // Task 150（[可撤销] 删除渲染器全局控制）：无键实例缺省 "auto"
+    //（用户确认；启动链同口径——resolveKeyForCurrentProfile 全局回退
+    // 已退役，profile 无键 → ame_effective_renderer 落 auto）。从此
+    // 每个实例都拥有显式渲染器值，实例页不再有“跟随全局”灰态。
+    self.selectedRenderer = [ame140_rendererRaw isKindOfClass:NSString.class] ? ame140_rendererRaw : @"auto";
 
     // 图形 API（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
     self.selectedGraphicsApi = self.profile[@"graphicsApi"] ?: @"default";
@@ -622,11 +629,10 @@ static NSString * localizeProfileTitle(NSString *title) {
 #pragma mark - Sections
 
 - (void)setupSections {
-    // 高级设置 section：跟随全局渲染器开关（Task 142 外置）+ 渲染器 +
-    // 图形 API（仅 MC 26.2+）+ Java/内存/JVM。
-    // 用户明令：跟随全局不再是渲染器列表里的一项——开关开启时渲染器行
-    // 置灰不可选（值显示全局默认），关闭时才允许本游戏独立选择。
-    NSMutableArray *advancedRows = [NSMutableArray arrayWithArray:@[@"跟随全局渲染器", @"渲染器"]];
+    // 高级设置 section：渲染器（Task 150：跟随全局开关退役——每个实例
+    // 强制单独选择，无键实例缺省 auto）+ 图形 API（仅 MC 26.2+）+
+    // Java/内存/JVM。
+    NSMutableArray *advancedRows = [NSMutableArray arrayWithArray:@[@"渲染器"]];
     if ([self isCurrentProfileModernVersion]) {
         [advancedRows addObject:@"图形 API"];
     }
@@ -636,13 +642,13 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 顺序与横屏布局对应：左侧（0,1）+ 右侧（2,3,4）
     //   0: 版本信息  - 名称 / 游戏版本 / 游戏目录
     //   1: 资源管理  - 模组 / 光影 / 资源包 / 数据包 / 世界
-    //   2: 组件安装  - Fabric API / OptiFine
+    //   2: 组件安装  - Fabric API / Sodium（Task150）/ OptiFine
     //   3: 高级设置  - 渲染器 / 图形 API / Java / 内存 / JVM 参数
     //   4: 服务器    - 服务器地址
     self.sections = @[
         @[@"名称", @"游戏版本", @"游戏目录"],
         @[@"模组管理", @"光影管理", @"资源包管理", @"数据包管理", @"世界管理"],
-        @[@"Fabric API", @"OptiFine"],
+        @[@"Fabric API", @"Sodium", @"OptiFine"],
         [advancedRows copy],
         @[localize(@"i18n_str_730", nil)]
     ];
@@ -730,19 +736,15 @@ static NSString * localizeProfileTitle(NSString *title) {
     if (!existing) {
         existing = [NSMutableDictionary dictionary];
     }
-    // Task 140：渲染器分居重构 —— 实例页只写【profile】层：
-    // - selectedRenderer == nil（跟随全局）→ 移除键，启动链回退全局默认；
-    // - 显式值（含 MG 家族三后端）→ 写 profile 键。
-    // Task139 曾在此同步全局 video.renderer（四处写入同构）——那会让
-    // 编辑单个游戏的渲染器改写其它游戏的默认值（跨游戏污染），且与
-    // 设置页的双写互相打架（用户“改了实例渲染器被设置页变回”反馈
-    // 的另一半根源）。全局层现在由设置页独占写入。
-    if (self.selectedRenderer == nil) {
-        [existing removeObjectForKey:@"renderer"];
-        NSLog(@"[ProfileSettings] Task140: renderer key removed (follow global) for '%@'", profName);
+    // Task 140：渲染器分居重构 —— 实例页只写【profile】层。
+    // Task 150（[可撤销] 删除渲染器全局控制）：跟随全局（删键）态退役——
+    // 无键实例在 loadSettings 已缺省 "auto"，此处防御性同口径：nil → auto。
+    if (self.selectedRenderer == nil || self.selectedRenderer.length == 0) {
+        existing[@"renderer"] = @"auto";
+        NSLog(@"[ProfileSettings] Task150: renderer missing -> explicit 'auto' for '%@'", profName);
     } else {
         existing[@"renderer"] = self.selectedRenderer;
-        NSLog(@"[ProfileSettings] Task140: renderer written to PROFILE ONLY '%@' = %@", profName, self.selectedRenderer);
+        NSLog(@"[ProfileSettings] Task150: renderer written to PROFILE ONLY '%@' = %@", profName, self.selectedRenderer);
     }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
     existing[@"javaVersion"] = self.selectedJavaVersion;
@@ -886,6 +888,13 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.imageView.tintColor = [UIColor systemOrangeColor];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                 cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);
+            } else if ([title isEqualToString:@"Sodium"]) {
+                // Task 150：Sodium 组件安装（火焰图标；与 Fabric API 同逻辑，
+                // 一键装 Sodium + Podium 双模组，仅 Fabric 实例可用）
+                cell.imageView.image = [UIImage systemImageNamed:@"flame.fill"];
+                cell.imageView.tintColor = [UIColor systemOrangeColor];
+                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);
             } else if ([title isEqualToString:@"OptiFine"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"speedometer"];
                 cell.imageView.tintColor = [UIColor systemRedColor];
@@ -895,27 +904,12 @@ static NSString * localizeProfileTitle(NSString *title) {
             break;
 
         case 3: // 高级设置
-            if ([title isEqualToString:@"跟随全局渲染器"]) {
-                // Task 142：外置开关行——开 = 本游戏跟随全局默认渲染器
-                // （profile 无 renderer 键），此时下方渲染器行置灰。
-                cell.imageView.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
-                cell.accessoryView = [self buildRendererFollowSwitch];
-                cell.detailTextLabel.text = nil;
-            } else if ([title isEqualToString:@"渲染器"]) {
+            if ([title isEqualToString:@"渲染器"]) {
+                // Task 150：跟随全局开关退役——每个实例强制单独选择，
+                // 渲染器行永远可点（不再有置灰态）
                 cell.imageView.image = [UIImage systemImageNamed:@"cpu"];
-                if (self.selectedRenderer == nil) {
-                    // Task 142：跟随全局态——整行置灰不可选（用户明令
-                    // "只要为真，渲染器选择就变灰"）；值位显示全局默认
-                    // 的显示名，让用户看到将实际生效的渲染器。
-                    cell.textLabel.textColor = [UIColor tertiaryLabelColor];
-                    cell.imageView.tintColor = [UIColor tertiaryLabelColor];
-                    cell.detailTextLabel.textColor = [UIColor tertiaryLabelColor];
-                    cell.accessoryType = UITableViewCellAccessoryNone;
-                    cell.detailTextLabel.text = [self rendererDisplayName:nil];
-                } else {
-                    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-                    cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
-                }
+                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
             } else if ([title isEqualToString:@"图形 API"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"rectangle.dashed"];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -1250,19 +1244,14 @@ static NSString * localizeProfileTitle(NSString *title) {
 #pragma mark - Helpers
 
 // Task 140：渲染器显示名（实例页专用）。三层：
-//   - nil（跟随全局）→ “跟随全局设置（当前: X）”，X = 全局默认的显示名；
 //   - MG 家族键 → 三后端文案（旧版显示原始 dylib 名“libMobileGL-gles.dylib”，
 //     用户不认识）；
 //   - 经典键 → candidates 表显示名（ame_renderer_display_name 统一处理）。
+// Task 150（[可撤销] 删除渲染器全局控制）：nil/空值分支改为显示 "auto"
+//（跟随全局态已退役——loadSettings 缺省 auto，此处仅防御）。
 - (NSString *)rendererDisplayName:(NSString *)renderer {
     if (renderer == nil || renderer.length == 0) {
-        // Task 142：跟随全局态显示全局默认的显示名（mg/家族键 → "mg"，
-        // 其余 → 真实名）——"跟随全局"语义由外置开关行承载，值位只展示
-        // 将实际生效的渲染器。
-        ame142_migrateRendererStorage();
-        NSString *ame140_global = getPrefObject(@"video.renderer");
-        NSString *ame140_gval = [ame140_global isKindOfClass:NSString.class] ? ame140_global : @"auto";
-        return ame_renderer_display_name(ame140_gval);
+        return ame_renderer_display_name(@"auto");
     }
     return ame_renderer_display_name(renderer);
 }
@@ -1311,30 +1300,18 @@ static NSString * localizeProfileTitle(NSString *title) {
         case 2: // 组件安装
             if ([title isEqualToString:@"Fabric API"]) {
                 [self installFabricAPIStandalone];
+            } else if ([title isEqualToString:@"Sodium"]) {
+                // Task 150：Sodium（+ Podium）一键安装
+                [self installSodiumStandalone];
             } else if ([title isEqualToString:@"OptiFine"]) {
                 [self installOptiFineStandalone];
             }
             break;
 
         case 3: // 高级设置
-            if ([title isEqualToString:@"跟随全局渲染器"]) {
-                // 点行即切开关（开关本体也可直接拨动）。
-                // 注意 UISwitch 是 accessoryView——挂在 cell 上而非
-                // contentView 里，遍历 cell.subviews 找它。
-                UITableViewCell *ame142_cell = [tableView cellForRowAtIndexPath:indexPath];
-                for (UIView *ame142_sub in ame142_cell.subviews) {
-                    if ([ame142_sub isKindOfClass:[UISwitch class]]) {
-                        UISwitch *ame142_sw = (UISwitch *)ame142_sub;
-                        [ame142_sw setOn:!ame142_sw.on animated:YES];
-                        [self rendererFollowSwitchChanged:ame142_sw];
-                        break;
-                    }
-                }
-            } else if ([title isEqualToString:@"渲染器"]) {
-                // Task 142：跟随全局态下本行置灰——点击不弹选择器
-                if (self.selectedRenderer != nil) {
-                    [self showRendererSelector];
-                }
+            if ([title isEqualToString:@"渲染器"]) {
+                // Task 150：跟随全局开关退役——渲染器行永远直接弹选择器
+                [self showRendererSelector];
             } else if ([title isEqualToString:@"图形 API"]) {
                 [self showGraphicsApiSelector];
             } else if ([title isEqualToString:@"Java版本"]) {
@@ -1807,6 +1784,209 @@ static NSString * localizeProfileTitle(NSString *title) {
     });
 }
 
+#pragma mark - 组件独立安装（Sodium + Podium，Task 150）
+
+/// Task 150：Modrinth 搜索 → 标题【精确】匹配 → 按游戏版本 + 加载器选版本
+/// → primaryFile。与 Fabric API 流程同逻辑，但匹配用全等比较——
+/// containsString 会误命中 "Sodium Extra" / "Podium Port" 等衍生项目。
+- (void)ame150_fetchModrinthPrimaryFileWithQuery:(NSString *)query
+                                      exactTitle:(NSString *)exactTitle
+                                     gameVersion:(NSString *)gameVersion
+                                          loader:(NSString *)loader
+                                      completion:(void (^)(NSString *fileURL, NSString *filename, NSError *error))completion {
+    NSMutableDictionary *filters = [NSMutableDictionary dictionary];
+    filters[@"query"] = query;
+    filters[@"limit"] = @"20";
+    [[ModrinthAPI sharedInstance] searchModWithFilters:filters completion:^(NSArray *results, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || results.count == 0) {
+                completion(nil, nil, [NSError errorWithDomain:@"SodiumComponent" code:1
+                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.not_found", nil),
+                        [NSString stringWithFormat:@"%@ / %@", gameVersion, loader]]}]);
+                return;
+            }
+            NSDictionary *match = nil;
+            for (NSDictionary *mod in results) {
+                NSString *title = mod[@"title"] ?: @"";
+                if ([title.lowercaseString isEqualToString:exactTitle.lowercaseString]) {
+                    match = mod;
+                    break;
+                }
+            }
+            if (!match) {
+                completion(nil, nil, [NSError errorWithDomain:@"SodiumComponent" code:2
+                    userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.not_found", nil),
+                        [NSString stringWithFormat:@"%@ / %@", gameVersion, loader]]}]);
+                return;
+            }
+            [[ModrinthAPI sharedInstance] getVersionsForModWithID:match[@"id"] completion:^(NSArray<ModVersion *> *versions, NSError *versionError) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (versionError || versions.count == 0) {
+                        completion(nil, nil, [NSError errorWithDomain:@"SodiumComponent" code:3
+                            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.not_found", nil),
+                                [NSString stringWithFormat:@"%@ / %@", gameVersion, loader]]}]);
+                        return;
+                    }
+                    ModVersion *matchingVersion = nil;
+                    for (ModVersion *ver in versions) {
+                        if (![ver.gameVersions containsObject:gameVersion]) continue;
+                        BOOL ame150_hasLoader = NO;
+                        for (NSString *l in ver.loaders) {
+                            if ([l.lowercaseString isEqualToString:loader.lowercaseString]) {
+                                ame150_hasLoader = YES;
+                                break;
+                            }
+                        }
+                        if (ame150_hasLoader) {
+                            matchingVersion = ver;
+                            break;
+                        }
+                    }
+                    if (!matchingVersion) {
+                        completion(nil, nil, [NSError errorWithDomain:@"SodiumComponent" code:4
+                            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.not_found", nil),
+                                [NSString stringWithFormat:@"%@ / %@", gameVersion, loader]]}]);
+                        return;
+                    }
+                    NSDictionary *primaryFile = matchingVersion.primaryFile;
+                    if (!primaryFile || ![primaryFile[@"url"] isKindOfClass:[NSString class]]) {
+                        completion(nil, nil, [NSError errorWithDomain:@"SodiumComponent" code:5
+                            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.not_found", nil),
+                                [NSString stringWithFormat:@"%@ / %@", gameVersion, loader]]}]);
+                        return;
+                    }
+                    completion(primaryFile[@"url"], primaryFile[@"filename"], nil);
+                });
+            }];
+        });
+    }];
+}
+
+- (void)installSodiumStandalone {
+    // Task 150：与 Fabric API 同门槛——仅 Fabric 实例可用（Sodium/Podium
+    // 均为 Fabric 模组；实例页组件安装的既定口径）
+    if (![self isFabricProfile]) {
+        [self showComponentAlert:localize(@"i18n_str_899", nil)
+                          message:localize(@"i18n_str_885", nil)];
+        return;
+    }
+    NSString *gameVersion = [self currentGameVersion];
+    if (!gameVersion) {
+        [self showComponentAlert:localize(@"i18n_str_899", nil) message:localize(@"i18n_str_901", nil)];
+        return;
+    }
+    UIAlertController *confirm = [UIAlertController alertControllerWithTitle:localize(@"component.sodium.confirm_title", nil)
+                                                                     message:[NSString stringWithFormat:localize(@"component.sodium.confirm_message", nil), gameVersion]
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_904", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self startInstallSodiumWithGameVersion:gameVersion];
+    }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
+
+- (void)startInstallSodiumWithGameVersion:(NSString *)gameVersion {
+    // Task 150：与 Fabric API 同链路（统一下载任务 + Modrinth 搜索 → 版本匹配
+    // → 下载进 mods/），一键安装两个模组：Sodium（高性能渲染）+ Podium
+    // （禁用 Sodium 的 PojavLauncher 检查——与 Task145 的 POJAV_RENDERER
+    // 导出收敛互为双保险：非 Mithril 会话不导出该变量，Podium 再兜底
+    // 屏蔽模组侧检查）。
+    DownloadTaskManager *manager = [DownloadTaskManager sharedManager];
+    DownloadTaskItem *taskItem = [manager
+        registerTaskWithResourceType:DownloadTaskResourceTypeMod
+                        resourceName:[NSString stringWithFormat:@"sodium-podium-%@", gameVersion]
+                         displayName:@"Sodium + Podium"
+                      downloadSource:@"modrinth"
+                             rawTask:nil
+                      supportsResume:NO
+                             iconURL:nil];
+    NSString *taskId = taskItem.taskId;
+    if (taskItem) {
+        [[DownloadTaskManager sharedManager] setTaskWithId:taskId stages:PLTaskStagesSingleFile()];
+        taskItem.autoPresentDetail = YES;
+        [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateDownloading];
+        [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
+                                                 stageAtIndex:0
+                                                     status:PLTaskStageStatusRunning];
+        [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
+                                                 stageAtIndex:0
+                                                     progress:-1.0
+                                                      message:[NSString stringWithFormat:localize(@"component.sodium.searching", nil), gameVersion]];
+    }
+    __weak typeof(self) weakSelf = self;
+    void (^ame150_failBlock)(NSError *) = ^(NSError *failError) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[DownloadTaskManager sharedManager] updateTaskWithId:taskId stageAtIndex:0 status:PLTaskStageStatusFailed];
+            [[DownloadTaskManager sharedManager] updateTaskWithId:taskId error:failError];
+            [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateFailed];
+            [weakSelf showComponentAlert:localize(@"i18n_str_918", nil)
+                                 message:failError.localizedDescription ?: localize(@"i18n_str_97", nil)];
+        });
+    };
+    void (^ame150_downloadBoth)(NSString *, NSString *, NSString *, NSString *) = ^(NSString *sodiumURL, NSString *sodiumFile, NSString *podiumURL, NSString *podiumFile) {
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            NSString *modsDir = [strongSelf currentProfileModsPath];
+            NSError *dlError1 = nil;
+            NSData *sodiumData = [strongSelf downloadDataWithURL:[NSURL URLWithString:sodiumURL] error:&dlError1];
+            NSError *dlError2 = nil;
+            NSData *podiumData = sodiumData ? [strongSelf downloadDataWithURL:[NSURL URLWithString:podiumURL] error:&dlError2] : nil;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!sodiumData || !podiumData) {
+                    NSError *failError = [NSError errorWithDomain:@"SodiumComponent" code:6
+                        userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.download_failed", nil),
+                            (dlError1 ?: dlError2).localizedDescription ?: localize(@"i18n_str_97", nil)]}];
+                    ame150_failBlock(failError);
+                    return;
+                }
+                NSString *sodiumPath = [modsDir stringByAppendingPathComponent:sodiumFile ?: @"sodium.jar"];
+                NSString *podiumPath = [modsDir stringByAppendingPathComponent:podiumFile ?: @"podium.jar"];
+                NSError *writeError1 = nil;
+                NSError *writeError2 = nil;
+                BOOL ok1 = [sodiumData writeToFile:sodiumPath options:NSDataWritingAtomic error:&writeError1];
+                BOOL ok2 = ok1 ? [podiumData writeToFile:podiumPath options:NSDataWritingAtomic error:&writeError2] : NO;
+                if (ok1 && ok2) {
+                    [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
+                                                             stageAtIndex:0
+                                                                 progress:1.0
+                                                                 message:[NSString stringWithFormat:localize(@"i18n_str_924", nil), sodiumFile ?: @"sodium.jar"]];
+                    [[DownloadTaskManager sharedManager] updateTaskWithId:taskId stageAtIndex:0 status:PLTaskStageStatusCompleted];
+                    [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateCompleted];
+                    [weakSelf showComponentAlert:localize(@"i18n_str_253", nil)
+                                         message:[NSString stringWithFormat:localize(@"component.sodium.done", nil),
+                                             [NSString stringWithFormat:@"%@ + %@", sodiumFile ?: @"sodium.jar", podiumFile ?: @"podium.jar"]]];
+                } else {
+                    NSError *failError = [NSError errorWithDomain:@"SodiumComponent" code:7
+                        userInfo:@{NSLocalizedDescriptionKey: (writeError1 ?: writeError2).localizedDescription ?: localize(@"i18n_str_926", nil)}];
+                    ame150_failBlock(failError);
+                }
+            });
+        });
+    };
+    [self ame150_fetchModrinthPrimaryFileWithQuery:@"sodium"
+                                        exactTitle:@"sodium"
+                                       gameVersion:gameVersion
+                                            loader:@"fabric"
+                                        completion:^(NSString *sodiumURL, NSString *sodiumFile, NSError *error) {
+        if (error || sodiumURL.length == 0) {
+            ame150_failBlock(error ?: [NSError errorWithDomain:@"SodiumComponent" code:10 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+            return;
+        }
+        [weakSelf ame150_fetchModrinthPrimaryFileWithQuery:@"podium"
+                                                exactTitle:@"podium"
+                                               gameVersion:gameVersion
+                                                    loader:@"fabric"
+                                                completion:^(NSString *podiumURL, NSString *podiumFile, NSError *error2) {
+            if (error2 || podiumURL.length == 0) {
+                ame150_failBlock(error2 ?: [NSError errorWithDomain:@"SodiumComponent" code:11 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+                return;
+            }
+            ame150_downloadBoth(sodiumURL, sodiumFile, podiumURL, podiumFile);
+        }];
+    }];
+}
+
 - (void)startInstallOptiFineWithGameVersion:(NSString *)gameVersion {
     // redesign-download-ui Phase 4 Task 4.4：OptiFine（mods 方式）注册为统一下载任务，
     // PLTaskStagesSingleFile 单阶段 + autoPresentDetail 自动弹出统一进度页
@@ -2205,43 +2385,23 @@ static NSString * localizeProfileTitle(NSString *title) {
     [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
 
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        // 渲染器行现在是高级设置 section 的第 2 行（第 1 行是跟随全局开关）
-        UITableViewCell *cell = [self cellForGlobalSection:3 row:1];
+        // Task 150：渲染器行现在是高级设置 section 的第 1 行（跟随全局
+        // 开关已退役）
+        UITableViewCell *cell = [self cellForGlobalSection:3 row:0];
         alert.popoverPresentationController.sourceView = cell ?: self.view;
         alert.popoverPresentationController.sourceRect = cell ? cell.bounds : self.view.bounds;
     }
 
-    NSLog(@"[ProfileSettings] Task142: renderer picker opened (%ld options incl. single 'mg'; follow-global is an external switch)",
+    NSLog(@"[ProfileSettings] Task150: renderer picker opened (%ld options incl. single 'mg'; follow-global retired)",
           (long)renderers.count);
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-#pragma mark - 渲染器跟随全局开关（Task 142）
-
-/// 跟随全局开关：开 = 删除 profile 渲染器键（启动链回退全局默认）；
-/// 关 = 本游戏独立选择（默认给 "mg"——唯一的 MG 家族入口，后端由
-/// mg 设置决定，默认 Vulkan 直连）。开关状态与 selectedRenderer
-/// 互为镜像：nil = 开。
-- (UISwitch *)buildRendererFollowSwitch {
-    UISwitch *ame142_sw = [[UISwitch alloc] init];
-    [ame142_sw setOn:(self.selectedRenderer == nil) animated:NO];
-    [ame142_sw addTarget:self
-                  action:@selector(rendererFollowSwitchChanged:)
-        forControlEvents:UIControlEventValueChanged];
-    return ame142_sw;
-}
-
-- (void)rendererFollowSwitchChanged:(UISwitch *)sender {
-    if (sender.isOn) {
-        self.selectedRenderer = nil;
-        NSLog(@"[ProfileSettings] Task142: follow-global ON (profile renderer key removed)");
-    } else {
-        self.selectedRenderer = @ RENDERER_KEY_MG;
-        NSLog(@"[ProfileSettings] Task142: follow-global OFF (per-game renderer defaults to 'mg')");
-    }
-    [self saveSettings];
-    [self reloadAllTableViews];
-}
+// Task 150（[可撤销] 删除渲染器全局控制）：跟随全局开关整体退役
+// （buildRendererFollowSwitch / rendererFollowSwitchChanged 删除）——
+// 每个实例强制单独选择渲染器，无键实例缺省 auto（loadSettings 同口径）。
+// 撤销 = 恢复本 pragma 区 + setupSections 的开关行 + cellForItem/didSelect
+// 的跟随全局分支 + loadSettings/saveSettings 的 nil（删键）语义。
 
 /// 判断当前 profile 的 MC 版本是否为 26.2+（需要图形 API 切换）
 - (BOOL)isCurrentProfileModernVersion {

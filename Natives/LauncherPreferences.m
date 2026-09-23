@@ -359,6 +359,11 @@ NSString *ame_effective_renderer(void) {
     // Task 142：读前迁移（幂等，进程内哨兵）——把旧版直写的家族键
     // 分层入位（video.renderer/profile → "mg"，家族键 → 后端键）。
     ame142_migrateRendererStorage();
+    // Task 150（[可撤销] 删除渲染器全局控制）：解析链改为
+    // 【profile 键 → auto】——resolveKeyForCurrentProfile 的全局
+    // video.renderer 回退已在 PLProfiles prefDefaults 退役，实例无
+    // renderer 键即落 "auto"（用户确认的缺省；1.17+ 经 Task144 升级
+    // 解析为 MobileGL Vulkan 直连）。撤销 = 恢复 prefDefaults 映射行。
     NSString *renderer = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
     if (![renderer isKindOfClass:NSString.class] || renderer.length == 0) {
         renderer = @"auto";

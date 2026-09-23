@@ -362,6 +362,13 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       # 全名"，4 语言各 1 行值改写，键集计数 1924 不变）；提交后 diff 清空走
       # 第二分支自愈。
       or all("preference.title.renderer.debug.mgfamily" in l
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task150 重锚：Sodium 组件 6 键新增 + 跟随全局开关/遮蔽告警 2 键退役
+      # （4 语言各 8 行 + 注释行），提交前 diff 形态一并接受；提交后 diff
+      # 清空走第二分支自愈。
+      or all(("component.sodium" in l or "renderer_follow_global_toggle" in l
+              or "renderer_shadowed_by_profile" in l
+              or l.lstrip("+-").strip().startswith("//") or l.strip() in ("+", "-"))
              for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",

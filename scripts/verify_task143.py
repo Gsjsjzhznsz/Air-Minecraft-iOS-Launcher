@@ -132,7 +132,7 @@ for path in ['Natives/PLPreferences.m', 'Natives/LauncherPreferences.m',
     b = bracket_balance(read(path))
     check(f"E {os.path.basename(path)} brackets balanced {b}", b == (0, 0, 0))
 
-print("== F. No l10n baseline drift (keys stay at 1924 x4) ==")
+print("== F. No l10n baseline drift (keys stay at 1928 x4) ==")
 total = None
 drift = []
 for lp in ['en', 'zh-CN', 'zh-Hans', 'zh-Hant']:
@@ -140,8 +140,8 @@ for lp in ['en', 'zh-CN', 'zh-Hans', 'zh-Hant']:
     keys = set(re.findall(r'^"([^"]+)"\s*=', read(p), re.M))
     if total is None: total = len(keys)
     if len(keys) != total: drift.append(f"{lp}:{len(keys)}")
-check(f"F1 four-language key sets identical at {total} keys (Task142 baseline 1924)",
-      total == 1924 and not drift, f"drift={drift}")
+check(f"F1 four-language key sets identical at {total} keys (Task150 baseline 1928)",
+      total == 1928 and not drift, f"drift={drift}")
 check("F2 debug.mg key still present x4 (reused for the legacy mapping)",
       all('"preference.title.renderer.debug.mg" =' in
           read(f'Natives/resources/{lp}.lproj/Localizable.strings')

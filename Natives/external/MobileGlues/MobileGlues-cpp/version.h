@@ -1213,3 +1213,20 @@
 // l10n: -1 retired key (renderer_follow_global picker format) +3 new
 // (renderer_follow_global_toggle / renderer.debug.mgfamily /
 // mg_backend_missing_dylib) x4 languages.
+// REVISION 17 addendum (Task 150, no bump): renderer GLOBAL control retired
+// (user decree, [revertable] -- each game MUST own its renderer choice).
+// The Settings-page global renderer row (video.renderer) is gone together
+// with the game editor's follow-global toggle (Task142's external switch):
+// PLProfiles resolveKey drops the video.renderer fallback (guarded against
+// getPrefObject(nil)), so ame_effective_renderer now resolves
+// [profile key -> auto] -- instances without an explicit choice run auto
+// (user-confirmed default; 1.17+ resolves to MobileGL Vulkan direct via the
+// Task144 upgrade). loadSettings defaults missing keys to "auto" and
+// saveSettings writes explicit values (nil can no longer remove the key).
+// l10n: -2 retired (renderer_follow_global_toggle /
+// renderer_shadowed_by_profile) +6 new (component.sodium.*) x4 languages.
+// Component install gains a Sodium entry (flame icon, Fabric-only): one
+// tap downloads Sodium + Podium from Modrinth (exact-title match vs
+// Sodium Extra / Podium Port forks; gameVersion+fabric loader matched
+// like Fabric API) into the instance mods/ dir; Podium disables Sodium's
+// PojavLauncher check, doubling the Task145 POJAV_RENDERER unwind.

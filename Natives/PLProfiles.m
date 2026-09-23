@@ -67,12 +67,20 @@ static PLProfiles* current;
         @"defaultTouchCtrl": @"control.default_ctrl",
         @"defaultGamepadCtrl": @"control.default_gamepad_ctrl",
         @"javaArgs": @"java.java_args",
-        @"renderer": @"video.renderer",
+        // Task 150（[可撤销] 删除渲染器全局控制）：renderer 的全局回退键退役
+        // ——每个实例强制单独选择渲染器，profile 无 renderer 键时由
+        // ame_effective_renderer 落到 "auto"（用户确认的缺省），不再读取
+        // 全局 video.renderer（该键随设置页渲染器行一并退役，仅存量设备
+        // 偏好文件中残留、无读取方）。撤销 = 恢复本行映射 + 设置页行。
+        // @"renderer": @"video.renderer",
         // MC 26.2+ Graphics API（OpenGL/Vulkan 游戏内切换），缺省为 "default"
         // 该字段仅在 MC 26.2+ 生效，旧版本会被 MC 忽略，无副作用。
         @"graphicsApi": @"video.graphics_api"
     };
-    return getPrefObject(prefDefaults[key]);
+    // Task 150：nil 守卫——映射里没有的键（如退役后的 renderer）直接返回
+    // nil（getPrefObject(nil) 会抛 NSInvalidArgumentException）
+    id prefKey = prefDefaults[key];
+    return prefKey ? getPrefObject(prefKey) : nil;
 }
 
 + (id)resolveKeyForCurrentProfile:(id)key {

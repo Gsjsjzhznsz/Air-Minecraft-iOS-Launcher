@@ -1,48 +1,48 @@
 {
-  "announcements": [
-    {
-      "id": "v6-0-0-release-2026-09-21",
-      "title": "v6.0.0 正式版发布",
-      "date": "2026-09-21",
-      "summary": "渲染器设置分层重构（全局默认 + 每游戏跟随开关，mg 单入口，改了不再跳回）+ MobileGL 全后端 FSR 修复 + OpenGL 4.0 (Mithril) 崩溃根治 + TouchController 虚拟按钮回归（屏蔽启动器控件但保留模组按钮）+ TouchController 26.2 失效根治（UDP 自动回落 + 双 ABI）+ JIT 开启工具选择、下载镜像策略（加载速度快优先默认）、26.1.2 整合包崩溃根治、界面与动画优化。",
-      "content": "## v6.0.0 主要内容\n\n\n\n**渲染器与图形（重点修复）**\n\n- **渲染器设置分层重构**：设置页的渲染器选择现在只作为【全局默认】；每个游戏在自己的设置页用\"跟随全局渲染器\"开关决定跟随或独立——开关开启时渲染器行置灰，关闭后从精简列表（mg / 自动 / GL4ES / Zink / MoltenVK 等）中选择，互不覆盖——修复\"编辑某个游戏的渲染器，退出后变回设置里选的那个（或自动）\"。MobileGL 家族在渲染器列表里合并为唯一的 **mg** 条目、不再写死后端：后端统一在 设置 > MobileGlues > 渲染后端 选择（Vulkan 直连 / GLES / OpenGL 4.0，默认 Vulkan 直连）\n- **MobileGL 渲染器 FSR 修复**：FSR 档位在 MobileGL（Vulkan 直连 / GLES 后端）上因符号解析命中错误图形库而从未生效的问题根治——现在选择 FSR 档位即可享受渲染分辨率降低 + 高质量升采样带来的帧率提升\n- **OpenGL 4.0 (Mithril) 后端崩溃根治**：上下文创建参数错误导致游戏启动即报\"无 OpenGL 上下文\"崩溃的问题修复，该实验性后端现在可以正常进入游戏\n- **GLES 后端**：进世界方块不渲染的问题随 FSR 修复消除了启动期的一次分辨率翻转（疑似诱因）；若仍复现请附日志反馈（属 MobileGL 上游翻译层问题）\n\n**TouchController 模组（重点修复）**\n\n- **MC 26.2 功能失效根治**：双重修复。其一，模组原生通信层从句柄制改成单例制导致的 ABI 错位已由双 ABI 传输层兼容；其二，模组 0.3.1-alpha14 的静态库分支在上游尚未完成（加载必失败并误报\"不支持的操作系统：iOS\"），静态库模式现会自动附带模组自带的 UDP 兼容通道作为回落——触控开箱即用\n- **静态库模式进世界触控恢复**：修复静态库模式下触控事件发错通道的问题（菜单能点、进游戏失灵的怪象根除），现在无论模组走哪条通道都能收到事件\n- **屏蔽控件（语义更新）**：开关现在只隐藏【启动器自带】的经典虚拟按钮，保留模组自己的虚拟按钮（摇杆/跳跃/聊天/暂停等一整套内置布局）——修复此前\"触控能用但一个按钮都不显示\"；此前被写成空布局的存量配置会在下次启动时自动修复，模组按钮即刻回归。触屏手势、震动、文字输入不受影响\n- 设置页入口恢复为二级菜单（此前误改为悬浮浮窗）\n\n**下载镜像策略（新增）**\n\n- **加载速度快优先**：参考 FCL 的测速策略，启动器会实测官方源与国内镜像（BMCLAPI / MCIM）的响应速度并自动选用更快的一方，结果缓存 24 小时；文件下载、资源搜索、资源文件、模组加载器四个分类均支持，且默认即为该选项\n- **模组镜像源合并**：原\"启动器设置\"里的模组镜像源移入\"下载镜像策略\"分区，作为模组/光影/资源包/数据包/整合包/世界的统一入口（选择同时作用于搜索与下载；需要精细控制时仍可单独调整分类行）\n\n**JIT 体验**\n\n- **JIT 开启工具选择**：设置 > 调试新增工具选择（自动 / StikDebug / SideStore / StosDebug / JitStreamer-EB / TrollStore / 手动）。没装 StikDebug 的用户请改选你实际使用的工具，不再\"点了没反应\"\n- **安装 Forge 自动申请 JIT**：Forge/NeoForge 安装需要运行 Java 处理器，此前 JIT 未开启时只会弹错让你手动去开——现在与启动游戏同款自动跳转申请并等待开启，装完即装；iOS 26+ 设备上即使 JIT 已开启，无活跃调试器时也会自动重新附上 JIT 脚本\n- **iOS 26 JS 脚本开关**：可关闭启动游戏时向 JIT 工具发送 UniversalJIT26.js 脚本的行为（供不支持脚本的工具使用）\n\n**修复**\n\n- **MC 26.1.2 整合包进世界闪退根治（新根因）**：controlify 闪退修复后游戏可正常进入世界，本轮追查到真正的最后一层——语音模组（Simple Voice Chat）的麦克风在部分设备上因音频格式不匹配触发系统异常。现在麦克风按设备原生格式采集并在内部重采样，格式不再冲突；即使麦克风不可用也只影响语音，绝不闪退\n- **MobileGL-gles 输入错位修复**：修复该渲染器下触摸点与画面位置对不上的问题（FSR 兜底恢复全分辨率渲染后输入坐标未同步）\n- **MobileGL-gles 渲染器**：修复选择后 EGL 加载失败导致的闪退，现在正常进入游戏\n- **OpenGL 4.0 实验性后端随包可用**：Mithril 组件（libmithril.dylib）已内置，无需再手动放置文件\n- **第三方皮肤头像**：本地渲染（脸 + 帽层），存量账户启动自愈、首页头像实时刷新不再需要重启启动器\n- **主页公告卡片**：高度按内容自适应，动作按钮不再被裁出卡片；长按预览档位切换平滑过渡\n\n**界面与动画**\n\n- **iPhone 右侧边栏精简**：手机上右侧面板改为窄图标轨（96pt），只保留头像与启动/选版本/执行JAR 图标按钮，内容区更宽敞；iPad 保持完整面板\n- 列表入场动画只在首次出现时播放（滚动回滑不再重复弹跳），条目按序错落进入\n- 侧栏切换选中项颜色平滑过渡，页面切换保持交叉渐变\n\n---\n\nv6.0.0: TouchController's MC 26.2 breakage root-fixed with a dual-ABI transport (static-library mode now delivers events on both channels, fixing in-world touch) plus a Hide-All-Controls option that now also hides the launcher's own button layer; a new download mirror strategy with a Fastest-First default (FCL-style racing, 24h cached) and the mod-mirror control consolidated; a LiveContainer-style JIT enabler picker with an iOS 26 script toggle -- and Forge/NeoForge installation now auto-requests JIT exactly like game launch (including the iOS 26+ debugger re-attach); the 26.1.2 world-join crash finally traced to Simple Voice Chat's microphone (AVAudioEngine tap format mismatch) and fixed with native-format capture + in-callback resampling + graceful no-mic degradation; MobileGL-gles input misalignment fixed (FSR-heal input scale reset) alongside its load fix; the OpenGL 4.0 experimental backend ships working with the bundled Mithril dylib; renderer settings re-layered into a global default plus a per-game follow-global switch (single mg entry; backend picked in MobileGlues settings, Vulkan direct by default); iPhone's right panel streamlined to a 96pt icon rail; and list/sidebar animations polished.",
-      "priority": "high",
-      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v6.0.0",
-      "action_title": "查看 v6.0.0",
-      "image_url": ""
-    },
-    {
-      "id": "repo-migration-2026-09-20",
-      "title": "公告已迁移至仓库托管",
-      "date": "2026-09-20",
-      "summary": "启动器公告改为 GitHub 仓库直接托管，不再依赖任何第三方接口，内容随仓库更新即时生效。",
-      "content": "## 公告源迁移\n\n从本版本起，启动器公告由本项目的 GitHub 仓库直接托管：\n\n- **主源**：仓库根目录 `announcements.json`（raw.githubusercontent.com），提交后即时生效\n- **镜像**：jsDelivr CDN（国内可达性更好，最长 12 小时缓存延迟）\n- **离线兜底**：随安装包内置的离线公告（网络完全不可用时显示）\n\n旧的公告接口（air-api.vercel.app）已失效且不受我们控制。迁移后公告内容与启动器代码同仓维护、同版发布，不会再出现“公告加载失败”这类单点故障。\n\n---\n\nAnnouncements are now hosted directly in this project's GitHub repository (announcements.json at the repo root): raw.githubusercontent.com as the primary source, a jsDelivr CDN mirror for reachability, and a bundled offline notice as the floor. The retired third-party API was unreachable and out of our control.",
-      "priority": "normal",
-      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/blob/main/announcements.json",
-      "action_title": "查看公告源文件",
-      "image_url": ""
-    },
-    {
-      "id": "v5-1-2-preview-2026-09-20",
-      "title": "下一版本修复预览（装机反馈四项）",
-      "date": "2026-09-20",
-      "summary": "26.1.2 整合包进入世界崩溃根治、第三方切换角色修复、MG 三后端回到渲染器悬浮菜单、设置悬浮菜单可用性加固。",
-      "content": "## 即将在下一版本发布（装机反馈四项修复）\n\n**修复**\n\n- **26.1.2 整合包进入世界崩溃**：根因是整合包内 Controlify 手柄模组经 JNA 向 SDL3 注册事件回调，该回调指针位于不可执行的内存页（iOS 无 JIT 权限），游戏每帧事件泵触发时直接 SIGBUS。已在 SDL 层拦截回调注册（手柄模组其余功能不受影响，26.3 会话不受影响）\n- **第三方登录切换角色失败（“访问令牌已经分配了角色”）**：LittleSkin 等 Blessing Skin 系服务器不允许在已绑定的访问令牌上换绑角色。现在登录时会把凭据安全保存进系统钥匙串，切换角色时自动重新认证并绑定新角色——仍然免密。老账户需重新登录一次以启用\n- **MG 三后端设置项“还是分开的”**：MobileGL 的 Vulkan / GLES / Mithril 三后端回到渲染器选择行的悬浮菜单（上游原有形态），MobileGlues 分区的独立后端设置行移除，选择即生效（不再要求渲染器先设为“自动”）\n- **设置悬浮菜单可用性**：选择菜单改为从最顶层界面呈现，消除个别场景下“点了没反应”的静默失败面\n\n----\n\nComing in the next build: the 26.1.2 world-join crash (controlify's JNA/SDL callback hitting a non-executable trampoline page) intercepted at the SDL layer; third-party profile switching now re-authenticates with Keychain-secured credentials after servers reject token rebinding (one re-login needed on existing accounts); the three MobileGL backends return to the renderer picker's floating menu (upstream form, effective immediately); and pick sheets present from the topmost view controller so a presenting state can no longer swallow the tap.",
-      "priority": "high",
-      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases",
-      "action_title": "查看版本发布",
-      "image_url": ""
-    },
-    {
-      "id": "v5-1-0-release-2026-09-19",
-      "title": "v5.1.0 正式版发布",
-      "date": "2026-09-19",
-      "summary": "MobileGL FSR 放大、渲染后端单选项（默认 Vulkan）、第三方登录恢复、启动时自动检查更新。",
-      "content": "## v5.1.0 主要内容\n\n- **MobileGL FSR 放大**：MobileGL 后端接入 FSR1 EASU 空间放大，低分辨率渲染 + 放大输出，性能显著提升\n- **渲染后端单选项**：MobileGL 三后端（Vulkan / GLES / Mithril）合并为一个设置项，默认 Vulkan，显式选择优先\n- **第三方登录恢复**：内置 authlib-injector，过期令牌优雅降级，LittleSkin 等外置登录站可用\n- **自动更新检查**：启动器启动时静默检查新版本，有更新时以卡片提醒\n- **子面板新拟物化**：全部二级面板统一新拟物设计\n\n---\n\nv5.1.0 shipped MobileGL FSR upscaling, the unified renderer-backend option (Vulkan default), restored third-party login with a bundled authlib-injector, silent auto update checks, and neumorphic sub-panels.",
-      "priority": "normal",
-      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v5.1.0",
-      "action_title": "查看 v5.1.0",
-      "image_url": ""
-    }
-  ]
+ "announcements": [
+  {
+   "id": "v6-0-0-release-2026-09-21",
+   "title": "v6.0.0 正式版发布",
+   "date": "2026-09-21",
+   "summary": "渲染器每游戏强制单选（无全局默认，缺省自动，mg 单入口，附 Sodium+Podium 一键安装）+ MobileGL 全后端 FSR 修复 + OpenGL 4.0 (Mithril) 崩溃根治 + TouchController 虚拟按钮回归（屏蔽启动器控件但保留模组按钮）+ TouchController 26.2 失效根治（UDP 自动回落 + 双 ABI）+ JIT 开启工具选择、下载镜像策略（加载速度快优先默认）、26.1.2 整合包崩溃根治、界面与动画优化。",
+   "content": "## v6.0.0 主要内容\n\n\n\n**渲染器与图形（重点修复）**\n\n- **渲染器每游戏强制单选**：设置页的全局渲染器选择退役，每个游戏在自己的设置页单独选择渲染器，未单独设置过的实例缺省\"自动\"（1.17+ 自动解析为 MobileGL Vulkan 直连）——彻底告别\"改了游戏渲染器又跳回设置里那个\"。MobileGL 家族在渲染器列表里合并为唯一的 **mg** 条目、不再写死后端：后端统一在 设置 > MobileGlues > 渲染后端 选择（Vulkan 直连 / GLES / OpenGL 4.0，默认 Vulkan 直连）；实例页新增 Sodium 组件安装（火焰图标，仅 Fabric 实例），一键从 Modrinth 下载 Sodium + Podium 进 mods 目录（Podium 负责解除 Sodium 对第三方启动器的检查）\n- **MobileGL 渲染器 FSR 修复**：FSR 档位在 MobileGL（Vulkan 直连 / GLES 后端）上因符号解析命中错误图形库而从未生效的问题根治——现在选择 FSR 档位即可享受渲染分辨率降低 + 高质量升采样带来的帧率提升\n- **OpenGL 4.0 (Mithril) 后端崩溃根治**：上下文创建参数错误导致游戏启动即报\"无 OpenGL 上下文\"崩溃的问题修复，该实验性后端现在可以正常进入游戏\n- **GLES 后端**：进世界方块不渲染的问题随 FSR 修复消除了启动期的一次分辨率翻转（疑似诱因）；若仍复现请附日志反馈（属 MobileGL 上游翻译层问题）\n\n**TouchController 模组（重点修复）**\n\n- **MC 26.2 功能失效根治**：双重修复。其一，模组原生通信层从句柄制改成单例制导致的 ABI 错位已由双 ABI 传输层兼容；其二，模组 0.3.1-alpha14 的静态库分支在上游尚未完成（加载必失败并误报\"不支持的操作系统：iOS\"），静态库模式现会自动附带模组自带的 UDP 兼容通道作为回落——触控开箱即用\n- **静态库模式进世界触控恢复**：修复静态库模式下触控事件发错通道的问题（菜单能点、进游戏失灵的怪象根除），现在无论模组走哪条通道都能收到事件\n- **屏蔽控件（语义更新）**：开关现在只隐藏【启动器自带】的经典虚拟按钮，保留模组自己的虚拟按钮（摇杆/跳跃/聊天/暂停等一整套内置布局）——修复此前\"触控能用但一个按钮都不显示\"；此前被写成空布局的存量配置会在下次启动时自动修复，模组按钮即刻回归。触屏手势、震动、文字输入不受影响\n- 设置页入口恢复为二级菜单（此前误改为悬浮浮窗）\n\n**下载镜像策略（新增）**\n\n- **加载速度快优先**：参考 FCL 的测速策略，启动器会实测官方源与国内镜像（BMCLAPI / MCIM）的响应速度并自动选用更快的一方，结果缓存 24 小时；文件下载、资源搜索、资源文件、模组加载器四个分类均支持，且默认即为该选项\n- **模组镜像源合并**：原\"启动器设置\"里的模组镜像源移入\"下载镜像策略\"分区，作为模组/光影/资源包/数据包/整合包/世界的统一入口（选择同时作用于搜索与下载；需要精细控制时仍可单独调整分类行）\n\n**JIT 体验**\n\n- **JIT 开启工具选择**：设置 > 调试新增工具选择（自动 / StikDebug / SideStore / StosDebug / JitStreamer-EB / TrollStore / 手动）。没装 StikDebug 的用户请改选你实际使用的工具，不再\"点了没反应\"\n- **安装 Forge 自动申请 JIT**：Forge/NeoForge 安装需要运行 Java 处理器，此前 JIT 未开启时只会弹错让你手动去开——现在与启动游戏同款自动跳转申请并等待开启，装完即装；iOS 26+ 设备上即使 JIT 已开启，无活跃调试器时也会自动重新附上 JIT 脚本\n- **iOS 26 JS 脚本开关**：可关闭启动游戏时向 JIT 工具发送 UniversalJIT26.js 脚本的行为（供不支持脚本的工具使用）\n\n**修复**\n\n- **MC 26.1.2 整合包进世界闪退根治（新根因）**：controlify 闪退修复后游戏可正常进入世界，本轮追查到真正的最后一层——语音模组（Simple Voice Chat）的麦克风在部分设备上因音频格式不匹配触发系统异常。现在麦克风按设备原生格式采集并在内部重采样，格式不再冲突；即使麦克风不可用也只影响语音，绝不闪退\n- **MobileGL-gles 输入错位修复**：修复该渲染器下触摸点与画面位置对不上的问题（FSR 兜底恢复全分辨率渲染后输入坐标未同步）\n- **MobileGL-gles 渲染器**：修复选择后 EGL 加载失败导致的闪退，现在正常进入游戏\n- **OpenGL 4.0 实验性后端随包可用**：Mithril 组件（libmithril.dylib）已内置，无需再手动放置文件\n- **第三方皮肤头像**：本地渲染（脸 + 帽层），存量账户启动自愈、首页头像实时刷新不再需要重启启动器\n- **主页卡片**：公告卡片与新闻卡片和\"最新正式版\"卡片等高，公告卡喇叭图标居中、查看按钮内联标题后，样式与新闻卡对齐；主页所有卡片取消阴影；欢迎卡头像等边距居左、未选账号首帧即显示默认头像；内存分配改为 iOS 原生底部面板\n\n**界面与动画**\n\n- **iPhone 右侧边栏精简**：手机上右侧面板改为窄图标轨（96pt），只保留头像与启动/选版本/执行JAR 图标按钮，内容区更宽敞；iPad 保持完整面板\n- 列表入场动画只在首次出现时播放（滚动回滑不再重复弹跳），条目按序错落进入\n- 侧栏切换选中项颜色平滑过渡，页面切换保持交叉渐变\n\n---\n\nv6.0.0: TouchController's MC 26.2 breakage root-fixed with a dual-ABI transport (static-library mode now delivers events on both channels, fixing in-world touch) plus a Hide-All-Controls option that now also hides the launcher's own button layer; a new download mirror strategy with a Fastest-First default (FCL-style racing, 24h cached) and the mod-mirror control consolidated; a LiveContainer-style JIT enabler picker with an iOS 26 script toggle -- and Forge/NeoForge installation now auto-requests JIT exactly like game launch (including the iOS 26+ debugger re-attach); the 26.1.2 world-join crash finally traced to Simple Voice Chat's microphone (AVAudioEngine tap format mismatch) and fixed with native-format capture + in-callback resampling + graceful no-mic degradation; MobileGL-gles input misalignment fixed (FSR-heal input scale reset) alongside its load fix; the OpenGL 4.0 experimental backend ships working with the bundled Mithril dylib; renderer selection is now per-game mandatory with no global default (games without an explicit choice default to Auto; single mg entry; backend picked in MobileGlues settings, Vulkan direct by default) plus a one-tap Sodium+Podium component install for Fabric instances; iPhone's right panel streamlined to a 96pt icon rail; and list/sidebar animations polished.",
+   "priority": "high",
+   "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v6.0.0",
+   "action_title": "查看 v6.0.0",
+   "image_url": ""
+  },
+  {
+   "id": "repo-migration-2026-09-20",
+   "title": "公告已迁移至仓库托管",
+   "date": "2026-09-20",
+   "summary": "启动器公告改为 GitHub 仓库直接托管，不再依赖任何第三方接口，内容随仓库更新即时生效。",
+   "content": "## 公告源迁移\n\n从本版本起，启动器公告由本项目的 GitHub 仓库直接托管：\n\n- **主源**：仓库根目录 `announcements.json`（raw.githubusercontent.com），提交后即时生效\n- **镜像**：jsDelivr CDN（国内可达性更好，最长 12 小时缓存延迟）\n- **离线兜底**：随安装包内置的离线公告（网络完全不可用时显示）\n\n旧的公告接口（air-api.vercel.app）已失效且不受我们控制。迁移后公告内容与启动器代码同仓维护、同版发布，不会再出现“公告加载失败”这类单点故障。\n\n---\n\nAnnouncements are now hosted directly in this project's GitHub repository (announcements.json at the repo root): raw.githubusercontent.com as the primary source, a jsDelivr CDN mirror for reachability, and a bundled offline notice as the floor. The retired third-party API was unreachable and out of our control.",
+   "priority": "normal",
+   "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/blob/main/announcements.json",
+   "action_title": "查看公告源文件",
+   "image_url": ""
+  },
+  {
+   "id": "v5-1-2-preview-2026-09-20",
+   "title": "下一版本修复预览（装机反馈四项）",
+   "date": "2026-09-20",
+   "summary": "26.1.2 整合包进入世界崩溃根治、第三方切换角色修复、MG 三后端回到渲染器悬浮菜单、设置悬浮菜单可用性加固。",
+   "content": "## 即将在下一版本发布（装机反馈四项修复）\n\n**修复**\n\n- **26.1.2 整合包进入世界崩溃**：根因是整合包内 Controlify 手柄模组经 JNA 向 SDL3 注册事件回调，该回调指针位于不可执行的内存页（iOS 无 JIT 权限），游戏每帧事件泵触发时直接 SIGBUS。已在 SDL 层拦截回调注册（手柄模组其余功能不受影响，26.3 会话不受影响）\n- **第三方登录切换角色失败（“访问令牌已经分配了角色”）**：LittleSkin 等 Blessing Skin 系服务器不允许在已绑定的访问令牌上换绑角色。现在登录时会把凭据安全保存进系统钥匙串，切换角色时自动重新认证并绑定新角色——仍然免密。老账户需重新登录一次以启用\n- **MG 三后端设置项“还是分开的”**：MobileGL 的 Vulkan / GLES / Mithril 三后端回到渲染器选择行的悬浮菜单（上游原有形态），MobileGlues 分区的独立后端设置行移除，选择即生效（不再要求渲染器先设为“自动”）\n- **设置悬浮菜单可用性**：选择菜单改为从最顶层界面呈现，消除个别场景下“点了没反应”的静默失败面\n\n----\n\nComing in the next build: the 26.1.2 world-join crash (controlify's JNA/SDL callback hitting a non-executable trampoline page) intercepted at the SDL layer; third-party profile switching now re-authenticates with Keychain-secured credentials after servers reject token rebinding (one re-login needed on existing accounts); the three MobileGL backends return to the renderer picker's floating menu (upstream form, effective immediately); and pick sheets present from the topmost view controller so a presenting state can no longer swallow the tap.",
+   "priority": "high",
+   "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases",
+   "action_title": "查看版本发布",
+   "image_url": ""
+  },
+  {
+   "id": "v5-1-0-release-2026-09-19",
+   "title": "v5.1.0 正式版发布",
+   "date": "2026-09-19",
+   "summary": "MobileGL FSR 放大、渲染后端单选项（默认 Vulkan）、第三方登录恢复、启动时自动检查更新。",
+   "content": "## v5.1.0 主要内容\n\n- **MobileGL FSR 放大**：MobileGL 后端接入 FSR1 EASU 空间放大，低分辨率渲染 + 放大输出，性能显著提升\n- **渲染后端单选项**：MobileGL 三后端（Vulkan / GLES / Mithril）合并为一个设置项，默认 Vulkan，显式选择优先\n- **第三方登录恢复**：内置 authlib-injector，过期令牌优雅降级，LittleSkin 等外置登录站可用\n- **自动更新检查**：启动器启动时静默检查新版本，有更新时以卡片提醒\n- **子面板新拟物化**：全部二级面板统一新拟物设计\n\n---\n\nv5.1.0 shipped MobileGL FSR upscaling, the unified renderer-backend option (Vulkan default), restored third-party login with a bundled authlib-injector, silent auto update checks, and neumorphic sub-panels.",
+   "priority": "normal",
+   "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases/tag/v5.1.0",
+   "action_title": "查看 v5.1.0",
+   "image_url": ""
+  }
+ ]
 }
