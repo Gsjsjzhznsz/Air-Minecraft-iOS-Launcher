@@ -18,7 +18,7 @@ verify_task150.py —— Task 150 校验器
      PojavLauncher 检查，与 Task145 的 POJAV_RENDERER 导出收敛互为双保险。
 
 分节：A 设置页退役 / B 实例页强制单选 / C 启动链 profile→auto /
-      D Sodium 组件安装 / E l10n（退役 2 + 新增 6 = 1928）/ F 发布资产 / G 配平
+      D Sodium 组件安装 / E l10n（Task151 后基线 1945）/ F 发布资产 / G 配平
 """
 import json
 import os
@@ -162,7 +162,7 @@ check("D8  统一下载任务接入（DownloadTaskManager 注册 Sodium + Podium
 
 print()
 print("=" * 72)
-print("E. l10n：退役 2 键 + 新增 6 键（四语言一致 = 1928）")
+print("E. l10n：Task151 后基线 1945（四语言一致）")
 print("=" * 72)
 langs = ['en.lproj', 'zh-Hans.lproj', 'zh-CN.lproj', 'zh-Hant.lproj']
 base = 'Natives/resources/'
@@ -179,8 +179,8 @@ for lg in langs:
     n6 = '"component.sodium.done"' in s
     check(f"E[{lg}] 退役 2 键清零 + Sodium 6 键在位", r1 and r2 and n1 and n2 and n3 and n4 and n5 and n6)
     sets.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
-check("E5 四语言键集一致（1928 = Task142 1924 - 退役 2 + Sodium 6）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1928,
+check("E5 四语言键集一致（1945 = Task150 的 1928 + Task151 Bing 17）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1945,
       f"counts={[len(x) for x in sets]}")
 
 print()

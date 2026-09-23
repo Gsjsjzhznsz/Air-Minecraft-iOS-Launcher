@@ -5,6 +5,7 @@
 #import "LauncherCardLayoutViewController.h"
 #import "LauncherPreferences.h"
 #import "BackgroundManager.h"
+#import "BingWallpaperManager.h" // Task151
 // Terracotta 暂时移除（排查启动崩溃）
 // #import "TerracottaManager.h"
 // #import "TerracottaBridge.h"
@@ -73,6 +74,10 @@ extern __weak UIWindow *mainWindow;
     // 延迟会在启动时露出窗口底色形成"黑条"或"黑闪"。BackgroundManager 在其 init
     // 中已 loadSavedBackground/loadUISettings，单例首次访问即完成初始化，无需延迟。
     [[BackgroundManager sharedManager] applyBackgroundToWindow:self.window];
+
+    // Task151：Bing 每日壁纸自动刷新与应用（默认开启；全异步不阻塞启动：
+    // 有缓存今日图直接登记背景，否则联网拉取后换图；用户自定义壁纸优先）。
+    [[BingWallpaperManager sharedManager] autoRefreshAndApplyIfEnabled];
 
     [self showTranslationNoticeIfNeeded];
 

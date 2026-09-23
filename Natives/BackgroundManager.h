@@ -52,6 +52,15 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 - (void)setVideoBackgroundWithURL:(NSURL *)videoURL completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
 - (void)clearBackground;
 
+// Task151：Bing 每日壁纸联动（来源标记机制）
+// 当前背景是否由 Bing 壁纸链路设置（source == @"bing"）。
+// 语义：用户手动设置的图片/视频来源为 user，优先于 Bing 自动应用；
+// 无背景或来源为 bing 时，BingWallpaperManager 可每日自动换图。
+@property (nonatomic, readonly) BOOL isBingSource;
+// 将已存在于磁盘的 Bing 壁纸图直接登记为当前背景（不再复制到 backgrounds/
+// 目录，避免每日图双份存储；来源标记为 bing）。
+- (void)setBingBackgroundImageAtPath:(NSString *)path completion:(void (^)(BOOL success, NSError * _Nullable error))completion;
+
 // Check if has background
 - (BOOL)hasBackground;
 - (BOOL)hasImageBackground;

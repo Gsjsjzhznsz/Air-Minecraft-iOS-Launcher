@@ -2094,3 +2094,22 @@
 /* Task 141: instance memory slider popup */
 "memory.current" = "当前内存：%ldMB";
 "memory.apply" = "确定";
+
+/* Task 151: Bing daily wallpaper */
+"bing.section.header" = "Bing 壁纸";
+"bing.toggle.title" = "Bing 每日壁纸";
+"bing.status.today" = "今日：%@";
+"bing.status.unsynced" = "尚未同步";
+"bing.gallery.title" = "浏览壁纸库";
+"bing.refresh.title" = "立即刷新";
+"bing.footer.hint" = "开启后，若未设置自定义壁纸，将自动应用 Bing 每日壁纸并每天更新；设置自定义壁纸会暂时停用，清除背景后自动恢复。";
+"bing.gallery.nav.title" = "Bing 壁纸库";
+"bing.setwallpaper.title" = "设为壁纸";
+"bing.save.title" = "保存到相册";
+"bing.apply.success" = "壁纸已应用";
+"bing.apply.failed" = "应用失败，请稍后重试";
+"bing.save.success" = "已保存到相册";
+"bing.save.failed" = "保存失败";
+"bing.download.hint" = "壁纸下载中…";
+"bing.refresh.done" = "同步完成";
+"bing.refresh.failed" = "同步失败，请检查网络";

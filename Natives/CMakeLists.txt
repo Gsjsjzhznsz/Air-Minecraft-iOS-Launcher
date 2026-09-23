@@ -498,6 +498,10 @@ add_executable(AngelAuraAmethyst
   BackgroundManager.m
   BackgroundSettingsViewController.m
 
+  # Task151: Bing daily wallpaper (HPImageArchive fetch/cache + gallery)
+  BingWallpaperManager.m
+  BingWallpaperGalleryViewController.m
+
   # FCL-style interface is implemented in LauncherMenuViewController.m
 
   # TouchController bridge and preferences

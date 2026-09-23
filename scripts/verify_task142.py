@@ -136,8 +136,8 @@ for lg in langs:
     check(f"D[{lg}] key set (toggle + mg + backend-warn; picker key retired; detail reworded)",
           n1 and n2 and n3 and n4 and n5)
     sets.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
-check("D5 Task150: four-language key sets identical (1928 = Task142 1924 - retired 2 + sodium 6)",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1928,
+check("D5 Task150: four-language key sets identical (1945 = Task150 1928 + Task151 bing 17)",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1945,
       f"counts={[len(x) for x in sets]}")
 
 print("== E. Publish assets ==")

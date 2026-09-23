@@ -2098,3 +2098,22 @@
 /* Task 141: instance memory slider popup */
 "memory.current" = "Current memory: %ldMB";
 "memory.apply" = "Apply";
+
+/* Task 151: Bing daily wallpaper */
+"bing.section.header" = "Bing Wallpaper";
+"bing.toggle.title" = "Bing Daily Wallpaper";
+"bing.status.today" = "Today: %@";
+"bing.status.unsynced" = "Not synced yet";
+"bing.gallery.title" = "Browse Gallery";
+"bing.refresh.title" = "Refresh Now";
+"bing.footer.hint" = "When enabled and no custom wallpaper is set, the Bing daily wallpaper is applied automatically and refreshed every day. Setting a custom wallpaper pauses it; clearing the background brings it back.";
+"bing.gallery.nav.title" = "Bing Gallery";
+"bing.setwallpaper.title" = "Set as Wallpaper";
+"bing.save.title" = "Save to Photos";
+"bing.apply.success" = "Wallpaper applied";
+"bing.apply.failed" = "Failed to apply, please try again";
+"bing.save.success" = "Saved to Photos";
+"bing.save.failed" = "Failed to save";
+"bing.download.hint" = "Downloading wallpaper…";
+"bing.refresh.done" = "Sync complete";
+"bing.refresh.failed" = "Sync failed, check your network";

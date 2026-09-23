@@ -1962,3 +1962,22 @@
 "preference.auto" = "Auto";
 "preference.auto_select" = "Auto";
 "preference.profile.title.lwjgl_version" = "LWJGL バージョン";
+
+/* Task 151: Bing daily wallpaper */
+"bing.section.header" = "Bing 壁紙";
+"bing.toggle.title" = "Bing 毎日壁紙";
+"bing.status.today" = "今日：%@";
+"bing.status.unsynced" = "未同期";
+"bing.gallery.title" = "ギャラリーを見る";
+"bing.refresh.title" = "今すぐ更新";
+"bing.footer.hint" = "有効にすると、カスタム壁紙未設定の場合は Bing の毎日壁紙が自動で適用され、毎日更新されます。カスタム壁紙を設定すると一時停止し、背景を消去すると自動的に再開します。";
+"bing.gallery.nav.title" = "Bing ギャラリー";
+"bing.setwallpaper.title" = "壁紙に設定";
+"bing.save.title" = "写真に保存";
+"bing.apply.success" = "壁紙を適用しました";
+"bing.apply.failed" = "適用に失敗しました。後でお試しください";
+"bing.save.success" = "写真に保存しました";
+"bing.save.failed" = "保存に失敗しました";
+"bing.download.hint" = "壁紙をダウンロード中…";
+"bing.refresh.done" = "同期が完了しました";
+"bing.refresh.failed" = "同期に失敗しました。ネットワークを確認してください";

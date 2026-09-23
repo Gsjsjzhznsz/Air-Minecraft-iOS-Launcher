@@ -1955,3 +1955,22 @@
 "preference.auto" = "Auto";
 "preference.auto_select" = "Auto";
 "preference.profile.title.lwjgl_version" = "LWJGL version";
+
+/* Task 151: Bing daily wallpaper */
+"bing.section.header" = "រូបភាព Bing";
+"bing.toggle.title" = "រូបភាពប្រចាំថ្ងៃ Bing";
+"bing.status.today" = "ថ្ងៃនេះ៖ %@";
+"bing.status.unsynced" = "មិនទាន់ធ្វើសមកាលកម្ម";
+"bing.gallery.title" = "មើលវិចិត្រសាល";
+"bing.refresh.title" = "ធ្វើឱ្យថ្មីឥឡូវនេះ";
+"bing.footer.hint" = "នៅពេលបើក ប្រសិនបើមិនបានកំណត់រូបភាពផ្ទាល់ខ្លួន រូបភាពប្រចាំថ្ងៃរបស់ Bing នឹងត្រូវបានអនុវត្តស្វ័យប្រវត្តិ និងធ្វើឱ្យថ្មីរាល់ថ្ងៃ។";
+"bing.gallery.nav.title" = "វិចិត្រសាល Bing";
+"bing.setwallpaper.title" = "កំណត់ជារូបភាពផ្ទៃខាងក្រោយ";
+"bing.save.title" = "រក្សាទុកទៅរូបភាព";
+"bing.apply.success" = "អនុវត្តរូបភាពបានសម្រេច";
+"bing.apply.failed" = "អនុវត្តមិនបានសម្រេច សូមព្យាយាមម្តងទៀត";
+"bing.save.success" = "បានរក្សាទុកទៅរូបភាព";
+"bing.save.failed" = "រក្សាទុកមិនបានសម្រេច";
+"bing.download.hint" = "កំពុងទាញយករូបភាព…";
+"bing.refresh.done" = "ធ្វើសមកាលកម្មបានសម្រេច";
+"bing.refresh.failed" = "ធ្វើសមកាលកម្មមិនបានសម្រេច សូមពិនិត្យបណ្តាញ";

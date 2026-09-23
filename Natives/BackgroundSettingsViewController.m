@@ -9,6 +9,9 @@
 #import "BackgroundSettingsViewController.h"
 #import "BackgroundManager.h"
 #import "ImageCropperViewController.h"
+// Task151：Bing 每日壁纸（开关/画廊/刷新）
+#import "BingWallpaperManager.h"
+#import "BingWallpaperGalleryViewController.h"
 
 @interface BackgroundSettingsViewController ()
 @property (nonatomic, strong) NSArray<NSArray *> *sections;
@@ -61,6 +64,12 @@
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(reapplyBackgroundEffect)
                                                  name:@"BackgroundUIEffectChanged"
+                                               object:nil];
+
+    // Task151：Bing 壁纸元数据刷新完成 → 刷新开关行状态文字（"今日：xxx"）
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleBingUpdate)
+                                                 name:BingWallpaperDidUpdateNotification
                                                object:nil];
 }
 
@@ -137,10 +146,13 @@
 }
 
 - (void)setupSections {
-    // Sections: [UI效果设置], [选择背景类型], [图片背景, 视频背景], [恢复默认背景, 清除背景]
+    // Task151：新增 section 2 = Bing 每日壁纸（开关/画廊/刷新），原图片/视频与
+    // 恢复/清除顺延为 3/4。
+    // Sections: [UI效果设置], [选择背景类型], [Bing 壁纸(开关+画廊+刷新)], [图片背景, 视频背景], [恢复默认背景, 清除背景]
     self.sections = @[
         @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil)],
         @[localize(@"i18n_str_60", nil)],
+        @[localize(@"bing.section.header", nil), localize(@"bing.toggle.title", nil), localize(@"bing.gallery.title", nil), localize(@"bing.refresh.title", nil)],
         @[localize(@"i18n_str_61", nil), localize(@"i18n_str_55", nil)],
         @[localize(@"i18n_str_62", nil), localize(@"i18n_str_63", nil)]
     ];
@@ -169,6 +181,14 @@
         return nil;
     }
     return self.sections[section][0];
+}
+
+// Task151：Bing 部分页脚说明（默认开启语义：用户自定义优先，清除背景后自动回到 Bing 每日图）
+- (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
+    if (section == 2) {
+        return localize(@"bing.footer.hint", nil);
+    }
+    return nil;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -285,24 +305,63 @@
         }
     }
     
+    // Task151：Bing 每日壁纸部分（section 2）——开关行（Value1+UISwitch）+ 画廊/刷新行
+    if (indexPath.section == 2) {
+        if (indexPath.row == 0) {
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"BingToggleCell"];
+            if (!cell) {
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"BingToggleCell"];
+                UISwitch *bingSwitch = [[UISwitch alloc] init];
+                [bingSwitch addTarget:self action:@selector(bingToggleChanged:) forControlEvents:UIControlEventValueChanged];
+                bingSwitch.tag = 400;
+                cell.accessoryView = bingSwitch;
+            }
+            UISwitch *bingSwitch = (UISwitch *)cell.accessoryView;
+            bingSwitch.on = [BingWallpaperManager sharedManager].isEnabled;
+
+            cell.textLabel.text = self.sections[2][1]; // bing.toggle.title
+            cell.detailTextLabel.text = [self bingStatusText];
+            cell.detailTextLabel.adjustsFontSizeToFitWidth = YES;
+            cell.imageView.image = [UIImage systemImageNamed:@"photo.on.rectangle.angled"];
+            [self styleCell:cell hasBackground:hasBackground];
+            return cell;
+        }
+
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
+        if (!cell) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellIdentifier];
+        }
+        cell.textLabel.text = self.sections[2][indexPath.row];
+        cell.detailTextLabel.text = nil;
+        [self styleCell:cell hasBackground:hasBackground];
+        if (indexPath.row == 1) {
+            cell.imageView.image = [UIImage systemImageNamed:@"square.grid.2x2"];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        } else if (indexPath.row == 2) {
+            cell.imageView.image = [UIImage systemImageNamed:@"arrow.triangle.2.circlepath"];
+            cell.accessoryType = UITableViewCellAccessoryNone;
+        }
+        return cell;
+    }
+
     // 其他部分
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
     if (!cell) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cellIdentifier];
     }
-    
+
     NSString *title = self.sections[indexPath.section][indexPath.row];
     cell.textLabel.text = title;
     cell.detailTextLabel.text = nil;
-    
+
     [self styleCell:cell hasBackground:hasBackground];
-    
+
     if (indexPath.section == 1) {
         // 选择背景类型标题
         cell.textLabel.textColor = [UIColor secondaryLabelColor];
         cell.imageView.image = nil;
         cell.accessoryType = UITableViewCellAccessoryNone;
-    } else if (indexPath.section == 2) {
+    } else if (indexPath.section == 3) {
         if (indexPath.row == 0) {
             cell.imageView.image = [UIImage systemImageNamed:@"photo"];
             cell.accessoryType = [manager hasImageBackground] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
@@ -310,7 +369,7 @@
             cell.imageView.image = [UIImage systemImageNamed:@"film"];
             cell.accessoryType = [manager hasVideoBackground] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
         }
-    } else if (indexPath.section == 3) {
+    } else if (indexPath.section == 4) {
         if (indexPath.row == 0) {
             // 恢复默认背景
             cell.imageView.image = [UIImage systemImageNamed:@"arrow.counterclockwise"];
@@ -323,7 +382,7 @@
             cell.accessoryType = UITableViewCellAccessoryNone;
         }
     }
-    
+
     return cell;
 }
 
@@ -366,6 +425,60 @@
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 
+#pragma mark - Task151：Bing 每日壁纸
+
+// 开关切换：开 → 立即触发自动刷新+应用；关 → 若当前背景来自 Bing 则清除
+// （用户自定义壁纸来源为 user，不受开关影响）
+- (void)bingToggleChanged:(UISwitch *)sender {
+    BingWallpaperManager *bing = [BingWallpaperManager sharedManager];
+    bing.enabled = sender.on;
+
+    if (sender.on) {
+        [bing autoRefreshAndApplyIfEnabled];
+    } else if ([[BackgroundManager sharedManager] isBingSource]) {
+        [[BackgroundManager sharedManager] clearBackground];
+        [self updatePreview];
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
+    }
+    [self.tableView reloadData];
+}
+
+// 开关行副标题：今日壁纸标题（已同步）或"尚未同步"
+- (NSString *)bingStatusText {
+    BingWallpaperManager *bing = [BingWallpaperManager sharedManager];
+    BingWallpaperItem *today = bing.items.firstObject;
+    if (today) {
+        NSString *name = today.title.length > 0 ? today.title : today.copyright;
+        return [NSString stringWithFormat:localize(@"bing.status.today", nil), name];
+    }
+    return localize(@"bing.status.unsynced", nil);
+}
+
+// "立即刷新"行：手动拉元数据 + 补下载今日图（已开 Bing 时顺带自动应用）
+- (void)refreshBingManually {
+    __weak typeof(self) weakSelf = self;
+    [[BingWallpaperManager sharedManager] refreshWithCompletion:^(BOOL success, NSError *_Nullable error) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (success) {
+            [[BingWallpaperManager sharedManager] autoRefreshAndApplyIfEnabled];
+        }
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil
+                                                                       message:success ? localize(@"bing.refresh.done", nil)
+                                                                                       : localize(@"bing.refresh.failed", nil)
+                                                                preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_44", nil) style:UIAlertActionStyleDefault handler:nil]];
+        [strongSelf presentViewController:alert animated:YES completion:nil];
+    }];
+}
+
+// Bing 元数据更新通知：仅重载表格（状态行文字更新）
+- (void)handleBingUpdate {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tableView reloadData];
+    });
+}
+
 #pragma mark - Table View Delegate
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -383,12 +496,23 @@
     }
     
     if (indexPath.section == 2) {
+        // Task151：Bing 部分——画廊跳转 / 立即刷新（开关行点击不做事，操作 UISwitch）
+        if (indexPath.row == 1) {
+            UICollectionViewController *gallery = [BingWallpaperGalleryViewController galleryController];
+            [self.navigationController pushViewController:gallery animated:YES];
+        } else if (indexPath.row == 2) {
+            [self refreshBingManually];
+        }
+        return;
+    }
+
+    if (indexPath.section == 3) {
         if (indexPath.row == 0) {
             [self selectImageBackground];
         } else if (indexPath.row == 1) {
             [self selectVideoBackground];
         }
-    } else if (indexPath.section == 3) {
+    } else if (indexPath.section == 4) {
         if (indexPath.row == 0) {
             [self restoreDefaultBackground];
         } else if (indexPath.row == 1) {
@@ -524,8 +648,12 @@
         self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
         self.tableView.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
         self.tableView.backgroundView = nil;
-        
+
         [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
+
+        // Task151：Bing 开启时，清除后立即回补每日壁纸（默认开启语义：
+        // 无自定义壁纸即 Bing 每日图；彻底无背景请关闭 Bing 开关）
+        [[BingWallpaperManager sharedManager] autoRefreshAndApplyIfEnabled];
     }]];
     
     [self presentViewController:alert animated:YES completion:nil];
@@ -550,8 +678,11 @@
         // Restore default background color
         self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
         self.tableView.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
-        
+
         [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundChanged" object:nil];
+
+        // Task151：同恢复默认——Bing 开启时立即回补每日壁纸
+        [[BingWallpaperManager sharedManager] autoRefreshAndApplyIfEnabled];
     }]];
     
     [self presentViewController:alert animated:YES completion:nil];

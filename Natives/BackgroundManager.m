@@ -15,6 +15,8 @@ static NSString * const kBackgroundPathKey = @"background_path";
 static NSString * const kBackgroundUIEffectKey = @"background_ui_effect";
 static NSString * const kBackgroundUIOpacityKey = @"background_ui_opacity";
 static NSString * const kBackgroundBlurIntensityKey = @"background_blur_intensity";
+// Task151：背景来源标记（"user" = 用户手动设置，"bing" = Bing 每日壁纸自动应用）
+static NSString * const kBackgroundSourceKey = @"background_source";
 static NSString * const kBackgroundsFolder = @"backgrounds";
 static const NSInteger kGlobalBackgroundTag = 99999;
 static const NSInteger kBackgroundImageTag = 99998;
@@ -28,6 +30,8 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 @property (nonatomic, weak) UIView *currentBackgroundView;
 @property (nonatomic, readwrite) BackgroundType currentType;
 @property (nonatomic, readwrite, nullable) NSString *currentBackgroundPath;
+// Task151：背景来源（@"user"/@"bing"，nil = 历史数据视为 user）
+@property (nonatomic, copy, nullable) NSString *backgroundSource;
 @property (nonatomic, weak) UIWindow *currentWindow;
 @property (nonatomic, weak) UISplitViewController *currentSplitVC;
 @property (nonatomic, strong, readwrite, nullable) UIView *globalBackgroundContainer;
@@ -110,11 +114,18 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     self.currentType = [defaults integerForKey:kBackgroundTypeKey];
     self.currentBackgroundPath = [defaults stringForKey:kBackgroundPathKey];
-    
+    // Task151：读取来源标记；历史数据（升级安装）无标记时视为 user，
+    // 保证老用户已设的自定义壁纸不会被 Bing 自动覆盖。
+    self.backgroundSource = [defaults stringForKey:kBackgroundSourceKey];
+    if (self.backgroundSource.length == 0) {
+        self.backgroundSource = (self.currentType != BackgroundTypeNone) ? @"user" : nil;
+    }
+
     // Validate path exists
     if (self.currentBackgroundPath && ![[NSFileManager defaultManager] fileExistsAtPath:self.currentBackgroundPath]) {
         self.currentBackgroundPath = nil;
         self.currentType = BackgroundTypeNone;
+        self.backgroundSource = nil;
         [self saveBackgroundSettings];
     }
 }
@@ -123,6 +134,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setInteger:self.currentType forKey:kBackgroundTypeKey];
     [defaults setObject:self.currentBackgroundPath forKey:kBackgroundPathKey];
+    // Task151：来源标记随背景持久化（nil 时移除，回退"无标记=user"语义）
+    if (self.backgroundSource.length > 0) {
+        [defaults setObject:self.backgroundSource forKey:kBackgroundSourceKey];
+    } else {
+        [defaults removeObjectForKey:kBackgroundSourceKey];
+    }
     [defaults synchronize];
 }
 
@@ -1088,6 +1105,7 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         if (saved) {
             self.currentType = BackgroundTypeImage;
             self.currentBackgroundPath = filePath;
+            self.backgroundSource = @"user"; // Task151：用户手动设置，优先于 Bing 自动应用
             [self saveBackgroundSettings];
             
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -1105,6 +1123,42 @@ static const NSInteger kDefaultBackgroundTag = 99995;
                 if (completion) completion(NO, [NSError errorWithDomain:@"BackgroundManager" code:3 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_50", nil)}]);
             });
         }
+    });
+}
+
+#pragma mark - Task151：Bing 每日壁纸联动
+
+- (BOOL)isBingSource {
+    return [self.backgroundSource isEqualToString:@"bing"];
+}
+
+// 将 Bing 缓存目录中已存在的图片直接登记为当前背景（不复制、不删源文件）。
+// 与 setImageBackground 的差异：跳过 JPEG 重编码与 backgrounds/ 目录复制，
+// 来源标记为 bing（供 BingWallpaperManager 的"用户优先"守卫与画廊勾选使用）。
+- (void)setBingBackgroundImageAtPath:(NSString *)path completion:(void (^)(BOOL success, NSError * _Nullable error))completion {
+    if (path.length == 0 || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        if (completion) {
+            completion(NO, [NSError errorWithDomain:@"BackgroundManager" code:6 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_48", nil)}]);
+        }
+        return;
+    }
+
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        [self clearBackgroundInternal];
+
+        self.currentType = BackgroundTypeImage;
+        self.currentBackgroundPath = path;
+        self.backgroundSource = @"bing";
+        [self saveBackgroundSettings];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.currentSplitVC) {
+                [self applyBackgroundToSplitViewController:self.currentSplitVC];
+            } else if (self.currentWindow) {
+                [self applyBackgroundToWindow:self.currentWindow];
+            }
+            if (completion) completion(YES, nil);
+        });
     });
 }
 
@@ -1130,6 +1184,7 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         if (copied) {
             self.currentType = BackgroundTypeVideo;
             self.currentBackgroundPath = filePath;
+            self.backgroundSource = @"user"; // Task151：用户手动设置，优先于 Bing 自动应用
             [self saveBackgroundSettings];
             
             dispatch_async(dispatch_get_main_queue(), ^{
@@ -1158,13 +1213,20 @@ static const NSInteger kDefaultBackgroundTag = 99995;
 
 - (void)clearBackgroundInternal {
     [self cleanupVideoPlayer];
-    
+
     if (self.currentBackgroundPath) {
-        [[NSFileManager defaultManager] removeItemAtPath:self.currentBackgroundPath error:nil];
+        // Task151：仅清理 backgrounds/ 目录内的文件。Bing 缓存图
+        // （Application Support/BingWallpaper/）不属于本目录，清除背景时
+        // 保留缓存（离线回退与画廊复用需要），避免误删后重复下载。
+        NSString *folder = [self backgroundsFolderPath];
+        if ([self.currentBackgroundPath hasPrefix:folder]) {
+            [[NSFileManager defaultManager] removeItemAtPath:self.currentBackgroundPath error:nil];
+        }
     }
-    
+
     self.currentType = BackgroundTypeNone;
     self.currentBackgroundPath = nil;
+    self.backgroundSource = nil; // Task151：来源一并复位（saveBackgroundSettings 移除标记）
 }
 
 #pragma mark - Check Background
