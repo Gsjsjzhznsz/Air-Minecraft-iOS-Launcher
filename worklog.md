@@ -384,3 +384,16 @@ Stage Summary:
 - 产出：Task156 九文件修复（JavaLauncher.m / egl_bridge.m / mithril_gl_shim.c(新) / Makefile / TrackedTextField.m / SurfaceViewController.m / BackgroundSettingsViewController.m / LauncherPreferencesViewController.h+.m / LauncherRightPanelViewController.m）+ android 桩复制进 lwjgl overlay + l10n 六语言（FSR 重写 + footer 新键）+ 13 个门禁 bump + disasm_gl1.py（GL$1 Delegate 常量池反汇编器）+ task156 两脚本 + verify_task156（52 项）+ version.h addendum
 - 装机验证锚点：①ES 会话 "[JavaLauncher] Task156: Espryt multidraw tier forced to 'drawelements'" + 方块渲染恢复（若仍透明，下一轮试 basevertex/ext 档位二分定位）；②Mithril 会话越过 DynamicUniformStorage（无 / by zero）"[JavaLauncher] Task156: Mithril libname -> GL shim ..."；③Forge 会话越过 DisplayWindow.initWindow（无 android.util.ArrayMap）进 mod 加载；④输入法：游戏内拼音组字/候选上屏正常送达（TrackedTextField 路径）+ TouchController 模式下组字边界正确；⑤毛玻璃下两行显示"透明度/模糊程度"标题 + 页脚说明；⑥右侧边栏 7 卡点击直达设置/版本管理
 - 关键决策：ES 透明按上游翻译层缺陷处置（保守档绕行而非修 dylib）；Mithril 走 re-export 垫片（不回退 Task154 jar 补丁、不改 libmithril.dylib）；FSR-on-mg 不再重试（8 轮失败后的架构性定案，设置项诚实化收口）；Bing 切换刷新归另一会话 Task155（未提交，不抢跑）
+
+---
+Task ID: 156 (续)
+Agent: Super Z (main agent, 本会话)
+Task: CI 确认
+
+Work Log:
+- CI run 35897091776（8b6ec05）completed success（约 8 分钟）——dep_mithril_glshim 新 dylib 编译通过（re-export libmithril + 本地 glGetIntegerv 覆盖）、JavaApp 双源排布（src/launcher + src/lwjgl 的 android/util 桩）无 duplicate-class、全部 ObjC 改动编译通过
+- 新 IPA 工件就绪，装机验证锚点见 Task156 主条目
+
+Stage Summary:
+- Task156 全链闭环：四案根修（ES multidraw 保守档 / Mithril GL shim / Forge android 模块层桩 / iPadOS 27 IME 双路径）+ 三案 UI（滑块命名 / FSR 诚实化 / 侧边栏深链）+ 验证器 52/52 + 级联零新增失败 + CI 绿
+- 下一轮装机反馈关注：①ES 方块是否恢复（若仍透明 → 二分试 basevertex/ext 档）②Mithril 是否越过 /0（若新崩点 → 附日志）③Forge 是否进 mod 加载④拼音组字/候选上屏⑤毛玻璃两行标题⑥侧边栏卡片点击
