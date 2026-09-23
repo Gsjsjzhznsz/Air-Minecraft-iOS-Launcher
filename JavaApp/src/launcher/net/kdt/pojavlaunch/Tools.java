@@ -105,53 +105,27 @@ public final class Tools {
             }
         }
 
-        // --- BEGIN Task152b: Mithril GL FunctionProvider pinning ---
-        // 病历（Run #356，4.0 后端）：GlDevice.<init> 处 GL.createCapabilities 抛
-        // "There is no OpenGL context current in the current thread"。
-        // 根因：设备 lwjgl.jar 的 GL.class（MACOSX 分支）不读 org.lwjgl.opengl.libname
-        // （其常量池无该字符串，-D 注入注定无效），create() 按裸名解析 libGLESv2.dylib
-        // → dlopen 命中全局已加载的 ANGLE；ANGLE 的 glGetString 在 Mithril 上下文上
-        // 返回 NULL → LWJGL 判定无上下文 → 崩溃。tri-probe 取证（Task146）证实
-        // default 域 glGetString 命中 ANGLE（ver=<NULL>），与该机理吻合。
-        // 修复：显式构建 MacOSXLibraryDL(绝对路径 libmithril.dylib)——其 dlsym 直接落
-        // 在 Mithril 句柄上（libmithril.dylib 导出 _glGetString/_glGetIntegerv 等全套
-        // GL 符号，symtab 已核）——再反射调 GL.create(FunctionProvider) 覆盖。
-        // explicitInit=true 防止 GL 类 static 块在 forName 时自动 create() 抢先解析。
-        // 仅 Mithril 路径生效；ES/Vulkan/MobileGlues direct 路径不受影响。
-        final String ameRenderer = System.getenv("AMETHYST_RENDERER");
-        final String mithrilPath = System.getProperty("org.lwjgl.opengl.libname");
-        if (ameRenderer != null && ameRenderer.contains("mithril")
-                && mithrilPath != null && mithrilPath.contains("mithril")) {
-            try {
-                System.setProperty("org.lwjgl.opengl.explicitInit", "true");
-                Class<?> dlCls = Class.forName("org.lwjgl.system.macosx.MacOSXLibraryDL", true, loader);
-                Object lib;
-                try {
-                    java.lang.reflect.Constructor<?> ctor = dlCls.getDeclaredConstructor(String.class);
-                    ctor.setAccessible(true);
-                    lib = ctor.newInstance(mithrilPath);
-                } catch (NoSuchMethodException nsme) {
-                    // 无 (String) 构造器的构建改走静态工厂 getLibrary(String)
-                    java.lang.reflect.Method getLib = dlCls.getMethod("getLibrary", String.class);
-                    lib = getLib.invoke(null, mithrilPath);
-                }
-                Class<?> fpCls = Class.forName("org.lwjgl.system.FunctionProvider", true, loader);
-                Class<?> glCls = Class.forName("org.lwjgl.opengl.GL", true, loader);
-                // 若游戏侧已有 provider（异常时序），先释放再注入
-                java.lang.reflect.Method getFp = glCls.getMethod("getFunctionProvider");
-                if (getFp.invoke(null) != null) {
-                    java.lang.reflect.Method destroy = glCls.getMethod("destroy");
-                    destroy.invoke(null);
-                }
-                java.lang.reflect.Method create = glCls.getMethod("create", fpCls);
-                create.invoke(null, lib);
-                System.out.println("[Amethyst] Task152b: GL FunctionProvider pinned to Mithril (" + mithrilPath + ")");
-            } catch (Throwable t) {
-                System.out.println("[Amethyst] Task152b: Mithril GL pinning failed; continuing with default GL resolution");
-                t.printStackTrace();
-            }
-        }
-        // --- END Task152b ---
+        // --- BEGIN Task 154: Task152b Mithril GL pinning RETIRED ---
+        // 病历（7c32bc3 装机日志，3b35b26 构建，Mithril 会话）：Task152b 在
+        // MC main 之前经【系统类加载器】初始化 GL/Library 类并 dlopen
+        // liblwjgl.dylib —— MC 侧 Knot 类加载器随后在自己的 Library.<clinit>
+        // 里再次 System.loadLibrary("lwjgl")，JVM 的"同一原生库不得跨类加载器
+        // 重复加载"不变量被击破（already loaded in another class loader），
+        // 异常被 LWJGL 的 catch 吞掉后伪装成 "Failed to locate library:
+        // liblwjgl.dylib" → 4.0 后端在 NativeLibrariesBootstrap 阶段闪退。
+        // Task152b 的前提（"设备 lwjgl-opengl.jar GL.class 不读
+        // org.lwjgl.opengl.libname"）经 jar 实检证伪——lwjgl-341/333 的
+        // lwjgl-opengl.jar GL.create() MACOSX 分支自带该读取（c71dcfa 起存在）
+        // ，-D 注入直接生效；Run #356 的 "no OpenGL context" 根因是
+        // GL.create(SharedLibrary) Delegate 对 eglGetProcAddress 的间接层
+        //（Mithril 的 eglGetProcAddress 对核心 gl* 返回坏指针），已由
+        // scripts/patch_lwjgl_delegate_dlsym.py（Task154，与 Task145 同款
+        // 字节码手术）改为直走 dlsym 解析——provider 命中 Mithril 自身导出
+        // （_glGetString/_glGetIntegerv/_glGetError 已在导出表核实）。
+        // 此处不再做任何预加载/反射钉扎：零跨加载器副作用，MC 自己的
+        // GL.create() 读 -Dorg.lwjgl.opengl.libname（JavaLauncher Task146
+        // 绝对路径推送）即得正确 provider。
+        // --- END Task 154 ---
 
         Class<?> clazz = loader.loadClass(versionInfo.mainClass);
         Method method = clazz.getMethod("main", String[].class);

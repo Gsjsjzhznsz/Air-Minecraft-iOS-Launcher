@@ -771,15 +771,13 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     if (s_task78_fsr_link < 0) {
         const char *ame78_renderer = getenv("AMETHYST_RENDERER");
         NSInteger ame78_fsr = getPrefInt(@"mobileglues.fsr1_setting");
-        // Task 119：豁免扩展到 MobileGL 两后端——其 FSR 形态与 MG 同构
-        // （viewport=渲染尺寸 < surface，mgl_fsr.mm 预交换 EASU 负责铺满），
-        // 补偿链同样不应介入。（实证上 es 表解析自 ANGLE，对 MobileGL 上下文
-        // 读数归零 → geoMismatch 天然不触发；本扩展是口径自卫，防 es 解析
-        // 路径变化后几何链与 MobileGL EASU 打架。）
+        // Task 154：Task119 的 MobileGL 扩展随 ame83 能力表除名一并回退——
+        // MobileGL 不再联动 FSR（窗口恒全尺寸、viewport==surface），豁免对
+        // 其天然无操作；保留在表里只会让未来 MobileGL 上的真几何事故
+        // （转置/失配）被误豁免。da5918a 语义：仅 MobileGlues 豁免。
         s_task78_fsr_link = (ame78_renderer != NULL &&
                              ame78_fsr > 0 &&
-                             (strcmp(ame78_renderer, RENDERER_NAME_MOBILEGLUES) == 0 ||
-                              isMobileGLRenderer(ame78_renderer))) ? 1 : 0;
+                             strcmp(ame78_renderer, RENDERER_NAME_MOBILEGLUES) == 0) ? 1 : 0;
         if (s_task78_fsr_link) {
             NSLog(@"[GLGeo] Task78 FSR linkage active: renderer=%s fsr1_setting=%ld -- viewport (render) < surface is the expected upscale geometry, compensation chain exempted", ame78_renderer, (long)ame78_fsr);
         }

@@ -245,28 +245,32 @@ static float ame78_fsr_preset_scale(NSInteger preset) {
 //   - Vulkan 渲染器（libMoltenVK）：不联动。纯 Vulkan 路径无呈现钩子
 //     （vkQueuePresent 由 MC 自管）；而 ≤26.2 的 GL 回退路径走 ANGLE
 //     （非 MG）也无法升采样——两种形态下缩窗口都会得到“画面缩在角落”
-//     （Task82 同款症状）。需要 FSR 请选 MobileGlues / Zink / MobileGL。
+//     （Task82 同款症状）。需要 FSR 请选 MobileGlues / Zink。
 //   - auto/gl4es：GLES2 后端（无 VAO/ES3）——暂不接入
 //   - tinygl4angle/LTW/Mithril：gl_bridge 侧接入留待后续
-//   - MobileGL（libMobileGL.dylib，DirectVulkan/DirectGLES 共体）：Task119
-//     接入——mgl_fsr.mm 预交换 EASU pass（与 zink 同款 shader，画进
-//     MobileGL 内部 swapchain image 后 eglSwapBuffers 直呈，零回读）。
-//     修复 5.1.0 实测"mg 的 vulkan 路径 fsr 没有放大、画面蜷缩"。
+//   - MobileGL（libMobileGL.dylib，DirectVulkan/DirectGLES 共体）：Task154
+//     全链退休，恢复 da5918a（5.1.0 正常态）语义——【不联动 FSR】。
+//     退休病历（7c32bc3 双会话，3b35b26 构建实证）：①Task148 的“内置 FSR1”
+//     理论被 Task153 strings 证伪（libMobileGL.dylib 无任何 fsr1Setting/
+//     FSR1 符号，配置仅 MOBILEGL_* env）——启动器侧链是该二进制上唯一
+//     升采样途径；②Task153 的延迟缩窗依赖 eglGetCurrentDisplay/
+//     CurrentSurface/QuerySurface，而 libMobileGL 的 EGL 是伪 EGL（句柄
+//     0x1，无 current 跟踪）→ 查询恒失败 → “backbuffer query unavailable”
+//     → 缩窗永不下发 → MC 窗口信念恒全尺寸，而 sendTouchPoint 仍除
+//     mgFsrScale → 触点只落到 MC 坐标空间左下四分之一（输入错位实测）
+//     → FSR 也永远无效果；③链在 d36a24f 构建上曾按启动器信念几何面
+//     画 EASU/RCAS（2360x1640 视口栅格化进 1180x820 后缓冲）→ 每帧裁
+//     切毁帧（Vulkan 花屏 / ES “方块不渲染”）。用户基准（da5918a 装机
+//     9f32cb4/1d4ff3a 会话）：MobileGL 直呈全分辨率、无任何启动器侧
+//     FSR 介入 = 正常。mgFsrScale 恒 1.0 = 缩窗、输入除法、延迟武装
+//     全部天然失效，与 da5918a 逐位对齐。FSR 仍可选 MobileGlues/zink。
 static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     if (renderer.length == 0) return NO;
     if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;
     if ([renderer hasPrefix:@"libOSMesa"]) return YES;
-    // Task 148：MobileGL 两后端恢复 FSR 联动（用户硬性要求：这两端必须可用
-    // FSR）。架构裁决——libMobileGL.dylib / libMobileGL-gles.dylib 是
-    // MobileGlues-cpp 共体构建，内置 FSR1（config.json fsr1Setting，Task78/130
-    // 每次启动写入）在 eglSwapBuffers 内部完成 EASU+RCAS 全程：fb0 的 DRAW
-    // 绑定被重定向到 FSR1 渲染目标（gl/framebuffer.cpp glBindFramebuffer），
-    // 呈现由 presentSurface→ApplyFSR 收口。Task 147 判定的"预交换链花屏"
-    // 根因正是启动器侧 Task119 链在该架构下经同一重定向把 RCAS 输出画进
-    // FSR1 目标、每帧摧毁 MC 刚渲染的帧（Run #356 Vulkan 花屏+倒转实证），
-    // Task148 已将启动器链退休（mgl_fsr.mm 内置仲裁探测），联动几何
-    // （MC 窗口=surface/档位）本就是内置 FSR1 的预期形态，与 mg 同构。
-    if (isMobileGLRenderer(renderer.UTF8String)) return YES;
+    // Task 154：MobileGL 两后端退出 FSR 联动（见上方退休病历）——
+    // isMobileGLRenderer 命中时维持 1.0（不缩窗、不除输入、零链路介入）。
+    if (isMobileGLRenderer(renderer.UTF8String)) return NO;
     return NO;
 }
 
@@ -1488,34 +1492,14 @@ void ame139_fsr_heal_reset_input_scale(void) {
     int ame153_renderH = roundf((float)surfaceHeight / mgFsrScale);
     if ((ame153_renderW % 2) != 0) { --ame153_renderW; }
     if ((ame153_renderH % 2) != 0) { --ame153_renderH; }
-    // Task 153（MobileGL 延迟缩窗）：MobileGL 渲染器把 EGL window surface
-    // 尺寸钉在 MC 窗口信念上——若启动即把窗口缩到渲染尺寸（旧路径），后缓冲
-    // 也只剩渲染尺寸，mgl_fsr 的 EASU/RCAS 按信念尺寸画图就会溢出裁切
-    //（d36a24f 双会话 Vulkan 花屏 / ES 方块不渲染的根因）。改为：先按
-    // 全尺寸窗口启动（渲染器据此建出全尺寸后缓冲），mgl_fsr 用渲染器自己的
-    // eglQuerySurface 确认后缓冲全尺寸后再下发缩窗（窗口缩小、后缓冲保持
-    // 全尺寸——403a459 会话实证该"不随缩"行为）。非 MobileGL 的 FSR 渲染器
-    //（zink / MobileGlues）维持既有直缩路径，零变化。
-    if (mgFsrScale > 1.0f && isMobileGLRenderer(ame78_renderer.UTF8String)) {
-        ame153_fsr_deferred_armed = 1;
-        ame153_fsr_pending_render_w = ame153_renderW;
-        ame153_fsr_pending_render_h = ame153_renderH;
-        ame153_fsr_believed_surface_w = surfaceWidth;
-        ame153_fsr_believed_surface_h = surfaceHeight;
-        // 全尺寸窗口启动（延迟缩窗下发前，MC 视口=后缓冲=全尺寸，直呈零花屏）
-        windowWidth = surfaceWidth;
-        windowHeight = surfaceHeight;
-        static BOOL s_task153_logged = NO;
-        if (!s_task153_logged) {
-            s_task153_logged = YES;
-            NSLog(@"[SurfaceVC] Task153 MobileGL deferred FSR shrink: launch window stays full %dx%d; chain pushes render window %dx%d after confirming a full-size backbuffer",
-                  surfaceWidth, surfaceHeight, ame153_renderW, ame153_renderH);
-        }
-    } else {
-        ame153_fsr_deferred_armed = 0;
-        windowWidth = ame153_renderW;
-        windowHeight = ame153_renderH;
-    }
+    // Task 154：Task153 的 MobileGL 延迟缩窗分支退役（连同 ame83 能力表
+    // 对 MobileGL 的除名，见上方针释）：mgFsrScale 对 MobileGL 恒 1.0，
+    // ame153_renderW/H == surfaceWidth/Height，下方统一路径写入的全尺寸
+    // 窗口与 da5918a 逐位一致。延迟武装标志清零以防残留（同进程内先玩
+    // zink（FSR 联动）再切 mg 的会话：armed 位的旧值不得跨渲染器存活）。
+    ame153_fsr_deferred_armed = 0;
+    windowWidth = ame153_renderW;
+    windowHeight = ame153_renderH;
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.surfaceView.layer;
         // Task 60（画面模糊根因修复，5f1df50 真机日志实证）：

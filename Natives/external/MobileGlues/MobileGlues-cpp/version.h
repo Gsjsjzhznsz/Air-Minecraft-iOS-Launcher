@@ -1230,3 +1230,53 @@
 // Sodium Extra / Podium Port forks; gameVersion+fabric loader matched
 // like Fabric API) into the instance mods/ dir; Podium disables Sodium's
 // PojavLauncher check, doubling the Task145 POJAV_RENDERER unwind.
+// REVISION 17 addendum (Task 154, no bump): MobileGL FSR chain RETIRED to
+// the da5918a semantics + Mithril double-classloader pin removed + Forge
+// isolation v2. (1) The whole launcher-side MobileGL FSR linkage is retired
+// (ame83_fsr_capable_renderer returns NO for both mg backends -- mgFsrScale
+// pinned at 1.0: no window shrink, no touch division, no deferred arming;
+// ame_mgl_fsr_before_swap hard-returns false behind a Task154 gate, full
+// chain archived under #if 0): the 7c32bc3 Vulkan session proved
+// libMobileGL's EGL is a fake-EGL (surface/ctx handles are 0x1, no current
+// tracking) so eglGetCurrentDisplay/CurrentSurface return nothing and the
+// Task153 deferred shrink never fires -- MC's window belief stays full
+// while sendTouchPoint keeps dividing by mgFsrScale (touch quarter-screen
+// misalignment, FSR no-op); the d36a24f sessions proved the chain's
+// belief-geometry draws destroy frames when it DOES run (Vulkan corruption,
+// ES "blocks not rendering"). User's own baseline: da5918a/5.1.0 (sessions
+// 9f32cb4 + 1d4ff3a) shipped MobileGL with zero launcher-side FSR and was
+// fully working; libMobileGL.dylib is byte-identical since da5918a, so the
+// entire regression was launcher plumbing. FSR remains on MobileGlues/zink.
+// (2) Task152b removed from Tools.launchMinecraft: preloading GL/Library
+// through the SYSTEM classloader poisoned the JVM's
+// one-native-library-per-classloader invariant for MC's Knot-loaded
+// Library.<clinit> ("already loaded in another class loader", masked by
+// LWJGL as "Failed to locate library: liblwjgl.dylib" -- the 3b35b26
+// Mithril crash). Its premise (shipped GL.class ignoring
+// org.lwjgl.opengl.libname) is disproven by jar inspection -- the MACOSX
+// branch reads it since c71dcfa. The real Run #356 culprit, the
+// GL$1 Delegate's eglGetProcAddress indirection (Mithril's returns broken
+// pointers for core gl*), is fixed by scripts/patch_lwjgl_delegate_dlsym.py:
+// a same-length constant-pool byte swap in lwjgl-341's lwjgl-opengl.jar
+// ("eglGetProcAddress" -> "xglGetProcAddress") that dead-ends the
+// indirection so every GL symbol resolves via dlsym on the provider
+// handle -- which is how MobileGL (eglGetProcAddress returns 0 for gl
+// names, Task140) and gl4es/tinygl4angle (no eglGetProcAddress export)
+// already work today; OSMesaGetProcAddress stays for zink. Mithril's
+// _glGetString/_glGetIntegerv/_glGetError dlsym exports are verified in
+// its LC_DYLD_EXPORTS_TRIE (2082 exports). POJAV_RENDERER export retired
+// for Mithril too (the 3b35b26 Mithril pack ships sodium 0.9.2, whose
+// PostLaunchChecks throws on that env var -- Task145's own finding).
+// (3) Forge split-package isolation v2: Task153's -Xbootclasspath/a move
+// broke MinecraftAccount.<clinit>'s System.loadLibrary("AmethystAccountJNI")
+// (boot loader searches only sun.boot.library.path -- "no AmethystAccountJNI
+// in system library path", the 3b35b26 Forge crash). v2 uses
+// BootstrapLauncher 1.1.2's own -DignoreList (source-verified filename-
+// prefix matching): launcher.jar stays on -cp with the system classloader
+// (loadLibrary intact) and is excluded from the MC-BOOTSTRAP module layer
+// (no "launcher" automatic module -- the split package is rooted at the
+// mechanism designed for exactly this). Device anchors:
+// "[MGLFSR] Task154 MobileGL pre-swap FSR chain RETIRED", Vulkan/ES touch
+// realignment + blocks rendering; Mithril past NativeLibrariesBootstrap
+// with "[JavaLauncher] Task154 Forge ignoreList shield: '...launcher.jar'"
+// on Forge sessions.

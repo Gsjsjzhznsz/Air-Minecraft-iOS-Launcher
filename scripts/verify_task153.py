@@ -121,16 +121,17 @@ check("B3 无余量兜底：直呈零花屏 + 输入除数归一（Task139 同�
 check("B4 缩窗当帧返回不采样（让 MC 消化窗口变更）",
       mf.find("CallbackBridge_nativeSendScreenSize(ame153_fsr_pending_render_w,") < mf.find("本帧让 MC 消化窗口变更"))
 
-print("== C. SurfaceViewController 武装侧 ==")
-check("C1 延迟分支：MobileGL + mgFsrScale>1 时窗口保持全尺寸启动",
-      "Task153 MobileGL deferred FSR shrink" in sv and
-      "windowWidth = surfaceWidth;" in sv)
+print("== C. SurfaceViewController 武装侧（Task154 重锚：延迟缩窗已退役）==")
+check("C1 延迟分支退役：MobileGL 不再全尺寸特殊启动，走统一 renderW 路径",
+      "Task153 MobileGL deferred FSR shrink" not in sv and
+      "windowWidth = ame153_renderW;" in sv and
+      "延迟缩窗分支退役" in sv.replace("\n", ""))
 check("C2 非 MobileGL（zink/MobileGlues）直缩路径保留",
       sv.find("ame153_fsr_deferred_armed = 0;") > 0 and
       sv.find("windowWidth = ame153_renderW;") > sv.find("ame153_fsr_deferred_armed = 0;"))
-check("C3 武装时记录 pending render + believed surface 全套全局",
-      "ame153_fsr_pending_render_w = ame153_renderW;" in sv and
-      "ame153_fsr_believed_surface_w = surfaceWidth;" in sv)
+check("C3 武装全局清理：armed 残留清零（跨渲染器会话不复用旧武装位）",
+      "ame153_fsr_pending_render_w = ame153_renderW;" not in sv and
+      "清零以防残留" in sv.replace("\n", ""))
 
 print("== D. environ.h 全局声明 ==")
 check("D1 四项全局（armed + pending render + believed surface）按 AME_ENVIRON_DECL 声明",
@@ -138,16 +139,18 @@ check("D1 四项全局（armed + pending render + believed surface）按 AME_ENV
       "AME_ENVIRON_DECL int ame153_fsr_pending_render_w, ame153_fsr_pending_render_h;" in eh and
       "AME_ENVIRON_DECL int ame153_fsr_believed_surface_w, ame153_fsr_believed_surface_h;" in eh)
 
-print("== E. Forge bootclasspath 隔离（JavaLauncher） ==")
+print("== E. Forge 隔离（Task154 重锚：ignoreList 方案替代 bootclasspath）==")
 check("E1 病历注释：ResolutionException split package 机理链记录",
       "ResolutionException" in jl and "split package" in jl)
 check("E2 Forge 判定 = 版本 JSON mainClass 含 cpw.mods.bootstraplauncher",
       'containsString:@"cpw.mods.bootstraplauncher"' in jl)
-check("E3 启动器侧 jar 全部转入 -Xbootclasspath/a（libs 收集分支）",
-      "[bootAppendBuilder appendFormat:@\"%@/%@:\", librariesPath, libFile];" in jl)
-check("E4 推送 bootclasspath + 日志锚点",
-      'PUSH_MARGV_FORMAT(@"-Xbootclasspath/a:%@", bootAppendBuilder);' in jl and
-      "Task153 Forge bootclasspath isolation ON" in jl)
+check("E3 启动器侧 jar 回归普通 -cp（bootAppendBuilder 已撤销）",
+      "[bootAppendBuilder appendFormat:@\"%@/%@:\", librariesPath, libFile];" not in jl and
+      "[classpathBuilder appendFormat:@\"%@/%@:\", librariesPath, libFile];" in jl)
+check("E4 ignoreList 注入替代 bootclasspath 推送（同名 -D 后者生效 + 并入 JSON 自带值）",
+      'PUSH_MARGV_FORMAT(@"-DignoreList=%@", ame154_ignore);' in jl and
+      "Task154 Forge ignoreList shield" in jl and
+      'PUSH_MARGV_FORMAT(@"-Xbootclasspath/a:%@", bootAppendBuilder);' not in jl)
 check("E5 非 Forge 会话 classpath 组装原样（lwjgl 通配 + launchJar 前插不变）",
       '[classpathBuilder appendFormat:@"%@/%@:", librariesPath, libFile];' in jl and
       "launchTarget, classpath];" in jl)

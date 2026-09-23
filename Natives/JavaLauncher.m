@@ -1625,16 +1625,15 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                 NSLog(@"[JavaLauncher] Auto renderer resolved to %s (ANGLE fallback: minVersion=%d or libMobileGL missing)",
                       glLibName, minVersion);
             }
-            // Task 145：auto 解析结果只会是 libMobileGL/ANGLE（见上），两者都是
-            // 全局上下文模型，不再导出 POJAV_RENDERER（导出会触发 Sodium
+            // Task 154：auto 解析结果只会是 libMobileGL/ANGLE（见上），两者都是
+            // 全局上下文模型，不导出 POJAV_RENDERER（导出会触发 Sodium
             // 反 Pojav 检测，见 launchJVM 主导出处 Task145 注释）。
-        } else if (isMithrilRenderer(glLibName) && getenv("POJAV_RENDERER") == NULL) {
-            // Task 145：仅 Mithril 需要防御补漏（LWJGL 补丁只认这个变量名来
-            // 激活 fixPojavGLContext —— Mithril 4.0 装机闪退根修）。主导出处
-            // 见上方 AMETHYST_RENDERER 的 setenv（launchJVM ~1219），此处只
-            // 覆盖 AMETHYST_RENDERER 被外部注入而主路径没跑到的场景。
-            setenv("POJAV_RENDERER", glLibName, 1);
-            NSLog(@"[JavaLauncher] Task145: POJAV_RENDERER exported for Mithril (%s)", glLibName);
+            // Task 154（Mithril 同步退役 POJAV_RENDERER）：Task145 为激活
+            // fixPojavGLContext 而给 Mithril 保留的导出一并移除——7c32bc3
+            // Mithril 会话的 mod 列表含 sodium 0.9.2（PostLaunchChecks 检测
+            // 到该变量即抛异常，Task145 自己的发现），且上下文重绑已由
+            // Task144 TLS 修复 + Task154 Delegate dlsym 补丁覆盖，该变量
+            // 只剩雷点没有收益。全渲染器零导出口径。
         }
         if (strcmp(glLibName, RENDERER_NAME_VULKAN) == 0) {
             // 对齐 Ynnyny 仓库：Vulkan 模式下 OpenGL 回退库使用 MobileGlues
@@ -2058,25 +2057,24 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     }
     NSString *lwjglJar = [NSString stringWithFormat:@"%@/*", lwjglDir];
 
-    // ---- Task 153：Forge split-package 隔离 ----
-    // 病历（7d51c28 装机日志，4894876 构建，20:34 会话）：Forge 1.20.1 启动即崩于
-    //   java.lang.module.ResolutionException: Module minecraft contains package
-    //   com.mojang.blaze3d.platform, module launcher exports package
-    //   com.mojang.blaze3d.platform to minecraft
-    // 机理链：① launcher.jar 内含 com/mojang/** 影子类（MacosUtil / text2speech
-    // 桩，26.x 必需）；② PojavClassLoader.addURL 会把每个游戏 jar 回写进
-    // java.class.path 属性；③ BootstrapLauncher/FML 把 classpath 上的每个 jar
-    // 变成 GAME 模块层的自动模块——"launcher"（launcher.jar）与 "minecraft"
-    // （client jar）在 com.mojang.* 上形成 JPMS 禁止的 split package。
-    // 修复：Forge 会话把启动器侧 jar（launcher / patchjna_agent / patchsvc /
-    // gson / jsr305 / arc_dns）整体移入 -Xbootclasspath/a —— boot 层的
-    // 【未命名模块】不参与任何模块层 split 检查，而类加载委托链（子→platform→
-    // boot）仍先于游戏 jar 命中，com.mojang 影子语义保真；-cp 只留 LWJGL
-    //（游戏自身 lwjgl 已被 MCDL 跳过，无同包冲突）。cacio 走同一
-    // -Xbootclasspath/a 机制（JVM 多值追加语义，上方已推），互不干扰。
-    // 非 Forge 会话（vanilla/Fabric）-cp 组装与旧版逐位一致，零回归。
-    // PojavClassLoader（-Djava.system.class.loader）经默认 AppClassLoader 的
-    // 委托链从 bootclasspath/a 解析（boot 可见），系统类加载器引导不受影响。
+    // ---- Task 154：Forge split-package 隔离 v2（BootstrapLauncher ignoreList）----
+    // 沿革：4894876 构建的 ResolutionException（"Module minecraft contains
+    // package com.mojang.blaze3d.platform, module launcher exports ..."）由
+    // launcher.jar 的 com/mojang/** 影子类（26.x 必需）+ BootstrapLauncher 把
+    // classpath 上每个 jar 模块化引爆。Task153 曾把启动器侧 jar 整体移入
+    // -Xbootclasspath/a —— split 消失，但 7c32bc3 装机日志（3b35b26 构建）
+    // 实锤新崩：launcher.jar 里的 MinecraftAccount.<clinit> System.loadLibrary
+    // ("AmethystAccountJNI") 改由 boot 加载器执行，其库搜索只覆盖
+    // sun.boot.library.path（JDK lib 目录）→ "no AmethystAccountJNI in
+    // system library path" 闪退（boot 加载器不搜 java.library.path）。
+    // v2 正解（BootstrapLauncher 1.1.2 源码实证）：-DignoreList 按文件名
+    // 前缀逗号分隔匹配，命中的 jar 不进 MC-BOOTSTRAP 模块层、留在传统
+    // classpath 由父加载器解析。launcher.jar 进 ignoreList 后：无 "launcher"
+    // 自动模块（split 根除）、类加载回到系统加载器（loadLibrary 搜
+    // java.library.path=Frameworks，AmethystAccountJNI 复活）、com.mojang
+    // 影子类经 ModuleClassLoader 的父委托链照常可达（与 Task153 同语义，
+    // 但加载器正确）。注意：JSON 自带 -DignoreList 时必须【并入】而非
+    // 覆盖（否则把 Forge 自己忽略的 jar 重新模块化）——下方原地改写。
     BOOL isForgeLaunch = NO;
     if (!launchJar && [launchTarget isKindOfClass:NSDictionary.class]) {
         NSString *ame153_mainClass = launchTarget[@"mainClass"];
@@ -2085,19 +2083,40 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                         [ame153_mainClass containsString:@"cpw.mods.bootstraplauncher"];
     }
 
+    // Task 154：注入 ignoreList（-D 同名后者生效——jvm_processed 在上方已
+    // 推送，我们的条目排在其后必然胜出；JSON 自带时【并入】其值而非覆盖，
+    // 防止把 Forge 自己忽略的 jar 重新模块化）。
+    if (isForgeLaunch && [launchTarget isKindOfClass:NSDictionary.class]) {
+        NSArray *ame154_jvmArgs = launchTarget[@"arguments"][@"jvm_processed"];
+        NSString *ame154_ignore = @"asm,securejarhandler";   // BootstrapLauncher 1.1.2 默认值
+        if ([ame154_jvmArgs isKindOfClass:NSArray.class]) {
+            for (NSString *ame154_arg in ame154_jvmArgs) {
+                if ([ame154_arg isKindOfClass:NSString.class] &&
+                    [ame154_arg hasPrefix:@"-DignoreList="]) {
+                    ame154_ignore = [ame154_arg substringFromIndex:13];
+                    break;
+                }
+            }
+        }
+        if (![ame154_ignore containsString:@"launcher.jar"]) {
+            ame154_ignore = [ame154_ignore stringByAppendingString:@",launcher.jar"];
+        }
+        PUSH_MARGV_FORMAT(@"-DignoreList=%@", ame154_ignore);
+        NSLog(@"[JavaLauncher] Task154 Forge ignoreList shield: '%@' (launcher.jar stays on -cp -- system classloader keeps loadLibrary/search paths intact -- and is excluded from the BootstrapLauncher module layer; split package rooted without bootclasspath side effects)",
+              ame154_ignore);
+    }
+
     NSMutableString *classpathBuilder = [NSMutableString string];
-    NSMutableString *bootAppendBuilder = [NSMutableString string];
     NSArray *libFiles = [fm contentsOfDirectoryAtPath:librariesPath error:nil];
     for (NSString *libFile in libFiles) {
         // 只收集 libs 下的 jar。lwjgl-333/ 与 lwjgl-341/ 是目录，不以 .jar 结尾，
         // 不会被误收；版本化 LWJGL 由下方的 lwjglJar 单独追加。
+        // Task 154：启动器侧 jar 回归普通 -cp（Task153 的 bootclasspath 迁移
+        // 撤销——boot 加载器劫持 System.loadLibrary 搜索路径，7c32bc3 的
+        // AmethystAccountJNI 闪退即此）。launcher.jar 与 minecraft 的 split
+        // package 由上方 ignoreList 注入根除。
         if (![libFile hasSuffix:@".jar"]) continue;
-        if (isForgeLaunch) {
-            // Forge：启动器侧 jar 全部转入 bootclasspath（见 Task153 块注释）
-            [bootAppendBuilder appendFormat:@"%@/%@:", librariesPath, libFile];
-        } else {
-            [classpathBuilder appendFormat:@"%@/%@:", librariesPath, libFile];
-        }
+        [classpathBuilder appendFormat:@"%@/%@:", librariesPath, libFile];
     }
     [classpathBuilder appendString:lwjglJar];
     NSString *classpath = classpathBuilder;
@@ -2107,16 +2126,6 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // 标准 `java -jar` 语义下 JAR 本应是唯一 classpath，此处保留 bundle libs 仅因 PojavLauncher
         // 与 UIKit bridge 类需要加载，但 installer 自身依赖应优先
         classpath = [NSString stringWithFormat:@"%@:%@", launchTarget, classpath];
-    }
-    if (isForgeLaunch) {
-        if ([bootAppendBuilder hasSuffix:@":"]) {
-            [bootAppendBuilder deleteCharactersInRange:NSMakeRange(bootAppendBuilder.length - 1, 1)];
-        }
-        if (bootAppendBuilder.length > 0) {
-            PUSH_MARGV_FORMAT(@"-Xbootclasspath/a:%@", bootAppendBuilder);
-        }
-        NSLog(@"[JavaLauncher] Task153 Forge bootclasspath isolation ON: %@ -> -Xbootclasspath/a (boot unnamed module, split-package shield); -cp keeps lwjgl only",
-              bootAppendBuilder);
     }
     PUSH_MARGV_LITERAL("-cp");
     PUSH_MARGV_FORMAT(@"%@", classpath);

@@ -110,11 +110,13 @@ AME_ENVIRON_DECL BOOL virtualMouseEnabled, isControlModifiable;
 // windowWidth 口径）。
 AME_ENVIRON_DECL int ame_surfaceWidth, ame_surfaceHeight;
 
-// Task 153（MobileGL 延迟缩窗）：FSR 联动 + MobileGL 渲染器时，MC 窗口
-// 先按全尺寸启动（渲染器把 EGL surface 钉在窗口信念上，全窗口=全尺寸
-// 后缓冲），mgl_fsr 在 eglQuerySurface 确认后缓冲全尺寸后下发缩窗。
-// 写者：主线程 updateSavedResolution；读者：渲染线程 mgl_fsr（benign
-// 竞态——int/单 flag，读写口径见 SurfaceViewController/mgl_fsr 注释）。
+// Task 153（MobileGL 延迟缩窗 → Task 154 已退役，档案保留）：曾用于 FSR
+// 联动 + MobileGL 的"全尺寸启动 → 链确认全尺寸后缓冲后下发缩窗"流程；
+// 7c32bc3 装机日志实证 libMobileGL 的伪 EGL 使 eglQuerySurface 链恒 idle、
+// 缩窗永不下发（输入错位 + FSR 无效果的直接根因），Task154 起 MobileGL
+// 整体退出 FSR 联动（ame83 能力表除名，mgl_fsr 链 #if 0 存档）。全局
+// 保留原因：updateSavedResolution 仍将其清零防跨渲染器残留；mgl_fsr 的
+// #if 0 档案体引用（未来复活的现成接缝）。
 AME_ENVIRON_DECL int ame153_fsr_deferred_armed;
 AME_ENVIRON_DECL int ame153_fsr_pending_render_w, ame153_fsr_pending_render_h;
 AME_ENVIRON_DECL int ame153_fsr_believed_surface_w, ame153_fsr_believed_surface_h;

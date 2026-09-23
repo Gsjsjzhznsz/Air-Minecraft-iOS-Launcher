@@ -59,11 +59,13 @@ check("A4 gl_init_context 成功后调用 ame_mgl_fsr_context_reset（上下文�
 check("A5 头文件声明两个对外入口",
       "bool ame_mgl_fsr_before_swap(void);" in gbh and
       "void ame_mgl_fsr_context_reset(void);" in gbh)
-check("A6 Task78 豁免扩展到 MobileGL（补偿链不介入预交换 EASU 几何）",
-      "isMobileGLRenderer(ame78_renderer)" in gb and
-      "Task78 FSR linkage active" in gb)
-check("A7 ame83_fsr_capable_renderer 认 MobileGL 两后端（联动覆盖感知）",
-      "isMobileGLRenderer(renderer.UTF8String)) return YES" in svc)
+check("A6 Task78 豁免范围（Task154 重锚：MobileGL 扩展已回退，仅 MobileGlues 豁免）",
+      "Task78 FSR linkage active" in gb and
+      "strcmp(ame78_renderer, RENDERER_NAME_MOBILEGLUES) == 0) ? 1 : 0;" in gb and
+      "isMobileGLRenderer(ame78_renderer))) ? 1 : 0;" not in gb)
+check("A7 ame83_fsr_capable_renderer（Task154 重锚：MobileGL 已除名，MobileGlues/zink 保留）",
+      "isMobileGLRenderer(renderer.UTF8String)) return NO" in svc and
+      "isMobileGLRenderer(renderer.UTF8String)) return YES" not in svc)
 check("A8 FSR 联动读有效渲染器（裸读 profile = 蜷缩根因之一）",
       "ame78_renderer = ame_effective_renderer()" in svc)
 check("A9 兜底自愈：EASU 不可用 -> nativeSendScreenSize 恢复全分辨率",

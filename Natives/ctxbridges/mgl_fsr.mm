@@ -828,6 +828,35 @@ static bool ame148_detect_builtin_fsr_redirect(void) {
 // 预交换 FSR 升采样：当前渲染器是 MobileGL 且几何满足 FSR 形态时执行一次
 // EASU pass。返回 true = 本帧已升采样（gl_bridge 无需其他动作，仅日志用途）。
 extern "C" bool ame_mgl_fsr_before_swap(void) {
+    // ---- Task 154：整链退休（用户基准 da5918a 语义恢复）----
+    // 7c32bc3 装机日志（3b35b26 构建，Vulkan 会话）三重实证：
+    //   1. "Task153 backbuffer query unavailable (no current EGL surface on
+    //      this thread?)" —— libMobileGL 的 EGL 是伪 EGL（surface/ctx 句柄
+    //      恒 0x1、无 current 状态跟踪），eglGetCurrentDisplay/CurrentSurface
+    //      返回空 → 后缓冲几何仲裁链从首帧起永久 idle；
+    //   2. 延迟缩窗因此永不下发 → MC 窗口信念恒全尺寸（swap 探针 viewport
+    //      2360x1640 实证），而 sendTouchPoint 仍除 mgFsrScale(2.0) →
+    //      触点只落到 MC 坐标空间左下四分之一 = 用户实测"输入错位"；
+    //   3. d36a24f 构建上链曾按启动器信念几何画 EASU/RCAS（2360x1640 视口
+    //      栅格化进渲染器钉在窗口信念上的 1180x820 后缓冲）→ 每帧裁切毁帧
+    //      = Vulkan 花屏 / ES "方块不渲染"。
+    // da5918a（5.1.0 用户认可的正常态，9f32cb4/1d4ff3a 装机日志）上 MobileGL
+    // 无任何启动器侧 FSR 介入、全分辨率直呈 = 正常。配合 ame83_fsr_capable_
+    // renderer 对 MobileGL 的除名（mgFsrScale 恒 1.0，缩窗/输入除法/延迟武装
+    // 天然失效），本入口直接返回 false：零绘制、零几何干预、零输入干预。
+    // 代码体完整保留（Task119-153 的机制与病历存档）；未来若 MobileGL 提供
+    // 真实 EGL current 跟踪或内置 FSR1，移除本门禁即可复用。
+    static bool s_ame154_logged = false;
+    if (!s_ame154_logged) {
+        s_ame154_logged = true;
+        const char *ame154_renderer = getenv("AMETHYST_RENDERER");
+        if (isMobileGLRenderer(ame154_renderer)) {
+            NSLog(@"[MGLFSR] Task154 MobileGL pre-swap FSR chain RETIRED (renderer=%s) -- full-res direct present, da5918a semantics restored; FSR remains available on MobileGlues/zink",
+                  ame154_renderer ?: "<unset>");
+        }
+    }
+    return false;
+#if 0
     const char *renderer = getenv("AMETHYST_RENDERER");
     // MobileGlues 有自己的内置 FSR1（Task78-82）；zink 走 osm_bridge；
     // 这里只服务 MobileGL 两后端（DirectVulkan / DirectGLES 共体二进制）。
@@ -941,6 +970,7 @@ extern "C" bool ame_mgl_fsr_before_swap(void) {
         ame139_fsr_heal_reset_input_scale();
     }
     return ok;
+#endif  // Task 154：#if 0 —— 旧链体（存档，见函数头退休说明）
 }
 
 // 上下文重建时的复位（gl_init_context 成功后调用）：程序/纹理属于旧上下文，
