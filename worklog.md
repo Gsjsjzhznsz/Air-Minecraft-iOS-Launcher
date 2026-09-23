@@ -2,7 +2,7 @@
 
 ## ⚡ READ ME FIRST —— 会话速览（只读本节 + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 151（2026-09-23，另一会话，Bing 每日壁纸）。此前：Task 150（2026-09-23）；149（2026-09-23）；144-146（2026-09-22）。此前记录：Task 142（2026-09-22）；2026-09-22 本文件瘦身重构（Tasks 34-140 → worklog-archive.md，未占用 Task 编号）。
+> 最后更新：Task 153（2026-09-23，渲染器三案 + Forge 模块层根修）。此前：Task 152/152b（另一会话，Mithril FunctionProvider 钉扎）；151（Bing 每日壁纸）；150（渲染器全局控制退役）；144-149（2026-09-22/23）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -12,8 +12,8 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 | 项 | 值 |
 |---|---|
 | 远端 HEAD | d36a24f8（Task 151 Bing 每日壁纸，CI 绿 run 35848334214）；此前 6d73fc11（Task 150） |
-| 最新 Task 号 | **151**（双会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 151 Bing 壁纸（默认开启/画廊/刷新/保存相册）+ Task 149 六项返工 + Task 144-146 渲染器与 Forge/Mithril 锚点 + Task 148 FSR 双后端 |
+| 最新 Task 号 | **153**（双会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 153 渲染器三案（Vulkan 花屏/ES 方块/Forge ResolutionException）+ Task 152b 4.0 崩溃（pin 生效待证）+ Task 151 Bing 壁纸 + Task 149 六项返工 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -304,3 +304,27 @@ Stage Summary:
   * run 35846197362 FAIL = ①+galleryController 未在 .h 声明（设置页只见头文件）②ame_loadMetadataFromDisk 的 raw 缺 __block；顺带根治两处 -Warc-retain-cycles（自递归 block → 实例方法递归 ame_fetchWithHosts/ame_attemptDownloadURLs）
   * run 35847353064 FAIL = 链接期 Undefined symbols PHAssetChangeRequest/PHPhotoLibrary —— PhotoLibrary 保存功能首次真正调用 Photos 框架；此前 BackgroundManager/settings 只 import 头文件不触发链接。修复 = target_link_libraries 加 "-framework Photos"
   * run 35848334214 GREEN，产物 ipa/tipa/dSYM 全可用
+
+## Task 153（本会话，渲染器三案 + Forge 模块层根修）
+
+### 用户反馈（7d51c28/0aac3aa/68f5706 三批装机日志，4894876/d36a24f 构建）
+"vulkan花屏，es驱动后端方块不渲染，opengl4.0后端崩溃。可是4.0和es后端在5.1.0正式版发布的时候是完全正常的。而刚适配vulkan解决崩溃问题后也没有出现花屏，我怀疑是flash模型改了什么导致mg系列全部无法正常使用。还有不要恢复回把3个端放到渲染器列表的模式，保持现状就行了。还有forge的启动崩溃异常指向启动器问题。最后我说的问题在log都有。"
+
+### 判读与根因（逐条日志实锤）
+1. **Vulkan 花屏 + ES 方块不渲染（同一根因）**：最新双会话（latestlog.old.txt=Vulkan / latestlog.txt=ES，均 d36a24f）"Task148 仲裁探测 -> no redirect（err=0x500）→ 启动器预交换链 ACTIVE"且 "EASU 1180x820 -> offscreen 2360x1640 -> RCAS engaged 600+ 帧"——但 geo-probe 全程 `surface=1180x820`（viewport 同为 1180x820）。**MobileGL 渲染器把 EGL window surface 尺寸钉在 MC 窗口信念上**（Task83 FSR 联动已把窗口缩到 surface/2=1180x820 → 后缓冲只剩 1180x820），启动器链却按信念 ame_surfaceWidth（2360x1640）画 RCAS——全屏四边形按 2360x1640 视口栅格化进 1180x820 后缓冲，只有左下四分之一落图，其余区域每帧残留旧帧 = 花屏（Vulkan）/毁帧错位（ES 方块不渲染）。Task148 的"内置 FSR1 重定向"理论对当前二进制【证伪】：`strings libMobileGL.dylib` 零 fsr1Setting/FSR1 符号（配置只有 MOBILEGL_* 环境变量；MobileGlues-cpp 有 FSR1 的是另一个渲染器 libmobileglues.dylib——Task148 张冠李戴）。用户"flash 改坏了"的直觉方向正确：花屏正是 Task143 修好 shader 常量（链从 inert 变 live）+ Task148 恢复联动后，链第一次在"后缓冲=窗口信念"的真实几何下全速运转所致。
+2. **4.0 (Mithril) 崩溃**：Run #356（2c66887:latestlog.txt，7b4d7df 构建）`GlDevice.<init> -> GL.createCapabilities "There is no OpenGL context current"`——LWJGL GL$1 按裸名解析 libGLESv2 命中全局 ANGLE，其 glGetString 在 Mithril 上下文返 NULL。**Task152b（4894876，FunctionProvider 钉到 libmithril.dylib 绝对路径）已修，待装机验证**（本轮无 4894876 的 Mithril 会话日志）。
+3. **Forge 1.20.1 启动崩溃（4894876 最新构建仍崩）**：`java.lang.module.ResolutionException: Module minecraft contains package com.mojang.blaze3d.platform, module launcher exports package ...`。机理链：launcher.jar 含 com/mojang/** 影子类（MacosUtil/text2speech 桩，26.x 必需）+ PojavClassLoader.addURL 把游戏 jar 回写 java.class.path + BootstrapLauncher/FML 把 classpath 每个 jar 变成 GAME 层自动模块 → "launcher" 与 "minecraft" 在 com.mojang.* 上 split package。考古：上游 Android Pojav 无任何 com/mojang 影子类（Forge 因此不炸）；本 fork 09-01 引入影子后 Forge launch 从未走通过（Task146 期同点原为 native 崩溃掩蔽）。
+
+### 修复（4 文件 + 2 验证器，零 l10n 变更）
+- **mgl_fsr.mm（几何仲裁）**：目标尺寸改读渲染器自己的 `eglQuerySurface`（eglGetCurrentDisplay/CurrentSurface/QuerySurface 三入口 dlsym 自 mgHandle，绝不外溢 ANGLE——Task140 纪律）——**实测后缓冲 or 不画**（查询失败零开销跳过，绝不按信念盲画）；视口闸门同步按实测；自愈恢复窗口改用实测后缓冲（防二次溢出）。
+- **mgl_fsr.mm + SurfaceViewController.m（延迟缩窗，真 FSR 几何复位）**：FSR 联动 + MobileGL 时不再启动即缩窗，先按全尺寸窗口启动（渲染器建出全尺寸后缓冲——403a459 会话实证 surface 不随窗口缩小），链在确认后缓冲全尺寸后下发缩窗（nativeSendScreenSize(渲染尺寸)）；无余量兜底 = 全尺寸直呈 + CA 缩放（零花屏）+ 输入除数归一（Task139 同款）。environ.h 新增 4 全局（armed/pending render/believed surface）。
+- **JavaLauncher.m（Forge 隔离）**：版本 JSON mainClass 含 cpw.mods.bootstraplauncher 判定 Forge；启动器侧 jar（launcher/patchjna/patchsvc/gson/jsr305/arc_dns）整体转 `-Xbootclasspath/a`（boot 未命名模块不参与 split 检查；委托链仍先命中 = 影子语义保真；JVM 多值 -Xbootclasspath/a 追加语义已本地 JDK 实测），`-cp` 只留 lwjgl（游戏自身 lwjgl 已被 MCDL 跳过无冲突）。非 Forge（vanilla/Fabric）-cp 组装逐位不变；launchHeadlessJVM（安装器，需 launcher.jar 内 ForgeProcessorRunner）不动。
+
+### 校验
+- verify_task153 新增 29 项全绿（A 几何仲裁 7 / B 状态机 4 / C 武装侧 3 / D 全局 1 / E Forge 隔离 6 / F 配平 4 / G 既有锚点 4）。
+- 级联基线对拍（git stash 前后）：119_124（A9 重锚 Task153 形态后 61/62 与基线一致）、130=59/60、142=48+1、143=30+1、149=35/35（TASK149_REPO）、150=43/43（TASK150_REPO）、151=ALL GREEN——**零新增失败**（112_118 E5/E6、139 B 块、140 G1/G3 为既有环境性同类，与基线逐项一致）。
+
+### Stage Summary
+- 装机验证锚点：①Vulkan/ES 会话日志必现 `[MGLFSR] Task153 deferred shrink applied: backbuffer 2360x1640 ... -> pushing MC render window 1180x820`，随后 `EASU 1180x820 -> offscreen 2360x1640`（真 FSR）；或 `Task153 geometry arbitration: backbuffer ... == window ...（no upscale headroom）-- full-res direct present`（兜底，同样零花屏）；②花屏/方块不渲染消失（两形态都不再溢出裁切）；③Forge 会话日志必现 `[JavaLauncher] Task153 Forge bootclasspath isolation ON`，且不再出现 ResolutionException、游戏进入 mod 加载完成；④4.0 后端按 Task152b 锚点验证（`Task152b` 无新日志 = pin 生效未崩）。
+- 用户明确指令遵守：**未动渲染器选择 UI**（保持单 mg + 后端独立键现状，未恢复三后端列表模式）。
+- 后续观察项：Vulkan 直连后端的 CopyTexSubImage2D 翻转/迟滞风险（Run #356 曾报"倒转"）——若下轮日志显示 EASU engaged 但画面上下颠倒，在链内加行序翻转（shader 常量级修复）。

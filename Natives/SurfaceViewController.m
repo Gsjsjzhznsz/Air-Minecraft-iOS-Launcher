@@ -1484,10 +1484,38 @@ void ame139_fsr_heal_reset_input_scale(void) {
     ame_surfaceWidth = surfaceWidth;
     ame_surfaceHeight = surfaceHeight;
     // 渲染口径（MC 告知窗口 = viewport = FSR render）：surface / fsr_scale。
-    windowWidth = roundf((float)surfaceWidth / mgFsrScale);
-    windowHeight = roundf((float)surfaceHeight / mgFsrScale);
-    if ((windowWidth % 2) != 0) { --windowWidth; }
-    if ((windowHeight % 2) != 0) { --windowHeight; }
+    int ame153_renderW = roundf((float)surfaceWidth / mgFsrScale);
+    int ame153_renderH = roundf((float)surfaceHeight / mgFsrScale);
+    if ((ame153_renderW % 2) != 0) { --ame153_renderW; }
+    if ((ame153_renderH % 2) != 0) { --ame153_renderH; }
+    // Task 153（MobileGL 延迟缩窗）：MobileGL 渲染器把 EGL window surface
+    // 尺寸钉在 MC 窗口信念上——若启动即把窗口缩到渲染尺寸（旧路径），后缓冲
+    // 也只剩渲染尺寸，mgl_fsr 的 EASU/RCAS 按信念尺寸画图就会溢出裁切
+    //（d36a24f 双会话 Vulkan 花屏 / ES 方块不渲染的根因）。改为：先按
+    // 全尺寸窗口启动（渲染器据此建出全尺寸后缓冲），mgl_fsr 用渲染器自己的
+    // eglQuerySurface 确认后缓冲全尺寸后再下发缩窗（窗口缩小、后缓冲保持
+    // 全尺寸——403a459 会话实证该"不随缩"行为）。非 MobileGL 的 FSR 渲染器
+    //（zink / MobileGlues）维持既有直缩路径，零变化。
+    if (mgFsrScale > 1.0f && isMobileGLRenderer(ame78_renderer.UTF8String)) {
+        ame153_fsr_deferred_armed = 1;
+        ame153_fsr_pending_render_w = ame153_renderW;
+        ame153_fsr_pending_render_h = ame153_renderH;
+        ame153_fsr_believed_surface_w = surfaceWidth;
+        ame153_fsr_believed_surface_h = surfaceHeight;
+        // 全尺寸窗口启动（延迟缩窗下发前，MC 视口=后缓冲=全尺寸，直呈零花屏）
+        windowWidth = surfaceWidth;
+        windowHeight = surfaceHeight;
+        static BOOL s_task153_logged = NO;
+        if (!s_task153_logged) {
+            s_task153_logged = YES;
+            NSLog(@"[SurfaceVC] Task153 MobileGL deferred FSR shrink: launch window stays full %dx%d; chain pushes render window %dx%d after confirming a full-size backbuffer",
+                  surfaceWidth, surfaceHeight, ame153_renderW, ame153_renderH);
+        }
+    } else {
+        ame153_fsr_deferred_armed = 0;
+        windowWidth = ame153_renderW;
+        windowHeight = ame153_renderH;
+    }
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.surfaceView.layer;
         // Task 60（画面模糊根因修复，5f1df50 真机日志实证）：

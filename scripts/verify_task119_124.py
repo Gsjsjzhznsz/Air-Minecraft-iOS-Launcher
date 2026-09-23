@@ -67,7 +67,9 @@ check("A7 ame83_fsr_capable_renderer 认 MobileGL 两后端（联动覆盖感知
 check("A8 FSR 联动读有效渲染器（裸读 profile = 蜷缩根因之一）",
       "ame78_renderer = ame_effective_renderer()" in svc)
 check("A9 兜底自愈：EASU 不可用 -> nativeSendScreenSize 恢复全分辨率",
-      "CallbackBridge_nativeSendScreenSize(surfW, surfH)" in fsr and
+      # Task153 重锚：自愈目标从信念 surface 改为实测后缓冲（bbW/bbH）——
+      # MobileGL 把 surface 钉在窗口信念上，按信念恢复会二次溢出（花屏根因）。
+      "CallbackBridge_nativeSendScreenSize(bbW, bbH)" in fsr and
       "healed" in fsr)
 check("A10 视口自适应输入（Task105 同款：优先 MC 真实呈现视口）",
       "vpArea * 4 >= beliefArea" in fsr)

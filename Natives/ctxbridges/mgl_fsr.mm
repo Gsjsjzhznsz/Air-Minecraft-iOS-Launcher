@@ -255,7 +255,54 @@ static struct {
     // ---- Task 148：内置 FSR1 仲裁 ----
     bool ame148_arbitrated;        // 已执行过仲裁探测（首帧日志）
     bool ame148_builtin_owns;      // 渲染器内置 FSR1 接管 → 启动器链退休
+    // ---- Task 153：真实后缓冲几何仲裁 ----
+    bool ame153_geoLogged;         // 几何仲裁首帧一次性日志（engage/retire 翻转各自打印）
+    bool ame153_retired;           // 后缓冲装不下升采样 → 本链退休（直呈 + CA 缩放）
 } ame119_fsr = {0};
+
+// Task 153：渲染器侧 EGL 入口（后缓冲真实尺寸查询）。
+// 病历（d36a24f 构建双会话，Vulkan 花屏 / ES 方块不渲染实锤）：MobileGL
+// 渲染器把 EGL window surface 尺寸【钉在 MC 窗口信念上】（Task83 FSR
+// 联动把 windowWidth 缩到 surface/fsr_scale=1180x820 → 后缓冲就是
+// 1180x820），而本链一直按启动器信念 ame_surfaceWidth（2360x1640）画
+// RCAS——全屏四边形按 2360x1640 视口栅格化进 1180x820 的后缓冲，
+// 只有左下四分之一落图，其余区域残留旧帧 = 每帧花屏/错位拼图。
+// ES 会话同根（方块不渲染 = 毁帧链的另一种呈现）。修复：目标尺寸改读
+// 渲染器自己的 eglQuerySurface（eglGetCurrentDisplay/CurrentSurface 同源
+// 本线程 current 上下文，绝不外溢到 ANGLE——Task140 窃符号教训同款纪律）。
+typedef void *ame153_egldisplay_t;
+typedef void *ame153_eglsurface_t;
+// EGL 基础类型与常量（防御性本地定义，与 egl.h 口径一致——本 TU 无 EGL 头）
+typedef unsigned int ame153_eglbool_t;   // EGLBoolean
+typedef int ame153_eglint_t;             // EGLint
+#define AME153_EGL_WIDTH   0x3057
+#define AME153_EGL_HEIGHT  0x3056
+#define AME153_EGL_DRAW    0x3059
+static struct {
+    ame153_egldisplay_t (*eglGetCurrentDisplay)(void);
+    ame153_eglsurface_t (*eglGetCurrentSurface)(unsigned int readdraw);
+    ame153_eglbool_t (*eglQuerySurface)(ame153_egldisplay_t, ame153_eglsurface_t,
+                                        ame153_eglint_t, ame153_eglint_t *);
+} ame153_egl = {NULL, NULL, NULL};
+
+// 查询当前线程 EGL 绘制表面的真实后缓冲尺寸（渲染器自己的 EGL 实现）。
+// 返回 false = 无 current 上下文/表面或查询失败（此帧不 engage，安全跳过）。
+static bool ame153_query_backbuffer(int *outW, int *outH) {
+    if (ame153_egl.eglGetCurrentDisplay == NULL ||
+        ame153_egl.eglGetCurrentSurface == NULL ||
+        ame153_egl.eglQuerySurface == NULL) return false;
+    ame153_egldisplay_t dpy = ame153_egl.eglGetCurrentDisplay();
+    if (dpy == (ame153_egldisplay_t)0 /*EGL_NO_DISPLAY*/) return false;
+    ame153_eglsurface_t surf = ame153_egl.eglGetCurrentSurface(AME153_EGL_DRAW);
+    if (surf == (ame153_eglsurface_t)0 /*EGL_NO_SURFACE*/) return false;
+    ame153_eglint_t w = 0, h = 0;
+    if (!ame153_egl.eglQuerySurface(dpy, surf, AME153_EGL_WIDTH, &w)) return false;
+    if (!ame153_egl.eglQuerySurface(dpy, surf, AME153_EGL_HEIGHT, &h)) return false;
+    if (w <= 0 || h <= 0) return false;
+    *outW = (int)w;
+    *outH = (int)h;
+    return true;
+}
 
 // Task 130：RCAS 锐化强度（mpv 口径 [0,1] 越大越锐，默认 0.2；负值 = 关闭
 // RCAS，仅 EASU）。环境变量 AMETHYST_FSR_RCAS_SHARPNESS 由 JavaLauncher
@@ -364,6 +411,11 @@ static bool ame119_resolve_gl(void) {
         {"glGetFramebufferAttachmentParameteriv",
                                       (void **)&ame119_fsr.gl.glGetFramebufferAttachmentParameteriv},
         {"glGetError",                (void **)&ame119_fsr.gl.glGetError},
+        // Task 153：后缓冲真实尺寸查询（libMobileGL.dylib 导出表实锤
+        // _eglGetCurrentDisplay/_eglGetCurrentSurface/_eglQuerySurface）
+        {"eglGetCurrentDisplay",      (void **)&ame153_egl.eglGetCurrentDisplay},
+        {"eglGetCurrentSurface",      (void **)&ame153_egl.eglGetCurrentSurface},
+        {"eglQuerySurface",           (void **)&ame153_egl.eglQuerySurface},
     };
     int ok = 0;
     ame119_fsr.srcHandle = ame119_fsr.srcProc = ame119_fsr.srcDefault = 0;
@@ -800,6 +852,22 @@ extern "C" bool ame_mgl_fsr_before_swap(void) {
     }
     if (ame119_fsr.ame148_builtin_owns) return false;
 
+    // ---- Task 153：真实后缓冲几何仲裁 ----
+    // 目标尺寸 = 渲染器自己的 eglQuerySurface 读数，绝不信启动器信念
+    // ame_surfaceWidth（MobileGL 把 surface 钉在 MC 窗口信念上，见文件头
+    // Task153 病历——旧代码按信念把 2360x1640 的 RCAS 画进 1180x820 的
+    // 后缓冲，只有左下四分之一落图 = 每帧花屏）。查询失败 = 零开销跳过，
+    // 绝不按信念盲画。
+    int bbW = 0, bbH = 0;
+    if (!ame153_query_backbuffer(&bbW, &bbH)) {
+        static bool s_ame153_queryLogged = false;
+        if (!s_ame153_queryLogged) {
+            s_ame153_queryLogged = true;
+            NSLog(@"[MGLFSR] Task153 backbuffer query unavailable (no current EGL surface on this thread?) -- chain idle this frame");
+        }
+        return false;
+    }
+
     // 输入区域：优先 MC 真实呈现视口（Task105 同款自适应——BMC2 类模组
     // 铺进 fb0 的区域可能小于告知窗口），闸门不符则回退 windowWidth 信仰。
     int inW = windowWidth, inH = windowHeight;
@@ -809,23 +877,64 @@ extern "C" bool ame_mgl_fsr_before_swap(void) {
         long vpArea = (long)vp[2] * (long)vp[3];
         long beliefArea = (long)windowWidth * (long)windowHeight;
         if (vp[0] == 0 && vp[1] == 0 && vp[2] > 0 && vp[3] > 0 &&
-            vp[2] <= surfW && vp[3] <= surfH &&
+            vp[2] <= bbW && vp[3] <= bbH &&
             (beliefArea <= 0 || vpArea * 4 >= beliefArea)) {
             inW = vp[2];
             inH = vp[3];
         }
     }
 
-    // 无需升采样：输入已达表面（FSR 关闭 / 兜底已恢复全分辨率）→ 零开销跳过。
-    if (inW <= 0 || inH <= 0 || inW >= surfW || inH >= surfH) return false;
+    // ---- Task 153：延迟缩窗（真 FSR 几何复位）----
+    // SurfaceViewController 在 FSR 联动 + MobileGL 时不再预先把 MC 窗口缩到
+    // surface/档位（那会让渲染器把后缓冲也钉成渲染尺寸），而是先按全尺寸
+    // 窗口启动、由本链在确认后缓冲为全尺寸后再下发缩窗。装机观察证据
+    //（403a459 会话）：窗口从 2360x1640 缩到 1180x820 后 surface 保持
+    // 2360x1640 不缩——这正是 EASU/RCAS 需要的几何（渲染小帧 + 全尺寸
+    // 后缓冲）。若个别构建/后端仍随窗口缩 surface：下方"无余量"判定接管
+    //（后缓冲==窗口尺寸 → 直呈 + CA 缩放），画面保真不花屏。
+    if (ame153_fsr_deferred_armed) {
+        int believedW = ame153_fsr_believed_surface_w;
+        int believedH = ame153_fsr_believed_surface_h;
+        if (believedW > 0 && believedH > 0 &&
+            bbW >= believedW - 8 && bbH >= believedH - 8) {
+            ame153_fsr_deferred_armed = 0;   // 本帧消费；主线程重算联动时会重新武装
+            NSLog(@"[MGLFSR] Task153 deferred shrink applied: backbuffer %dx%d >= believed surface %dx%d -> pushing MC render window %dx%d (chain engages EASU once MC's viewport settles)",
+                  bbW, bbH, believedW, believedH,
+                  ame153_fsr_pending_render_w, ame153_fsr_pending_render_h);
+            CallbackBridge_nativeSendScreenSize(ame153_fsr_pending_render_w,
+                                                ame153_fsr_pending_render_h);
+            // 本帧让 MC 消化窗口变更（视口尚未收缩，此刻采样只会拿到局部帧）
+            return false;
+        }
+        // 后缓冲未达全尺寸：保持武装继续观察（渲染器可能晚建/重建表面）。
+    }
 
-    bool ok = ame119_fsr_upscale(inW, inH, surfW, surfH);
+    // 无需/无法升采样：MC 的帧已铺满后缓冲（FSR 关闭 / 已恢复全分辨率 /
+    // 后缓冲被渲染器钉在窗口尺寸=延迟缩窗未获得余量）→ 直呈零花屏，
+    // 画面由 CAMetalLayer 按内容缩放铺满物理屏（画质=双线性，几何正确）。
+    if (inW <= 0 || inH <= 0) return false;
+    if (inW >= bbW || inH >= bbH) {
+        if (ame153_fsr_deferred_armed) {
+            // 延迟缩窗未换来全尺寸后缓冲（渲染器把 surface 钉在窗口尺寸的
+            // 当前行为）：保持全尺寸窗口直呈（画面正确、性能=全分辨率渲染），
+            // 并归一输入除数（窗口=全尺寸而 mgFsrScale>1 的口径错位——
+            // Task139 heal 同款语义，触点只发一半的旧病历）。
+            ame153_fsr_deferred_armed = 0;
+            NSLog(@"[MGLFSR] Task153 geometry arbitration: backbuffer %dx%d == window %dx%d (renderer pinned surface to window size, no upscale headroom) -- full-res direct present, zero corruption, input scale normalized",
+                  bbW, bbH, inW, inH);
+            ame139_fsr_heal_reset_input_scale();
+        }
+        return false;
+    }
+
+    bool ok = ame119_fsr_upscale(inW, inH, bbW, bbH);
     if (!ok && !ame119_fsr.healed) {
         ame119_fsr.healed = true;
-        NSLog(@"[MGLFSR] Task119 FSR upscale unavailable -- restoring MC window to surface %dx%d (direct full-res render)",
-              surfW, surfH);
-        // 与 osm_bridge Task83b 同款自愈：MC 切回全分辨率渲染，画面退出蜷缩。
-        CallbackBridge_nativeSendScreenSize(surfW, surfH);
+        NSLog(@"[MGLFSR] Task119 FSR upscale unavailable -- restoring MC window to backbuffer %dx%d (direct full-res render)",
+              bbW, bbH);
+        // 与 osm_bridge Task83b 同款自愈：MC 切回后缓冲真实尺寸渲染，画面
+        // 退出蜷缩（Task153：用实测后缓冲而非信念，防再次溢出）。
+        CallbackBridge_nativeSendScreenSize(bbW, bbH);
         // Task 139：输入侧同步复位 —— MC 窗口信念已变为全表面，
         // sendTouchPoint 的 mgFsrScale 除数若仍为档位系数，触点坐标
         // 只发一半（23:08 会话“mg 渲染器输入错位”实锤）。
