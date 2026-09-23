@@ -121,7 +121,7 @@ static NSTimeInterval kBingRequestTimeout = 12.0;
 
 - (void)ame_loadMetadataFromDisk {
     NSString *path = [[self bingDirectory] stringByAppendingPathComponent:kBingMetadataFile];
-    NSArray *raw = nil;
+    __block NSArray *raw = nil; // CI 修正：dispatch_sync 块内赋值需 __block
     dispatch_sync(self.ioQueue, ^{
         raw = [NSArray arrayWithContentsOfFile:path];
     });
@@ -174,78 +174,72 @@ static NSTimeInterval kBingRequestTimeout = 12.0;
     self.refreshInFlight = YES;
 
     // cn.bing.com 主源（大陆直连），www.bing.com 备源（海外/主源异常）
-    NSArray<NSString *> *hosts = @[@"https://cn.bing.com", @"https://www.bing.com"];
+    // CI 修正：自递归 block 会强捕获自身（-Warc-retain-cycles），改为实例方法递归
+    NSMutableArray<NSString *> *hostList = [@[@"https://cn.bing.com", @"https://www.bing.com"] mutableCopy];
     NSString *apiPath = @"/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=zh-CN";
 
-    NSMutableArray<NSString *> *hostList = [hosts mutableCopy];
-    __block NSError *lastError = nil;
     __weak typeof(self) weakSelf = self;
-
-    __block void (^tryNextHostBlock)(void);
-
-    void (^finish)(BOOL, NSError *) = ^(BOOL ok, NSError *error) {
+    [self ame_fetchWithHosts:hostList apiPath:apiPath lastError:nil completion:^(BOOL ok, NSError *error) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) {
-            if (completion) completion(NO, error);
-            return;
+        if (strongSelf) {
+            strongSelf.refreshInFlight = NO;
+            if (ok) {
+                NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+                [defaults setObject:[NSDate date] forKey:kBingLastSyncKey];
+                [defaults synchronize];
+            }
         }
-        strongSelf.refreshInFlight = NO;
         if (completion) completion(ok, error);
-    };
+    }];
+}
 
-    tryNextHostBlock = ^{
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        if (hostList.count == 0) {
-            finish(NO, lastError ?: [NSError errorWithDomain:@"BingWallpaper" code:102
+/// 双源兜底递归（实例方法形态；completion 恒主线程回调）
+- (void)ame_fetchWithHosts:(NSMutableArray<NSString *> *)hosts
+                   apiPath:(NSString *)apiPath
+                 lastError:(nullable NSError *)lastError
+                completion:(void (^)(BOOL success, NSError *_Nullable error))completion {
+    if (hosts.count == 0) {
+        completion(NO, lastError ?: [NSError errorWithDomain:@"BingWallpaper" code:102
                                                     userInfo:@{NSLocalizedDescriptionKey: localize(@"bing.refresh.failed", nil)}]);
-            return;
-        }
-        NSString *host = [hostList firstObject];
-        [hostList removeObjectAtIndex:0];
+        return;
+    }
+    NSString *host = [hosts firstObject];
+    [hosts removeObjectAtIndex:0];
 
-        NSURL *url = [NSURL URLWithString:[host stringByAppendingString:apiPath]];
-        if (!url) {
-            tryNextHostBlock();
-            return;
-        }
-        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-        request.timeoutInterval = kBingRequestTimeout;
-        request.HTTPMethod = @"GET";
-        [request setValue:@"Mozilla/5.0 (iOS) AmethystLauncher/6.0" forHTTPHeaderField:@"User-Agent"];
+    NSURL *url = [NSURL URLWithString:[host stringByAppendingString:apiPath]];
+    if (!url) {
+        [self ame_fetchWithHosts:hosts apiPath:apiPath lastError:lastError completion:completion];
+        return;
+    }
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.timeoutInterval = kBingRequestTimeout;
+    request.HTTPMethod = @"GET";
+    [request setValue:@"Mozilla/5.0 (iOS) AmethystLauncher/6.0" forHTTPHeaderField:@"User-Agent"];
 
-        NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
-                                                                     completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
-
-            NSInteger status = [(NSHTTPURLResponse *)response statusCode];
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
+                                                                 completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        NSInteger status = [(NSHTTPURLResponse *)response statusCode];
+        dispatch_async(dispatch_get_main_queue(), ^{
             if (error || status != 200 || data.length == 0) {
                 NSLog(@"[BingWallpaper] Task151 fetch failed host=%@ status=%ld error=%@", host, (long)status, error);
-                lastError = error ?: [NSError errorWithDomain:@"BingWallpaper" code:status
-                                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"HTTP %ld", (long)status]}];
-                dispatch_async(dispatch_get_main_queue(), tryNextHostBlock);
+                NSError *httpError = error ?: [NSError errorWithDomain:@"BingWallpaper" code:status
+                                                              userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"HTTP %ld", (long)status]}];
+                [self ame_fetchWithHosts:hosts apiPath:apiPath lastError:httpError completion:completion];
                 return;
             }
 
-            BOOL ok = [strongSelf ame_parseMetadataData:data host:host];
-            dispatch_async(dispatch_get_main_queue(), ^{
-                if (ok) {
-                    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-                    [defaults setObject:[NSDate date] forKey:kBingLastSyncKey];
-                    [defaults synchronize];
-                    finish(YES, nil);
-                } else {
-                    lastError = [NSError errorWithDomain:@"BingWallpaper" code:103
-                                                userInfo:@{NSLocalizedDescriptionKey: @"invalid payload"}];
-                    dispatch_async(dispatch_get_main_queue(), tryNextHostBlock);
-                }
-            });
-        }];
-        [task resume];
-    };
-
-    tryNextHostBlock();
+            BOOL ok = [self ame_parseMetadataData:data host:host];
+            if (ok) {
+                completion(YES, nil);
+            } else {
+                [self ame_fetchWithHosts:hosts apiPath:apiPath
+                               lastError:[NSError errorWithDomain:@"BingWallpaper" code:103
+                                                          userInfo:@{NSLocalizedDescriptionKey: @"invalid payload"}]
+                              completion:completion];
+            }
+        });
+    }];
+    [task resume];
 }
 
 /// 解析 HPImageArchive JSON（images[]），成功则更新 items + 写盘 + 发通知
@@ -408,49 +402,54 @@ static NSTimeInterval kBingRequestTimeout = 12.0;
         return;
     }
 
-    __weak typeof(self) weakSelf = self;
-    __block void (^attempt)(NSUInteger);
-    attempt = ^(NSUInteger index) {
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf || index >= urls.count) {
-            NSLog(@"[BingWallpaper] Task151 all variants failed for %@", item.startdate);
-            if (completion) completion(nil, [NSError errorWithDomain:@"BingWallpaper" code:203
-                                                            userInfo:@{NSLocalizedDescriptionKey: localize(@"bing.apply.failed", nil)}]);
-            return;
-        }
-        NSURL *url = [NSURL URLWithString:urls[index]];
-        if (!url) {
-            attempt(index + 1);
-            return;
-        }
-        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-        request.timeoutInterval = kBingRequestTimeout;
-        NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
-                                                                     completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-            NSInteger status = [(NSHTTPURLResponse *)response statusCode];
-            BOOL ok = (!error && status == 200 && data.length > 4096); // >4KB 防截断占位
-            if (!ok) {
-                NSLog(@"[BingWallpaper] Task151 image download failed url=%@ status=%ld error=%@ (fallback next)",
-                      url.absoluteString, (long)status, error);
-                dispatch_async(dispatch_get_main_queue(), ^{ attempt(index + 1); });
-                return;
-            }
-            dispatch_async(strongSelf.ioQueue, ^{
-                BOOL written = [data writeToFile:targetPath atomically:YES];
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (written) {
-                        NSLog(@"[BingWallpaper] Task151 image saved %@ (%lu KB)", targetPath.lastPathComponent, (unsigned long)(data.length / 1024));
-                        if (completion) completion(targetPath, nil);
-                    } else {
-                        if (completion) completion(nil, [NSError errorWithDomain:@"BingWallpaper" code:204
-                                                                        userInfo:@{NSLocalizedDescriptionKey: localize(@"bing.apply.failed", nil)}]);
-                    }
-                });
+    // CI 修正：自递归 block 强捕获自身（-Warc-retain-cycles），改为实例方法递归
+    [self ame_attemptDownloadURLs:urls index:0 targetPath:targetPath completion:completion];
+}
+
+/// 变体逐个尝试递归（UHD 失败回退原图；completion 恒主线程回调）
+- (void)ame_attemptDownloadURLs:(NSArray<NSString *> *)urls
+                          index:(NSUInteger)index
+                     targetPath:(NSString *)targetPath
+                     completion:(void (^)(NSString *_Nullable path, NSError *_Nullable error))completion {
+    if (index >= urls.count) {
+        NSLog(@"[BingWallpaper] Task151 all variants failed for %@", targetPath.lastPathComponent);
+        if (completion) completion(nil, [NSError errorWithDomain:@"BingWallpaper" code:203
+                                                        userInfo:@{NSLocalizedDescriptionKey: localize(@"bing.apply.failed", nil)}]);
+        return;
+    }
+    NSURL *url = [NSURL URLWithString:urls[index]];
+    if (!url) {
+        [self ame_attemptDownloadURLs:urls index:index + 1 targetPath:targetPath completion:completion];
+        return;
+    }
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.timeoutInterval = kBingRequestTimeout;
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request
+                                                                 completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        NSInteger status = [(NSHTTPURLResponse *)response statusCode];
+        BOOL ok = (!error && status == 200 && data.length > 4096); // >4KB 防截断占位
+        if (!ok) {
+            NSLog(@"[BingWallpaper] Task151 image download failed url=%@ status=%ld error=%@ (fallback next)",
+                  url.absoluteString, (long)status, error);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self ame_attemptDownloadURLs:urls index:index + 1 targetPath:targetPath completion:completion];
             });
-        }];
-        [task resume];
-    };
-    attempt(0);
+            return;
+        }
+        dispatch_async(self.ioQueue, ^{
+            BOOL written = [data writeToFile:targetPath atomically:YES];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (written) {
+                    NSLog(@"[BingWallpaper] Task151 image saved %@ (%lu KB)", targetPath.lastPathComponent, (unsigned long)(data.length / 1024));
+                    if (completion) completion(targetPath, nil);
+                } else {
+                    if (completion) completion(nil, [NSError errorWithDomain:@"BingWallpaper" code:204
+                                                                    userInfo:@{NSLocalizedDescriptionKey: localize(@"bing.apply.failed", nil)}]);
+                }
+            });
+        });
+    }];
+    [task resume];
 }
 
 #pragma mark - Thumbnails

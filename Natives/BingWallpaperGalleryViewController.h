@@ -14,6 +14,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface BingWallpaperGalleryViewController : UICollectionViewController
 
+/// 工厂方法：按设备宽度预配置网格布局的画廊控制器（Task151）
++ (UICollectionViewController *)galleryController;
+
 @end
 
 NS_ASSUME_NONNULL_END
