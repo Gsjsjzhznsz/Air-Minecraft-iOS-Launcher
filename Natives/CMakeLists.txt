@@ -624,6 +624,8 @@ target_link_libraries(AngelAuraAmethyst
   "-framework CoreImage"
   "-framework CoreMedia"
   "-framework ImageIO"
+  # Task151：Bing 壁纸保存到相册（PHPhotoLibrary/PHAssetChangeRequest）
+  "-framework Photos"
   "-framework CoreMotion"
   "-framework GameController"
   "-framework IOKit"
