@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 159 提交（管理 Java 26.0+ 预选 + 内存输入框弹窗 + 分辨率缩放实例化，CI 盯绿中）；此前 ce0783d（Task158 CI 闭环） |
-| 最新 Task 号 | **159**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化——注意 Task157 的内存卡片弹窗已被 159 替换为输入框）+ Task 158 + 157 + 156 + 154/153/151 |
+| 远端 HEAD | 本会话 Task 160 提交（新拟态 UI 回归 + 初次默认配置 + 弹窗背景回归 + 分辨率行样式统一 25~150 + 文字重影修复，CI 盯绿中）；此前 e979a58（Task159 CI 绿） |
+| 最新 Task 号 | **160**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化——注意 Task157 的内存卡片弹窗已被 159 替换为输入框）+ Task 158 + 157 + 156 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -44,48 +44,8 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 
 ---
 
-## Task 142（本会话，渲染器）
-
-### 用户需求（原话要点）
-1. 实例页渲染器选项太多（跟随全局 + 8 经典 + MG 家族三后端共 11 项）。
-2. "跟随全局渲染器设置放到外面，只要为真，渲染器选择就变灰"。
-3. "我之前的想法一直都是在渲染器选择只有一个 mg，而且不写什么后端，后端是根据 mg 设置选择的后端启动默认 vulkan"。
-4. "最后再审核一下"（渲染器持久化链路全面复审）。
-5. 注意：另一会话并行操作项目（其对 Task 141 已占用 141 编号与 verify_task141.py——本轮重命名避让为 Task 142，rebase 对齐后推送）。
-
-### 设计（存储分层）
-- **渲染器层**（全局 `video.renderer` + 各 profile `renderer` 键）：只存逻辑键 `auto` / `mg`（新增 RENDERER_KEY_MG，rendererCandidates 永列项）/ 经典 dylib 键。
-- **后端层**：MobileGL 家族键（libMobileGL / libMobileGL-gles / libmithril）迁入独立键 `mobileglues.renderer_backend`（默认 libMobileGL.dylib = Vulkan 直连），由设置页 MobileGlues 分区独占读写——用户明令"不写什么后端"。
-- **解析**（单一事实源 ame_effective_renderer，"mg" 逻辑键不外泄）：mg 分支 → ame142_effective_backend_key（新键 → legacy 全局家族键 → legacy 档位 → 默认 Vulkan）→ dylib 守卫（缺失回落默认后端→auto，一次性 NMToast 显示后端真名）；legacy 直写家族键仍原样生效（Task132-140 兼容 + Task138 守卫）；JavaLauncher/egl_bridge/layerClass/FSR 消费的仍是解析后的家族物理键——零下游行为变化。
-- **迁移 ame142_migrateRendererStorage**（幂等 static 哨兵；ame_effective_renderer/设置页/实例页读前触达）：全局家族键 → 后端键 + video.renderer="mg"；各 profile 家族键 → "mg"（活字典原地改写 + 单次 save）；同时退役 legacy 档位键（显式改选 = Task132 承诺的 legacy 终点，也防 JavaLauncher 档位分支与新键矛盾）。
-
-### UI
-- **实例页（ProfileSettingsViewController）**："跟随全局渲染器" 外置 UISwitch 行（渲染器行上方）；开 = 删 profile 键 + 渲染器整行置灰（tertiary 三色 + 无箭头 + 点击不弹窗，值位显示全局默认显示名）；关 = 启用精简选择器（经典列表 + 唯一 mg 项），关闭时默认给 "mg"；点行可拨开关（accessoryView 在 cell.subviews 而非 contentView）；legacy 家族键 ✓ 归一到 mg；popover 锚点移至 row 1。cell 复用复位补 detailTextLabel.textColor（防灰值外泄）。
-- **设置页**：MobileGlues renderer_backend 行只读写自己的键（Task132-140 直写渲染器键——两层互相伪装正是"选了后端、渲染器行跟着变"的困惑源）；显式改选同时清零 legacy 档位；dylib 缺失即时提示保留。
-- **审核修复**（"最后再审核一下"命中）：设置页渲染器行 getPreference 改回返回【存储键】——Task140 返回本地化显示名，openPicker 的 ✓ 按 pickKeys 精确比较存储值，auto/gl4es 等经典值 ✓ 永远丢失（隐性回归）；typePickField ame132 分支本就支持存储键→标签映射，两头皆对（含 "mg"）。
-
-### l10n（+3/-1 ×4 语言，基线 1922→1924）
-- 新增：renderer_follow_global_toggle（跟随全局渲染器/跟隨全域渲染器/Follow Global Renderer）、renderer.debug.mgfamily="mg"、mg_backend_missing_dylib（后端 dylib 缺失回落提示）。
-- 退役：preference.profile.renderer_follow_global（旧选择器格式键"跟随全局设置（当前: %@）"）。
-- 重写：preference.detail.renderer_backend（mg 后端语义：渲染器选 mg 时按此启动，默认 Vulkan 直连）。
-
-### 发布资产
-- announcements.json v6.0.0：summary 加"mg 单入口"；渲染器弹点重写（开关+置灰+精简列表+唯一 mg+后端归 MobileGlues 设置）；删除 Task139 时代"设置页的选择现在与实例配置同步写入"陈旧弹点（与新分层矛盾）；英文尾段重写。
-- README/README_CN 渲染器行、version.h REVISION 17 addendum（Task 142, no bump）。
-- 注意：v6.0.0-release-notes.md 是工作区工件（不在 git），发布时需从 announcements.json 重新导出（verify_task140 F7 已改为缺失跳过）。
-
-### 校验
-- **verify_task142 新增 49 项全绿**（A 核心模型 13 / B 设置页 6 / C 实例页 12 / D l10n 5 / E 发布资产 7 / F 下游单一事实源 6）。
-- 重锚：verify_task140（C6/C7/C8/C12/C13/C14/E → 58/58）、task132（B6/B7/B11/F1）、task139（E2/E3/I2）、task129/130/131/133/134/135/138 计数基线 1922→1924（rebase 合并双方）。
-- **级联全绿对照**（本沙箱）：141(their)=35/35、140=58/58、138=52/52、137=46/46、142=49/49；129-135/139 剩余失败全部为环境性（另一会话沙箱的会话本地脚本 task116_l10n_audit.py / task132_jna_got_mirror.py / task139_syntax_gate.py 及其级联，与基线一致，零新增）。
-- 括号平衡：五个改动 ObjC 文件 + 合并波及的 JavaLauncher/SurfaceViewController 全部平衡。
-- rebase 冲突（7 个验证器计数销）以 1924 统一解决；双方 ObjC 改动（其 Task141 字号缩放/内存弹窗 vs 本轮开关/置灰）自动合并无重叠，逐一目检。
-
-### Stage Summary
-- 提交 1c23bab（rebase 于另一会话 649609f 之上），CI 已触发。
-- 装机待验证锚点：①实例页"跟随全局渲染器"开关行，开启时渲染器行置灰、值显示全局默认；②渲染器选择器仅"mg / 自动 / 经典项"（无三后端、无跟随全局）；③设置页 MobileGlues 渲染后端行独立变化，渲染器行不再跟着变；④✓ 标记在设置页渲染器行正确显示（含 auto/gl4es/zink——Task140 起丢失，本轮修复）；⑤旧设备首启日志 '[Amethyst] Task142: global renderer <family> migrated to 'mg''；⑥后端行改选日志 '[PLPrefTable] Task142: renderer_backend written to OWN KEY'；⑦渲染器选 mg + 后端选 GLES/OpenGL4.0 启动，日志 RENDERER is set to 对应家族 dylib。
-
----
+## Task 142（渲染器）——已挪 worklog-archive.md
+> 全文检索：`grep -n "Task ID: 142" worklog-archive.md` 或 `grep -n "Task 142" worklog-archive.md`（存储分层设计/三端 UI/l10n +3/-1/发布资产/校验矩阵）。
 
 ## Task 143（本会话，装机日志三修复）
 
@@ -429,4 +389,31 @@ Stage Summary:
 ### Stage Summary
 - 用户预期装机锚点：①管理 Java 默认预选四行（1.16.5- / 1.17+ / **26.0 及更高版本 [Java 25]** / 执行 .jar），26.x 实例启动走 1_26_newer 槽；②实例内存行点开=输入框弹窗（标题"调整内存分配" + 三行简介 + 数字框 + 取消/确定，无恢复默认），输 0/超上限定 512/上限，确认即生效；③实例"渲染器"行下"分辨率缩放"行（点击行内数字框编辑 25~100，右侧独立 %，Done 落盘），启动生效；全局设置页视频区无分辨率行
 - 已知边界：游戏内分辨率菜单与 Java GUI 仍读写全局键（运行时语义）；自动分配开关无入口再开启（存量自动实例保持原比例直到手动确认）；footer.java17 文案保持原文（"1.17 及更高版本"），26.0+ 的默认说明由新 footer.java25 承载
+- 留档纪律：CI 绿后不推 worklog-only 提交（Task 96 教训）
+
+---
+
+## Task 160（本会话，新拟态 UI 回归 + 初次默认配置 + 弹窗背景回归 + 分辨率行样式统一 + 文字重影修复）
+
+### 用户五需求（AskUserQuestion 八问定稿后实施）
+1. 实例页分辨率缩放行右侧参数样式与内存分配同款（灰字+向右箭头）；输入 clamp 25~150。**定稿：保留行内输入**（不弹窗），右侧值显示带 %。
+2. 初次使用默认配置：浅色模式、背景 UI 效果毛玻璃、透明度 10%、模糊 75%。**定稿：仅影响新装/重置**；透明度按"反转理解"= 面板 alpha≈0.1（毛玻璃模式 uiOpacity 直接作 cell 底色 alpha，滑条显示 10% 与实际效果一致）。
+3. 大量小窗口背景加回来（例如自定义背景/自定义主页）；"游戏目录/已安装的版本"等字样背后的背景去掉。**定稿：弹窗底色跟随壁纸状态**（无壁纸=系统底、有壁纸=毛玻璃）；范围=模态弹窗类（侧栏/右面板/主页继续透壁纸）。
+4. 所有自创 UI 改新拟态（原生代码非 webview），按 CSS 规格：浅 #e0e0e0 + 双阴影 #bebebe/#ffffff、深 #2c2c2c + #1e1e1e/#3a3a3a，主文字 #333333/#f5f5f5、次文字 #888888/#a0a0a0。**定稿：按元素尺寸等比**（340pt=100% 规格 50/20/60，下限 8/4/12）。
+5. 设置页选项文字"重叠两次"修复。**定稿：两个都修**（黑影重影 + 换行压字），颜色回归原生。
+
+### Work Log
+- 前置：fetch 对齐 e979a58（Task159 并行会话已闭环），空号 160；勘察实锤：ui_theme 默认 dark（PLPreferences:241）、uiOpacity/blurIntensity 默认 0.7/0.7（BackgroundManager:150-160）、makeViewControllerTransparent 毛玻璃分支整页透明、VMSectionHeaderView 铺满 SystemMaterial 毛玻璃块、Task137 曾整退新拟态（三大历史问题：阴影被裁/圆角 50 小元素过圆/深浅色对比）
+- **A. 分辨率行样式统一**：buildResolutionScaleAccessory 重构——输入框 17pt secondaryLabelColor（内存行 detailTextLabel 同款灰字）、% 标签同步 17pt、容器尾端补 chevron.right（tertiaryLabel 灰，accessoryView 占位后系统箭头不绘制）+ 容器 76→96pt；clamp [25,100]→[25,150]（旧全局滑条同口径）；行内输入/NumberPad/Done 条/tap-to-focus 保留；属性注释与 loadSettings 注释同步
+- **B. 初次默认配置**：PLPreferences general.ui_theme dark→light（SceneDelegate 消费链零改动）；BackgroundManager loadUISettings 默认 uiOpacity 0.7→0.1（毛玻璃分支 cell 底色 alpha=0.1 几乎全透，模糊 75% 保可读）+ blurIntensity 0.7→0.75；效果默认 BackgroundUIEffectBlur 保持；仅 prefDefaults 层生效，存量用户已保存值不变
+- **C. 弹窗背景回归**：makeViewControllerTransparent 毛玻璃分支追加 ame160_applyGlassBackdropIfModal——判定 presentingViewController / navigationController.presentingViewController（弹窗 nav 内 push 子页覆盖；侧栏/右面板/root 中央 setContentViewController 两链为空自然跳过），view 底插 SystemThinMaterial UIVisualEffectView（tag 99994 防重复、autoresizing、userInteractionEnabled=NO）；半透明模式走既有底色逻辑不动；VMSectionHeaderView 的 blurView 属性/创建/四边约束全删（标题直接浮壁纸，Task160 注释留档）
+- **D. 新拟态引擎**：UIKit+NativeSurface 重建——五个动态色函数（colorWithDynamicProvider 浅/深规格值）+ AmeNeumorphMetricsForSide（340 基准等比，radius clamp[8,50]/offset[4,20]/blur=offset*3）+ AmeNeumorphShadowView（双 CALayer 只投影不画块、shadowPath 圆角矩形、layoutSubviews 随宿主短边重算并写宿主圆角、traitCollectionDidChange 重刷 CGColor；insertSubview atIndex:0 + autoresizing W/H + 关联对象复用）；ame_apply{Card,Raised,Panel}Surface 三方法内部统一路由 ame_applyNeumorphSurface（Task137 语义色退役）；新增 ame_applyNeumorphSurfaceFlatWithRadius（cell/列表场景：只上规格表面色+圆角 clamp[8,50]+masksToBounds=YES，防相邻 cell/tableView 裁剪互叠）——BackgroundManager 三处 cell 管线（applyEffectToView 尾/applyEffectToCollectionViewCell 尾/applyCardEffectToCell）改用 flat；host masksToBounds=NO 放行外阴影（Task137 教训注释）；文字色规格化 11 文件（VMSectionHeader title/subtitle、VersionCard version/date、Home 磁贴 welcome/greeting/公告卡/新闻卡 title/summary、VM 空态、Hero 卡 ×2、NMToast、RightPanel username/progress else 分支——customColor 用户自定义优先分支保留）；Hero 卡手绘黑影/白边框/白 14% 半透明底移除（表面由 applyEffectToView flat/毛玻璃接管）
+- **E. 文字重影修复**：LauncherPreferences cell 分支（hasBackground）textLabel/detailTextLabel shadowColor=nil+offset=0（detail 写死 0.8 灰→secondaryLabelColor）+ pickerLabel 同步 + 自定义 label 循环去阴影；header/footer willDisplay 去阴影；PLPrefTableViewController textLabel/detailTextLabel numberOfLines 0→1（Subtitle 多行标题换行压小字的布局半因；adjustsFontSizeToFitWidth 缩字兜长标题）；ManageJRE header 同口径
+- **F. 发布资产**：announcements.json 四处（summary 尾 / content 新块"新拟态 UI 与默认体验"四 bullet + 分辨率 bullet 口径更新 / 主页卡片追加 / EN 尾段）；JSON 合法性断言；version.h REVISION 17 addendum (Task 160)；**l10n 零新键零退役，基线 1952 四语言 set 口径复验不变**
+- **校验**：verify_task160 新建 47 项全绿（A 分辨率行 7 / B 默认 5 / C 弹窗背景 6 / D 新拟态 10 / E 重影 6 / F 资产 5 / G 配平+白名单 2 / H 回归 6）；重锚 5 处：verify_task159 D9（clamp 150）+F2（announcements 口径）48/48、verify_task149 A4/C2（文字色规格化）35/35、verify_task141 A3 36/36、verify_task137 D1/D2/D9（三表面→新拟态形态；masks 计数 3→2）46/46；verify_task157 44/44、150 43/43 幸存；级联对拍零新增失败（129=44/47、130=59/60、133=41/44、143=30+1、156=49+3 与基线逐项一致；132/135/151/153/154/158=沙箱环境性）；校验器配平函数坑：正则版 strip 在"字符串内含 //"（URL）时错位误报 PLPreferences/PreferredVC/RightPanel 三文件——改字符状态机单遍扫描修复
+- 提交推送（fetch 防撞号后）+ CI 轮询
+
+### Stage Summary
+- 用户预期装机锚点：①实例页"分辨率缩放"右侧=灰字数字+独立%+向右箭头（内存分配同款），输入 25~150；②新装/重置后=浅色模式+毛玻璃+透明度 10%+模糊 75%，存量用户不受影响；③壁纸模式下自定义背景/自定义主页/各设置弹窗有页面级毛玻璃底（不再整页透明），"游戏目录/已安装的版本"标题背景块消失；④全部自创 UI 新拟态（规格表面色+双阴影+规格文字色，深浅自适应）；⑤设置页文字无重影、换行不压字（黑标题+灰小字）
+- 已知边界：Task137 的"列表 cell 无阴影"以 flat 版本延续（列表阴影互叠是历史证明的坑）；Hero 卡/设置列表走 flat 无外阴影（壁纸模式毛玻璃视觉主导）；等比圆角下限 8 对徽章类仍略圆
 - 留档纪律：CI 绿后不推 worklog-only 提交（Task 96 教训）

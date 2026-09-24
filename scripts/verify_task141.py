@@ -80,9 +80,9 @@ check("A2  Task149 重锚：公告标题行整体退役（icon/label/button/rowS
           'self.announceLabel = [[UILabel alloc] init];',
           'self.detailButton = [UIButton buttonWithType:UIButtonTypeSystem];',
           'announceRowStack']))
-check("A3  Task149 重锚：问候语行回归（14pt medium secondaryLabelColor，cellForItem 填充 festivalGreeting）",
+check("A3  Task149 重锚：问候语行回归（14pt medium，cellForItem 填充 festivalGreeting；Task160 文字色规格化）",
       "self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];" in home
-      and "self.greetingLabel.textColor = [UIColor secondaryLabelColor];" in home
+      and "self.greetingLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160" in home
       and "cell.greetingLabel.text = festivalGreeting();" in home)
 check("A4  Task149 重锚：公告预览回归主页公告卡（cellForItem 不再引用 detailButton；公告卡标题行/内联按钮在位）",
       "cell.detailButton" not in home

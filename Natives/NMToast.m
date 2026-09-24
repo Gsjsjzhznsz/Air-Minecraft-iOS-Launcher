@@ -114,7 +114,7 @@ static __weak NMToast *s_nm125_current = nil;
     self.messageLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.messageLabel.numberOfLines = 0;
     self.messageLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    self.messageLabel.textColor = [UIColor labelColor];
+    self.messageLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
     self.messageLabel.text = message;
 
     [self.cardView addSubview:self.messageLabel];

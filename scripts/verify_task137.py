@@ -173,13 +173,13 @@ print()
 print("=" * 72)
 print("D. 原生 UI 换装（语义色 / 逐元素圆角 / 按钮原生还原 / 面板表面）")
 print("=" * 72)
-check("D1  原生三表面 API（卡片=secondarySystemGrouped / 凸起=tertiarySystemGrouped / 面板=secondarySystem）",
-      "secondarySystemGroupedBackgroundColor" in nsm
-      and "tertiarySystemGroupedBackgroundColor" in nsm
-      and "secondarySystemBackgroundColor" in nsm)
-check("D2  卡片/凸起表面裁剪到圆角 + AmeBadgeLabel 胶囊裁剪（共 3 处 masks），面板表面不动裁剪",
-      nsm.count("self.layer.masksToBounds = YES;") == 3
-      and "不改动裁剪" in nsm)
+check("D1  三表面 API（Task160 新拟态回归：三方法统一走 ame_applyNeumorphSurface，规格动态色）",
+      "AmeNeumorphSurfaceColor()" in nsm
+      and "[self ame_applyNeumorphSurface];" in nsm
+      and "ame_applyNeumorphSurfaceFlatWithRadius" in nsm)
+check("D2  AmeBadgeLabel 胶囊裁剪幸存 + Task160 新拟态宿主放行阴影（masksToBounds = NO）+ cell 平贴保裁剪",
+      nsm.count("self.layer.masksToBounds = YES;") == 2
+      and "self.layer.masksToBounds = NO; // Task137 教训：YES 会裁掉外阴影" in nsm)
 check("D3  逐元素原生圆角（版本卡 12 / 账户卡 16 / 筛选 14 / 崩溃卡 16 / 磁贴 16 / 加载器名条 10）",
       "cardContainer.layer.cornerRadius = 12" in vc
       and "cardView.layer.cornerRadius = 16" in read("Natives/AccountListViewController.m")
@@ -204,9 +204,9 @@ check("D8  子面板基座原生化（AMEPanel：systemBackground + 系统分隔
       "[UIColor systemBackgroundColor]" in read("Natives/UIViewController+AMEPanel.m")
       and "[UIColor separatorColor]" in read("Natives/UIViewController+AMEPanel.m")
       and "[viewController ame_applySubpanelBaseStyle];" in read("Natives/LauncherNavigationController.m"))
-check("D9  NMToast 卡片原生化（ame 表面 + labelColor 正文）",
+check("D9  NMToast 卡片新拟态化（ame 表面 + Task160 规格主文字）",
       "[self.cardView ame_applyCardSurfaceWithRadius:kNMToastCornerRadius];" in read("Natives/NMToast.m")
-      and "self.messageLabel.textColor = [UIColor labelColor];" in read("Natives/NMToast.m"))
+      and "self.messageLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read("Natives/NMToast.m"))
 
 print()
 print("=" * 72)

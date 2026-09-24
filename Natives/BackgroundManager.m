@@ -23,6 +23,8 @@ static const NSInteger kBackgroundImageTag = 99998;
 static const NSInteger kBackgroundBlurTag = 99997;
 static const NSInteger kBackgroundDimTag = 99996;
 static const NSInteger kDefaultBackgroundTag = 99995;
+// Task160：模态弹窗页面级毛玻璃底层的 tag（防重复添加/便于移除重铺）
+static const NSInteger kAme160GlassBackdropTag = 99994;
 
 @interface BackgroundManager ()
 @property (nonatomic, strong) AVPlayer *videoPlayer;
@@ -152,12 +154,15 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     
     _uiOpacity = [defaults floatForKey:kBackgroundUIOpacityKey];
     if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {
-        _uiOpacity = 0.7; // 默认透明度
+        // Task160：初次使用默认透明度 10%（毛玻璃模式下 uiOpacity 直接作 cell
+        // 底色 alpha，0.1 = 面板几乎全透、壁纸大量透出，靠模糊保证可读；
+        // 仅新装/重置生效，存量用户已保存值不变）
+        _uiOpacity = 0.1;
     }
     
     _blurIntensity = [defaults floatForKey:kBackgroundBlurIntensityKey];
     if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {
-        _blurIntensity = 0.7; // 默认模糊程度
+        _blurIntensity = 0.75; // Task160：默认模糊程度 75%（原 0.7）
     }
 }
 
@@ -551,6 +556,12 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     if (self.uiEffect == BackgroundUIEffectBlur) {
         // 毛玻璃效果 - clear background, let blur show through
         viewController.view.backgroundColor = [UIColor clearColor];
+        // Task160：模态弹窗"把背景加回来"（用户指令：自定义背景/自定义主页等
+        // 大量小窗口此前整页透明直接透壁纸，文字直接压在壁纸上）。壁纸模式下
+        // 给弹窗页铺一层页面级 SystemThinMaterial 毛玻璃底（文字可读、隐约透
+        // 壁纸）；侧栏/右面板/root 中央内容区（非模态）不铺、保持透壁纸。
+        // 无壁纸时上方已 return，弹窗保持各页自持的系统底色。
+        [self ame160_applyGlassBackdropIfModal:viewController];
     } else {
         // 半透明效果 - semi-transparent background
         // 修复：使用 systemBackgroundColor 替代硬编码黑色，自适应浅色/深色模式
@@ -586,6 +597,34 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     // Child view controllers
     for (UIViewController *childVC in viewController.childViewControllers) {
         [self makeViewControllerTransparent:childVC];
+    }
+}
+
+/// Task160：模态弹窗页面级毛玻璃底（"把背景加回来"）。
+/// 判定：present 出来的 VC（presentingViewController 非空）或弹窗 nav 内
+/// push 的子页（navigationController.presentingViewController 非空）。侧栏/
+/// 右面板/root 中央内容区（setContentViewController 嵌入）两链都为空，
+/// 自然跳过。SystemThinMaterial：比 cell 级 SystemMaterial 更通透，避免
+/// 页面底+cell 毛玻璃双层叠加后过浓；深浅色自动适配。
+- (void)ame160_applyGlassBackdropIfModal:(UIViewController *)viewController {
+    if (!viewController || !viewController.viewIfLoaded) return;
+    BOOL isModal = (viewController.presentingViewController != nil) ||
+                   (viewController.navigationController.presentingViewController != nil);
+    if (!isModal) return;
+
+    // 防重复：先移除旧底层再重铺（重复调用/布局变更场景）
+    for (UIView *sub in [NSArray arrayWithArray:viewController.view.subviews]) {
+        if (sub.tag == kAme160GlassBackdropTag) [sub removeFromSuperview];
+    }
+
+    if (@available(iOS 13.0, *)) {
+        UIBlurEffect *effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
+        UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:effect];
+        glass.tag = kAme160GlassBackdropTag;
+        glass.frame = viewController.view.bounds;
+        glass.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        glass.userInteractionEnabled = NO;
+        [viewController.view insertSubview:glass atIndex:0];
     }
 }
 
@@ -924,13 +963,14 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task137：新拟态退役——无自定义背景时回归 iOS 原生表面：
-    // 调用点预置了圆角的（卡片容器）= secondarySystemGroupedBackground 卡片；
+    // Task160：新拟态回归——无自定义背景时按新拟态规格重建表面。
+    // 调用点预置了圆角的（卡片容器）= 规格表面色平贴卡片（无外阴影：
+    // 本 helper 的调用者含 cell/列表场景，阴影会被裁剪互叠，统一平贴）；
     // 未设圆角的（多数页面的整页 self.view）= systemBackground 平铺整页，
-    // 不加圆角不强制裁剪（原生页面形态，深浅色由语义色自动适配）。
+    // 不加圆角不强制裁剪（原生页面形态）。
     CGFloat radius = view.layer.cornerRadius;
     if (radius > 0) {
-        [view ame_applyCardSurfaceWithRadius:radius];
+        [view ame_applyNeumorphSurfaceFlatWithRadius:radius];
     } else {
         view.backgroundColor = [UIColor systemBackgroundColor];
     }
@@ -1025,12 +1065,9 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task137：新拟态退役——无自定义背景时回归 iOS 原生卡片 cell：
-    // 卡片容器为 contentView 内第一个带圆角的子视图（各 cell 的既定结构），
-    // 找不到时退回 contentView（优先读自身圆角，未设置时取 12）。
-    // 表面 = secondarySystemGroupedBackground，无自绘阴影；
-    // cell 级裁剪恢复系统默认（此前为露出新拟态阴影而放开，原生卡片
-    // 由卡片自身圆角 + 裁剪呈现，不再需要帧外阴影空间）。
+    // Task160：无自定义背景时回归新拟态卡片 cell（规格表面色平贴，无外阴影；
+    // 卡片容器为 contentView 内第一个带圆角的子视图，找不到时退回
+    // contentView，优先读自身圆角，未设置时取 12；cell 级裁剪保持）。
     UIView *target = nil;
     CGFloat radius = 0;
     for (UIView *sub in cell.contentView.subviews) {
@@ -1056,7 +1093,7 @@ static const NSInteger kDefaultBackgroundTag = 99995;
     cell.contentView.backgroundColor = [UIColor clearColor];
     cell.clipsToBounds = YES;
     cell.layer.masksToBounds = NO;
-    [target ame_applyCardSurfaceWithRadius:radius];
+    [target ame_applyNeumorphSurfaceFlatWithRadius:radius];
 }
 
 - (void)applyCardEffectToCell:(UITableViewCell *)cell {
@@ -1068,14 +1105,14 @@ static const NSInteger kDefaultBackgroundTag = 99995;
         return;
     }
 
-    // Task137：新拟态退役——无背景时 cell 整体为原生卡片行
-    // （secondarySystemGroupedBackground + 12pt 圆角，与上级菜单卡片同语言，
-    // 无自绘阴影；深浅色由语义色自动适配）。
+    // Task160：新拟态退役→回归——无背景时 cell 整体为新拟态卡片行
+    // （规格表面色平贴 + 12pt 圆角，与上级菜单卡片同语言，无自绘阴影；
+    // cell 场景阴影会被裁剪互叠，用 flat 版本）。
     cell.backgroundView = nil;
     cell.backgroundColor = [UIColor clearColor];
     cell.clipsToBounds = YES;
     cell.layer.masksToBounds = NO;
-    [cell.contentView ame_applyCardSurfaceWithRadius:12];
+    [cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

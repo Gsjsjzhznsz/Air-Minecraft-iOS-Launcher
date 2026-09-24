@@ -1393,3 +1393,26 @@
 // (manage_runtime.default.126 / footer.java25 / profile.title.resolution_scale
 // / memory.adjust_title / memory.adjust_message) -1 retired (memory.current)
 // x4 languages, baseline 1948->1952.
+// REVISION 17 addendum (Task 160, no bump): Neumorphism UI regression + first-
+// launch defaults. (1) The per-instance resolution-scale accessory is restyled
+// to match the memory row (secondaryLabel gray digits at the system detail
+// size, a separate % label, and a trailing chevron since the accessoryView
+// suppresses the cell's disclosure arrow) and the clamp widens 25-100 ->
+// 25-150 (the legacy global-slider range). (2) First-launch defaults only
+// (stock users keep saved values): ui_theme dark->light, blur-mode uiOpacity
+// 0.7->0.1 (panels nearly transparent against the wallpaper, readability
+// carried by the 75% blur, up from 70%). (3) Modal sheets get their backdrop
+// back: makeViewControllerTransparent now lays a page-level SystemThinMaterial
+// glass layer under modal VCs (presenting chain check skips the sidebar /
+// right panel / root content area, which keep showing wallpaper); the
+// VersionManager section-header SystemMaterial block is deleted outright (the
+// "Game directories / Installed versions" titles float on the wallpaper).
+// (4) Neumorphism rebuilt natively per the user's CSS spec: dynamic surface
+// #e0e0e0/#2c2c2c, dual outer shadows (dark bottom-right, highlight top-left)
+// scaled by element size (340pt = 100% spec: radius 50 / offset 20 / blur 60,
+// floors 8/4/12), primary text #333333/#f5f5f5, secondary #888888/#a0a0a0.
+// The ame_apply{Card,Raised,Panel}Surface entry points now route through the
+// engine; cell pipelines use a flat variant (shadows would clip/stack in
+// lists). Settings-page text shadows (the "double-drawn text" ghosting) and
+// the multi-line title/detail overlap are fixed back to native single-line
+// label/secondaryLabel rendering. l10n baseline unchanged (1952).

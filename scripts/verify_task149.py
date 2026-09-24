@@ -75,9 +75,9 @@ check("A2  viewWillAppear 刷新保险（updateSkinDisplay 二次补齐账号态
       and "[self updateSkinDisplay];" in home.split("- (void)viewWillAppear:(BOOL)animated")[1].split("- (void)dealloc")[0])
 check("A3  公告标题行退役（announceIconView/announceLabel/detailButton/announceRowStack 引用清零）",
       all(x not in home for x in ["announceIconView", "announceLabel", "detailButton", "announceRowStack"]))
-check("A4  问候语行回归（greetingLabel 14pt medium secondary + festivalGreeting）",
+check("A4  问候语行回归（greetingLabel 14pt medium + festivalGreeting；Task160 文字色规格化）",
       "self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];" in home
-      and "self.greetingLabel.textColor = [UIColor secondaryLabelColor];" in home
+      and "self.greetingLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160" in home
       and "cell.greetingLabel.text = festivalGreeting();" in home)
 check("A5  欢迎堆叠 = [welcomeLabel, greetingLabel]（相对头像纵轴居中保留）",
       "initWithArrangedSubviews:@[self.welcomeLabel, self.greetingLabel]" in home
@@ -117,10 +117,10 @@ print("=" * 72)
 check("C1  喇叭图标垂直居中（centerY = contentContainer.centerY）",
       re.search(r"HomeAnnouncementTileCell[\s\S]*?iconView\.centerYAnchor constraintEqualToAnchor:self\.contentContainer\.centerYAnchor", home) is not None)
 ann_impl = home.split("@implementation HomeAnnouncementTileCell")[1].split("\n@end")[0]
-check("C2  标题/简介样式对齐新闻卡片（标题 15pt semibold / 简介 12pt tertiary）",
+check("C2  标题/简介样式对齐新闻卡片（标题 15pt semibold / 简介 12pt；Task160 简介色规格化）",
       "self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];" in ann_impl
       and "self.summaryLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];" in ann_impl
-      and "self.summaryLabel.textColor = [UIColor tertiaryLabelColor];" in ann_impl)
+      and "self.summaryLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 公告卡简介" in ann_impl)
 check("C3  查看详情按钮内联标题后（titleRowStack 横向栈 + 缩小 12pt/28pt 高）",
       "initWithArrangedSubviews" not in home.split("self.titleRowStack = ")[1].split("];")[0]
       and "[self.titleRowStack addArrangedSubview:self.titleLabel];" in home

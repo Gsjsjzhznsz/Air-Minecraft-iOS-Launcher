@@ -238,7 +238,9 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"hidden_sidebar": @([[[UIDevice currentDevice].model lowercaseString] containsString:@"iphone"]),
             @"appicon": @"AppIcon-Light",
             @"ui_layout": @"vs",
-            @"ui_theme": @"dark",
+            // Task160：初次使用默认浅色模式（SceneDelegate 读 general.ui_theme；
+            // 仅新装/重置偏好生效，存量用户已保存的值不变）
+            @"ui_theme": @"light",
             // 应用语言："system"=跟随系统，"zh-Hans"=简体中文，"en"=English
             @"app_language": @"system",
             @"multi_threaded": @NO,

@@ -30,7 +30,7 @@
 @property (nonatomic, assign) NSInteger allocatedMemory;
 @property (nonatomic, assign) NSInteger maxMemory;
 @property (nonatomic, assign) BOOL memoryAutoEnabled;  // Task157：自动分配内存开关（profile memoryAuto 标记，仅显式拨过为 YES）
-// Task159：分辨率缩放（per-instance，profile 键 resolution，25~100）
+// Task160：分辨率缩放（per-instance，profile 键 resolution，25~150，与旧全局滑条同口径）
 @property (nonatomic, assign) NSInteger resolutionScale;
 @property (nonatomic, strong) UITextField *resolutionScaleTextField;
 // 服务器地址（FCL 风格：留空则不自动加入）
@@ -312,15 +312,11 @@ static NSString * localizeProfileTitle(NSString *title) {
 - (void)setupHeroCard {
     // ===== Hero 卡片容器（L3：16pt 圆角 + 半透明背景 + 毛玻璃 + 浅边框 + 中阴影）=====
     UIView *heroCard = [[UIView alloc] init];
-    heroCard.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.14]; // surface-bright
+    // Task160：半透明白底/白边框/黑色下阴影退役——无壁纸时由
+    // applyEffectToView 上新拟态规格表面色（cell 场景同款 flat），有壁纸时
+    // 走毛玻璃管线；黑色单侧阴影与新拟态双阴影体系冲突，一并移除
     heroCard.layer.cornerRadius = 16;
     heroCard.layer.cornerCurve = kCACornerCurveContinuous;
-    heroCard.layer.borderWidth = 0.5;
-    heroCard.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
-    heroCard.layer.shadowColor = [UIColor blackColor].CGColor;
-    heroCard.layer.shadowOpacity = 0.12;
-    heroCard.layer.shadowRadius = 8;
-    heroCard.layer.shadowOffset = CGSizeMake(0, 3);
     [[BackgroundManager sharedManager] applyEffectToView:heroCard];
 
     // ===== Hero 图标（56x56，14pt 圆角，accentColor 背景，白色 cube.fill SF Symbol）=====
@@ -338,7 +334,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = self.profile[@"name"] ?: self.originalName ?: @"New Profile";
     titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
-    titleLabel.textColor = [UIColor labelColor];
+    titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
     titleLabel.adjustsFontSizeToFitWidth = YES;
     titleLabel.minimumScaleFactor = 0.8;
     [heroCard addSubview:titleLabel];
@@ -372,7 +368,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     NSString *instanceName = getPrefObject(@"general.game_directory") ?: @"default";
     subtitleLabel.text = [NSString stringWithFormat:@"%@ → /instances/%@", gameDir, instanceName];
     subtitleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    subtitleLabel.textColor = [UIColor secondaryLabelColor];
+    subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
     subtitleLabel.adjustsFontSizeToFitWidth = YES;
     subtitleLabel.minimumScaleFactor = 0.7;
     [heroCard addSubview:subtitleLabel];
@@ -505,10 +501,9 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 图形 API（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
     self.selectedGraphicsApi = self.profile[@"graphicsApi"] ?: @"default";
 
-    // Task159：分辨率缩放（per-instance，25~100）。profile 无键时显示全局
-    // 回退值（与启动解析链 resolveKeyForCurrentProfile 同口径）——存量设备
-    // 全局行删除后存量值继续生效直到显式设置；存量超范围值（全局滑条允许
-    // 25~150）原样显示，仅编辑时 clamp。
+    // Task160：分辨率缩放（per-instance，25~150，与旧全局滑条同口径）。profile 无键时
+    // 显示全局回退值（与启动解析链 resolveKeyForCurrentProfile 同口径）——存量设备
+    // 全局行删除后存量值继续生效直到显式设置；编辑结束 clamp [25,150]。
     id ame159_resolutionRaw = self.profile[@"resolution"];
     if ([ame159_resolutionRaw isKindOfClass:[NSString class]] && [(NSString *)ame159_resolutionRaw length] > 0) {
         self.resolutionScale = [(NSString *)ame159_resolutionRaw intValue];
@@ -857,9 +852,9 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                 cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
             } else if ([title isEqualToString:@"分辨率缩放"]) {
-                // Task159：per-instance 分辨率缩放（25~100）——名称行同款
-                // 行内输入框，点击行聚焦；右侧 "%" 为独立标签（与输入框文字
-                // 同样式，不在输入框内，用户指令）；全局设置页滑条同步退役
+                // Task160：per-instance 分辨率缩放（25~150）——右侧参数样式与
+                // 内存分配行同款（灰字 + 向右箭头），行内输入保留（点击行聚焦）；
+                // "%" 为独立标签（不在输入框内）；容器尾端补仿系统箭头
                 cell.imageView.image = [UIImage systemImageNamed:@"viewfinder"];
                 cell.accessoryView = [self buildResolutionScaleAccessory];
                 cell.detailTextLabel.text = nil;
@@ -929,11 +924,14 @@ static NSString * localizeProfileTitle(NSString *title) {
     return textField;
 }
 
-#pragma mark - Task159 分辨率缩放输入框（per-instance）
+#pragma mark - Task160 分辨率缩放输入框（per-instance）
 
-/// 分辨率缩放行的 accessory：[数字输入框 | %] 容器。
-/// "%" 为独立标签（与输入框文字同字号样式，不在输入框内，用户指令）；
-/// 数字输入框类似名称行——点击行聚焦，编辑结束 clamp 到 [25, 100] 落盘。
+/// 分辨率缩放行的 accessory：[数字输入框 | % | 箭头] 容器（Task160）。
+/// 右侧参数样式与内存分配行同款——灰字（secondaryLabelColor）、系统 detail
+/// 同字号 17pt、无输入框观感；行内输入保留（点击行聚焦编辑，用户定稿）；
+/// "%" 为独立标签（与输入框文字同字号样式，不在输入框内）；accessoryView
+/// 占位后系统 disclosure 箭头不再显示，容器尾端补一个同视觉的 chevron。
+/// 编辑结束 clamp 到 [25, 150] 落盘。
 - (UIView *)buildResolutionScaleAccessory {
     // 复用：container 仍持有 textField 就直接重挂（accessoryView 赋值时
     // UIKit 自动从旧 cell 挪到新 cell），并刷新为当前值
@@ -942,9 +940,11 @@ static NSString * localizeProfileTitle(NSString *title) {
         return self.resolutionScaleTextField.superview;
     }
 
-    UITextField *textField = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 52, 30)];
+    UITextField *textField = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 56, 30)];
     textField.text = [NSString stringWithFormat:@"%ld", (long)self.resolutionScale];
-    textField.font = [UIFont systemFontOfSize:14];
+    // Task160：与内存分配行 detailTextLabel 同色同字号（系统 detail 默认 17pt regular）
+    textField.font = [UIFont systemFontOfSize:17];
+    textField.textColor = [UIColor secondaryLabelColor];
     textField.keyboardType = UIKeyboardTypeNumberPad;
     textField.textAlignment = NSTextAlignmentRight;
     textField.autocorrectionType = UITextAutocorrectionTypeNo;
@@ -958,23 +958,33 @@ static NSString * localizeProfileTitle(NSString *title) {
     [textField addTarget:self action:@selector(resolutionScaleDidEnd:) forControlEvents:UIControlEventEditingDidEnd];
     self.resolutionScaleTextField = textField;
 
-    UILabel *percentLabel = [[UILabel alloc] initWithFrame:CGRectMake(56, 0, 18, 30)];
+    UILabel *percentLabel = [[UILabel alloc] initWithFrame:CGRectMake(58, 0, 18, 30)];
     percentLabel.text = @"%";
-    percentLabel.font = [UIFont systemFontOfSize:14];
+    percentLabel.font = [UIFont systemFontOfSize:17];
     percentLabel.textColor = [UIColor secondaryLabelColor];
 
-    UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 76, 30)];
+    // Task160：仿系统 disclosure 箭头（chevron.right，tertiaryLabel 灰）——
+    // accessoryView 被本容器占用后 cell 自带的向右箭头不会绘制，在此补齐
+    // 与内存分配行（DisclosureIndicator）同视觉的箭头
+    UIImage *chevronImage = [UIImage systemImageNamed:@"chevron.right"];
+    UIImageView *chevronView = [[UIImageView alloc] initWithImage:chevronImage];
+    chevronView.tintColor = [UIColor tertiaryLabelColor];
+    chevronView.contentMode = UIViewContentModeScaleAspectFit;
+    chevronView.frame = CGRectMake(82, 9, 8, 13);
+
+    UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 96, 30)];
     [container addSubview:textField];
     [container addSubview:percentLabel];
+    [container addSubview:chevronView];
     return container;
 }
 
 - (void)resolutionScaleDidEnd:(UITextField *)textField {
-    // 编辑结束 clamp 到 [25, 100]（用户指令范围）并落盘；空/非数字输入
-    // intValue=0 → 落到下限 25
+    // 编辑结束 clamp 到 [25, 150]（Task160 用户指令范围）并落盘；空/非数字
+    // 输入 intValue=0 → 落到下限 25
     NSInteger ame159_value = textField.text.intValue;
     if (ame159_value < 25) ame159_value = 25;
-    if (ame159_value > 100) ame159_value = 100;
+    if (ame159_value > 150) ame159_value = 150;
     self.resolutionScale = ame159_value;
     textField.text = [NSString stringWithFormat:@"%ld", (long)ame159_value];
     [self saveSettings];

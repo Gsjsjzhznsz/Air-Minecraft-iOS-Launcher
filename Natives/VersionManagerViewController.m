@@ -588,7 +588,6 @@ static NSInteger const kSectionVersions    = 1;
 @property (nonatomic, strong) UILabel *titleLabel;
 @property (nonatomic, strong) UILabel *subtitleLabel;
 @property (nonatomic, strong) UILabel *countBadge;
-@property (nonatomic, strong) UIVisualEffectView *blurView;
 - (void)configureWithIcon:(NSString *)iconName title:(NSString *)title subtitle:(NSString *)subtitle count:(NSInteger)count;
 @end
 
@@ -597,11 +596,9 @@ static NSInteger const kSectionVersions    = 1;
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        // 规范 6.2：SystemMaterial 自动适配亮/暗模式（替代原 SystemMaterialDark）
-        UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemMaterial];
-        self.blurView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
-        self.blurView.translatesAutoresizingMaskIntoConstraints = NO;
-        [self addSubview:self.blurView];
+        // Task160：标题后的 SystemMaterial 毛玻璃块整块退役（用户指令：
+        // "显示壁纸时文字的背景会挡住，去掉，例如游戏目录和已安装的版本
+        // 标题"）——标题/副标题直接浮在壁纸上，仅保留强调条/图标/计数胶囊
 
         // 规范 9.5：前导强调色条（4pt 宽，圆角，accentColor）
         self.accentBar = [[UIView alloc] init];
@@ -622,14 +619,14 @@ static NSInteger const kSectionVersions    = 1;
         self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.titleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:16] weight:UIFontWeightBold];
         // 规范 2.1：强制使用系统色
-        self.titleLabel.textColor = [UIColor labelColor];
+        self.titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
         [self addSubview:self.titleLabel];
 
         self.subtitleLabel = [[UILabel alloc] init];
         self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.subtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
         // 规范 2.1：副文字 secondaryLabelColor
-        self.subtitleLabel.textColor = [UIColor secondaryLabelColor];
+        self.subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
         self.subtitleLabel.numberOfLines = 0;
         self.subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
         [self addSubview:self.subtitleLabel];
@@ -646,10 +643,6 @@ static NSInteger const kSectionVersions    = 1;
         [self addSubview:self.countBadge];
 
         [NSLayoutConstraint activateConstraints:@[
-            [self.blurView.topAnchor constraintEqualToAnchor:self.topAnchor],
-            [self.blurView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
-            [self.blurView.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
-            [self.blurView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
             // 前导强调条：左侧 18pt，垂直居中，4pt 宽，18pt 高
             [self.accentBar.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:18],
             [self.accentBar.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
@@ -895,7 +888,7 @@ static NSInteger const kSectionVersions    = 1;
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     titleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:18] weight:UIFontWeightBold];
-    titleLabel.textColor = [UIColor labelColor];
+    titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
     titleLabel.text = localize(@"i18n_str_1056", nil);
     titleLabel.textAlignment = NSTextAlignmentCenter;
     [self.emptyStateView addSubview:titleLabel];
@@ -904,7 +897,7 @@ static NSInteger const kSectionVersions    = 1;
     UILabel *subtitleLabel = [[UILabel alloc] init];
     subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     subtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:13] weight:UIFontWeightRegular];
-    subtitleLabel.textColor = [UIColor secondaryLabelColor];
+    subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
     subtitleLabel.text = localize(@"i18n_str_1057", nil);
     subtitleLabel.textAlignment = NSTextAlignmentCenter;
     subtitleLabel.numberOfLines = 0;

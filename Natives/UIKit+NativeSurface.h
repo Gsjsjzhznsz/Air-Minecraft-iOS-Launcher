@@ -9,29 +9,99 @@
 //  深浅色对比需要额外扫描器兜底。用户最终决定：删除全部新拟态代码，回归
 //  iOS 原生 UI（系统语义色 + 标准圆角，无任何自绘阴影）。
 //
-//  本分类是替换层：全部使用 UIKit 语义色（secondarySystemGroupedBackground 等），
-//  深浅色适配由 UIColor 动态色自动完成，无需通知广播/KVO/重绘。
-//  尺寸与位置不受影响——只改底色/圆角/裁剪三个样式维度。
+//  ===== Task160：新拟态回归（按用户 CSS 规格重建） =====
+//
+//  用户指令："所有自创UI全部更改为新拟态UI，按照css样式来写启动器原生的代码
+//  而不是webview，按照比例调整阴影和高光"。规格（CSS 100% 基准）：
+//
+//    浅色：background #e0e0e0；box-shadow  20px 20px 60px #bebebe（暗影）
+//                                         -20px -20px 60px #ffffff（高光）
+//          主要文字 #333333；次要文字 #888888
+//    深色：background #2c2c2c；box-shadow  20px 20px 60px #1e1e1e（暗影）
+//                                         -20px -20px 60px #3a3a3a（高光）
+//          主要文字 #f5f5f5；次要文字 #a0a0a0
+//
+//  Task137 三类历史问题的本轮对策：
+//    1) 阴影被父视图裁剪 → 阴影承载视图插在宿主 subview 最底层，宿主与承载
+//       层 masksToBounds 一律 NO（内容裁剪交给卡片内部容器，卡片内容本身在
+//       约束内不溢出）；
+//    2) 统一圆角 50 对小元素过圆 → 圆角/阴影偏移/模糊全部按元素短边等比缩放
+//       （340pt = 100% 规格），并设下限（圆角 8 / 偏移 4 / 模糊 12）；
+//    3) 深浅色对比 → 全部颜色用 dynamic provider 动态色，承载视图在
+//       traitCollectionDidChange 时重刷 CGColor，无需广播。
+//
+//  尺寸与位置不受影响——只改底色/圆角/阴影/文字色四个样式维度。
 //
 
 #import <UIKit/UIKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// 新拟态 CSS 规格基准尺寸：340pt 宽的元素 = 100% 规格（圆角 50/偏移 20/模糊 60）。
+/// 小于基准的元素按 短边/340 等比缩放，带下限；大于基准封顶 100%。
+FOUNDATION_EXPORT const CGFloat AmeNeumorphBaseDimension;
+
+/// 新拟态表面色（Task160 规格）：浅色 #e0e0e0 / 深色 #2c2c2c（动态色）
+FOUNDATION_EXPORT UIColor *AmeNeumorphSurfaceColor(void);
+
+/// 新拟态暗影色：浅色 #bebebe / 深色 #1e1e1e（动态色）
+FOUNDATION_EXPORT UIColor *AmeNeumorphShadowColor(void);
+
+/// 新拟态高光色：浅色 #ffffff / 深色 #3a3a3a（动态色）
+FOUNDATION_EXPORT UIColor *AmeNeumorphHighlightColor(void);
+
+/// 新拟态主要文字色：浅色 #333333 / 深色 #f5f5f5（动态色）
+FOUNDATION_EXPORT UIColor *AmeNeumorphPrimaryTextColor(void);
+
+/// 新拟态次要文字色：浅色 #888888 / 深色 #a0a0a0（动态色）
+FOUNDATION_EXPORT UIColor *AmeNeumorphSecondaryTextColor(void);
+
+/// 按元素短边等比计算新拟态度量（Task160）：
+///   scale = clamp(短边 / 340, 0, 1)；圆角 = clamp(50*scale, 8, 50)；
+///   偏移 = clamp(20*scale, 4, 20)；模糊 = 偏移 * 3（CSS 20:60 同比例）。
+FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
+                                                 CGFloat *radiusOut,
+                                                 CGFloat *offsetOut,
+                                                 CGFloat *blurOut);
+
+/// 双阴影承载视图（Task160 新拟态引擎）：
+/// 两个 CALayer（暗影 + 高光）只画投影不画块（backgroundColor = clear），
+/// 元素本体色由宿主 view 自绘；layoutSubviews 按 bounds 短边重算度量并写
+/// 宿主 layer.cornerRadius；traitCollectionDidChange 时重刷阴影颜色。
+/// 作为宿主的第一个 subview 自动随 bounds 缩放（autoresizing W|H），
+/// userInteractionEnabled = NO 不拦截触摸。
+@interface AmeNeumorphShadowView : UIView
+/// 强制立即按宿主当前 bounds 重算度量/颜色（宿主 frame 变化后调用）
+- (void)ame_refreshForHostBounds;
+@end
+
 /// 原生卡片/面板表面（Task137 起替代 nm_convex / nm_flat 系列引擎调用）
+///
+/// Task160：三个方法的内部实现统一升级为新拟态表面（表面色/圆角/双阴影按
+/// 上文规格），调用点无需改动——传入的 cornerRadius 参数仍被尊重（调用点
+/// 既有圆角设计不变），双阴影度量按元素短边等比。仅 Panel 平贴面板沿用
+/// "不强制改裁剪"的旧约定，但为露出阴影会保证 masksToBounds = NO。
 @interface UIView (AmeNativeSurface)
 
-/// 原生卡片表面：secondarySystemGroupedBackground 底 + 指定圆角，
-/// 裁剪内容到圆角内（对应原 nm_convexRadius:shadowRadius: 无背景分支）。
+/// 原生卡片表面（Task160 新拟态：规格表面色 + 双外阴影 + 指定圆角）。
 - (void)ame_applyCardSurfaceWithRadius:(CGFloat)cornerRadius;
 
-/// 原生嵌套凸起卡片表面：tertiarySystemGroupedBackground 底 + 指定圆角，
-/// 裁剪内容（对应原 nm_convexRaisedRadius:shadowRadius:）。
+/// 原生嵌套凸起卡片表面（Task160 新拟态同款表面；嵌套凸起感由双阴影与
+/// 宿主层级关系呈现）。
 - (void)ame_applyRaisedCardSurfaceWithRadius:(CGFloat)cornerRadius;
 
-/// 原生平贴面板表面：secondarySystemBackground 底 + 指定圆角，
-/// 不改动裁剪（对应原 nm_flatSurfaceWithRadius:，用于侧栏/右面板等大面板）。
+/// 原生平贴面板表面（Task160 新拟态同款表面，用于侧栏/右面板等大面板；
+/// 不强制改内容裁剪，但会保证 masksToBounds = NO 以露出外阴影）。
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius;
+
+/// Task160：纯新拟态表面（规格表面色 + 双阴影承载视图 + masksToBounds = NO；
+/// 圆角按宿主短边等比自动写入规格值）。供三方法外的自创卡片直接使用。
+- (void)ame_applyNeumorphSurface;
+
+/// Task160：cell/列表场景专用的平贴新拟态表面——阴影会被相邻 cell 与
+/// tableView 裁剪互叠（Task137 历史问题），此处只上规格表面色 + 圆角
+/// （尊重调用点传入值，clamp [8,50]），裁剪保持（Task152 直角露出修复不变）。
+- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius;
 
 @end
 

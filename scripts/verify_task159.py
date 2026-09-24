@@ -170,9 +170,9 @@ check("D8  builder：NumberPad + Done 条 + 独立 % 标签（不在输入框内
       "textField.keyboardType = UIKeyboardTypeNumberPad;" in ps
       and "percentLabel.text = @\"%\";" in ps
       and "UIBarButtonSystemItemDone target:textField action:@selector(resignFirstResponder)" in ps)
-check("D9  编辑结束 clamp [25, 100] 并落盘",
+check("D9  编辑结束 clamp [25, 150] 并落盘（Task160 上限放宽至旧全局滑条口径）",
       "if (ame159_value < 25) ame159_value = 25;" in ps
-      and "if (ame159_value > 100) ame159_value = 100;" in ps
+      and "if (ame159_value > 150) ame159_value = 150;" in ps
       and "- (void)resolutionScaleDidEnd:(UITextField *)textField {" in ps)
 check("D10 saveSettings 写 profile 层 NSString",
       'existing[@"resolution"] = [NSString stringWithFormat:@"%ld", (long)self.resolutionScale];' in ps)
@@ -222,7 +222,7 @@ check("F2  content 新块\"Java 与内存（体验调整）\"三 bullet",
       "**Java 与内存（体验调整）**" in e["content"]
       and "26.0 及更高版本：Java 25" in e["content"]
       and "内存调配指南见启动器使用教程" in e["content"]
-      and "点击行内数字框即可编辑 25~100" in e["content"])
+      and "可编辑 25~150" in e["content"])  # Task160 口径：25~150 + 内存分配同款样式
 check("F3  主页卡片内存措辞更新（输入框弹窗 + 自动开关退役）",
       "内存分配改为输入框弹窗（512MB ~ 可分配上限，自动分配开关随旧弹窗退役）" in e["content"])
 check("F4  EN 尾段（Java 25 preselect / input dialog / per-instance resolution）",

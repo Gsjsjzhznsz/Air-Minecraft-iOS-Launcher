@@ -288,9 +288,10 @@ static NSString *currentImportTaskId;
     // 透明背景：不再使用毛玻璃，可看到背景图
     header.backgroundView = nil;
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        header.textLabel.textColor = [UIColor labelColor]; // Task91：写死白色改主题主文字色
-        header.textLabel.shadowColor = [UIColor blackColor];
-        header.textLabel.shadowOffset = CGSizeMake(0, 1);
+        header.textLabel.textColor = [UIColor labelColor];
+        // Task160：去文字阴影（重影修复，与启动器设置页同口径）
+        header.textLabel.shadowColor = nil;
+        header.textLabel.shadowOffset = CGSizeZero;
     } else {
         header.textLabel.textColor = [UIColor labelColor];
         header.textLabel.shadowColor = nil;

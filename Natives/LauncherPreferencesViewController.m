@@ -6,6 +6,7 @@
 #import "LauncherMenuViewController.h"
 #import "LauncherPreferences.h"
 #import "LauncherPreferencesViewController.h"
+#import "UIKit+NativeSurface.h" // Task160 新拟态规格色
 // Task 132：renderer_backend 行的 legacy 显示精化需读当前 profile 的
 // renderer 键（与 ame_effective_renderer 同一解析入口）
 #import "PLProfiles.h"
@@ -1578,15 +1579,11 @@
 
     // ===== Hero 卡片（L3 大卡片：16pt 圆角 + 半透明背景 + 毛玻璃 + 浅边框 + 中阴影）=====
     UIView *heroCard = [[UIView alloc] init];
-    heroCard.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.14]; // surface-bright
+    // Task160：半透明白底/白边框/黑色下阴影退役——无壁纸时由
+    // applyEffectToView 上新拟态规格表面色（cell 场景同款 flat），有壁纸时
+    // 走毛玻璃管线；黑色单侧阴影与新拟态双阴影体系冲突，一并移除
     heroCard.layer.cornerRadius = 16;
     heroCard.layer.cornerCurve = kCACornerCurveContinuous;
-    heroCard.layer.borderWidth = 0.5;
-    heroCard.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
-    heroCard.layer.shadowColor = [UIColor blackColor].CGColor;
-    heroCard.layer.shadowOpacity = 0.12;
-    heroCard.layer.shadowRadius = 8;
-    heroCard.layer.shadowOffset = CGSizeMake(0, 3);
     [[BackgroundManager sharedManager] applyEffectToView:heroCard];
 
     // Hero 图标（56x56，14pt 圆角，accentColor 纯色背景，白色 SF Symbol）
@@ -1604,7 +1601,7 @@
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = [self appName];
     titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
-    titleLabel.textColor = [UIColor labelColor];
+    titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
     titleLabel.adjustsFontSizeToFitWidth = YES;
     titleLabel.minimumScaleFactor = 0.8;
     [heroCard addSubview:titleLabel];
@@ -1617,7 +1614,7 @@
     NSString *subtitle = [NSString stringWithFormat:@"v%@\n%@ · iOS %@", appVersion, deviceName, systemVersion];
     subtitleLabel.text = subtitle;
     subtitleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    subtitleLabel.textColor = [UIColor secondaryLabelColor];
+    subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
     subtitleLabel.numberOfLines = 0;
     [heroCard addSubview:subtitleLabel];
 
@@ -1952,15 +1949,17 @@
         // Set semi-transparent dark background for cells
         [[BackgroundManager sharedManager] applyEffectToCell:cell];
 
-        // Task91：写死白色改主题主文字色（新拟态表面浅色模式下白字不可读）
+        // Task160：去掉文字黑色阴影（用户实测重影：每行文字带 shadowOffset
+        // (0,1) 的黑影，看起来像"文字重叠两次"）——回归原生纯色：浅色模式
+        // 黑色标题 + 灰色小字（label / secondaryLabel 语义色，深浅色自适应）
         cell.textLabel.textColor = [UIColor labelColor];
-        cell.textLabel.shadowColor = [UIColor blackColor];
-        cell.textLabel.shadowOffset = CGSizeMake(0, 1);
+        cell.textLabel.shadowColor = nil;
+        cell.textLabel.shadowOffset = CGSizeZero;
 
-        // Detail text light gray
-        cell.detailTextLabel.textColor = [UIColor colorWithWhite:0.8 alpha:1.0];
-        cell.detailTextLabel.shadowColor = [UIColor blackColor];
-        cell.detailTextLabel.shadowOffset = CGSizeMake(0, 1);
+        // Detail text：原生次要文字色（替代写死 0.8 灰 + 阴影）
+        cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
+        cell.detailTextLabel.shadowColor = nil;
+        cell.detailTextLabel.shadowOffset = CGSizeZero;
 
         // Tint color for icons and accessories：使用主题强调色（accentColor）
         cell.tintColor = accentColor();
@@ -1993,15 +1992,16 @@
             if ([subview isKindOfClass:[UILabel class]]) {
                 UILabel *label = (UILabel *)subview;
                 label.textColor = [UIColor labelColor]; // Task91
-                label.shadowColor = [UIColor blackColor];
-                label.shadowOffset = CGSizeMake(0, 1);
+                // Task160：同步去阴影（重影修复）
+                label.shadowColor = nil;
+                label.shadowOffset = CGSizeZero;
             }
         }
 
         // Style the picker label if exists
         if (cell.accessoryView && [cell.accessoryView isKindOfClass:[UILabel class]]) {
             UILabel *pickerLabel = (UILabel *)cell.accessoryView;
-            pickerLabel.textColor = [UIColor colorWithWhite:0.8 alpha:1.0];
+            pickerLabel.textColor = [UIColor secondaryLabelColor]; // Task160：原生次要色（替代写死 0.8 灰）
         }
     } else {
         // Reset to default when no background
@@ -2157,9 +2157,10 @@
     if ([[BackgroundManager sharedManager] hasBackground]) {
         if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
             UITableViewHeaderFooterView *header = (UITableViewHeaderFooterView *)view;
-            header.textLabel.textColor = [UIColor labelColor]; // Task91
-            header.textLabel.shadowColor = [UIColor blackColor];
-            header.textLabel.shadowOffset = CGSizeMake(0, 1);
+            header.textLabel.textColor = [UIColor labelColor];
+            // Task160：去文字阴影（重影修复）
+            header.textLabel.shadowColor = nil;
+            header.textLabel.shadowOffset = CGSizeZero;
             header.backgroundView = [[UIView alloc] init];
             header.backgroundView.backgroundColor = [UIColor clearColor];
         }
@@ -2203,9 +2204,9 @@
     if ([[BackgroundManager sharedManager] hasBackground]) {
         if ([view isKindOfClass:[UITableViewHeaderFooterView class]]) {
             UITableViewHeaderFooterView *footer = (UITableViewHeaderFooterView *)view;
-            footer.textLabel.textColor = [UIColor colorWithWhite:0.8 alpha:1.0];
-            footer.textLabel.shadowColor = [UIColor blackColor];
-            footer.textLabel.shadowOffset = CGSizeMake(0, 1);
+            footer.textLabel.textColor = [UIColor secondaryLabelColor]; // Task160：原生次要色
+            footer.textLabel.shadowColor = nil;
+            footer.textLabel.shadowOffset = CGSizeZero;
             footer.backgroundView = [[UIView alloc] init];
             footer.backgroundView.backgroundColor = [UIColor clearColor];
         }

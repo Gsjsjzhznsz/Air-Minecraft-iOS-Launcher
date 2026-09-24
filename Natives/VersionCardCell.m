@@ -71,7 +71,7 @@
         self.versionLabel = [[UILabel alloc] init];
         self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.versionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-        self.versionLabel.textColor = [UIColor labelColor];
+        self.versionLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
         self.versionLabel.adjustsFontSizeToFitWidth = YES;
         // Task141：缩小下限 = 12/16 = 0.75 —— 用户实测"主标题字号比时间灰字还小"
         // 根因：旧下限 0.7 允许标题缩到 11.2pt < 日期 12pt；现在标题最小渲染尺寸
@@ -108,7 +108,7 @@
         self.dateLabel = [[UILabel alloc] init];
         self.dateLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.dateLabel.font = [UIFont systemFontOfSize:12];
-        self.dateLabel.textColor = [UIColor secondaryLabelColor];
+        self.dateLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
         self.dateLabel.adjustsFontSizeToFitWidth = YES;
         self.dateLabel.minimumScaleFactor = 0.7;
         self.dateLabel.lineBreakMode = NSLineBreakByTruncatingTail;

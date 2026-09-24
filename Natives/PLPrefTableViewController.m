@@ -185,7 +185,10 @@
         if (cell == nil) {
             cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cellID];
             cell.textLabel.adjustsFontSizeToFitWidth = YES;
-            cell.textLabel.numberOfLines = 0;
+            // Task160：回归原生单行（numberOfLines=0 时标题换行第二行会压到
+            // detailTextLabel 上，用户实测"选项文字重叠两次"的布局半因）；
+            // 长标题由 adjustsFontSizeToFitWidth 缩字，不再跨行侵入小字区
+            cell.textLabel.numberOfLines = 1;
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.selectionStyle = UITableViewCellSelectionStyleDefault;
         }
@@ -220,10 +223,11 @@
     if (cell == nil) {
         cell = [[UITableViewCell alloc] initWithStyle:cellStyle reuseIdentifier:cellID];
         cell.textLabel.adjustsFontSizeToFitWidth = YES;
-        cell.textLabel.numberOfLines = 0;
-        cell.textLabel.lineBreakMode = NSLineBreakByWordWrapping;
-        cell.detailTextLabel.numberOfLines = 0;
-        cell.detailTextLabel.lineBreakMode = NSLineBreakByWordWrapping;
+        // Task160：textLabel/detailTextLabel 回归原生单行（同上：多行标题
+        // 换行后压到灰色小字上，修复"文字重叠"）；颜色用系统默认，
+        // 浅色模式 = 黑色标题 + 灰色小字（原生语义）
+        cell.textLabel.numberOfLines = 1;
+        cell.detailTextLabel.numberOfLines = 1;
     }
     // Reset cell properties, as it could be reused
     cell.accessoryType = UITableViewCellAccessoryNone;
