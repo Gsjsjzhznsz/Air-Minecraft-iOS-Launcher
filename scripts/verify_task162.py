@@ -22,9 +22,10 @@
 
 用法：python3 scripts/verify_task162.py
 """
+import os
 import sys
 
-ROOT = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+ROOT = os.environ.get('TASK162_REPO', '/home/z/my-project/Amethyst-iOS-MyRemastered')  # Task163: env-injected
 
 def rd(rel):
     return open(f"{ROOT}/{rel}", encoding="utf-8", errors="replace").read()

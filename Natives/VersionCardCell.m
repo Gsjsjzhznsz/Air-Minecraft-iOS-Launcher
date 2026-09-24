@@ -46,9 +46,10 @@
         self.cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
         [self.contentView addSubview:self.cardContainer];
 
-        // 应用原生卡片效果（BackgroundManager.applyEffectToView 检测切换：
-        // 有背景照片时走毛玻璃/半透明旧管线，无背景时原生卡片表面）
-        [[BackgroundManager sharedManager] applyEffectToView:self.cardContainer];
+        // 应用原生卡片效果（Task163：applyNeumorphCardEffectToView 检测切换：
+        // 有背景照片时转调毛玻璃/半透明旧管线，无背景时挂新拟态规格双阴影
+        // ——用户实测"下载页面版本选项一点没改"的修复落点）
+        [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:self.cardContainer];
 
         // ----- 左侧图标容器：40x40 圆角方块，类型色背景 -----
         self.iconContainer = [[UIView alloc] init];

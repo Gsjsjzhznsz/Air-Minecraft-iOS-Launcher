@@ -831,12 +831,13 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.accessoryView = [self buildNameTextField];
             } else if ([title isEqualToString:@"游戏版本"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"archivebox"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                // Task163：原 disclosureType 赋值删除——accessoryView 已被
+                // 版本输入框占用，系统箭头本就不绘制，留着误导维护者
                 cell.accessoryView = [self buildVersionTextField];
                 cell.detailTextLabel.text = nil;
             } else if ([title isEqualToString:@"游戏目录"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"folder"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 NSString *gameDir = self.profile[@"gameDir"] ?: @".";
                 cell.detailTextLabel.text = gameDir;
             }
@@ -845,19 +846,19 @@ static NSString * localizeProfileTitle(NSString *title) {
         case 1: // 资源管理
             if ([title isEqualToString:@"模组管理"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"puzzlepiece.fill"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
             } else if ([title isEqualToString:@"光影管理"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"paintbrush.fill"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
             } else if ([title isEqualToString:@"资源包管理"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"rectangle.stack.fill"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
             } else if ([title isEqualToString:@"数据包管理"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"shippingbox.fill"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
             } else if ([title isEqualToString:@"世界管理"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"globe.asia.australia.fill"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
             }
             break;
 
@@ -865,7 +866,7 @@ static NSString * localizeProfileTitle(NSString *title) {
             if ([title isEqualToString:@"Fabric API"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"bolt.fill"];
                 cell.imageView.tintColor = [UIColor systemOrangeColor];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);
             } else if ([title isEqualToString:@"Sodium + Iris Shaders"]) {
                 // Task 157：Sodium + Iris Shaders 组件安装（火焰图标；与 Fabric
@@ -873,12 +874,12 @@ static NSString * localizeProfileTitle(NSString *title) {
                 // 实例可用）
                 cell.imageView.image = [UIImage systemImageNamed:@"flame.fill"];
                 cell.imageView.tintColor = [UIColor systemOrangeColor];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);
             } else if ([title isEqualToString:@"OptiFine"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"speedometer"];
                 cell.imageView.tintColor = [UIColor systemRedColor];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self isOptiFineCompatibleProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_886", nil);
             }
             break;
@@ -888,7 +889,7 @@ static NSString * localizeProfileTitle(NSString *title) {
                 // Task 150：跟随全局开关退役——每个实例强制单独选择，
                 // 渲染器行永远可点（不再有置灰态）
                 cell.imageView.image = [UIImage systemImageNamed:@"cpu"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
             } else if ([title isEqualToString:@"分辨率缩放"]) {
                 // Task160：per-instance 分辨率缩放（25~150）——右侧参数样式与
@@ -899,17 +900,17 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.detailTextLabel.text = nil;
             } else if ([title isEqualToString:@"图形 API"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"rectangle.dashed"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self graphicsApiDisplayName:self.selectedGraphicsApi];
             } else if ([title isEqualToString:@"Java版本"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"j.square"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self.selectedJavaVersion isEqualToString:@"0"] ? localize(@"preference.auto", nil) : [NSString stringWithFormat:@"Java %@", self.selectedJavaVersion];
             } else if ([title isEqualToString:@"内存分配"]) {
                 // Task157：右侧只显示当前分配值（去"/ 最大可分配内存"）+
                 // 与 Java版本同款箭头；自动分配态显示"自动分配内存"
                 cell.imageView.image = [UIImage systemImageNamed:@"memorychip"];
-                cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = self.memoryAutoEnabled
                     ? localize(@"memory.auto_row", nil)
                     : [NSString stringWithFormat:@"%ld MB", (long)self.allocatedMemory];
@@ -965,6 +966,24 @@ static NSString * localizeProfileTitle(NSString *title) {
 
 #pragma mark - Task160 分辨率缩放输入框（per-instance）
 
+#pragma mark - Task163 统一 disclosure 箭头
+
+/// 与分辨率行尾端完全同款的自绘向右箭头（chevron.right，tertiaryLabel 灰）。
+/// Task163：系统 DisclosureIndicator 的 glyph 粗细与分辨率行的 SF Symbol
+/// chevron 并排观感突兀（用户实测渲染器行箭头"与其他选项样式不匹配"）
+/// ——整页所有跳转行统一改用本箭头，与分辨率行容器尾端箭头同款
+/// （同 glyph/同色/同 8x13 尺寸；容器 14x30 使箭头距右缘 6pt、垂直居中
+/// 与分辨率行一致）。accessoryView 占位后系统箭头同样不再绘制。
+- (UIView *)ame163_disclosureChevron {
+    UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, 30)];
+    UIImageView *chevron = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"chevron.right"]];
+    chevron.tintColor = [UIColor tertiaryLabelColor];
+    chevron.contentMode = UIViewContentModeScaleAspectFit;
+    chevron.frame = CGRectMake(0, 8.5, 8, 13);
+    [container addSubview:chevron];
+    return container;
+}
+
 /// 分辨率缩放行的 accessory：[数字输入框 | % | 箭头] 容器（Task160）。
 /// 右侧参数样式与内存分配行同款——灰字（secondaryLabelColor）、系统 detail
 /// 同字号 17pt、无输入框观感；行内输入保留（点击行聚焦编辑，用户定稿）；
@@ -1002,9 +1021,10 @@ static NSString * localizeProfileTitle(NSString *title) {
     percentLabel.font = [UIFont systemFontOfSize:17];
     percentLabel.textColor = [UIColor secondaryLabelColor];
 
-    // Task160：仿系统 disclosure 箭头（chevron.right，tertiaryLabel 灰）——
-    // accessoryView 被本容器占用后 cell 自带的向右箭头不会绘制，在此补齐
-    // 与内存分配行（DisclosureIndicator）同视觉的箭头
+    // Task160：容器尾端自绘箭头（chevron.right，tertiaryLabel 灰）——
+    // accessoryView 被本容器占用后 cell 自带的向右箭头不会绘制，在此补齐；
+    // Task163：本箭头升级为整页统一基准（ame163_disclosureChevron 与本处
+    // 同 glyph/同色/同尺寸），渲染器等所有跳转行已与其对齐
     UIImage *chevronImage = [UIImage systemImageNamed:@"chevron.right"];
     UIImageView *chevronView = [[UIImageView alloc] initWithImage:chevronImage];
     chevronView.tintColor = [UIColor tertiaryLabelColor];

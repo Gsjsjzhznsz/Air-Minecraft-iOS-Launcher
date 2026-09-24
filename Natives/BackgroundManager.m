@@ -951,6 +951,9 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // 卡片效果（背景图从卡片下方透出）；无背景时维持新拟态凸出表面。
     // 防御性移除历史遗留的 blur 子视图在两条分支各自处理。
     if ([self hasBackground]) {
+        // Task163：防御性清掉可能残留的新拟态阴影承载视图（从无壁纸新拟态
+        // 切回的宿主，旧投影会漏在 blur/半透明底外面穿帮）；未挂载时空操作。
+        [view ame_removeNeumorphShadow];
         if (self.uiEffect == BackgroundUIEffectBlur) {
             // 毛玻璃效果 - 创建 UIVisualEffectView 作为子视图
             for (UIView *subview in view.subviews) {
@@ -1051,6 +1054,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 ? cell.contentView.layer.cornerRadius : 12;
         }
 
+        // Task163：同 applyEffectToView——切回壁纸管线前清残留阴影承载层
+        // （无壁纸新拟态卡片会挂在 contentView 或卡片容器上）。
+        [cell.contentView ame_removeNeumorphShadow];
+        [cardTarget ame_removeNeumorphShadow];
+
         if (self.uiEffect == BackgroundUIEffectBlur) {
             // 毛玻璃
             for (UIView *subview in cell.contentView.subviews) {
@@ -1108,9 +1116,12 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         return;
     }
 
-    // Task160：无自定义背景时回归新拟态卡片 cell（规格表面色平贴，无外阴影；
-    // 卡片容器为 contentView 内第一个带圆角的子视图，找不到时退回
-    // contentView，优先读自身圆角，未设置时取 12；cell 级裁剪保持）。
+    // Task163：无自定义背景时回归新拟态凸起卡片（用户实测"主页的卡片一点
+    // 没改"——Task160 把 cell 管线统一成 Flat 平贴后磁贴完全丢失凸起感；
+    // 现对卡片容器挂规格双阴影：暗影右下/高光左上，短边等比）。宿主链
+    // 逐层放行裁剪（cell.clipsToBounds = NO；contentView/cell.layer masks
+    // = NO）让阴影越出卡片边界投到磁贴间隙——相邻淡阴影叠加属新拟态正常
+    // 形态，collectionView 边界外的阴影仍由其自身裁剪收口。
     UIView *target = nil;
     CGFloat radius = 0;
     for (UIView *sub in cell.contentView.subviews) {
@@ -1134,9 +1145,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     }
     cell.backgroundColor = [UIColor clearColor];
     cell.contentView.backgroundColor = [UIColor clearColor];
-    cell.clipsToBounds = YES;
+    cell.clipsToBounds = NO;
     cell.layer.masksToBounds = NO;
-    [target ame_applyNeumorphSurfaceFlatWithRadius:radius];
+    cell.contentView.layer.masksToBounds = NO;
+    [target ame_applyNeumorphSurface];
 }
 
 - (void)applyCardEffectToCell:(UITableViewCell *)cell {
@@ -1156,6 +1168,25 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     cell.clipsToBounds = YES;
     cell.layer.masksToBounds = NO;
     [cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];
+}
+
+- (void)applyNeumorphCardEffectToView:(UIView *)view {
+    if (!view) return;
+
+    // Task163：独立卡片容器的新拟态凸起管线（用户实测"下载页面版本选项
+    // 一点没改"——版本卡走 applyEffectToView 的 Flat 尾分支完全丢失阴影）。
+    // 有自定义背景：转调旧管线（毛玻璃/半透明），转调前清残留阴影层。
+    if ([self hasBackground]) {
+        [view ame_removeNeumorphShadow];
+        [self applyEffectToView:view];
+        return;
+    }
+
+    // 无自定义背景：规格表面色 + 双阴影（暗影右下/高光左上，短边等比）。
+    // 容器未预置圆角时取 12 兼底；调用点（VersionCardCell）容器链已
+    // masksToBounds = NO，阴影可越出卡片边界投到列表间隙。
+    if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;
+    [view ame_applyNeumorphSurface];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

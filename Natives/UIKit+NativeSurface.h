@@ -90,8 +90,11 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 宿主层级关系呈现）。
 - (void)ame_applyRaisedCardSurfaceWithRadius:(CGFloat)cornerRadius;
 
-/// 原生平贴面板表面（Task160 新拟态同款表面，用于侧栏/右面板等大面板；
-/// 不强制改内容裁剪，但会保证 masksToBounds = NO 以露出外阴影）。
+/// 原生平贴面板表面（Task163 语义修订：侧栏/右面板等大面板不再携带
+/// 新拟态双阴影——用户实测全屏高大容器的等比阴影直接溢出、压到中央
+/// 卡片上（"不该改的你改了"）。面板回归平贴：规格表面色 + 圆角
+/// （clamp [8,50]），不挂阴影承载层；maskedCorners 由调用点维护的约定
+/// 不变，masksToBounds = YES 与侧栏容器创建态一致）。
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius;
 
 /// Task160：纯新拟态表面（规格表面色 + 双阴影承载视图 + masksToBounds = NO；
@@ -102,6 +105,11 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// tableView 裁剪互叠（Task137 历史问题），此处只上规格表面色 + 圆角
 /// （尊重调用点传入值，clamp [8,50]），裁剪保持（Task152 直角露出修复不变）。
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius;
+
+/// Task163：移除 ame_applyNeumorphSurface 挂载的双阴影承载视图并清空
+/// 关联对象（背景模式切换场景的残留清理——新拟态卡片切回毛玻璃/半透明
+/// 管线时旧投影会漏在 blur/半透明底外面穿帮）。未挂载时为无害空操作。
+- (void)ame_removeNeumorphShadow;
 
 @end
 

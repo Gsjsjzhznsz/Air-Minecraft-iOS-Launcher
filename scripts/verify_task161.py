@@ -18,9 +18,11 @@
 
 用法：python3 scripts/verify_task161.py
 """
+import os
 import sys
 
-ROOT = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+# Task163：ROOT 环境注入（沿用 TASK160_REPO 惯例）——原默认指向另一会话沙箱。
+ROOT = os.environ.get('TASK161_REPO', '/home/z/my-project/Amethyst-iOS-MyRemastered')
 
 def rd(rel):
     return open(f"{ROOT}/{rel}", encoding="utf-8", errors="replace").read()

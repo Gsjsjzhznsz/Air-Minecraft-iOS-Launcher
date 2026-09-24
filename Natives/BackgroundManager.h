@@ -99,6 +99,11 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 /// 对齐的页面专用）——无自定义背景时 cell 整体应用凸出表面（圆角 50 基准、
 /// 双外阴影）；有自定义背景时行为与 applyEffectToCell: 一致（毛玻璃/半透明）。
 - (void)applyCardEffectToCell:(UITableViewCell *)cell;
+/// Task163：独立卡片容器的新拟态凸起管线（下载版本卡等"该改的"）——
+/// 无自定义背景时对传入容器挂规格双阴影（ame_applyNeumorphSurface，凸起感
+/// 由暗影右下/高光左上呈现）；有自定义背景时转调 applyEffectToView:（毛玻璃/
+/// 半透明旧管线），并在转调前清掉可能残留的阴影承载视图防投影穿帮。
+- (void)applyNeumorphCardEffectToView:(UIView *)view;
 // 适配 UISearchBar：移除默认不透明背景，让 searchBar 透出底层自定义启动器背景
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar;
 

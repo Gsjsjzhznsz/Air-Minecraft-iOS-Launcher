@@ -1508,3 +1508,29 @@
 // re-anchored: task150/157/159 announcement index [0] -> by-id (new
 // entries legally take the head slot), task160 B2/B3/B5/F1/F4 re-anchored
 // to the Task162 defaults decree.
+
+// REVISION 17 addendum (Task 163, no bump): neumorphism scope correction on
+// device feedback -- Task160 applied the raised surface to the wrong
+// objects and left the intended ones flat. (1) Sidebar/right-panel shadow
+// retirement: ame_applyPanelSurfaceWithRadius now routes to the flat
+// variant (spec surface + clamped radius, no shadow host view) -- the
+// full-height chrome containers sat near the 340pt metric base so their
+// proportional offset/blur bled onto the central cards ("you changed what
+// should not be changed"); maskedCorners (outer two corners only) and the
+// creation-time masksToBounds=YES are untouched. (2) Home tiles and the
+// download version cards gain the raised form:
+// applyEffectToCollectionViewCell's no-wallpaper branch now mounts
+// AmeNeumorphShadowView on the card target with the clip chain released
+// (cell.clipsToBounds=NO, contentView masks=NO) so the dual shadow reads
+// across tile gaps; wallpaper branches strip stale shadow hosts first via
+// the new ame_removeNeumorphShadow (UIKit+NativeSurface). (3)
+// VersionCardCell moves to the new applyNeumorphCardEffectToView:
+// pipeline (wallpaper -> legacy applyEffectToView detour with shadow
+// cleanup; no wallpaper -> raised surface). (4) ProfileSettings page-wide
+// chevron unification: every UITableViewCellAccessoryDisclosureIndicator
+// row (renderer / graphics API / Java / memory / game dir / managers)
+// swaps to the same self-drawn chevron.right accessory as the Task160
+// resolution row (ame162_disclosureChevron, 8x13 tertiaryLabel glyph in a
+// 14x30 container) -- the mixed system/SF-symbol glyph weights read as a
+// mismatch side by side. applyCardEffectToCell (table rows) and the
+// Card/Raised surface methods keep their Task160 forms.

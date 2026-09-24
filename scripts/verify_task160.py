@@ -170,8 +170,9 @@ check("D4  双阴影承载视图（暗影右下 + 高光左上，只投影不画
 check("D5  深浅色切换自动重刷（traitCollectionDidChange）",
       "traitCollectionDidChange:" in nsm
       and "AmeNeumorphDynamicColor" in nsm)
-check("D6  三表面方法统一路由新拟态",
-      nsm.count("[self ame_applyNeumorphSurface];") == 3)
+check("D6  表面方法路由（Task163 重锚：Panel 退役阴影转 Flat——侧栏/右面板全屏大容器等比阴影溢出压到中央卡片，用户指令；Card/Raised 仍走新拟态）",
+      nsm.count("[self ame_applyNeumorphSurface];") == 2
+      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm)
 check("D7  cell 平贴版（无阴影层，防列表裁剪互叠）",
       "- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {" in nsm
       and "self.layer.masksToBounds = YES;" in nsm)
@@ -274,10 +275,10 @@ print()
 print("=" * 72)
 print("H. 回归锚点")
 print("=" * 72)
-check("H1  内存行口径幸存（Task157/159：auto_row + %ld MB + 箭头）",
+check("H1  内存行口径幸存（Task157/159：auto_row + %ld MB；Task163 重锚：箭头统一为自绘 chevron，系统 disclosure 清零）",
       "localize(@\"memory.auto_row\", nil)" in ps
       and '[NSString stringWithFormat:@"%ld MB", (long)self.allocatedMemory]' in ps
-      and "cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;" in ps)
+      and "cell.accessoryView = [self ame163_disclosureChevron];" in ps)
 check("H2  内存输入框弹窗幸存（Task159：adjust_title/adjust_message + clamp 512）",
       "localize(@\"memory.adjust_title\", nil)" in ps
       and "localize(@\"memory.adjust_message\", nil)," in ps)

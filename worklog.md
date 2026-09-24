@@ -4,7 +4,7 @@
 
  + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 162（2026-09-24，profile 身份一致性=渲染器回退根修 / Forge 存档闪退 / Bing 自愈 / 壁纸默认 60%/100% / 头像缓存 / 账号刷新 / CurseForge 免 key / 公告服务器推荐）。此前：Task 161（六案根修）；158（mg 后端重映射）；151-160 见近况。
+> 最后更新：Task 163（2026-09-24，新拟态范围修正：侧栏/右面板阴影退役 + 主页磁贴/下载版本卡凸起 + 实例设置页箭头统一）。此前：Task 162（另一会话，八案根修：profile 身份一致性=渲染器回退根修 / Forge 存档闪退 / Bing 自愈 / 壁纸默认 60%/100% / 头像缓存 / 账号刷新 / CurseForge 免 key / 公告服务器推荐）；Task 161（六案根修）；160（新拟态回归/弹窗背景/重影修复）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 162 提交（八案根修：profile 身份一致性=渲染器回退 auto 根修 / Forge 存档闪退（UIKit 模块层）/ Bing 脱窗自愈 / 壁纸默认毛玻璃 60%/100% / 主页头像缓存 / 账号列表自动刷新 / CurseForge 免 key 走 MCIM 镜像 / 公告服务器推荐 mysv.dpdns.org，CI 盯绿中）；此前 bf91f41（Task161 CI 绿） |
-| 最新 Task 号 | **162**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 162（八案）+ Task 161（六案）+ Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化）+ Task 158 + 157 + 156 |
+| 远端 HEAD | 本会话 Task 163 提交（新拟态范围修正：Panel 阴影退役 + 主页磁贴/下载版本卡凸起 + 实例设置页箭头统一，CI 盯绿中）；此前 df96d13（Task162 八案根修）+ bf91f41（Task161 CI 绿） |
+| 最新 Task 号 | **163**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 163（本批三案）+ Task 162（八案）+ Task 161（六案）+ Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化）+ Task 158 + 157 + 156 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135/149/158 路径依赖 + task140 G2/G3 日志轮换），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -47,29 +47,8 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ## Task 142（渲染器）——已挪 worklog-archive.md
 > 全文检索：`grep -n "Task ID: 142" worklog-archive.md` 或 `grep -n "Task 142" worklog-archive.md`（存储分层设计/三端 UI/l10n +3/-1/发布资产/校验矩阵）。
 
-## Task 143（本会话，装机日志三修复）
-
-### 用户反馈（4ecc256 构建，日志 = 仓库根 latestlog.txt，用户经 GitHub 网页上传）
-"现在无论切换什么渲染器都会变成mg。fsr没有生效。而且mg是MobileGlues，为什么列表有个mg又有个MobileGlues"。
-
-### 根因（日志逐行实锤）
-1. **后端永不落盘**：Task142 引入 `mobileglues.renderer_backend` 但漏在 PLPreferences.m setDefaultsForPref 注册；PLPreferences 只能读写已存在键。装机日志 L30-31：选 GLES 后端 → "Setter could not find preference mobileglues.renderer_backend" 写入静默丢弃 → 启动恒回落默认 libMobileGL.dylib（DirectVulkan）= "切什么都是 mg"。
-2. **FSR 从未生效**：mgl_fsr.mm 把 GL_FRAGMENT_SHADER 定义为 0x8B92（实为 GL_PALETTE4_R5_G6_B5_OES，GLES1 调色板格式；规范值 0x8B30，mesa glext.h:599）。考古：Task83 原值正确 → Task84 据装机日志 stage=35632 误诊反向"勘误"成 0x8B92 → Task119 复制同错值 → MobileGL/zink 两链片元着色器恒 glCreateShader=0 + GL_INVALID_ENUM（日志 L818-820：顶点 0x8B31 成功、片元 35730 失败）→ 恒自愈回全分辨率。附带 GL_ARRAY_BUFFER_BINDING 0x8B8C（实为 GL_SHADING_LANGUAGE_VERSION）→ 0x8894——RCAS 路径 glGetIntegerv 实际引用它，VBO 保存静默失效。
-3. **mg 与 MobileGlues 并列**：mg=libMobileGL.dylib 家族（Vulkan直呈/GLES/Mithril 后端），MobileGlues=libmobileglues.dylib 独立渲染器（源码构建、自带 FSR1）——本就是两个渲染器，Task142 未把后者从选择列表隐退导致命名撞车。
-
-### 修复（4 文件 + 验证器，零 l10n 变更、基线 1952 不动）
-- PLPreferences.m：mobileglues 分区注册 `@"renderer_backend": @""`——刻意空串：实体默认会让解析链第一层恒命中、legacy 档位（renderer=auto + mobilegl_backend=2/3）永久失明；空串保住"键未设"语义与 legacy 层，顺带消 Getter 噪音。
-- ctxbridges/mgl_fsr.mm：GL_FRAGMENT_SHADER 0x8B92→0x8B30；GL_ARRAY_BUFFER_BINDING →0x8894。
-- ctxbridges/osm_bridge.mm：同款两常量 + Task84 错误勘误注释改写为 Task143 再勘误（教训：勿据日志反推枚举规范值）。
-- LauncherPreferences.m：availableRendererCandidates 规则 3——libmobileglues 条目仅当其为当前选中值时可见（存量设备照常显示/启动，legacy 显式键路径不变，dylib 仍随包），新选择一律七项列表；ame_renderer_display_name 对该键映射回既有 debug.mg 文案（存量 profile 裸键名防御，零新 l10n 键）。
-- scripts/verify_task143.py：31 项（A5/B7/C5/D7/E4/F2/G1）。
-
-### 校验
-- verify_task143 31/31；task142 49/49；136=63、137=46、138=52、140=58 全绿；129-135/139/141 失败逐项 = 已记录环境性同类（会话本地审计脚本被沙箱清除 + 旧级联 + task141 硬编码另一会话路径），零新增；四文件括号平衡 (0,0,0)。
-
-### Stage Summary
-- 装机验证锚点：①后端改选 GLES/Mithril 重启后保持，启动日志 `RENDERER is set to libMobileGL-gles.dylib`（不再恒 DirectVulkan）；②不再出现 "Setter could not find preference mobileglues.renderer_backend"；③FSR1 开启后不再有 glCreateShader(stage=35730)=0 / "restoring MC window" 自愈，画面为 EASU 上采样；④选择列表不再同时出现 mg 与 MobileGlues（存量选过者除外）；⑤Task142 七锚点继续有效。
-- 用户侧：mg 与 MobileGlues 本就是两个渲染器；按"渲染器选择只有一个 mg"指令把后者隐退为存量兼容项。
+## Task 143（装机日志三修复）——已挪 worklog-archive.md
+> 全文检索：`grep -n "Task ID: 143" worklog-archive.md` 或 `grep -n "Task 143" worklog-archive.md`（后端键注册/FSR 常量勘误/mg 与 MobileGlues 并列归因）。
 
 ---
 
@@ -82,108 +61,10 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - 配套重锚：9 个验证器的 worklog 内容检查改为兼容 worklog-archive.md（92/93/96/97/98/101/102/111/119_124，python 定点替换）
 - 验证：96/98/111/119_124 本地全绿；92/93/101/102 的条目在重构前即缺失（历史丢失，非本次回归，且不在 CI 集内）
 
----
-
-## Task 144（本会话，装机日志四 bug 根修 + 渲染器 UX 七项）
-
-### 用户反馈（9aa15c8 构建装机实况，日志直接推仓库根 403a4597/5b38fd72/c8221ad3）
-"把mg改成全名。切换其他渲染器还是会变成mg。es后端方块不渲染。4.0后端闪退。forge安装闪退。还有优化一下自动渲染器机制。最后我排查软件自动选择mg问题发现为什么我版本有2个一模一样的版本，而这个版本不会回退mg可以使用zink等其他渲染器启动，赶快恢复一下为什么会有2个一模一样的版本。"
-
-### 根因（逐条日志/字节码实锤）
-1. **4.0(Mithril) 后端闪退**：`GL.createCapabilities` 抛 "There is no OpenGL context current in the current thread"（latestlog.txt）。反编译补丁版 lwjgl-opengl.jar（新工具 scripts/disasm.py，沙箱无 javap）：补丁 createCapabilities 在调渲染器 dylib 的 glGetString(GL_VERSION) 探针前，唯一重绑上下文的门是 `System.getenv("POJAV_RENDERER") != null -> GL.fixPojavGLContext()`（反射 GLFW.glfwMakeContextCurrent(GLFW.mainContext)）。我们只导出 AMETHYST_RENDERER -> 补丁是死代码 -> 渲染线程无上下文绑定时 Mithril（线程绑定模型）glGetString 返 NULL -> 抛异常。MobileGL-gles/OSMesa 全局单上下文模型混过探针（ES 方块不渲染 = 渲染线程状态未绑定的同根嫌疑）。
-2. **ES 后端方块不渲染**：同一根因家族；另 init_loadMobileGluesConfig 白名单（mobileglues/auto/vulkan）不含 mg/家族键 -> config.json + MG_DIR_PATH 从未写入（日志 "MobileGlues config not written"），MobileGlues 分区用户偏好对 mg 会话全失效。
-3. **Forge 安装闪退**：latestlog 14k 行 —— 处理器 4/4 全部成功、进度 0.85 时安装器 JVM 的 libjli 内部线程调 exit(0)，与启动器同进程 -> 整 app 被带走（Task 48 hooked_exit 取证栈实锤 libjli dummyTimer 帧）。
-4. **"切换渲染器还是变 mg"**：日志证据（latestlog.old 20:43）用户连选两次 `Task140: renderer written to PROFILE ONLY = mg / = libOSMesa.8.dylib`（zink 存储键即 libOSMesa.8.dylib，20:44 会话真用 Mesa 启动）—— 写入/启动链路实际已通；困惑源 = ①"mg" 名字不透明 ②follow-global OFF 默认给 mg ③与旧 App 行为对比。
-5. **"2 个一模一样的版本"**：commit 9659740a（2026-07-24）包名 org.angelauramcremastered.amethyst -> com.air-devs.air，iOS 视为不同 App，新 IPA 不覆盖旧装 -> 主屏双图标并存（旧图标 = 旧代码 + 旧偏好容器，所以它"能用 zink"）。非本仓库 bug；删除旧图标即消除。
-
-### 修复（8 代码文件 + 1 新工具 + 7 验证器重锚，l10n 键集 1924 不动；commit 171006ce）
-- **JavaLauncher.m**：①launchJVM 导出 `POJAV_RENDERER`（与 AMETHYST_RENDERER 同值：主导出点 + "Preset OpenGL libname" 处防御同步）激活 LWJGL fixPojavGLContext —— Mithril 闪退根修；②init_loadMobileGluesConfig 改读 ame_effective_renderer()，白名单 +家族三键（mg 家族 config.json + MG_DIR_PATH 修复）；③自动渲染器升级：minVersion>8（MC 1.17+）且 libMobileGL.dylib 在位 -> auto 解析为 MobileGL Vulkan 直连（装机验证最快路径；旧"always ANGLE"顾虑 = config 缺失已修），否则 ANGLE 回退；layerClass 侧 auto/MobileGL 均 CAMetalLayer，Task124 约束不受影响。
-- **egl_bridge.m**：④三处 setenv(AMETHYST_RENDERER) 同步导出 POJAV_RENDERER；⑤pojavGetCurrentContext 渲染线程上下文采纳兜底（TLS 空 + ame_brLastCurrent 非空 + 非主线程 -> pojavMakeCurrent 迁移上下文）；⑥ame_brCurrent/ame_brLastCurrent 唯一 TLS 定义点。
-- **bridge_tbl.h**：`static __thread currentBundle` 头文件定义退役（每 TU 一份副本、egl_bridge 那份恒 NULL -> pojavGetCurrentContext 恒空的病历见注释）-> extern 共享 TLS + br_get_current/br_set_current。
-- **gl_bridge.m / osm_bridge.mm**：currentBundle 全量改走 br_get_current/br_set_current（机械替换 18+21 处，括号 delta 与 HEAD 逐文件一致）。
-- **main_hook.m + JavaLauncher.h + ForgeProcessorExecutor.m**：⑦Forge 闪退根治 —— `atomic_int g_ame_suppressJvmExit`（launchHeadlessJVM 前后置位/清零），hooked_exit 命中标志且非主线程 -> pthread_exit(NULL) 只终结 JVM 线程（JLI ContinueInNewThread 的 join 正常返回 -> status.json 判定安装成败），游戏正常退出路径不受影响。
-- **l10n x4 + VersionManagerViewController**：⑧renderer.debug.mgfamily 值 "mg" -> "MobileGlues"（用户指令"把mg改成全名"；逻辑键 RENDERER_KEY_MG="mg" 不动）；VersionManager 短名映射同改。
-- **AppDelegate.m**：⑨旧包检测（NSClassFromString LSApplicationWorkspace + applicationIsInstalled:，@try 防御）—— 命中 org.angelauramcremastered.amethyst 打日志提示删旧图标（日志级，零 UI 噪音）。
-- **scripts/disasm.py**：新最小 JVM class 反汇编器（常量池 + 字节码取证，无 javap 环境）。
-- **验证器重锚（日志轮换 403a4597/5b38fd72/c8221ad3 所致）**：task140 G 块、task138 A1/A2/C1、task132 A1/A2、task133 B1/log 源、task134 E4b -> 锚定现日志映射与 Task143 修复生效证据；task137 G3 +mgfamily diff 分支；task142 F5 -> @"MobileGlues"。
-
-### 校验
-- 136=63/63、137=46/46、138=51/51、140=58/58、142=49/49、143=31/31 全绿；129/130/131/132(A15/F4/F5)/133(H1/H2)/134/141 剩余失败逐项核对 = 既有环境性同类（task116_l10n_audit.py / task132_jna_got_mirror.py 会话本地脚本被沙箱清除 + 112-118/119-124/125-128 级联 + task141 硬编码另一会话绝对路径），**零新增失败**。
-
-### Stage Summary
-- 装机待验证锚点：①选 Mithril(4.0 后端) 进游戏不再闪退（日志见 POJAV_RENDERER 导出 + 正常起图）；②ES 后端进世界方块渲染恢复（若仍复现，下轮抓 MGL 前端 GLES 行）；③Forge 安装走完 100%（不再 85% 闪退，日志出现 `Task144: exit(0) suppressed during headless JVM`）；④渲染器列表显示 "MobileGlues" 全名（不再裸 "mg"）；⑤选"自动" + MC 1.17+ -> 日志 `Auto renderer resolved to libMobileGL.dylib (modern MC...)`；⑥mg 会话日志不再出现 `MobileGlues config not written`；⑦旧包并存检测日志 `Task144: legacy bundle ... still installed`；⑧zink/gl4es/angle 切换保持 Task142/143 行为。
-- 用户须知：双图标在仓库侧不可修（旧 App 独立容器）——主屏删除旧版 "AngelAuraAmethyst" 即可；新 App 数据不受影响。
-
-## Task 145（本会话，Sodium 全崩根修 + 4.0 门补丁 + Forge 线程化）
-
-装机日志（0297d0c7/d8295412 两批共 5 份，全部 171006c 构建）：22:16 libmithril 会话 IllegalStateException "no OpenGL context"（4.0 依旧崩）；22:19 libMobileGL / 22:20 libOSMesa 两会话 Sodium `PostLaunchChecks.isUsingPojavLauncher` 首帧抛异常（"not supported when using Sodium"）＝用户"你一改全部失效"；22:21 forge 会话 exit(0) 抑制生效但进度恒 0.85 挂死。
-
-诊断（反汇编实锤）：
-1. **Sodium 全崩根因**：Modrinth 拉 sodium-fabric-0.9.2+mc26.2.jar 反编译 `PostLaunchChecks` —— `System.getenv("POJAV_RENDERER") != null` 即判 PojavLauncher 抛异常（常量池无 isEmpty，空值也躲不过）。Task144 无条件导出该变量＝全渲染器全崩。
-2. **4.0 崩因再进一层**：补丁版 lwjgl-opengl.jar `GL.createCapabilities` 的重绑定门是 `Platform.get() == Platform.LINUX && getenv("POJAV_RENDERER") != null -> fixPojavGLContext()`；本启动器伪装 `os.name=Mac OS X`（JNA 兼容，JavaLauncher.m:725）→ Platform != LINUX → **门永不触发**，Task144 的变量导出白导。运行时 GLFW 类＝Amethyst overlay（JavaApp/Makefile lwjgl-%.jar 规则，libs/*/*.jar 之上覆盖 build/lwjgl），源码已含 `mainContext` 字段+赋值（GLFW.java:513/1030），无需补字段；libs/lwjgl-341/lwjgl-glfw.jar 的 GL.class 是 stub（不进 classpath 主链）。
-3. **Forge 挂死根因**：JLI_Launch 在 JVM main 返回后由【调用线程】（fatal-trace 栈帧 libjli dummyTimer）调 exit(0) 终结进程；Task144 把它转 pthread_exit → launchHeadlessJVM 永不返回 → status.json 终态判定/收尾代码永不到达 → 轮询挂死。
-
-修复（本提交）：
-- `JavaLauncher.m`：POJAV_RENDERER 仅 `isMithrilRenderer()` 时导出，其它渲染器 unsetenv（同会话先 Mithril 后其它渲染器的残留也清掉）；auto 分支与防御同步同步收紧。
-- `egl_bridge.m`：gl4es/MOBILEGLUES 分支与 pojavSetWindowHint 两处共 4 个无条件 setenv("POJAV_RENDERER") 全部移除。
-- `scripts/patch_lwjgl_gate.py` + 两个二进制：lwjgl-341/333 的 lwjgl-opengl.jar `GL.class` 把门里 `invokestatic Platform.get / getstatic Platform.LINUX / if_acmpne` 9 字节 NOP 掉（栈平衡、目标帧不变），门改为纯由 POJAV_RENDERER 控制（仅 Mithril 导出，非 Mithril 零行为变化）。
-- `ForgeProcessorExecutor.m`：headless JVM 改跑 64MB 栈专用 pthread + pthread_join；exit 被转线程退出后 join 照常返回，status.json 终态判定恢复，轮询不再挂死。ret 仅保留启动失败语义。
-- `gl_bridge.m`（取证，无行为变化）：dlsym_EGL 处捕获渲染器 dylib 句柄；gl_make_current 成功分支在 Task140 readback 后追加同源 `glGetString(GL_VERSION)` 探针——下轮 Mithril 日志可一锤判定「renderer 内部 eglGetCurrentContext 与 glGetString 分叉」还是「创建后被动解绑」。
-
-装机验证锚点：① 带 Sodium 整合包 + MobileGL/OSMesa/zink/ANGLE 启动不再出现 "not supported when using Sodium"；② 4.0 后端（若再崩）日志必现 `Task140 make-current readback` + `Task145 glGetString-probe: version=...` 两行——NULL 值即 Mithril 内部分叉实锤；③ Forge 安装越过 0.85 后出现 status.json 终态判定日志（成功或明确报错），不再无限刷 (4/4)。
-
-## Task 148（本会话，MobileGL 双后端 FSR 复活——内置 FSR1 独家接管）
-
-用户指令（Run #356 判读后的否决）："不行那2个端必须可以使用fsr"——Task 147 把 Vulkan/ES 退回全分辨率直呈（FSR 停用）的方案被否，这两端必须可用 FSR。
-
-### 根因（Run #356 五日志 + MobileGlues-cpp 源码实锤，花屏+倒转完整机理）
-1. **libMobileGL.dylib / libMobileGL-gles.dylib = MobileGlues-cpp 共体构建**：iOS settings 分支读 config.json 的 fsr1Setting（Task78/130 每次启动写入，Run #356 双会话 config.json 实锤 fsr1Setting:4）→ **渲染器内置 FSR1 在这两后端本就激活**：glBindFramebuffer(fb0) 的 DRAW 绑定被重定向到 FSR1 渲染目标（framebuffer.cpp:186 `draw_fb = FSR1_Context::g_renderFBO`），呈现由 presentSurface→ApplyFSR 在 eglSwapBuffers 内收口。
-2. **双重管线打架 = 毁帧**：启动器侧 Task119 预交换链（EASU→离屏→RCAS→"fb0"）在此架构下，RCAS 的 fb0 绘制经同一重定向灌进 FSR1 渲染目标——每帧把 MC 刚画好的帧摧毁成"RCAS(上一帧拷贝)按 2360x1640 视口裁进 1180x820 目标"的错位拼图，再被 ApplyFSR 2x 放大上屏 = 用户所见花屏+倒转。双会话日志（EASU/RCAS ready + 600 帧 steady）与"损坏但持续输出"完全吻合。
-3. **勘误（Task147 判读错误）**：RCAS sharpness=1.000 在 mpv 口径是【最大锐化】（FSRRCASSource.h stops=2*(1-S)：S=1→0 stops→最锐），不是"无锐化"；该值为用户 pick 所选（pickKeys 含 @"1"），非默认值 bug（PLPreferences 默认 @0.2）。zink 会话 FSR 端到端 LANDED（Task103 哨兵 3/3 + bundle-direct present）——"zink fsr 不生效"的感知与 sharpness=1.0 的过锐观感需在 UI 侧引导（建议 0.2-0.5），非管线问题。latestlog.old 的"zink 无 EASU"会话实为 Forge 启动崩溃会话（OSMesa 渲染器 + JVM SIGSEGV 尾帧，Task147 osm_make_current 空指针守卫已修）。
-
-### 修复（本提交，2 文件）
-- `SurfaceViewController.m`：ame83_fsr_capable_renderer 恢复 isMobileGLRenderer（Task147 撤销块反转）——Task83 联动（MC 窗口=surface/档位）复位，这正是内置 FSR1 预期几何（与 mg 同构）；mgFsrScale 触控缩放随之恢复。
-- `mgl_fsr.mm`（Task148 仲裁）：启动器预交换链不再是 MobileGL 后端的默认服务方——
-  - 新增 `ame148_detect_builtin_fsr_redirect()`：GL_DRAW_FRAMEBUFFER_BINDING getter 会隐藏重定向（getter.cpp:147 回 0），改走附件查询——DRAW 绑定显式指回 fb0 后查 COLOR_ATTACHMENT0 的 OBJECT_NAME：重定向时非零（FSR1 目标颜色纹理），无重定向时按规范拒绝 NAME 查询且名字保持 0；
-  - `ame_mgl_fsr_before_swap` 入口仲裁：判内置接管 → 启动器链永久退休（探测停止、零开销）；判无重定向（渲染器过旧/内置 FSR1 初始化失败未重试成功）→ 链作兜底继续活跃且逐帧复探（InitFSRResources 失败后会重试，重定向中途出现即 Retirement，杜绝晚到毁帧）；导出表缺失保守判接管；
-  - 新增符号 glGetFramebufferAttachmentParameteriv（gl_native.cpp NATIVE 导出已验证）；状态位 ame148_arbitrated/ame148_builtin_owns；
-  - 日志锚点：`[MGLFSR] Task148 builtin-FSR1 arbitration: fb0 draw color0 type=0x... name=... -> REDIRECTED ... RETIRED`（防刷屏：明细行仅首探/翻转时打印）。
-
-### 装机验证锚点（下轮日志判读）
-1. Vulkan/ES 会话必现 `Task148 builtin-FSR1 arbitration ... REDIRECTED -- builtin FSR1 owns upscale+present, launcher chain RETIRED`，且不再出现 `Task119 FSR1 upscale engaged` / `Task130 RCAS engaged (MobileGL)`；
-2. Vulkan 花屏+倒转消失、画面正常且为 FSR 档位渲染分辨率（内置 ApplyFSR 呈现）；ES 方块渲染情况随毁帧链退休一并观察（若仍缺方块 = 独立问题，抓 MGL 前端 GLES 行）；
-3. 若出现 `no redirect -- launcher chain stays as fallback`：说明该渲染器二进制未含内置 FSR1 或 config 未生效——启动器链接管（旧路径），需抓 config.json 内容与 [MG] FSR1 行再判。
----
-
-## Task 149（本会话，UI 六项返工；编号避让注明：动工时远端为 Task 146，本任务按 147 开发；推送前 fetch 发现另一会话已占用 147/148，避让重编号为 149）
-
-### 用户需求（Task 141 实装实测反馈，五点疑点已经用户确认）
-1. 欢迎卡头像**还是**不加载默认头像，点击后才会加载。
-2. 欢迎卡删掉更新语句（公告标题行）及按钮；头像移到左边居中（到左边缘 = 到上下边缘距离，**不调整大小**）；文字与头像间距 = 头像距边缘距离。
-3. 更新卡片（公告磁贴）与 MC 新闻磁贴高度都和"最新正式版"磁贴一样；高度不够就把简介截断到能显示的行；新闻卡缩略图及文字按第 2 项模式移动；标题及简介样式改成和新闻卡片一样；喇叭图标放在中间的高度位置；查看详情按钮移到标题后面（调整大小）；核查新闻卡版本号是死版本还是动态检测（结论：announcements.json 驱动，用户确认保持）；新闻页简介全部显示而非截断；新闻恢复横轴两个并列排（Task141 单列退役）。
-4. 主页面所有卡片全部取消阴影。
-5. 公告卡片页面公告周围"不知用途的蓝色圆角矩形边边"删掉。
-6. 内存分配弹窗"一整片黑色背景"改掉，能用 iOS 原生 UI 就用（用户确认：**原生底部面板**）。
-
-### 根因与实施
-- **Item1（HomeProfileTileCell）**：首帧路径封死——cell init 直接呈现 DefaultAccount（缺失回退 SF 占位；此前 init 用 SF 占位、等 cellForItem 换装的时序缝隙即"点击前空白"观感源）+ viewWillAppear 再跑 updateSkinDisplay 补账号态（标签页往返/返回前台）。
-- **Item2**：announceRowStack 四件套（announceIconView/announceLabel/detailButton/announceRowStack）整体退役；greetingLabel 复位（14pt medium secondary + festivalGreeting，cellForItem 填充）；头像等边距 = 新增 avatarLeadingConstraint/textLeadingConstraint 两条动态约束，layoutSubviews 按头像实际边长（=卡高×0.5）取半刷新（左边距=文字间距=上/下边距=side/2；卡片 170/头像尺寸零变化）。
-- **Item3**：heightForTileConfig 公告/新闻磁贴固定 100（ame138_announcementTileHeight 自适应机制退役）；HomeAnnouncementTileCell 重排——喇叭图标 centerY 居中、titleRowStack（标题 15pt semibold + 内联 actionButton 12pt/28pt 高/edgeInsets 自适应宽）、summaryLabel 12pt tertiary、压缩序 750<998（简介优先截断）、预览档位仅控简介显隐；HomeNewsTileCell——缩略图等边距（leading 20 = (100-60)/2）、文字 stack 相对缩略图居中 + 上下钳制、简介 numberOfLines 0；MinecraftNewsViewController 恢复双列（两个 0.5 子项 + 12pt 间距 + (8,8,8,8) 边距）、newsCardFixedHeight 固定等高退役改 estimated 280 自 sizing（简介不截断）、禁横向滑保留。**版本号核查结论**：公告卡标题/按钮文案来自仓库根 announcements.json（服务端 JSON、用户手动发布），App 无写死、不自动检测 GitHub——用户确认保持。
-- **Item4**：HomeTileBaseCell.setupBaseViews 阴影四件套（shadowColor/Offset/Opacity/Radius + masksToBounds NO）删除；BackgroundManager 管线零变化。
-- **Item5（AnnouncementCardCell）**：priorityBarView 整体退役（属性/创建/约束/configure + kAnnHighPriorityBarWidth 常量）——announcements.json priority=high 时的左侧 4pt 蓝条即用户所见"蓝色边边"。
-- **Item6（ProfileSettingsViewController）**：showMemoryAllocator 重写为 Ame149MemoryAllocatorController 原生底部面板（UISheetPresentationController medium 档 + prefersGrabberVisible，iOS 15 以下回退 formSheet）；遮罩自绘卡片/关联对象键 kAme141MemorySliderKey/dismissMemoryAllocator/applyMemoryAllocation/memorySliderChanged 全删；拉条区间（512→maxMemory）与写回链路（allocatedMemory→saveSettings→reloadAllTableViews）不变。
-
-### 校验
-- verify_task147 新增 35 项全绿（A 欢迎卡 8 / B 高度阴影 4 / C 公告卡 6 / D 蓝条 2 / E 内存弹窗 6 / F 新闻页 4 / G 配平+UIColor 白名单 5）。
-- 重锚：task136（D2/D3/E2/E4 → Task149 形态）、task137 F7（自 sizing + 双列）、task138 F1/F2（自适应高度退役 → 等高 100）、task141（A2-A6 问候语回归 / C2-C5 原生面板 / D5 写回链路 / E1-E4 双列自 sizing）。
-- 级联 stash 基线对拍（在远端 HEAD 2775e2f 上重跑）：136=63/63、137=46/46、141=36/36、149=35/35 全绿；138 剩余失败（C1=另一会话 Task147/148 日志轮换未重锚的远端既有 + J-135 环境性）与基线逐项一致；139（H 块 Task146 撤销精简既有 + I1 环境性）、132/135（另一会话沙箱路径/会话本地脚本被清）均既有环境性；**零新增失败**。
-- 四改动 ObjC 文件括号配平全 0；UIColor 白名单审计通过。
-
-### Stage Summary
-- 用户预期：①头像首帧即默认头像（不点击也显示）②欢迎卡=头像等边距居左+欢迎语+灰字问候语（无公告行无按钮）③公告卡/新闻卡与最新正式版卡等高（简介截断适配）、喇叭居中、按钮内联标题后、样式对齐新闻卡、新闻页双列+简介完整、版本号保持 announcements.json 驱动 ④主页卡片零阴影 ⑤公告列表蓝条消失 ⑥内存分配=原生底部面板（拉条+写回不变）。
-- 待用户安装新 CI 工件实机验证；推送前 fetch 对齐（双会话并行）。
-
----
+## Task 144（装机日志四 bug 根修 + 渲染器 UX 七项）/ Task 145（Sodium 全崩根修 + 4.0 门补丁 + Forge 线程化）/ Task 148（MobileGL 双后端 FSR 复活）——均已挪 worklog-archive.md
+> 全文检索：`grep -n "Task ID: 144\|Task ID: 145\|Task ID: 148" worklog-archive.md`。
+## Task 149（UI 六项返工）——已挪 worklog-archive.md
+> 全文检索：`grep -n "Task ID: 149" worklog-archive.md`（UI 六项/重锚链）。
 
 ## Task 150（本会话，[可撤销] 删除渲染器全局控制 + Sodium 组件安装）
 
@@ -471,3 +352,39 @@ Work Log:
 Stage Summary:
 - 装机验证锚点：①实例页选渲染器后不再回退 auto（键≠名设备日志 "Task162: save keyed by dict key ... no phantom write"）；mg+GLES/4.0 → "Task83 FSR linkage ... scale=2.00" ②Forge 1.20.1 进存档不崩 ③Bing 加载完成即上屏（脱界自愈日志 "Task162 self-heal re-apply OK"）④新装默认 60%/100% ⑤切页返回头像即显 ⑥添加账号即见 ⑦无 key 可用 CurseForge（世界 tab 同）⑧公告见服务器推荐
 - 遗留待装机观察：26.2 键盘弹出（Task161⑥）、静态库虚拟按钮、26.1.2 libjvm 崩溃
+
+---
+
+
+Task ID: 163
+Agent: herbrine8403 (Claude 会话)
+Task: 装机反馈修正——新拟态范围纠偏（侧栏/右面板阴影退役 + 主页磁贴/下载版本卡凸起）+ 实例设置页箭头统一
+
+用户反馈（逐字）：
+1. "我根本就没看到你改了UI，主页的卡片一点没改，下载页面版本选项一点没改，倒是把左侧栏和右侧栏改了，这两个栏的阴影直接影响了旁边的卡片，不该改的你改了，该改的你就是不改。"
+2. "实例设置页面的渲染器右侧的灰色箭头与其他选项样式不匹配，十分突兀"
+
+根因：
+- 侧栏/右面板：LauncherRootViewController updateChromeSurfaces 无壁纸分支走 ame_applyPanelSurfaceWithRadius（Task160 把三方法统一路由到 ame_applyNeumorphSurface 带双阴影）——全屏高大容器短边接近 340pt 基准，等比 offset≈20/blur≈60 的阴影直接溢出压到中央卡片上。
+- 主页磁贴/下载版本卡：走 BackgroundManager 管线的 Flat 尾分支（Task160 防 cell 阴影互叠的取舍）——完全无阴影，与 Task160 之前观感几乎一致 = 用户"一点没改"。
+- 箭头：实例设置页 13 处系统 DisclosureIndicator 与分辨率行（Task160 自绘 chevron.right）相邻对比，glyph 粗细/形态肉眼可见不同。
+
+修复（8 文件 + 3 验证器重锚 + 1 新验证器 + 公告，零 l10n 变更基线 1952 不动）：
+- UIKit+NativeSurface.h/.m：ame_applyPanelSurfaceWithRadius 转 Flat 路由（规格表面色+圆角 clamp[8,50]，不挂阴影承载层；maskedCorners 不触碰、masks=YES 与侧栏创建态一致）；新增 ame_removeNeumorphShadow（移除阴影承载视图+清关联对象，背景模式切换防旧投影穿帮）。
+- BackgroundManager.h/.m：新增 applyNeumorphCardEffectToView:（有壁纸转调 applyEffectToView 并前置清阴影；无壁纸挂 ame_applyNeumorphSurface 凸起）；applyEffectToCollectionViewCell 无壁纸分支 Flat→NeumorphSurface + 宿主链放行（cell.clipsToBounds=NO + contentView masks=NO，阴影越界投磁贴间隙）；applyEffectToView/CollectionViewCell 壁纸分支入口防御清阴影。
+- VersionCardCell.m：换调 applyNeumorphCardEffectToView（cardContainer 链 masks=NO 阴影链通）。
+- ProfileSettingsViewController.m：新增 ame163_disclosureChevron（chevron.right tertiaryLabel 8x13 in 14x30 容器，与分辨率行尾端同 glyph/同色/同尺寸/同距右缘 6pt）；13 处 DisclosureIndicator→自绘 accessory（渲染器/游戏目录/资源管理 5 行/组件安装 3 行/图形API/Java/内存），游戏版本行无效 accessoryType 赋值删除——整页系统 disclosure 清零。
+- LauncherRootViewController.m：updateChromeSurfaces 注释同步（调用点不动，语义就地生效）。
+- version.h：REVISION 17 addendum (Task 163, no bump)。
+- announcements.json：新拟态 bullet 补"主页磁贴与下载版本卡片凸起双阴影（侧栏/右面板平贴不投影）+ 实例设置页箭头统一"；"主页所有卡片取消阴影"（Task149 旧语义）改"主页磁贴卡片随视觉大改更新为新拟态凸起阴影"。JSON 合法断言过。
+
+验证：
+- verify_task163.py 新建 36 项全绿（A 侧栏平贴 5 / B 卡片凸起 11 / C 箭头统一 6 / D 回归 7 / E 配平 7）。
+- 重锚：task160 D6（NeumorphSurface 直调 3→2，Panel 转 Flat）+ H1（内存行箭头锚→chevron 形态）；task157 A1 / task159 H4（"行箭头与 Java 版本同款"语义保留，实现锚→ame163_disclosureChevron）。重锚后 160=47/47、157=PASSED、159=PASSED。
+- 幸存全绿：137=46/46、149=35/35、141=36/36、150=43/43；基线对拍 129=44/47、130=59/60、133=41/44、143=30+1、156=49+3 与记录一致（沙箱环境性，零新增）。
+- 配平：7 个触碰 ObjC 文件 {} () 平衡全 0（字符状态机，与 task160 口径一致——引号奇偶属基线噪声不判定）。
+- 教训：MultiEdit 多编辑非严格原子（H1 old_str 失败但 D6 已应用）——重锚后必须 grep 复核每一处。
+
+Stage Summary
+- 装机验证锚点（无壁纸模式）：①主页磁贴（Profile/Info/公告/新闻/快捷）呈现新拟态凸起双阴影（右下暗影+左上高光，随卡片尺寸等比）；②下载页版本卡片同款凸起；③侧栏/右面板平贴表面+外侧两角圆角，无阴影溢出，旁边卡片不再被压；④实例设置页渲染器/内存/Java 等所有跳转行箭头与分辨率行完全同款（细灰 chevron）；⑤壁纸模式行为不变（磁贴/版本卡毛玻璃，侧栏透壁纸）；⑥深浅色切换阴影/表面自动重刷。
+- 已知边界：collectionView 边缘磁贴外侧阴影由 collectionView 自身裁剪收口（原生 app 常见形态）；相邻磁贴间隙淡阴影叠加属新拟态正常形态，若装机观感需调浓度可改比例系数。

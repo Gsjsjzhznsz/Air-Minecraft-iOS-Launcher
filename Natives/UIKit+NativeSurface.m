@@ -185,9 +185,26 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
 }
 
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius {
-    // Task160：平贴面板同款新拟态表面。旧约定"不改动裁剪"升级为显式
-    // masksToBounds = NO（露出外阴影必需；面板内容本身约束在面板内）
-    [self ame_applyNeumorphSurface];
+    // Task163：平贴面板退役阴影——用户实测侧栏/右面板等全屏高大容器的
+    // 等比阴影（短边接近基准，offset 接近封顶 20/模糊 60）直接溢出到中央
+    // 卡片上（"不该改的你改了"）。面板语义回归平贴：规格表面色 + 圆角
+    // （clamp 8~50），不挂阴影承载层；Flat 版 masksToBounds = YES 与侧栏
+    // 容器创建态（masks = YES + maskedCorners 只圆外侧两角）一致，
+    // maskedCorners 不被触碰。Task160 的"显式 masksToBounds = NO 露外阴影"
+    // 仅对需要凸起感的卡片有意义，面板不作此要求。
+    [self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];
+}
+
+- (void)ame_removeNeumorphShadow {
+    // Task163：背景模式切换的残留清理——新拟态卡片切回毛玻璃/半透明管线
+    // 时，旧阴影承载视图（关联对象持有）会漏在 blur/半透明底外面穿帮。
+    // 未挂载时为无害空操作；只移视图与关联，不动表面色/圆角/裁剪
+    // （后续管线会按自己的形态重设）。
+    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
+    if (shadowView) {
+        [shadowView removeFromSuperview];
+        objc_setAssociatedObject(self, kAmeNeumorphShadowViewKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 
 @end

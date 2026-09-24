@@ -74,8 +74,8 @@ print()
 print("=" * 72)
 print("A. 内存分配行（去最大值 + 右箭头 + 自动态显示）")
 print("=" * 72)
-check("A1  行箭头与 Java 版本同款（DisclosureIndicator）",
-      'cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;\n                cell.detailTextLabel.text = self.memoryAutoEnabled' in ps)
+check("A1  行箭头与 Java 版本同款（Task163 重锚：整页统一自绘 chevron——系统 DisclosureIndicator 与分辨率行 SF Symbol 并排突兀，用户指令；'同款'语义不变，实现换成 ame163_disclosureChevron）",
+      'cell.accessoryView = [self ame163_disclosureChevron];\n                cell.detailTextLabel.text = self.memoryAutoEnabled' in ps)
 check("A2  右侧只显示当前值（%ld MB），自动态显示 memory.auto_row",
       'cell.detailTextLabel.text = self.memoryAutoEnabled\n                    ? localize(@"memory.auto_row", nil)\n                    : [NSString stringWithFormat:@"%ld MB", (long)self.allocatedMemory];' in ps)
 check("A3  旧'当前/最大'双值显示清零（MB / %ld MB 不复存在）",

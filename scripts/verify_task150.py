@@ -208,8 +208,8 @@ vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("F5  version.h Task 150 附记（[可撤销] 退役 + sodium 组件）",
       'REVISION 17 addendum (Task 150, no bump)' in vh
       and 'Sodium + Podium' in vh)
-check("F6  announcements 主页卡片 bullet 同步 Task149 语义",
-      '最新正式版' in e['content'] and '取消阴影' in e['content'])
+check("F6  announcements 主页卡片 bullet（Task163 重锚：用户指令推翻 Task149 '取消阴影'——主页磁贴更新为新拟态凸起阴影，公告文案同步）",
+      '最新正式版' in e['content'] and '新拟态凸起阴影' in e['content'])
 
 print()
 print("=" * 72)

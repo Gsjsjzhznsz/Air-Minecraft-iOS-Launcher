@@ -661,7 +661,9 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 - (void)updateChromeSurfaces {
     // Task111：检测并切换（用户实测：背景照片功能被 Task89 强制纯色底顶掉）。
     // 有自定义背景 → 走 BackgroundManager 旧毛玻璃/半透明管线，背景图从
-    // 两侧面板下方透出；无背景 → 原生平贴表面（Task137：新拟态退役）。
+    // 两侧面板下方透出；无背景 → 原生平贴表面（Task163：ame_applyPanel
+    // SurfaceWithRadius 已退役阴影——全屏高大容器的等比阴影会溢出压到
+    // 中央卡片上，用户实测"不该改的你改了"；现为规格表面色+圆角平贴）。
     // cornerRadius/maskedCorners/masksToBounds 由调用点维护，此处只换表面。
     if ([[BackgroundManager sharedManager] hasBackground]) {
         [[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];

@@ -263,8 +263,8 @@ check("H2  Sodium + Iris 行与三 jar 下载链幸存（Task157 契约）",
 check("H3  组件区 footer/其余行零意外（Fabric API 与 OptiFine 行原样）",
       ps.count('cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);') == 2
       and '[UIImage systemImageNamed:@"speedometer"]' in ps)
-check("H4  内存行箭头与 Task157 显示口径幸存（A1-A3 延续）",
-      'cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;\n                cell.detailTextLabel.text = self.memoryAutoEnabled' in ps
+check("H4  内存行箭头与 Task157 显示口径幸存（Task163 重锚：整页统一自绘 chevron，ame163_disclosureChevron 形态）",
+      'cell.accessoryView = [self ame163_disclosureChevron];\n                cell.detailTextLabel.text = self.memoryAutoEnabled' in ps
       and "MB / %ld MB" not in ps)
 
 print()
