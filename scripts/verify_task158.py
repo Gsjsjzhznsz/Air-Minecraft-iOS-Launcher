@@ -48,8 +48,8 @@ check("A2 latestlog.es：MobileGlues ANGLE ES 会话（enableANGLE=3 + customGLV
 check("A3 两份基准会话渲染器均为 libmobileglues.dylib（非 MobileGL/Mithril 二进制）",
       "RENDERER is set to libmobileglues.dylib" in gl40
       and "RENDERER is set to libmobileglues.dylib" in gles)
-check("A4 当前 latestlog.txt（10cee5d）：Mithril 管线着色器崩溃实锤（Sampler0Smplr + pipeline 失败）",
-      "Sampler0Smplr" in cur_txt and "Fragment shader function could not be compiled into pipeline" in cur_txt)
+check("A4 Mithril 管线着色器崩溃实锤（git 钉住 d380bcc:latestlog.txt，10cee5d 会话；Task161 重锚——原锚当前工作树 latestlog.txt，用户日志轮换后失靶）",
+      (lambda g: "Sampler0Smplr" in g and "Fragment shader function could not be compiled into pipeline" in g)(git("show", "d380bcc:latestlog.txt")))
 check("A5 当前 latestlog.forge：text2speech CNFE 实锤（模块层 Narrator 缺失）",
       "NoClassDefFoundError: com/mojang/text2speech/Narrator" in cur_forge
       and "Task154 Forge ignoreList shield" in cur_forge)

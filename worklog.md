@@ -13,10 +13,10 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 160 提交（新拟态 UI 回归 + 初次默认配置 + 弹窗背景回归 + 分辨率行样式统一 25~150 + 文字重影修复，CI 盯绿中）；此前 e979a58（Task159 CI 绿） |
-| 最新 Task 号 | **160**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化——注意 Task157 的内存卡片弹窗已被 159 替换为输入框）+ Task 158 + 157 + 156 |
-| 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
+| 远端 HEAD | 本会话 Task 161 提交（六案根修：auto 跟随 mg 后端键→FSR 复活 / 壁纸设置页 glass 修 / Bing 静默应用根修 / 外观默认跟随系统+迁移 / 侧边栏深链闪退 / 26.2 聊天自动弹键盘，CI 盯绿中）；此前 9c66184（Task160 CI 绿） |
+| 最新 Task 号 | **161**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 161（六案）+ Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化）+ Task 158 + 157 + 156 |
+| 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135/149/158 路径依赖 + task140 G2/G3 日志轮换），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
 - 推送前必须 `git fetch origin && git rebase origin/main`；Task 编号冲突避让下一空号并在记录里注明
@@ -417,3 +417,34 @@ Stage Summary:
 - 用户预期装机锚点：①实例页"分辨率缩放"右侧=灰字数字+独立%+向右箭头（内存分配同款），输入 25~150；②新装/重置后=浅色模式+毛玻璃+透明度 10%+模糊 75%，存量用户不受影响；③壁纸模式下自定义背景/自定义主页/各设置弹窗有页面级毛玻璃底（不再整页透明），"游戏目录/已安装的版本"标题背景块消失；④全部自创 UI 新拟态（规格表面色+双阴影+规格文字色，深浅自适应）；⑤设置页文字无重影、换行不压字（黑标题+灰小字）
 - 已知边界：Task137 的"列表 cell 无阴影"以 flat 版本延续（列表阴影互叠是历史证明的坑）；Hero 卡/设置列表走 flat 无外阴影（壁纸模式毛玻璃视觉主导）；等比圆角下限 8 对徽章类仍略圆
 - 留档纪律：CI 绿后不推 worklog-only 提交（Task 96 教训）
+
+## Task 161（本会话，装机反馈六案根修：FSR 复活 + 壁纸设置页被盖 + Bing 静默应用 + 外观默认 + 侧边栏闪退 + 26.2 键盘）
+
+### 用户反馈（9c66184 构建，1e6f796 日志两份均 libMobileGL 会话）
+"可以呀3端都可以了。怎么都没有fsr放大和锐化呀连zink都没有了。还有第一次启动重启之后壁纸设置中，好像盖了什么东西，所有文字和按钮都看不到，但是只有滑块滑动不了，而且2个滑块默认值是透明度60%模糊程度为100%。还有bing壁纸还是要重启才能静默加载。还有外观模式默认跟随系统。还有右边信息栏点击启动器版本，jit和2个内存扩展闪退。还有26.3遇到光标能正常弹出键盘，而26.2及以下都不行。"
+
+### 根因（逐条实锤）
+1. **FSR 全无（连 zink）**：用户整合包 profile（ModpackImportService.createProfileForModpack 建）无 renderer 键 → ame_effective_renderer 落 "auto" → auto 只认 legacy 整数档位（mobileglues.mobilegl_backend），**不消费新后端键 mobileglues.renderer_backend** → 用户设置页选的 4.0 后端（日志 L23 实锤写入 libmithril.dylib）完全被无视，恒解析 libMobileGL.dylib（Vulkan 直连，Task154 FSR 退休链）。zink 本身链路完好（10cee5d/e8e55b2 会话 sentinel LANDED 实证），用户感知"连 zink 都没有"= 其 auto 实例永远到不了任何 FSR 路径。
+2. **壁纸设置页被盖**：Task160 的 ame160_applyGlassBackdropIfModal 对 UITableViewController（view==tableView，即 BackgroundSettingsViewController）insertSubview 进 **UITableView 本体**——外来视图插表不受支持，iPadOS 27 装机表现为整页像盖了东西/文字按钮不可见/滑块拖不动。另：背景容器 addBlurEffectToContainer 的 blurView/dimView 从未关 userInteractionEnabled（层级异常时拦截触摸的保险带）。
+3. **Bing 需重启才能静默加载**：`applyBackgroundToWindow:` 顺序为【L200 设 currentWindow → L204 调 removeGlobalBackground → 后者 L311-312 把 currentWindow/currentSplitVC 置 nil】——启动后宿主引用恒空，Bing 下载完成后的 setBingBackgroundImageAtPath 应用分支（双 nil）静默空转：状态已落盘、活 UI 从不更新，重启时启动路径才真正应用。Task152 的 refreshTransparencyForWindowUI 同因 root=nil 跳过。
+4. **外观默认**：Task160 默认 light（此前 dark）；用户指令改"跟随系统"。存量设备已固化历史默认，需迁移（dark/light → auto，仅未显式选择者）。
+5. **侧边栏 4 卡闪退**：Task156 深链按 prefContents 全量索引 selectRowAtIndexPath，而主设置页分区默认折叠（prefSectionsVisible 默认 NO，折叠分区 numberOfRows=1）→ check_update/jit_enabler/memory_limit_help 的 r>0 索引越界 → NSInternalInconsistencyException。游戏版本卡（versionManager 分支）/设备系统卡（无深链键）不滚动故不炸——与用户报告的四卡完全吻合。
+6. **26.2 及以下键盘不自动弹**：26.3 走 SDL（SDL_StartTextInput + Task114 screen-keyboard hint → 系统键盘 ✓）；≤26.2 走 GLFW——GLFW 协议无"开始文本输入"概念，vanilla EditBox 聚焦不发出任何可观察信号。
+
+### 修复（10 代码文件 + 3 验证器）
+- **LauncherPreferences.m**：①ame_effective_renderer auto 分支消费 ame142_effective_backend_key（GLES/Mithril → libmobileglues.dylib 存在守卫；Vulkan/默认维持返回 "auto"，旧 MC ANGLE 回退语义不变）；②ame158_mg_mobileglues_mode 对 auto/无键 profile 同源跟随（否则 auto+GLES 拿 mode 0 → customGLVersion=40 → ES 方块不渲染回归）。
+- **BackgroundManager.m**：③ame160 对 view==tableView 的 table 控制器改挂 tableView.backgroundView（UIKit 管理位，cells 之下、不参与命中测试）+ 非 table 路径保持 insertSubview:atIndex:0；ame160 调用移到 makeViewControllerTransparent 末尾（table 分支 backgroundView=nil 之后）；④addBlurEffectToContainer 的 blurView/dimView 显式 userInteractionEnabled=NO；⑤removeGlobalBackground 不再清空 currentWindow/currentSplitVC（均 weak；注册语义归 apply 方法所有）。
+- **BackgroundSettingsViewController.m / LauncherPreferencesViewController.m**：⑥viewWillAppear/reapplyBackgroundEffect 改走 makeViewControllerTransparent 单点，不再手写 backgroundView=nil（会把 glass 清掉）。
+- **PLPreferences.m / SceneDelegate.m / LauncherPreferencesViewController.m**：⑦ui_theme 默认 light→auto + 注册 ui_theme_explicit 标记键；SceneDelegate 一次性迁移（未显式选择 + 值为历史默认 dark/light → auto）；设置页 pick action 置显式标记。
+- **LauncherPreferencesViewController.m**：⑧深链命中后先展开折叠分区（prefSectionsVisibility[s]=YES + reloadSections）再滚动/高亮 + 行数防御（r >= numberOfRowsInSection 只展开不选中）。
+- **input_bridge_v3.m / utils.h / SurfaceViewController.m**：⑨nativeSendKey 记录最近按下键（ame161_lastSentKey/Time）；ame161_lastSentKeyWasChatOpener(within) 查询（T=84/SLASH=53）；updateGrabState 在 GLFW 路径（g_sdlWindow==NULL）grab 转 false 且 1.5s 内发过聊天开键 → inputTextField 自动弹出（ame161_autoShown 标记，回游戏自动收起，手动 ⌨ 不受影响，26.3 SDL 零影响）。
+- **JavaLauncher.m**：⑩过时的 "auto will be resolved to ANGLE" 警告改写为 Task144/161 语义。
+
+### 校验
+- verify_task161 新建 56/56 ALL GREEN（A auto 跟随 5 + A2b 决策矩阵镜像 14 + B 壁纸页 7 + C Bing 4 + D 外观 5 + E 深链 3 + F 键盘 7 + G 文案 1 + H 括号平衡 10）。
+- 级联：156=52/52、160=47/47（B1/B5 重锚 Task161 语义 + ROOT 环境注入）、151=46/46、158=32/33（A4 重锚 git 钉住 d380bcc 防日志轮换；C6 取证存档被沙箱清除=既有环境性）、140 G2/G3 与 stash 基线逐项一致（日志轮换）、142/143 链式同因、149 路径硬编码另一会话沙箱=环境性——**零新增失败**。
+- 10 个改动 ObjC 文件 + version.h 括号平衡全 0（字符状态机剥离）。
+
+### Stage Summary
+- 装机验证锚点：①整合包实例（renderer 未设）+ 设置页后端选 GLES/4.0 → 日志 `RENDERER is set to libmobileglues.dylib` + `[SurfaceVC] Task83 FSR linkage: renderer=libmobileglues.dylib preset=4 scale=2.00` + MobileGlues FSR1 生效（画面=渲染分辨率升采样）；后端选 Vulkan/默认 → 行为与 9c66184 一致（libMobileGL）；②重启后壁纸设置页文字/按钮/滑块全部正常可交互（glass 走 backgroundView）；③首启联网数秒后 Bing 壁纸不重启即上屏（日志出现 `Task151 auto-apply OK` + `Task152: transparency refreshed`）；④未手动选过外观的设备自动跟随系统（日志 `Task161: ui_theme 'dark' was a historical default ... migrated to 'auto'`）；⑤侧边栏启动器版本/JIT/内存两卡点击直达设置对应行并高亮（日志 `deep-linked to row`），不再闪退；⑥26.2 及以下游戏内按 T/斜杠打开聊天 → 键盘自动弹出（日志 `Task161: chat key + ungrab -> keyboard auto-shown`），回游戏自动收起；26.3 行为不变。
+- 已知边界：GLFW 路径的键盘自动弹只覆盖聊天/命令行（T/斜杠前驱）；告示牌/书与笔等右键场景仍需 ⌨ 手动（歧义大，故意不自动化）。

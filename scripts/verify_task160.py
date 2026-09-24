@@ -13,11 +13,14 @@
   G 语法配平 + UIColor 白名单
   H 回归锚点
 """
+import os
 import re
 import subprocess
 import sys
 
-ROOT = '/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher'
+# Task161：ROOT 环境注入（沿用 TASK150_REPO 惯例）——原硬编码另一会话沙箱
+# 路径 /home/z/my-project/workspace/...，本仓库运行直接 FileNotFoundError。
+ROOT = os.environ.get('TASK160_REPO', '/home/z/my-project/Amethyst-iOS-MyRemastered')
 PASS, FAIL = 0, 0
 
 
@@ -107,15 +110,16 @@ print("B. 初次使用默认配置（仅新装/重置生效）")
 print("=" * 72)
 plp = read('Natives/PLPreferences.m')
 bm = read('Natives/BackgroundManager.m')
-check("B1  ui_theme 默认浅色（dark -> light）",
-      '@"ui_theme": @"light",' in plp and '@"ui_theme": @"dark"' not in plp)
+check("B1  ui_theme 默认（Task161 重锚：用户指令“外观模式默认跟随系统”，推翻 Task160 的 light 缺省 → auto + 迁移）",
+      '@"ui_theme": @"auto",' in plp
+      and 'ui_theme_explicit' in plp)
 check("B2  uiOpacity 默认 0.1（毛玻璃模式下面板几乎全透）",
       "_uiOpacity = 0.1;" in bm and "_uiOpacity = 0.7;" not in bm)
 check("B3  blurIntensity 默认 0.75",
       "_blurIntensity = 0.75;" in bm and "_blurIntensity = 0.7; //" not in bm)
 check("B4  默认效果仍为毛玻璃（BackgroundUIEffectBlur）",
       "_uiEffect = BackgroundUIEffectBlur;" in bm)
-check("B5  仅初次使用语义注释（存量用户设置不变）",
+check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto）",
       "仅新装/重置偏好生效，存量用户已保存的值不变" in plp
       and "仅新装/重置生效，存量用户已保存值不变" in bm)
 

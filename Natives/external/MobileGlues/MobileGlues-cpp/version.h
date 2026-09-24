@@ -1416,3 +1416,50 @@
 // lists). Settings-page text shadows (the "double-drawn text" ghosting) and
 // the multi-line title/detail overlap are fixed back to native single-line
 // label/secondaryLabel rendering. l10n baseline unchanged (1952).
+// REVISION 17 addendum (Task 161, no bump): six-fix round on the 9c66184
+// device logs ("3 backends all work now, but no FSR upscaling/sharpening
+// anywhere, even zink"; wallpaper-settings page covered after the first-
+// launch restart; Bing wallpaper still requiring a restart to silently
+// load; appearance default; sidebar info-card crashes; keyboard auto-pop
+// on MC <=26.2). (1) FSR root fix: renderer=auto now consumes the mg
+// backend key (ame_effective_renderer's auto branch consults
+// ame142_effective_backend_key -- GLES / OpenGL 4.0 remap to
+// libmobileglues.dylib per Task158, Vulkan/default keeps returning "auto"
+// so the legacy per-version ANGLE fallback is untouched); the modpack-
+// imported profiles carry no renderer key and were permanently resolving
+// to libMobileGL.dylib (Task154-retired FSR chain) while the user's
+// backend pick in Settings > MobileGlues was silently ignored --
+// ame158_mg_mobileglues_mode follows the same source so auto+GLES gets
+// the 5.1.0 forced config (enableANGLE=3 + customGLVersion=32; without
+// it the ES blocks-invisible regression returns). zink keeps its
+// sentinel-verified EASU path untouched. (2) Wallpaper-settings cover:
+// the Task160 modal glass backdrop must never be insertSubview'd into a
+// UITableView (view==tableView form, i.e. BackgroundSettingsViewController)
+// -- foreign subviews inside a table are unsupported and on iPadOS 27
+// manifested as the whole page covered with dead sliders; table
+// controllers now hang the glass on tableView.backgroundView, with the
+// ame160 call moved to the tail of makeViewControllerTransparent (after
+// the table branch nils backgroundView) and the settings pages' own
+// viewWillAppear/reapply stops wiping it; the background container's
+// decorative blur+dim layers get explicit userInteractionEnabled=NO.
+// (3) Bing live-apply root cause: removeGlobalBackground nil-ed
+// currentWindow/currentSplitVC AFTER applyBackgroundToWindow had just
+// registered them, so every later setBingBackgroundImageAtPath took the
+// both-nil branch (state saved, live UI never updated) = "needs a
+// restart"; the host references are now left intact (both weak, mutual
+// exclusivity owned by the apply methods). (4) Appearance default now
+// "follow system" (ui_theme light->auto) with a one-time migration that
+// only rewrites devices still sitting on the historical dark/light
+// DEFAULTS and never those explicitly chosen (general.ui_theme_explicit
+// marker set by the settings picker). (5) Sidebar info-card crash: the
+// Task156 deep link indexed prefContents and called selectRowAtIndexPath
+// while the target section was collapsed (PLPrefTable sections default to
+// 1 header row) -- out-of-bounds selection on check_update / jit_enabler
+// / memory_limit_help; the link now expands the section first and guards
+// the row against the visible row count. (6) GLFW-path chat keyboard
+// (MC <=26.2 has no text-input protocol unlike 26.3's SDL screen
+// keyboard): nativeSendKey records the last pressed key; updateGrabState
+// auto-shows inputTextField when an ungrab follows a T/slash within 1.5s
+// (auto-shown flag auto-dismisses on re-grab; manual keyboard unaffected;
+// SDL path untouched). JavaLauncher's stale "auto will be resolved to
+// ANGLE" warning reworded to the Task144/161 semantics.

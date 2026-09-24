@@ -314,6 +314,11 @@ BOOL CallbackBridge_nativeSendCharMods(jchar codepoint, int mods);
 // 字符事件（MC 1.13+ 聊天框只认 charTyped/text-input，纯 key 事件不进文本）。
 // 仅由按钮路径调用（SurfaceViewController executebtn），硬件键盘不走这里。
 BOOL CallbackBridge_buttonKeySynthesizeText(int key);
+// Task161：GLFW 路径（MC ≤26.2）聊天自动弹键盘——查询"最近 withinSeconds
+// 秒内发给 MC 的最后一次按键是否为 T / 斜杠"（vanilla 聊天/命令行的标准
+// 开键）。SurfaceViewController.updateGrabState 在 grab 转 false 时消费。
+// 实现于 input_bridge_v3.m（nativeSendKey 侧记录）。
+BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds);
 void CallbackBridge_nativeSendCursorPos(char event, CGFloat x, CGFloat y);
 void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods);
 void CallbackBridge_nativeSendMouseButton(int button, int action, int mods);

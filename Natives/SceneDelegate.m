@@ -49,10 +49,23 @@ extern __weak UIWindow *mainWindow;
 
     // 外观模式（浅色/深色/跟随系统）：读 general.ui_theme 偏好。
     //   light  -> UIUserInterfaceStyleLight
-    //   dark   -> UIUserInterfaceStyleDark（默认，保持与原行为一致）
-    //   auto   -> UIUserInterfaceStyleUnspecified（跟随系统）
+    //   dark   -> UIUserInterfaceStyleDark（Task160 前的历史默认）
+    //   auto   -> UIUserInterfaceStyleUnspecified（跟随系统；Task161 起为默认）
     // iOS 13+ 支持 overrideUserInterfaceStyle。仅设置 window 级别，不触碰账号/偏好。
     if (@available(iOS 13.0, *)) {
+        // Task161：一次性迁移——外观默认值改为"跟随系统"（用户指令）。历史
+        // 版本的默认合并曾把 dark（Task160 前）/ light（Task160）静默写盘，
+        // 只改默认表对这些设备无效；未显式选择过的设备（无
+        // general.ui_theme_explicit 标记）若还停在两个历史默认值上，迁移到
+        // auto。显式选过的设备永不覆盖（标记在设置页 pick 的 action 里置位）。
+        if (!getPrefBool(@"general.ui_theme_explicit")) {
+            NSString *ame161_legacy = getPrefObject(@"general.ui_theme");
+            if ([ame161_legacy isEqualToString:@"dark"] ||
+                [ame161_legacy isEqualToString:@"light"]) {
+                setPrefObject(@"general.ui_theme", @"auto");
+                NSLog(@"[SceneDelegate] Task161: ui_theme '%@' was a historical default (never explicitly chosen) -> migrated to 'auto' (follow system)", ame161_legacy);
+            }
+        }
         NSString *theme = getPrefObject(@"general.ui_theme");
         if ([theme isEqualToString:@"light"]) {
             self.window.overrideUserInterfaceStyle = UIUserInterfaceStyleLight;

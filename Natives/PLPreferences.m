@@ -238,9 +238,16 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"hidden_sidebar": @([[[UIDevice currentDevice].model lowercaseString] containsString:@"iphone"]),
             @"appicon": @"AppIcon-Light",
             @"ui_layout": @"vs",
-            // Task160：初次使用默认浅色模式（SceneDelegate 读 general.ui_theme；
-            // 仅新装/重置偏好生效，存量用户已保存的值不变）
-            @"ui_theme": @"light",
+            // Task161：初次使用默认"跟随系统"（用户指令"外观模式默认跟随系统"，
+            // 推翻 Task160 的 light 缺省；SceneDelegate 读 general.ui_theme，
+            // auto -> UIUserInterfaceStyleUnspecified）。
+            // 仅新装/重置偏好生效，存量用户已保存的值不变（设置页"外观模式"三档随时可改）。
+            @"ui_theme": @"auto",
+            // Task161：外观显式选择标记——用户在设置页亲手选过主题后置 YES；
+            // SceneDelegate 的一次性迁移（历史默认值 dark/light → auto）只
+            // 对未显式选择的设备生效，选过的永不覆盖。注册本键是
+            // PLPreferences "只能读写已注册键" 规矩的硬要求（Task143 病历）。
+            @"ui_theme_explicit": @NO,
             // 应用语言："system"=跟随系统，"zh-Hans"=简体中文，"en"=English
             @"app_language": @"system",
             @"multi_threaded": @NO,

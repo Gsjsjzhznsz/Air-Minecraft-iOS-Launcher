@@ -1796,6 +1796,35 @@ char getKeyModifiers(int key, int action) {
     return currMods;
 }
 
+// ============================================================================
+// Task161：GLFW 路径（MC ≤26.2）聊天自动弹出键盘——按键侧记录器。
+//
+// 病历（用户反馈"26.3 遇到光标能正常弹出键盘，而 26.2 及以下都不行"）：
+//   MC 26.3 走 SDL3，EditBox 聚焦时调用 SDL_StartTextInputWithProperties，
+//   SDL_ENABLE_SCREEN_KEYBOARD hint（Task114）让 SDL 的 iOS 后端拉起系统
+//   软键盘——26.3 自动弹。MC ≤26.2 走 GLFW，而 GLFW 协议没有"开始文本
+//   输入"概念：vanilla 在 EditBox 聚焦时不发任何可观察信号，启动器无从
+//   得知"光标在闪"。
+//   务实方案（本记录器 + SurfaceViewController.updateGrabState 消费）：
+//   启动器知道自己刚把哪个键发给了 MC——游戏内按 T / 斜杠几乎必然是
+//   打开聊天/命令行（vanilla 惯例），而聊天必然伴随 grab→false（开界面）。
+//   "最近 1.5s 内发过 T/SLASH + grab 转 false"即判定聊天打开，主线程
+//   inputTextField becomeFirstResponder（与 ⌨ 按钮同一路径）。
+//   菜单/告示牌/书与笔等无键前驱的开界面不自动弹（歧义大，⌨ 手动兜底）；
+//   自动弹出的键盘在 grab 恢复 true 时自动收起（ame161_autoShown 标记，
+//   ⌨ 手动唤出的不受影响）。
+// ============================================================================
+static int ame161_lastSentKey = -1;
+static CFAbsoluteTime ame161_lastSentKeyTime = 0.0;
+
+BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds) {
+    // GLFW_KEY_T=84 / GLFW_KEY_SLASH=53（输入侧统一 GLFW 键码，与
+    // nativeSendKey 的 key 参数同口径）。
+    if (ame161_lastSentKey != 84 && ame161_lastSentKey != 53) return NO;
+    CFAbsoluteTime ame161_now = CFAbsoluteTimeGetCurrent();
+    return (ame161_now - ame161_lastSentKeyTime) <= withinSeconds;
+}
+
 void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods) {
     static int keySendCount = 0;
     keySendCount++;
@@ -1803,6 +1832,12 @@ void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods) {
         NSLog(@"[InputDiag] sendKey #%d: key=%d scancode=%d action=%d mods=%d GLFW_invoke_Key=%p isInputReady=%d g_sdlWindow=%p",
             keySendCount, key, scancode, action, mods,
             (void*)GLFW_invoke_Key, isInputReady, g_sdlWindow);
+    }
+
+    // Task161：记录最近一次按下（action==1）的键——聊天自动弹键盘判定用。
+    if (action == 1) {
+        ame161_lastSentKey = key;
+        ame161_lastSentKeyTime = CFAbsoluteTimeGetCurrent();
     }
 
     // Path A: GLFW callbacks (older MC versions)

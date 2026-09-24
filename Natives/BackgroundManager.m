@@ -308,8 +308,16 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // Cleanup
     [self cleanupVideoPlayer];
     self.globalBackgroundContainer = nil;
-    self.currentWindow = nil;
-    self.currentSplitVC = nil;
+    // Task161（Bing 壁纸“要重启才能加载”根修）：不再清空 currentWindow /
+    // currentSplitVC。旧代码在这里把两个宿主引用置 nil，而
+    // applyBackgroundToWindow: 的顺序是【先设 currentWindow → 再调本方法
+    // → 本方法把它置 nil】——启动后宿主引用恒为 nil，后续
+    // setBingBackgroundImageAtPath 的应用分支（currentSplitVC / currentWindow
+    // 双 nil）什么都不做：Bing 图下载完成只落盘了状态，活 UI 从不插入
+    // 背景容器，直到重启时启动路径才真正应用 = “要重启才能静默加载”。
+    // 修复后语义：宿主注册归 applyBackgroundToWindow / ToSplitViewController
+    // 所有（互斥另一侧置 nil 的逻辑保留在那两侧）；两个属性均为 weak，
+    // 宿主销毁时自动置 nil，无悬挂风险。
 }
 
 - (void)updateBackgroundFrame {
@@ -465,6 +473,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     blurView.alpha = self.blurIntensity * 0.5; // max 0.5 for readability
     blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     blurView.frame = container.bounds;
+    // Task161：纯装饰层显式关闭触摸——容器层在任何层级形态下都不得拦截
+    // 命中测试（保险带：装机实测“壁砰设置页被盖住、滑块拖不动”的嫌疑层
+    // 之一，与 Task160 模态毛玻璃底同轮排查）。
+    blurView.userInteractionEnabled = NO;
 
     [container addSubview:blurView];
 
@@ -478,6 +490,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     }
     dimView.alpha = self.blurIntensity * 0.2; // 降低到 0.2，避免过度压暗
     dimView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    // Task161：同上——装饰层不参与命中测试。
+    dimView.userInteractionEnabled = NO;
 
     [container addSubview:dimView];
 }
@@ -556,12 +570,6 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     if (self.uiEffect == BackgroundUIEffectBlur) {
         // 毛玻璃效果 - clear background, let blur show through
         viewController.view.backgroundColor = [UIColor clearColor];
-        // Task160：模态弹窗"把背景加回来"（用户指令：自定义背景/自定义主页等
-        // 大量小窗口此前整页透明直接透壁纸，文字直接压在壁纸上）。壁纸模式下
-        // 给弹窗页铺一层页面级 SystemThinMaterial 毛玻璃底（文字可读、隐约透
-        // 壁纸）；侧栏/右面板/root 中央内容区（非模态）不铺、保持透壁纸。
-        // 无壁纸时上方已 return，弹窗保持各页自持的系统底色。
-        [self ame160_applyGlassBackdropIfModal:viewController];
     } else {
         // 半透明效果 - semi-transparent background
         // 修复：使用 systemBackgroundColor 替代硬编码黑色，自适应浅色/深色模式
@@ -572,31 +580,43 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             viewController.view.backgroundColor = [UIColor colorWithWhite:0 alpha:1.0 - self.uiOpacity];
         }
     }
-    
+
     // For UITableViewController
     if ([viewController isKindOfClass:[UITableViewController class]]) {
         UITableViewController *tableVC = (UITableViewController *)viewController;
         tableVC.tableView.backgroundColor = [UIColor clearColor];
         tableVC.tableView.backgroundView = nil;
-        
+
         // Make cells semi-transparent or with blur effect
         tableVC.tableView.separatorStyle = UITableViewCellSeparatorStyleSingleLine;
-        
+
         // Apply to all visible cells
         for (UITableViewCell *cell in tableVC.tableView.visibleCells) {
             [self applyEffectToCell:cell];
         }
     }
-    
+
     // For UICollectionViewController
     if ([viewController isKindOfClass:[UICollectionViewController class]]) {
         UICollectionViewController *collectionVC = (UICollectionViewController *)viewController;
         collectionVC.collectionView.backgroundColor = [UIColor clearColor];
     }
-    
+
     // Child view controllers
     for (UIViewController *childVC in viewController.childViewControllers) {
         [self makeViewControllerTransparent:childVC];
+    }
+
+    // Task161：模态弹窗页面级毛玻璃底收口到方法末尾——必须在上方
+    // UITableViewController 分支（backgroundView = nil）之后执行，否则
+    // table 控制器的 glass 会被立即清掉。仅毛玻璃模式（Task160 语义）。
+    if (self.uiEffect == BackgroundUIEffectBlur) {
+        // Task160：模态弹窗"把背景加回来"（用户指令：自定义背景/自定义主页等
+        // 大量小窗口此前整页透明直接透壁纸，文字直接压在壁纸上）。壁纸模式下
+        // 给弹窗页铺一层页面级 SystemThinMaterial 毛玻璃底（文字可读、隐约透
+        // 壁纸）；侧栏/右面板/root 中央内容区（非模态）不铺、保持透壁纸。
+        // 无壁纸时上方已 return，弹窗保持各页自持的系统底色。
+        [self ame160_applyGlassBackdropIfModal:viewController];
     }
 }
 
@@ -612,12 +632,35 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                    (viewController.navigationController.presentingViewController != nil);
     if (!isModal) return;
 
-    // 防重复：先移除旧底层再重铺（重复调用/布局变更场景）
-    for (UIView *sub in [NSArray arrayWithArray:viewController.view.subviews]) {
-        if (sub.tag == kAme160GlassBackdropTag) [sub removeFromSuperview];
-    }
-
     if (@available(iOS 13.0, *)) {
+        // Task161：UITableViewController 的 view 即 UITableView 本体时
+        // （未在 viewDidLoad 里重赋 tableView 的形态——BackgroundSettings
+        // ViewController 正是如此），绝不 insertSubview——外来视图插进
+        // UITableView 不在受支持用法内：子视图顺序由表自管（iOS 27 实测
+        // 布局与命中测试不可预期，装机表现为"整页像盖了东西、文字按钮
+        // 看不到、滑块拖不动"）。改挂 tableView.backgroundView——UIKit
+        // 管理的背景位，天然位于全部 cells 之下且不参与命中测试。
+        if ([viewController isKindOfClass:[UITableViewController class]] &&
+            viewController.view == ((UITableViewController *)viewController).tableView) {
+            UITableView *ame161_table = ((UITableViewController *)viewController).tableView;
+            UIView *ame161_existing = ame161_table.backgroundView;
+            if (ame161_existing.tag != kAme160GlassBackdropTag) {
+                UIBlurEffect *ame161_effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
+                UIVisualEffectView *ame161_glass = [[UIVisualEffectView alloc] initWithEffect:ame161_effect];
+                ame161_glass.tag = kAme160GlassBackdropTag;
+                ame161_glass.frame = ame161_table.bounds;
+                ame161_glass.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                ame161_glass.userInteractionEnabled = NO;
+                ame161_table.backgroundView = ame161_glass;
+            }
+            return;
+        }
+
+        // 防重复：先移除旧底层再重铺（重复调用/布局变更场景）
+        for (UIView *sub in [NSArray arrayWithArray:viewController.view.subviews]) {
+            if (sub.tag == kAme160GlassBackdropTag) [sub removeFromSuperview];
+        }
+
         UIBlurEffect *effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterial];
         UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:effect];
         glass.tag = kAme160GlassBackdropTag;

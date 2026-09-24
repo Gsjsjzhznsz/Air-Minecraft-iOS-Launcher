@@ -223,11 +223,16 @@ void init_loadMobileGluesConfig() {
         return;
     }
 
-    // 警告：auto 渲染器实际不会加载 MobileGlues，设置不会生效
+    // 警告：auto 渲染器（mg 后端=Vulkan 直连/默认时保持 auto）按 MC 版本解析
+    // Task144/161：1.17+ → libMobileGL（Vulkan 直连，config.json 不读，
+    // MobileGlues 分区偏好在两端 inert 但无害）；≤1.16 → ANGLE。需要
+    // MobileGlues 完整配置（含 FSR1 联动）请选 GLES / OpenGL 4.0 后端
+    // （Task161 起 auto 同样跟随后端键，见 ame_effective_renderer）。
     if ([renderer isEqualToString:@"auto"]) {
-        NSLog(@"[JavaLauncher] WARNING: renderer is 'auto', will be resolved to ANGLE. "
-              @"MobileGlues settings will NOT take effect. "
-              @"Please explicitly select 'MobileGlues' renderer to use these settings.");
+        NSLog(@"[JavaLauncher] renderer 'auto' (mg backend = Vulkan direct / default): "
+              @"resolved per MC version (1.17+ -> libMobileGL, else ANGLE). "
+              @"MobileGlues config is inert on libMobileGL. Pick the GLES / "
+              @"OpenGL 4.0 backend for MobileGlues + FSR1 (Task161 auto-follows the backend key).");
     } else if ([renderer isEqualToString:@ RENDERER_NAME_VULKAN]) {
         NSLog(@"[JavaLauncher] Vulkan renderer detected, MobileGlues used as GL fallback. Config will take effect.");
     } else {

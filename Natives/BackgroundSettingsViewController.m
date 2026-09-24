@@ -79,10 +79,12 @@
     [self.tableView reloadData];
     
     // Maintain transparency
+    // Task161：改走 makeViewControllerTransparent 单点——本页是
+    // UITableViewController（view == tableView），模态毛玻璃底现在挂
+    // tableView.backgroundView；旧代码此处 backgroundView = nil 会把
+    // glass 每次出现都清掉（整页回透壁纸）。
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        self.view.backgroundColor = [UIColor clearColor];
-        self.tableView.backgroundColor = [UIColor clearColor];
-        self.tableView.backgroundView = nil;
+        [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
     } else {
         // Task111：与 viewDidLoad 同步的无背景底色（主题切换后保持一致）
         self.view.backgroundColor = [UIColor systemBackgroundColor];
@@ -909,9 +911,11 @@
 /// 通过 BackgroundManager 重新设置当前视图控制器的透明度/毛玻璃效果，
 /// 并手动清空 tableView 背景与 backgroundView，确保全局背景能够正常透出。
 - (void)reapplyBackgroundEffect {
+    // Task161：makeViewControllerTransparent 末尾的 ame160 会重铺模态
+    // 毛玻璃底（table 控制器挂 backgroundView）；旧代码随后一句
+    // backgroundView = nil 会把它清掉，改为只补背景色清零。
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
     self.tableView.backgroundColor = [UIColor clearColor];
-    self.tableView.backgroundView = nil;
 }
 
 - (void)dealloc {

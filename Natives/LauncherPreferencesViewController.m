@@ -516,6 +516,9 @@
                   // 实时应用主题，发通知由 SceneDelegate 处理。
                   // 不调用 loadPreferences(YES) 等会重置账号偏好的操作，
                   // 仅设置 window.overrideUserInterfaceStyle，账号数据不受影响。
+                  // Task161：显式选择标记——SceneDelegate 的一次性迁移
+                  // （历史默认 dark/light → auto）从此对本设备免疫。
+                  setPrefBool(@"general.ui_theme_explicit", YES);
                   [[NSNotificationCenter defaultCenter] postNotificationName:@"UIThemeChanged" object:value];
               }
             },
@@ -1703,6 +1706,17 @@
     // Task156：右侧边栏信息卡深链——滚动到目标行并高亮（一次性）。
     // prefContents 在 super 的加载流程完成后可用；搜索态下目标行必然
     // 在表内（深链键都是普通行），不做搜索态特判。
+    // Task161（闪退根修）：本页分区默认折叠（PLPrefTable 的
+    // prefSectionsVisible 默认 NO，numberOfRowsInSection 对折叠分区只返回
+    // 1——表头行）。旧代码按 prefContents 的全量索引直接
+    // scrollToRowAtIndexPath/selectRowAtIndexPath，折叠分区内 r>0 的索引
+    // 越界 → UITableView 抛 NSInternalInconsistencyException → 闪退。
+    // 装机实锤：启动器版本卡（check_update）/ JIT 卡（jit_enabler）/
+    // 内存两卡（memory_limit_help）全部命中；游戏版本卡（versionManager
+    // 分支）与设备/系统卡（无深链键不滚动）不炸——与用户报告完全吻合。
+    // 修复：命中目标行后先展开所在分区（与搜索结果点击的既有语义一致，
+    // PLPrefTable didSelectRowAtIndexPath 的 filteredItems 分支同款），
+    // 再滚动 + 高亮；并加行数防御（目标行不在当前可见行数内则只展开不选中）。
     if (self.ameDeepLinkKey.length > 0) {
         NSString *target = self.ameDeepLinkKey;
         self.ameDeepLinkKey = nil;  // 只消费一次，返回本页不再跳
@@ -1713,6 +1727,24 @@
                 NSString *k = rows[r][@"key"];
                 if (k != nil && [k isEqualToString:target]) {
                     NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
+                    // Task161：目标分区若处于折叠态（visibility NO → 表内只
+                    // 有 1 行表头），先展开再定位——否则下方两个 Row 调用
+                    // 直接以越界索引崩掉。
+                    if (s < (NSInteger)self.prefSectionsVisibility.count &&
+                        !self.prefSectionsVisibility[s].boolValue) {
+                        self.prefSectionsVisibility[s] = @YES;
+                        [self.tableView reloadSections:[NSIndexSet indexSetWithIndex:s]
+                                      withRowAnimation:UITableViewRowAnimationNone];
+                        [self.tableView layoutIfNeeded];
+                    }
+                    // 行数防御：目标行必须落在当前表的实际行数内才滚动/选中。
+                    NSInteger ame161_visibleRows =
+                        [self.tableView numberOfRowsInSection:s];
+                    if (r >= ame161_visibleRows) {
+                        NSLog(@"[LauncherPrefs] Task161: deep-link row %ld beyond visible rows (%ld) in section %ld -- expanded only, no selection",
+                              (long)r, (long)ame161_visibleRows, (long)s);
+                        return;
+                    }
                     [self.tableView scrollToRowAtIndexPath:ip
                                              atScrollPosition:UITableViewScrollPositionMiddle
                                                      animated:YES];
@@ -1743,10 +1775,11 @@
     }
 
     // Re-apply transparency when appearing (in case background was just set)
+    // Task161：改走 makeViewControllerTransparent 单点（table 分支的
+    // backgroundView = nil 之后 ame160 会重铺模态毛玻璃底；旧代码直接
+    // nil 会把 glass 清掉）。
     if ([[BackgroundManager sharedManager] hasBackground]) {
-        self.view.backgroundColor = [UIColor clearColor];
-        self.tableView.backgroundColor = [UIColor clearColor];
-        self.tableView.backgroundView = nil;
+        [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
         
         // Refresh cells to apply background styling
         [self.tableView reloadData];
@@ -1781,8 +1814,9 @@
 /// 并将 tableView 背景置为透明、移除默认 backgroundView，确保全局背景能够正常透出。
 - (void)reapplyBackgroundEffect {
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
+    // Task161：不再手动 backgroundView = nil——模态毛玻璃底现在挂
+    // tableView.backgroundView（table 控制器形态），清掉会整页回透壁纸。
     self.tableView.backgroundColor = [UIColor clearColor];
-    self.tableView.backgroundView = nil;
 }
 
 #pragma mark - Check For Update

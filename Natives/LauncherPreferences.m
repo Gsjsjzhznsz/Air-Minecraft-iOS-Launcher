@@ -472,6 +472,32 @@ NSString *ame_effective_renderer(void) {
         return renderer;
     }
     // (2) auto + MobileGL 后端选项：按档位覆盖（dylib 缺失时守卫回落）。
+    // Task161（auto 跟随后端键——"3 端都可以了但没有 FSR"根修）：
+    //   用户明令"后端是根据 mg 设置选择的后端启动，默认 vulkan"。Task150
+    //   起 profile 无 renderer 键即落 auto（新建整合包实例、Task158 重映射
+    //   前的老实例都是这个形态），而 auto 原先只认 legacy 整数档位键
+    //   （mobileglues.mobilegl_backend 1/2/3）——设置页 MobileGlues 分区
+    //   的新后端 pick（mobileglues.renderer_backend）对 auto 实例完全无效：
+    //   用户选了 4.0 后端，实际仍解析为 auto → JavaLauncher 按 MC 版本落
+    //   libMobileGL.dylib（Vulkan 直连，Task154 FSR 退休链）→ "怎么都
+    //   没有 fsr 放大和锐化"。修复：auto 与 mg 同源消费
+    //   ame142_effective_backend_key（新键优先 + legacy 档位兜底）——
+    //   GLES / OpenGL 4.0 后端 → libmobileglues.dylib（Task158 重映射 +
+    //   ame158_mg_mobileglues_mode 的 5.1.0 配置强制，FSR1 联动随
+    //   mobileglues.fsr1_setting 恢复）；Vulkan 直连（默认）→ 维持返回
+    //   "auto" 原样（JavaLauncher 的 auto 解析点按 MC 版本决定
+    //   libMobileGL / ANGLE——旧 MC 的 ANGLE 回退语义保持不变）。
+    {
+        NSString *ame161_backend = ame142_effective_backend_key();
+        if ([ame161_backend isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
+            [ame161_backend isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+            if (rendererLibraryExists(@ RENDERER_NAME_MOBILEGLUES)) {
+                return @ RENDERER_NAME_MOBILEGLUES;
+            }
+            // libmobileglues.dylib 缺失（非常规构建）→ 落回 auto（下方
+            // legacy 档位检查后原样返回）。
+        }
+    }
     NSInteger backend = getPrefInt(@"mobileglues.mobilegl_backend");
     if (backend == 1 || backend == 2) {
         if (rendererLibraryExists(@ RENDERER_NAME_MOBILEGL)) {
@@ -644,10 +670,16 @@ NSString* ame142_effective_backend_key(void) {
 int ame158_mg_mobileglues_mode(void) {
     ame142_migrateRendererStorage();
     NSString *ame158_pr = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
-    if (![ame158_pr isKindOfClass:NSString.class] || ame158_pr.length == 0) {
-        return 0;
-    }
-    if (![ame158_pr isEqualToString:@ RENDERER_KEY_MG]) {
+    // Task161：auto（含无键缺省）与 mg 同源跟随 mg 后端键。ame_effective_renderer
+    // 的 auto 分支现在会把 GLES / OpenGL 4.0 后端解析为 libmobileglues.dylib，
+    // 本判定必须同步——否则 auto+GLES 会话拿到 mode 0（customGLVersion 默认
+    // 40，桌面 GLSL #version 400 被 ANGLE 拒收）→ ES 方块不渲染回归
+    // （5.1.0 时代的同款修复缺失，Task158 病历）。
+    BOOL ame161_autoProfile = (![ame158_pr isKindOfClass:NSString.class] ||
+                               ame158_pr.length == 0 ||
+                               [ame158_pr isEqualToString:@"auto"]);
+    if (!ame161_autoProfile &&
+        ![ame158_pr isEqualToString:@ RENDERER_KEY_MG]) {
         // legacy：未迁移进程态的家族键直选（ame142_migrateRendererStorage 正常
         // 已在首次读取时把它迁成 "mg"；此处防御首读竞态。独立 MobileGlues
         // 直选（libmobileglues.dylib）不在此列——它走用户自有设置）。

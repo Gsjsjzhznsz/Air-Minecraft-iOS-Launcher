@@ -1635,6 +1635,32 @@ void ame139_fsr_heal_reset_input_scale(void) {
 }
 
 - (void)updateGrabState {
+    // Task161：GLFW 路径（MC ≤26.2）聊天自动弹键盘——与 26.3（SDL 路径，
+    // SDL_StartTextInput 系统键盘）对齐的用户指令"遇到光标能正常弹出键盘"。
+    // 判定：grab 转 false（开界面）+ 最近 1.5s 内启动器发过 T/斜杠（vanilla
+    // 聊天/命令行开键，见 ame161_lastSentKeyWasChatOpener）+ 本页键盘未开
+    // → inputTextField becomeFirstResponder（与 ⌨ 按钮同路径）。仅 GLFW
+    // 路径（g_sdlWindow == NULL）生效；26.3 的 SDL 键盘不受影响。
+    // 自动弹出的键盘在 grab 恢复 true（回游戏/关聊天）时自动收起；
+    // ame161_autoShown 标记保证 ⌨ 手动唤出的键盘不被误收（游戏内 ⌨ 键盘
+    // 常用于快捷栏按键）。
+    static BOOL ame161_autoShown = NO;
+    if (g_sdlWindow == NULL) {
+        if (isGrabbing == JNI_FALSE &&
+            !self.inputTextField.isFirstResponder &&
+            ame161_lastSentKeyWasChatOpener(1.5)) {
+            [self.inputTextField becomeFirstResponder];
+            ame161_autoShown = YES;
+            NSLog(@"[SurfaceVC] Task161: chat key + ungrab -> keyboard auto-shown (GLFW path, MC <=26.2)");
+        } else if (isGrabbing == JNI_TRUE && ame161_autoShown) {
+            if (self.inputTextField.isFirstResponder) {
+                [self.inputTextField resignFirstResponder];
+                self.inputTextField.alpha = 1.0f;
+            }
+            ame161_autoShown = NO;
+            NSLog(@"[SurfaceVC] Task161: grab restored -> auto-shown keyboard dismissed");
+        }
+    }
     if (isGrabbing == JNI_TRUE) {
         // Task59：contentsScale 已被 Task52 呈现对齐钉成 1.0，作输入乘数会缺 ×2
         // （lastVirtualMousePoint 是点，乘 1 后落入 MC 2360 像素空间的 1/4 处）。
