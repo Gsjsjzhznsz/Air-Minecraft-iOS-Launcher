@@ -313,7 +313,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 超分辨率";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超解析度。選擇檔位即自動降低渲染解析度（超高品質 77%／高品質 67%／均衡 59%／效能優先 50%），再由渲染器放大回全解析度表面。僅對 MobileGlues（內建 FSR1）與 Zink（EASU 昇採樣）渲染器生效；mg 系列（Vulkan／ES／OpenGL 4.0 後端）、MoltenVK、gl4es 均不支援啟動器側 FSR——這些渲染器需要畫質／幀率取捨時，請改用影片設定中的「解析度」縮放。";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 超解析度。選擇檔位即自動降低渲染解析度（超高品質 77%／高品質 67%／均衡 59%／效能優先 50%），再由渲染器放大回全解析度表面。對 MobileGlues 渲染器（含 mg 的 GLES／OpenGL 4.0 後端）與 Zink（EASU 昇採樣）生效；mg 的 Vulkan 直連後端（MobileGL）、MoltenVK、gl4es 不支援——Vulkan 直連需要降低渲染負載時，請改用影片設定中的「解析度」縮放。";
 "preference.title.mg_fsr1_setting-0" = "关闭";
 "preference.title.mg_fsr1_setting-1" = "超高品质";
 "preference.title.mg_fsr1_setting-2" = "高品质";
@@ -2062,10 +2062,10 @@
 "i18n_str_2068" = "应用語言";
 "preference.title.renderer.debug.mithril" = "Mithril（1.17+）- OpenGL 3.3 核心，经 Vulkan/Metal，实验性";
 "preference.title.renderer_backend" = "MobileGlues 渲染後端";
-"preference.detail.renderer_backend" = "mg 渲染器的後端選擇（原地懸浮浮窗）：Vulkan 直連（預設）/ GLES 後端 / OpenGL 4.0 實驗性。渲染器選擇 mg 時按此啟動；GLES 後端經內建 ANGLE 框架把桌面 GL 翻譯為 OpenGL ES。每個遊戲可在自己的遊戲設定頁選擇 mg 或跟隨全域。";
+"preference.detail.renderer_backend" = "mg 渲染器的後端選擇（原地懸浮浮窗）。Vulkan 直連（預設）：MobileGL 把桌面 GL 直接翻譯到 Vulkan/MoltenVK。GLES 後端：MobileGlues 經內建 ANGLE 把桌面 GL 翻譯為 OpenGL ES。OpenGL 4.0：MobileGlues 以 GL 4.0 檔位翻譯。GLES 與 OpenGL 4.0 後端支援 FSR 1.0 檔位聯動（FSR 檔位在影片設定中）；Vulkan 直連不支援 FSR。渲染器選擇 mg 時按此啟動；每個遊戲可在自己的遊戲設定頁選擇 mg。";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直連)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
-"preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 實驗性)";
+"preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0)";
 "preference.title.renderer.debug.mgfamily" = "MobileGlues";
 "preference.warning.mg_backend_missing_dylib" = "mg 後端（%@）的渲染庫缺失，已回落預設後端（Vulkan 直連）。";
 "preference.warning.renderer_missing_dylib" = "本構建未隨包攜帶 %@，遊戲將回退為 Auto（ANGLE）。如需啟用，請把對應 dylib 放入 app 的 Frameworks 目錄。";

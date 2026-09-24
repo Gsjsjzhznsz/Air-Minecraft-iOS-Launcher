@@ -315,7 +315,7 @@
 "preference.title.mg_custom_gl_version-4.5" = "OpenGL 4.5";
 "preference.title.mg_custom_gl_version-4.6" = "OpenGL 4.6";
 "preference.title.fsr1_setting" = "FSR 1.0 Upscaling";
-"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales it back to the full-resolution surface. Only works with the MobileGlues (built-in FSR1) and Zink (EASU) renderers. The mg family (Vulkan / ES / OpenGL 4.0 backends), MoltenVK and gl4es do not support launcher-side FSR -- for those renderers use the Resolution scaler in Video settings instead.";
+"preference.detail.fsr1_setting" = "AMD FidelityFX Super Resolution 1.0 upscaling. Picking a preset lowers the render resolution (Ultra Quality 77% / Quality 67% / Balanced 59% / Performance 50%) and the renderer upscales it back to the full-resolution surface. Works with the MobileGlues renderer (including the mg GLES and OpenGL 4.0 backends) and Zink (EASU). The mg Vulkan-direct backend (MobileGL), MoltenVK and gl4es do not support launcher-side FSR -- for Vulkan direct use the Resolution scaler in Video settings instead.";
 "preference.title.mg_fsr1_setting-0" = "Off";
 "preference.title.mg_fsr1_setting-1" = "Ultra Quality";
 "preference.title.mg_fsr1_setting-2" = "Quality";
@@ -2053,10 +2053,10 @@
 "preference.detail.ui_theme" = "Choose light/dark/system appearance.";
 "preference.title.renderer.debug.mithril" = "Mithril (1.17+) - OpenGL 3.3 Core via Vulkan/Metal, EXPERIMENTAL";
 "preference.title.renderer_backend" = "MobileGlues backend";
-"preference.detail.renderer_backend" = "Backend selection for the mg renderer (floating popup): Vulkan direct (default) / GLES backend / OpenGL 4.0 experimental. Applies whenever the renderer is set to mg; the GLES backend translates desktop GL to OpenGL ES via the built-in ANGLE framework. Each game can pick mg or follow this global setting in its own game settings page.";
+"preference.detail.renderer_backend" = "Backend selection for the mg renderer (floating popup). Vulkan direct (default): MobileGL translates desktop GL straight to Vulkan/MoltenVK. GLES backend: MobileGlues translates desktop GL to OpenGL ES through the built-in ANGLE. OpenGL 4.0: MobileGlues with the GL 4.0 profile. The GLES and OpenGL 4.0 backends support the FSR 1.0 preset linkage (FSR presets live in Video settings); Vulkan direct does not support FSR. Applies whenever the renderer is set to mg; each game can pick mg in its own game settings page.";
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
-"preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0 experimental)";
+"preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0)";
 "preference.title.renderer.debug.mgfamily" = "MobileGlues";
 "preference.warning.mg_backend_missing_dylib" = "The rendering library for mg backend (%@) is missing; fell back to the default backend (Vulkan direct).";
 "preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";

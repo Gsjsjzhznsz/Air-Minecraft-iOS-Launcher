@@ -86,6 +86,14 @@ void ame142_migrateRendererStorage(void);
 /// 调用方（ame_effective_renderer）负责 dylib 存在性守卫。
 NSString* ame142_effective_backend_key(void);
 
+/// Task 158：mg 家族 GLES / OpenGL 4.0 后端重映射（ame_effective_renderer
+/// 把这两个后端解析为 libmobileglues.dylib，即 5.1.0 用户实际可玩的路径）
+/// 后，本会话的 MobileGlues 配置强制模式。0 = 不强制（独立 MobileGlues
+/// 直选或 mg+Vulkan 直连，用户分区偏好透传）；1 = GLES 后端（ANGLE
+/// ForceEnable + GL 3.2）；2 = OpenGL 4.0 后端（GL 4.0 + ANGLE off）。
+/// 消费者：JavaLauncher.init_loadMobileGluesConfig。
+int ame158_mg_mobileglues_mode(void);
+
 NSArray* getRendererKeys(BOOL containsDefault);
 NSArray* getRendererNames(BOOL containsDefault);
 

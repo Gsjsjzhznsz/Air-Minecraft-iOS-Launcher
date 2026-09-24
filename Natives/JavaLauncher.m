@@ -22,6 +22,7 @@
 #import "LauncherPreferences.h"
 #import "PLLogOutputView.h"
 #import "PLProfiles.h"
+#import "MinecraftResourceUtils.h"
 
 #define fm NSFileManager.defaultManager
 
@@ -250,6 +251,32 @@ void init_loadMobileGluesConfig() {
     // 内置 glslang+SPIRV-Cross 从源码编译，GLSL→SPIRV→ESSL 转换链可靠工作）
     config[@"customGLVersion"] = @40;
 
+    // Task 158：mg 家族 GLES / OpenGL 4.0 后端重映射到 MobileGlues 后的
+    // 配置强制（5.1.0 正式版同款形态——9e6fc27 装机日志 latestlog.es /
+    // latestlog.4.0 实证两档全程可玩且 FSR 生效）。
+    //   mode 1（mg GLES 后端）：enableANGLE=3（ForceEnable，绕过 iOS 上
+    //     hasVulkan12()==0 的 ANGLE 支持检测）+ customGLVersion=32——ANGLE
+    //     在 iOS 的实际上限是 GLES 3.0/3.1，桌面 GLSL（#version 400）会被
+    //     ANGLE 编译器拒收导致方块不渲染（5.1.0 时代的同款修复）；
+    //   mode 2（mg OpenGL 4.0 后端）：enableANGLE=0（DisableIfPossible →
+    //     MobileGlues 自有 glslang→SPIRV→ESSL 转译链）+ customGLVersion=40；
+    //   mode 0：独立 MobileGlues 直选或 mg+Vulkan 直连——不强制，
+    //     mobileglues.custom_gl_version 用户分区偏好照常透传（5.1.0 语义；
+    //     Vulkan 直连下 libMobileGL 不读 config.json，Task153 strings 实证，
+    //     写入无害）。
+    // 模式来自 ame158_mg_mobileglues_mode()（存储层判定，与
+    // ame_effective_renderer 的 mg→libmobileglues 重映射天然一致）。
+    int ame158_mode = ame158_mg_mobileglues_mode();
+    if (ame158_mode == 1) {
+        config[@"enableANGLE"] = @3;
+        config[@"customGLVersion"] = @32;
+        NSLog(@"[JavaLauncher] Task158: mg GLES backend -> MobileGlues (enableANGLE=3 ForceEnable, customGLVersion=32; 5.1.0 semantics, FSR1 linkage follows fsr1_setting)");
+    } else if (ame158_mode == 2) {
+        config[@"enableANGLE"] = @0;
+        config[@"customGLVersion"] = @40;
+        NSLog(@"[JavaLauncher] Task158: mg OpenGL 4.0 backend -> MobileGlues (enableANGLE=0, customGLVersion=40; 5.1.0 semantics, FSR1 linkage follows fsr1_setting)");
+    }
+
     id enableNoError = getPrefObject(@"mobileglues.enable_no_error");
     if (enableNoError) {
         config[@"enableNoError"] = @([enableNoError intValue]);
@@ -318,7 +345,9 @@ void init_loadMobileGluesConfig() {
         NSLog(@"[JavaLauncher]   mobileglues.angle_depth_clear_fix_mode = %@ -> angleDepthClearFixMode = %@", angleDepthClearFixMode, config[@"angleDepthClearFixMode"]);
     }
 
-    id customGlVersion = getPrefObject(@"mobileglues.custom_gl_version");
+    // Task 158：mg 重映射会话（mode 1/2）下，ANGLE/GL 版本轴由后端选择独占
+    //（这正是后端浮窗的语义），custom_gl_version 用户偏好只在 mode 0 生效。
+    id customGlVersion = (ame158_mode == 0) ? getPrefObject(@"mobileglues.custom_gl_version") : nil;
     if (customGlVersion) {
         NSString *verStr = [customGlVersion description];
         NSLog(@"[JavaLauncher]   mobileglues.custom_gl_version = %@ (raw)", customGlVersion);
@@ -1008,6 +1037,163 @@ static void ame140_remediateTouchControllerConfig(NSString *gameDir) {
     }
 }
 
+// ============================================================================
+// Task 158（Fix B）：JVM 启动前的游戏库完整性自愈闸门（非阻断）
+//
+// 病历（latestlog.forge，10cee5d 构建，1.20.1-forge-47.4.13 + 116 mods，
+// Forge 走到 Minecraft.<init> 即闪退）：
+//   java.lang.NoClassDefFoundError: com/mojang/text2speech/Narrator
+//     at net.minecraft.client.GameNarrator.<init>
+//
+// 机制闭环（BootstrapLauncher 1.1.2 + securejarhandler 2.1.10 源码逐行实证，
+// 见 scripts/task158_bl/ 取证产物）：
+//   ① BootstrapLauncher.loadLegacyClassPath 回退读 java.class.path；我们的
+//      PojavClassLoader.addURL 重写会把 generateLaunchClassPath 的每个游戏
+//      jar 路径追加进该属性（Java 侧 generateLaunchClassPath 对不存在的文件
+//      "Ignored non-exists file" 直接跳过）；
+//   ② MC-BOOTSTRAP / GAME 模块层由这些 jar 模块化构成；ModuleClassLoader 的
+//      父链是 boot/platform 层——系统类加载器（-cp 上的 launcher.jar 影子类）
+//      对模块层【完全不可见】（Task154 起 launcher.jar 正确地在 ignoreList 里，
+//      那次修复的代价就是模块层失去了 launcher.jar 携带的 com.mojang 桩）；
+//   ③ 模块层里 com.mojang.text2speech 桩已由随包的 mojang-stubs.jar 补齐
+//      （JavaApp/Makefile Task158 规则——它恒在 -cp → 恒在 java.class.path →
+//      自动成为 MC-BOOTSTRAP 模块，GameNarrator 可加载）；
+//   ④ 但【真实游戏库】缺失仍是模块层的静默黑洞：BootstrapLauncher 对不
+//      存在的路径 Files.notExists → continue，磁盘上缺哪个 jar，哪个 jar 的
+//      全部类就在模块层凭空消失——游戏内第一个触类点抛 NoClassDefFoundError，
+//      用户看到的只是"Forge 闪退"。
+//
+// 本闸门把④变成可自愈/可诊断：JVM 启动前遍历合并版 JSON 的 libraries，
+// 逐个核对磁盘存在性，缺者同步下载（官方源 → BMCLAPI 镜像双路），失败仅
+// 记日志点名（非阻断——历史证明部分库缺失可被容忍，如 oshi/objc-bridge；
+// 阻断会把"可容忍缺失"误伤成"无法启动"）。
+// ============================================================================
+static NSData *ame158_fetchSynchronous(NSString *urlString) {
+    NSURL *ame158_url = [NSURL URLWithString:urlString];
+    if (!ame158_url) return nil;
+    NSURLSessionConfiguration *ame158_cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    ame158_cfg.timeoutIntervalForRequest = 20.0;
+    ame158_cfg.timeoutIntervalForResource = 45.0;
+    NSURLSession *ame158_session = [NSURLSession sessionWithConfiguration:ame158_cfg];
+    dispatch_semaphore_t ame158_sem = dispatch_semaphore_create(0);
+    __block NSData *ame158_result = nil;
+    NSURLSessionDataTask *ame158_task = [ame158_session dataTaskWithURL:ame158_url
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            if (error == nil && data.length > 0 &&
+                [response isKindOfClass:NSHTTPURLResponse.class] &&
+                [(NSHTTPURLResponse *)response statusCode] == 200) {
+                ame158_result = data;
+            }
+            dispatch_semaphore_signal(ame158_sem);
+        }];
+    [ame158_task resume];
+    dispatch_semaphore_wait(ame158_sem, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50.0 * NSEC_PER_SEC)));
+    [ame158_task cancel];
+    return ame158_result;
+}
+
+// BMCLAPI 镜像改写（与 ForgeDirectInstaller/PLMirrorCenter 同源的host 映射）
+static NSString *ame158_bmclapiMirror(NSString *urlString) {
+    NSString *ame158_mojang = @"https://libraries.minecraft.net/";
+    NSString *ame158_forge = @"https://maven.minecraftforge.net/";
+    if ([urlString hasPrefix:ame158_mojang]) {
+        return [@"https://bmclapi2.bangbang93.com/libraries/"
+            stringByAppendingString:[urlString substringFromIndex:ame158_mojang.length]];
+    }
+    if ([urlString hasPrefix:ame158_forge]) {
+        return [@"https://bmclapi2.bangbang93.com/maven/"
+            stringByAppendingString:[urlString substringFromIndex:ame158_forge.length]];
+    }
+    return nil;
+}
+
+static void ame158_repairMissingLibraries(NSDictionary *launchTarget) {
+    const char *ame158_gameDir = getenv("POJAV_GAME_DIR");
+    if (!ame158_gameDir || !*ame158_gameDir) return;
+    NSArray *ame158_libs = [launchTarget[@"libraries"] isKindOfClass:NSArray.class]
+        ? launchTarget[@"libraries"] : nil;
+    if (ame158_libs.count == 0) return;
+
+    NSFileManager *ame158_fm = NSFileManager.defaultManager;
+    NSString *ame158_libRoot = [@(ame158_gameDir) stringByAppendingPathComponent:@"libraries"];
+    NSUInteger ame158_present = 0, ame158_repaired = 0, ame158_failed = 0, ame158_skipped = 0;
+
+    for (NSDictionary *ame158_lib in ame158_libs) {
+        if (![ame158_lib isKindOfClass:NSDictionary.class]) continue;
+        NSString *ame158_name = [ame158_lib[@"name"] isKindOfClass:NSString.class]
+            ? ame158_lib[@"name"] : nil;
+        // 与 Java 侧 preProcessLibraries 的 _skip 集合同步：LWJGL 自带、
+        // text2speech 由 mojang-stubs 桩提供（真实 jar 进 classpath 会与桩
+        // split-package，Task158 语义下必须留在 classpath 之外）、twitch 弃用。
+        if (!ame158_name ||
+            [ame158_name hasPrefix:@"org.lwjgl:"] ||
+            [ame158_name hasPrefix:@"com.mojang:text2speech"] ||
+            [ame158_name hasPrefix:@"net.java.dev.jna:platform:"] ||
+            [ame158_name hasPrefix:@"tv.twitch"]) {
+            ame158_skipped++;
+            continue;
+        }
+        // client 伪库条目（tweakVersionJson 添加，path 相对 libraries 的 ../versions）
+        if ([ame158_lib[@"skip"] boolValue]) { ame158_skipped++; continue; }
+        // OS 规则（iOS 视作 osx）：规则不允许的 natives 类库不需要
+        id ame158_rules = ame158_lib[@"rules"];
+        if ([ame158_rules isKindOfClass:NSArray.class] &&
+            [(NSArray *)ame158_rules count] > 0 &&
+            ![MinecraftResourceUtils evaluateRules:(NSArray *)ame158_rules]) {
+            ame158_skipped++;
+            continue;
+        }
+        NSDictionary *ame158_artifact =
+            [ame158_lib[@"downloads"][@"artifact"] isKindOfClass:NSDictionary.class]
+                ? ame158_lib[@"downloads"][@"artifact"] : nil;
+        NSString *ame158_rel = [ame158_artifact[@"path"] isKindOfClass:NSString.class]
+            ? ame158_artifact[@"path"] : nil;
+        // 相对路径含 ".."（版本 jar 伪条目）或无 path 的条目不由本闸门处理
+        if (!ame158_rel || [ame158_rel containsString:@".."]) { ame158_skipped++; continue; }
+        NSString *ame158_dest = [ame158_libRoot stringByAppendingPathComponent:ame158_rel];
+        if ([ame158_fm fileExistsAtPath:ame158_dest]) { ame158_present++; continue; }
+
+        NSString *ame158_url = [ame158_artifact[@"url"] isKindOfClass:NSString.class]
+            ? ame158_artifact[@"url"] : nil;
+        if (!ame158_url) {
+            ame158_failed++;
+            NSLog(@"[JavaLauncher] Task158: library jar missing and no download URL: %@ (%@)",
+                  ame158_name, ame158_dest.lastPathComponent);
+            continue;
+        }
+        NSLog(@"[JavaLauncher] Task158: downloading missing library jar: %@", ame158_name);
+        NSData *ame158_blob = ame158_fetchSynchronous(ame158_url);
+        if (!ame158_blob) {
+            NSString *ame158_mirror = ame158_bmclapiMirror(ame158_url);
+            if (ame158_mirror) {
+                ame158_blob = ame158_fetchSynchronous(ame158_mirror);
+            }
+        }
+        if (ame158_blob) {
+            NSString *ame158_parent = ame158_dest.stringByDeletingLastPathComponent;
+            [ame158_fm createDirectoryAtPath:ame158_parent
+                      withIntermediateDirectories:YES attributes:nil error:nil];
+            if ([ame158_blob writeToFile:ame158_dest options:NSDataWritingAtomic error:nil]) {
+                ame158_repaired++;
+                NSLog(@"[JavaLauncher] Task158: repaired %@ (%lu bytes)",
+                      ame158_dest.lastPathComponent, (unsigned long)ame158_blob.length);
+                continue;
+            }
+        }
+        ame158_failed++;
+        NSLog(@"[JavaLauncher] Task158: could NOT download missing library %@ -- classes in this jar will be absent (possible in-game NoClassDefFoundError)", ame158_name);
+    }
+
+    if (ame158_repaired > 0 || ame158_failed > 0) {
+        NSLog(@"[JavaLauncher] Task158: library gate summary: %lu present, %lu repaired, %lu failed, %lu skipped",
+              (unsigned long)ame158_present, (unsigned long)ame158_repaired,
+              (unsigned long)ame158_failed, (unsigned long)ame158_skipped);
+    } else {
+        NSLog(@"[JavaLauncher] Task158: library gate clean (%lu present, %lu skipped)",
+              (unsigned long)ame158_present, (unsigned long)ame158_skipped);
+    }
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -1176,6 +1362,11 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
     NSString *gameDir;
     NSString *defaultJRETag;
     if ([launchTarget isKindOfClass:NSDictionary.class]) {
+        // Task 158（Fix B）：启动前游戏库完整性自愈闸门——见上方
+        // ame158_repairMissingLibraries 病历（Forge text2speech CNFE 根修 +
+        // 未来任何缺库的静默黑洞自愈）。非阻断：失败只记日志点名。
+        ame158_repairMissingLibraries(launchTarget);
+
         // Get preferred Java version from current profile
         // 26.x 官方强制要求 Java 25（Mojang 自 26.x 起将 javaVersion.majorVersion 设为 25），
         // 不再对 preferredJavaVersion 做任何钳制，直接采纳 Profile 指定的 Java 版本。

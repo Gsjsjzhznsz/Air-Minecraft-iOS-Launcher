@@ -4,7 +4,7 @@
 
  + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 153（2026-09-23，渲染器三案 + Forge 模块层根修）。此前：Task 152/152b（另一会话，Mithril FunctionProvider 钉扎）；151（Bing 每日壁纸）；150（渲染器全局控制退役）；144-149（2026-09-22/23）。
+> 最后更新：Task 158（2026-09-24，mg 后端重映射回 MobileGlues + FSR 恢复 + Forge 模块层根修）。此前：Task 152/152b（另一会话，Mithril FunctionProvider 钉扎）；151（Bing 每日壁纸）；150（渲染器全局控制退役）；144-149（2026-09-22/23）。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 157 提交（内存分配居中卡片弹窗 + Sodium+Iris Shaders，CI 盯绿中）；此前 8b6ec05f（Task 156） |
-| 最新 Task 号 | **157**（多会话并行开发，开新任务前先 fetch 避让编号；154-156 已被并行会话占用，本任务由 154 重编号为 157） |
-| 待用户装机验证 | Task 157（内存卡片弹窗/自动分配开关/Sodium+Iris Shaders 三 jar）+ Task 156 四案根修+三 UI + Task 154（并行，渲染器/Forge）+ Task 153 渲染器三案 + Task 151 Bing 壁纸 + Task 149 六项返工 |
+| 远端 HEAD | 本会话 Task 158 提交（mg 后端重映射回 MobileGlues + Forge 模块层桩 + 缺库闸门，CI 盯绿中）；此前 10cee5d（Task157 CI 修正）+ 用户日志上传 a0ac656 |
+| 最新 Task 号 | **158**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 158（mg ES/4.0 后端=MobileGlues 路径 + FSR 恢复 + Forge 修复）+ Task 157（内存卡片弹窗/Sodium+Iris）+ Task 156（IME/毛玻璃标题/侧边栏深链）+ Task 154/153/151 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -397,3 +397,36 @@ Stage Summary:
 - 产出：本地 main 提交（推送后 CI 出包）；verify_task157 44/44 绿。
 - 用户验证锚点（装机后）：①内存行右侧只有 "xxxx MB" 且带右箭头；②点开 = 居中卡片（右上角✕、大字当前内存、拉条、"自动分配内存"开关），缩放+淡入出入场，无抓手条；③拨开开关 → 拉条变灰显示自动实值、行右侧变"自动分配内存"、✕ 关闭即生效（启动日志 `[Task141] launch memory from auto ratio: xxxx MB`）；④关开关 → 还原手动值；⑤组件区行名"Sodium + Iris Shaders"，非 Fabric 实例点按弹 Fabric API 同构长文案；⑥Fabric 实例一键装 3 jar（下载任务名 Sodium + Iris Shaders + Podium），装完 mods/ 含 sodium/iris/podium 三个文件；⑦组件区灰字含"Sodium + Iris Shaders：优化模组 + 光影加载器 (附带安装Podium)"。
 - 技术要点：allocatedMemory=0 与 memoryAuto=YES 双写保证启动链无需感知新键；旧实例（无标记）显示与启动行为错位为用户定稿接受项（显示手动缺省值、实际按自动比例启动——与 Task141 以来行为一致）；本任务开工时远端被并行会话推进至 156（含另一 verify_task154.py），全部 ame154/Task154 前缀与验证器名重编号为 157 后 rebase（零冲突自动合并），l10n 键数 1946+2=1948。
+
+---
+
+## Task 158（本会话，渲染器 + Forge）
+
+### 用户需求（原话要点）
+1. "把fsr取消掉干嘛"——Task154 把 MobileGL FSR 链退休后，mg 家族三后端全部无 FSR，用户不满。
+2. "我上传了旧版本的log，有4.0有es，是完全正常使用且有fsr"——a0ac656 上传 latestlog.4.0 / latestlog.es 作为 5.1.0 可玩性基准。
+3. "现在的es方块穿透，4.0崩溃，vulkan没有fsr"。
+
+### 判读（用户日志实证，全链闭环）
+- **5.1.0 基准（9e6fc27）**：latestlog.4.0 与 latestlog.es 两会话的渲染器都是 **libmobileglues.dylib（MobileGlues）**——前者 customGLVersion=40（GL 4.0），后者 enableANGLE=3 + customGLVersion=32（ANGLE ES）；均 fsr1Setting=4、MC 26.2 + fabric + 110 mods 全程可玩（swapOK=1920/1034，exit(0) 正常退出）。**5.1.0 用户的"4.0/ES 后端"从来不是 Mithril/MobileGL-Espryt 二进制**——Task131 重构把这两个档位静默换到了上游二进制上。
+- **4.0 崩溃（10cee5d，libmithril）**：Mithril 把 MC 26.2 pipeline 着色器转 MSL 时 `Sampler0Smplr` 未声明（未用采样器被剥离但引用残留）→ MoltenVK pipeline 编译失败 → vkCreateGraphicsPipelines 重试路径 commit_frame SIGSEGV。上游二进制缺陷，启动器不可修。
+- **ES 方块不渲染（libMobileGL DirectGLES/Espryt）**：Task140/153/154 清完启动器侧全部嫌疑 + Task156 强制 drawelements 档实测仍不渲染——上游翻译层缺陷，启动器不可修。
+- **Forge 闪退（10cee5d）**：NoClassDefFoundError: com/mojang/text2speech/Narrator @ GameNarrator.<init>。源码级机制闭环（BootstrapLauncher 1.1.2 + securejarhandler 2.1.10 全文判读，scripts/task158_bl/ 存档）：ModuleClassLoader 父链=boot/platform 层，系统类加载器对模块层不可见；Task154 起 launcher.jar 进 ignoreList（split-package 根治）的代价=模块层失去 com.mojang 桩；Java 侧 preProcessLibraries 又恒 _skip text2speech → 模块层无人提供该类。
+
+### 修复
+1. **mg 后端重映射（LauncherPreferences.m ame_effective_renderer mg 分支）**：GLES / OpenGL 4.0 两档解析为 libmobileglues.dylib（dylib 存在守卫，缺失落回 Task142 守卫链）。Vulkan 直连（默认）保持 libMobileGL.dylib（da5918a 语义 + Task154 退休链零回退）。
+2. **5.1.0 配置强制（JavaLauncher.init_loadMobileGluesConfig + ame158_mg_mobileglues_mode）**：mg+GLES → enableANGLE=3(ForceEnable)+customGLVersion=32；mg+4.0 → enableANGLE=0+customGLVersion=40；mode 0（独立 MobileGlues/mg+Vulkan）透传用户分区偏好。AME83 FSR 能力表对 libmobileglues 恒 YES → **fsr1_setting 档位联动原样复活**（窗口=surface/档位 + MobileGlues FSR1 渲染器侧升采样 + 触控同口径 = 5.1.0 逐位同款）。
+3. **Forge 模块层桩（JavaApp/Makefile 新规则）**：构建 mojang-stubs.jar（仅 com/mojang/text2speech 桩类，与 launcher.jar 同源同字节，getNarrator() 恒 NarratorDummy）随包进 app/libs → 恒在 -cp → 恒在 java.class.path → BootstrapLauncher 自动模块化进 MC-BOOTSTRAP 层 → GameNarrator 可加载（真实 text2speech 库保持 _skip，防与桩 split-package）。
+4. **启动前缺库闸门（JavaLauncher ame158_repairMissingLibraries，非阻断）**：遍历合并版 JSON libraries 核对磁盘存在性，缺者同步下载（官方→BMCLAPI 双源），失败仅日志点名——BootstrapLauncher 对不存在路径静默 continue 的"缺库=模块层黑洞"从此可自愈可诊断。
+5. l10n 四语言值级更新（FSR 详情/renderer_backend 详情/mithril 标签去"实验性"，零键增删）+ FAQ 标签页同步 + version.h addendum。
+
+### 验证
+- verify_task158 **35/35 ALL GREEN**（A 日志取证 5 + B 重映射锚点 7 + C Forge 桩/闸门 6 + C7 桩本地 ECJ 编译+jar 组装+类清单 3 + D l10n 键集不变+新文案 9 + E version.h + F 语法配平/Makefile tab + G 级联）。
+- 级联基线对拍（task158_baseline_compare.sh，HEAD worktree 对拍）：129-143/150-154/156-158 全部 BASELINE-IDENTICAL 或预期改善；task156 E5/G 重锚（FSR 详情新语义 + task154 基线 36P/3F→35P/4F 随用户日志轮换漂移）；task133 E2 重锚（enableANGLE 偏好读取仍删，Task158 后端模式写入合法）；task137 G3/G4 重锚（l10n 值级行 + JavaApp//Makefile 文件集）；task138 C1 为日志轮换环境项（基线同败）。
+- ECJ 编译门（task94）三段全过；Makefile tab 卫生检查（Edit 工具 tab→空格事故被 python 定点替换规避，worklog 教训复发拦截）。
+
+### Stage Summary
+- 装机验证锚点：mg+GLES/4.0 后端 → 日志 `RENDERER is set to libmobileglues.dylib` + `[JavaLauncher] Task158: mg GLES backend -> MobileGlues (enableANGLE=3 ...)` / `mg OpenGL 4.0 backend -> ...` + FSR 联动行 `[SurfaceVC] Task83 FSR linkage: renderer=libmobileglues.dylib preset=N scale=...`；画面=方块正常渲染 + FSR 档位生效。
+- Forge 1.20.1 → 过 GameNarrator（无 Narrator CNFE）+ `[JavaLauncher] Task158: library gate ...` 行；mojang-stubs.jar 在 IPA 的 libs/ 内。
+- Vulkan 直连=MobileGL 仍无 FSR（伪 EGL 无升采样钩子，结构性限制）——FSR 行详情/FAQ 已诚实指向 GLES/4.0 后端或「分辨率」缩放。
+- 遗留：Mithril/MobileGL-Espryt 两个上游二进制的原生缺陷仍在（已被重映射绕开，不再是用户路径）；设备侧 text2speech-1.17.9.jar 若曾缺失由闸门自动补下。

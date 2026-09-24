@@ -264,6 +264,13 @@ static float ame78_fsr_preset_scale(NSInteger preset) {
 //     9f32cb4/1d4ff3a 会话）：MobileGL 直呈全分辨率、无任何启动器侧
 //     FSR 介入 = 正常。mgFsrScale 恒 1.0 = 缩窗、输入除法、延迟武装
 //     全部天然失效，与 da5918a 逐位对齐。FSR 仍可选 MobileGlues/zink。
+//     Task158 更新：mg 的 GLES / OpenGL 4.0 后端已重映射回 MobileGlues
+//     （libmobileglues.dylib，5.1.0 用户实际可玩路径——见
+//     LauncherPreferences.m 的 ame_effective_renderer mg 分支），本函数
+//     对其返回 YES → FSR 档位联动随 mobileglues.fsr1_setting 恢复，
+//     与 5.1.0 装机日志（latestlog.es / latestlog.4.0，fsr1Setting=4、
+//     MC 渲染窗口=surface/2.00、exit(0) 正常退出）逐位同款。Vulkan 直连
+//     后端（libMobileGL.dylib）维持不联动。
 static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     if (renderer.length == 0) return NO;
     if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;

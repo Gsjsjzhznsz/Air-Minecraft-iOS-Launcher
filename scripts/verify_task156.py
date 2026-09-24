@@ -135,8 +135,11 @@ check("E3 section0 页脚（background.effect.footer）",
       'localize(@"background.effect.footer", nil)' in bsv)
 check("E4 两行图标分化（circle.lefthalf.filled / drop.halffull）",
       "circle.lefthalf.filled" in bsv and "drop.halffull" in bsv)
-check("E5 FSR 详情诚实化（mg 家族不支持 → video 分辨率）",
-      "mg 系列" in rd("Natives/resources/zh-Hans.lproj/Localizable.strings")
+# Task158 重锚：mg 的 GLES/OpenGL 4.0 后端重映射回 MobileGlues 后 FSR 恢复联动，
+# 详情文案改为「GLES/4.0 后端支持 FSR；Vulkan 直连不支持 → 分辨率缩放」。
+check("E5 FSR 详情（Task158：GLES/4.0 后端支持 FSR；Vulkan 直连 → video 分辨率）",
+      "GLES／OpenGL 4.0 后端" in rd("Natives/resources/zh-Hans.lproj/Localizable.strings")
+      and "Vulkan 直连后端" in rd("Natives/resources/zh-Hans.lproj/Localizable.strings")
       and "分辨率」缩放" in rd("Natives/resources/zh-Hans.lproj/Localizable.strings"))
 check("E6 侧边栏 7 卡全部挂点击路由",
       rpp.count("[self ame156_attachInfoCardTap:") == 7)
@@ -184,9 +187,12 @@ for t in ["153", "151"]:
     check(f"G verify_task{t} 全绿（{tail}）", r.returncode == 0)
 r = subprocess.run([sys.executable, "scripts/verify_task154.py"],
                    capture_output=True, text=True)
-baseline = "36 passed, 3 failed"  # 日志轮换环境项（E1/E3/E5）为既有基线
+# Task158 基线漂移：用户上传新日志（d380bcc/0cb7708）后，task154 的 E4（旧 Mithril
+# 会话的 sodium 版本串）与 E1/E3/E5 一同成为日志轮换环境项（35P/4F，语义锚全部 intact）。
+baseline = "35 passed, 4 failed"  # 日志轮换环境项（E1/E3/E4/E5）为既有基线
 check(f"G verify_task154 与基线一致（{baseline}；实为 {r.stdout.strip().splitlines()[-2] if len(r.stdout.strip().splitlines())>1 else '?'}）",
-      "36 passed, 3 failed" in r.stdout and "E1" in r.stdout and "E3" in r.stdout and "E5" in r.stdout)
+      "35 passed, 4 failed" in r.stdout and "E1" in r.stdout and "E3" in r.stdout
+      and "E4" in r.stdout and "E5" in r.stdout)
 r = subprocess.run([sys.executable, "scripts/verify_task150.py"],
                    capture_output=True, text=True,
                    env={**os.environ, "TASK150_REPO": REPO})

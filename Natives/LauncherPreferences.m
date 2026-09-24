@@ -372,6 +372,36 @@ NSString *ame_effective_renderer(void) {
     // （mobileglues.renderer_backend，默认 Vulkan 直连）在启动时解析。
     if ([renderer isEqualToString:@ RENDERER_KEY_MG]) {
         NSString *ame142_backend = ame142_effective_backend_key();
+        // Task 158（mg 后端重映射）：GLES / OpenGL 4.0 两档改走 MobileGlues
+        //（libmobileglues.dylib）——即 5.1.0 正式版用户实际可玩的两条路径
+        //（9e6fc27 装机日志 latestlog.es / latestlog.4.0 实证：前者
+        // enableANGLE=3+customGLVersion=32，后者 customGLVersion=40，均
+        // fsr1Setting=4、MC 26.2 全程可玩、swap 链健康、exit(0) 正常退出）。
+        // Task131 起这两档被接到 MobileGL-Espryt(DirectGLES) / libmithril
+        // 两个上游二进制后：ES 档方块不可见（Task140/153/154 清完启动器侧
+        // 全部嫌疑、Task156 强制 drawelements 档位实测仍不渲染——上游翻译层
+        // 缺陷，启动器不可修），4.0 档 Mithril 管线着色器编译崩溃
+        //（Sampler0Smplr 未声明 → MoltenVK pipeline 创建失败 → 重试路径
+        // commit_frame SIGSEGV，10cee5d 装机日志实锤）。两档回接 MobileGlues：
+        //   - ame83_fsr_capable_renderer(libmobileglues)=YES → FSR 档位联动
+        //     随 mobileglues.fsr1_setting 恢复（5.1.0 同款 MobileGlues FSR1，
+        //     窗口=表面/档位系数 + 渲染器侧升采样，输入换算同口径）；
+        //   - MobileGlues config 由 init_loadMobileGluesConfig 按
+        //     ame158_mg_mobileglues_mode() 强制 5.1.0 语义（GLES：ANGLE
+        //     ForceEnable+GL3.2；4.0：GL4.0+ANGLE off）；
+        //   - Vulkan 直连（默认）保持 libMobileGL.dylib 不变——da5918a 语义
+        //     与 Task154 的 mgl_fsr 退休链零回退（MobileGL 的 EGL 是伪 EGL，
+        //     无 FSR 升采样钩子，强行联动=输入错位+毁帧，见 Task154 病历）。
+        // 本函数为纯解析器（layerClass/显示层高频调用），不打日志；一次性
+        // 装机锚点在 init_loadMobileGluesConfig 的 Task158 行。
+        if ([ame142_backend isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] ||
+            [ame142_backend isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+            if (rendererLibraryExists(@ RENDERER_NAME_MOBILEGLUES)) {
+                return @ RENDERER_NAME_MOBILEGLUES;
+            }
+            // libmobileglues.dylib 缺失（非常规构建）→ 落回下方守卫链
+            //（libMobileGL → auto），行为与后端 dylib 缺失一致。
+        }
         NSString *ame142_physical = @(ame_physical_renderer_dylib(ame142_backend.UTF8String));
         if ([ame142_physical hasSuffix:@".dylib"] && rendererLibraryExists(ame142_physical)) {
             return ame142_backend;
@@ -594,6 +624,42 @@ NSString* ame142_effective_backend_key(void) {
         if (ame142_legacy == 1) return @ RENDERER_NAME_MOBILEGL;
     }
     return @ RENDERER_NAME_MOBILEGL;
+}
+
+// Task 158：mg 家族 GLES / OpenGL 4.0 后端重映射（ame_effective_renderer 的
+// mg 分支）到 MobileGlues 后，该会话应使用的 MobileGlues 配置模式。
+// 返回值：
+//   0 = 非 mg-remap 会话——独立 MobileGlues 渲染器（存量 profile 直选
+//       libmobileglues.dylib）或 mg+Vulkan 直连（config.json 照写但
+//       libMobileGL 不读它，Task153 strings 实证），用户 MobileGlues 分区
+//       偏好原样透传（5.1.0 语义，含 enable_angle / custom_gl_version 档位）；
+//   1 = mg GLES 后端——强制 enableANGLE=3 (ForceEnable) + customGLVersion=32
+//      （ANGLE 在 iOS 的 GLES 上限；5.1.0 latestlog.es 同款形态）；
+//   2 = mg OpenGL 4.0 后端——强制 enableANGLE=0 + customGLVersion=40
+//      （MobileGlues 2.0.16 默认 GL 档；5.1.0 latestlog.4.0 同款形态）。
+// 消费者：JavaLauncher.init_loadMobileGluesConfig（配置强制点，唯一调用方）。
+// 模式判定只看存储层（profile renderer 键 + mobileglues.renderer_backend），
+// 与 ame_effective_renderer 的解析结果天然一致（mg+gles/mithril 恒解析为
+// libmobileglues.dylib；mg+vulkan 恒解析为 libMobileGL.dylib）。
+int ame158_mg_mobileglues_mode(void) {
+    ame142_migrateRendererStorage();
+    NSString *ame158_pr = [PLProfiles resolveKeyForCurrentProfile:@"renderer"];
+    if (![ame158_pr isKindOfClass:NSString.class] || ame158_pr.length == 0) {
+        return 0;
+    }
+    if (![ame158_pr isEqualToString:@ RENDERER_KEY_MG]) {
+        // legacy：未迁移进程态的家族键直选（ame142_migrateRendererStorage 正常
+        // 已在首次读取时把它迁成 "mg"；此处防御首读竞态。独立 MobileGlues
+        // 直选（libmobileglues.dylib）不在此列——它走用户自有设置）。
+        if (![ame158_pr isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES] &&
+            ![ame158_pr isEqualToString:@ RENDERER_NAME_MITHRIL]) {
+            return 0;
+        }
+    }
+    NSString *ame158_backend = ame142_effective_backend_key();
+    if ([ame158_backend isEqualToString:@ RENDERER_NAME_MOBILEGL_GLES]) return 1;
+    if ([ame158_backend isEqualToString:@ RENDERER_NAME_MITHRIL]) return 2;
+    return 0;
 }
 
 // Task 142：一次性存储分层迁移（幂等；进程内 static 哨兵，可被任何读前

@@ -141,8 +141,12 @@ check("D6 基类 pickExtraAction 机制退役（Task134 随浮窗行移除）",
 print("== E. ANGLE ES 驱动开关退役（与 GLES 后端重复，iOS 死配置）==")
 check("E1 设置行已删（LPVC 无 enable_angle 行）",
       '@"key": @"enable_angle"' not in lpvc)
-check("E2 JavaLauncher 读取已删（enableANGLE/config 写入随行退役）",
-      "enable_angle" not in jl and "enableANGLE" not in jl)
+# Task158 重锚：mg 的 GLES/4.0 后端重映射回 MobileGlues 后，init_loadMobileGluesConfig
+# 重新按后端模式写 enableANGLE（mode 1=3 ForceEnable / mode 2=0）——值来自后端键
+# （mobileglues.renderer_backend），不再是已退役的 enable_angle 用户开关。退役语义
+# 精确化为：不再【读取】该偏好键、设置行/默认值保持删除。
+check("E2 enable_angle 偏好读取已删（Task158 后端模式写入除外，设置行/默认值退役保持）",
+      'getPrefObject(@"mobileglues.enable_angle")' not in jl)
 check("E3 PLPreferences 默认已删",
       '@"enable_angle"' not in plp)
 

@@ -369,10 +369,15 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       or all(("component.sodium" in l or "renderer_follow_global_toggle" in l
               or "renderer_shadowed_by_profile" in l
               or l.lstrip("+-").strip().startswith("//") or l.strip() in ("+", "-"))
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task158 重锚：FSR 详情/renderer_backend 详情与 mithril 标签的纯值更新
+      # （4 语言 ×3 行，零键增删——G3 的键集守卫仍在位）。
+      or all(("fsr1_setting" in l or "renderer_backend" in l)
              for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",
-      all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md"))
+      all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "scripts/task158_",
+                                     "worklog.md", "JavaApp/", "Makefile"))
           for ln in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],
                                    capture_output=True, text=True).stdout.splitlines()
           if ln.strip()))

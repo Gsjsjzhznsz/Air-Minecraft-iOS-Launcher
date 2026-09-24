@@ -1326,3 +1326,48 @@
 //     video Resolution scaler; the right panel's 7 info cards are tappable
 //     and deep-link into settings (LauncherPreferencesViewController
 //     ameDeepLinkKey scroll+flash; game version card -> VersionManager).
+
+// REVISION 17 addendum (Task 158, no bump): mg backend remap back to
+//     MobileGlues + Forge module-layer text2speech stubs + launch-time
+//     library gate. User's ground truth (their own uploaded 5.1.0 logs,
+//     9e6fc27 build): latestlog.4.0 (customGLVersion=40) and latestlog.es
+//     (enableANGLE=3 + customGLVersion=32) both ran MC 26.2 fully playable
+//     WITH fsr1Setting=4 (swapOK=1920 / 1034, exit(0)) -- those sessions
+//     were libmobileglues.dylib, NOT the MobileGL/Mithril binaries the
+//     Task131 rework silently substituted under the same "mg" label.
+//     (1) ame_effective_renderer's mg branch now resolves the GLES and
+//     OpenGL 4.0 backend keys to libmobileglues.dylib (MobileGlues; dylib
+//     existence-guarded, falls back to the Task142 chain). ame83 FSR
+//     capability therefore returns YES for them: the fsr1_setting preset
+//     linkage (MC window = surface/scale + renderer-side FSR1 upscale +
+//     matching touch math) is restored bit-for-bit to the 5.1.0 behavior.
+//     init_loadMobileGluesConfig forces the 5.1.0 config per backend via
+//     ame158_mg_mobileglues_mode(): GLES -> enableANGLE=3 (ForceEnable) +
+//     customGLVersion=32; 4.0 -> enableANGLE=0 + customGLVersion=40; mode 0
+//     (standalone MobileGlues / mg Vulkan-direct) keeps passing the user's
+//     own MobileGlues section preferences through. Vulkan direct stays
+//     libMobileGL.dylib (da5918a semantics; Task154's mgl_fsr retirement
+//     untouched -- its EGL is fake, FSR linkage there equals input skew).
+//     (2) Forge 1.20.1 Narrator CNFE (10cee5d latestlog.forge, crash at
+//     GameNarrator.<init>): BootstrapLauncher 1.1.2 + securejarhandler
+//     2.1.10 sources verified line-by-line (scripts/task158_bl/) -- the
+//     MC-BOOTSTRAP/GAME ModuleClassLoaders parent to the boot/platform
+//     layers, the system classloader is invisible to them, and
+//     launcher.jar is ignoreListed (Task154), so nothing provides
+//     com.mojang.text2speech inside the module layer. Fix: JavaApp/Makefile
+//     now also builds mojang-stubs.jar (only the com/mojang/text2speech
+//     stub classes, same bytes as launcher.jar's), shipped into app/libs
+//     -> always on -cp -> always in java.class.path -> auto-modularized
+//     into MC-BOOTSTRAP (filename matches no ignoreList prefix). The real
+//     text2speech library stays _skipped in Java preProcessLibraries
+//     (it would split-package with the stub module). Device anchor: Forge
+//     gets past GameNarrator, no NoClassDefFoundError.
+//     (3) Launch-time library gate (ame158_repairMissingLibraries,
+//     non-blocking): before the JVM starts, every non-skipped library in
+//     the merged version JSON is checked on disk; missing jars download
+//     synchronously (official URL -> BMCLAPI mirror) so a silently-missing
+//     library stops turning into an in-game NoClassDefFoundError crash
+//     (BootstrapLauncher silently skips non-existent paths). Failures are
+//     logged by name and never block (some missing libs are historically
+//     tolerated). Anchors: "[JavaLauncher] Task158: library gate summary"
+//     / "downloading missing library jar".
