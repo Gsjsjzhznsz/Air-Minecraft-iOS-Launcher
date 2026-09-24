@@ -132,12 +132,12 @@ $(OUTPUTDIR)/patchsvc.jar: $(CLASSES)
 $(OUTPUTDIR)/mojang-stubs.jar: $(OUTPUTDIR)/launcher.jar
 	@set -e
 	@rm -rf $(OUTPUTDIR)/mojang-stubs
-	@mkdir -p $(OUTPUTDIR)/mojang-stubs
+	@mkdir -p $(OUTPUTDIR)/mojang-stubs/com/mojang
 	@if [ ! -d "$(OUTPUTDIR)/launcher/com/mojang/text2speech" ]; then \
 		echo "ERROR: launcher classes missing com/mojang/text2speech (Task158 mojang-stubs)"; \
 		exit 1; \
 	fi
-	@cp -R $(OUTPUTDIR)/launcher/com/mojang/text2speech $(OUTPUTDIR)/mojang-stubs/
+	@cp -R $(OUTPUTDIR)/launcher/com/mojang/text2speech $(OUTPUTDIR)/mojang-stubs/com/mojang/
 	@cd $(OUTPUTDIR)/mojang-stubs && $(BOOTJDK)/jar -cf ../mojang-stubs.jar com
 	@echo "Created $(OUTPUTDIR)/mojang-stubs.jar (Forge module-layer com.mojang.text2speech stubs, Task158)"
 
