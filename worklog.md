@@ -390,3 +390,19 @@ Stage Summary
 - 已知边界：collectionView 边缘磁贴外侧阴影由 collectionView 自身裁剪收口（原生 app 常见形态）；相邻磁贴间隙淡阴影叠加属新拟态正常形态，若装机观感需调浓度可改比例系数。
 - CI 记录：push 后 fetch 发现并行会话 df96d13 抢占 162 号 + 其 CI 失败（AccountList duplicate method）→ 本批重编 163（rebase 融合：源码自动合并无冲突；version.h/announcements/worklog 手工融合；verify_task162.py 保留并行 68 项版、我的 36 项版改名 verify_task163.py；ame162 独占标识→ame163 精确改号）；我的首 run 36026472118 被并行 hotfix 678a76f 的 concurrency 取消；**组合 run 36026565195（678a76f，基于 447a677）completed success**——含 Task163 全部改动的最终产物 ipa/tipa/dSYM 可下载，待用户装机验证。
 - 融合期重锚链：task160 D6/H1 注记改号 163、task157 A1 / task159 H4 锚改 ame163、task150 F6（Task163 推翻 Task149 '取消阴影'→'新拟态凸起阴影'）、task161/162 ROOT 环境变量化；终态 163=36/36、162=68/68、161=56/56、160=47/47、157/159/150/137/149/141 全绿。
+
+---
+Task ID: 162 (续)
+Agent: main (Super Z)
+Task: CI 闭环
+
+Work Log:
+- df96d13 首推 CI 失败（run 36024818658）：AccountListViewController.m 重复声明 reloadAccountList（:89 我方新增 vs :883 文件末既有的 FCL 风格实现——grep "reloadData" 时漏查了既有方法的调用面）；lwjgl overlay（GLFW.java）编译通过
+- 热修 33a0281：删除我方重复定义，既有 reloadAccountList 成为唯一实现，viewWillAppear/双通知三个触发口全部复用；verify_task162 F1-F4 重锚（新增唯一实现检查）
+- 推送遇并行会话 Task 163（447a677，新拟态作用域修正，已自觉从 162 改号为 163 并在我的 60%/100% 文案同步之上叠加）——rebase 干净落地（仅 AccountListViewController.m + verify_task162.py 两文件差异）
+- 复验：162=68/68、163=36/36（TASK163_REPO 注入）、161=56/56、160=47/47
+- CI run 36026565195（678a76f）completed success；artifacts：com.air-devs.air-ios.ipa 205.8MB + trollstore .tipa + dSYM
+
+Stage Summary:
+- Task162 八案全链闭环：根修 + 验证器 + 级联 + CI 绿 + 新 IPA 就绪（含 Task163 新拟态修正）
+- 装机待验证锚点见上一节 Stage Summary；mg 的 FSR 注意：mg+GLES/OpenGL 4.0 后端 → MobileGlues FSR1（装机日志看 "Task83 FSR linkage ... scale=2.00"）；mg+Vulkan 直连后端无 FSR（Task154 设计语义）；zink 自带 FSR（本轮日志已实证）
