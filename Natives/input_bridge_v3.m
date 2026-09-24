@@ -1825,6 +1825,14 @@ BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds) {
     return (ame161_now - ame161_lastSentKeyTime) <= withinSeconds;
 }
 
+// Task161（CI 9b57650 修复）：g_sdlWindow 是本文件的 static，SurfaceViewController
+// 不能直接引用（首次提交 use of undeclared identifier 'g_sdlWindow' 编译错误）。
+// 导出判定函数：YES = GLFW 输入路径（MC ≤26.2，聊天键盘自动弹的唯一适用面）；
+// NO = SDL3 路径（MC 26.3+，系统键盘由 SDL screen keyboard 协议自理）。
+BOOL ame161_inputPathIsGLFW(void) {
+    return g_sdlWindow == NULL;
+}
+
 void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods) {
     static int keySendCount = 0;
     keySendCount++;

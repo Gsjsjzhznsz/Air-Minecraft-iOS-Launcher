@@ -319,6 +319,9 @@ BOOL CallbackBridge_buttonKeySynthesizeText(int key);
 // 开键）。SurfaceViewController.updateGrabState 在 grab 转 false 时消费。
 // 实现于 input_bridge_v3.m（nativeSendKey 侧记录）。
 BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds);
+// Task161（CI 修复）：输入路径判定——YES = GLFW（MC ≤26.2），NO = SDL3（26.3+）。
+// g_sdlWindow 是 input_bridge_v3.m 的 static，导出本函数供 UI 侧判定。
+BOOL ame161_inputPathIsGLFW(void);
 void CallbackBridge_nativeSendCursorPos(char event, CGFloat x, CGFloat y);
 void CallbackBridge_nativeSendKey(int key, int scancode, int action, int mods);
 void CallbackBridge_nativeSendMouseButton(int button, int action, int mods);

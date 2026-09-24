@@ -162,18 +162,20 @@ svc = rd("Natives/SurfaceViewController.m")
 jl = rd("Natives/JavaLauncher.m")
 check("F1 按键侧记录器（T=84/SLASH=53 + 时间窗判定）",
       "BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds) {" in ib
-      and "ame161_lastSentKey != 84 && ame161_lastSentKey != 53" in ib)
+      and "ame161_lastSentKey != 84 && ame161_lastSentKey != 53" in ib
+      and "BOOL ame161_inputPathIsGLFW(void) {" in ib)
 check("F2 nativeSendKey 记录按下键（action==1）",
       "if (action == 1) {\n        ame161_lastSentKey = key;" in ib.replace("\r", ""))
 check("F3 utils.h 声明（SurfaceViewController 可见）",
-      "BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds);" in uh)
-check("F4 updateGrabState 消费：仅 GLFW 路径（g_sdlWindow == NULL）+ 1.5s 窗",
-      "if (g_sdlWindow == NULL) {" in svc and "ame161_lastSentKeyWasChatOpener(1.5)" in svc)
+      "BOOL ame161_lastSentKeyWasChatOpener(NSTimeInterval withinSeconds);" in uh
+      and "BOOL ame161_inputPathIsGLFW(void);" in uh)
+check("F4 updateGrabState 消费：仅 GLFW 路径（ame161_inputPathIsGLFW，CI 9b57650 修复 g_sdlWindow static 可见性）+ 1.5s 窗",
+      "if (ame161_inputPathIsGLFW()) {" in svc and "ame161_lastSentKeyWasChatOpener(1.5)" in svc)
 check("F5 自动弹出标记 + 回游戏自动收起（手动 ⌨ 不受影响）",
       "static BOOL ame161_autoShown = NO;" in svc
       and "grab restored -> auto-shown keyboard dismissed" in svc)
-check("F6 26.3 SDL 路径零影响（判定门 g_sdlWindow == NULL）",
-      "仅 GLFW\n    // 路径（g_sdlWindow == NULL）生效" in svc)
+check("F6 26.3 SDL 路径零影响（判定门 ame161_inputPathIsGLFW）",
+      "仅 GLFW\n    // 路径（ame161_inputPathIsGLFW，MC ≤26.2）生效" in svc)
 check("F7 日志锚点（chat key + ungrab）",
       "Task161: chat key + ungrab -> keyboard auto-shown" in svc)
 

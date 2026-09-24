@@ -1640,12 +1640,12 @@ void ame139_fsr_heal_reset_input_scale(void) {
     // 判定：grab 转 false（开界面）+ 最近 1.5s 内启动器发过 T/斜杠（vanilla
     // 聊天/命令行开键，见 ame161_lastSentKeyWasChatOpener）+ 本页键盘未开
     // → inputTextField becomeFirstResponder（与 ⌨ 按钮同路径）。仅 GLFW
-    // 路径（g_sdlWindow == NULL）生效；26.3 的 SDL 键盘不受影响。
+    // 路径（ame161_inputPathIsGLFW，MC ≤26.2）生效；26.3 的 SDL 键盘不受影响。
     // 自动弹出的键盘在 grab 恢复 true（回游戏/关聊天）时自动收起；
     // ame161_autoShown 标记保证 ⌨ 手动唤出的键盘不被误收（游戏内 ⌨ 键盘
     // 常用于快捷栏按键）。
     static BOOL ame161_autoShown = NO;
-    if (g_sdlWindow == NULL) {
+    if (ame161_inputPathIsGLFW()) {
         if (isGrabbing == JNI_FALSE &&
             !self.inputTextField.isFirstResponder &&
             ame161_lastSentKeyWasChatOpener(1.5)) {
