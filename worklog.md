@@ -388,3 +388,5 @@ Task: 装机反馈修正——新拟态范围纠偏（侧栏/右面板阴影退�
 Stage Summary
 - 装机验证锚点（无壁纸模式）：①主页磁贴（Profile/Info/公告/新闻/快捷）呈现新拟态凸起双阴影（右下暗影+左上高光，随卡片尺寸等比）；②下载页版本卡片同款凸起；③侧栏/右面板平贴表面+外侧两角圆角，无阴影溢出，旁边卡片不再被压；④实例设置页渲染器/内存/Java 等所有跳转行箭头与分辨率行完全同款（细灰 chevron）；⑤壁纸模式行为不变（磁贴/版本卡毛玻璃，侧栏透壁纸）；⑥深浅色切换阴影/表面自动重刷。
 - 已知边界：collectionView 边缘磁贴外侧阴影由 collectionView 自身裁剪收口（原生 app 常见形态）；相邻磁贴间隙淡阴影叠加属新拟态正常形态，若装机观感需调浓度可改比例系数。
+- CI 记录：push 后 fetch 发现并行会话 df96d13 抢占 162 号 + 其 CI 失败（AccountList duplicate method）→ 本批重编 163（rebase 融合：源码自动合并无冲突；version.h/announcements/worklog 手工融合；verify_task162.py 保留并行 68 项版、我的 36 项版改名 verify_task163.py；ame162 独占标识→ame163 精确改号）；我的首 run 36026472118 被并行 hotfix 678a76f 的 concurrency 取消；**组合 run 36026565195（678a76f，基于 447a677）completed success**——含 Task163 全部改动的最终产物 ipa/tipa/dSYM 可下载，待用户装机验证。
+- 融合期重锚链：task160 D6/H1 注记改号 163、task157 A1 / task159 H4 锚改 ame163、task150 F6（Task163 推翻 Task149 '取消阴影'→'新拟态凸起阴影'）、task161/162 ROOT 环境变量化；终态 163=36/36、162=68/68、161=56/56、160=47/47、157/159/150/137/149/141 全绿。
