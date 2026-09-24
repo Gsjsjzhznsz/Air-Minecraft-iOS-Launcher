@@ -203,7 +203,8 @@ print("=" * 72)
 print("F. 发布资产（announcements.json 同步）")
 print("=" * 72)
 ann = json.loads(read("announcements.json"))
-e = ann["announcements"][0]
+# Task162 重锚：公告数组按日期降序，新条目（服务器推荐等）会插到头部——发布资产锚点改按 id 定位 v6.0.0 发行条目。
+e = [a for a in ann["announcements"] if a.get("id") == "v6-0-0-release-2026-09-21"][0]
 check("F1  summary 口径（Sodium+Iris+Podium 一键安装）",
       "Sodium+Iris+Podium 一键安装" in e["summary"])
 check("F2  content bullet（Sodium + Iris Shaders 组件安装 + Iris 光影加载器）",

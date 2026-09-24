@@ -69,7 +69,17 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
 /// 重写 baseURL getter，根据 PLMirrorCenter 的资源搜索（AssetSearch）策略
 /// 动态返回官方或 MCIM 镜像 URL，这样所有使用 self.baseURL 的请求都会自动走镜像
 - (NSString *)baseURL {
-    return [PLMirrorCenter curseForgeAPIBaseURL];
+    NSString *ame162_resolved = [PLMirrorCenter curseForgeAPIBaseURL];
+    // Task162(CurseForge source completely unusable root fix): when no API key is configured, force fallback to
+    // MCIM mirror. Official api.curseforge.com always returns 403 for requests without x-api-key,
+    // and the default policy official_first makes keyless devices always hit official -> field-tested "curseforge
+    // loading source completely unusable". MCIM mirror is keyless (server comes with public key,
+    // field-tested GET /mods/search without x-api-key returns 200); devices with a key configured keep the original
+    // mirror policy semantics (official_first/mirror_first/speed_first all take effect as before).
+    if ([self apiKey].length == 0 && [ame162_resolved containsString:@"api.curseforge.com"]) {
+        return [PLMirrorCenter mcimCurseForgeAPIBaseURL];
+    }
+    return ame162_resolved;
 }
 
 + (instancetype)sharedInstance {
@@ -146,6 +156,17 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
         return YES;
     }
     return NO;
+}
+
+// Task162: CurseForge source availability (for UI gating). Difference from isAPIKeyConfigured:
+// the key is only an entry pass for direct official connection; when no key is configured, baseURL already
+// forcibly falls back to the MCIM mirror (keyless, field-tested 200), the source is available to everyone. The
+// "check key before switching to CurseForge source" gates should use this method -- the old gate
+// directly blocked keyless users and sent them to the settings page to configure a key, while registering a
+// CurseForge developer key is nearly infeasible for ordinary users, equivalent to "completely unusable".
+// The API key settings entry is retained: devices with a key configured can go official via the mirror policy.
++ (BOOL)isSourceAvailable {
+    return YES;
 }
 
 - (NSError *)missingAPIKeyError {

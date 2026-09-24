@@ -347,7 +347,19 @@ static NSTimeInterval kBingRequestTimeout = 12.0;
         BackgroundManager *bgManager = [BackgroundManager sharedManager];
         if ([bgManager hasBackground] && ![bgManager isBingSource]) return; // 双检
         if ([bgManager hasBackground] && [bgManager.currentBackgroundPath isEqualToString:path]) {
-            return; // 已是今日图，避免每日无谓重建闪烁
+            // 已是今日图。Task162：静默跳过仅当背景【真实挂载在活 UI】上——
+            // 状态层已登记但容器脱窗（历史会话首次应用失败/宿主引用丢失）时
+            // 重放一次应用（setBingBackgroundImageAtPath 的插入+透明化重放链），
+            // 自愈装机实测"Bing 壁纸加载完成还要重启才有图"的脱节态。
+            if ([bgManager isBackgroundLiveAttached]) {
+                return; // 避免每日无谓重建闪烁
+            }
+            NSLog(@"[BingWallpaper] Task162: today image already registered but not live-attached -- re-applying for self-heal");
+            [bgManager setBingBackgroundImageAtPath:path completion:^(BOOL ok, NSError *_Nullable err) {
+                NSLog(@"[BingWallpaper] Task162 self-heal re-apply %@ (%@)",
+                      ok ? @"OK" : @"FAILED", path.lastPathComponent);
+            }];
+            return;
         }
         [bgManager setBingBackgroundImageAtPath:path completion:^(BOOL ok, NSError *_Nullable err) {
             NSLog(@"[BingWallpaper] Task151 auto-apply %@ (%@)", ok ? @"OK" : @"FAILED", path.lastPathComponent);

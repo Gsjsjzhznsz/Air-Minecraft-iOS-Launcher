@@ -76,6 +76,12 @@ FOUNDATION_EXPORT NSString *const PLMirrorMCIMRootURL;
 /// CurseForge API base URL（等价 MCIMMirror 同名能力：按 AssetSearch 策略返回官方或 MCIM 镜像基址）
 + (NSString *)curseForgeAPIBaseURL;
 
+/// Task162：MCIM 的 CurseForge API 镜像基址（https://mod.mcimirror.top/curseforge/v1）。
+/// 公开常量口径供 CurseForgeAPI 的无 key 回落使用：MCIM 镜像免 x-api-key
+///（服务端自带公共 key，实测 GET /mods/search 200），官方 api.curseforge.com
+/// 则强制要求——无 key 设备唯一可用路径就是镜像。
++ (NSString *)mcimCurseForgeAPIBaseURL;
+
 /// 读取指定资源类型当前生效的镜像策略（含旧键回退逻辑）
 + (PLMirrorPolicy)policyForType:(PLMirrorResourceType)type;
 

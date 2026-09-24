@@ -38,17 +38,7 @@
     }
 
     // List accounts
-    NSString *listPath = [NSString stringWithFormat:@"%s/accounts", getenv("POJAV_HOME")];
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray *files = [fm contentsOfDirectoryAtPath:listPath error:nil];
-    for(NSString *file in files) {
-        NSString *path = [listPath stringByAppendingPathComponent:file];
-        BOOL isDir = NO;
-        [fm fileExistsAtPath:path isDirectory:(&isDir)];
-        if(!isDir && [file hasSuffix:@".json"]) {
-            [self.accountList addObject:parseJSONFromFile(path)];
-        }
-    }
+    [self reloadAccountList];
 
     // 参照 FCL：卡片式账户列表，去除默认分割线，圆角卡片自带视觉分隔
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
@@ -72,11 +62,60 @@
                                              selector:@selector(reapplyBackgroundEffect)
                                                  name:@"BackgroundUIEffectChanged"
                                                object:nil];
+    // Task162：账号增删/切换后自动刷新列表（用户实测：添加账号完成后必须
+    // 手动刷新账号标签页才出现）。旧实现只在 viewDidLoad 扫一次 accounts
+    // 目录，push 登录页返回后列表过期。三个触发口：viewWillAppear（pop
+    // 返回）、AccountChanged、UpdateAccountInfo。
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(ame162_handleAccountsChanged)
+                                                 name:@"AccountChanged"
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(ame162_handleAccountsChanged)
+                                                 name:@"UpdateAccountInfo"
+                                               object:nil];
+}
+
+// Task162：重扫 accounts 目录并刷新表格（主线程）。
+- (void)ame162_handleAccountsChanged {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self reloadAccountList];
+        [self.tableView reloadData];
+    });
+}
+
+// Task162：扫描 accounts 目录重建 accountList（从 viewDidLoad 原地提取，
+// 可重复调用）。新增/删除/登录成功后重扫，返回本页即见。
+- (void)reloadAccountList {
+    if (self.accountList == nil) {
+        self.accountList = [NSMutableArray array];
+    } else {
+        [self.accountList removeAllObjects];
+    }
+    NSString *listPath = [NSString stringWithFormat:@"%s/accounts", getenv("POJAV_HOME")];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray *files = [fm contentsOfDirectoryAtPath:listPath error:nil];
+    for(NSString *file in files) {
+        NSString *path = [listPath stringByAppendingPathComponent:file];
+        BOOL isDir = NO;
+        [fm fileExistsAtPath:path isDirectory:(&isDir)];
+        if(!isDir && [file hasSuffix:@".json"]) {
+            [self.accountList addObject:parseJSONFromFile(path)];
+        }
+    }
 }
 
 /// 背景效果改变时重新应用透明化（由 BackgroundUIEffectChanged 通知触发）
 - (void)reapplyBackgroundEffect {
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
+}
+
+// Task162：pop 返回本页时重扫账号目录——添加账户流程（push 登录页 →
+// 登录成功 pop 回来）后新账号立即可见，无需手动刷新。
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self reloadAccountList];
+    [self.tableView reloadData];
 }
 
 - (void)dealloc {

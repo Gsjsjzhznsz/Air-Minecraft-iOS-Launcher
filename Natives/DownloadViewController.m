@@ -1679,8 +1679,11 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     NSString *currentSource = [PLPreferences currentDownloadSourceForType:type];
     if ([currentSource isEqualToString:@"curseforge"]) return;
 
-    // API Key 未配置时在内容区显示提示（替代弹窗）
-    if (![CurseForgeAPI isAPIKeyConfigured]) {
+    // Task162：CurseForge 源免 key 可用（无 key 时 baseURL 强制落 MCIM 镜像，
+    // 实测 200）。旧门控拦无 key 用户去设置页配 key（注册 CF 开发者 key 对
+    // 普通用户几乎不可行 = 装机实测“完全无法使用”）；API key 入口保留，
+    // 配了 key 的设备按镜像策略可走官方直连。
+    if (![CurseForgeAPI isSourceAvailable]) {
         InlineMessageView *msgView = [InlineMessageView showInViewController:self
                                                                        title:localize(@"i18n_str_171", nil)
                                                                     message:localize(@"i18n_str_172", nil)
@@ -1717,8 +1720,8 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     NSString *currentSource = [PLPreferences currentDownloadSourceForType:type];
     if ([currentSource isEqualToString:@"curseforge"]) return;
 
-    // API Key 未配置时提示
-    if (![CurseForgeAPI isAPIKeyConfigured]) {
+    // Task162：同 curseforgeSourceButtonClicked——免 key 可用（MCIM 镜像回落）。
+    if (![CurseForgeAPI isSourceAvailable]) {
         InlineMessageView *msgView = [InlineMessageView showInViewController:self
                                                                        title:localize(@"i18n_str_171", nil)
                                                                     message:localize(@"i18n_str_172", nil)
@@ -2307,8 +2310,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         [self.loadingIndicator startAnimating];
     }
 
-    // 世界 tab 强制 CurseForge，但需 API Key（与实际请求一致的三层 fallback 判断）；缺失时给出明确入口提示
-    if (![CurseForgeAPI isAPIKeyConfigured]) {
+    // 世界 tab 强制 CurseForge。Task162：免 key 可用（无 key 时 baseURL 强制落
+    // MCIM 镜像，实测 200），空态拦截退役——key 仅官方直连需要。
+    if (![CurseForgeAPI isSourceAvailable]) {
         [self.loadingIndicator stopAnimating];
         [self.worldTableView.refreshControl endRefreshing];
         self.isLoadingWorlds = NO;

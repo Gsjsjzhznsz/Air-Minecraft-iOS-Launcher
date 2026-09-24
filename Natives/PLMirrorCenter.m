@@ -371,6 +371,11 @@ static BOOL ame138_probeInFlight[2] = {NO, NO};
     return @"https://api.curseforge.com/v1";
 }
 
+// Task162：MCIM CurseForge 镜像基址（唯一定义处；无 key 设备的强制回落目标）。
++ (NSString *)mcimCurseForgeAPIBaseURL {
+    return [NSString stringWithFormat:@"%@/curseforge/v1", PLMirrorMCIMRootURL];
+}
+
 + (PLMirrorPolicy)policyForType:(PLMirrorResourceType)type {
     // 优先读取新版分资源类型策略键（值 official_first / mirror_first）
     NSString *key = nil;

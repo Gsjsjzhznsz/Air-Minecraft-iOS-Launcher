@@ -1463,3 +1463,48 @@
 // (auto-shown flag auto-dismisses on re-grab; manual keyboard unaffected;
 // SDL path untouched). JavaLauncher's stale "auto will be resolved to
 // ANGLE" warning reworded to the Task144/161 semantics.
+
+// REVISION 17 addendum (Task 162, no bump): eight-fix round on the bf91f41
+// build (cbef9d5 logs, iPad Air M4 / iPadOS 27). (1) Profile identity
+// consistency -- THE "switch a renderer and it silently reverts to auto"
+// root cause: ProfileSettingsViewController saved under the profile's
+// display NAME while the launch chain resolves by the dict KEY
+// (selectedProfileName), and the modpack import collision suffix
+// ("Name (2)" key vs "Name" field) plus the home version picker writing
+// the name field into selectedProfileName made key!=name a reachable
+// steady state; the editor now records profileDictKey at load and
+// reads+writes the same key (rename re-keys old->new, existing-entry
+// base taken from the target key so partial dicts never clobber real
+// entries), and the picker selects by sorted key snapshot (allValues
+// row-drift retired). Renderer/memory/resolution/java writes all land
+// on the entry the launch reads. (2) Forge save-load crash: the lwjgl
+// overlay's glfwSetInputMode called net.kdt.pojavlaunch.uikit.UIKit
+// (launcher.jar-only class) on cursor grab -- Forge's MC-BOOTSTRAP
+// module layer (launcher.jar ignoreList-ed) can't see it ->
+// NoClassDefFoundError in ReceivingLevelScreen.onClose; the Java-side
+// call is removed and the GLFW-path nativeSetGrabbing now runs the
+// Task63 refreshGuiScaleNatively (same as the SDL path), keeping hotbar
+// hit-testing fed with zero class-visibility dependencies. (3) Bing
+// "loads but needs a restart": the already-today silent skip now checks
+// isBackgroundLiveAttached (container in a live window + host refs
+// alive) and re-plays setBingBackgroundImageAtPath when the registered
+// state has no live UI, self-healing any past detached apply on every
+// metadata sync / foreground / manual refresh. (4) Wallpaper defaults
+// per user decree: frosted glass, opacity 60%, blur 100% (first-run /
+// never-saved devices only). (5) Home avatar missing after tab switch:
+// updateSkinDisplay now goes AvatarManager local -> session NSCache ->
+// network (cache fill), so viewWillAppear renders instantly instead of
+// flashing the placeholder through a full re-download. (6) Account list
+// refreshes on viewWillAppear + AccountChanged/UpdateAccountInfo
+// (adding an account no longer needs a manual refresh). (7) CurseForge
+// source usable without an API key: with no key configured the API base
+// URL is forced to the MCIM mirror (server-side public key, verified
+// keyless GET /mods/search -> 200) and the five UI gates switch from
+// isAPIKeyConfigured to isSourceAvailable -- official-direct remains
+// available for keyed devices under the mirror policy. (8)
+// announcements.json: server recommendation mysv.dpdns.org entry added
+// (dated top-of-list) and the v6.0.0 defaults wording synced to the new
+// 60%/100% + follow-system values. verify_task162 68 checks; cascades
+// re-anchored: task150/157/159 announcement index [0] -> by-id (new
+// entries legally take the head slot), task160 B2/B3/B5/F1/F4 re-anchored
+// to the Task162 defaults decree.

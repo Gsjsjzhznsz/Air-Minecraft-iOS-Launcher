@@ -39,6 +39,13 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 @property(nonatomic) PLPickerView* versionPickerView;
 @property(nonatomic) UITextField* versionTextField;
 @property(nonatomic) int profileSelectedAt;
+// Task162（选择器键稳定化）：主页版本选择器的行→profile 映射快照（字典键，
+// 排序后固定顺序）。旧实现每次 dataSource 回调都实时取 profiles.allValues
+//（无序，字典变更后顺序可能变），且 didSelectRow 把【name 字段】写进
+// selectedProfileName——键≠名（整合包重名导入 " (2)"）时选中错档/
+// 指向不存在的条目，叠加 ProfileSettings 的幻影写入，就是装机实测
+// “切换渲染器为其他都会自动切回自动”的另一半根因。
+@property(nonatomic, strong) NSArray<NSString *> *ame162PickerKeys;
 
 // ===== 下载中心入口（参照 FCL/ZL2/HMCL 下载进度弹窗入口）=====
 // 在工具栏上添加"下载中心"按钮，点击后弹出 DownloadTasksViewController，
@@ -295,15 +302,22 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     [self fetchLocalVersionList];
     // Reload launcher_profiles.json
     [PLProfiles updateCurrent];
+    [self ame162RefreshPickerKeys];
     [self.versionPickerView reloadAllComponents];
     // Reload selected profile info
-    self.profileSelectedAt = [PLProfiles.current.profiles.allKeys indexOfObject:PLProfiles.current.selectedProfileName];
+    self.profileSelectedAt = (int)[self.ame162PickerKeys indexOfObject:PLProfiles.current.selectedProfileName];
     if (self.profileSelectedAt == -1) {
         // This instance has no profiles?
         return;
     }
     [self.versionPickerView selectRow:self.profileSelectedAt inComponent:0 animated:NO];
     [self pickerView:self.versionPickerView didSelectRow:self.profileSelectedAt inComponent:0];
+}
+
+// Task162：重建选择器键快照（排序 → 行号稳定；字典增删后行号不漂移）。
+- (void)ame162RefreshPickerKeys {
+    NSArray *keys = PLProfiles.current.profiles.allKeys;
+    self.ame162PickerKeys = [keys sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
 }
 
 - (void)dealloc {
@@ -791,11 +805,15 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 
 #pragma mark - UIPickerView stuff
 - (void)pickerView:(PLPickerView *)pickerView didSelectRow:(NSInteger)row inComponent:(NSInteger)component {
-    self.profileSelectedAt = row;
+    self.profileSelectedAt = (int)row;
     //((UIImageView *)self.versionTextField.leftView).image = [pickerView imageAtRow:row column:component];
     ((UIImageView *)self.versionTextField.leftView).image = [pickerView imageAtRow:row column:component];
     self.versionTextField.text = [self pickerView:pickerView titleForRow:row forComponent:component];
-    PLProfiles.current.selectedProfileName = self.versionTextField.text;
+    // Task162：selectedProfileName 必须落【字典键】（与 resolveKeyForCurrentProfile
+    // 同一命名空间）。旧行为写 name 字段，键≠名时启动链读到 nil/幻影条目。
+    if (row >= 0 && row < (NSInteger)self.ame162PickerKeys.count) {
+        PLProfiles.current.selectedProfileName = self.ame162PickerKeys[row];
+    }
 }
 
 - (NSInteger)numberOfComponentsInPickerView:(UIPickerView *)pickerView {
@@ -803,16 +821,29 @@ static void *ProgressObserverContext = &ProgressObserverContext;
 }
 
 - (NSInteger)pickerView:(UIPickerView *)pickerView numberOfRowsInComponent:(NSInteger)component {
-    return PLProfiles.current.profiles.count;
+    // Task162：行号一律基于键快照；字典变更后（增删 profile）自动重建，
+    // 避免 allValues 无序导致行号↔条目错位。
+    if (self.ame162PickerKeys.count != PLProfiles.current.profiles.count) {
+        [self ame162RefreshPickerKeys];
+    }
+    return self.ame162PickerKeys.count;
 }
 
 - (NSString *)pickerView:(UIPickerView *)pickerView titleForRow:(NSInteger)row forComponent:(NSInteger)component {
-    return PLProfiles.current.profiles.allValues[row][@"name"];
+    // Task162：显示 name 字段，但行号经快照键定位（越界防御）。
+    if (row < 0 || row >= (NSInteger)self.ame162PickerKeys.count) return @"";
+    NSDictionary *profile = PLProfiles.current.profiles[self.ame162PickerKeys[row]];
+    NSString *name = profile[@"name"];
+    return [name isKindOfClass:NSString.class] && name.length > 0 ? name : self.ame162PickerKeys[row];
 }
 
 - (void)pickerView:(UIPickerView *)pickerView enumerateImageView:(UIImageView *)imageView forRow:(NSInteger)row forComponent:(NSInteger)component {
     UIImage *fallbackImage = [[UIImage imageNamed:@"DefaultProfile"] _imageWithSize:CGSizeMake(40, 40)];
-    NSString *urlString = PLProfiles.current.profiles.allValues[row][@"icon"];
+    // Task162：同款快照键定位。
+    NSString *urlString = nil;
+    if (row >= 0 && row < (NSInteger)self.ame162PickerKeys.count) {
+        urlString = PLProfiles.current.profiles[self.ame162PickerKeys[row]][@"icon"];
+    }
     [imageView setImageWithURL:[NSURL URLWithString:urlString] placeholderImage:fallbackImage];
 }
 

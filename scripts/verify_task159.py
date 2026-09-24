@@ -214,7 +214,8 @@ print()
 print("=" * 72)
 print("F. 发布资产：announcements.json 四处同步")
 print("=" * 72)
-e = json.loads(read("announcements.json"))["announcements"][0]
+# Task162 重锚：公告数组按日期降序，新条目（服务器推荐等）会插到头部——发布资产锚点改按 id 定位 v6.0.0 发行条目。
+e = [a for a in json.loads(read("announcements.json"))["announcements"] if a.get("id") == "v6-0-0-release-2026-09-21"][0]
 check("F1  summary 收尾补本轮三项（26.0+ 预选 / 内存输入框 / 分辨率缩放）",
       "Java 25）预选" in e["summary"] and "内存分配输入框弹窗" in e["summary"]
       and "分辨率缩放每实例单独设置" in e["summary"])

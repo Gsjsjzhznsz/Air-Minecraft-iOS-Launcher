@@ -1152,7 +1152,20 @@ public class GLFW
         if (mode == GLFW_CURSOR) {
             switch (value) {
                 case GLFW_CURSOR_DISABLED:
-                    net.kdt.pojavlaunch.uikit.UIKit.updateMCGuiScale();
+                    // Task 162（Forge 存档闪退根修）：不再调用
+                    // net.kdt.pojavlaunch.uikit.UIKit.updateMCGuiScale()。
+                    // 装机日志实锤（bf91f41，1.20.1-forge-47.4.13 + Connector）：
+                    // 进存档 ReceivingLevelScreen 关闭 → MouseHandler 抓鼠标 →
+                    // 本方法 → UIKit（launcher.jar 独有类）→ Forge 的
+                    // MC-BOOTSTRAP 模块层（securejarhandler ModuleClassLoader，
+                    // 父链只有 boot/platform 层，launcher.jar 被 -DignoreList
+                    // 排除在模块层外）不可见 → NoClassDefFoundError
+                    // net/kdt/pojavlaunch/uikit/UIKit → Ticking screen 崩溃。
+                    // guiScale 的刷新职责已由 native 侧接管：
+                    // CallbackBridge_nativeSetGrabbing（GLFW 路径，Task 162 补齐）
+                    // 与 CallbackBridge_syncGrabStateFromSDL（SDL 路径，Task 63）
+                    // 都会调 refreshGuiScaleNatively() 直读 options.txt，
+                    // 算法与 Java 侧完全一致，且不依赖 JNIEnv/类可见性。
                     CallbackBridge.nativeSetGrabbing(true);
                     break;
                 default: CallbackBridge.nativeSetGrabbing(false);

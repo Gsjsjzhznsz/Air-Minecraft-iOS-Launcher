@@ -113,15 +113,15 @@ bm = read('Natives/BackgroundManager.m')
 check("B1  ui_theme 默认（Task161 重锚：用户指令“外观模式默认跟随系统”，推翻 Task160 的 light 缺省 → auto + 迁移）",
       '@"ui_theme": @"auto",' in plp
       and 'ui_theme_explicit' in plp)
-check("B2  uiOpacity 默认 0.1（毛玻璃模式下面板几乎全透）",
-      "_uiOpacity = 0.1;" in bm and "_uiOpacity = 0.7;" not in bm)
-check("B3  blurIntensity 默认 0.75",
-      "_blurIntensity = 0.75;" in bm and "_blurIntensity = 0.7; //" not in bm)
+check("B2  uiOpacity 默认 0.6（Task162 重锚：用户定稿“毛玻璃，60% 的透明度，100% 的模糊”，推翻 Task160 的 0.1 缺省）",
+      "_uiOpacity = 0.6;" in bm and "_uiOpacity = 0.1;" not in bm and "_uiOpacity = 0.7;" not in bm)
+check("B3  blurIntensity 默认 1.0（Task162 重锚：100%）",
+      "_blurIntensity = 1.0;" in bm and "_blurIntensity = 0.75;" not in bm and "_blurIntensity = 0.7; //" not in bm)
 check("B4  默认效果仍为毛玻璃（BackgroundUIEffectBlur）",
       "_uiEffect = BackgroundUIEffectBlur;" in bm)
-check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto）",
+check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto；Task162 重锚：透明度/模糊注释改口径）",
       "仅新装/重置偏好生效，存量用户已保存的值不变" in plp
-      and "仅新装/重置生效，存量用户已保存值不变" in bm)
+      and "仅新装/从未保存过该键的设备生效" in bm)
 
 print()
 print("=" * 72)
@@ -225,8 +225,8 @@ try:
     valid = True
 except Exception:
     valid = False
-check("F1  announcements.json 合法 + summary 尾追加",
-      valid and "新拟态 UI 回归（双阴影高光按 CSS 规格原生实现）、浅色模式与毛玻璃新默认" in ann)
+check("F1  announcements.json 合法 + summary 尾追加（Task162 重锚：默认值文案改 60%/100% + 跟随系统）",
+      valid and "新拟态 UI 回归（双阴影高光按 CSS 规格原生实现）、外观跟随系统与毛玻璃新默认（透明度 60%/模糊 100%）" in ann)
 check("F2  content 新增「新拟态 UI 与默认体验」块（四 bullet）",
       "**新拟态 UI 与默认体验（本轮视觉大改）**" in ann
       and "**新拟态 UI 全面回归**" in ann
@@ -236,9 +236,9 @@ check("F2  content 新增「新拟态 UI 与默认体验」块（四 bullet）",
 check("F3  分辨率 bullet 口径更新（灰字箭头样式 + 25~150）",
       "右侧参数改为与内存分配同款灰字+向右箭头样式" in ann
       and "可编辑 25~150" in ann)
-check("F4  EN 尾段同步",
+check("F4  EN 尾段同步（Task162 重锚：opacity 60% / blur 100%）",
       "native Neumorphism per the user's CSS spec" in ann
-      and "opacity 10% / blur 75%" in ann
+      and "opacity 60% / blur 100%" in ann
       and "clamp widened to 25-150" in ann)
 vh = read('Natives/external/MobileGlues/MobileGlues-cpp/version.h')
 check("F5  version.h REVISION 17 addendum (Task 160)",

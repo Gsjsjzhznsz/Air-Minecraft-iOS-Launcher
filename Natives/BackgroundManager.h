@@ -57,6 +57,12 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 // 语义：用户手动设置的图片/视频来源为 user，优先于 Bing 自动应用；
 // 无背景或来源为 bing 时，BingWallpaperManager 可每日自动换图。
 @property (nonatomic, readonly) BOOL isBingSource;
+// Task162：背景容器是否真实挂在活窗口上（自愈判定）。
+// 状态层（currentBackgroundPath）与视图层（globalBackgroundContainer）
+// 可能脱节——例如历史会话的首次应用只落了状态、容器插入失败/宿主引用
+// 丢失，用户实测“Bing 壁纸加载完成还要重启才有图”。Bing 链路用它判断
+// 是否需要重放应用，避免静默跳过。
+- (BOOL)isBackgroundLiveAttached;
 // 将已存在于磁盘的 Bing 壁纸图直接登记为当前背景（不再复制到 backgrounds/
 // 目录，避免每日图双份存储；来源标记为 bing）。
 - (void)setBingBackgroundImageAtPath:(NSString *)path completion:(void (^)(BOOL success, NSError * _Nullable error))completion;

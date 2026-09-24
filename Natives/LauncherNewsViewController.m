@@ -18,6 +18,7 @@
 #import "AnnouncementItem.h"
 #import "AnnouncementListViewController.h"
 #import "IconLoader.h"
+#import "AvatarManager.h"
 #import <SafariServices/SafariServices.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -1297,6 +1298,21 @@ static NSString *festivalGreeting(void) {
 
 // MARK: - Data Loading
 
+// Task162：主页头像会话级缓存（URL → UIImage）。旧实现每次 viewWillAppear
+// 的 updateSkinDisplay 都裸 NSData dataWithContentsOfURL 重新下载，切标签页
+// 返回时网络往返未完成 → cellForItem 先用旧值/默认头像渲染，弱网下头像
+// 长时间“缺失”（用户实测：切其它标签页再回主页，顶部头像必须点一下才有）。
+// 本缓存保证第二次进入同步命中；进程内有效（跨启动首次仍会下载一次）。
+static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
+    static NSCache<NSString *, UIImage *> *cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [[NSCache alloc] init];
+        cache.countLimit = 16;
+    });
+    return cache;
+}
+
 - (void)updateSkinDisplay {
     BaseAuthenticator *auth = BaseAuthenticator.current;
     
@@ -1312,20 +1328,37 @@ static NSString *festivalGreeting(void) {
         }
         
         // 加载头像 (与右侧面板相同来源)。Task136：皮肤全身预览退场，
-        // 不再请求全身渲染图，主页顶卡只显示 MC 头像
-        NSString *avatarURL = auth.authData[@"profilePicURL"];
-        if (avatarURL) {
-            avatarURL = [avatarURL stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:avatarURL]];
-                if (data) {
-                    UIImage *img = [UIImage imageWithData:data];
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                        self.currentAvatar = img;
-                        [self reloadProfileSection];
+        // 不再请求全身渲染图，主页顶卡只显示 MC 头像。
+        // Task162：三层链——① AvatarManager 本地自定义头像（与右面板
+        // updateAccountInfo 同源，磁盘直读零延迟）；② 会话缓存（切标签页
+        // 返回同步命中，不再闪烁默认头像）；③ 网络拉取（成功后回填缓存）。
+        UIImage *ame162_local = [[AvatarManager sharedManager] avatarForAccount:auth.authData[@"accountId"]];
+        if (ame162_local) {
+            self.currentAvatar = ame162_local;
+        } else {
+            NSString *avatarURL = auth.authData[@"profilePicURL"];
+            if (avatarURL) {
+                avatarURL = [avatarURL stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
+                UIImage *ame162_cached = [ame162_avatarCache() objectForKey:avatarURL];
+                if (ame162_cached) {
+                    // 命中缓存：同步上屏，本次不再发起网络请求
+                    self.currentAvatar = ame162_cached;
+                } else {
+                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                        NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:avatarURL]];
+                        if (data) {
+                            UIImage *img = [UIImage imageWithData:data];
+                            if (img) {
+                                [ame162_avatarCache() setObject:img forKey:avatarURL];
+                            }
+                            dispatch_async(dispatch_get_main_queue(), ^{
+                                self.currentAvatar = img;
+                                [self reloadProfileSection];
+                            });
+                        }
                     });
                 }
-            });
+            }
         }
     } else {
         self.currentUsername = localize(@"i18n_str_357", nil);

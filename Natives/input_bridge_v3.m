@@ -1459,6 +1459,16 @@ JNIEXPORT jstring JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeClipboard(JNI
 JNIEXPORT void JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeSetGrabbing(JNIEnv* env, jclass clazz, jboolean grabbing, jfloat xset, jfloat yset) {
     isGrabbing = grabbing;
 
+    // Task162：GLFW 路径补齐 guiScale 原生刷新（与 SDL 路径
+    // CallbackBridge_syncGrabStateFromSDL 的 Task63 调用对齐）。
+    // 旧链路依赖 Java 侧 GLFW.glfwSetInputMode → UIKit.updateMCGuiScale()
+    // 推送（launcher.jar 独有类），Forge 的 MC-BOOTSTRAP 模块层不可见 →
+    // NoClassDefFoundError 存档闪退（Task162 已把 Java 侧调用移除）；
+    // native 直读 options.txt 无 JNIEnv/类可见性依赖，算法与 Java 侧
+    // 完全一致（见 readGuiScaleFromOptions 注释块），物品栏命中判定
+    // （mcscale）在两种加载器形态下都保持新鲜。
+    refreshGuiScaleNatively();
+
     // Manage SDL cursor visibility: hide when grabbing (in-game), show when not (menu)
     static SDL_HideCursor_func *pSDL_HideCursor = NULL;
     static SDL_ShowCursor_func *pSDL_ShowCursor = NULL;

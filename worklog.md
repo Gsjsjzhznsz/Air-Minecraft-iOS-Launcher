@@ -4,7 +4,7 @@
 
  + 「滚动近况」即可开工；更早历史一律查 worklog-archive.md，勿通读）
 
-> 最后更新：Task 158（2026-09-24，mg 后端重映射回 MobileGlues + FSR 恢复 + Forge 模块层根修）。此前：Task 152/152b（另一会话，Mithril FunctionProvider 钉扎）；151（Bing 每日壁纸）；150（渲染器全局控制退役）；144-149（2026-09-22/23）。
+> 最后更新：Task 162（2026-09-24，profile 身份一致性=渲染器回退根修 / Forge 存档闪退 / Bing 自愈 / 壁纸默认 60%/100% / 头像缓存 / 账号刷新 / CurseForge 免 key / 公告服务器推荐）。此前：Task 161（六案根修）；158（mg 后端重映射）；151-160 见近况。
 > 新会话规则：新任务记录**追加到本文件最末尾**（`## Task N` 或 `---/Task ID:` 模板均可）；收尾时同步更新下面「当前状态」表；本文件超过 ~400 行时把最旧的任务段挪进 worklog-archive.md。
 
 ### 一句话
@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 161 提交（六案根修：auto 跟随 mg 后端键→FSR 复活 / 壁纸设置页 glass 修 / Bing 静默应用根修 / 外观默认跟随系统+迁移 / 侧边栏深链闪退 / 26.2 聊天自动弹键盘，CI 盯绿中）；此前 9c66184（Task160 CI 绿） |
-| 最新 Task 号 | **161**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 161（六案）+ Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化）+ Task 158 + 157 + 156 |
+| 远端 HEAD | 本会话 Task 162 提交（八案根修：profile 身份一致性=渲染器回退 auto 根修 / Forge 存档闪退（UIKit 模块层）/ Bing 脱窗自愈 / 壁纸默认毛玻璃 60%/100% / 主页头像缓存 / 账号列表自动刷新 / CurseForge 免 key 走 MCIM 镜像 / 公告服务器推荐 mysv.dpdns.org，CI 盯绿中）；此前 bf91f41（Task161 CI 绿） |
+| 最新 Task 号 | **162**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 162（八案）+ Task 161（六案）+ Task 160（新拟态/默认配置/弹窗背景/重影修复）+ Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化）+ Task 158 + 157 + 156 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135/149/158 路径依赖 + task140 G2/G3 日志轮换），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -448,3 +448,26 @@ Stage Summary:
 ### Stage Summary
 - 装机验证锚点：①整合包实例（renderer 未设）+ 设置页后端选 GLES/4.0 → 日志 `RENDERER is set to libmobileglues.dylib` + `[SurfaceVC] Task83 FSR linkage: renderer=libmobileglues.dylib preset=4 scale=2.00` + MobileGlues FSR1 生效（画面=渲染分辨率升采样）；后端选 Vulkan/默认 → 行为与 9c66184 一致（libMobileGL）；②重启后壁纸设置页文字/按钮/滑块全部正常可交互（glass 走 backgroundView）；③首启联网数秒后 Bing 壁纸不重启即上屏（日志出现 `Task151 auto-apply OK` + `Task152: transparency refreshed`）；④未手动选过外观的设备自动跟随系统（日志 `Task161: ui_theme 'dark' was a historical default ... migrated to 'auto'`）；⑤侧边栏启动器版本/JIT/内存两卡点击直达设置对应行并高亮（日志 `deep-linked to row`），不再闪退；⑥26.2 及以下游戏内按 T/斜杠打开聊天 → 键盘自动弹出（日志 `Task161: chat key + ungrab -> keyboard auto-shown`），回游戏自动收起；26.3 行为不变。
 - 已知边界：GLFW 路径的键盘自动弹只覆盖聊天/命令行（T/斜杠前驱）；告示牌/书与笔等右键场景仍需 ⌨ 手动（歧义大，故意不自动化）。
+
+---
+Task ID: 162
+Agent: main (Super Z)
+Task: 用户八案装机反馈根修（bf91f41 构建 = Task161 修复后的新 IPA，cbef9d5 两份日志）：①"切换渲染器为其他都会自动切回自动" + "mg的fsr依旧失效" ②"forge加载存档闪退" ③"bing壁纸加载完成还是要重启才能有图片" ④"壁纸设置默认值为毛玻璃，60%的透明度，100%的模糊" ⑤"切换其他标签页再切换回主页，上方的头像缺失，必须点击一下" ⑥"账号添加完成需要手动刷新账号标签页" ⑦"curse forge加载源完全无法使用" ⑧"在公告添加服务器推荐：mysv.dpdns.org"
+
+Work Log:
+- 判读：旧会话日志实锤 "renderer written to PROFILE ONLY 'Fabulously Optimized' = mg/libOSMesa.8.dylib" 两次写入后，启动链 "Task120: profile renderer was (null) -> auto"——写入与读取用了两个不同身份
+- ①根因（Profile 身份不一致，三处叠加）：ProfileSettingsViewController 以 name 字段为字典键写；ModpackImportService 重名导入产生键 "Name (2)" + name 字段 "Name"；主页版本选择器把 name 字段写进 selectedProfileName + allValues 无序行漂移。修复：编辑器加载时记录 profileDictKey（读源同写目标、空基底回退 working copy、重命名按旧键删新键建并同步 selected/profileDictKey）；选择器改排序键快照（didSelectRow 落字典键、漂移自愈重建、越界防御）。渲染器/内存/分辨率/Java 全部字段随之修复（= mg 的 FSR 丢失根因：mg 选择从未落到真实条目 → 恒 auto；mg+GLES/4.0 后端才有 MobileGlues FSR1，mg+Vulkan 直连无 FSR 属 Task154 设计语义，zink 有）
+- ②根因：进存档 ReceivingLevelScreen.onClose → MouseHandler 抓鼠标 → GLFW.glfwSetInputMode → UIKit.updateMCGuiScale()（launcher.jar 独有类）→ Forge MC-BOOTSTRAP 模块层 NoClassDefFoundError。修复：lwjgl overlay 移除 UIKit 调用；nativeSetGrabbing（GLFW JNI 路径）补 refreshGuiScaleNatively()（Task63 native 直读，与 SDL 路径对齐）
+- ③根因："已是今日图"静默跳过不检查活 UI。修复：BackgroundManager.isBackgroundLiveAttached（容器→window→宿主三段判定）；静默跳过前检查，未挂载则重放 setBingBackgroundImageAtPath（每次元数据同步/回前台/手动刷新都是自愈口）
+- ④壁纸默认值：uiOpacity 0.1→0.6、blurIntensity 0.75→1.0（仅新装/从未保存过键的设备）
+- ⑤主页头像：AvatarManager 本地 → 会话 NSCache → 网络三层链（viewWillAppear 同步命中，不再裸重下载）
+- ⑥账号列表：reloadAccountList 提取 + viewWillAppear 重扫 + AccountChanged/UpdateAccountInfo 双通知
+- ⑦CurseForge：实测 MCIM 镜像免 key（curl 无 x-api-key → 200）→ baseURL 无 key 强制落镜像 + isSourceAvailable 替换 6 处门控（DownloadViewController×3 / ModVersion / ShaderVersion / ServerList）；有 key 设备镜像策略语义不变
+- ⑧公告：新增"推荐服务器：mysv.dpdns.org"（2026-09-24 置顶）；v6.0.0 文案默认值同步 60%/100% + 跟随系统（CN+EN）
+- version.h REVISION 17 addendum (Task 162)
+- 验证：verify_task162 新建 68/68 ALL GREEN；级联 161=56/56、160=47/47（重锚）、158=32/33（C6 环境性=基线）、156=52/52、150=43/43 + 157=44/44 + 159=48/48（公告锚点 [0]→按 id 重锚）、149=35/35、151=46/46；其余与 stash 基线逐项一致（差异仅"预期文件集"类检查，提交自愈）
+- 教训：终端显示层吞 "[m" 序列（[msg dismiss] 显示成 sg dismiss]）→ bash 管道观察 ObjC 方括号代码不可信，须字节级复核
+
+Stage Summary:
+- 装机验证锚点：①实例页选渲染器后不再回退 auto（键≠名设备日志 "Task162: save keyed by dict key ... no phantom write"）；mg+GLES/4.0 → "Task83 FSR linkage ... scale=2.00" ②Forge 1.20.1 进存档不崩 ③Bing 加载完成即上屏（脱界自愈日志 "Task162 self-heal re-apply OK"）④新装默认 60%/100% ⑤切页返回头像即显 ⑥添加账号即见 ⑦无 key 可用 CurseForge（世界 tab 同）⑧公告见服务器推荐
+- 遗留待装机观察：26.2 键盘弹出（Task161⑥）、静态库虚拟按钮、26.1.2 libjvm 崩溃

@@ -49,6 +49,14 @@
 @property (nonatomic, assign) NSInteger versionSelectedAt;
 // 原始名称，用于重命名检测
 @property (nonatomic, copy) NSString *originalName;
+// Task162（profile 身份一致性）：本 VC 在 PLProfiles.profiles 字典里的【键】。
+// 病历（bf91f41 装机日志实锤）：saveSettings/actionDone 原先一律用 name 字段
+// （originalName）当字典键写入，而启动链 resolveKeyForCurrentProfile 读的是
+// selectedProfileName（字典键）。整合包重名导入（createProfileForModpack 碰撞
+// 后缀 " (2)"，name 字段仍是原名）等路径下键≠名，写入落到幻影条目——用户实测
+// “切换渲染器为其他都会自动切回自动”（渲染器/内存/分辨率/Java 全部丢写）。
+// 修复：加载时记录真实键，保存按键写；重命名按旧键删、新键建。
+@property (nonatomic, copy, nullable) NSString *profileDictKey;
 // Hero 卡片（顶部 Profile 信息卡片）
 @property (nonatomic, strong, nullable) UIView *heroCard;
 
@@ -107,6 +115,13 @@ static NSString * localizeProfileTitle(NSString *title) {
 
     // 如果只传了 profileName 没传 profile，从 PLProfiles 加载
     if (!self.profile && self.profileName) {
+        // Task162：profileName 是字典键（两个 ShowProfileEditor 投递点均传
+        // selectedProfileName）。仅当该键真实存在时记为 profileDictKey——
+        // 不存在（新建/竞态）保持 nil，saveSettings 回退 name 键（新建语义
+        // 与旧行为一致）。
+        if (PLProfiles.current.profiles[self.profileName]) {
+            self.profileDictKey = self.profileName;
+        }
         self.profile = [PLProfiles.current.profiles[self.profileName] mutableCopy];
         if (!self.profile) {
             self.profile = [NSMutableDictionary dictionary];
@@ -116,6 +131,15 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 安全网：如果调用方既没传 profileName 也没传 profile，创建空字典避免后续 nil 写入
     if (!self.profile) {
         self.profile = [NSMutableDictionary dictionary];
+    }
+    // Task162：直传 profile 字典的调用路径（如旧版内联创建）无 profileName——
+    // 用 originalName 反查键（name 字段与键一致的常规形态；查不到保持 nil）。
+    if (!self.profileDictKey) {
+        NSString *ame162_probeName = self.profile[@"name"];
+        if ([ame162_probeName isKindOfClass:NSString.class] &&
+            PLProfiles.current.profiles[ame162_probeName]) {
+            self.profileDictKey = ame162_probeName;
+        }
     }
 
     // 确保 profile 有 name 字段
@@ -652,26 +676,41 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 重命名逻辑在 actionDone 中处理
     // 注意：必须使用 originalName 作为 key，且不能把用户正在编辑的 name 写入 PLProfiles
     // 否则用户改名后关闭（不点 Done），PLProfiles 中的 profile.name 会变成新名但 key 仍是旧名
+    // Task162（身份一致性）：写入键改为 profileDictKey（加载时记录的字典键），
+    //   originalName 仅作新建/未知路径的回退。键≠名时旧代码写幻影条目，
+    //   启动链读 selectedProfileName 键永远看不到——渲染器/内存/分辨率
+    //   等全部丢写，装机日志实锤（详见 viewDidLoad 的 Task162 病历注）。
     NSString *profName = self.originalName ?: self.profile[@"name"];
     if (!profName) return;
+    NSString *ame162_targetKey = self.profileDictKey.length > 0 ? self.profileDictKey : profName;
+    if (self.profileDictKey.length > 0 && ![self.profileDictKey isEqualToString:profName]) {
+        NSLog(@"[ProfileSettings] Task162: save keyed by dict key '%@' (display name '%@' differs -- no phantom write)",
+              ame162_targetKey, profName);
+    }
 
     // 保存用户正在编辑的字段（name 和 lastVersionId 可能在编辑中，尚未确认）
     NSString *userInputName = self.profile[@"name"];
     NSString *userInputVersion = self.profile[@"lastVersionId"];
 
-    NSMutableDictionary *existing = [PLProfiles.current.profiles[profName] mutableCopy];
+    // Task162：读源同写目标——existing 必须从 ame162_targetKey 取（旧代码读
+    // name 键：键≠名时拷到空字典，再把残缺条目（缺 lastVersionId/gameDir/
+    // javaVersion 等）整体写回正确键 = 破坏原条目）。self.profile 在编辑器
+    // 生命周期内保持加载时的完整字段（loadSettings 只读不改），此处以
+    // profileDictKey 的活字典为基底最稳。
+    NSMutableDictionary *existing = [PLProfiles.current.profiles[ame162_targetKey] mutableCopy];
     if (!existing) {
-        existing = [NSMutableDictionary dictionary];
+        existing = [self.profile mutableCopy] ?: [NSMutableDictionary dictionary];
     }
     // Task 140：渲染器分居重构 —— 实例页只写【profile】层。
     // Task 150（[可撤销] 删除渲染器全局控制）：跟随全局（删键）态退役——
     // 无键实例在 loadSettings 已缺省 "auto"，此处防御性同口径：nil → auto。
     if (self.selectedRenderer == nil || self.selectedRenderer.length == 0) {
         existing[@"renderer"] = @"auto";
-        NSLog(@"[ProfileSettings] Task150: renderer missing -> explicit 'auto' for '%@'", profName);
+        NSLog(@"[ProfileSettings] Task150: renderer missing -> explicit 'auto' for '%@'", ame162_targetKey);
     } else {
         existing[@"renderer"] = self.selectedRenderer;
-        NSLog(@"[ProfileSettings] Task150: renderer written to PROFILE ONLY '%@' = %@", profName, self.selectedRenderer);
+        NSLog(@"[ProfileSettings] Task150: renderer written to PROFILE ONLY '%@' = %@",
+              ame162_targetKey, self.selectedRenderer);
     }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
     existing[@"javaVersion"] = self.selectedJavaVersion;
@@ -699,7 +738,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 保存游戏目录（版本隔离用）：gameDir 为 nil 时默认 "."，与 main 分支行为一致
     existing[@"gameDir"] = self.profile[@"gameDir"] ?: @".";
     // existing 中的 name 和 lastVersionId 字段保持原始值不变
-    PLProfiles.current.profiles[profName] = existing;
+    PLProfiles.current.profiles[ame162_targetKey] = existing;
     [PLProfiles.current save];
 
     // 同步到 working copy（深拷贝，避免与 PLProfiles 共享对象）
@@ -2637,6 +2676,10 @@ static NSString * localizeProfileTitle(NSString *title) {
     }
 
     // 检查重命名冲突
+    // Task162：重命名的【旧键】改为 profileDictKey（字典键）；无键路径
+    //（新建 profile）回退 originalName。删旧键、建新键、同步 selected、
+    // 同步 profileDictKey——后续 saveSettings 继续落在新键上。
+    NSString *ame162_oldKey = self.profileDictKey.length > 0 ? self.profileDictKey : self.originalName;
     if (![self.originalName isEqualToString:newName]) {
         // 名称变了，检查新名是否已存在
         if (PLProfiles.current.profiles[newName]) {
@@ -2644,18 +2687,23 @@ static NSString * localizeProfileTitle(NSString *title) {
             showDialog(localize(@"i18n_str_42", nil), localize(@"i18n_str_1289", nil));
             return;
         }
-        // 删除旧名，添加新名
-        if (self.originalName.length > 0) {
-            [PLProfiles.current.profiles removeObjectForKey:self.originalName];
+        // 删除旧键，添加新键
+        if (ame162_oldKey.length > 0) {
+            [PLProfiles.current.profiles removeObjectForKey:ame162_oldKey];
         }
         PLProfiles.current.profiles[newName] = self.profile;
+        self.profileDictKey = newName;
         // 如果原来选中的是被重命名的 profile，更新选中
-        if ([PLProfiles.current.selectedProfileName isEqualToString:self.originalName]) {
+        if ([PLProfiles.current.selectedProfileName isEqualToString:ame162_oldKey]) {
             PLProfiles.current.selectedProfileName = newName;
         }
     } else {
-        // 名称没变，直接保存
-        PLProfiles.current.profiles[newName] = self.profile;
+        // 名称没变，直接保存（Task162：按键落位，不写幻影）
+        if (ame162_oldKey.length > 0) {
+            PLProfiles.current.profiles[ame162_oldKey] = self.profile;
+        } else {
+            PLProfiles.current.profiles[newName] = self.profile;
+        }
     }
 
     [PLProfiles.current save];

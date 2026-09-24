@@ -192,7 +192,9 @@ print("=" * 72)
 rcn = read("README_CN.md")
 ren = read("README.md")
 ann = json.loads(read("announcements.json"))
-e = ann["announcements"][0]
+# Task162 重锚：公告数组按日期降序（服务端排序消费），新条目会插到头部——
+# 发布资产锚点改按 id 定位 v6.0.0 发行条目，不再假设它是 [0]。
+e = [a for a in ann["announcements"] if a.get("id") == "v6-0-0-release-2026-09-21"][0]
 check("F1  README_CN 渲染器行 = 每游戏强制单选（缺省自动 + mg 单入口）",
       '每游戏强制单选' in rcn and '缺省"自动"' in rcn and '唯一的 mg 条目' in rcn)
 check("F2  README EN 渲染器行 = per-game mandatory（无全局默认）",

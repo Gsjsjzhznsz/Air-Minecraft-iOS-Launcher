@@ -154,15 +154,15 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     
     _uiOpacity = [defaults floatForKey:kBackgroundUIOpacityKey];
     if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {
-        // Task160：初次使用默认透明度 10%（毛玻璃模式下 uiOpacity 直接作 cell
-        // 底色 alpha，0.1 = 面板几乎全透、壁纸大量透出，靠模糊保证可读；
-        // 仅新装/重置生效，存量用户已保存值不变）
-        _uiOpacity = 0.1;
+        // Task162：初次使用默认透明度 60%（用户定稿"毛玻璃，60% 的透明度，
+        // 100% 的模糊"；Task160 的 10% 过透，面板文字在浅色壁纸上偏虚）。
+        // 仅新装/从未保存过该键的设备生效，存量已保存值不变。
+        _uiOpacity = 0.6;
     }
     
     _blurIntensity = [defaults floatForKey:kBackgroundBlurIntensityKey];
     if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {
-        _blurIntensity = 0.75; // Task160：默认模糊程度 75%（原 0.7）
+        _blurIntensity = 1.0; // Task162：默认模糊程度 100%（用户定稿；Task160/159 为 75%/0.7）
     }
 }
 
@@ -1338,6 +1338,21 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 
 - (BOOL)isBingSource {
     return [self.backgroundSource isEqualToString:@"bing"];
+}
+
+// Task162：背景容器是否真实挂在活窗口上。
+// 判定链：容器存在 → 容器有 window（在任意 UIWindow 层级里）→ 宿主引用
+//（currentWindow / currentSplitVC）至少一个活着且其视图也在窗口上。
+// 轻量纯读，Bing 每次元数据同步/前台回调时调用一次无性能负担。
+- (BOOL)isBackgroundLiveAttached {
+    if (![self hasBackground]) return NO;
+    if (!self.globalBackgroundContainer) return NO;
+    if (!self.globalBackgroundContainer.window) return NO;
+    // 容器挂载了但宿主引用双失（理论上不该发生——容器就在宿主视图里），
+    // 视为脱节，交由调用方重放应用重建全链。
+    BOOL ame162_hostAlive = (self.currentWindow != nil && self.currentWindow.rootViewController != nil)
+        || (self.currentSplitVC != nil && self.currentSplitVC.view.window != nil);
+    return ame162_hostAlive;
 }
 
 // 将 Bing 缓存目录中已存在的图片直接登记为当前背景（不复制、不删源文件）。
