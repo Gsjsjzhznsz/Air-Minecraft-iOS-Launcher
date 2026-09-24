@@ -76,33 +76,13 @@
                                                object:nil];
 }
 
-// Task162：重扫 accounts 目录并刷新表格（主线程）。
+// Task162：重扫 accounts 目录由文末既有的 reloadAccountList（FCL 风格，
+// 含 reloadData）承担——viewWillAppear / AccountChanged / UpdateAccountInfo
+// 三个新触发口全部复用它，勿在此重复实现（CI 实锤 duplicate declaration）。
 - (void)ame162_handleAccountsChanged {
     dispatch_async(dispatch_get_main_queue(), ^{
         [self reloadAccountList];
-        [self.tableView reloadData];
     });
-}
-
-// Task162：扫描 accounts 目录重建 accountList（从 viewDidLoad 原地提取，
-// 可重复调用）。新增/删除/登录成功后重扫，返回本页即见。
-- (void)reloadAccountList {
-    if (self.accountList == nil) {
-        self.accountList = [NSMutableArray array];
-    } else {
-        [self.accountList removeAllObjects];
-    }
-    NSString *listPath = [NSString stringWithFormat:@"%s/accounts", getenv("POJAV_HOME")];
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray *files = [fm contentsOfDirectoryAtPath:listPath error:nil];
-    for(NSString *file in files) {
-        NSString *path = [listPath stringByAppendingPathComponent:file];
-        BOOL isDir = NO;
-        [fm fileExistsAtPath:path isDirectory:(&isDir)];
-        if(!isDir && [file hasSuffix:@".json"]) {
-            [self.accountList addObject:parseJSONFromFile(path)];
-        }
-    }
 }
 
 /// 背景效果改变时重新应用透明化（由 BackgroundUIEffectChanged 通知触发）
@@ -111,11 +91,11 @@
 }
 
 // Task162：pop 返回本页时重扫账号目录——添加账户流程（push 登录页 →
-// 登录成功 pop 回来）后新账号立即可见，无需手动刷新。
+// 登录成功 pop 回来）后新账号立即可见，无需手动刷新（reloadAccountList
+// 自带 reloadData）。
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     [self reloadAccountList];
-    [self.tableView reloadData];
 }
 
 - (void)dealloc {

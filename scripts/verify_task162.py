@@ -178,16 +178,17 @@ check("E4 网络成功回填缓存",
 
 print("== F. 账号列表自动刷新 ==")
 al = rd("Natives/AccountListViewController.m")
-check("F1 reloadAccountList 提取（可重复调用）",
-      "- (void)reloadAccountList {" in al
-      and "%s/accounts" in al)
-check("F2 viewWillAppear 重扫 + reloadData",
+check("F1 既有的 FCL 风格 reloadAccountList 保持唯一实现（CI 热修：删除我方重复定义）",
+      al.count("- (void)reloadAccountList {") == 1
+      and "重新加载账户列表并刷新表格（FCL 风格：登录/删除后刷新卡片视图）" in al
+      and "勿在此重复实现（CI 实锤 duplicate declaration）" in al)
+check("F2 viewWillAppear 重扫（复用既有 reloadAccountList）",
       "- (void)viewWillAppear:(BOOL)animated {" in al
       and "[self reloadAccountList];" in al
-      and "[self.tableView reloadData];" in al)
+      and "[self.tableView reloadData];\n}" not in al.split("- (void)viewWillAppear")[1][:400])
 check("F3 AccountChanged / UpdateAccountInfo 双通知注册",
       'name:@"AccountChanged"' in al and 'name:@"UpdateAccountInfo"' in al)
-check("F4 通知处理主线程重扫",
+check("F4 通知处理主线程重扫（ame162_handleAccountsChanged → reloadAccountList）",
       "- (void)ame162_handleAccountsChanged {" in al
       and "dispatch_async(dispatch_get_main_queue(), ^{" in al)
 
