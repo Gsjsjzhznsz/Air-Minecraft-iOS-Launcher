@@ -431,3 +431,18 @@ Stage Summary:
 - 壁纸首启默认：毛玻璃/60%/100% 真正生效（nil 判定）
 - Vulkan 直连 FSR：上游不可行（零符号+伪 EGL 实证），公告/FAQ 明示切换 GLES/4.0 获得完整 FSR
 - 遗留：装机验证（黑屏是否痊愈 + 探针读数）；26.1.2 libjvm 崩溃、静态库虚拟按钮等继承待办
+
+---
+Task ID: 164-CI
+Agent: main (Super Z)
+Task: Task 164 CI 收尾
+
+Work Log:
+- 推送 23ae87c → run 36032594042 轮询 4 轮（~10 分钟）→ completed success
+- Artifacts 三件就绪：com.air-devs.air-ios.ipa (205.8MB) / trollstore.tipa (205.8MB) / AngelAuraAmethyst.dSYM (3.8MB)，均未过期
+
+Stage Summary:
+- Task164 构建产物可装机；装机验证锚点：
+  ① mg GLES / OpenGL 4.0 后端 + FSR 档位 → 画面正常显示（黑屏痊愈判定）
+  ② 日志 "[MG] Task164 RCAS GPU probe: fb0 pixel ... nonzero = draw landed on GPU"（探针读数，若仍黑屏则据此二分）
+  ③ 新装/重置偏好设备 → 壁纸设置默认毛玻璃 / 60% / 100%
