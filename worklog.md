@@ -430,3 +430,12 @@ Stage Summary:
 - Forge 1.20.1 → 过 GameNarrator（无 Narrator CNFE）+ `[JavaLauncher] Task158: library gate ...` 行；mojang-stubs.jar 在 IPA 的 libs/ 内。
 - Vulkan 直连=MobileGL 仍无 FSR（伪 EGL 无升采样钩子，结构性限制）——FSR 行详情/FAQ 已诚实指向 GLES/4.0 后端或「分辨率」缩放。
 - 遗留：Mithril/MobileGL-Espryt 两个上游二进制的原生缺陷仍在（已被重映射绕开，不再是用户路径）；设备侧 text2speech-1.17.9.jar 若曾缺失由闸门自动补下。
+
+---
+
+## Task 158（续：CI 闭环）
+
+- 首推 cd13424 CI run 35940449744 failure：JavaApp/Makefile:138 mojang-stubs.jar 规则——BSD cp -R 把源目录末级组件拷进目标，`cp -R build/launcher/com/mojang/text2speech build/mojang-stubs/` 产出 `mojang-stubs/text2speech`（缺 com/ 层级）→ `jar -cf ../mojang-stubs.jar com` 报 "com: no such file or directory"。
+- 热修 afea13b：先 `mkdir -p mojang-stubs/com/mojang` 再 cp 进该父目录（本地 replica 测试通过）；CI run 35941955757 **completed success**。
+- IPA 产物三重验证（rule: strings 验证后才交付）：①libs/mojang-stubs.jar 在包内且 jar 根为 com/（Narrator+嵌套类+全平台桩+OperatingSystem 全清单）；②Frameworks/libmobileglues.dylib 在包（5.7MB，重映射目标）；③主二进制含全部 8 条 Task158 日志串（mg GLES/4.0 backend 行 ×2 + 缺库闸门行 ×6）。
+- Stage Summary：Task158 全链闭环（verify 35/35 + 级联基线对拍 + CI 绿 + 产物验证）；新 IPA 就绪，装机锚点见 Task158 主条目。
