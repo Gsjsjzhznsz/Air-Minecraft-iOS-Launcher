@@ -1487,7 +1487,11 @@ void ame139_fsr_heal_reset_input_scale(void) {
         self.surfaceView.frame = self.surfaceView.superview.frame;
     }
 
-    resolutionScale = getPrefFloat(@"video.resolution") / 100.0;
+    // Task159：分辨率缩放实例化——profile 键 resolution（实例设置页显式值）
+    // → 全局 video.resolution（存量回退，PLProfiles prefDefaults）→ 100
+    // （PLPreferences 默认）。与 ame_effective_renderer 的解析哲学同源：
+    // 单点解析、调用方零回退逻辑。
+    resolutionScale = [PLProfiles resolveKeyForCurrentProfile:@"resolution"].floatValue / 100.0;
     // Task 78（FSR 渲染分辨率联动）：MG 渲染器 + FSR 预设开启时，
     // MG 配置里的 fsr1_setting 终于有真实含义：
     //   surface/drawable = 物理 × resolutionScale（呈现分辨率，不变）；

@@ -372,9 +372,11 @@
 "preference.manage_runtime.header.default" = "Preferred Java version";
 "preference.manage_runtime.default.1165" = "1.16.5 and older";
 "preference.manage_runtime.default.117" = "1.17 and newer";
+"preference.manage_runtime.default.126" = "26.0 and newer";
 "preference.manage_runtime.footer.default" = "Minecraft 1.16.5 and older may run with a newer Java version, however compatibility with mods is not guaranteed. External runtimes can be placed in the “java_runtimes” folder. Changing Java version for “Execute .jar” only takes effect if the installer does not expect a newer Java version.";
 "preference.manage_runtime.footer.java8" = "This is the default version for Minecraft 1.16.5 and older.";
 "preference.manage_runtime.footer.java17" = "This is the default version for Minecraft 1.17 and newer.";
+"preference.manage_runtime.footer.java25" = "This is the default version for Minecraft 26.0 and newer.";
 "preference.manage_runtime.header.invalid" = "Invalid runtimes";
 
 "preference.title.java_args" = "JVM Launch arguments";
@@ -476,6 +478,7 @@
 "preference.detail.debug_show_layout_overlap" = "Override each view with light yellow colors, the deeper the color will overlay";
 
 "preference.profile.title.name" = "Name";
+"preference.profile.title.resolution_scale" = "Resolution scale";
 "preference.profile.title.loader_type" = "Loader type";
 "preference.profile.title.loader_vendor" = "Loader vendor";
 "preference.profile.title.loader_version" = "Loader version";
@@ -2097,8 +2100,9 @@
 "login.3rdparty.stale.message" = "Skins and server authentication may not work. Re-login on this account to restore full access.";
 
 /* Task 141: instance memory slider popup */
-"memory.current" = "Current memory: %ldMB";
 "memory.auto_row" = "Auto-allocate memory";
+"memory.adjust_title" = "Adjust Memory Allocation";
+"memory.adjust_message" = "Device max memory: %ld MB\nMax allocatable: %ld MB\nSee the launcher user guide for memory tuning.";
 "memory.apply" = "Apply";
 
 /* Task 151: Bing daily wallpaper */

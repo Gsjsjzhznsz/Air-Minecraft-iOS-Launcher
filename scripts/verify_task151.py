@@ -3,7 +3,7 @@
 
 Checks: A new files & balance / B Bing API correctness / C BackgroundManager
 source-tag integration / D settings page wiring / E launch hook / F build
-wiring / G l10n (4x1948, bing keys) + Info.plist / H re-anchored gates clean.
+wiring / G l10n (4x1952, bing keys) + Info.plist / H re-anchored gates clean.
 """
 import os
 import re
@@ -158,8 +158,8 @@ def main():
         counts[lang] = len(ks)
         missing = [k for k in bing_keys if k not in ks]
         check(f"G {lang} has all {len(bing_keys)} bing keys", not missing, f"missing={missing}")
-    check("G gated baseline 1948 x4", len(set(counts.values())) == 1 and
-          counts["en"] == 1948, str(counts))
+    check("G gated baseline 1952 x4", len(set(counts.values())) == 1 and
+          counts["en"] == 1952, str(counts))
     for lang in ["ja", "km"]:
         s = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
         ks = set(re.findall(r'^"([^"]+)"\s*=', s, re.M))
@@ -176,12 +176,12 @@ def main():
             continue
         s = rd(f"scripts/{fn}")
         for m in re.finditer(r'len\(sets\[0\]\)\s*==\s*(\d+)', s):
-            if m.group(1) != "1948":
+            if m.group(1) != "1952":
                 stale.append(f"{fn}:{m.group(1)}")
         for m in re.finditer(r'vals == \{(\d+)\}', s):
-            if m.group(1) != "1948":
+            if m.group(1) != "1952":
                 stale.append(f"{fn}:vals{m.group(1)}")
-    check("H no stale l10n anchors (expect 1948 everywhere)", not stale, str(stale))
+    check("H no stale l10n anchors (expect 1952 everywhere)", not stale, str(stale))
 
     print(f"\n{'=' * 40}\n{PASSED} passed, {len(FAILED)} failed")
     if FAILED:

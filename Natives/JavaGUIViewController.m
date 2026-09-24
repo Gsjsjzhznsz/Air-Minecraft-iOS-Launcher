@@ -192,6 +192,9 @@ void AWTInputBridge_sendKey(int keycode) {
     }
 
     // Send cursor position to AWT
+    // Task159：分辨率缩放实例化后本文件 4 处仍读全局 video.resolution——
+    // Java GUI 是"执行 .jar"窗口（无实例上下文），不适用 per-instance 解析；
+    // 全局键保留（PLPreferences 默认 100），游戏内菜单/旧全局值继续驱动。
     CGFloat screenScale = UIScreen.mainScreen.scale * getPrefFloat(@"video.resolution") / 100.0;
     AWTInputBridge_nativeSendData(EVENT_TYPE_CURSOR_POS, (int)(location.x * screenScale), (int)(location.y * screenScale), 0, 0);
 }

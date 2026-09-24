@@ -1385,6 +1385,10 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         }
         if (minVersion <= 8) {
             defaultJRETag = @"1_16_5_older";
+        } else if (minVersion >= 25) {
+            // Task159：26.x 官方强制 Java 25（javaVersion.majorVersion=25），
+            // 新增独立预选槽位，避免 26.x 误选 1_17_newer 槽的 Java 17 启动即崩
+            defaultJRETag = @"1_26_newer";
         } else {
             defaultJRETag = @"1_17_newer";
         }
@@ -2610,10 +2614,12 @@ int launchHeadlessJVM(NSString *mainClass, NSArray<NSString *> *args, int minJav
     // Always activate Library Validation bypass (see launchJVM for rationale).
     init_bypassDyldLibValidation();
 
-    // JRE 选择：按 minJavaVersion 推断 runtime tag（≥17 用 1_17_newer，否则 1_16_5_older），
+    // JRE 选择：按 minJavaVersion 推断 runtime tag（≥25 用 1_26_newer，≥17 用
+    // 1_17_newer，否则 1_16_5_older，Task159 对齐 launchJVM 三档分界），
     // 失败回退 execute_jar。getSelectedJavaHome 内部会在 tag 槽位不满足 minVersion 时
     // 搜索任意满足版本要求的 runtime。
-    NSString *defaultJRETag = (minJavaVersion >= 17) ? @"1_17_newer" : @"1_16_5_older";
+    NSString *defaultJRETag = (minJavaVersion >= 25) ? @"1_26_newer"
+                            : ((minJavaVersion >= 17) ? @"1_17_newer" : @"1_16_5_older");
     NSString *javaHome = getSelectedJavaHome(defaultJRETag, minJavaVersion);
     if (javaHome == nil) {
         javaHome = getSelectedJavaHome(@"execute_jar", minJavaVersion);

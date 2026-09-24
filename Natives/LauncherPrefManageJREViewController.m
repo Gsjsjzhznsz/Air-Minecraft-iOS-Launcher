@@ -111,11 +111,13 @@ static NSString *currentImportTaskId;
     self.edgesForExtendedLayout = UIRectEdgeAll;
 
     self.javaRuntimes = @{
-        @(DEFAULT_JRE): @[@"preference.manage_runtime.default.1165", @"preference.manage_runtime.default.117", @"launcher.menu.execute_jar"]
+        // Task159：1.17+ 预选下新增 "26.0 及更高版本"（tag 1_26_newer，26.x 官方
+        // javaVersion.majorVersion=25 → 预选行右侧显示 Java 25）
+        @(DEFAULT_JRE): @[@"preference.manage_runtime.default.1165", @"preference.manage_runtime.default.117", @"preference.manage_runtime.default.126", @"launcher.menu.execute_jar"]
     }.mutableCopy;
     self.sortedJavaVersions = @[@(DEFAULT_JRE)].mutableCopy;
 
-    self.selectedRTTags = @[@"1_16_5_older", @"1_17_newer", @"execute_jar"];
+    self.selectedRTTags = @[@"1_16_5_older", @"1_17_newer", @"1_26_newer", @"execute_jar"];
     self.selectedRuntimes = getPrefObject(@"java.java_homes");
 
     NSString *internalPath = [NSString stringWithFormat:@"%@/java_runtimes", NSBundle.mainBundle.bundlePath];
@@ -300,6 +302,8 @@ static NSString *currentImportTaskId;
         case DEFAULT_JRE: return localize(@"preference.manage_runtime.footer.default", nil);
         case 8: return localize(@"preference.manage_runtime.footer.java8", nil);
         case 17: return localize(@"preference.manage_runtime.footer.java17", nil);
+        // Task159：Java 25 section footer（26.0+ 默认版本说明，与新预选行配套）
+        case 25: return localize(@"preference.manage_runtime.footer.java25", nil);
         default: return nil;
     }
 }
@@ -324,8 +328,12 @@ static NSString *currentImportTaskId;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
     }
     cell.textLabel.text = localize(self.javaRuntimes[@DEFAULT_JRE][indexPath.row], nil);
-    cell.detailTextLabel.text = [NSString stringWithFormat:@"Java %@",
-        ((NSDictionary *)self.selectedRuntimes[@"0"])[self.selectedRTTags[indexPath.row]]];
+    // Task159：新 tag 1_26_newer 在存量设备偏好文件里无键（getObject 不做深合并）
+    // ——未配置显示“自动”（getSelectedJavaHome 的 minVersion 搜索语义），首次点选后落值
+    NSString *ame159_picked = ((NSDictionary *)self.selectedRuntimes[@"0"])[self.selectedRTTags[indexPath.row]];
+    cell.detailTextLabel.text = ame159_picked
+        ? [NSString stringWithFormat:@"Java %@", ame159_picked]
+        : localize(@"preference.auto", nil);
     // 适配自定义启动器背景：cell 应用毛玻璃/半透明效果，避免默认 systemBackgroundColor 遮挡背景
     [[BackgroundManager sharedManager] applyEffectToCell:cell];
     return cell;

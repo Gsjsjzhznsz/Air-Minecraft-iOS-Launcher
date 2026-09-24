@@ -131,9 +131,12 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
         }.mutableCopy,
         @"java": @{
             @"java_homes": @{
+                // Task159：新增 1_26_newer 预选槽位（26.0+ 默认 Java 25，
+                // 与 Manage JRE 页新预选行配套；25 runtime 为内置捆绑）
                 @"0": @{
                     @"1_16_5_older": @"8",
                     @"1_17_newer": @"17",
+                    @"1_26_newer": @"25",
                     @"execute_jar": @"8"
                 }.mutableCopy,
                 @"8": @"internal",

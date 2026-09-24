@@ -1175,6 +1175,8 @@ static const double kInnerProcessorsStart = 0.45;
 /// （对齐游戏运行时要求：1.20.5+/1.21+ → 21，1.17+ → 17，其余 8）
 + (int)inferJavaMajorForMinecraft:(NSString *)minecraftVersion {
     NSArray *parts = [minecraftVersion componentsSeparatedByString:@"."];
+    // Task159：年份制 26.x（"26.2"）此前落到尾部 fallback 17——26.x 官方要求 Java 25
+    if (parts.count >= 2 && [parts[0] integerValue] >= 26) return 25;
     if (parts.count >= 2 && [parts[0] integerValue] == 1) {
         NSInteger minor = [parts[1] integerValue];
         NSInteger patch = (parts.count >= 3) ? [parts[2] integerValue] : 0;

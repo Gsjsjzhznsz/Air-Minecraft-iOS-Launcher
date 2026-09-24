@@ -370,9 +370,11 @@
 "preference.manage_runtime.header.default" = "首选 Java 版本";
 "preference.manage_runtime.default.1165" = "1.16.5 及更早版本";
 "preference.manage_runtime.default.117" = "1.17 及更高版本";
+"preference.manage_runtime.default.126" = "26.0 及更高版本";
 "preference.manage_runtime.footer.default" = "Minecraft 1.16.5 和更早版本可能运行更新的 Java 版本，但与 mod 的兼容性不能保证。外部运行时可放在 “java_runtimes” 文件夹。更改 “Execute .jar” 的 Java 版本仅在安装程序无需新版 Java 时生效。";
 "preference.manage_runtime.footer.java8" = "这是 Minecraft 1.16.5 及更早版本的默认版本。";
 "preference.manage_runtime.footer.java17" = "这是 Minecraft 1.17 及更高版本的默认版本。";
+"preference.manage_runtime.footer.java25" = "这是 Minecraft 26.0 及更高版本的默认版本。";
 "preference.manage_runtime.header.invalid" = "无效的运行时";
 
 "preference.title.java_args" = "JVM 啟動引數";
@@ -474,6 +476,7 @@
 "preference.detail.debug_show_layout_overlap" = "通過用透明顏色來覆蓋所有視圖，來顯示重複的視圖";
 
 "preference.profile.title.name" = "名称";
+"preference.profile.title.resolution_scale" = "解析度縮放";
 "preference.profile.title.loader_type" = "加载器类型";
 "preference.profile.title.loader_vendor" = "加载器供应商";
 "preference.profile.title.loader_version" = "加载器版本";
@@ -2093,8 +2096,9 @@
 "login.3rdparty.stale.message" = "皮膚與聯機驗證可能不可用，重新登入該帳戶即可恢復完整功能。";
 
 /* Task 141: instance memory slider popup */
-"memory.current" = "目前記憶體：%ldMB";
 "memory.auto_row" = "自動分配記憶體";
+"memory.adjust_title" = "調整記憶體分配";
+"memory.adjust_message" = "裝置最大記憶體：%ld MB\n可分配最大記憶體：%ld MB\n記憶體調配指南見啟動器使用教學";
 "memory.apply" = "確定";
 
 /* Task 151: Bing daily wallpaper */

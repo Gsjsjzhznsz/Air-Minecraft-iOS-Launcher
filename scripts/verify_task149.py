@@ -158,41 +158,34 @@ print("E. 内存分配弹窗（Item 6；Task157 重锚：sheet → 居中卡片�
 print("=" * 72)
 ps = read("Natives/ProfileSettingsViewController.m")
 ps_code = strip_objc(ps)
-check("E1  居中卡片控制器（Ame157MemoryAllocatorCard 定义 + 实现，Task157 换装）",
-      "@interface Ame157MemoryAllocatorCard : UIViewController" in ps_code
-      and "@implementation Ame157MemoryAllocatorCard" in ps_code)
-check("E2  居中卡片呈现（UIModalPresentationCustom + 自持 transitioningDelegate；Task149 sheet 退役）",
-      "ame157_vc.modalPresentationStyle = UIModalPresentationCustom;" in ps_code
-      and "ame157_vc.transitioningDelegate = ame157_vc;" in ps_code
+check("E1  Task159 重锚：Ame157 卡片类零残留 + showMemoryAllocator 输入框化",
+      "Ame157MemoryAllocatorCard" not in ps_code
+      and "[alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {" in ps)
+check("E2  Task159 重锚：原生 alert 呈现（卡片 UIModalPresentationCustom 清零；Task149 sheet 仍退役）",
+      "UIModalPresentationCustom" not in ps_code
       and "UISheetPresentationControllerDetent.mediumDetent" not in ps_code
       and "prefersGrabberVisible" not in ps_code)
-check("E3  自绘出入场转场（缩放+淡入动画器，原生 alert 观感）",
-      "@interface Ame157CardTransitionAnimator : NSObject" in ps_code
-      and "animationControllerForPresentedController" in ps_code
-      and "animationControllerForDismissedController" in ps_code
-      and "CGAffineTransformMakeScale(1.14, 1.14)" in ps_code)
-check("E4  Task141 遗留键清零 + 卡片规格（右上角✕ / 大标题 / 自动分配开关）",
+check("E3  Task159 重锚：无自绘转场（动画器/缩放符号清零，原生 alert 默认转场）",
+      "Ame157CardTransitionAnimator" not in ps_code
+      and "animationControllerForPresentedController" not in ps_code
+      and "CGAffineTransformMakeScale" not in ps_code)
+check("E4  Task141 遗留键清零 + ✕/开关随卡片退役（memory.auto_row 行显示幸存）",
       "kAme141MemorySliderKey" not in ps_code
       and "- (void)dismissMemoryAllocator" not in ps_code
       and "- (void)applyMemoryAllocation" not in ps_code
-      and '[ame157_close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];' in ps
+      and "xmark.circle.fill" not in ps
       and "memory.auto_row" in ps
-      and "ame157AutoSwitchChanged" in ps_code)
-check("E5  拉条区间与写回链路（512 → maxMemory；ameOnChange → allocatedMemory/memoryAuto → saveSettings）",
-      "self.ameSlider.minimumValue = 512;" in ps_code
-      and "self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);" in ps_code
-      and "strongSelf.allocatedMemory = autoEnabled ? 0 : memoryMB;" in ps_code
-      and "[strongSelf saveSettings];" in ps_code
-      and "[strongSelf reloadAllTableViews];" in ps_code)
-check("E6  标题实时刷新（memory.current + memory.auto_row + ame157SliderChanged）",
-      'localize(@"memory.current", nil)' in ps
-      and "- (void)ame157SliderChanged:(UISlider *)sender" in ps_code
-      and "- (void)ame157RefreshTitle" in ps_code)
-
-print()
-print("=" * 72)
-print("F. MC 新闻页：双列恢复 + 简介完整 + 禁横向滑（Item 3 尾）")
-print("=" * 72)
+      and "ame157AutoSwitchChanged" not in ps_code)
+check("E5  Task159 重锚：数值范围与写回链路（clamp 512 → maxMemory；确定 → saveSettings → reload）",
+      "if (ame159_value < 512) ame159_value = 512;" in ps_code
+      and "if (ame159_value > self.maxMemory) ame159_value = self.maxMemory;" in ps_code
+      and "self.allocatedMemory = ame159_value;" in ps_code
+      and "[self saveSettings];" in ps_code
+      and "[self reloadAllTableViews];" in ps_code)
+check("E6  Task159 重锚：弹窗标题键（memory.adjust_title；memory.current 退役，auto_row 幸存）",
+      'localize(@"memory.adjust_title", nil)' in ps
+      and "memory.current" not in ps
+      and "memory.auto_row" in ps)
 mcnews = read("Natives/MinecraftNewsViewController.m")
 mcnews_code = strip_objc(mcnews)
 check("F1  恢复双列并列排（每组两个 0.5 宽子项 + interItemSpacing 12）",

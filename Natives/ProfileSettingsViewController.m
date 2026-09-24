@@ -30,6 +30,9 @@
 @property (nonatomic, assign) NSInteger allocatedMemory;
 @property (nonatomic, assign) NSInteger maxMemory;
 @property (nonatomic, assign) BOOL memoryAutoEnabled;  // Task157：自动分配内存开关（profile memoryAuto 标记，仅显式拨过为 YES）
+// Task159：分辨率缩放（per-instance，profile 键 resolution，25~100）
+@property (nonatomic, assign) NSInteger resolutionScale;
+@property (nonatomic, strong) UITextField *resolutionScaleTextField;
 // 服务器地址（FCL 风格：留空则不自动加入）
 @property (nonatomic, strong) NSString *serverIp;
 // JVM 启动参数（如 -Dfoo=bar -Xnoclassgc 等；Xms/Xmx/d32/d64 由内存分配控制会被过滤）
@@ -67,6 +70,8 @@ static NSString * localizeProfileTitle(NSString *title) {
     dispatch_once(&onceToken, ^{
         map = @{
             @"渲染器": @"preference.title.renderer",
+            // Task159：分辨率缩放（per-instance，紧随渲染器行）
+            @"分辨率缩放": @"preference.profile.title.resolution_scale",
             // Task 150（[可撤销] 删除渲染器全局控制）：跟随全局渲染器开关退役，
             // 映射项同步删除（l10n 键 preference.profile.renderer_follow_global_toggle 退役）
             @"图形 API": @"i18n_str_2057",
@@ -92,246 +97,6 @@ static NSString * localizeProfileTitle(NSString *title) {
     return localize(key, nil);
 }
 
-// Task157：内存分配居中卡片弹窗（用户定稿"类放大 alert 形态"）——Task149 的
-// 底部 sheet 退役（用户实测：高度不符预期且多出顶部抓手条"顶部条"）。卡片
-// 右上角 ✕（同实例设置页关闭钮语义），"当前内存"灰字升为标题字号、"内存
-// 分配"标题删除；拉条下方保持间距新增"自动分配内存"开关（即 profile 的
-// memoryAuto 标记，开启后 allocatedMemory 落 0 → 启动链
-// ame141_currentLaunchAllocMem 走原版自动比例 0.5/0.25，拉条置灰并显示自动
-// 实值）。保存语义 = 即改即存（ameOnChange 实时写回 → saveSettings →
-// reloadAllTableViews；✕/点外部仅关闭，任何关闭路径都不丢数据）。
-// 出入场为自绘缩放+淡入转场（原生 alert 观感；iPhone 上原生 API 给不出
-// 紧凑居中卡，用户已确认此取舍）。
-@interface Ame157MemoryAllocatorCard : UIViewController <UIViewControllerTransitioningDelegate>
-@property (nonatomic, copy) void (^ameOnChange)(NSInteger memoryMB, BOOL autoEnabled);
-@property (nonatomic, assign) NSInteger ameInitialMemory;   // 打开时的手动值
-@property (nonatomic, assign) NSInteger ameMaxMemory;       // 物理×0.8 上限
-@property (nonatomic, assign) NSInteger ameAutoMemory;      // 自动比例实值（置灰展示）
-@property (nonatomic, assign) BOOL ameAutoEnabled;          // 打开时开关状态
-@property (nonatomic, strong) UIControl *ameDimmingView;
-@property (nonatomic, strong) UIView *ameCardView;
-@property (nonatomic, strong) UILabel *ameTitleLabel;
-@property (nonatomic, strong) UISlider *ameSlider;
-@property (nonatomic, strong) UISwitch *ameAutoSwitch;
-@property (nonatomic, assign) NSInteger ameCurrentManual;   // 最近一次手动值（关自动后还原）
-@end
-
-// Task157：卡片出入场动画器（缩放+淡入，原生 alert 观感；声明在卡片
-// 控制器之后、实现之前——卡片实现内的 transitioning delegate 会先构造它）
-@interface Ame157CardTransitionAnimator : NSObject <UIViewControllerAnimatedTransitioning>
-@property (nonatomic, assign) BOOL amePresenting;
-@end
-
-@implementation Ame157MemoryAllocatorCard
-
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    self.view.backgroundColor = [UIColor clearColor];
-    self.ameCurrentManual = self.ameInitialMemory;
-
-    // 点外部 = 关闭（即改即存，改动早已实时落盘）
-    self.ameDimmingView = [[UIControl alloc] init];
-    self.ameDimmingView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ameDimmingView.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.4];
-    [self.ameDimmingView addTarget:self action:@selector(ame157Close) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:self.ameDimmingView];
-
-    // 卡片外观手绘而非走 ame_applyCardSurfaceWithRadius：该助手会置
-    // masksToBounds=YES 裁掉投影，"窗口式黑色阴影"需要 layer 同持圆角+阴影
-    self.ameCardView = [[UIView alloc] init];
-    self.ameCardView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ameCardView.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
-    self.ameCardView.layer.cornerRadius = 18.0;
-    self.ameCardView.layer.masksToBounds = NO;
-    self.ameCardView.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.ameCardView.layer.shadowOffset = CGSizeMake(0, 10);
-    self.ameCardView.layer.shadowOpacity = 0.3;
-    self.ameCardView.layer.shadowRadius = 30.0;
-    [self.view addSubview:self.ameCardView];
-
-    UIButton *ame157_close = [UIButton buttonWithType:UIButtonTypeSystem];
-    ame157_close.translatesAutoresizingMaskIntoConstraints = NO;
-    [ame157_close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];
-    ame157_close.tintColor = [UIColor secondaryLabelColor];
-    [ame157_close addTarget:self action:@selector(ame157Close) forControlEvents:UIControlEventTouchUpInside];
-    [self.ameCardView addSubview:ame157_close];
-
-    self.ameTitleLabel = [[UILabel alloc] init];
-    self.ameTitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    // 用户指令："当前内存"行升为标题字号、"内存分配"标题删除
-    self.ameTitleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    self.ameTitleLabel.textColor = [UIColor labelColor];
-    self.ameTitleLabel.textAlignment = NSTextAlignmentCenter;
-    [self.ameCardView addSubview:self.ameTitleLabel];
-
-    self.ameSlider = [[UISlider alloc] init];
-    self.ameSlider.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ameSlider.minimumValue = 512;
-    self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);
-    [self.ameSlider addTarget:self action:@selector(ame157SliderChanged:) forControlEvents:UIControlEventValueChanged];
-    [self.ameSlider addTarget:self action:@selector(ame157SliderReleased) forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];
-    [self.ameCardView addSubview:self.ameSlider];
-
-    UILabel *ame157_autoTitle = [[UILabel alloc] init];
-    ame157_autoTitle.translatesAutoresizingMaskIntoConstraints = NO;
-    ame157_autoTitle.text = localize(@"memory.auto_row", nil);
-    ame157_autoTitle.font = [UIFont systemFontOfSize:15];
-    ame157_autoTitle.textColor = [UIColor labelColor];
-    [self.ameCardView addSubview:ame157_autoTitle];
-
-    self.ameAutoSwitch = [[UISwitch alloc] init];
-    self.ameAutoSwitch.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.ameAutoSwitch addTarget:self action:@selector(ame157AutoSwitchChanged:) forControlEvents:UIControlEventValueChanged];
-    [self.ameCardView addSubview:self.ameAutoSwitch];
-
-    // 卡宽：优先 340pt，窄屏时被 ≤屏宽-48 的必需约束压低
-    // （Task157 CI 修复：赋值表达式不是对象，不能直接写进 NSArray 字面量）
-    NSLayoutConstraint *ame157_width = [self.ameCardView.widthAnchor constraintEqualToConstant:340];
-    ame157_width.priority = 999;
-
-    [NSLayoutConstraint activateConstraints:@[
-        [self.ameDimmingView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-        [self.ameDimmingView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
-        [self.ameDimmingView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.ameDimmingView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-
-        [self.ameCardView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-        [self.ameCardView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
-        ame157_width,
-        [self.ameCardView.widthAnchor constraintLessThanOrEqualToAnchor:self.view.widthAnchor constant:-48],
-
-        [ame157_close.topAnchor constraintEqualToAnchor:self.ameCardView.topAnchor constant:10],
-        [ame157_close.trailingAnchor constraintEqualToAnchor:self.ameCardView.trailingAnchor constant:-10],
-        [ame157_close.widthAnchor constraintEqualToConstant:32],
-        [ame157_close.heightAnchor constraintEqualToConstant:32],
-
-        [self.ameTitleLabel.topAnchor constraintEqualToAnchor:self.ameCardView.topAnchor constant:26],
-        [self.ameTitleLabel.leadingAnchor constraintEqualToAnchor:self.ameCardView.leadingAnchor constant:20],
-        [self.ameTitleLabel.trailingAnchor constraintEqualToAnchor:ame157_close.leadingAnchor constant:-8],
-
-        [self.ameSlider.topAnchor constraintEqualToAnchor:self.ameTitleLabel.bottomAnchor constant:22],
-        [self.ameSlider.leadingAnchor constraintEqualToAnchor:self.ameCardView.leadingAnchor constant:22],
-        [self.ameSlider.trailingAnchor constraintEqualToAnchor:self.ameCardView.trailingAnchor constant:-22],
-
-        [ame157_autoTitle.centerYAnchor constraintEqualToAnchor:self.ameAutoSwitch.centerYAnchor],
-        [ame157_autoTitle.leadingAnchor constraintEqualToAnchor:self.ameCardView.leadingAnchor constant:22],
-
-        [self.ameAutoSwitch.topAnchor constraintEqualToAnchor:self.ameSlider.bottomAnchor constant:16],
-        [self.ameAutoSwitch.trailingAnchor constraintEqualToAnchor:self.ameCardView.trailingAnchor constant:-22],
-        [self.ameAutoSwitch.bottomAnchor constraintEqualToAnchor:self.ameCardView.bottomAnchor constant:-20],
-    ]];
-
-    [self ame157SyncAutoVisual];
-}
-
-#pragma mark - Task157 视觉同步
-
-- (void)ame157SyncAutoVisual {
-    BOOL ame157_on = self.ameAutoEnabled;
-    self.ameAutoSwitch.on = ame157_on;
-    self.ameSlider.enabled = !ame157_on;
-    if (ame157_on) {
-        // 自动挡：置灰展示原版自动比例实值（与 ame141_currentLaunchAllocMem
-        // 同口径，见 showMemoryAllocator 的 ameAutoMemory 计算）
-        self.ameSlider.value = (float)MAX(512, self.ameAutoMemory);
-    } else {
-        self.ameSlider.value = (float)self.ameCurrentManual;
-    }
-    [self ame157RefreshTitle];
-}
-
-- (void)ame157RefreshTitle {
-    if (self.ameAutoEnabled) {
-        self.ameTitleLabel.text = localize(@"memory.auto_row", nil);
-    } else {
-        self.ameTitleLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(self.ameSlider.value)];
-    }
-}
-
-#pragma mark - Task157 交互（即改即存）
-
-- (void)ame157SliderChanged:(UISlider *)sender {
-    // 拖动中只刷标题；落点由 ame157SliderReleased 统一写回（避免逐帧落盘）
-    if (!self.ameAutoEnabled) {
-        self.ameTitleLabel.text = [NSString stringWithFormat:localize(@"memory.current", nil), (long)lroundf(sender.value)];
-    }
-}
-
-- (void)ame157SliderReleased {
-    if (self.ameAutoEnabled) return;
-    self.ameCurrentManual = (NSInteger)lroundf(self.ameSlider.value);
-    if (self.ameOnChange) self.ameOnChange(self.ameCurrentManual, NO);
-}
-
-- (void)ame157AutoSwitchChanged:(UISwitch *)sender {
-    self.ameAutoEnabled = sender.on;
-    [self ame157SyncAutoVisual];
-    // 即改即存：开 → 父层落 0 + memoryAuto 标记；关 → 当前拉条值落为手动值
-    if (self.ameOnChange) self.ameOnChange((NSInteger)lroundf(self.ameSlider.value), self.ameAutoEnabled);
-}
-
-- (void)ame157Close {
-    [self dismissViewControllerAnimated:YES completion:nil];
-}
-
-#pragma mark - Task157 自绘转场（缩放 + 淡入，原生 alert 观感）
-
-- (id<UIViewControllerAnimatedTransitioning>)animationControllerForPresentedController:(UIViewController *)presented presentingController:(UIViewController *)presenting sourceController:(UIViewController *)source {
-    Ame157CardTransitionAnimator *ame157_animator = [[Ame157CardTransitionAnimator alloc] init];
-    ame157_animator.amePresenting = YES;
-    return ame157_animator;
-}
-
-- (id<UIViewControllerAnimatedTransitioning>)animationControllerForDismissedController:(UIViewController *)dismissed {
-    Ame157CardTransitionAnimator *ame157_animator = [[Ame157CardTransitionAnimator alloc] init];
-    ame157_animator.amePresenting = NO;
-    return ame157_animator;
-}
-
-@end
-
-@implementation Ame157CardTransitionAnimator
-
-- (NSTimeInterval)transitionDuration:(id<UIViewControllerContextTransitioning>)transitionContext {
-    return self.amePresenting ? 0.38 : 0.26;
-}
-
-- (void)animateTransition:(id<UIViewControllerContextTransitioning>)transitionContext {
-    if (self.amePresenting) {
-        Ame157MemoryAllocatorCard *ame157_toVC = (Ame157MemoryAllocatorCard *)[transitionContext viewControllerForKey:UITransitionContextToViewControllerKey];
-        ame157_toVC.view.frame = transitionContext.containerView.bounds;
-        [transitionContext.containerView addSubview:ame157_toVC.view];
-        ame157_toVC.ameDimmingView.alpha = 0.0;
-        ame157_toVC.ameCardView.alpha = 0.0;
-        ame157_toVC.ameCardView.transform = CGAffineTransformMakeScale(1.14, 1.14);
-        [UIView animateWithDuration:[self transitionDuration:transitionContext]
-                              delay:0.0
-             usingSpringWithDamping:0.9
-              initialSpringVelocity:0.4
-                            options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionAllowUserInteraction
-                         animations:^{
-            ame157_toVC.ameDimmingView.alpha = 1.0;
-            ame157_toVC.ameCardView.alpha = 1.0;
-            ame157_toVC.ameCardView.transform = CGAffineTransformIdentity;
-        } completion:^(BOOL finished) {
-            [transitionContext completeTransition:!transitionContext.transitionWasCancelled];
-        }];
-    } else {
-        Ame157MemoryAllocatorCard *ame157_fromVC = (Ame157MemoryAllocatorCard *)[transitionContext viewControllerForKey:UITransitionContextFromViewControllerKey];
-        [UIView animateWithDuration:[self transitionDuration:transitionContext]
-                              delay:0.0
-                            options:UIViewAnimationOptionCurveEaseIn
-                         animations:^{
-            ame157_fromVC.ameDimmingView.alpha = 0.0;
-            ame157_fromVC.ameCardView.alpha = 0.0;
-            ame157_fromVC.ameCardView.transform = CGAffineTransformMakeScale(1.08, 1.08);
-        } completion:^(BOOL finished) {
-            [transitionContext completeTransition:YES];
-        }];
-    }
-}
-
-@end
 
 @implementation ProfileSettingsViewController
 
@@ -740,6 +505,20 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 图形 API（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
     self.selectedGraphicsApi = self.profile[@"graphicsApi"] ?: @"default";
 
+    // Task159：分辨率缩放（per-instance，25~100）。profile 无键时显示全局
+    // 回退值（与启动解析链 resolveKeyForCurrentProfile 同口径）——存量设备
+    // 全局行删除后存量值继续生效直到显式设置；存量超范围值（全局滑条允许
+    // 25~150）原样显示，仅编辑时 clamp。
+    id ame159_resolutionRaw = self.profile[@"resolution"];
+    if ([ame159_resolutionRaw isKindOfClass:[NSString class]] && [(NSString *)ame159_resolutionRaw length] > 0) {
+        self.resolutionScale = [(NSString *)ame159_resolutionRaw intValue];
+    } else if ([ame159_resolutionRaw isKindOfClass:[NSNumber class]]) {
+        self.resolutionScale = [(NSNumber *)ame159_resolutionRaw integerValue];
+    } else {
+        self.resolutionScale = (NSInteger)getPrefFloat(@"video.resolution");
+    }
+    if (self.resolutionScale <= 0) self.resolutionScale = 100;
+
     // Java版本（兼容旧版直装器写入的 NSDictionary 格式）
     id javaVerRaw = self.profile[@"javaVersion"];
     if ([javaVerRaw isKindOfClass:[NSDictionary class]]) {
@@ -780,9 +559,12 @@ static NSString * localizeProfileTitle(NSString *title) {
 
 - (void)setupSections {
     // 高级设置 section：渲染器（Task 150：跟随全局开关退役——每个实例
-    // 强制单独选择，无键实例缺省 auto）+ 图形 API（仅 MC 26.2+）+
+    // 强制单独选择，无键实例缺省 auto）+ 分辨率缩放（Task159：全局滑条
+    // 退役后迁入，per-instance 25~100）+ 图形 API（仅 MC 26.2+）+
     // Java/内存/JVM。
     NSMutableArray *advancedRows = [NSMutableArray arrayWithArray:@[@"渲染器"]];
+    // Task159：分辨率缩放迁入实例页，紧随渲染器行（用户指令"渲染器选项下"）
+    [advancedRows addObject:@"分辨率缩放"];
     if ([self isCurrentProfileModernVersion]) {
         [advancedRows addObject:@"图形 API"];
     }
@@ -898,6 +680,10 @@ static NSString * localizeProfileTitle(NSString *title) {
     }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
     existing[@"javaVersion"] = self.selectedJavaVersion;
+    // Task159：分辨率缩放落 profile 层（NSString，与 PLProfiles resolveKey 的
+    // NSString 读取约定一致）；用户未设置时 loadSettings 已把全局回退值填进
+    // resolutionScale，首次保存即固化为实例显式值（语义与显示一致）
+    existing[@"resolution"] = [NSString stringWithFormat:@"%ld", (long)self.resolutionScale];
     // Task157：自动分配内存——开启时 allocatedMemory 落 0（启动链
     // ame141_currentLaunchAllocMem 的 0 = 原版自动比例语义）并打 memoryAuto
     // 标记；关闭时写拉条值并清标记（无标记 = 手动态，用户定稿"默认手动"）
@@ -1070,6 +856,13 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.imageView.image = [UIImage systemImageNamed:@"cpu"];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                 cell.detailTextLabel.text = [self rendererDisplayName:self.selectedRenderer];
+            } else if ([title isEqualToString:@"分辨率缩放"]) {
+                // Task159：per-instance 分辨率缩放（25~100）——名称行同款
+                // 行内输入框，点击行聚焦；右侧 "%" 为独立标签（与输入框文字
+                // 同样式，不在输入框内，用户指令）；全局设置页滑条同步退役
+                cell.imageView.image = [UIImage systemImageNamed:@"viewfinder"];
+                cell.accessoryView = [self buildResolutionScaleAccessory];
+                cell.detailTextLabel.text = nil;
             } else if ([title isEqualToString:@"图形 API"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"rectangle.dashed"];
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -1134,6 +927,57 @@ static NSString * localizeProfileTitle(NSString *title) {
     [textField addTarget:self action:@selector(nameTextFieldDidEnd:) forControlEvents:UIControlEventEditingDidEnd];
     self.nameTextField = textField;
     return textField;
+}
+
+#pragma mark - Task159 分辨率缩放输入框（per-instance）
+
+/// 分辨率缩放行的 accessory：[数字输入框 | %] 容器。
+/// "%" 为独立标签（与输入框文字同字号样式，不在输入框内，用户指令）；
+/// 数字输入框类似名称行——点击行聚焦，编辑结束 clamp 到 [25, 100] 落盘。
+- (UIView *)buildResolutionScaleAccessory {
+    // 复用：container 仍持有 textField 就直接重挂（accessoryView 赋值时
+    // UIKit 自动从旧 cell 挪到新 cell），并刷新为当前值
+    if (self.resolutionScaleTextField && self.resolutionScaleTextField.superview) {
+        self.resolutionScaleTextField.text = [NSString stringWithFormat:@"%ld", (long)self.resolutionScale];
+        return self.resolutionScaleTextField.superview;
+    }
+
+    UITextField *textField = [[UITextField alloc] initWithFrame:CGRectMake(0, 0, 52, 30)];
+    textField.text = [NSString stringWithFormat:@"%ld", (long)self.resolutionScale];
+    textField.font = [UIFont systemFontOfSize:14];
+    textField.keyboardType = UIKeyboardTypeNumberPad;
+    textField.textAlignment = NSTextAlignmentRight;
+    textField.autocorrectionType = UITextAutocorrectionTypeNo;
+    textField.delegate = self;
+    textField.tag = 1004;
+    // NumberPad 无 return 键：Done 条收键盘 → EditingDidEnd 落库
+    UIToolbar *doneBar = [[UIToolbar alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, 44)];
+    doneBar.items = @[[[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil],
+                      [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:textField action:@selector(resignFirstResponder)]];
+    textField.inputAccessoryView = doneBar;
+    [textField addTarget:self action:@selector(resolutionScaleDidEnd:) forControlEvents:UIControlEventEditingDidEnd];
+    self.resolutionScaleTextField = textField;
+
+    UILabel *percentLabel = [[UILabel alloc] initWithFrame:CGRectMake(56, 0, 18, 30)];
+    percentLabel.text = @"%";
+    percentLabel.font = [UIFont systemFontOfSize:14];
+    percentLabel.textColor = [UIColor secondaryLabelColor];
+
+    UIView *container = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 76, 30)];
+    [container addSubview:textField];
+    [container addSubview:percentLabel];
+    return container;
+}
+
+- (void)resolutionScaleDidEnd:(UITextField *)textField {
+    // 编辑结束 clamp 到 [25, 100]（用户指令范围）并落盘；空/非数字输入
+    // intValue=0 → 落到下限 25
+    NSInteger ame159_value = textField.text.intValue;
+    if (ame159_value < 25) ame159_value = 25;
+    if (ame159_value > 100) ame159_value = 100;
+    self.resolutionScale = ame159_value;
+    textField.text = [NSString stringWithFormat:@"%ld", (long)ame159_value];
+    [self saveSettings];
 }
 
 - (void)nameTextFieldChanged:(UITextField *)textField {
@@ -1476,6 +1320,9 @@ static NSString * localizeProfileTitle(NSString *title) {
             if ([title isEqualToString:@"渲染器"]) {
                 // Task 150：跟随全局开关退役——渲染器行永远直接弹选择器
                 [self showRendererSelector];
+            } else if ([title isEqualToString:@"分辨率缩放"]) {
+                // Task159：聚焦行内输入框（名称行同款交互）
+                if (self.resolutionScaleTextField) [self.resolutionScaleTextField becomeFirstResponder];
             } else if ([title isEqualToString:@"图形 API"]) {
                 [self showGraphicsApiSelector];
             } else if ([title isEqualToString:@"Java版本"]) {
@@ -2705,29 +2552,50 @@ static NSString * localizeProfileTitle(NSString *title) {
 }
 
 - (void)showMemoryAllocator {
-    // Task157：Task149 的底部 sheet 退役（用户实测"高度不符预期且多出顶部
-    // 抓手条"）——改用居中卡片（类放大 alert，右上角✕、"当前内存"升为
-    // 标题、拉条下"自动分配内存"开关）；即改即存（ameOnChange 实时写回
-    // allocatedMemory / memoryAuto → saveSettings → reloadAllTableViews）。
-    // 自动实值与 utils.m ame141_currentLaunchAllocMem 同口径（0.5/0.25）。
-    Ame157MemoryAllocatorCard *ame157_vc = [[Ame157MemoryAllocatorCard alloc] init];
-    ame157_vc.ameInitialMemory = self.allocatedMemory;
-    ame157_vc.ameMaxMemory = self.maxMemory;
-    CGFloat ame157_ratio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
-    ame157_vc.ameAutoMemory = (NSInteger)roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * ame157_ratio);
-    ame157_vc.ameAutoEnabled = self.memoryAutoEnabled;
-    __weak typeof(self) weakSelf = self;
-    ame157_vc.ameOnChange = ^(NSInteger memoryMB, BOOL autoEnabled) {
-        __strong typeof(weakSelf) strongSelf = weakSelf;
-        if (!strongSelf) return;
-        strongSelf.memoryAutoEnabled = autoEnabled;
-        strongSelf.allocatedMemory = autoEnabled ? 0 : memoryMB;
-        [strongSelf saveSettings];
-        [strongSelf reloadAllTableViews];
-    };
-    ame157_vc.modalPresentationStyle = UIModalPresentationCustom;
-    ame157_vc.transitioningDelegate = ame157_vc;
-    [self presentViewController:ame157_vc animated:YES completion:nil];
+    // Task159：内存调整改为与游戏目录（editGameDir）同款的输入框弹窗——
+    // Task157 居中卡片（拉条 + "自动分配内存"开关 + ✕）整体退役：输入框
+    // 形态放不下开关，用户本轮定稿为纯数值输入（512 ~ 可分配最大内存）。
+    // 边界约定：
+    // - 存量 memoryAuto=YES 实例（allocatedMemory=0）：表格行仍显示
+    //   "自动分配内存"（memory.auto_row 键保留），弹窗预填 512，确认后落
+    //   实际值并清 memoryAuto 标记（回到纯手动语义）；用户不碰内存时启动
+    //   链 ame141_currentLaunchAllocMem 的 0=自动比例语义不变。
+    // - "设备最大内存"= 物理内存 MB；"可分配最大内存"= self.maxMemory
+    //   （loadSettings：物理×0.8，下限 1024，与原拉条上限同口径）。
+    // - 恢复默认按钮不搬（用户指令：游戏目录弹窗三按钮 → 本弹窗仅取消/确定）。
+    NSInteger ame159_deviceTotalMB = (NSInteger)(NSProcessInfo.processInfo.physicalMemory >> 20);
+    NSInteger ame159_initial = self.allocatedMemory > 0 ? self.allocatedMemory : 512;
+
+    UIAlertController *alert = [UIAlertController
+        alertControllerWithTitle:localize(@"memory.adjust_title", nil)
+                         message:[NSString stringWithFormat:localize(@"memory.adjust_message", nil),
+                                  (long)ame159_deviceTotalMB, (long)self.maxMemory]
+                  preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
+        textField.keyboardType = UIKeyboardTypeNumberPad;
+        textField.text = [NSString stringWithFormat:@"%ld", (long)ame159_initial];
+        textField.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil)
+                                              style:UIAlertActionStyleCancel handler:nil]];
+
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_44", nil)
+                                              style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+        NSInteger ame159_value = alert.textFields.firstObject.text.intValue;
+        // 输入值 clamp 到 [512, 可分配最大内存]（用户指令范围）；空/非数字
+        // 输入 intValue=0 → 落到下限 512
+        if (ame159_value < 512) ame159_value = 512;
+        if (ame159_value > self.maxMemory) ame159_value = self.maxMemory;
+        self.allocatedMemory = ame159_value;
+        // 写实际值即退出自动态（memoryAuto 标记随 saveSettings 手动分支清除）
+        self.memoryAutoEnabled = NO;
+        [self saveSettings];
+        [self reloadAllTableViews];
+    }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Done / Close

@@ -1371,3 +1371,25 @@
 //     logged by name and never block (some missing libs are historically
 //     tolerated). Anchors: "[JavaLauncher] Task158: library gate summary"
 //     / "downloading missing library jar".
+// REVISION 17 addendum (Task 159, no bump): resolution scale per-instance.
+// The global Settings slider (video.resolution, 25-150%) is retired from the
+// Settings page (same migration philosophy as Task 150's renderer retirement):
+// each instance now owns its scale via the profile key "resolution", edited in
+// the game editor right under the renderer row as an inline 25-100 number field
+// with a separate "%" label (not inside the field). Resolution chain:
+// [profile resolution -> legacy global video.resolution fallback -> 100], the
+// PLProfiles prefDefaults mapping restored exactly like the reverted renderer
+// fallback -- legacy global values keep applying to instances without an
+// explicit choice until the user saves one. Launch-time single point:
+// SurfaceViewController reads resolveKeyForCurrentProfile (same philosophy as
+// ame_effective_renderer); the in-game resolution menu and the Java GUI
+// ("Execute .jar", no instance context) keep reading/writing the global key.
+// The memory-allocation card was replaced by a game-directory-style input
+// dialog the same round (512..max-allocatable clamp); the auto-allocate switch
+// retired with the card (stock memoryAuto profiles keep the stock auto-ratio
+// semantics until one manual confirm). Manage Java gains the "26.0 and newer"
+// preselect slot (tag 1_26_newer -> Java 25) with the launch/installer chains
+// adapted to the three-tier defaultJRETag split. l10n: +5 new
+// (manage_runtime.default.126 / footer.java25 / profile.title.resolution_scale
+// / memory.adjust_title / memory.adjust_message) -1 retired (memory.current)
+// x4 languages, baseline 1948->1952.

@@ -86,41 +86,36 @@ print()
 print("=" * 72)
 print("B. Ame157 居中卡片弹窗（✕/大标题/自动开关/自绘转场/即改即存）")
 print("=" * 72)
-check("B1  Ame157MemoryAllocatorCard 定义 + 实现",
-      "@interface Ame157MemoryAllocatorCard : UIViewController <UIViewControllerTransitioningDelegate>" in ps_code
-      and "@implementation Ame157MemoryAllocatorCard" in ps_code)
-check("B2  Ame157CardTransitionAnimator 定义 + 实现（缩放 1.14→1 入场 / 1.08 淡出）",
-      "@interface Ame157CardTransitionAnimator : NSObject <UIViewControllerAnimatedTransitioning>" in ps_code
-      and "@implementation Ame157CardTransitionAnimator" in ps_code
-      and "CGAffineTransformMakeScale(1.14, 1.14)" in ps_code
-      and "CGAffineTransformMakeScale(1.08, 1.08)" in ps_code)
-check("B3  右上角✕（xmark.circle.fill）+ 点外部关闭（ame157Close）",
-      '[ame157_close setImage:[UIImage systemImageNamed:@"xmark.circle.fill"] forState:UIControlStateNormal];' in ps
-      and "[self.ameDimmingView addTarget:self action:@selector(ame157Close) forControlEvents:UIControlEventTouchUpInside];" in ps
-      and "- (void)ame157Close {" in ps_code)
-check("B4  '当前内存'升为标题字号（17 semibold），弹窗内'内存分配'标题退役（仅保留表格行名映射）",
-      "self.ameTitleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];" in ps_code
-      and ps.count('@"i18n_str_2037"') == 1)
-check("B5  自动分配开关在拉条下方（memory.auto_row + UISwitch + ame157AutoSwitchChanged）",
-      'ame157_autoTitle.text = localize(@"memory.auto_row", nil);' in ps
-      and "[self.ameAutoSwitch addTarget:self action:@selector(ame157AutoSwitchChanged:) forControlEvents:UIControlEventValueChanged];" in ps)
-check("B6  自动态拉条置灰（enabled = !on）+ 显示自动实值（MAX(512, ameAutoMemory)）",
-      "self.ameSlider.enabled = !ame157_on;" in ps_code
-      and "self.ameSlider.value = (float)MAX(512, self.ameAutoMemory);" in ps_code)
-check("B7  即改即存：滑条松手（TouchUpInside|UpOutside）与拨开关当下回调 ameOnChange",
-      "forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside];" in ps
-      and "- (void)ame157SliderReleased {" in ps_code
-      and "if (self.ameOnChange) self.ameOnChange(self.ameCurrentManual, NO);" in ps_code
-      and "if (self.ameOnChange) self.ameOnChange((NSInteger)lroundf(self.ameSlider.value), self.ameAutoEnabled);" in ps_code)
+check("B1  Task159 重锚：Ame157 卡片+动画类零残留（输入框弹窗替代）",
+      "Ame157MemoryAllocatorCard" not in ps_code
+      and "Ame157CardTransitionAnimator" not in ps_code)
+check("B2  Task159 重锚：输入框 alert 形态（UIAlertControllerStyleAlert + addTextField）",
+      "[alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {" in ps
+      and "preferredStyle:UIAlertControllerStyleAlert];" in ps)
+check("B3  Task159 重锚：无恢复默认按钮（i18n_str_898 仅存于游戏目录弹窗）",
+      ps.count('@"i18n_str_898"') == 1)
+check("B4  Task159 重锚：弹窗标题 memory.adjust_title（memory.current 键退役）",
+      'localize(@"memory.adjust_title", nil)' in ps
+      and "memory.current" not in ps)
+check("B5  Task159 重锚：简介 memory.adjust_message（设备最大内存 + 可分配最大内存两参数）",
+      'message:[NSString stringWithFormat:localize(@"memory.adjust_message", nil),' in ps
+      and "(long)ame159_deviceTotalMB, (long)self.maxMemory]" in ps)
+check("B6  Task159 重锚：NumberPad 键盘 + 预填（存量自动实例 allocatedMemory=0 → 预填 512）",
+      "textField.keyboardType = UIKeyboardTypeNumberPad;" in ps
+      and "NSInteger ame159_initial = self.allocatedMemory > 0 ? self.allocatedMemory : 512;" in ps)
+check("B7  Task159 重锚：确定后写回（clamp → allocatedMemory → saveSettings → reloadAllTableViews）",
+      "if (ame159_value < 512) ame159_value = 512;" in ps_code
+      and "self.allocatedMemory = ame159_value;" in ps_code
+      and "self.memoryAutoEnabled = NO;" in ps_code
+      and "[self saveSettings];" in ps_code
+      and "[self reloadAllTableViews];" in ps_code)
 check("B8  取消/确认按钮退役（memory.apply 不再被引用，卡片内无 cancelButton）",
       "memory.apply" not in ps
       and "[cancelButton setTitle" not in ps
       and "[applyButton setTitle" not in ps)
-check("B9  窗口式阴影卡片（圆角 18 + masksToBounds NO + shadow 四件套）+ 0.4 点外部遮罩",
-      "self.ameCardView.layer.cornerRadius = 18.0;" in ps_code
-      and "self.ameCardView.layer.masksToBounds = NO;" in ps_code
-      and "self.ameCardView.layer.shadowOpacity = 0.3;" in ps_code
-      and "[[UIColor blackColor] colorWithAlphaComponent:0.4];" in ps)
+check("B9  Task159 重锚：输入值 clamp [512, 可分配最大内存]（上限 self.maxMemory）",
+      "if (ame159_value < 512) ame159_value = 512;" in ps
+      and "if (ame159_value > self.maxMemory) ame159_value = self.maxMemory;" in ps)
 check("B10 Task149 sheet 呈现链退役（mediumDetent/grabber/formSheet 回退清零）",
       "UISheetPresentationControllerDetent.mediumDetent" not in ps_code
       and "prefersGrabberVisible" not in ps_code
@@ -134,27 +129,20 @@ check("C1  loadSettings 读 memoryAuto 标记（缺省 NO = 用户定稿'默认�
       'self.memoryAutoEnabled = [self.profile[@"memoryAuto"] boolValue];' in ps)
 check("C2  saveSettings 分支：自动 = 落 0 + memoryAuto@YES；手动 = 数值 + 清标记",
       'if (self.memoryAutoEnabled) {\n        existing[@"allocatedMemory"] = @(0);\n        existing[@"memoryAuto"] = @YES;\n    } else {\n        existing[@"allocatedMemory"] = @(self.allocatedMemory);\n        [existing removeObjectForKey:@"memoryAuto"];\n    }' in ps)
-check("C3  ameOnChange 写回链（memoryAutoEnabled/allocatedMemory → saveSettings → reloadAllTableViews）",
-      "strongSelf.memoryAutoEnabled = autoEnabled;" in ps_code
-      and "strongSelf.allocatedMemory = autoEnabled ? 0 : memoryMB;" in ps_code
-      and "[strongSelf saveSettings];" in ps_code
-      and "[strongSelf reloadAllTableViews];" in ps_code)
-check("C4  自动实值与启动链同口径（getEntitlementValue memorystatus ? 0.5 : 0.25 × 物理 MB）",
-      'CGFloat ame157_ratio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;' in ps
-      and "(NSProcessInfo.processInfo.physicalMemory >> 20) * ame157_ratio" in ps)
+check("C3  Task159 重锚：确定即退出自动态（memoryAutoEnabled=NO → saveSettings 手动分支清标记）",
+      "self.memoryAutoEnabled = NO;\n        [self saveSettings];\n        [self reloadAllTableViews];" in ps_code)
+check("C4  Task159 重锚：自动比例唯一权威回归 utils.m（ps 内零 memorystatus 比例残留）",
+      'getEntitlementValue(@"com.apple.private.memorystatus")' not in ps
+      and 'getEntitlementValue(@"com.apple.private.memorystatus")' in read("Natives/utils.m"))
 utils_m = read("Natives/utils.m")
 check("C5  启动链 ame141_currentLaunchAllocMem 零改动（0 = 自动比例语义幸存）",
       "int ame141_currentLaunchAllocMem(void)" in utils_m
       and 'CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;' in utils_m
       and "[profile[@\"allocatedMemory\"] integerValue]" in utils_m)
-check("C6  自绘转场接线（UIModalPresentationCustom + 自持 transitioningDelegate）",
-      "ame157_vc.modalPresentationStyle = UIModalPresentationCustom;" in ps_code
-      and "ame157_vc.transitioningDelegate = ame157_vc;" in ps_code)
-
-print()
-print("=" * 72)
-print("D. Sodium + Iris Shaders（行名 / 三 jar / Iris Shaders 回退 / 同款门槛）")
-print("=" * 72)
+check("C6  Task159 重锚：卡片转场/呈现链退役（UIModalPresentationCustom / transitioningDelegate / xmark 清零）",
+      "UIModalPresentationCustom" not in ps_code
+      and "transitioningDelegate" not in ps_code
+      and "xmark.circle.fill" not in ps)
 check("D1  组件区行名升级（Fabric API / Sodium + Iris Shaders / OptiFine）",
       '@[@"Fabric API", @"Sodium + Iris Shaders", @"OptiFine"]' in ps)
 check("D2  l10n 映射同步（Sodium + Iris Shaders 键）+ 行配置改用新名",
@@ -187,7 +175,7 @@ check("D9  火焰图标保留（flame.fill，Task150 视觉不变）",
 
 print()
 print("=" * 72)
-print("E. l10n：Task157 后基线 1948（四语言一致 + 新键/改写在位）")
+print("E. l10n：Task159 后基线 1952（四语言一致 + 新键/改写在位）")
 print("=" * 72)
 langs = ["en.lproj", "zh-Hans.lproj", "zh-CN.lproj", "zh-Hant.lproj"]
 base = "Natives/resources/"
@@ -206,8 +194,8 @@ check("E5  footer 用户原文行（Sodium + Iris Shaders：优化模组 + 光�
 check("E6  确认弹窗标题升级（安装 Sodium + Iris Shaders）",
       '"component.sodium.confirm_title" = "安装 Sodium + Iris Shaders";' in zh
       and '"component.sodium.confirm_title" = "Install Sodium + Iris Shaders";' in read(base + "en.lproj/Localizable.strings"))
-check("E7  四语言键集一致（1948 = Task156 基线 1946 + Task157 组件键 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1948,
+check("E7  四语言键集一致（1952 = Task157 基线 1948 + Task159 净增 4（新增 5 键，退役 memory.current））",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1952,
       f"counts={[len(x) for x in sets]}")
 
 print()

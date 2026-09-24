@@ -118,23 +118,23 @@ ps_code = strip_objc(ps)
 check("C1  枚举 actionSheet 列表退役（旧 for-options 循环不再存在）",
       "NSMutableArray *options = [NSMutableArray array];" not in ps_code
       and "for (NSNumber *memNum in options)" not in ps_code)
-check("C2  Task157 重锚：居中卡片弹窗（Ame157MemoryAllocatorCard + UIModalPresentationCustom；Task149 sheet 退役）",
-      "@interface Ame157MemoryAllocatorCard : UIViewController" in ps_code
-      and "ame157_vc.modalPresentationStyle = UIModalPresentationCustom;" in ps_code
-      and "UISheetPresentationControllerDetent.mediumDetent" not in ps_code
-      and "UIControl *dimming" not in ps_code)
-check("C3  Task157 重锚：标题实时刷新（memory.current + memory.auto_row + ame157SliderChanged）",
-      'localize(@"memory.current", nil)' in ps
-      and "- (void)ame157RefreshTitle" in ps_code
-      and "- (void)ame157SliderChanged:(UISlider *)sender" in ps_code)
-check("C4  Task149 重锚：拉条 512MB → maxMemory（启动器检测的最大可分配，随设备自适应）",
-      "self.ameSlider.minimumValue = 512;" in ps_code
-      and "self.ameSlider.maximumValue = (float)MAX(1024, self.ameMaxMemory);" in ps_code)
-check("C5  Task157 重锚：即改即存写回（ame157SliderReleased/开关 → ameOnChange → saveSettings + reloadAllTableViews）",
-      "- (void)ame157SliderReleased {" in ps_code
-      and "- (void)ame157AutoSwitchChanged:(UISwitch *)sender" in ps_code
-      and "[strongSelf saveSettings];" in ps_code
-      and "[strongSelf reloadAllTableViews];" in ps_code)
+check("C2  Task159 重锚：内存弹窗 = 输入框 alert（卡片/转场符号清零；sheet 仍退役）",
+      "[alert addTextFieldWithConfigurationHandler:^(UITextField *textField) {" in ps_code
+      and "Ame157MemoryAllocatorCard" not in ps_code
+      and "UIModalPresentationCustom" not in ps_code
+      and "UISheetPresentationControllerDetent.mediumDetent" not in ps_code)
+check("C3  Task159 重锚：弹窗标题/简介键（adjust_title/adjust_message；memory.current 退役）",
+      'localize(@"memory.adjust_title", nil)' in ps
+      and 'localize(@"memory.adjust_message", nil)' in ps
+      and "memory.current" not in ps)
+check("C4  Task159 重锚：数值范围（下限 512 / 上限 self.maxMemory，空输入落 512）",
+      "if (ame159_value < 512) ame159_value = 512;" in ps_code
+      and "if (ame159_value > self.maxMemory) ame159_value = self.maxMemory;" in ps_code
+      and "NSInteger ame159_initial = self.allocatedMemory > 0 ? self.allocatedMemory : 512;" in ps_code)
+check("C5  Task159 重锚：确定写回（退出自动态 → saveSettings → reloadAllTableViews）",
+      "self.memoryAutoEnabled = NO;" in ps_code
+      and "[self saveSettings];" in ps_code
+      and "[self reloadAllTableViews];" in ps_code)
 check("C6  行标题/详情永不截断改缩字（JVM 启动参数行修复）",
       "cell.textLabel.adjustsFontSizeToFitWidth = YES;" in ps_code
       and "cell.textLabel.minimumScaleFactor = 0.6;" in ps_code
@@ -169,12 +169,12 @@ check("D4  全局设置两行删除（auto_ram 开关 + allocated_memory 滑条�
       '@{@"key": @"auto_ram",' not in prefs_code
       and '@{@"key": @"allocated_memory",' not in prefs_code
       and "Task141" in prefs)
-check("D5  Task157 重锚：实例内存写回链路（ameOnChange → allocatedMemory/memoryAuto → saveSettings；读取字段同前）",
-      "strongSelf.allocatedMemory = autoEnabled ? 0 : memoryMB;" in ps_code
+check("D5  Task159 重锚：实例内存写回链路（确定 → allocatedMemory 落值；loadSettings 读取字段同前）",
+      "self.allocatedMemory = ame159_value;" in ps_code
       and 'self.allocatedMemory = [self.profile[@"allocatedMemory"] integerValue];' in ps)
-check("D5b Task157 重锚：自绘转场接线（自持 transitioningDelegate + 动画器，兼容性门）",
-      "ame157_vc.transitioningDelegate = ame157_vc;" in ps_code
-      and "@implementation Ame157CardTransitionAnimator" in ps_code)
+check("D5b  Task159 重锚：转场/呈现链退役（transitioningDelegate / 动画器类清零）",
+      "transitioningDelegate" not in ps_code
+      and "Ame157CardTransitionAnimator" not in ps_code)
 check("D6  validateVirtualMemorySpace 口径保留（虚存校验不回退）",
       "if (!validateVirtualMemorySpace(allocmem)) {" in jl_code)
 check("D7  启动日志锚点保留（Max RAM allocation 行在）",
@@ -209,15 +209,14 @@ for lang in langs:
     src = read(f"Natives/resources/{lang}.lproj/Localizable.strings")
     keysets[lang] = set(re.findall(r'^"([^"]+)"\s*=', src, flags=re.M))
 check("F1  四语言 key 集合完全一致", len({frozenset(v) for v in keysets.values()}) == 1)
-check("F2  两个新 key 存在于全部语言", all({"memory.current", "memory.apply"} <= keysets[l] for l in langs))
-check("F3  简繁中文文案正确",
-      '"memory.current" = "当前内存：%ldMB";' in read("Natives/resources/zh-Hans.lproj/Localizable.strings")
-      and '"memory.current" = "目前記憶體：%ldMB";' in read("Natives/resources/zh-Hant.lproj/Localizable.strings"))
-
-print()
-print("=" * 72)
-print("G. 语法与配平")
-print("=" * 72)
+check("F2  Task159 新 key 存在于全部语言（五新键 + auto_row/apply 幸存）",
+      all({"memory.adjust_title", "memory.adjust_message", "memory.apply", "memory.auto_row",
+           "preference.manage_runtime.default.126", "preference.manage_runtime.footer.java25",
+           "preference.profile.title.resolution_scale"} <= keysets[l] for l in langs))
+check("F3  简繁中文文案正确（Task159 新键抽查）",
+      '"memory.adjust_title" = "调整内存分配";' in read("Natives/resources/zh-Hans.lproj/Localizable.strings")
+      and '"memory.adjust_title" = "調整記憶體分配";' in read("Natives/resources/zh-Hant.lproj/Localizable.strings")
+      and '"preference.profile.title.resolution_scale" = "解析度縮放";' in read("Natives/resources/zh-Hant.lproj/Localizable.strings"))
 check("G1  关键改动文件括号配平（字符串/注释感知）",
       all(balanced(read(f)) for f in [
           "Natives/LauncherNewsViewController.m",
@@ -252,7 +251,7 @@ check("G3  检测口径护栏零变化（getEntitlementValue ×2 / isJITEnabled(
       read("Natives/LauncherRightPanelViewController.m").count('getEntitlementValue(@"com.apple.developer.kernel.') == 2
       and "isJITEnabled(NO)" in strip_objc(read("Natives/LauncherRightPanelViewController.m")))
 check("G4  工作区改动仅限预期文件集（提交后自愈）",
-      all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md"))
+      all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md", "announcements.json"))
           for ln in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],
                                    capture_output=True, text=True).stdout.splitlines()
           if ln.strip()))

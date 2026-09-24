@@ -618,7 +618,10 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
             if (major == 20) {
                 return (minor >= 5) ? 21 : 17;
             }
-            // 21.x 及以上（1.21+）→ Java 21
+            // Task159：26.x 及以上 loader（MC 年份制 26.x+）→ Java 25
+            // （26.x 官方 javaVersion.majorVersion=25；原注释"未来版本 → Java 21"过时）
+            if (major >= 26) return 25;
+            // 21.x - 25.x（1.21+）→ Java 21
             if (major >= 21) return 21;
         }
     }

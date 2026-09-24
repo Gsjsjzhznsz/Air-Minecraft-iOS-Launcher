@@ -67,6 +67,12 @@ static PLProfiles* current;
         @"defaultTouchCtrl": @"control.default_ctrl",
         @"defaultGamepadCtrl": @"control.default_gamepad_ctrl",
         @"javaArgs": @"java.java_args",
+        // Task159：分辨率缩放实例化（与上方退役的 renderer 回退同款机制，
+        // [可撤销]）——profile 有 resolution 键（NSString）→ 实例显式值；
+        // 无键 → 回退全局 video.resolution（存量设备平滑：全局行虽从设置页
+        // 移除，存量值仍生效，直到用户在实例里显式设置）。撤销 = 删本行 +
+        // 恢复设置页全局行。
+        @"resolution": @"video.resolution",
         // Task 150（[可撤销] 删除渲染器全局控制）：renderer 的全局回退键退役
         // ——每个实例强制单独选择渲染器，profile 无 renderer 键时由
         // ame_effective_renderer 落到 "auto"（用户确认的缺省），不再读取

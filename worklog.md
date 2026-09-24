@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 158 提交（mg 后端重映射回 MobileGlues + Forge 模块层桩 + 缺库闸门，CI 盯绿中）；此前 10cee5d（Task157 CI 修正）+ 用户日志上传 a0ac656 |
-| 最新 Task 号 | **158**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 158（mg ES/4.0 后端=MobileGlues 路径 + FSR 恢复 + Forge 修复）+ Task 157（内存卡片弹窗/Sodium+Iris）+ Task 156（IME/毛玻璃标题/侧边栏深链）+ Task 154/153/151 |
+| 远端 HEAD | 本会话 Task 159 提交（管理 Java 26.0+ 预选 + 内存输入框弹窗 + 分辨率缩放实例化，CI 盯绿中）；此前 ce0783d（Task158 CI 闭环） |
+| 最新 Task 号 | **159**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 159（Java 26.0+ 预选/内存输入框/分辨率缩放实例化——注意 Task157 的内存卡片弹窗已被 159 替换为输入框）+ Task 158 + 157 + 156 + 154/153/151 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135 路径依赖），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -27,7 +27,7 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - 仓库: `/home/z/my-project/Amethyst-iOS-MyRemastered`；GitHub token 在 `git remote -v` 的 URL 里（放心直接用）
 - CI 轮询: `TOKEN=$(git remote get-url origin | sed -n 's\|https://[^:]*:\([^@]*\)@.*\|\1\|p')` + `/actions/runs?per_page=N` API；失败先拉 job log grep "error:"
 - 产物: artifact `com.air-devs.air-ios.ipa`（另有 trollstore .tipa / dSYM）
-- l10n: en/zh-CN/zh-Hans/zh-Hant 四语言键集一致，基线 1924
+- l10n: en/zh-CN/zh-Hans/zh-Hant 四语言键集一致，基线 1952
 - 用户日志: 直接推仓库根 latestlog* 系列（勿删）；`/home/z/my-project/upload/` 为旧渠道（hs_err_pid*.log）
 - 装机日志轮换映射（Task 144 时点）：latestlog.txt=Mithril(4.0) 崩溃会话 / latestlog.old.txt=MobileGL-gles(ES) 会话 / latestlog=Forge 安装会话 / latestlog.old=OSMesa(zink) 会话
 
@@ -37,7 +37,7 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - shaderc 渲染链（Task 30-47 沉淀）：main_hook.m 32MB 栈 hop → shaderc_shim.c（串行化 + SIGSEGV 恢复网 + 源快照 + #include 文本级展开）→ libshaderc_impl（源码构建 + lValueErrorCheck 二进制补丁）
 
 ### 历史检索
-- Tasks 34-140 明细 → `grep -n "Task ID:" worklog-archive.md`；Task 141 起在本文件
+- Tasks 34-140 明细 → `grep -n "Task ID:" worklog-archive.md`；Task 141 起在本文件（141/154 两段已挪 archive 留指针）
 - 找 commit：`git log --oneline --grep "Task N"`
 
 ---
@@ -97,7 +97,7 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 2. **FSR 从未生效**：mgl_fsr.mm 把 GL_FRAGMENT_SHADER 定义为 0x8B92（实为 GL_PALETTE4_R5_G6_B5_OES，GLES1 调色板格式；规范值 0x8B30，mesa glext.h:599）。考古：Task83 原值正确 → Task84 据装机日志 stage=35632 误诊反向"勘误"成 0x8B92 → Task119 复制同错值 → MobileGL/zink 两链片元着色器恒 glCreateShader=0 + GL_INVALID_ENUM（日志 L818-820：顶点 0x8B31 成功、片元 35730 失败）→ 恒自愈回全分辨率。附带 GL_ARRAY_BUFFER_BINDING 0x8B8C（实为 GL_SHADING_LANGUAGE_VERSION）→ 0x8894——RCAS 路径 glGetIntegerv 实际引用它，VBO 保存静默失效。
 3. **mg 与 MobileGlues 并列**：mg=libMobileGL.dylib 家族（Vulkan直呈/GLES/Mithril 后端），MobileGlues=libmobileglues.dylib 独立渲染器（源码构建、自带 FSR1）——本就是两个渲染器，Task142 未把后者从选择列表隐退导致命名撞车。
 
-### 修复（4 文件 + 验证器，零 l10n 变更、基线 1924 不动）
+### 修复（4 文件 + 验证器，零 l10n 变更、基线 1952 不动）
 - PLPreferences.m：mobileglues 分区注册 `@"renderer_backend": @""`——刻意空串：实体默认会让解析链第一层恒命中、legacy 档位（renderer=auto + mobilegl_backend=2/3）永久失明；空串保住"键未设"语义与 legacy 层，顺带消 Getter 噪音。
 - ctxbridges/mgl_fsr.mm：GL_FRAGMENT_SHADER 0x8B92→0x8B30；GL_ARRAY_BUFFER_BINDING →0x8894。
 - ctxbridges/osm_bridge.mm：同款两常量 + Task84 错误勘误注释改写为 Task143 再勘误（教训：勿据日志反推枚举规范值）。
@@ -236,7 +236,7 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 - **实例页（ProfileSettingsViewController）**：advancedRows 去掉"跟随全局渲染器"；开关映射/构建器/回调三删；渲染器行永远可选（置灰态退役）；didSelect 直接弹选择器；popover 锚点 row 1→0；loadSettings 无键缺省 `@"auto"`；saveSettings 防御性写 auto（键永不再被删除）；rendererDisplayName nil→auto。
 - **启动链（PLProfiles.m）**：prefDefaults 的 `renderer→video.renderer` 全局回退退役（注释留档撤销路径）+ 新增 nil 守卫（getPrefObject(nil) 会抛 NSInvalidArgumentException）——ame_effective_renderer 解析链变为【profile 键 → auto】（用户确认缺省；1.17+ 经 Task144 升级逻辑解析为 MobileGL Vulkan 直连）。
 - **Sodium 组件安装（ProfileSettingsViewController）**：组件安装区新增 Sodium 行（flame.fill 火焰图标 + systemOrange，Fabric 门槛文案与 Fabric API 行同构）；`ame150_fetchModrinthPrimaryFileWithQuery:exactTitle:gameVersion:loader:completion:` ——Modrinth 搜索→**标题全等匹配**（containsString 会误命中 Sodium Extra / Podium Port）→getVersionsForModWithID→**gameVersions+loaders(fabric) 双过滤**→primaryFile；`startInstallSodiumWithGameVersion:` 注册统一下载任务（Sodium + Podium 单阶段）→两次取文件→串行下载→写实例 mods/ 目录→成功/失败 alert 与任务状态机对齐 Fabric API 流程。
-- **l10n**：退役 preference.profile.renderer_follow_global_toggle / preference.warning.renderer_shadowed_by_profile；新增 component.sodium.confirm_title/confirm_message/searching/not_found/download_failed/done——四语言键集一致，**基线 1924→1928**。
+- **l10n**：退役 preference.profile.renderer_follow_global_toggle / preference.warning.renderer_shadowed_by_profile；新增 component.sodium.confirm_title/confirm_message/searching/not_found/download_failed/done——四语言键集一致，**基线 1952→1928**。
 - **发布资产**：announcements.json v6.0.0 渲染器 bullet/summary/英文尾段重写为"每游戏强制单选（无全局默认，缺省自动）+ Sodium+Podium 一键安装"；主页卡片 bullet 同步 Task149 语义；README/README_CN 渲染器行重写；version.h 追加 REVISION 17 addendum (Task 150, no bump)。
 
 ### 校验
@@ -300,40 +300,6 @@ Stage Summary:
 - 装机验证锚点：①Vulkan/ES 会话日志必现 `[MGLFSR] Task153 deferred shrink applied: backbuffer 2360x1640 ... -> pushing MC render window 1180x820`，随后 `EASU 1180x820 -> offscreen 2360x1640`（真 FSR）；或 `Task153 geometry arbitration: backbuffer ... == window ...（no upscale headroom）-- full-res direct present`（兜底，同样零花屏）；②花屏/方块不渲染消失（两形态都不再溢出裁切）；③Forge 会话日志必现 `[JavaLauncher] Task153 Forge bootclasspath isolation ON`，且不再出现 ResolutionException、游戏进入 mod 加载完成；④4.0 后端按 Task152b 锚点验证（`Task152b` 无新日志 = pin 生效未崩）。
 - 用户明确指令遵守：**未动渲染器选择 UI**（保持单 mg + 后端独立键现状，未恢复三后端列表模式）。
 - 后续观察项：Vulkan 直连后端的 CopyTexSubImage2D 翻转/迟滞风险（Run #356 曾报"倒转"）——若下轮日志显示 EASU engaged 但画面上下颠倒，在链内加行序翻转（shader 常量级修复）。
-
----
-Task ID: 154
-Agent: Super Z (main agent, 本会话)
-Task: 用户四连反馈根修（mg 系列"da5918a 后全部异常"回归定案）：ES 方块不渲染 + vulkan/es FSR 无效果致输入错位 + Forge 闪退 + Mithril(4.0) 加载崩溃（7c32bc3 新日志三会话，全部 3b35b26 构建）；渲染器 UI 保持现状（单 mg + 后端独立键，用户明令）
-
-Work Log:
-- 回归定案（用户问题"为什么那 2 个端在 da5918a 的时候正常"的完整答案）：libMobileGL.dylib 自 da5918a 后逐字节未变（git 单提交实锤）；9f32cb4/1d4ff3a（9e6fc27=5.1.0 发布构建）装机日志显示 MobileGL DirectVulkan 全分辨率直呈、无任何启动器侧 FSR 介入 = 用户认可的正常态；da5918a 之后的全部异常源 = Task119 起的启动器侧 FSR 联动（链体 + 缩窗 + 输入除法 + 几何豁免），与 mg 二进制无关
-- 7c32bc3 三会话判读：①Vulkan（latestlog.old.txt）"Task153 backbuffer query unavailable" 一次性日志 + swap 探针 viewport 2360x1640 —— libMobileGL 的 EGL 是伪 EGL（surface/ctx 句柄恒 0x1、无 current 跟踪），eglGetCurrentDisplay/CurrentSurface 返回空 → 延迟缩窗永不下发 → MC 窗口信念恒全尺寸而 sendTouchPoint 仍除 mgFsrScale(2.0) → 触点只落左下四分之一 = "fsr 没有效果导致输入错位" 实锤；②Mithril（latestlog.txt）UnsatisfiedLinkError "Failed to locate library: liblwjgl.dylib" @ NativeLibrariesBootstrap —— Task152b 经系统类加载器预载 GL/Library + dlopen liblwjgl.dylib，MC 侧 Knot 加载器 Library.<clinit> 再载触发 JVM 单加载器不变量（already loaded in another class loader，被 LWJGL catch 吞掉伪装成 locate 失败）；且该会话 mod 列表含 sodium 0.9.2（POJAV_RENDERER 导出会在修完后再炸一次）；③Forge（latestlog.forge）"no AmethystAccountJNI in system library path" @ MinecraftAccount.<clinit> —— Task153 的 -Xbootclasspath/a 把 launcher.jar 交给 boot 加载器，其 loadLibrary 只搜 sun.boot.library.path
-- 取证链：本地 JDK 21 实测双 -Xbootclasspath/a 为追加语义（Task153 该点无误但方向错）；CFR 反编译随包 lwjgl-opengl.jar 的 GL.create() —— MACOSX 分支自 c71dcfa 起读取 org.lwjgl.opengl.libname（Task152b 的"常量池无该字符串"判断系探错 jar：核心 lwjgl.jar 无 GL.class）；GL$1 Delegate 的 getFunctionAddress 先走 GetProcAddress(eglGetProcAddress) 再 dlsym 兜底 —— MobileGL 的 eglGetProcAddress 对核心 gl* 返回 0（Task140 实测）故 vulkan/es 一直走 dlsym；Mithril 的返回坏指针 = Run #356 "no OpenGL context" 真因（上下文已 current + tri-probe dlsym 正常 + createCapabilities 空值的排除法闭环）；下载官方 MC 26.2 client.jar 反编译 NativeLibrariesBootstrap（loadOpenGL=Objects.requireNonNull(GL.getFunctionProvider)）与 BootstrapLauncher 1.1.2（ignoreList=文件名前缀逗号分隔，命中 jar 不进模块层留传统 classpath）；手写 Mach-O 导出 trie 解析器（uleb128 子偏移）核实 libmithril.dylib 导出 _glGetString/_glGetIntegerv/_glGetError/_eglGetProcAddress（2082 exports）与各渲染器 dylib 的 eglGetProcAddress 导出面（OSMesa 无/导 OSMesaGetProcAddress、gl4es 空 trie、MobileGL 有但对 gl* 返 0）
-- 修复 A（MobileGL FSR 全链退休，恢复 da5918a 语义）：ame83_fsr_capable_renderer 对 isMobileGLRenderer 返回 NO（mgFsrScale 恒 1.0：不缩窗、不除输入、不武装）+ 完整退休病历注释；mgl_fsr.mm ame_mgl_fsr_before_swap 入口即 return false（Task154 门禁 + 一次性日志，Task119-153 链体 #if 0 存档）；SurfaceViewController 延迟缩窗分支移除（统一 renderW 路径，armed 清零防跨渲染器残留）；gl_bridge Task78 豁免的 MobileGL 扩展回退（仅 MobileGlues 豁免——viewport==surface 使豁免对 mg 无操作，保留只会误豁免未来真几何事故）；渲染器 UI 零改动（A9 验证项）
-- 修复 B（Mithril 4.0）：Tools.java Task152b 反射钉扎整块移除（跨类加载器原生库毒害根除，MC 自己的 GL.create() 读 -Dorg.lwjgl.opengl.libname 绝对路径即得正确 provider）；scripts/patch_lwjgl_delegate_dlsym.py —— GL$1.class 常量池 "eglGetProcAddress"→"xglGetProcAddress"（17 字节等长交换，零结构变更；OSMesaGetProcAddress 保留给 zink；已对 lwjgl-341/lwjgl-opengl.jar 应用并幂等复验，lwjgl-333 为上游 Delegate 结构无此串不触碰；src/lwjgl overlay 无 opengl 类，补丁在 JavaApp 构建合并后存活）；JavaLauncher 移除 Mithril 的 POJAV_RENDERER 导出（Sodium 0.9.2 雷点 + fixPojavGLContext 已无必要）
-- 修复 C（Forge v2）：Task153 的 bootclasspath 迁移整体撤销（libs 回归 -cp 主路径+headless 双处）；BootstrapLauncher ignoreList 注入 —— 扫描 jvm_processed 自带 -DignoreList 则并入 launcher.jar，否则推默认值 "asm,securejarhandler,launcher.jar"；后推生效（JVM 同名 -D 后者胜出）；launcher.jar 留系统加载器（loadLibrary 搜 java.library.path=Frameworks，AmethystAccountJNI 复活）且不进 MC-BOOTSTRAP 模块层（无 "launcher" 自动模块，split package 根除）
-- 验证：verify_task154 新建 39/39（A mg-FSR 退休 9 + B Mithril 5 + C Delegate 补丁 5 + D Forge v2 5 + E 7c32bc3 证据锚 6 + F 语法配平/version.h/environ 9 + G 级联）；verify_task153 重锚 29/29（C1/C3/E3/E4 改判 Task154 超越语义）；verify_task119_124 A6/A7 重锚（61/62，仅剩 F1=HEAD 既有）；task139 失败集与 HEAD 逐项一致（11/11 全环境性旧账：历史日志文件已被覆盖/工作区副本缺失）；142/143/151 与 HEAD 一致；149/150 为环境性 workspace 副本缺失（既有）；语法门 error 数与 HEAD 相等（5=5，br_get_current 类既有环境缺失）
-- 环境经验：CFR 反编译 class 用 stdout 模式（--outputdir 需目录结构）；Mach-O 导出 trie 子偏移是 uleb128 且相对 trie 起点（LC_DYLD_EXPORTS_TRIE=0x80000033，0x34 是 chained fixups）；github API 限流时用 git remote 里的 token 走 actions API；heredoc 写 C 头文件注释时行首 '#' 会变成非法预处理指令（本次已修复为 '//'）
-
-Stage Summary:
-- 产出：Task154 五文件修复（SurfaceViewController.m / mgl_fsr.mm / gl_bridge.m / JavaLauncher.m / Tools.java）+ lwjgl-341 jar 字节码补丁 + patch_lwjgl_delegate_dlsym.py + verify_task154.py（39 项）+ task153/119_124 重锚 + version.h/environ.h addendum + worklog 双份
-- 装机锚点：①vulkan/es 会话 "[MGLFSR] Task154 MobileGL pre-swap FSR chain RETIRED (renderer=...)" + 输入复位（触点全屏准确）+ ES 方块渲染恢复 + 全分辨率直呈画面干净；②Mithril 会话越过 NativeLibrariesBootstrap（无 "Failed to locate library"）且 GlDevice 过 createCapabilities（sodium 0.9.2 包不再被 POJAV_RENDERER 触发）；③Forge 会话 "[JavaLauncher] Task154 Forge ignoreList shield: '...launcher.jar'" 且无 ResolutionException/无 AmethystAccountJNI 闪退
-- 关键决策：mg 系列 FSR 彻底退休（8 轮修补失败的架构性裁决——伪 EGL 下启动器侧链无可靠几何信号源；用户 da5918a 基准即无 FSR 态）；FSR 仍可用渲染器 = MobileGlues/zink；mg 想要画质/帧率权衡用 video.resolution
-- 遗留：ES 方块不渲染若在 Task154 构建上仍复现（理论上不可能——链已 #if 0），下一轮需其会话日志；26.1.2 存档崩溃/FSR(MobileGlues 侧)/虚拟按钮等既有遗留不动
-
----
-Task ID: 154 (续)
-Agent: Super Z (main agent, 本会话)
-Task: CI 确认
-
-Work Log:
-- CI run 35884635001（0a22f51）completed success（完整 SHA 轮询：15:51 触发，约 5 分钟完成——本会话改动无 iOS 编译新增面，.m/.mm 均为纯 ObjC 语法内改动）
-- 轮询经验：GitHub actions API 的 head_sha 过滤需完整 40 位 SHA（短 7 位恒返回空）
-
-Stage Summary:
-- Task154 全链闭环：三案根修（mg-FSR 退休 / Mithril 双加载器+Delegate 补丁 / Forge ignoreList v2）+ 验证器 39/39 + 级联零新增失败 + CI 绿，新 IPA 就绪
-- 装机待验证锚点见 Task154 主条目：①vulkan/es "Task154 ... RETIRED" + 触点全屏准确 + ES 方块渲染；②Mithril 越过 NativeLibrariesBootstrap 进 GlDevice（sodium 0.9.2 包）；③Forge "Task154 Forge ignoreList shield" 且无 ResolutionException/AmethystAccountJNI 闪退
 
 ---
 Task ID: 156
@@ -439,3 +405,28 @@ Stage Summary:
 - 热修 afea13b：先 `mkdir -p mojang-stubs/com/mojang` 再 cp 进该父目录（本地 replica 测试通过）；CI run 35941955757 **completed success**。
 - IPA 产物三重验证（rule: strings 验证后才交付）：①libs/mojang-stubs.jar 在包内且 jar 根为 com/（Narrator+嵌套类+全平台桩+OperatingSystem 全清单）；②Frameworks/libmobileglues.dylib 在包（5.7MB，重映射目标）；③主二进制含全部 8 条 Task158 日志串（mg GLES/4.0 backend 行 ×2 + 缺库闸门行 ×6）。
 - Stage Summary：Task158 全链闭环（verify 35/35 + 级联基线对拍 + CI 绿 + 产物验证）；新 IPA 就绪，装机锚点见 Task158 主条目。
+
+---
+
+## Task 159（本会话，管理 Java 26.0+ 预选 + 内存输入框弹窗 + 分辨率缩放实例化）
+
+### 用户三需求
+1. 管理 Java：1.17+ 预选下加"26.0 及更高版本：Java 25"行 + 适配检测代码。
+2. 实例内存弹窗改与游戏目录同款输入框（标题"调整内存分配"、简介"设备最大内存/可分配最大内存/内存调配指南见启动器使用教程"、删"恢复默认"、数值 clamp 512~可分配最大内存）。
+3. 分辨率缩放从设置页迁到每实例"渲染器"行下（删 % 后缀 → 右侧独立 % 标签，像名称行点击编辑 25~100），做单独选项而非全局。
+
+### Work Log
+- 前置：fetch 对齐 ce0783d（Task158 已被并行会话完成），下一个空号 159；l10n 基线 1948
+- **A. Manage JRE 26.0+ 预选**：javaRuntimes[@DEFAULT_JRE] 与 selectedRTTags 在 1_17_newer 与 execute_jar 之间插入 `1_26_newer`（新键 preference.manage_runtime.default.126）；PLPreferences java_homes 默认 "0" 加 `1_26_newer: 25`（25=internal 捆绑已存在）；footer 加 `case 25 → footer.java25`（"这是 Minecraft 26.0 及更高版本的默认版本"）；预选行 detail 加 nil 守卫（getObject 无深合并，存量设备新 tag 无键 → 显示"自动"，getSelectedJavaHome 的 minVersion 搜索语义兜底，首次点选落值）
+- **B. 26.x 检测代码**：JavaLauncher launchJVM defaultJRETag 三档分界（minVersion>=25 → 1_26_newer；26.x 官方 javaVersion.majorVersion=25，原二档会让 26.x 落 1_17_newer 槽选 Java 17 启动即崩）+ execute_jar 路径（2616 区）三档；ModpackUtils.javaMajorVersionForMC 补 first>=26→25（"26.2" parts[1]=2 漏到 Java 8——对齐 ModpackImportService 的 Task70 口径）；ForgeProcessorExecutor.inferJavaMajorForMinecraft 补 parts[0]>=26→25（原 fallback 17 漏网）；NeoForgeDirectInstaller loader 反推 major>=26→25（原"未来版本→21"过时）；ModpackImportService/ForgeDirectInstaller 已有 Task70 分支（B7 锚点验证幸存）
+- **C. 内存输入框弹窗**：Ame157MemoryAllocatorCard + Ame157CardTransitionAnimator 整类删除（脚本删行 95-334 + 锚点断言 + 残留清零）；showMemoryAllocator 重写为 editGameDir 同款 UIAlertControllerStyleAlert + addTextField（NumberPad、预填 allocatedMemory>0?:512、clearButtonMode）；标题 memory.adjust_title、简介 memory.adjust_message（设备最大内存=物理MB、可分配最大内存=self.maxMemory=物理×0.8 下限 1024 与原拉条上限同口径）；不搬"恢复默认"（i18n_str_898 仅存 editGameDir）；确定 → clamp [512, maxMemory]（空输入落 512）→ allocatedMemory 落值 + memoryAutoEnabled=NO → saveSettings → reload；**存量兼容**：memoryAuto=YES 老实例行仍显示"自动分配内存"（memory.auto_row 键保留），弹窗预填 512，确认一次即回手动；启动链 ame141_currentLaunchAllocMem 的 0=自动比例语义零改动（用户不碰内存行为不变）
+- **D. 分辨率缩放实例化**：设置页全局滑条行删除（留 [可撤销] 注释，撤销=恢复行字典 typeSlider 25-150）；PLProfiles prefDefaults 恢复 `@"resolution": @"video.resolution"`（renderer 退役前同款回退机制，[可撤销]）——解析链【profile 键 → 全局存量 → 100】，存量全局值继续生效直到实例显式设置；SurfaceViewController 启动解析单点改 resolveKeyForCurrentProfile:@"resolution"（ame_effective_renderer 同哲学）；实例页 advancedRows 渲染器后插"分辨率缩放"（viewfinder 图标）+ buildResolutionScaleAccessory（52pt NumberPad 输入框 + 右侧 18pt 独立 "%" 标签同一容器、Done 条收键盘、tag 1004、container 复用）+ 点击行聚焦 + resolutionScaleDidEnd clamp [25,100] 落盘 + loadSettings 读（NSString/NSNumber/全局回退、<=0 兜底 100）+ saveSettings 写 existing[@"resolution"] NSString（PLProfiles resolveKey 的 NSString 约定）；JavaGUIViewController 4 处保留全局键（执行 .jar 无实例上下文，注释留档）；游戏内菜单 actionAdjustResolution 维持写全局（运行时调整，重启后实例显式值接管）
+- **E. l10n**：+5（default.126 / footer.java25 / profile.title.resolution_scale / memory.adjust_title / memory.adjust_message）-1（memory.current 随卡片退役）×4 门语言 → 基线 1948→1952（set 口径逐语言断言；首版脚本行计数 1986 与门禁不符即 Task154 同款坑，改 set 口径核实 +5/-1 正确）；zh-Hant 风格跟邻近键（manage_runtime 区现状简体照抄、memory 区繁体）
+- **F. 发布资产**：announcements.json 四处（summary 尾补三项 / content 新块"Java 与内存（体验调整）"三 bullet / 主页卡片内存措辞改输入框口径 / EN 尾段追加）；indent=1 保持原格式最小 diff（首版 indent=2 全文件重排 92 行 diff，checkout 重跑）；MobileGlues-cpp/version.h 追加 REVISION 17 addendum (Task 159)
+- **校验**：verify_task159 新建 48 项全绿（A 预选 4 / B 26.x 7 / C 输入框 10 / D 分辨率 12 / E l10n 5 / F 资产 4 / G 配平+白名单 2 / H 回归 4）；重锚三件：verify_task157 B1-B9/C3/C4/C6 → 输入框形态（44/44）、verify_task149 E1-E6 → 输入框形态（35/35）、verify_task141 C2-C5/D5/D5b/F2/F3 → 输入框+新键口径（36/36，G4 允许前缀 +announcements.json）；l10n 门 1948→1952 ×15 文件（129-135/138/139/142/143/150/151/156/157，脚本 task159_gates.py）；级联 stash 基线对拍零新增失败（129=44/47、130=59/60、131=34/37、133=41/44、134=64/68、138=49/51、139=26/36、142=48+1、143=30+1、140=56+2、137=44+2、156=49+3 全基线一致；132/135/151/153/154/158/125_128 = MyRemastered 沙箱环境性）；重锚脚本坑：sub_check 块替换吞了块间变量定义行（157 的 utils_m / 149 的 mcnews=读 MinecraftNewsViewController.m 而非 LauncherNews…）→ 逐个补回
+- 提交推送（fetch 防撞号后）+ CI 轮询
+
+### Stage Summary
+- 用户预期装机锚点：①管理 Java 默认预选四行（1.16.5- / 1.17+ / **26.0 及更高版本 [Java 25]** / 执行 .jar），26.x 实例启动走 1_26_newer 槽；②实例内存行点开=输入框弹窗（标题"调整内存分配" + 三行简介 + 数字框 + 取消/确定，无恢复默认），输 0/超上限定 512/上限，确认即生效；③实例"渲染器"行下"分辨率缩放"行（点击行内数字框编辑 25~100，右侧独立 %，Done 落盘），启动生效；全局设置页视频区无分辨率行
+- 已知边界：游戏内分辨率菜单与 Java GUI 仍读写全局键（运行时语义）；自动分配开关无入口再开启（存量自动实例保持原比例直到手动确认）；footer.java17 文案保持原文（"1.17 及更高版本"），26.0+ 的默认说明由新 footer.java25 承载
+- 留档纪律：CI 绿后不推 worklog-only 提交（Task 96 教训）

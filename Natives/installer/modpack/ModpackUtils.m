@@ -102,6 +102,9 @@
 + (NSInteger)javaMajorVersionForMC:(NSString *)mcVersion {
     NSArray *parts = [mcVersion componentsSeparatedByString:@"."];
     if (parts.count < 2) return 8;
+    // Task159：对齐 ModpackImportService 同名函数（Task 70 口径）——年份制
+    // 26.x 的 parts[1] 是小版本号（"26.2" → 2），不补此分支会漏到 Java 8
+    if ([parts.firstObject integerValue] >= 26) return 25;  // 年份制 26.x 及后续 → Java 25
     NSInteger major = [parts[1] integerValue];
     if (major >= 21) return 21;       // 1.21+
     if (major >= 20 && parts.count >= 3 && [parts[2] integerValue] >= 5) return 21; // 1.20.5+

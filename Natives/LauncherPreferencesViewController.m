@@ -871,15 +871,12 @@
         ], @[
             // Video and renderer settings
             @{@"icon": @"video"},
-            // Task 150（[可撤销] 删除渲染器全局控制）：渲染器选择行退役——
-            // 全局默认概念随之取消，每个实例在实例设置页单独选择渲染器。
-            @{@"key": @"resolution",
-              @"hasDetail": @YES,
-              @"icon": @"viewfinder",
-              @"type": self.typeSlider,
-              @"min": @(25),
-              @"max": @(150)
-            },
+            // Task159（[可撤销] 分辨率缩放实例化）：全局分辨率缩放行退役——
+            // 与 Task150 渲染器同款迁移：每个实例在实例设置页"渲染器"行下
+            // 单独设置（profile 键 resolution，25~100 数字输入框 + 右侧 %）。
+            // 全局键 video.resolution 保留：PLProfiles prefDefaults 回退链
+            // （profile 无键 → 全局存量值）+ 游戏内菜单/Java GUI 仍走全局。
+            // 撤销 = 恢复本行字典（typeSlider 25-150）+ 实例页行。
             // Task 83（FSR 独立化）：FSR 档位从 MobileGlues 分区移到视频分区
             // ——它现在是多渲染器功能（MG 内置 FSR1 / zink EASU / Vulkan 渲染器
             // 的 GL 路径）。存储键经上方 get/set 重映射仍写
