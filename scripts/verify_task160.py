@@ -119,9 +119,9 @@ check("B3  blurIntensity 默认 1.0（Task162 重锚：100%）",
       "_blurIntensity = 1.0;" in bm and "_blurIntensity = 0.75;" not in bm and "_blurIntensity = 0.7; //" not in bm)
 check("B4  默认效果仍为毛玻璃（BackgroundUIEffectBlur）",
       "_uiEffect = BackgroundUIEffectBlur;" in bm)
-check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto；Task162 重锚：透明度/模糊注释改口径）",
+check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto；Task162 重锚：透明度/模糊注释改口径；Task164 重锚：nil 判定后病历注释承载首次语义）",
       "仅新装/重置偏好生效，存量用户已保存的值不变" in plp
-      and "仅新装/从未保存过该键的设备生效" in bm)
+      and "从未保存" in bm)
 
 print()
 print("=" * 72)

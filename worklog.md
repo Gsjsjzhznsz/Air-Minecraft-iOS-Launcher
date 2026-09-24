@@ -406,3 +406,28 @@ Work Log:
 Stage Summary:
 - Task162 八案全链闭环：根修 + 验证器 + 级联 + CI 绿 + 新 IPA 就绪（含 Task163 新拟态修正）
 - 装机待验证锚点见上一节 Stage Summary；mg 的 FSR 注意：mg+GLES/OpenGL 4.0 后端 → MobileGlues FSR1（装机日志看 "Task83 FSR linkage ... scale=2.00"）；mg+Vulkan 直连后端无 FSR（Task154 设计语义）；zink 自带 FSR（本轮日志已实证）
+
+---
+Task ID: 164
+Agent: main (Super Z)
+Task: 用户报"vulkan没有fsr。es和4.0黑屏。壁纸默认半透明60%/0%（应为毛玻璃60%/100%）" + 判读朋友 00:40 上传的新日志（56c8173）+ 解释"Add files via upload #399"
+
+Work Log:
+- 判读 56c8173 上传对（构建 678a76f）：latestlog.txt = mg GLES 会话（FSR+EASU+RCAS 全 engage、fps=58、swap 330/330、用户拖鼠标后切后台 = 黑屏现场）；latestlog.old.txt = Vulkan 直连会话（fps=59、exit(0)、Task154 退休链日志 = "vulkan 没有 fsr"实锤）
+- "Add files via upload #399"释义：朋友（Gsjsjzhznsz）网页拖拽上传新设备日志，#399 是该上传触发的 CI 构建编号，非代码改动
+- ES/4.0 黑屏根因定位：5.1.0 健康基线（a0ac656 latestlog.es/4.0）同管线但 EASU-only（无 RCAS pass）有画面；新构建唯一 delta = Task130 RCAS pass；mod 组合两场一致（continuity/iris 都在）排除模组变量；四项与 zink 已验证 RCAS（osm_bridge，实机正常）的实现差异全部修正：
+  ① FSRRCASSource.h FsrRcasLoadF 边界 clamp（textureSize 自查）——fullscreen-quad 边缘像素的 5-tap 越界 texelFetch 在 Mesa 良性、ANGLE Metal（MTLTexture read:）未定义可整帧作废 = 最可能真根因；三 TU 共享（zink 获得正确边缘行为，零视觉回归）
+  ② FSR1.cpp 两个 directToSurface 分支 disable 列表补 GL_STENCIL_TEST（zink 五件套；EGL config 带 stencil bits + 模组可能留拒绝型 stencil test → quad 逐像素被丢而 swap 照常）
+  ③ RCAS draw 前显式 glActiveTexture(GL_TEXTURE0) + sampler 每帧 re-pin（zink 形态）
+  ④ RCAS 首帧后一次性 GPU 探针（fb0 边缘单像素 + glGetError 清扫）——装机分诊锚点 "[MG] Task164 RCAS GPU probe"
+- 壁纸默认值根因：Task162 范围检查把"从未保存"误当"保存了 0"——integerForKey 未保存返回 0 = 枚举半透明（范围检查放行）；floatForKey 未保存返回 0.0 过 "< 0.0" 检查（0% 模糊）；三键统一 objectForKey == nil 判定（nil → 毛玻璃/0.6/1.0；显式保存值含故意选半透明/0% 照常尊重）
+- Vulkan FSR 评估：libMobileGL.dylib 二进制 strings 零 FSR/EASU/RCAS 符号、零相关环境变量、不读 config.json（Task153 实证）+ 伪 EGL（Task154 三重实证：句柄恒 0x1、无 current 跟踪、强推 = 花屏+输入错位）→ 上游硬限制不可行；公告/FAQ 明示矩阵（GLES/4.0 = 完整 FSR1 EASU+RCAS；Vulkan 直连 = 暂不支持，切后端指引）
+- 公告更新（scripts/task164_announcements.py）：v6.0.0 失实的"MobileGL 全后端 FSR 修复"改为准确矩阵表述 + 新增 Task164 置顶公告；保持 indent=1
+- version.h REVISION 17 addendum（Task 164，不 bump）
+- 验证：verify_task164 新 30/30；级联 162=68/68（D1-D4 重锚 nil 判定形态）、160=47/47（B5 重锚）、161=56/56、163=36/36（env 注入）、150=43/43、157=44/44、159=48/48、158=32/33（C6 与上轮 environmental baseline 一致）
+
+Stage Summary:
+- ES/4.0 黑屏：RCAS 管线四项对齐 zink 已验证形态（边界 clamp/五件套状态防护/显式 unit+re-pin/GPU 探针），装机验证锚点 "[MG] Task164 RCAS GPU probe: ... nonzero = draw landed"
+- 壁纸首启默认：毛玻璃/60%/100% 真正生效（nil 判定）
+- Vulkan 直连 FSR：上游不可行（零符号+伪 EGL 实证），公告/FAQ 明示切换 GLES/4.0 获得完整 FSR
+- 遗留：装机验证（黑屏是否痊愈 + 探针读数）；26.1.2 libjvm 崩溃、静态库虚拟按钮等继承待办

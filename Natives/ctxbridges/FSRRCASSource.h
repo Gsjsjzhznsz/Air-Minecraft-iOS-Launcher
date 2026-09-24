@@ -171,7 +171,20 @@ uniform float uSharpness;   // mpv 口径：[0,1]，越大越锐，默认 0.2
 in vec2 vTexCoord;
 out vec4 oFragColor;
 
-AF4 FsrRcasLoadF(ASU2 p) { return texelFetch(uInputTex, p, 0); }
+// ---- 边界 clamp（Task164，Amethyst）----
+// fullscreen-quad 入口在边缘像素必然产生 p+(0,-1)/(-1,0)/(1,0)/(0,1) 的
+// 越界 tap：Mesa（zink）对越界 texelFetch 返回垃圾值但无害；ANGLE Metal
+// 映射到 MTLTexture read:，越界读是未定义行为——M 系驱动实测可整帧废掉
+// （fps/swap 全绿、屏幕全黑，即 ES/4.0 黑屏形态）。AMD 原版假设调用方
+// 保证边界（mpv hook 天然 clamp），这里用 textureSize 在 shader 内自查，
+// 零调用方侵入。textureSize 是 uniform-rate 查询，编译器 CSE 提升后
+// 每像素开销可忽略。
+AF4 FsrRcasLoadClamped(ASU2 p) {
+    ASU2 ame164_max = ASU2(textureSize(uInputTex, 0)) - ASU2(1);
+    p = clamp(p, ASU2(0), ame164_max);
+    return texelFetch(uInputTex, p, 0);
+}
+AF4 FsrRcasLoadF(ASU2 p) { return FsrRcasLoadClamped(p); }
 void FsrRcasInputF(inout AF1 r, inout AF1 g, inout AF1 b) {}
 
 void main() {

@@ -152,16 +152,18 @@ bh = rd("Natives/BackgroundManager.h")
 check("C4 头文件声明（Task162 注）",
       "- (BOOL)isBackgroundLiveAttached;" in bh)
 
-print("== D. 壁纸默认值（毛玻璃/60%/100%）==")
-check("D1 uiOpacity 默认 0.6（Task162 用户定稿注）",
-      "_uiOpacity = 0.6;" in bm and "Task162：初次使用默认透明度 60%" in bm)
-check("D2 blurIntensity 默认 1.0（Task162 注）",
-      "_blurIntensity = 1.0;" in bm and "Task162：默认模糊程度 100%" in bm)
-check("D3 效果默认毛玻璃保持不变",
-      "_uiEffect = BackgroundUIEffectBlur; // 默认毛玻璃效果" in bm)
-check("D4 存量已保存值不受影响（越界回落即新默认，仅无键设备命中）",
+print("== D. 壁纸默认值（毛玻璃/60%/100%；Task164 重锚：nil 判定形态）==")
+check("D1 uiOpacity 默认 0.6（Task162 定稿，Task164 nil 判定重写后语义不变）",
+      "_uiOpacity = 0.6; // Task162/164：默认透明度 60%" in bm)
+check("D2 blurIntensity 默认 1.0（Task162 定稿，Task164 nil 判定重写后语义不变）",
+      "_blurIntensity = 1.0; // Task162/164：默认模糊程度 100%" in bm)
+check("D3 效果默认毛玻璃保持不变（Task164：未保存键不再误读为枚举 0 半透明）",
+      "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm
+      and "[defaults objectForKey:kBackgroundUIEffectKey]" in bm)
+check("D4 存量已保存值不受影响（Task164 重锚：显式保存值走 else 分支 + 越界兜底）",
       "if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {" in bm
-      and "if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {" in bm)
+      and "if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {" in bm
+      and "_uiEffect < BackgroundUIEffectTranslucent || _uiEffect > BackgroundUIEffectBlur" in bm)
 
 print("== E. 主页头像缓存 ==")
 nw = rd("Natives/LauncherNewsViewController.m")

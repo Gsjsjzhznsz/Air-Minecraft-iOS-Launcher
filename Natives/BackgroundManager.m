@@ -147,22 +147,45 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 
 - (void)loadUISettings {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    _uiEffect = [defaults integerForKey:kBackgroundUIEffectKey];
-    if (_uiEffect < BackgroundUIEffectTranslucent || _uiEffect > BackgroundUIEffectBlur) {
-        _uiEffect = BackgroundUIEffectBlur; // 默认毛玻璃效果
+    // Task164：默认值判定从"范围检查"改为"键是否存在"（用户定稿：毛玻璃、
+    // 透明度 60%、模糊 100%）。Task162 的范围检查有两个漏洞：
+    //   ① kBackgroundUIEffectKey 从未保存时 integerForKey 返回 0 =
+    //      BackgroundUIEffectTranslucent（枚举 0 = 半透明），范围检查
+    //      [Translucent, Blur] 对 0 恒放行 → 新装设备默认"半透明"而非
+    //      "毛玻璃"（用户实测"半透明 60%/0%"的第一半）；
+    //   ② kBackgroundBlurIntensityKey 从未保存时 floatForKey 返回 0.0，
+    //      "< 0.0" 检查抓不住 → 默认模糊 0%（第二半）。
+    // 只有 _uiOpacity 的 "< 0.1" 检查碰巧把未保存的 0.0 归一到默认。
+    // 现在三个键统一"objectForKey == nil = 从未保存 → 写默认；显式保存过
+    // 的值（包括用户故意选的 半透明 / 0% 模糊）照常尊重"。
+    NSNumber *ame164_effect = [defaults objectForKey:kBackgroundUIEffectKey];
+    if (ame164_effect == nil) {
+        _uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果
+    } else {
+        _uiEffect = [ame164_effect integerValue];
+        if (_uiEffect < BackgroundUIEffectTranslucent || _uiEffect > BackgroundUIEffectBlur) {
+            _uiEffect = BackgroundUIEffectBlur; // 越界值（历史损坏数据）兜底毛玻璃
+        }
     }
-    
-    _uiOpacity = [defaults floatForKey:kBackgroundUIOpacityKey];
-    if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {
-        // Task162：初次使用默认透明度 60%（用户定稿"毛玻璃，60% 的透明度，
-        // 100% 的模糊"；Task160 的 10% 过透，面板文字在浅色壁纸上偏虚）。
-        // 仅新装/从未保存过该键的设备生效，存量已保存值不变。
-        _uiOpacity = 0.6;
+
+    NSNumber *ame164_opacity = [defaults objectForKey:kBackgroundUIOpacityKey];
+    if (ame164_opacity == nil) {
+        _uiOpacity = 0.6; // Task162/164：默认透明度 60%
+    } else {
+        _uiOpacity = [ame164_opacity doubleValue];
+        if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {
+            _uiOpacity = 0.6;
+        }
     }
-    
-    _blurIntensity = [defaults floatForKey:kBackgroundBlurIntensityKey];
-    if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {
-        _blurIntensity = 1.0; // Task162：默认模糊程度 100%（用户定稿；Task160/159 为 75%/0.7）
+
+    NSNumber *ame164_blur = [defaults objectForKey:kBackgroundBlurIntensityKey];
+    if (ame164_blur == nil) {
+        _blurIntensity = 1.0; // Task162/164：默认模糊程度 100%
+    } else {
+        _blurIntensity = [ame164_blur doubleValue];
+        if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {
+            _blurIntensity = 1.0;
+        }
     }
 }
 

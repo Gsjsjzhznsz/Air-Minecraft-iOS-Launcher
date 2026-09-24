@@ -1534,3 +1534,48 @@
 // 14x30 container) -- the mixed system/SF-symbol glyph weights read as a
 // mismatch side by side. applyCardEffectToCell (table rows) and the
 // Card/Raised surface methods keep their Task160 forms.
+
+// REVISION 17 addendum (Task 164, no bump): ES / OpenGL 4.0 black-screen
+// fix + wallpaper first-launch defaults repair. Device evidence
+// (56c8173 logs, build 678a76f): both MG-remap sessions present the
+// Task130 RCAS chain engaged (render 1180x820 -> EASU -> target
+// 2360x1640 -> RCAS -> surface) with fps=58 / swap 100% OK / zero GL
+// errors -- yet the screen stays black; the 5.1.0 healthy baseline
+// (a0ac656 latestlog.es / latestlog.4.0) is byte-identical pipeline
+// EXCEPT it is EASU-only (no RCAS pass existed) and shows a picture.
+// The modpacks match (continuity/iris present in BOTH), so the delta is
+// the RCAS pass itself. Four deviations from the proven zink RCAS form
+// (osm_bridge, device-verified) are corrected in FSR1.cpp +
+// FSRRCASSource.h: (1) FsrRcasLoadF now clamps its texelFetch taps to
+// the input bounds via textureSize -- the fullscreen-quad entry
+// generates out-of-range taps on every edge pixel (p+(0,-1) etc.);
+// Mesa tolerates OOB texelFetch, ANGLE Metal maps it to MTLTexture
+// read: which is UB and can void the whole frame (fps/swap green,
+// screen black). Applies to all three TUs sharing the header (zink
+// gains correct edge behavior, no visual regression). (2) Both
+// directToSurface branches now disable GL_STENCIL_TEST (zink's
+// five-state list; EGL configs carry stencil bits and mod shaders can
+// leave a rejecting stencil test armed -- the quad gets discarded
+// pixel-by-pixel while swap succeeds). (3) The RCAS draw now
+// explicitly selects texture unit 0 and re-pins the sampler uniform
+// every frame instead of relying on the init-time pin (zink form;
+// glUniform1i(-1,..) stays a legal no-op). (4) A one-shot GPU probe
+// (zink Task99 forensics form) reads a single fb0 edge pixel right
+// after the first RCAS frame -- the install-verification anchor
+// "[MG] Task164 RCAS GPU probe: ... nonzero = draw landed on GPU;
+// all-zero = RCAS quad never landed" bisects state-eaten draws from
+// presentation-layer failures on the next device round. Wallpaper
+// defaults (BackgroundManager.loadUISettings): the Task162 range
+// checks let never-saved keys fall through as valid values --
+// integerForKey never-saved returns 0 == BackgroundUIEffectTranslucent
+// (semi-transparent, NOT the decreed frosted glass) and floatForKey
+// never-saved returns 0.0 which "< 0.0" cannot catch (0% blur). All
+// three keys now branch on objectForKey == nil first (never saved ->
+// frosted glass / 60% opacity / 100% blur; explicitly saved values,
+// including a deliberate semi-transparent pick or 0% blur, are
+// respected as-is). Vulkan-direct FSR remains upstream-impossible
+// (libMobileGL ships zero FSR/EASU/RCAS symbols and no config
+// surface; Task154 pseudo-EGL evidence stands) -- the FAQ fsr entry
+// and the announcements support matrix carry the guidance: use the
+// GLES / OpenGL 4.0 backend for the full MobileGlues FSR1
+// (EASU upscale + RCAS sharpening).

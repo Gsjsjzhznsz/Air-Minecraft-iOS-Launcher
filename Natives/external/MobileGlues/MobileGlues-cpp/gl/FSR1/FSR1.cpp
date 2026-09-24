@@ -627,14 +627,20 @@ void ApplyFSR() {
         const bool rcasOn = FSR1_Context::g_rcasProgram != 0 &&
                             global_settings.fsr1_rcas_sharpness >= 0.0f;
         if (rcasOn) {
-            // Depth/scissor/blend/cull would all silently eat the quad on a
-            // default framebuffer that carries a depth attachment or app-leftover
-            // state -- the target FBO never had those, the surface may. MC
-            // re-arms its own state every frame, so leaving these disabled
+            // Depth/scissor/stencil/blend/cull would all silently eat the quad on a
+            // default framebuffer that carries a depth/stencil attachment or
+            // app-leftover state -- the target FBO never had those, the surface
+            // may. MC re-arms its own state every frame, so leaving these disabled
             // through the swap is the same stomp the rest of this function
             // already makes.
+            // Task164：GL_STENCIL_TEST 补齐（zink 五件套对齐）——EGL config 携
+            // 带 stencil bits 且模组（continuity/iris 家族）可能在帧尾留下
+            // stencil test enabled + 拒绝型 func：RCAS 的全屏 quad 会被逐像素
+            // 丢弃而 swap 照常成功，屏幕全黑（678a76f 装机日志形态）。EASU-
+            // only 时代直画 fb0 同样暴露在此风险下，一并对齐。
             GLES.glDisable(GL_DEPTH_TEST);
             GLES.glDisable(GL_SCISSOR_TEST);
+            GLES.glDisable(GL_STENCIL_TEST);
             GLES.glDisable(GL_BLEND);
             GLES.glDisable(GL_CULL_FACE);
             GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, FSR1_Context::g_targetFBO);
@@ -645,16 +651,23 @@ void ApplyFSR() {
             // sampler was pinned at init; only the texture binding and the
             // sharpness uniform are per-frame (config reload picks changes up
             // without a relaunch).
+            // Task164：unit 0 显式化 + sampler 每帧 re-pin（zink 已验证形态）
+            // ——不再依赖"init 时 pin 过、期间无人改"的隐式契约；若着色器
+            // 把 uniform 优化掉，location 为 -1，glUniform1i(-1,..) 是合法
+            // 空操作，零回归。
             GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+            GLES.glActiveTexture(GL_TEXTURE0);
             GLES.glBindTexture(GL_TEXTURE_2D, FSR1_Context::g_targetTexture);
             GLES.glUseProgram(FSR1_Context::g_rcasProgram);
+            if (FSR1_Context::g_rcasInputTexLoc >= 0) {
+                GLES.glUniform1i(FSR1_Context::g_rcasInputTexLoc, 0);
+            }
             if (FSR1_Context::g_rcasSharpnessLoc >= 0) {
                 GLES.glUniform1f(FSR1_Context::g_rcasSharpnessLoc,
                                  global_settings.fsr1_rcas_sharpness);
             }
             GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
             GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
-            GLES.glUseProgram(FSR1_Context::g_fsrProgram);
             static bool s_rcasEngaged = false;
             if (!s_rcasEngaged) {
                 s_rcasEngaged = true;
@@ -662,6 +675,28 @@ void ApplyFSR() {
                       FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight,
                       FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight,
                       global_settings.fsr1_rcas_sharpness);
+                // Task164：一次性 GPU 探针（zink Task99 同款取证）——RCAS
+                // 首帧后读回 fb0 边缘单像素。装机分诊锚点：探针非零 =
+                // 绘制已落地 GPU（后续仍黑屏则断在呈现/传输层）；探针全零
+                // = RCAS quad 未落地（状态被吃/shader 转译问题），后续二分
+                // 有据可依。单像素 glReadPixels 不走已退休的
+                // CopyBGRA8ToRGBA8 大回读（Task75 SIGSYS 病历），零风险。
+                // 读回前显式绑 fb0 的 READ 通道（RCAS draw 绑的是 DRAW）。
+                {
+                    unsigned char ame164_px[4] = {0, 0, 0, 0};
+                    GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+                    GLES.glReadPixels(FSR1_Context::g_targetWidth > 4 ? FSR1_Context::g_targetWidth - 4 : 0,
+                                      FSR1_Context::g_targetHeight > 4 ? FSR1_Context::g_targetHeight - 4 : 0,
+                                      1, 1, GL_RGBA, GL_UNSIGNED_BYTE, ame164_px);
+                    unsigned int ame164_err = 0;
+                    for (int ame164_i = 0; ame164_i < 4; ame164_i++) {
+                        unsigned int ame164_e = GLES.glGetError();
+                        if (ame164_e != 0 && ame164_err == 0) ame164_err = ame164_e;
+                    }
+                    LOG_I("[MG] Task164 RCAS GPU probe: fb0 pixel (edge-4) rgba=%02x%02x%02x%02x glErr=0x%04x -- nonzero = draw landed on GPU; all-zero = RCAS quad never landed (state/shader suspect)",
+                          ame164_px[0], ame164_px[1], ame164_px[2], ame164_px[3], ame164_err);
+                    // READ 绑定还回 guard 保存值由析构完成；此处不预还原。
+                }
             }
             // Hand the draw binding back to the render FBO the application's next
             // frame expects (the guard would restore it too, but the explicit
@@ -670,13 +705,15 @@ void ApplyFSR() {
             GLES.glViewport(0, 0, FSR1_Context::g_renderWidth, FSR1_Context::g_renderHeight);
             return;
         }
-        // Depth/scissor/blend/cull would all silently eat the quad on a default
-        // framebuffer that carries a depth attachment or app-leftover state --
-        // the target FBO never had those, the surface may. MC re-arms its own
-        // state every frame, so leaving these disabled through the swap is the
-        // same stomp the rest of this function already makes.
+        // Depth/scissor/stencil/blend/cull would all silently eat the quad on a
+        // default framebuffer that carries a depth/stencil attachment or
+        // app-leftover state -- the target FBO never had those, the surface may.
+        // MC re-arms its own state every frame, so leaving these disabled
+        // through the swap is the same stomp the rest of this function already
+        // makes.（Task164：stencil 对齐 zink 五件套，见上方 rcasOn 分支注释。）
         GLES.glDisable(GL_DEPTH_TEST);
         GLES.glDisable(GL_SCISSOR_TEST);
+        GLES.glDisable(GL_STENCIL_TEST);
         GLES.glDisable(GL_BLEND);
         GLES.glDisable(GL_CULL_FACE);
         GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
