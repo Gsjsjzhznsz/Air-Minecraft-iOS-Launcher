@@ -1874,3 +1874,104 @@
 // retries 5xx (empty or non-JSON bodies) with a 2s backoff (max 2), and the
 // sync getEndpoint wraps AFNetworking 5xx failures into the existing
 // code-543 retry loop.
+
+// REVISION 17 addendum (Amethyst Task 173, no bump): ten-symptom round from
+// the fd31b79 device logs (Task 172 build, three sessions: ANGLE FO pack on
+// 26.3, Zombie Invade 100 Days on 1.20.1-forge, old Forge 1.8.9).
+// (1) ANGLE renderer crash AFTER the GL backend was accepted: the session
+// dies at Minecraft.loadCriticalShaders -> Failed
+
+// REVISION 17 addendum (Amethyst Task 173, no bump): ten-symptom round from
+// the fd31b79 device logs (Task 172 build, three sessions: ANGLE FO pack on
+// 26.3, Zombie Invade 100 Days on 1.20.1-forge, old Forge 1.8.9).
+// (1) ANGLE renderer crash AFTER the GL backend was accepted: the session
+// dies at Minecraft.loadCriticalShaders -> "Failed to find or load pipeline
+// minecraft:pipeline/gui" -- the LWJGL line "No context is current or a
+// function that is not available..." pins NULL function pointers. CFR
+// forensics of the real 26.3 client.jar renderpearl GL backend: GlDevice
+// calls GL33C.glColorMaski/glEnablei/glDisablei, GlCommandEncoder uses
+// glDrawElementsInstancedBaseVertex, GlQueryPool uses glQueryCounter, and
+// Iris uses glTexImage1D -- none of which exist in the ES-only export set of
+// the bundled libGLESv2 framework, so the GL$1 macOS chain (OSMesaGetProc
+// =0 then plain dlsym, Task 172's verbatim mirror) resolves them to NULL.
+// tinygl4angle.c now carries a desktop-GL completion layer: ~20 wrappers
+// (per-slot blend, multi-draw family, queries, tex buffers, FBO layered
+// attach, copy image, 1D textures, GLdouble adapters) resolved at first
+// call via eglGetProcAddress with EXT/OES/KHR/NV/ARB suffix fallbacks and
+// safe degradation (slot 0 falls through to the non-indexed variant,
+// multi-draw unwinds to per-draw calls, glLogicOp no-ops). Two latent bugs
+// fixed in the same file: glShaderSource early-returned WITHOUT uploading
+// ES-versioned shader sources (compile-empty programs), and the GLSL
+// version string "OpenGL GLSL 3.30 (ANGLE...)" broke Iris's semver regex
+// (prefix now stripped in glGetString). One-shot forensics logs the
+// resolved/missing table on first glGetString.
+// (2) Old-Forge (1.8.9-forge-11.15.1.2318) launch crash: the generated
+// version JSON lacks a "libraries" array, so Tools.getVersionInfo NPE'd at
+// the customVer.libraries loop (line 752). Both sides now get empty-array
+// guards + null library/name skips, and a missing parent-version JSON
+// reports a locatable error instead of a raw NPE.
+// (3) Zombie Invade 100 Days (244-mod 1.20.1 Forge pack) dies silently
+// 53s into loading: the instance memory slider allowed 7165MB (the 0.8 x
+// physical formula) which blows the iOS per-process Jetsam limit (heap +
+// JVM native + renderer surfaces). ame173_safeHeapCeilingMB() derives an
+// authoritative ceiling from os_proc_available_memory() minus a 1.2GB
+// native reserve; ame141_currentLaunchAllocMem clamps every launch
+// (profile or auto) through it with a bilingual toast, and the Profile
+// memory slider is capped at ceiling+512MB so doomed values cannot be
+// pre-selected.
+// (4) CurseForge list ignored the sort menu: the UI passed Modrinth-style
+// sort ("follows"/"downloads"/...) and loader ("fabric"/...) keys, but the
+// CF search never mapped them -- sortField/sortOrder/modLoaderType are now
+// appended on both the sync and async paths (2=Popularity, 6=TotalDownloads,
+// 3=LastUpdated; loader enums 1/4/5/6), and ModrinthAPI gets the same
+// treatment (its index was hardcoded relevance/follows -- the sort menu
+// never worked on EITHER source; ame173_indexForSort maps the shared keys).
+// (5) CF modpack version downloads all failed: double root cause -- the
+// MCIM mirror's 302 keeps the zero-padded edge path (/files/8697/067/...)
+// which mediafilez.forgecdn.net rejects with 403 (unpadded /8697/67/ works,
+// verified live), and ModVersion.parseCurseForgeDictionary never ran the
+// download URL through PLMirrorCenter (ModrinthAPI always did). CDN
+// fallback now emits unpadded segments; CF primaryFile URLs are
+// mirror-resolved like Modrinth's.
+// (6) Download-page game-version picker stopped at 1.21.1/1.16.5: the
+// manifest filter required the "1." prefix (26.x dropped), the 32-entry
+// cap cut everything below 1.16.4, and a failed manifest load left a
+// 5-entry fallback. Manifests now load through the PLMirrorCenter GameFile
+// candidate chain (official + bmclapi), releases are accepted for any
+// numeric id (26.x and 1.x, floor 1.8), the cap is 64, and the fallback
+// list is the full common set (26.3 down to 1.8).
+// (7) TouchController reworked into the Sodium-style component row (user
+// decree "same style as Sodium, tap to auto-install AND auto-configure"):
+// moved from the advanced section's toggle picker to the components
+// section; installTouchControllerStandalone runs the exact Sodium flow
+// (Fabric gate, bilingual confirm, Modrinth exact-title match, unified
+// download task, jar into mods/) and arms the Task 172 auto-config key on
+// success (UDP mode + launcher controls hidden at launch).
+// (8) Home avatar disappearing on tab return (round 3): every
+// showHomePage call allocated a FRESH LauncherNewsViewController, so the
+// Task 169/171/172 timing patches could always be raced by the new
+// instance's fetch. Both layout controllers now cache and reuse the home
+// VC (cachedHomeVC) -- currentAvatar survives on the instance, and
+// returning to the home tab is a zero-refetch path.
+// (9) Wallpaper settings "default config inverted -> UI size and taps
+// misaligned": the three slider rows (opacity/blur/card opacity) were
+// built with top-aligned y=0 h=30 frames and fixed x offsets computed from
+// the pre-layout cell width, mis-centring the thumb and overlapping the
+// value label on wide form sheets and after rotation. All three rows are
+// now built from one Auto Layout spec (icon -> title -> slider -> value,
+// centerY-anchored, flexible width).
+// (10) "After Forge's JIT install, launching the game pops a java runtime
+// error until the launcher is restarted": one JVM per process -- the
+// installer's headless JVM occupies it, and the old dialog told the user
+// to restart manually. launchJVM's guard now offers Restart & Launch --
+// internal.autolaunch_profile + exit(0), and LauncherRightPanel
+// viewDidLoad consumes the key (selects the profile, waits 1.5s for
+// UI/account readiness, fires launchGame through the full JIT wait chain).
+// Plus: VGPU renderer added (PojavLauncherTeam/VGPU vendored under
+// external/vgpu with iOS patches: @rpath framework dlopens, android/log
+// removed, clang strict-implicit fixes; CMake builds it as libvgpu.dylib
+// via two OBJECT libs to dodge the duplicate-basename collision); renderer
+// list "Auto" label dropped its ": gl4es or ANGLE" suffix, MobileGlues is
+// annotated (1.17+), and auto's legacy-MC branch switched from ANGLE to
+// gl4es (per-version assignment, matching the CMake positioning of
+// tinygl4angle as the 1.17+ wrapper).

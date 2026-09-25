@@ -132,20 +132,19 @@ check("E5 viewDidAppear 延迟补刷（0.35s）",
 
 # ---------- F. TouchController 版本级 ----------
 ps = read("Natives/ProfileSettingsViewController.m")
-check("F1 高级设置区新增行",
-      '[advancedRows addObject:@"TouchController"];' in ps)
+check("F1 组件安装区新增行（Task173 重锚：开关式高级区行已迁往组件区）",
+      '@[@"Fabric API", @"Sodium + Iris Shaders", @"TouchController", @"OptiFine"]' in ps)
 check("F2 属性 + 读写（loadSettings boolValue / saveSettings YES+删键）",
       "BOOL touchControllerEnabled;" in ps
       and 'self.touchControllerEnabled = [self.profile[@"touchController"] boolValue];' in ps
       and 'existing[@"touchController"] = @YES;' in ps
       and '[existing removeObjectForKey:@"touchController"];' in ps)
-check("F3 行渲染 + 选择器 + popover 行反查",
-      ' isEqualToString:@"TouchController"]' in ps
-      and "showTouchControllerSelector" in ps
-      and 'indexOfObject:@"TouchController"' in ps)
-check("F4 复用既有 l10n 键（零新键零计数级联）",
-      'localize(@"preference.touchcontroller.mode.udp", nil)' in ps
-      and 'localize(@"preference.touchcontroller.mode.disabled", nil)' in ps)
+check("F3 行渲染 + 安装流程（Task173 重锚：Sodium 同款组件，不再有开关式 picker）",
+      'systemImageNamed:@"hand.tap.fill"' in ps
+      and "installTouchControllerStandalone" in ps
+      and 'exactTitle:@"touchcontroller"' in ps)
+check("F4 复用既有 l10n 键（Task173 重锚：udp 键沿用，disabled 键随开关退役）",
+      'localize(@"preference.touchcontroller.mode.udp", nil)' in ps)
 bridge = read("Natives/ios_uikit_bridge.m")
 check("F5 启动时自动配置（换根前调用 + 三键落值 + 关不碰全局）",
       "ame172_applyProfileTouchController();" in bridge
@@ -176,8 +175,8 @@ check("H1 version.h REVISION 17 addendum (Task 172)",
       and "six-symptom round" in vh)
 import json
 anns = json.load(open(f"{REPO}/announcements.json"))["announcements"]
-check("H2 announcements task172@2（server-pin/task169 钉 0/1）",
-      anns[2].get("id") == "task172-six-fixes-2026-09-25"
+check("H2 announcements task172@3（Task173 插入 index 2 后顺延；server-pin/task169 钉 0/1）",
+      anns[3].get("id") == "task172-six-fixes-2026-09-25"
       and anns[0].get("id") == "server-recommend-2026-09-24"
       and "task169" in anns[1].get("id", ""))
 

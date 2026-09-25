@@ -13,10 +13,13 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <sys/sysctl.h>
+// Task173：os_proc_available_memory（Jetsam 剩余量，iOS 13+）
+#include <libproc.h>
 
 #include "utils.h"
 #import "LauncherPreferences.h"
 #import "PLProfiles.h"
+#import "NMToast.h"
 
 CFTypeRef SecTaskCopyValueForEntitlement(void* task, NSString* entitlement, CFErrorRef  _Nullable *error);
 void* SecTaskCreateFromSelf(CFAllocatorRef allocator);
@@ -690,23 +693,86 @@ void dismissModalViewController(UIViewController *viewController) {
 }
 
 // ============================================================================
+// Task173: 进程内存天花板（Jetsam 安全堆顶）。
+// 病历（惊变100天/Zombie Invade 100 Days 装机会话 latestlog.old）：
+// 实例内存滑到 7165MB（= 0.8 × 物理内存，ProfileSettings 的 maxMemory 公式），
+// 244 mods 的 1.20.1 Forge 重包加载 53 秒后进程被静默击杀（无 hs_err、无
+// exit 标记 = Jetsam SIGKILL）——堆 7165MB + JVM 原生侧（metaspace/代码缓存/
+// GC 结构）+ 渲染器表面合计超过 iOS 进程上限。0.8 × 物理内存对 iOS 是
+// 错误公式：带 increased-memory-limit 权限的进程上限约为物理内存的 75%，
+// 没权限时更低。
+// 修复：用 os_proc_available_memory()（iOS 13+，返回“距离 Jetsam 击杀还剩
+// 多少字节”的权威值）推算安全堆顶。调用时机越早越准（启动器冷启时进程
+// 自身驻留小，读数接近真实上限）。
+// ============================================================================
+int ame173_safeHeapCeilingMB(void) {
+    static int cachedCeilingMB = -1;
+    if (cachedCeilingMB > 0) {
+        return cachedCeilingMB;
+    }
+    int ceilingMB = 0;
+    {
+        // os_proc_available_memory 在 <libproc.h>（iOS 13+）。返回 0 表示不支持
+        // （老系统/模拟器），此时退回保守比例：物理内存 × 0.6。
+        uint64_t avail = os_proc_available_memory();
+        if (avail > 0) {
+            int availMB = (int)(avail >> 20);
+            // 剩余可用 − 1.2GB 原生预留（JVM 非堆 + 渲染面 + 系统开销）
+            // = 可安全承诺的 -Xmx。
+            ceilingMB = availMB - 1200;
+            if (ceilingMB < 1024) {
+                ceilingMB = 1024;
+            }
+            NSLog(@"[Task173] safe heap ceiling: os_proc_available_memory=%dMB -> Xmx ceiling %dMB (native reserve 1200MB)",
+                  availMB, ceilingMB);
+        }
+    }
+    if (ceilingMB <= 0) {
+        long long physMB = (NSProcessInfo.processInfo.physicalMemory >> 20);
+        ceilingMB = (int)(physMB * 0.6);
+        if (ceilingMB < 1024) ceilingMB = 1024;
+        NSLog(@"[Task173] safe heap ceiling: fallback 60 percent of physical = %dMB (phys=%lldMB)",
+              ceilingMB, physMB);
+    }
+    cachedCeilingMB = ceilingMB;
+    return ceilingMB;
+}
+
+// ============================================================================
 // Task141: launch-time memory resolution (see utils.h for the contract).
 // Instance slider (profile allocatedMemory) first; untouched profiles fall
 // back to the pre-Task141 auto ratio (java.auto_ram UI retired).
+// Task173: 任何来源的内存值（实例滑条/自动比例）都要过安全堆顶钳制——
+// 惊变100天会话的 7165MB 直接击穿 Jetsam 上限，启动前钳制并留日志/提示。
 // ============================================================================
 int ame141_currentLaunchAllocMem(void) {
+    int mem = 0;
     @try {
         NSDictionary *profile = [PLProfiles current].selectedProfile;
-        NSInteger mem = [profile[@"allocatedMemory"] integerValue];
-        if (mem > 0) {
-            NSLog(@"[Task141] launch memory from instance profile: %ld MB", (long)mem);
-            return (int)mem;
+        NSInteger profMem = [profile[@"allocatedMemory"] integerValue];
+        if (profMem > 0) {
+            NSLog(@"[Task141] launch memory from instance profile: %ld MB", (long)profMem);
+            mem = (int)profMem;
         }
     } @catch (NSException *e) {
         NSLog(@"[Task141] instance memory read failed (%@), falling back to auto ratio", e);
     }
-    CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
-    int mem = (int)roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
-    NSLog(@"[Task141] launch memory from auto ratio: %d MB", mem);
+    if (mem <= 0) {
+        CGFloat autoRatio = getEntitlementValue(@"com.apple.private.memorystatus") ? 0.5 : 0.25;
+        mem = (int)roundf((NSProcessInfo.processInfo.physicalMemory >> 20) * autoRatio);
+        NSLog(@"[Task141] launch memory from auto ratio: %d MB", mem);
+    }
+    // Task173：Jetsam 安全钳制（惊变100天根修）。
+    int ame173_ceiling = ame173_safeHeapCeilingMB();
+    if (mem > ame173_ceiling) {
+        NSLog(@"[Task173] launch memory %dMB exceeds safe ceiling %dMB -- clamping (profile value preserved on disk)",
+              mem, ame173_ceiling);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [NMToast showMessage:[NSString stringWithFormat:
+                @"内存 %dMB 超过设备安全上限，已降至 %dMB / Memory %dMB exceeds device limit, clamped to %dMB",
+                mem, ame173_ceiling, mem, ame173_ceiling]];
+        });
+        mem = ame173_ceiling;
+    }
     return mem;
 }

@@ -182,6 +182,133 @@ target_link_libraries(tinygl4angle
   "-framework libEGL"
   "-framework libGLESv2"
 )
+# Task173：桌面 GL 补全层（tinygl4angle.c 的 ANGLE pipeline/gui 崩溃根修）
+# 用到 NSArray/NSLog/`dispatch_once`（取证日志），把该文件强制 objective-c
+# 方言 + ARC（与 osm_bridge.mm 的 set_source_files_properties 同款先例，
+# 但 .c 目标默认走纯 C）。string_utils.c 保持纯 C。
+set_source_files_properties(external/gl4es/tinygl4angle.c PROPERTIES
+  COMPILE_OPTIONS "-x;objective-c;-fobjc-arc")
+
+# ============================================================================
+# Task173: VGPU 渲染器（PojavLauncherTeam/VGPU，gl4es 分支 + 强化的着色器
+# 语法转换器——GLSL120 兼容 → ESSL3.x，隐式类型转换，gl_FragData 等
+# 内建变量在 shader 里改写）。面向旧版 MC（<1.13 生态；FCL 同款可选
+# 渲染器）。iOS 移植补丁（见各文件 Task173 标记）：
+#   - src/gl/pack/load.c: dlopen 库名 → iOS 框架名（libGLESv2.framework/
+#     libGLESv2，经 @executable_path/Frameworks rpath 解析）
+#   - src/glx/glx.c + src/gl/pack/printf_def.h: android/log.h 移除
+#     （iOS 无 bionic 日志；printf 路由到启动器重定向的 stdout）
+# 构建口径与 Android.mk 一致：-DNOX11 -DNO_GBM -DDEFAULT_ES=3 -DSHAREDLIB。
+# __APPLE__ 在 loader.h 触发 NO_LOADER（gl4es 运行时 dlopen 装载器退役，
+# VGPU 自己的 pack/load_all() 惰性装载接管）。双重 basename（pack/shader.c
+# vs gl/shader.c、pack/shaderconv.c vs gl/shaderconv.c）会撞 Makefile 生成器
+# 的目标文件名——拆两个 OBJECT 库再链接（.o 全路径互不冲突）。
+# ============================================================================
+set(VGPU_DIR "${CMAKE_CURRENT_LIST_DIR}/external/vgpu")
+set(VGPU_PACK_SRC
+  "${VGPU_DIR}/src/gl/pack/pack.c"
+  "${VGPU_DIR}/src/gl/pack/load.c"
+  "${VGPU_DIR}/src/gl/pack/Initialization.c"
+  "${VGPU_DIR}/src/gl/pack/shaderconv.c"
+  "${VGPU_DIR}/src/gl/pack/shader.c"
+)
+set(VGPU_CORE_SRC
+  "${VGPU_DIR}/src/glx/hardext.c"
+  "${VGPU_DIR}/src/glx/glx.c"
+  "${VGPU_DIR}/src/glx/lookup.c"
+  "${VGPU_DIR}/src/glx/gbm.c"
+  "${VGPU_DIR}/src/glx/streaming.c"
+  "${VGPU_DIR}/src/gl/arbconverter.c"
+  "${VGPU_DIR}/src/gl/arbgenerator.c"
+  "${VGPU_DIR}/src/gl/arbhelper.c"
+  "${VGPU_DIR}/src/gl/arbparser.c"
+  "${VGPU_DIR}/src/gl/array.c"
+  "${VGPU_DIR}/src/gl/blend.c"
+  "${VGPU_DIR}/src/gl/blit.c"
+  "${VGPU_DIR}/src/gl/buffers.c"
+  "${VGPU_DIR}/src/gl/build_info.c"
+  "${VGPU_DIR}/src/gl/debug.c"
+  "${VGPU_DIR}/src/gl/decompress.c"
+  "${VGPU_DIR}/src/gl/depth.c"
+  "${VGPU_DIR}/src/gl/directstate.c"
+  "${VGPU_DIR}/src/gl/drawing.c"
+  "${VGPU_DIR}/src/gl/enable.c"
+  "${VGPU_DIR}/src/gl/envvars.c"
+  "${VGPU_DIR}/src/gl/eval.c"
+  "${VGPU_DIR}/src/gl/face.c"
+  "${VGPU_DIR}/src/gl/fog.c"
+  "${VGPU_DIR}/src/gl/fpe.c"
+  "${VGPU_DIR}/src/gl/fpe_cache.c"
+  "${VGPU_DIR}/src/gl/fpe_shader.c"
+  "${VGPU_DIR}/src/gl/framebuffers.c"
+  "${VGPU_DIR}/src/gl/gl_lookup.c"
+  "${VGPU_DIR}/src/gl/getter.c"
+  "${VGPU_DIR}/src/gl/gl4es.c"
+  "${VGPU_DIR}/src/gl/glstate.c"
+  "${VGPU_DIR}/src/gl/hint.c"
+  "${VGPU_DIR}/src/gl/init.c"
+  "${VGPU_DIR}/src/gl/light.c"
+  "${VGPU_DIR}/src/gl/line.c"
+  "${VGPU_DIR}/src/gl/list.c"
+  "${VGPU_DIR}/src/gl/listdraw.c"
+  "${VGPU_DIR}/src/gl/listrl.c"
+  "${VGPU_DIR}/src/gl/loader.c"
+  "${VGPU_DIR}/src/gl/logs.c"
+  "${VGPU_DIR}/src/gl/matrix.c"
+  "${VGPU_DIR}/src/gl/oldprogram.c"
+  "${VGPU_DIR}/src/gl/pixel.c"
+  "${VGPU_DIR}/src/gl/planes.c"
+  "${VGPU_DIR}/src/gl/pointsprite.c"
+  "${VGPU_DIR}/src/gl/preproc.c"
+  "${VGPU_DIR}/src/gl/program.c"
+  "${VGPU_DIR}/src/gl/queries.c"
+  "${VGPU_DIR}/src/gl/raster.c"
+  "${VGPU_DIR}/src/gl/render.c"
+  "${VGPU_DIR}/src/gl/shader.c"
+  "${VGPU_DIR}/src/gl/shaderconv.c"
+  "${VGPU_DIR}/src/gl/shader_hacks.c"
+  "${VGPU_DIR}/src/gl/stack.c"
+  "${VGPU_DIR}/src/gl/stencil.c"
+  "${VGPU_DIR}/src/gl/string_utils.c"
+  "${VGPU_DIR}/src/gl/stubs.c"
+  "${VGPU_DIR}/src/gl/texenv.c"
+  "${VGPU_DIR}/src/gl/texgen.c"
+  "${VGPU_DIR}/src/gl/texture.c"
+  "${VGPU_DIR}/src/gl/texture_compressed.c"
+  "${VGPU_DIR}/src/gl/texture_params.c"
+  "${VGPU_DIR}/src/gl/texture_read.c"
+  "${VGPU_DIR}/src/gl/texture_3d.c"
+  "${VGPU_DIR}/src/gl/uniform.c"
+  "${VGPU_DIR}/src/gl/vertexattrib.c"
+  "${VGPU_DIR}/src/gl/wrap/gl4eswraps.c"
+  "${VGPU_DIR}/src/gl/wrap/gles.c"
+  "${VGPU_DIR}/src/gl/wrap/glstub.c"
+  "${VGPU_DIR}/src/gl/math/matheval.c"
+  "${VGPU_DIR}/src/gl/matvec.c"
+)
+add_library(vgpu_pack OBJECT ${VGPU_PACK_SRC})
+add_library(vgpu_core OBJECT ${VGPU_CORE_SRC})
+foreach(ame173_vgpu_tgt vgpu_pack vgpu_core)
+  target_include_directories(${ame173_vgpu_tgt} PRIVATE "${VGPU_DIR}/include")
+  target_compile_definitions(${ame173_vgpu_tgt} PRIVATE
+    NOX11 NO_GBM DEFAULT_ES=3 SHAREDLIB
+  )
+  target_link_libraries(${ame173_vgpu_tgt}
+    "${GLOBAL_LDFLAGS}"
+  )
+endforeach()
+add_library(vgpu SHARED
+  $<TARGET_OBJECTS:vgpu_pack>
+  $<TARGET_OBJECTS:vgpu_core>
+)
+target_link_libraries(vgpu
+  "${GLOBAL_LDFLAGS}"
+  "-F'${CMAKE_CURRENT_LIST_DIR}/resources/Frameworks'"
+  "-framework libEGL"
+  "-framework libGLESv2"
+)
+# payload 的 "cp $(WORKINGDIR)/*.dylib" 会把 libvgpu.dylib 自动带进 app
+# 的 Frameworks（与 libtinygl4angle.dylib 同链路）。
 
 # LTW (Large Thin Wrapper) - OpenGL Core 3.3 → OpenGL ES 3 转译层
 # 复刻自官方 MojoLauncher/LTW 仓库（master 分支），iOS 移植修改：

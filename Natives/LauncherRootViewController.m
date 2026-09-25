@@ -77,6 +77,13 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 
 @property(nonatomic, assign) BOOL isShowingProfileEditor;
 @property(nonatomic, strong) ProfileSettingsViewController *profileEditorVC;
+// Task173：主页 VC 实例缓存（头像消失根修）。
+// 病历：showHomePage 每次切回主页都 alloc 全新 LauncherNewsViewController，
+// 头像/公告/壁纸同步全部重跑一遍——Task169/171/172 三轮“切标签页回来
+// 头像要点一下才显示”的时序修复全部治标不治本（新实例的 fetch/缓存命中
+// 总能找到新的时序窗口）。复用实例后 currentAvatar 存活于实例上，切回
+// 主页零重拉。onConfigsChanged（主页自定义）回调更新同一实例，无过期风险。
+@property(nonatomic, strong) LauncherNewsViewController *cachedHomeVC;
 
 @end
 
@@ -501,8 +508,18 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 }
 
 - (void)showHomePage {
-    LauncherNewsViewController *newsVC = [[LauncherNewsViewController alloc] init];
-    [self setContentViewController:newsVC animated:YES];
+    // Task173：复用主页 VC 实例（头像消失根修，见 cachedHomeVC 属性注释）。
+    // setContentViewController 对同一实例有早退守卫（主页已在前台时点击
+    // 主页按钮 = 无操作）；从其它页切回时走正常 crossDissolve + 子 VC
+    // appearance 链——viewWillAppear 触发 updateSkinDisplay（本地/会话缓存
+    // 命中同步上屏，不再有网络窗口期）。
+    if (!self.cachedHomeVC) {
+        self.cachedHomeVC = [[LauncherNewsViewController alloc] init];
+        NSLog(@"[HomeAvatar] Task173 home VC created (will be reused across tab switches)");
+    } else {
+        NSLog(@"[HomeAvatar] Task173 home VC reused (avatar survives tab switch)");
+    }
+    [self setContentViewController:self.cachedHomeVC animated:YES];
 }
 
 - (void)showDownloadPage {

@@ -356,6 +356,12 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         @{@"key": @ RENDERER_NAME_MTL_ANGLE,
           @"name": localize(@"preference.title.renderer.debug.angle", nil),
           @"file": @ RENDERER_NAME_MTL_ANGLE},
+        // Task173：VGPU（gl4es 分支 + 强化着色器语法转换，旧版 MC 生态；
+        // FCL 同款可选渲染器）。dylib 由 CMake 的 vgpu 目标随包构建——
+        // rendererLibraryExists 的存在性过滤天然处理构建失败/裁剪场景。
+        @{@"key": @ RENDERER_NAME_VGPU,
+          @"name": localize(@"preference.title.renderer.debug.vgpu", nil),
+          @"file": @ RENDERER_NAME_VGPU},
         @{@"key": @ RENDERER_NAME_MOBILEGLUES,
           @"name": localize(@"preference.title.renderer.debug.mg", nil),
           @"file": @ RENDERER_NAME_MOBILEGLUES},

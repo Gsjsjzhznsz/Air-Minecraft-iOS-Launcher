@@ -251,12 +251,13 @@
 "preference.title.renderer.release.angle" = "ANGLE";
 "preference.title.renderer.release.zink" = "Zink";
 
-"preference.title.renderer.debug.auto" = "自動：gl4es或ANGLE";
+"preference.title.renderer.debug.auto" = "自動";
 "preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 － 輸出OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE（1.17+）— 輸出OpenGL 3.2（核心，有限）";
 "preference.title.renderer.debug.mg" = "MobileGlues（1.17+）- OpenGL 版本 4.0，实验性";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) － 輸出OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES 转译（1.17+）";
+"preference.title.renderer.debug.vgpu" = "VGPU（舊版本專用）";
 "preference.title.renderer.debug.vulkan" = "MoltenVK（26.2+）- 导出 Vulkan 1.4";
 "preference.title.renderer.debug.mobilegl" = "MobileGL（Vulkan 直呈·預設）- GL→Vulkan→Metal，無逐幀回讀";
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL（GLES 後端）- GL→OpenGL ES，實驗性";
@@ -2069,7 +2070,7 @@
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan 直連)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES 後端)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0)";
-"preference.title.renderer.debug.mgfamily" = "MobileGlues";
+"preference.title.renderer.debug.mgfamily" = "MobileGlues (1.17+)";
 "preference.warning.mg_backend_missing_dylib" = "mg 後端（%@）的渲染庫缺失，已回落預設後端（Vulkan 直連）。";
 "preference.warning.renderer_missing_dylib" = "本構建未隨包攜帶 %@，遊戲將回退為 Auto（ANGLE）。如需啟用，請把對應 dylib 放入 app 的 Frameworks 目錄。";
 "preference.detail.announcement_preview_level" = "控制公告在主介面展示的詳細程度。";

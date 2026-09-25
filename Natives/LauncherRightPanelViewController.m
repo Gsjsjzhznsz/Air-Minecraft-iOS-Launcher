@@ -111,6 +111,30 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     [self updateAccountInfo];
     [self updateVersionInfo];
     
+    // Task173：自动启动出口（gJvmUsedInProcess 一键出路的冷启侧）。用户在
+    // "Forge 安装完成 → 启动 → 安装器占用 JVM"弹窗里选了「重启并启动」后，
+    // internal.autolaunch_profile 持久化 + exit(0)；下次冷启在此检测该键：
+    // 选中对应实例 → 清键 → 延迟 1.5s（等 UI/账户就位）触发 launchGame
+    //（JIT 等待链 invokeAfterJITEnabled 照常接管，与手动点启动完全同路）。
+    {
+        NSString *ame173_autolaunch = getPrefObject(@"internal.autolaunch_profile");
+        if ([ame173_autolaunch isKindOfClass:NSString.class] && ame173_autolaunch.length > 0) {
+            setPrefObject(@"internal.autolaunch_profile", nil);
+            NSLog(@"[Task173] autolaunch detected for '%@' -- will auto-launch after UI settles", ame173_autolaunch);
+            if (PLProfiles.current.profiles[ame173_autolaunch]) {
+                [PLProfiles.current setSelectedProfileName:ame173_autolaunch];
+            }
+            __weak typeof(self) weakSelf = self;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (!strongSelf) return;
+                NSLog(@"[Task173] auto-launching profile '%@'", ame173_autolaunch);
+                [strongSelf launchGame];
+            });
+        }
+    }
+    
     // 监听账户信息更新通知
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(updateAccountInfo)

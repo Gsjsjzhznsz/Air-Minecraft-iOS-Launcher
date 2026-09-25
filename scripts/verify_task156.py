@@ -127,10 +127,10 @@ check("D6 sendTextInputStatus：真实 markedTextRange 组字边界（非硬编�
 print("=" * 72)
 print("E. UI（滑块命名 + FSR 诚实化 + 侧边栏深链）")
 print("=" * 72)
-check("E1 透明度行显示标题（sections[0][1] + 202 标签）",
-      "titleLabel.text = self.sections[0][1]" in bsv and "tag = 202" in bsv)
-check("E2 模糊行显示标题（sections[0][2] + 302 标签）",
-      "titleLabel.text = self.sections[0][2]" in bsv and "tag = 302" in bsv)
+check("E1 透明度行显示标题（Task173 重锚：行统一构建，标题随 indexPath 动态取）",
+      "titleLabel.text = self.sections[0][indexPath.row]" in bsv and "@202" in bsv)
+check("E2 模糊行显示标题（Task173 重锚：同上，302 标签在 rowSpec 表内）",
+      "titleLabel.text = self.sections[0][indexPath.row]" in bsv and "@302" in bsv)
 check("E3 section0 页脚（background.effect.footer）",
       'localize(@"background.effect.footer", nil)' in bsv)
 check("E4 两行图标分化（circle.lefthalf.filled / drop.halffull）",
@@ -164,7 +164,7 @@ for lg in langs:
     sets.append(keys)
     check(f"F[{lg}] footer 键在位", "background.effect.footer" in keys)
 check("F1 四主语言键集一致（1952 = Task157 基线 1948 + Task159 净增 4（新增 5 键，退役 memory.current））",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1953,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1954,
       f"counts={[len(x) for x in sets]}")
 for f in ["Natives/BackgroundSettingsViewController.m", "Natives/JavaLauncher.m",
           "Natives/egl_bridge.m", "Natives/SurfaceViewController.m",

@@ -251,12 +251,13 @@
 "preference.title.renderer.release.angle" = "ANGLE";
 "preference.title.renderer.release.zink" = "Zink";
 
-"preference.title.renderer.debug.auto" = "Auto: gl4es or ANGLE";
+"preference.title.renderer.debug.auto" = "Auto";
 "preference.title.renderer.debug.gl4es" = "holy gl4es - exports OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - exports OpenGL 3.2 (Core Profile, limited)";
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - exports OpenGL 4.0, EXPERIMENTAL";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) - exports OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES wrapper (1.17+)";
+"preference.title.renderer.debug.vgpu" = "VGPU (legacy versions)";
 "preference.title.renderer.debug.vulkan" = "MoltenVK (26.2+) - exports vulkan 1.4";
 "preference.title.renderer.debug.mobilegl" = "MobileGL (Vulkan, default) - GL to Vulkan to Metal, direct present";
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL (GLES backend) - GL to OpenGL ES, experimental";
@@ -2060,7 +2061,7 @@
 "preference.title.renderer_backend-mobilegl" = "MobileGlues (Vulkan direct)";
 "preference.title.renderer_backend-mobilegl_gles" = "MobileGlues (GLES backend)";
 "preference.title.renderer_backend-mithril" = "MobileGlues (OpenGL 4.0)";
-"preference.title.renderer.debug.mgfamily" = "MobileGlues";
+"preference.title.renderer.debug.mgfamily" = "MobileGlues (1.17+)";
 "preference.warning.mg_backend_missing_dylib" = "The rendering library for mg backend (%@) is missing; fell back to the default backend (Vulkan direct).";
 "preference.warning.renderer_missing_dylib" = "%@ is not bundled in this build. The game will fall back to Auto (ANGLE). To enable it, place the dylib in the app Frameworks folder.";
 

@@ -1,4 +1,5 @@
 #import "ModVersion.h"
+#import "PLMirrorCenter.h"
 
 @interface ModVersion ()
 - (instancetype)parseCurseForgeDictionary:(NSDictionary *)dictionary;
@@ -87,7 +88,16 @@
     // 构造 primaryFile 以兼容 Modrinth 格式读取（url/filename/hashes）
     NSMutableDictionary *pf = [NSMutableDictionary dictionary];
     if (dictionary[@"downloadUrl"]) {
-        pf[@"url"] = dictionary[@"downloadUrl"];
+        // Task173：CF 下载 URL 镜像解析（整合包 CF 源不可用的根因）。
+        // ModrinthAPI 的 MRAMirrorResolvedURL 一直在做这件事（cdn.modrinth.com → MCIM
+        // 镜像），CF 路径漏了：raw edge.forgecdn.net 在镜像策略开启
+        // 的设备上不可达 → 模组/整合包版本丰页下载全挂（搜索/版本
+        // 列表都是好的）。与 CurseForgeAPI.downloadURLForFile 同款
+        // （PLMirrorCenter AssetDownload 策略：forgecdn → MCIM 镜像；官方优先档不重写）。
+        NSString *ame173_url = [PLMirrorCenter preferredURLForOriginalURL:
+            [NSURL URLWithString:dictionary[@"downloadUrl"]]
+            resourceType:PLMirrorResourceTypeAssetDownload].absoluteString;
+        pf[@"url"] = ame173_url ?: dictionary[@"downloadUrl"];
     }
     if (fileName) {
         pf[@"filename"] = fileName;

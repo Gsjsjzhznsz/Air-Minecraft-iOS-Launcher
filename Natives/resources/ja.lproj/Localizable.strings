@@ -237,12 +237,13 @@
 "preference.title.renderer.release.angle" = "ANGLE";
 "preference.title.renderer.release.zink" = "Zink";
 
-"preference.title.renderer.debug.auto" = "自動: gl4es または angle";
+"preference.title.renderer.debug.auto" = "自動";
 "preference.title.renderer.debug.gl4es" = "holy gl4es - exports OpenGL 2.1";
 "preference.title.renderer.debug.angle" = "ANGLE (1.17+) - エクスポートOpenGL 3.2 (Core Profile, limited)";
 "preference.title.renderer.debug.mg" = "MobileGlues (1.17+) - exports OpenGL 4.0, EXPERIMENTAL";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) - exports OpenGL 4.1";
 "preference.title.renderer.debug.ltw" = "LTW - OpenGL Core→ES wrapper (1.17+)";
+"preference.title.renderer.debug.vgpu" = "VGPU（旧バージョン向け）";
 "preference.title.renderer.debug.vulkan" = "MoltenVK (26.2+) - exports vulkan 1.4";
 
 "preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";

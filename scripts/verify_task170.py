@@ -141,13 +141,13 @@ check("E4 四主语言键集逐键一致", keysets[0] == keysets[1] == keysets[2
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("F1 公告插入 index 2（anns[1] task169 pin 不动；Task172 插入后 task171 顺延 anns[3]、task170 顺延 anns[4]、task168 顺延 anns[5]）且 id 唯一",
+check("F1 公告插入 index 2（anns[1] task169 pin 不动；Task173 插入后 task171 顺延 anns[4]、task170 顺延 anns[5]、task168 顺延 anns[6]）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[3]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[4]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[5]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[4]
+      and anns[4]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[5]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[6]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[5]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]

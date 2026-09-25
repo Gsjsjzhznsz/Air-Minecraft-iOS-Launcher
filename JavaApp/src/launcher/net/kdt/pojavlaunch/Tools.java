@@ -738,6 +738,15 @@ createLibraryInfo(libItem);
                 return customVer;
             } else {
                 JMinecraftVersionList.Version inheritsVer = Tools.GLOBAL_GSON.fromJson(read(DIR_HOME_VERSION + "/" + customVer.inheritsFrom + "/" + customVer.inheritsFrom + ".json"), JMinecraftVersionList.Version.class);
+                // Task173（旧版 Forge 崩溃修复）：父版本 JSON 缺失/解析失败时 inheritsVer
+                // 为 null，旧代码下一行 inheritsVer.inheritsFrom = inheritsVer.id 直接 NPE，
+                // 用户看到的是被 RuntimeException 包装后毫无信息的崩溃（815 行）。
+                // 老版 Forge（1.8.9-forge-11.15.1.2318-bbc7aad9 装机实录：752 行 NPE）
+                // 的继承链问题在此一并防御：报出可定位的错误而非裸 NPE。
+                if (inheritsVer == null) {
+                    throw new RuntimeException("Parent version JSON for '" + customVer.inheritsFrom
+                            + "' is missing or unreadable (required by '" + versionName + "')");
+                }
                 inheritsVer.inheritsFrom = inheritsVer.id;
                 
                 insertSafety(inheritsVer, customVer,
@@ -746,14 +755,31 @@ createLibraryInfo(libItem);
                              "releaseTime", "time", "type"
                              );
 
+                // Task173（旧版 Forge 崩溃修复，装机 NPE 实锤）：MCDL 生成的老版
+                // Forge JSON 可能没有 "libraries" 字段（customVer.libraries == null
+                // → 752 行 for 循环 NPE；inheritsVer.libraries == null → 750 行
+                // Arrays.asList NPE）。旧版 vanilla JSON 理论上恒有 libraries，但
+                // 老 Forge/整合包生成的 JSON 不保证。空数组兜底：无 libraries 的
+                // 自定义版本不再崩溃，仅跳过“同名替换”逻辑。
+                DependentLibrary[] customLibraries =
+                        (customVer.libraries != null) ? customVer.libraries : new DependentLibrary[0];
+                DependentLibrary[] inheritLibraries =
+                        (inheritsVer.libraries != null) ? inheritsVer.libraries : new DependentLibrary[0];
+
                 // Go through the libraries, remove the ones overridden by the custom version
-                List<DependentLibrary> inheritLibraryList = new ArrayList<>(Arrays.asList(inheritsVer.libraries));
+                List<DependentLibrary> inheritLibraryList = new ArrayList<>(Arrays.asList(inheritLibraries));
                 outer_loop:
-                for(DependentLibrary library : customVer.libraries){
+                for(DependentLibrary library : customLibraries){
                     // Clean libraries overridden by the custom version
+                    if (library == null || library.name == null) {
+                        continue;
+                    }
                     String libName = library.name.substring(0, library.name.lastIndexOf(":"));
 
                     for(DependentLibrary inheritLibrary : inheritLibraryList) {
+                        if (inheritLibrary == null || inheritLibrary.name == null) {
+                            continue;
+                        }
                         String inheritLibName = inheritLibrary.name.substring(0, inheritLibrary.name.lastIndexOf(":"));
 
                         if(libName.equals(inheritLibName)){
@@ -769,7 +795,7 @@ createLibraryInfo(libItem);
                 }
 
                 // Fuse libraries
-                inheritLibraryList.addAll(Arrays.asList(customVer.libraries));
+                inheritLibraryList.addAll(Arrays.asList(customLibraries));
                 inheritsVer.libraries = inheritLibraryList.toArray(new DependentLibrary[0]);
                 preProcessLibraries(inheritsVer.libraries);
 

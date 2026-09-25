@@ -51,6 +51,55 @@ void showDialog(NSString* title, NSString* message) {
     });
 }
 
+// Task173：gJvmUsedInProcess 的出路弹窗（“Forge 安装后启动游戏弹 java
+// runtime 问题，重启刷新 jit 状态就好”根修的 UI 侧）。
+// 机制：进程内 JVM 只能创建一次——Forge/NeoForge 安装器（headless JVM）跑
+// 过之后，本进程再 JLI_Launch 必崩。旧实现死路弹窗（“请重启启动器再启动
+// 游戏”，用户手动重启 + 重新导航 + 重新点启动）。现在提供一键出路：
+// 「重启并启动」→ 写 internal.autolaunch_profile 偏好 → 2 秒后 exit(0)；
+// 下次冷启时 LauncherRightPanelViewController 检测该键 → 自动选中该实例
+// 并触发 launchGame（JIT 等待链照常接管，与用户手动流程完全一致）。
+void ame173_showJvmUsedRestartDialog(NSString *profileName) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"需要重启启动器"
+            message:[NSString stringWithFormat:
+                @"Forge 安装器占用了本次会话的 Java 运行时（进程内只能创建一次 JVM）。\n\n点击「重启并启动」后启动器将退出，重新打开后将自动启动「%@」并完成 JIT 授权。\n\nThe mod installer used this session's Java runtime (one JVM per process). Tap Restart & Launch, reopen the launcher, and %@ will auto-launch.",
+                profileName ?: @"", profileName ?: @""]
+            preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil)
+                                                  style:UIAlertActionStyleCancel
+                                                handler:^(UIAlertAction *action) {
+            UIWindow *w = objc_getAssociatedObject(alert, @selector(alertWindow));
+            if (w) {
+                w.hidden = YES;
+                if (previousKeyWindow && previousKeyWindow != w) {
+                    [previousKeyWindow makeKeyAndVisible];
+                }
+            }
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:@"重启并启动 / Restart & Launch"
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction *action) {
+            if (profileName.length > 0) {
+                setPrefObject(@"internal.autolaunch_profile", profileName);
+            }
+            NSLog(@"[Task173] autolaunch armed for '%@' -- exiting in 2s", profileName);
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                exit(0);
+            });
+        }]];
+        UIWindow *previousKeyWindow = UIWindow.mainWindow;
+        UIWindow *alertWindow = [[UIWindow alloc] initWithWindowScene:UIWindow.mainWindow.windowScene];
+        alertWindow.frame = UIScreen.mainScreen.bounds;
+        alertWindow.rootViewController = [UIViewController new];
+        alertWindow.windowLevel = 1000;
+        [alertWindow makeKeyAndVisible];
+        objc_setAssociatedObject(alert, @selector(alertWindow), alertWindow, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [alertWindow.rootViewController presentViewController:alert animated:YES completion:nil];
+    });
+}
+
 JNIEXPORT void JNICALL Java_net_kdt_pojavlaunch_uikit_UIKit_showError(JNIEnv* env, jclass clazz, jstring title, jstring message, jboolean exitIfOk) {
     const char *title_c = (*env)->GetStringUTFChars(env, title, 0);
     const char *message_c = (*env)->GetStringUTFChars(env, message, 0);

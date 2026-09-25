@@ -1218,12 +1218,15 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
     // 防御检查：headless JVM（Forge/NeoForge 直装 processors 阶段）已在当前进程
     // 创建过 JVM。进程内 JVM 只能创建一次，再次 JLI_Launch 必然崩溃。
-    // 提示用户重启 app 后再启动游戏。
+    // Task173：死路弹窗升级为一键出路——「重启并启动」写 internal.autolaunch_profile
+    // 后 exit(0)，下次冷启 RightPanel 检测该键自动启动（用户实测"Forge 申请
+    // JIT 安装完成后启动游戏弹 java runtime 弹窗，重启刷新 JIT 状态就好"，
+    // 旧弹窗把整个重启+导航+重启动的手动流程丢给用户）。
     if (gJvmUsedInProcess) {
         UIKit_returnToSplitView();
-        showDialog(localize(@"Error", nil),
-            @"A Java runtime was used by the mod installer in this session. "
-            @"Please restart the launcher, then launch the game again.");
+        NSString *ame173_profile = PLProfiles.current.selectedProfileName ?: @"";
+        NSLog(@"[JavaLauncher] Task173: in-process JVM already used by the mod installer -- offering restart-and-launch for '%@'", ame173_profile);
+        ame173_showJvmUsedRestartDialog(ame173_profile);
         return 1;
     }
 
@@ -1843,6 +1846,15 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             // 均返回 CAMetalLayer（GameSurfaceView），Task124 同源约束不受影响。
             // （rendererLibraryExists 是 LauncherPreferences.m 的 static 助手，
             //  这里内联同口径检查：主 bundle Frameworks/ 下 dylib 存在性。）
+            // Task 173：auto 的旧版本分支从 ANGLE 改为 gl4es（用户指令
+            // "会根据游戏版本自动分配渲染器"）。依据：CMakeLists 对
+            // tinygl4angle 的定位是 "ANGLE wrapper for 1.17+"（桌面 GL 3.3
+            // 语义），旧版 MC（1.8.9-forge 等装机会话）的 legacy GLSL 120/
+            // 固定管线在 gl4es（gl4es 1.1.4，legacy 语义翻译的老兵）上才是
+            // 验证过的路径——用户在 1.8.9 会话手动选 gl4es 也是这个原因。
+            // ANGLE 仍可显式选择（列表不变）。
+            // 新逻辑：MC 1.17+（minVersion>8）优先 MobileGL Vulkan 直连；
+            // 旧版本 → gl4es（不再是 ANGLE）。
             NSString *ame144_mglPath = [NSBundle.mainBundle.bundlePath
                 stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MOBILEGL]];
             if (minVersion > 8 && [NSFileManager.defaultManager fileExistsAtPath:ame144_mglPath]) {
@@ -1850,10 +1862,19 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                 setenv("AMETHYST_RENDERER", glLibName, 1);
                 NSLog(@"[JavaLauncher] Auto renderer resolved to %s (modern MC, MobileGL Vulkan direct; config+ctx fixes active)", glLibName);
             } else {
-                glLibName = RENDERER_NAME_MTL_ANGLE;
-                setenv("AMETHYST_RENDERER", glLibName, 1);
-                NSLog(@"[JavaLauncher] Auto renderer resolved to %s (ANGLE fallback: minVersion=%d or libMobileGL missing)",
-                      glLibName, minVersion);
+                NSString *ame173_gl4esPath = [NSBundle.mainBundle.bundlePath
+                    stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_GL4ES]];
+                if ([NSFileManager.defaultManager fileExistsAtPath:ame173_gl4esPath]) {
+                    glLibName = RENDERER_NAME_GL4ES;
+                    setenv("AMETHYST_RENDERER", glLibName, 1);
+                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (legacy MC, gl4es; Task173 change from ANGLE; minVersion=%d)",
+                          glLibName, minVersion);
+                } else {
+                    glLibName = RENDERER_NAME_MTL_ANGLE;
+                    setenv("AMETHYST_RENDERER", glLibName, 1);
+                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (gl4es missing, ANGLE fallback: minVersion=%d)",
+                          glLibName, minVersion);
+                }
             }
             // Task 154：auto 解析结果只会是 libMobileGL/ANGLE（见上），两者都是
             // 全局上下文模型，不导出 POJAV_RENDERER（导出会触发 Sodium

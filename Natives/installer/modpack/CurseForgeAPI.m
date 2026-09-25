@@ -577,7 +577,12 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         return @"";
     }
     NSString *encodedName = [fileName stringByAddingPercentEncodingWithAllowedCharacters:NSCharacterSet.URLPathAllowedCharacterSet];
-    NSString *cdnURL = [NSString stringWithFormat:@"https://edge.forgecdn.net/files/%ld/%03ld/%@",
+    // Task173：路径段去补零——旧 %03ld 形式（/files/8697/067/xxx.zip）经
+    // MCIM 镜像 302 到 mediafilez 后被 403 拒（镜像不重写路径，mediafilez
+    // 只认未补零的 /8697/67/ 形式；实测：补零→403 AccessDenied，未补零→200）。
+    // edge.forgecdn.net 自身的 302 会正确重写补零路径，但镜像链不会——
+    // 统一改用未补零形式（与 CF API downloadUrl 字段返回的格式一致）。
+    NSString *cdnURL = [NSString stringWithFormat:@"https://edge.forgecdn.net/files/%ld/%ld/%@",
             (long)(numericFileId / 1000),
             (long)(numericFileId % 1000),
             encodedName ?: fileName];
@@ -607,6 +612,53 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     return mcVersion.length > 0 ? mcVersion : loader;
 }
 
+/// Task173：排序/加载器参数适配（同步/异步搜索共用）。
+/// 病历（用户实测“CF 列表完全没有根据排序方式排列”）：DownloadViewController
+/// 传的是 Modrinth 风格的 sort 值（follows/downloads/updated/newest/relevance）
+/// 与 loader 值（fabric/forge/quilt/neoforge），而 CF 搜索 API 需要的是
+/// sortField（数字枚举）+ sortOrder + modLoaderType（数字枚举）——旧代码
+/// 两个参数都没映射，请求里压根不带，CF 用默认 Featured/Popularity 排序，
+/// 加载器筛选也整体失效。
+/// 映射表（CF 官方 sortField：1=Featured 2=Popularity 3=LastUpdated
+/// 4=Name 5=Author 6=TotalDownloads；modLoaderType：0=Any 1=Forge
+/// 3=LiteLoader 4=Fabric 5=Quilt 6=NeoForge）：
+///   follows  -> sortField=2  desc（人气≈关注）
+///   downloads-> sortField=6  desc
+///   updated  -> sortField=3  desc
+///   newest   -> sortField=3  desc（CF 无“创建时间”排序，LastUpdated 最近似）
+///   relevance-> 不带参数（searchFilter 存在时 CF 默认即相关度）
++ (void)ame173_applySortAndLoaderParams:(NSDictionary *)filters
+                                  params:(NSMutableDictionary *)params {
+    NSString *sort = [filters[@"sort"] isKindOfClass:NSString.class] ? filters[@"sort"] : nil;
+    if (sort.length > 0) {
+        if ([sort isEqualToString:@"follows"]) {
+            params[@"sortField"] = @2;
+            params[@"sortOrder"] = @"desc";
+        } else if ([sort isEqualToString:@"downloads"]) {
+            params[@"sortField"] = @6;
+            params[@"sortOrder"] = @"desc";
+        } else if ([sort isEqualToString:@"updated"] || [sort isEqualToString:@"newest"]) {
+            params[@"sortField"] = @3;
+            params[@"sortOrder"] = @"desc";
+        }
+        // relevance：不带 sortField（CF 默认）
+    }
+    NSString *loader = [filters[@"loader"] isKindOfClass:NSString.class] ? filters[@"loader"] : nil;
+    if (loader.length > 0) {
+        NSDictionary<NSString *, NSNumber *> *ame173_loaderMap = @{
+            @"forge": @1,
+            @"liteloader": @3,
+            @"fabric": @4,
+            @"quilt": @5,
+            @"neoforge": @6,
+        };
+        NSNumber *loaderType = ame173_loaderMap[loader.lowercaseString];
+        if (loaderType) {
+            params[@"modLoaderType"] = loaderType;
+        }
+    }
+}
+
 #pragma mark - 同步搜索（原始实现）
 
 - (NSMutableArray *)searchModWithFilters:(NSDictionary<NSString *, NSString *> *)searchFilters
@@ -631,6 +683,8 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         // Task169：剥 fabric 构建哈希后缀（"26.3-0a78cefc" -> "26.3"）
         params[@"gameVersion"] = CFA169NormalizeGameVersion(searchFilters[@"mcVersion"]);
     }
+    // Task173：排序 + 加载器（同步路径同款适配）
+    [CurseForgeAPI ame173_applySortAndLoaderParams:searchFilters params:params];
     if ([projectType isEqualToString:@"minecraft_java_server"]) {
         params[@"categoryId"] = @(kCurseForgeCategoryIDServerUtility);
     }
@@ -757,6 +811,20 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     if (mcVersion.length > 0) {
         // Task169：剥 fabric 构建哈希后缀（"26.3-0a78cefc" -> "26.3"）
         [urlString appendFormat:@"&gameVersion=%@", CFA169NormalizeGameVersion(mcVersion)];
+    }
+    // Task173：排序 + 加载器参数（用户反馈“CF 列表没有按排序方式排列”）。
+    // sortField/sortOrder/modLoaderType 直接拼 URL；值域映射见
+    // ame173_applySortAndLoaderParams 的注释。
+    {
+        NSMutableDictionary *ame173_params = [NSMutableDictionary dictionary];
+        [CurseForgeAPI ame173_applySortAndLoaderParams:filters params:ame173_params];
+        if (ame173_params[@"sortField"]) {
+            [urlString appendFormat:@"&sortField=%@&sortOrder=%@",
+                ame173_params[@"sortField"], ame173_params[@"sortOrder"] ?: @"desc"];
+        }
+        if (ame173_params[@"modLoaderType"]) {
+            [urlString appendFormat:@"&modLoaderType=%@", ame173_params[@"modLoaderType"]];
+        }
     }
     
     NSURL *url = [NSURL URLWithString:urlString];

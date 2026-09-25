@@ -502,6 +502,16 @@ static NSString * localizeProfileTitle(NSString *title) {
     if (self.maxMemory < 1024) {
         self.maxMemory = 1024;
     }
+    // Task173：内存滑条上限过 Jetsam 安全堆顶（惊变100天根修的 UI 侧）。
+    // 0.8 × 物理内存（8GB 设备 ≈ 7165MB）远超 iOS 进程上限——用户滑到
+    // 满格 = 启动后静默 SIGKILL。上限收紧到 安全堆顶 + 512MB 余量
+    //（滑条顶格仍略高于钳制值，但启动链 ame141 会兜底钳制并提示）。
+    NSInteger ame173_sliderCap = ame173_safeHeapCeilingMB() + 512;
+    if (self.maxMemory > ame173_sliderCap) {
+        NSLog(@"[ProfileSettings] Task173: memory slider cap %ldMB -> %ldMB (Jetsam-safe)",
+              (long)self.maxMemory, (long)ame173_sliderCap);
+        self.maxMemory = ame173_sliderCap;
+    }
 }
 
 #pragma mark - Load Settings
@@ -595,21 +605,24 @@ static NSString * localizeProfileTitle(NSString *title) {
         [advancedRows addObject:@"图形 API"];
     }
     [advancedRows addObjectsFromArray:@[@"Java版本", @"内存分配", @"JVM 启动参数", @"清除JVM参数"]];
-    // Task172：版本级 TouchController（用户指令"在版本配置中添加
-    // TouchController，顺便自动配置设置（udp 模式，屏蔽控件）"）
-    [advancedRows addObject:@"TouchController"];
+    // Task173：TouchController 从高级设置区退役（Task172 的开关式 picker 一并
+    // 退役），改为组件安装区的 Sodium 同款样式（用户指令"TouchController 选项
+    // 是跟 sodium 一样的样式，点击自动安装加自动配置，而不是只有自动配置"）。
+    // 选中行为 = 一键安装（Modrinth 拉取适配版本的 mod jar 落 mods/）+ 自动
+    // 配置（写 profile touchController=YES → 启动链 ame172_applyProfileTouchController
+    // 自动落 UDP 模式 + 屏蔽启动器控件）。
 
     // 重构（Air-Design v1.2）：5 个 Bento 分组
     // 顺序与横屏布局对应：左侧（0,1）+ 右侧（2,3,4）
     //   0: 版本信息  - 名称 / 游戏版本 / 游戏目录
     //   1: 资源管理  - 模组 / 光影 / 资源包 / 数据包 / 世界
-    //   2: 组件安装  - Fabric API / Sodium + Iris Shaders（Task157）/ OptiFine
+    //   2: 组件安装  - Fabric API / Sodium + Iris Shaders（Task157）/ TouchController（Task173）/ OptiFine
     //   3: 高级设置  - 渲染器 / 图形 API / Java / 内存 / JVM 参数
     //   4: 服务器    - 服务器地址
     self.sections = @[
         @[@"名称", @"游戏版本", @"游戏目录"],
         @[@"模组管理", @"光影管理", @"资源包管理", @"数据包管理", @"世界管理"],
-        @[@"Fabric API", @"Sodium + Iris Shaders", @"OptiFine"],
+        @[@"Fabric API", @"Sodium + Iris Shaders", @"TouchController", @"OptiFine"],
         [advancedRows copy],
         @[localize(@"i18n_str_730", nil)]
     ];
@@ -893,6 +906,21 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.imageView.tintColor = [UIColor systemOrangeColor];
                 cell.accessoryView = [self ame163_disclosureChevron];
                 cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);
+            } else if ([title isEqualToString:@"TouchController"]) {
+                // Task173：TouchController 组件安装（Sodium 同款样式，用户指令
+                // "跟 sodium 一样的样式，点击自动安装加自动配置"）。触摸手掌图标
+                // + 橙色 + 右箭头；右侧文案三态：非 Fabric → 仅 Fabric 有效；
+                // 已启用（profile touchController=YES，Task172 键沿用）→ UDP
+                // 模式；可安装 → 点击安装。零新 l10n 键（复用 Task172 的
+                // preference.touchcontroller.mode.udp + 组件区现成键）。
+                cell.imageView.image = [UIImage systemImageNamed:@"hand.tap.fill"];
+                cell.imageView.tintColor = [UIColor systemOrangeColor];
+                cell.accessoryView = [self ame163_disclosureChevron];
+                cell.detailTextLabel.text = ![self isFabricProfile]
+                    ? localize(@"i18n_str_885", nil)
+                    : (self.touchControllerEnabled
+                        ? localize(@"preference.touchcontroller.mode.udp", nil)
+                        : localize(@"i18n_str_2043", nil));
             } else if ([title isEqualToString:@"OptiFine"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"speedometer"];
                 cell.imageView.tintColor = [UIColor systemRedColor];
@@ -940,15 +968,9 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.imageView.tintColor = [UIColor systemRedColor];
                 cell.textLabel.textColor = [UIColor systemRedColor];
                 cell.detailTextLabel.text = self.javaArgs.length > 0 ? localize(@"i18n_str_2044", nil) : localize(@"i18n_str_889", nil);
-            } else if ([title isEqualToString:@"TouchController"]) {
-                // Task172：版本级 TouchController（显示复用既有 l10n 键，
-                // 与全局 TouchController 设置页同文案家族，零新键零计数级联）
-                cell.imageView.image = [UIImage systemImageNamed:@"hand.tap"];
-                cell.accessoryView = [self ame163_disclosureChevron];
-                cell.detailTextLabel.text = self.touchControllerEnabled
-                    ? localize(@"preference.touchcontroller.mode.udp", nil)
-                    : localize(@"preference.touchcontroller.mode.disabled", nil);
             }
+            // Task173：TouchController 行已迁往组件安装区（case 2），高级设置
+            // 区的旧分支（Task172 开关式 picker）随之退役。
             break;
 
         case 4: // 服务器地址（FCL 风格）
@@ -1405,6 +1427,9 @@ static NSString * localizeProfileTitle(NSString *title) {
             } else if ([title isEqualToString:@"Sodium + Iris Shaders"]) {
                 // Task 157：Sodium + Iris Shaders（+ Podium）一键安装
                 [self installSodiumStandalone];
+            } else if ([title isEqualToString:@"TouchController"]) {
+                // Task173：TouchController 一键安装 + 自动配置（Sodium 同款流程）
+                [self installTouchControllerStandalone];
             } else if ([title isEqualToString:@"OptiFine"]) {
                 [self installOptiFineStandalone];
             }
@@ -1427,9 +1452,8 @@ static NSString * localizeProfileTitle(NSString *title) {
                 if (self.javaArgsTextField) [self.javaArgsTextField becomeFirstResponder];
             } else if ([title isEqualToString:@"清除JVM参数"]) {
                 [self clearJavaArgs];
-            } else if ([title isEqualToString:@"TouchController"]) {
-                [self showTouchControllerSelector];
             }
+            // Task173：TouchController 分支已迁往组件安装区（case 2）。
             break;
 
         case 4: // 服务器地址
@@ -2608,46 +2632,122 @@ static NSString * localizeProfileTitle(NSString *title) {
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-/// Task172：版本级 TouchController 选择器（开启/关闭）。
-/// 用户指令："在版本配置中添加 TouchController，顺便自动配置设置（udp 模式，
-/// 屏蔽控件）"。开启后此实例启动时自动配置：control.mod_touch_enable=YES、
-/// control.mod_touch_mode=1（UDP）、control.mod_touch_hide_controls=YES
-/// （隐藏启动器自带控件层，保留模组自己的虚拟按钮——Task140 语义）；
-/// 关闭仅删本键，不碰全局 TouchController 设置。
-/// 说明文案硬编码中英双语（与 Task169 JIT 超时弹窗同款先例），避免
-/// l10n 计数级联。
-- (void)showTouchControllerSelector {
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"TouchController"
-                                                                   message:@"开启后此实例启动时自动配置：UDP 通信模式 + 屏蔽启动器自带控件（保留模组自己的虚拟按钮）。需要游戏内已安装 TouchController 模组。\nWhen enabled, launching this instance auto-configures UDP mode and hides the launcher's own on-screen controls (the mod's virtual buttons stay). Requires the TouchController mod installed in the game."
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"preference.touchcontroller.mode.udp", nil)
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction * _Nonnull action) {
-        self.touchControllerEnabled = YES;
-        [self saveSettings];
-        [self reloadAllTableViews];
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"preference.touchcontroller.mode.disabled", nil)
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction * _Nonnull action) {
-        self.touchControllerEnabled = NO;
-        [self saveSettings];
-        [self reloadAllTableViews];
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
-
-    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        // 行位置随"图形 API"的条件行漂移，从 sections 实时反查
-        NSUInteger rowIdx = [self.sections[3] indexOfObject:@"TouchController"];
-        UITableViewCell *cell = (rowIdx != NSNotFound)
-            ? [self cellForGlobalSection:3 row:(NSInteger)rowIdx]
-            : nil;
-        alert.popoverPresentationController.sourceView = cell ?: self.view;
-        alert.popoverPresentationController.sourceRect = cell ? cell.bounds : self.view.bounds;
+/// Task173：TouchController 一键安装 + 自动配置（Sodium 同款流程，取代
+/// Task172 的开关式 showTouchControllerSelector——用户指令"TouchController
+/// 选项是跟 sodium 一样的样式，点击自动安装加自动配置，而不是只有自动
+/// 配置"）。
+/// 流程：Fabric 门槛检查 → 确认弹窗（双语硬编码，Task169 先例）→
+/// Modrinth 精确匹配 "TouchController" 项目（fabric loader + 当前游戏版本）
+/// → 下载 primaryFile 落 mods/（统一下载任务 + autoPresentDetail）→
+/// 成功后写 profile touchController=YES（Task172 键沿用，启动链
+/// ame172_applyProfileTouchController 自动落 UDP 模式 + 屏蔽启动器控件）。
+- (void)installTouchControllerStandalone {
+    if (![self isFabricProfile]) {
+        [self showComponentAlert:localize(@"i18n_str_899", nil)
+                          message:@"TouchController 仅对 Fabric 加载器有效。\n\n当前版本不是 Fabric 加载器，无法安装。\n\nTouchController is Fabric-only. The current instance does not use the Fabric loader."];
+        return;
     }
+    NSString *gameVersion = [self currentGameVersion];
+    if (!gameVersion) {
+        [self showComponentAlert:localize(@"i18n_str_899", nil) message:localize(@"i18n_str_901", nil)];
+        return;
+    }
+    UIAlertController *confirm = [UIAlertController alertControllerWithTitle:@"TouchController"
+                                                                     message:[NSString stringWithFormat:
+        @"将自动安装 TouchController 模组（触屏控制器，适配 Minecraft %@）并自动配置：UDP 通信模式 + 屏蔽启动器自带控件（保留模组自己的虚拟按钮）。\n\nInstall the TouchController mod for Minecraft %@ and auto-configure: UDP transport + hide the launcher's own on-screen controls (the mod's virtual buttons stay).", gameVersion, gameVersion]
+                                                              preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_904", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self startInstallTouchControllerWithGameVersion:gameVersion];
+    }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
 
-    [self presentViewController:alert animated:YES completion:nil];
+- (void)startInstallTouchControllerWithGameVersion:(NSString *)gameVersion {
+    // Task173：与 Sodium 组件同链路（统一下载任务 + Modrinth 搜索 → 版本匹配
+    // → 下载进 mods/），单模组安装 + 成功后落 profile 自动配置键。
+    DownloadTaskManager *manager = [DownloadTaskManager sharedManager];
+    DownloadTaskItem *taskItem = [manager
+        registerTaskWithResourceType:DownloadTaskResourceTypeMod
+                        resourceName:[NSString stringWithFormat:@"touchcontroller-%@", gameVersion]
+                         displayName:@"TouchController"
+                      downloadSource:@"modrinth"
+                             rawTask:nil
+                      supportsResume:NO
+                             iconURL:nil];
+    NSString *taskId = taskItem.taskId;
+    if (taskItem) {
+        [[DownloadTaskManager sharedManager] setTaskWithId:taskId stages:PLTaskStagesSingleFile()];
+        taskItem.autoPresentDetail = YES;
+        [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateDownloading];
+        [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
+                                                 stageAtIndex:0
+                                                     status:PLTaskStageStatusRunning];
+        [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
+                                                 stageAtIndex:0
+                                                     progress:-1.0
+                                                      message:[NSString stringWithFormat:localize(@"component.sodium.searching", nil), gameVersion]];
+    }
+    __weak typeof(self) weakSelf = self;
+    void (^ame173_failBlock)(NSError *) = ^(NSError *failError) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[DownloadTaskManager sharedManager] updateTaskWithId:taskId stageAtIndex:0 status:PLTaskStageStatusFailed];
+            [[DownloadTaskManager sharedManager] updateTaskWithId:taskId error:failError];
+            [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateFailed];
+            [weakSelf showComponentAlert:localize(@"i18n_str_918", nil)
+                                 message:failError.localizedDescription ?: localize(@"i18n_str_97", nil)];
+        });
+    };
+    [self ame150_fetchModrinthPrimaryFileWithQuery:@"touchcontroller"
+                                         exactTitle:@"touchcontroller"
+                                        gameVersion:gameVersion
+                                             loader:@"fabric"
+                                         completion:^(NSString *tcURL, NSString *tcFile, NSError *error) {
+        if (error || tcURL.length == 0) {
+            ame173_failBlock(error ?: [NSError errorWithDomain:@"TouchControllerComponent" code:1 userInfo:@{NSLocalizedDescriptionKey: localize(@"i18n_str_97", nil)}]);
+            return;
+        }
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            NSString *modsDir = [strongSelf currentProfileModsPath];
+            NSError *dlError = nil;
+            NSData *tcData = [strongSelf downloadDataWithURL:[NSURL URLWithString:tcURL] error:&dlError];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (!tcData) {
+                    NSError *failError = [NSError errorWithDomain:@"TouchControllerComponent" code:2
+                        userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.download_failed", nil),
+                            dlError.localizedDescription ?: localize(@"i18n_str_97", nil)]}];
+                    ame173_failBlock(failError);
+                    return;
+                }
+                NSString *tcPath = [modsDir stringByAppendingPathComponent:tcFile ?: @"touchcontroller.jar"];
+                NSError *writeError = nil;
+                BOOL ok = [tcData writeToFile:tcPath options:NSDataWritingAtomic error:&writeError];
+                if (ok) {
+                    [[DownloadTaskManager sharedManager] updateTaskWithId:taskId
+                                                             stageAtIndex:0
+                                                                 progress:1.0
+                                                                  message:[NSString stringWithFormat:localize(@"i18n_str_924", nil), tcFile ?: @"touchcontroller.jar"]];
+                    [[DownloadTaskManager sharedManager] updateTaskWithId:taskId stageAtIndex:0 status:PLTaskStageStatusCompleted];
+                    [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateCompleted];
+                    // Task173：安装成功 → 落自动配置键（Task172 键沿用；启动链
+                    // ame172_applyProfileTouchController 落 UDP + 屏蔽控件）。
+                    weakSelf.touchControllerEnabled = YES;
+                    [weakSelf saveSettings];
+                    [weakSelf reloadAllTableViews];
+                    NSLog(@"[TouchController] Task173 installed %@ for %@ -- profile auto-config armed (UDP + hide controls)", tcFile, gameVersion);
+                    [weakSelf showComponentAlert:localize(@"i18n_str_253", nil)
+                                         message:[NSString stringWithFormat:
+                        @"TouchController 已安装并自动配置（UDP 模式 + 屏蔽启动器控件）：\n%@\n\nTouchController installed and auto-configured (UDP mode + launcher controls hidden):\n%@", tcFile ?: @"touchcontroller.jar", tcFile ?: @"touchcontroller.jar"]];
+                } else {
+                    NSError *failError = [NSError errorWithDomain:@"TouchControllerComponent" code:3
+                        userInfo:@{NSLocalizedDescriptionKey: writeError.localizedDescription ?: localize(@"i18n_str_926", nil)}];
+                    ame173_failBlock(failError);
+                }
+            });
+        });
+    }];
 }
 
 - (void)showJavaVersionSelector {

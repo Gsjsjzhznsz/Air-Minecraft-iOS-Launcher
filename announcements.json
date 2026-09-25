@@ -24,6 +24,13 @@
       "image_url": ""
     },
     {
+      "id": "task173-ten-fixes-2026-09-26",
+      "title": "装机反馈十连修（ANGLE 渲染管线 / 老 Forge / 惊变100天内存 / CF 三连 / TouchController 组件化 / 头像根修 / 壁纸滑条 / Forge JIT 重启 / VGPU 渲染器 / 自动渲染器）",
+      "date": "2026-09-26",
+      "priority": "normal",
+      "summary": "fd31b79 装机三日志（e0c68e7 构建：ANGLE FO 包 / 惊变100天 1.20.1 Forge / 老 Forge 1.8.9）反馈十项全部处理：①ANGLE 崩溃根因实锤——GL 后端首次被接受后死在 minecraft:pipeline/gui 预编译（LWJGL 报函数不可用）：反编译 26.3 renderpearl 的 GL 后端要调 glColorMaski/glEnablei/glDrawElementsBaseVertex/glQueryCounter 等桌面 GL 独有函数，而 ANGLE 框架只导出 ES 符号集，dlsym 恒 NULL——tinygl4angle 现在内置桌面 GL 补全层（eglGetProcAddress 解析 + EXT 变体兜底 + 分槽 blend/多绘制族安全降级），另修 glShaderSource 对 ES 版本化着色器不上传的潜伏雷 + Iris 的 GLSL 版本串前缀（OpenGL GLSL 3.30... 正则不匹配）规范化；②老版 Forge（1.8.9-forge-11.15.1）启动崩溃——版本 JSON 的 libraries 字段缺失时 getVersionInfo 裸解引用 NPE，现已空数组兜底 + 父版本缺失可定位报错；③惊变100天整合包加载期静默闪退——实例内存 7165MB（0.8×物理内存的错误公式）击穿 iOS 进程 Jetsam 上限，现在用 os_proc_available_memory 权威推算安全堆顶：启动链自动钳制 + 内存滑条上限封顶 + 超限双语提示；④CF 列表不按排序方式排列——排序/加载器参数从未映射进请求（Modrinth 风格的 sort/loader 直接被忽略），现在 sortField/sortOrder/modLoaderType（CF）与 index（Modrinth）双源全接通；⑤整合包 CF 源版本下载全挂——双根因：MCIM 镜像 302 不重写补零路径（mediafilez 403，实测未补零即 200）+ ModVersion 的 CF 下载 URL 从不做镜像解析（Modrinth 一直在做），均已修；⑥下载界面游戏版本只到 1.21.1/1.16.5——旧过滤把 26.x 全滤掉 + 32 条封顶截掉老版本 + 清单加载失败只剩 5 个兜底，现在 26.x/1.x 通吃 + 镜像候选链 + 64 条 + 全量兜底；⑦TouchController 改为 Sodium 同款组件样式（用户指令）：组件安装区一键安装（Modrinth 拉适配版本落 mods/）+ 自动配置（UDP 模式 + 屏蔽启动器控件）；⑧头像切标签页消失第三轮根修——每次切回主页都全新 alloc 实例导致三轮流标修复全部失守，现在主页 VC 实例缓存复用（头像存活于实例上，切回零重拉）；⑨壁纸设置默认配置调反界面尺寸与点击错位——三个滑块行从顶对齐固定坐标改为 Auto Layout 居中自适应（任意宽度/旋转不再错位）；⑩Forge 安装完成后启动弹 java runtime 问题——进程内只能创建一次 JVM（安装器占用），旧弹窗让用户手动重启，现在「重启并启动」一键出路（写自动启动键退出，下次冷启自动选中实例并走完整 JIT 授权链启动）。另：新增 VGPU 渲染器（PojavLauncherTeam/VGPU 源码 vendoring + iOS 移植，旧版本 MC 专用，FCL 同款）；渲染器列表「自动」去掉后缀、MobileGlues 标注 (1.17+)，auto 的旧版本分支从 ANGLE 改为 gl4es（按游戏版本分配）。装机验证锚点：'[TinyGL] Task173 desktop-GL completion layer: N/20 resolved'（ANGLE 会话首帧）、'Task173 launch memory clamping'（惊变100天）、'[TinyGL] Task173 GLSL version string normalized'（Iris）、'Task173 home VC reused'（头像）、'[TouchController] Task173 installed'（组件安装）、'Task173 autolaunch detected'（Forge 重启启动）。"
+    },
+    {
       "id": "task172-six-fixes-2026-09-25",
       "title": "装机反馈六连修（ANGLE 依旧崩溃 / JIT 卡死闪退 / 键盘 / 头像 / 版本级 TouchController / CF 镜像 502）",
       "date": "2026-09-25",

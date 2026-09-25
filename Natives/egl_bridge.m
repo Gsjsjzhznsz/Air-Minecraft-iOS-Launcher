@@ -214,6 +214,14 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MTL_ANGLE]) {
         set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_VGPU]) {
+        // Task173：VGPU 渲染器（PojavLauncherTeam/VGPU——gl4es 分支 + 强化
+        // 着色器语法转换，旧版 MC 生态；FCL 同款）。与 gl4es 同形：导出全套
+        // 桌面 GL 1.x/2.x API，运行时 dlopen ANGLE 框架解析 GLES（pack/load.c
+        // 的 Task173 iOS 补丁把库名指向 libGLESv2.framework）。EGL 同样经
+        // gl_bridge 从 ANGLE 框架解析——与 gl4es 完全同链路。
+        NSLog(@"[egl_bridge] VGPU renderer: gl4es-family GL-on-ES translation (legacy MC)");
+        set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_LTW]) {
         // LTW (Large Thin Wrapper) - OpenGL Core 3.3 → OpenGL ES 3 转译层
         // 复刻自官方 MojoLauncher/LTW 仓库，完美支持 Sodium + Iris 光影。

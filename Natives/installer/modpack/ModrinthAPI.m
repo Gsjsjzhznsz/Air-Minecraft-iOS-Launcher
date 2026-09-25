@@ -72,7 +72,8 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
         @"facets": facetString,
         @"query": [searchFilters[@"name"] stringByReplacingOccurrencesOfString:@" " withString:@"+"] ?: @"",
         @"limit": @(limit),
-        @"index": @"relevance",
+        // Task173：同步路径同款排序映射（见异步路径注释）
+        @"index": [ModrinthAPI ame173_indexForSort:searchFilters[@"sort"] query:searchFilters[@"name"]],
         @"offset": @(modrinthSearchResult.count)
     };
     NSDictionary *response = [self getEndpoint:@"search" params:params];
@@ -280,6 +281,17 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
 
 #pragma mark - Async Mod Search (推荐使用)
 
+/// Task173：UI 排序键（follows/downloads/updated/newest/relevance）→ Modrinth
+/// search 的 index 参数。值域恰好同名直通；未选择排序时的旧缺省语义
+/// （有搜索词 = relevance，无搜索词 = follows）保持不变。
++ (NSString *)ame173_indexForSort:(NSString *)sort query:(NSString *)query {
+    NSArray *ame173_valid = @[@"relevance", @"downloads", @"follows", @"newest", @"updated"];
+    if ([sort isKindOfClass:NSString.class] && [ame173_valid containsObject:sort]) {
+        return sort;
+    }
+    return (query.length > 0) ? @"relevance" : @"follows";
+}
+
 - (void)searchModWithFilters:(NSDictionary *)filters
                   completion:(void (^)(NSArray * _Nullable results, NSError * _Nullable error))completion {
     NSString *projectType = filters[@"projectType"];
@@ -309,7 +321,7 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
     
     NSString *encodedQuery = [query stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
     NSString *encodedFacets = [facetString stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
-    NSString *index = query.length > 0 ? @"relevance" : @"follows";
+    NSString *index = [ModrinthAPI ame173_indexForSort:filters[@"sort"] query:query];
     NSString *urlString = [NSString stringWithFormat:@"%@/search?query=%@&limit=%d&offset=%d&facets=%@&index=%@",
                            self.baseURL, encodedQuery, limit, offset, encodedFacets, index];
     
@@ -477,7 +489,7 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
 
     NSString *encodedQuery = [query stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
     NSString *encodedFacets = [facetString stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLQueryAllowedCharacterSet]];
-    NSString *index = query.length > 0 ? @"relevance" : @"follows";
+    NSString *index = [ModrinthAPI ame173_indexForSort:filters[@"sort"] query:query];
     NSString *urlString = [NSString stringWithFormat:@"%@/search?query=%@&limit=%d&offset=%d&facets=%@&index=%@",
                            self.baseURL, encodedQuery, limit, offset, encodedFacets, index];
 

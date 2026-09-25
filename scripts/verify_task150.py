@@ -135,7 +135,7 @@ print("=" * 72)
 print("D. Sodium 组件安装（ProfileSettingsViewController.m）")
 print("=" * 72)
 check("D1  组件安装区新增 Sodium 行（Fabric API / Sodium + Iris Shaders / OptiFine，Task157 行名升级）",
-      '@[@"Fabric API", @"Sodium + Iris Shaders", @"OptiFine"]' in ps)
+      '@[@"Fabric API", @"Sodium + Iris Shaders", @"TouchController", @"OptiFine"]' in ps)
 check("D2  火焰图标（flame.fill）+ Fabric 门槛文案（2043/885，与 Fabric API 行同构）",
       '[UIImage systemImageNamed:@"flame.fill"]' in ps
       and ps.count('cell.detailTextLabel.text = [self isFabricProfile] ? localize(@"i18n_str_2043", nil) : localize(@"i18n_str_885", nil);') == 2)
@@ -182,7 +182,7 @@ for lg in langs:
     check(f"E[{lg}] 退役 2 键清零 + Sodium 6 键在位", r1 and r2 and n1 and n2 and n3 and n4 and n5 and n6)
     sets.append(set(re.findall(r'^"([^"]+)"\s*=', s, re.M)))
 check("E5 四语言键集一致（1952 = Task156 基线 1952 + Task157 组件键 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1953,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1954,
       f"counts={[len(x) for x in sets]}")
 
 print()

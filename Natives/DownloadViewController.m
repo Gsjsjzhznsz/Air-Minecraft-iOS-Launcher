@@ -11,6 +11,7 @@
 #import "installer/modpack/ModrinthAPI.h"
 #import "installer/modpack/CurseForgeAPI.h"
 #import "PLPreferences.h"
+#import "PLMirrorCenter.h"
 #import "ModService.h"
 #import "ShaderService.h"
 #import "UIKit+NativeSurface.h"
@@ -1828,40 +1829,61 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 - (void)loadVersionList {
     [self.loadingIndicator startAnimating];
     
-    NSString *downloadSource = getPrefObject(@"general.download_source");
-    NSString *versionManifestURL;
-    
-    if ([downloadSource isEqualToString:@"bmclapi"]) {
-        versionManifestURL = @"https://bmclapi2.bangbang93.com/mc/game/version_manifest_v2.json";
-    } else {
-        versionManifestURL = @"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
+    // Task173：版本清单镜像候选链。旧实现只认 general.download_source == bmclapi
+    // 才走镜像，其余设备直连 piston-meta——国内网络下加载失败，版本筛选弹窗
+    // 只剩硬编码兜底列表（用户实测“筛选的游戏版本到 1.21.1 和 1.16.5 就
+    // 没有了”）。现在按 PLMirrorCenter 的 GameFile 策略生成候选（官方 +
+    // bmclapi 镜像），逐个尝试直到成功。
+    NSURL *officialURL = [NSURL URLWithString:@"https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"];
+    NSArray<NSURL *> *ame173_candidates = [PLMirrorCenter candidateURLsForOriginalURL:officialURL
+                                                                      resourceType:PLMirrorResourceTypeGameFile];
+    if (ame173_candidates.count == 0) {
+        ame173_candidates = @[officialURL];
     }
+    NSLog(@"[DownloadVC] Task173 version manifest candidates: %lu", (unsigned long)ame173_candidates.count);
     
-    NSURL *url = [NSURL URLWithString:versionManifestURL];
     __weak typeof(self) weakSelf = self;
-    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf;
-            if (!strongSelf) return;
-            [strongSelf.loadingIndicator stopAnimating];
-            
-            if (data && !error) {
-                NSError *jsonError;
-                NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
-                if (json && !jsonError) {
-                    strongSelf.versionList = json[@"versions"];
-                    [strongSelf applyVersionFilter];
-                } else {
-                    strongSelf.emptyLabel.text = localize(@"i18n_str_176", nil);
-                    strongSelf.emptyLabel.hidden = NO;
+    __block NSMutableArray<NSURL *> *ame173_remaining = [ame173_candidates mutableCopy];
+    __block void (^ame173_tryNext)(void) = ^{ };
+    ame173_tryNext = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (ame173_remaining.count == 0) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf2 = weakSelf;
+                if (!strongSelf2) return;
+                [strongSelf2.loadingIndicator stopAnimating];
+                strongSelf2.emptyLabel.text = localize(@"i18n_str_177", nil);
+                strongSelf2.emptyLabel.hidden = NO;
+            });
+            return;
+        }
+        NSURL *url = ame173_remaining.firstObject;
+        [ame173_remaining removeObjectAtIndex:0];
+        NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf3 = weakSelf;
+                if (!strongSelf3) return;
+                if (data && !error) {
+                    NSError *jsonError;
+                    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+                    if (json && !jsonError && [json[@"versions"] isKindOfClass:NSArray.class]) {
+                        [strongSelf3.loadingIndicator stopAnimating];
+                        strongSelf3.versionList = json[@"versions"];
+                        [strongSelf3 applyVersionFilter];
+                        NSLog(@"[DownloadVC] Task173 version manifest loaded from %@ (%lu versions)",
+                              url.host, (unsigned long)[json[@"versions"] count]);
+                        return;
+                    }
                 }
-            } else {
-                strongSelf.emptyLabel.text = localize(@"i18n_str_177", nil);
-                strongSelf.emptyLabel.hidden = NO;
-            }
-        });
-    }];
-    [task resume];
+                NSLog(@"[DownloadVC] Task173 manifest fetch failed on %@ (%@) -- trying next candidate",
+                      url.host, error.localizedDescription ?: @"non-JSON");
+                ame173_tryNext();
+            });
+        }];
+        [task resume];
+    };
+    ame173_tryNext();
 }
 
 - (void)versionFilterChanged:(UISegmentedControl *)sender {
@@ -2467,6 +2489,13 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     // 动态构建版本列表：优先使用已加载的 Mojang version_manifest 中的 release 版本，
     // 这样能自动跟随 MC 版本更新（不再使用硬编码列表）。
     // 同时把当前 profile 的 MC 版本置顶（如果有）方便快速选择。
+    // Task173（版本补全，用户实测“筛选的游戏版本到 1.21.1 和 1.16.5 就没有了”）：
+    //   1. 旧 hasPrefix:@"1." 把 26.x 新版本号全部滤掉；
+    //   2. 旧 32 条封顶把 1.16.4 及更早的经典 mod 版本（1.12.2/1.8.9 等）截掉；
+    //   3. 清单没加载时只剩 5 个硬编码兜底。
+    // 现在：接受一切纯数字开头的 release id（26.x 与 1.x 通吃），保留老版本
+    //（下到 1.8——mod 生态起点），封顶放宽到 64 条（actionSheet 可滚动）；
+    // 兜底列表换成全量常用集。
     NSMutableArray<NSString *> *versions = [NSMutableArray arrayWithObject:localize(@"i18n_str_2032", nil)];
 
     // 当前 profile 的 MC 版本（若有）放第二位，便于快速选择
@@ -2477,27 +2506,52 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 
     // 从 Mojang version_manifest 提取 release 版本
     if (self.versionList && [self.versionList isKindOfClass:[NSArray class]]) {
+        NSCharacterSet *ame173_digits = [NSCharacterSet decimalDigitCharacterSet];
         for (NSDictionary *version in self.versionList) {
             NSString *type = version[@"type"];
             if (![type isEqualToString:@"release"]) continue;
             NSString *versionId = version[@"id"];
             if (![versionId isKindOfClass:[NSString class]] || versionId.length == 0) continue;
-            // 跳过过于旧的版本（1.8 之前的版本 mod 支持极少）
-            if ([versionId hasPrefix:@"1."] == NO) continue;
+            // Task173：数字开头的 release 全收（26.x / 1.x），非数字的
+            //（如旧 csv 命名或特殊 id）跳过；1.8 之前的版本 mod 支持极少，
+            // 以 “1.” 开头且次版本 < 8 的滤掉。
+            unichar ame173_first = [versionId characterAtIndex:0];
+            if (![ame173_digits characterIsMember:ame173_first]) continue;
+            if ([versionId hasPrefix:@"1."]) {
+                NSInteger ame173_minor = [[versionId substringFromIndex:2] integerValue];
+                if (ame173_minor < 8) continue;
+            }
             // 跳过已经在列表中的（避免 profileMcVersion 重复）
             if ([versions containsObject:versionId]) continue;
             [versions addObject:versionId];
         }
     }
 
-    // 若 versionList 还未加载或为空，使用基础 fallback（保证 picker 至少能弹出）
-    if (versions.count <= 1) {
-        [versions addObjectsFromArray:@[@"1.21", @"1.20.1", @"1.19.2", @"1.18.2", @"1.16.5"]];
+    // 若 versionList 还未加载或为空，使用基础 fallback（保证 picker 至少能弹出）。
+    // Task173：兜底列表从 5 个换成全量常用集（26.x + 1.21.x 全系 + … + 1.8.9）。
+    if (versions.count <= 2) {
+        [versions addObjectsFromArray:@[
+            @"26.3", @"26.2", @"26.1",
+            @"1.21.11", @"1.21.10", @"1.21.9", @"1.21.8", @"1.21.7", @"1.21.6", @"1.21.5", @"1.21.4", @"1.21.3", @"1.21.2", @"1.21.1", @"1.21",
+            @"1.20.6", @"1.20.5", @"1.20.4", @"1.20.3", @"1.20.2", @"1.20.1", @"1.20",
+            @"1.19.4", @"1.19.3", @"1.19.2", @"1.19.1", @"1.19",
+            @"1.18.2", @"1.18.1", @"1.18",
+            @"1.17.1", @"1.17",
+            @"1.16.5", @"1.16.4", @"1.16.3", @"1.16.2", @"1.16.1", @"1.16",
+            @"1.15.2", @"1.15.1", @"1.15",
+            @"1.14.4", @"1.14.3", @"1.14.2", @"1.14.1", @"1.14",
+            @"1.13.2", @"1.13.1", @"1.13",
+            @"1.12.2", @"1.12.1", @"1.12",
+            @"1.11.2", @"1.11",
+            @"1.10.2", @"1.10",
+            @"1.9.4", @"1.9", @"1.8.9", @"1.8"
+        ]];
     }
 
-    // 限制列表长度避免 alert 过长（保留最近 30 个版本 + 全部 + profile 版本）
-    if (versions.count > 32) {
-        NSArray *tail = [versions subarrayWithRange:NSMakeRange(0, 32)];
+    // Task173：封顶从 32 放宽到 64（“全部” + profile + 62 个 release；
+    // 26.x 全系 + 1.x 下到 1.8 全覆盖，actionSheet 可滚动）。
+    if (versions.count > 64) {
+        NSArray *tail = [versions subarrayWithRange:NSMakeRange(0, 64)];
         versions = [NSMutableArray arrayWithArray:tail];
     }
 

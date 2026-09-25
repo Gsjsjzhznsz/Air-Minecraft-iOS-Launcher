@@ -47,6 +47,10 @@ extern "C" {
 
 #define RENDERER_NAME_GL4ES "libgl4es_114.dylib"
 #define RENDERER_NAME_MTL_ANGLE "libtinygl4angle.dylib"
+// Task173：VGPU 渲染器（PojavLauncherTeam/VGPU，gl4es 分支 + 强化着色器
+// 语法转换，旧版 MC <1.13 生态；FCL 同款可选渲染器，iOS 移植见
+// Natives/external/vgpu 各文件 Task173 标记与 CMakeLists 的 vgpu 目标）。
+#define RENDERER_NAME_VGPU "libvgpu.dylib"
 #define RENDERER_NAME_MOBILEGLUES "libmobileglues.dylib"
 #define RENDERER_NAME_VK_ZINK "libOSMesa.8.dylib"
 #define RENDERER_NAME_VULKAN "libMoltenVK.dylib"
@@ -368,6 +372,18 @@ int Ame66GetKbNumKeys(void);
 // mismatched Jetsam limit vs Xmx = launch-time SIGKILL).
 // ============================================================================
 int ame141_currentLaunchAllocMem(void);
+
+// ============================================================================
+// Task173: Jetsam-safe heap ceiling in MB for THIS process.
+// Derived from os_proc_available_memory() (authoritative "bytes left before
+// the process gets killed") minus a 1.2GB native reserve (JVM non-heap +
+// renderer surfaces), floored at 1024MB; falls back to 60% of physical memory
+// when the API is unavailable. ame141_currentLaunchAllocMem clamps every
+// -Xmx through this (device session: 7165MB slider value = silent Jetsam
+// SIGKILL 53s into a 244-mod pack load). Also used to cap the memory slider
+// in ProfileSettingsViewController so users cannot pre-select doomed values.
+// ============================================================================
+int ame173_safeHeapCeilingMB(void);
 
 #ifdef __cplusplus
 }

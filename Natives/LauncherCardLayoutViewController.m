@@ -81,6 +81,8 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
 
 @property(nonatomic, assign) BOOL isShowingProfileEditor;
 @property(nonatomic, strong) ProfileSettingsViewController *profileEditorVC;
+// Task173：主页 VC 实例缓存（头像消失根修，同 LauncherRootViewController）。
+@property(nonatomic, strong) LauncherNewsViewController *cachedHomeVC;
 
 @end
 
@@ -368,7 +370,9 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
     _sidebarViewController = sidebarVC;
     
     // 中间内容 - 默认显示新闻页
+    // Task173：实例缓存（头像消失根修，见 cachedHomeVC 属性注释）。
     LauncherNewsViewController *newsVC = [[LauncherNewsViewController alloc] init];
+    self.cachedHomeVC = newsVC;
     [self setContentViewController:newsVC animated:NO];
     
     // 右侧面板 - 账户和启动
@@ -522,8 +526,14 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
 }
 
 - (void)showHomePage {
-    LauncherNewsViewController *newsVC = [[LauncherNewsViewController alloc] init];
-    [self setContentViewController:newsVC animated:YES];
+    // Task173：复用主页 VC 实例（头像消失根修，同 LauncherRootViewController）。
+    if (!self.cachedHomeVC) {
+        self.cachedHomeVC = [[LauncherNewsViewController alloc] init];
+        NSLog(@"[HomeAvatar] Task173 home VC created (card layout, will be reused)");
+    } else {
+        NSLog(@"[HomeAvatar] Task173 home VC reused (card layout, avatar survives tab switch)");
+    }
+    [self setContentViewController:self.cachedHomeVC animated:YES];
 }
 
 - (void)showDownloadPage {

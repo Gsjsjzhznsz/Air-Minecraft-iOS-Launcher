@@ -1076,6 +1076,7 @@ static NSInteger const kSectionVersions    = 1;
         @ RENDERER_KEY_MG: @"MobileGlues",
         @ RENDERER_NAME_GL4ES: @"GL4ES",
         @ RENDERER_NAME_MTL_ANGLE: @"ANGLE",
+        @ RENDERER_NAME_VGPU: @"VGPU", // Task173：旧版 MC 专用渲染器
         @ RENDERER_NAME_MOBILEGLUES: @"MobileGlues",
         @ RENDERER_NAME_VK_ZINK: @"Zink",
         @ RENDERER_NAME_LTW: @"LTW",

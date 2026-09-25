@@ -144,7 +144,7 @@ check("C6  Task159 重锚：卡片转场/呈现链退役（UIModalPresentationCu
       and "transitioningDelegate" not in ps_code
       and "xmark.circle.fill" not in ps)
 check("D1  组件区行名升级（Fabric API / Sodium + Iris Shaders / OptiFine）",
-      '@[@"Fabric API", @"Sodium + Iris Shaders", @"OptiFine"]' in ps)
+      '@[@"Fabric API", @"Sodium + Iris Shaders", @"TouchController", @"OptiFine"]' in ps)
 check("D2  l10n 映射同步（Sodium + Iris Shaders 键）+ 行配置改用新名",
       '@"Sodium + Iris Shaders": @"Sodium + Iris Shaders",' in ps
       and ps.count('[title isEqualToString:@"Sodium + Iris Shaders"]') == 2)
@@ -195,7 +195,7 @@ check("E6  确认弹窗标题升级（安装 Sodium + Iris Shaders）",
       '"component.sodium.confirm_title" = "安装 Sodium + Iris Shaders";' in zh
       and '"component.sodium.confirm_title" = "Install Sodium + Iris Shaders";' in read(base + "en.lproj/Localizable.strings"))
 check("E7  四语言键集一致（1952 = Task157 基线 1948 + Task159 净增 4（新增 5 键，退役 memory.current））",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1953,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1954,
       f"counts={[len(x) for x in sets]}")
 
 print()

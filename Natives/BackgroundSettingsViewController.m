@@ -201,8 +201,7 @@
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     static NSString *cellIdentifier = @"BackgroundCell";
-    static NSString *sliderCellIdentifier = @"SliderCell";
-    static NSString *blurSliderCellIdentifier = @"BlurSliderCell";
+    // Task173：滑块行复用标识改由 ame173_rowSpec 内联提供（三个滑块行统一构建）。
     
     BackgroundManager *manager = [BackgroundManager sharedManager];
     BOOL hasBackground = [manager hasBackground];
@@ -226,175 +225,94 @@
             [self styleCell:cell hasBackground:hasBackground];
             return cell;
             
-        } else if (indexPath.row == 1) {
-            // 透明度滑块
-            // Task156：行内标题（用户反馈“毛玻璃下两个百分比无名”）——
-            // sections[0][1]（i18n_str_1296“透明度”）此前从未被显示（原代码
-            // textLabel.text = nil，只有滑块+百分比）。标题 UILabel 固定在
-            // 图标之后，滑块右移让位。
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:sliderCellIdentifier];
+        } else if (indexPath.row == 1 || indexPath.row == 2 || indexPath.row == 3) {
+            // Task173：三个滑块行（透明度/模糊程度/卡片透明度）改用统一的
+            // Auto Layout 构建（用户反馈"壁纸设置默认配置调反了界面尺寸就会
+            // 与点击位置错位"——旧实现三重错位源：①滑块/标签 y=0 h=30 顶对齐，
+            // 可见拇指位置与行中心（用户点击预期）错开；②固定 x 偏移
+            //（150/165 + width-230/-245）按预布局宽度计算，iPad 宽 form sheet
+            // 与旋转后数值标签与滑块尾端重叠互相吞点击；③autoresizing 对初次
+            // 布局前的错误宽度无能为力。统一构建：图标后标题，滑块垂直居中
+            // 占满剩余宽度，数值标签固定尾端，全部约束驱动任意宽度自适应）。
+            NSDictionary *ame173_rowSpec = @{
+                @1: @[@"SliderCell", @200, @202, @201, NSStringFromSelector(@selector(opacitySliderChanged:))],
+                @2: @[@"BlurSliderCell", @300, @302, @301, NSStringFromSelector(@selector(blurIntensitySliderChanged:))],
+                @3: @[@"CardsNeumorphOpacityCell", @500, @502, @501, NSStringFromSelector(@selector(cardsNeumorphOpacitySliderChanged:))],
+            }[@(indexPath.row)];
+            NSString *ame173_reuse = ame173_rowSpec[0];
+            NSInteger ame173_sliderTag = [ame173_rowSpec[1] integerValue];
+            NSInteger ame173_titleTag = [ame173_rowSpec[2] integerValue];
+            NSInteger ame173_valueTag = [ame173_rowSpec[3] integerValue];
+            SEL ame173_action = NSSelectorFromString(ame173_rowSpec[4]);
+
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:ame173_reuse];
             if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:sliderCellIdentifier];
-                cell.selectionStyle = UITableViewCellSelectionStyleNone;
-                
-                // 标题标签（Task156：位于图标右侧，固定宽度，垂直居中）
-                UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 0, 95, 30)];
-                titleLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
-                titleLabel.font = [UIFont systemFontOfSize:15];
-                titleLabel.textColor = [UIColor labelColor];
-                titleLabel.tag = 202;
-                [cell.contentView addSubview:titleLabel];
-                
-                // 创建滑块（Task156：起点右移到标题之后）
-                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(150, 0, cell.bounds.size.width - 230, 30)];
-                slider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-                slider.minimumValue = 0.1f;
-                slider.maximumValue = 1.0f;
-                slider.tag = 200;
-                [slider addTarget:self action:@selector(opacitySliderChanged:) forControlEvents:UIControlEventValueChanged];
-                
-                // 创建数值标签
-                UILabel *valueLabel = [[UILabel alloc] initWithFrame:CGRectMake(cell.bounds.size.width - 80, 0, 60, 30)];
-                valueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-                valueLabel.textAlignment = NSTextAlignmentRight;
-                valueLabel.tag = 201;
-                valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
-                
-                [cell.contentView addSubview:slider];
-                [cell.contentView addSubview:valueLabel];
-                
-                cell.contentView.layoutMargins = UIEdgeInsetsMake(8, 16, 8, 16);
-            }
-            
-            [self styleCell:cell hasBackground:hasBackground];
-            
-            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:202];
-            titleLabel.text = self.sections[0][1];
-            
-            UISlider *slider = [cell.contentView viewWithTag:200];
-            slider.value = manager.uiOpacity;
-            
-            UILabel *valueLabel = [cell.contentView viewWithTag:201];
-            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.uiOpacity * 100];
-            valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
-            self.opacityValueLabel = valueLabel;
-            
-            cell.textLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
-            
-            return cell;
-            
-        } else if (indexPath.row == 2) {
-            // 模糊程度滑块
-            // Task156：行内标题（同透明度行，sections[0][2]“模糊程度”首次显示）。
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:blurSliderCellIdentifier];
-            if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:blurSliderCellIdentifier];
-                cell.selectionStyle = UITableViewCellSelectionStyleNone;
-                
-                // 标题标签（Task156）
-                UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 0, 95, 30)];
-                titleLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
-                titleLabel.font = [UIFont systemFontOfSize:15];
-                titleLabel.textColor = [UIColor labelColor];
-                titleLabel.tag = 302;
-                [cell.contentView addSubview:titleLabel];
-                
-                // 创建滑块（Task156：起点右移到标题之后）
-                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(150, 0, cell.bounds.size.width - 230, 30)];
-                slider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-                slider.minimumValue = 0.0f;
-                slider.maximumValue = 1.0f;
-                slider.tag = 300;
-                [slider addTarget:self action:@selector(blurIntensitySliderChanged:) forControlEvents:UIControlEventValueChanged];
-                
-                // 创建数值标签
-                UILabel *valueLabel = [[UILabel alloc] initWithFrame:CGRectMake(cell.bounds.size.width - 80, 0, 60, 30)];
-                valueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-                valueLabel.textAlignment = NSTextAlignmentRight;
-                valueLabel.tag = 301;
-                valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
-                
-                [cell.contentView addSubview:slider];
-                [cell.contentView addSubview:valueLabel];
-                
-                cell.contentView.layoutMargins = UIEdgeInsetsMake(8, 16, 8, 16);
-            }
-            
-            [self styleCell:cell hasBackground:hasBackground];
-            
-            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:302];
-            titleLabel.text = self.sections[0][2];
-            
-            UISlider *slider = [cell.contentView viewWithTag:300];
-            slider.value = manager.blurIntensity;
-            
-            UILabel *valueLabel = [cell.contentView viewWithTag:301];
-            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.blurIntensity * 100];
-            valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
-            
-            cell.textLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"drop.halffull"];
-            
-            return cell;
-            
-        } else if (indexPath.row == 3) {
-            // Task170：卡片新拟态整体透明度滑条（替换 Task168 实底开关——
-            // 用户定稿"用拉条从 0%~100% 调节整个卡片的透明度，而不是实底
-            // 啥的"）。行内布局与透明度/模糊程度两行同款（Task156 形态）：
-            // 图标 + 标题 + 滑块 + 百分比。语义 = 整个卡片（卡面 + 双阴影
-            // 承载层 + 内容）作为单元做 alpha 缩放；0% = 整卡不可见（极端
-            // 档），100% = Task168 形态原样。用户反馈"按钮边缘晕影很重"
-            // 的自助调节入口（调低时边缘阴影晕影随之变淡）。
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphOpacityCell"];
-            if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CardsNeumorphOpacityCell"];
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:ame173_reuse];
                 cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-                // 标题标签（Task156 同款：位于图标右侧，固定宽度，垂直居中）
-                UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 0, 110, 30)];
-                titleLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
+                UILabel *titleLabel = [[UILabel alloc] init];
+                titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
                 titleLabel.font = [UIFont systemFontOfSize:15];
                 titleLabel.textColor = [UIColor labelColor];
-                titleLabel.tag = 502;
+                titleLabel.tag = ame173_titleTag;
                 [cell.contentView addSubview:titleLabel];
 
-                // 创建滑块（Task156 同款：起点右移到标题之后；Task170 按用户
-                // 定稿全开 0%~100%，不设 0.1 下限——0% 是合法的"整卡隐藏"档）
-                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(165, 0, cell.bounds.size.width - 245, 30)];
-                slider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-                slider.minimumValue = 0.0f;
+                UISlider *slider = [[UISlider alloc] init];
+                slider.translatesAutoresizingMaskIntoConstraints = NO;
+                // Task173：透明度行保持 0.1 下限（旧语义），模糊/卡片行 0.0 起步
+                slider.minimumValue = (indexPath.row == 1) ? 0.1f : 0.0f;
                 slider.maximumValue = 1.0f;
-                slider.tag = 500;
-                [slider addTarget:self action:@selector(cardsNeumorphOpacitySliderChanged:) forControlEvents:UIControlEventValueChanged];
-
-                // 创建数值标签
-                UILabel *valueLabel = [[UILabel alloc] initWithFrame:CGRectMake(cell.bounds.size.width - 80, 0, 60, 30)];
-                valueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-                valueLabel.textAlignment = NSTextAlignmentRight;
-                valueLabel.tag = 501;
-                valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
-
+                slider.tag = ame173_sliderTag;
+                [slider addTarget:self action:ame173_action forControlEvents:UIControlEventValueChanged];
                 [cell.contentView addSubview:slider];
+
+                UILabel *valueLabel = [[UILabel alloc] init];
+                valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
+                valueLabel.textAlignment = NSTextAlignmentRight;
+                valueLabel.tag = ame173_valueTag;
+                valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
                 [cell.contentView addSubview:valueLabel];
 
+                [NSLayoutConstraint activateConstraints:@[
+                    // 标题：图标右侧起步，垂直居中，固定宽度让位
+                    [titleLabel.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:50],
+                    [titleLabel.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                    [titleLabel.widthAnchor constraintEqualToConstant:110],
+                    // 滑块：标题右侧 → 数值标签左侧，垂直居中（自适应任意行宽）
+                    [slider.leadingAnchor constraintEqualToAnchor:titleLabel.trailingAnchor constant:8],
+                    [slider.trailingAnchor constraintEqualToAnchor:valueLabel.leadingAnchor constant:-8],
+                    [slider.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                    // 数值标签：行尾固定 60 宽，垂直居中
+                    [valueLabel.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+                    [valueLabel.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                    [valueLabel.widthAnchor constraintEqualToConstant:60],
+                ]];
                 cell.contentView.layoutMargins = UIEdgeInsetsMake(8, 16, 8, 16);
             }
 
             [self styleCell:cell hasBackground:hasBackground];
 
-            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:502];
-            titleLabel.text = self.sections[0][3]; // background.cards.neumorph.opacity.title
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:ame173_titleTag];
+            titleLabel.text = self.sections[0][indexPath.row];
 
-            UISlider *slider = [cell.contentView viewWithTag:500];
-            slider.value = manager.cardsNeumorphOpacity;
-
-            UILabel *valueLabel = [cell.contentView viewWithTag:501];
-            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
-            valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
-
+            UISlider *slider = [cell.contentView viewWithTag:ame173_sliderTag];
+            UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:ame173_valueTag];
+            if (indexPath.row == 1) {
+                slider.value = manager.uiOpacity;
+                valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.uiOpacity * 100];
+                self.opacityValueLabel = valueLabel;
+                cell.imageView.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
+            } else if (indexPath.row == 2) {
+                slider.value = manager.blurIntensity;
+                valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.blurIntensity * 100];
+                cell.imageView.image = [UIImage systemImageNamed:@"drop.halffull"];
+            } else {
+                slider.value = manager.cardsNeumorphOpacity;
+                valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
+                cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
+            }
+            valueLabel.textColor = [UIColor labelColor]; // Task91
             cell.textLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
 
             return cell;
         }
