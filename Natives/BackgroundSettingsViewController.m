@@ -243,7 +243,11 @@
             // 数值标签与滑块尾端重叠互相吞点击；③autoresizing 对初次布局前
             // 的错误宽度无能为力）。
             // 合并保留并行会话（新拟态重写）的灰化语义：开关开启时本行变灰停用。
-            NSDictionary *ame173_rowSpec = @{
+            // Task174 CI 取证（run 36178299321）：字典字面量下标取出的值是内层
+            // NSArray，静态类型必须写 NSArray *——写成 NSDictionary * 时后续
+            // ame173_rowSpec[0] 整数下标全部报"expected method to read array
+            // element not found"（七处编译错误同根因）。
+            NSArray *ame173_rowSpec = @{
                 @1: @[@"SliderCell", @200, @202, @201, NSStringFromSelector(@selector(opacitySliderChanged:))],
                 @2: @[@"BlurSliderCell", @300, @302, @301, NSStringFromSelector(@selector(blurIntensitySliderChanged:))],
             }[@(indexPath.row)];
