@@ -452,7 +452,8 @@ void int_to_float(char **source, int vsh){//				Printf("&&&&\nStart %d \n&&&&", 
 	int len_s_to_m = 0;
 	int num_uint = 0;
 	int num_uint_ = 0;
-	char **ptr_uint = (char **)malloc( ((uint)(lenS/len_uint)+1)*sizeof(char*) );
+	// Task173 (iOS port): Apple clang has no implicit 'uint' typedef.
+	char **ptr_uint = (char **)malloc( ((unsigned int)(lenS/len_uint)+1)*sizeof(char*) );
 	//char **ptr_uint_ = (char **)malloc( ((uint)(lenS/len_uint)+1)*sizeof(char*) );
 	pot = find("uint", "uint", source, ptr_uint, &num_uint);
 	char *ptrm = NULL;
