@@ -418,3 +418,20 @@ Task: 用户裁决："那2个后端（GLES/4.0）在加载区块的情况下是�
   3. `[MGLFSR] Task154 MobileGL pre-swap GL FSR chain RETIRED ... Task166: present-side Metal FSR owns upscaling`（双链不冲突确认）
   4. 若 Vulkan FSR 异常：`AME166_MGL_METAL_FSR=0` 环境变量强制关闭回退全分辨率直呈（分诊用）
 - 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README + 6.0.0 发行文案收尾
+
+---
+Task ID: 166-CI
+Agent: main (Super Z)
+Task: Task 166 CI 收尾
+
+Work Log:
+- 推送 7b36060 → run 36093123023 轮询 17 轮（~9 分钟）→ completed success
+- Artifacts 三件就绪：com.air-devs.air-ios.ipa (215.8MB) / trollstore.tipa (215.8MB) / AngelAuraAmethyst.dSYM (4.0MB)，2026-12-24 前不过期
+
+Stage Summary:
+- Task166 构建产物可装机；装机验证锚点：
+  ① Vulkan 后端 + FSR 档位 → `[MGLFSR] Task166 Metal FSR engaged: EGL surface (private layer) ...`（链路建立）→ `first frame presented: EASU ... -> RCAS -> display layer`（首帧上屏）→ 画面应为放大+锐化后的全分辨率；`Task166 steady: 600 frames upscaled`（约 10 秒后稳态确认，dropped 应为 0）
+  ② GLES / OpenGL 4.0 后端 → 画面恢复显示（DSA 已关，日志应现 "DSA support not detected"）；存量设备自动迁移（日志 "[Preferences] Task166 migrated MG DSA default: 1 -> 0"）
+  ③ 双链确认：`[MGLFSR] Task154 ... RETIRED ... Task166: present-side Metal FSR owns upscaling`（预交换 GL 链不复活）
+  ④ 分诊开关：Vulkan FSR 异常时设 `AME166_MGL_METAL_FSR=0` 强制回退全分辨率直呈（对比定位）
+- 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README + 6.0.0 发行文案收尾
