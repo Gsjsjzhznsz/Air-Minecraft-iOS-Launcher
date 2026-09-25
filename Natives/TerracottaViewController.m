@@ -169,8 +169,9 @@
 
 /// 对所有卡片/输入框/玩家行应用毛玻璃或半透明效果
 - (void)applyBackgroundEffects {
-    /* 状态卡片：注入毛玻璃（或半透明色） */
-    [[BackgroundManager sharedManager] applyEffectToView:self.statusCard];
+    /* 状态卡片：Task168 改走新拟态卡片管线（实底开关开=规格实底+双阴影；
+       动态=毛玻璃/半透明面+双阴影叠加）——与主页/下载页卡片形态统一 */
+    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:self.statusCard];
 
     /* 输入框：背景透明 + 注入毛玻璃（让背景透出） */
     [[BackgroundManager sharedManager] applyEffectToView:self.portField];

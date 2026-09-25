@@ -111,6 +111,13 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 管线时旧投影会漏在 blur/半透明底外面穿帮）。未挂载时为无害空操作。
 - (void)ame_removeNeumorphShadow;
 
+/// Task168：仅阴影挂载（动态新拟态）——保留宿主现有卡面（壁纸管线的毛
+/// 玻璃/半透明底，随用户的透明度/模糊设置动态变化），只追加双阴影承载
+/// 视图并把宿主圆角统一到规格等比值；masksToBounds = NO 放行阴影外溢。
+/// 与实底版 ame_applyNeumorphSurface 的唯一差异是不写 backgroundColor。
+/// 调用点负责把卡面子视图（如 blur 层）的圆角同步到宿主新值。
+- (void)ame_attachNeumorphShadowOnly;
+
 @end
 
 /// 带左右内边距的胶囊徽章标签（Task137：列表右侧小字框的统一实现）。

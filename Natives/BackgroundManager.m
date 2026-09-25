@@ -15,6 +15,8 @@ static NSString * const kBackgroundPathKey = @"background_path";
 static NSString * const kBackgroundUIEffectKey = @"background_ui_effect";
 static NSString * const kBackgroundUIOpacityKey = @"background_ui_opacity";
 static NSString * const kBackgroundBlurIntensityKey = @"background_blur_intensity";
+// Task168：卡片新拟态形态开关（YES=实底，NO=动态随壁纸透明度/模糊+双阴影）
+static NSString * const kBackgroundCardsNeumorphSolidKey = @"background_cards_neumorph_solid";
 // Task151：背景来源标记（"user" = 用户手动设置，"bing" = Bing 每日壁纸自动应用）
 static NSString * const kBackgroundSourceKey = @"background_source";
 static NSString * const kBackgroundsFolder = @"backgrounds";
@@ -210,6 +212,19 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)setBlurIntensity:(CGFloat)blurIntensity {
     _blurIntensity = MAX(0.0, MIN(1.0, blurIntensity));
     [self saveUISettings];
+}
+
+#pragma mark - Task168 卡片新拟态形态开关
+
+// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链）——开关是
+// 布尔语义，无默认值合并/范围钳制诉求，读侧永远拿到最新落盘值。
+- (BOOL)cardsNeumorphSolid {
+    return [[NSUserDefaults standardUserDefaults] boolForKey:kBackgroundCardsNeumorphSolidKey];
+}
+
+- (void)setCardsNeumorphSolid:(BOOL)cardsNeumorphSolid {
+    [[NSUserDefaults standardUserDefaults] setBool:cardsNeumorphSolid forKey:kBackgroundCardsNeumorphSolidKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 #pragma mark - Global Background Application
@@ -1048,8 +1063,49 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
     if (!cell) return;
 
-    // Task111：检测并切换——有自定义背景时恢复 Task89 之前的毛玻璃/半透明
-    // cell 效果；无背景时维持新拟态凸出表面。
+    // Task168（用户定稿重构）：实底开关开或无自定义背景 → 统一新拟态凸起
+    // 尾部（规格表面色+双阴影，壁纸从卡片间隙透出）。这正是"下载了最新
+    // 提交却看不到新拟态"的范围修正——有壁纸时不再提前 return 进旧管线。
+    if (self.cardsNeumorphSolid || ![self hasBackground]) {
+        // Task163：回归新拟态凸起卡片（用户实测"主页的卡片一点
+        // 没改"——Task160 把 cell 管线统一成 Flat 平贴后磁贴完全丢失凸起感；
+        // 现对卡片容器挂规格双阴影：暗影右下/高光左上，短边等比）。宿主链
+        // 逐层放行裁剪（cell.clipsToBounds = NO；contentView/cell.layer masks
+        // = NO）让阴影越出卡片边界投到磁贴间隙——相邻淡阴影叠加属新拟态正常
+        // 形态，collectionView 边界外的阴影仍由其自身裁剪收口。
+        UIView *target = nil;
+        CGFloat radius = 0;
+        for (UIView *sub in cell.contentView.subviews) {
+            if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
+                [sub removeFromSuperview];
+                continue;
+            }
+            if (!target && sub.layer.cornerRadius > 0 &&
+                ![sub isKindOfClass:[UIImageView class]] &&
+                ![sub isKindOfClass:[UILabel class]] &&
+                ![sub isKindOfClass:[UITextView class]] &&
+                ![sub isKindOfClass:[UIControl class]]) {
+                target = sub;
+                radius = sub.layer.cornerRadius;
+            }
+        }
+        if (!target) {
+            target = cell.contentView;
+            radius = cell.contentView.layer.cornerRadius > 0
+                ? cell.contentView.layer.cornerRadius : 12;
+        }
+        cell.backgroundColor = [UIColor clearColor];
+        cell.contentView.backgroundColor = [UIColor clearColor];
+        cell.clipsToBounds = NO;
+        cell.layer.masksToBounds = NO;
+        cell.contentView.layer.masksToBounds = NO;
+        [target ame_applyNeumorphSurface];
+        return;
+    }
+
+    // Task111：检测并切换——有自定义背景（动态模式）时恢复 Task89 之前的
+    // 毛玻璃/半透明 cell 效果（卡面随壁纸透明度/模糊设置动态变化），
+    // 随后 Task168 叠加双阴影承载层（面管线不动，无把握不逞强）。
     if ([self hasBackground]) {
         // Task152：探测卡片容器（contentView 内第一个带圆角的非文本/控件子视图）。
         // 此前 blur/半透明一律铺满直角 contentView，而 VMTileBaseCell 等的圆角在
@@ -1136,42 +1192,22 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             cell.backgroundColor = [UIColor clearColor];
             cell.contentView.backgroundColor = [UIColor clearColor];
         }
+        // Task168 动态模式收口：卡面已按壁纸设置呈现，叠加双阴影承载层并把
+        // 宿主链逐层放行裁剪（与无壁纸新拟态尾部同约定），blur 层圆角同步到
+        // 规格等比值（attach 重写宿主圆角后不同步会外露圆角差）。
+        [cardTarget ame_attachNeumorphShadowOnly];
+        for (UIView *subview in cardTarget.subviews) {
+            if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
+                subview.layer.cornerRadius = cardTarget.layer.cornerRadius;
+            }
+        }
+        cell.clipsToBounds = NO;
+        cell.layer.masksToBounds = NO;
+        cell.contentView.clipsToBounds = NO;
+        cell.contentView.layer.masksToBounds = NO;
+        cardTarget.layer.masksToBounds = NO;
         return;
     }
-
-    // Task163：无自定义背景时回归新拟态凸起卡片（用户实测"主页的卡片一点
-    // 没改"——Task160 把 cell 管线统一成 Flat 平贴后磁贴完全丢失凸起感；
-    // 现对卡片容器挂规格双阴影：暗影右下/高光左上，短边等比）。宿主链
-    // 逐层放行裁剪（cell.clipsToBounds = NO；contentView/cell.layer masks
-    // = NO）让阴影越出卡片边界投到磁贴间隙——相邻淡阴影叠加属新拟态正常
-    // 形态，collectionView 边界外的阴影仍由其自身裁剪收口。
-    UIView *target = nil;
-    CGFloat radius = 0;
-    for (UIView *sub in cell.contentView.subviews) {
-        if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
-            [sub removeFromSuperview];
-            continue;
-        }
-        if (!target && sub.layer.cornerRadius > 0 &&
-            ![sub isKindOfClass:[UIImageView class]] &&
-            ![sub isKindOfClass:[UILabel class]] &&
-            ![sub isKindOfClass:[UITextView class]] &&
-            ![sub isKindOfClass:[UIControl class]]) {
-            target = sub;
-            radius = sub.layer.cornerRadius;
-        }
-    }
-    if (!target) {
-        target = cell.contentView;
-        radius = cell.contentView.layer.cornerRadius > 0
-            ? cell.contentView.layer.cornerRadius : 12;
-    }
-    cell.backgroundColor = [UIColor clearColor];
-    cell.contentView.backgroundColor = [UIColor clearColor];
-    cell.clipsToBounds = NO;
-    cell.layer.masksToBounds = NO;
-    cell.contentView.layer.masksToBounds = NO;
-    [target ame_applyNeumorphSurface];
 }
 
 - (void)applyCardEffectToCell:(UITableViewCell *)cell {
@@ -1198,14 +1234,29 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 
     // Task163：独立卡片容器的新拟态凸起管线（用户实测"下载页面版本选项
     // 一点没改"——版本卡走 applyEffectToView 的 Flat 尾分支完全丢失阴影）。
-    // 有自定义背景：转调旧管线（毛玻璃/半透明），转调前清残留阴影层。
-    if ([self hasBackground]) {
+    //
+    // Task168 范围修正（用户定稿）：壁纸模式不再"转调旧管线后什么都不加"
+    // （这正是"下载了最新提交却看不到新拟态"的根源——有壁纸时卡片完全
+    // 走旧毛玻璃）。现在：
+    //   实底开关开 → 一律规格表面色+双阴影（壁纸从卡片间隙透出）；
+    //   动态（默认，无把握不逞强）→ 有壁纸时卡面沿用壁纸管线（毛玻璃/
+    //   半透明，随透明度/模糊设置动态变化），只叠加双阴影承载层；
+    //   无壁纸 → 规格表面色+双阴影（Task163 原形态）。
+    if (!self.cardsNeumorphSolid && [self hasBackground]) {
         [view ame_removeNeumorphShadow];
         [self applyEffectToView:view];
+        [view ame_attachNeumorphShadowOnly];
+        // 卡面子视图（壁纸管线插入的 blur 层）圆角同步到规格等比值
+        // （attach 会把宿主圆角重写为规格值，blur 层不同步会外露直角差）
+        for (UIView *sub in view.subviews) {
+            if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
+                sub.layer.cornerRadius = view.layer.cornerRadius;
+            }
+        }
         return;
     }
 
-    // 无自定义背景：规格表面色 + 双阴影（暗影右下/高光左上，短边等比）。
+    // 实底 / 无壁纸：规格表面色 + 双阴影（暗影右下/高光左上，短边等比）。
     // 容器未预置圆角时取 12 兼底；调用点（VersionCardCell）容器链已
     // masksToBounds = NO，阴影可越出卡片边界投到列表间隙。
     if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;

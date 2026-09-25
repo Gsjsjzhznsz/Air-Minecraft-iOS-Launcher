@@ -1972,6 +1972,7 @@
 "bing.refresh.title" = "今すぐ更新";
 "bing.footer.hint" = "有効にすると、カスタム壁紙未設定の場合は Bing の毎日壁紙が自動で適用され、毎日更新されます。カスタム壁紙を設定すると一時停止し、背景を消去すると自動的に再開します。";
 "background.effect.footer" = "「不透明度」はUI素材の不透明度を制御します（低いほど壁紙が透けて見えます）。「ぼかしレベル」は背景のガウスぼかしの強さを制御します（低いほど背景が鮮明になります）。UI効果がぼかし/半透明に設定されている場合のみ有効です。";
+"background.cards.neumorph.title" = "カードニューモーフィズム（単色）";
 "bing.gallery.nav.title" = "Bing ギャラリー";
 "bing.setwallpaper.title" = "壁紙に設定";
 "bing.save.title" = "写真に保存";

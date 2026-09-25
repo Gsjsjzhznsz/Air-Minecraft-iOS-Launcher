@@ -34,366 +34,46 @@
 #pragma mark - Data
 
 - (void)buildFaqData {
-    // 每条目为项目 worklog 中定案的真实结论（Task 34-83）+ 社区/上游常见问题
-    // （PojavLauncher/Amethyst issue tracker、Iris/Sodium 兼容性报告）整理。
-    LauncherHelpFaqItem *renderer = [[LauncherHelpFaqItem alloc] init];
-    renderer.iconName = @"cpu";
-    renderer.question = @"渲染器应该怎么选？各渲染器是什么原理？";
-    renderer.answer = @"渲染器在 设置 → 视频设置 → 渲染器 中选择（游戏未运行时才能改）：\n\n"
-                      @"• Zink：把游戏的 OpenGL 转译到系统 Vulkan 栈上运行（GL→Vulkan→Metal），适合 26.x 新版本和装了模组的场景，区块加载更流畅；\n"
-                      @"• MobileGlues：OpenGL→Metal 转译层，兼容性好，适合轻量场景和老版本；加载区块时每帧转译开销较大（安卓设备同样如此，属已知特性）；\n"
-                      @"• LTW：轻量级 OpenGL 3.3→ES 转译层（与安卓端同源），开销小，适合 1.21.x 及更早的轻量版本；不支持 MC 26.x（见下一条）；\n"
-                      @"• MoltenVK：独立的渲染器，直接把 Vulkan API 映射到 Metal。MC 26.2+ 可在 游戏内 视频设置 → 图形 切到 Vulkan 后端配合使用（配合帧率解锁可超过屏幕刷新率）；它和 Zink 是两个互相独立的选项——Zink 用的是系统 Vulkan 栈，不等于\"选择 MoltenVK 渲染器\"；\n"
-                      @"• 自动：由启动器按版本自动选择。\n\n"
-                      @"简单记法：玩新版本/整合包用 Zink；老版本/轻量场景用 MobileGlues 或 LTW；需要 Vulkan 后端时选 MoltenVK。";
+    // Task168：条目数据源迁移到随包 JSON（与启动器公告同模式，双文件对齐：
+    // 仓库根 help-faq.json = 维护源，Natives/resources/help-faq.json = 随包
+    // 运行时读取，两文件逐字节一致由 verify_task168 把守漂移）。条目字段：
+    // icon（SF Symbols 名）/ title（标题）/ description（简介）。
+    // 历史口径不变：本页自 Task82 起为纯中文页面（不做 54 语言 l10n），
+    // JSON 内容同口径——条目为项目 worklog 定案的真实结论，非泛泛帮助文案。
+    // 解析失败时页面呈现空分组（不崩溃），日志留痕便于发现坏包。
+    NSString *path = [NSBundle.mainBundle pathForResource:@"help-faq" ofType:@"json"];
+    NSData *data = path ? [NSData dataWithContentsOfFile:path] : nil;
+    NSDictionary *root = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
+    NSArray *cats = [root isKindOfClass:[NSDictionary class]] ? root[@"categories"] : nil;
 
-    LauncherHelpFaqItem *ltw26 = [[LauncherHelpFaqItem alloc] init];
-    ltw26.iconName = @"bolt.trianglebadge.exclamationmark";
-    ltw26.question = @"LTW 渲染器玩 MC 26.x 直接崩溃？";
-    ltw26.answer = @"已知能力边界，启动器已内置预检（选 LTW 启动 26.x 时会直接弹出提示并阻止启动，不会让你白跑一趟）。\n\n"
-                   @"原因：LTW 在 iOS 上基于 Apple 系统的 GLES 3.0 后端转译桌面 OpenGL 3.3，而 MC 26.x 的云渲染管线需要\"纹理缓冲\"（samplerBuffer，桌面 GL 3.1 起的核心特性）——ES 3.0 后端没有这个能力，云朵着色器必然编译失败，游戏在标题界面崩溃（日志特征：'samplerBuffer: Illegal use of reserved word' + 'Failed to load required shader programs: pipeline/flat_clouds'）。\n\n"
-                   @"解决办法：设置 → 视频设置 → 渲染器 切换到 Zink 或 MobileGlues（两者都完整支持 26.x：Zink 提供桌面级 GL 4.x，MobileGlues 内置纹理缓冲模拟层）。\n\n"
-                   @"LTW 的适用范围：1.21.x 及更早版本照常可用。给 LTW 补上纹理缓冲模拟属结构性工程，已在路线图上（参照 MobileGlues 同类模拟层的实现历史）。";
-
-    LauncherHelpFaqItem *mgLag = [[LauncherHelpFaqItem alloc] init];
-    mgLag.iconName = @"speedometer";
-    mgLag.question = @"MobileGlues 加载区块时卡顿正常吗？";
-    mgLag.answer = @"正常（已知特性）。MobileGlues 是 OpenGL → Metal 的转译层，26.x 新区块管线对它压力较大：同视距下转译调用量约为老版本的 3 倍，移动时帧率会明显下降；安卓设备跑 MobileGlues 同样卡顿，是上游转译栈的固有开销。\n\n"
-                   @"缓解办法（按性价比排序）：\n"
-                   @"1. 换 Zink 渲染器（区块流式吞吐明显更高）；\n"
-                   @"2. 开启 FSR 超分辨率降低渲染分辨率（见下条）；\n"
-                   @"3. 视距保持 10 左右即可，调大只会放大加载风暴时长。\n\n"
-                   @"已排除的因素：GC、内存容量、GPU 性能都不是该卡顿的原因，单纯加大内存分配不会治愈它。";
-
-    LauncherHelpFaqItem *fsr = [[LauncherHelpFaqItem alloc] init];
-    fsr.iconName = @"square.grid.3x2";
-    fsr.question = @"FSR 超分辨率怎么用？支持哪些渲染器？";
-    fsr.answer = @"FSR 1.0 在 设置 → 视频设置 → FSR 1.0 超分辨率 中选择档位（超高品质 77%／高品质 67%／均衡 59%／性能优先 50%）：开启后游戏自动以低分辨率渲染，再由 FSR 的 EASU 算法放大回全屏，帧率明显提升、画质轻微下降。\n\n"
-                 @"支持的渲染器（多渲染器支持为近期新增）：\n"
-                 @"• MobileGlues：内置 FSR1（推荐，最成熟）；mg 渲染器的 GLES 后端与 OpenGL 4.0 后端即此渲染器（Task158 起同款路径，档位联动直接生效）；\n"
-                 @"• Zink：同一套 EASU 升采样算法，呈现前放大（早期版本在 Zink 上先后出现过绿色花屏和\"画面分裂\"两种显示异常，均已修复——前者是 GLSL 4.1 上限的版本适配与半精度函数补齐，后者是升采样与画面回读的执行顺序颠倒，现已是回读前放大、显式锁定默认帧缓冲的封闭链路）；\n"
-                 @"• mg 的 Vulkan 直连后端（MobileGL）/ 其它渲染器（MoltenVK/自动/gl4es 等）：暂不支持。Vulkan 直连无升采样呈现钩子，需要 FSR 请切到 GLES / OpenGL 4.0 后端、MobileGlues 或 Zink。\n\n"
-                 @"注意：\n"
-                 @"1. 分辨率滑条保持 100% 即可，不需要再手动降低分辨率（那反而会二次缩放）；\n"
-                 @"2. 早期版本的\"开启后黑屏\"\"画面缩在左下角\"\"Zink 下绿色花屏\"均已分别修复（着色器降级修复 + 渲染视口识别修复 + 着色器版本适配与半精度函数补齐），如仍出现请上传日志反馈；\n"
-                 @"3. FSR 升采样是在游戏画面渲染完成后一次性完成的，开销极小；若感觉\"开了 FSR 反而卡\"，多半是区块加载卡顿（参考 MobileGlues 卡顿一条），与 FSR 无关。";
-
-    LauncherHelpFaqItem *metalFx = [[LauncherHelpFaqItem alloc] init];
-    metalFx.iconName = @"wand.and.stars";
-    metalFx.question = @"能不能用 MetalFX 时域放大（Temporal）代替 FSR？";
-    metalFx.answer = @"短答案：时域（Temporal）版目前做不到，这是引擎层的硬性依赖，不是启动器不想接。\n\n"
-                     @"【为什么做不到】\n"
-                     @"MetalFX 的时域模式需要游戏每帧提供：逐像素运动向量图（Motion Vectors，API 必填）、深度图、相机抖动与重投影矩阵。Minecraft 原版渲染管线不产出运动向量——这需要在游戏的渲染器内部新增一个“速度通道”，属于引擎/模组层级的改造（相当于 Sodium/Iris 级别的工作量）。启动器的呈现桥只能看到最终成品帧，没有任何一帧的深度与相机信息，无法凭空合成出正确的运动向量；强行做纯时域累积会产生严重重影（拖影/鬼影），Apple 的接口也直接要求该输入。\n\n"
-                     @"【空间（Spatial）版呢】\n"
-                     @"MetalFX 空间版和 FSR 1.0 同为单帧升采样，画质同级，接上还需要 iOS 16+／A13+ 的设备门槛与额外的纹理互操作层，收益边际很小，暂不引入。\n\n"
-                     @"【现在的建议】\n"
-                     @"追求帧率：用 FSR 超高品质/高品质档（Zink 或 MobileGlues）；追求画质：关 FSR 用原生化渲染。若未来上游（Sodium 系或 Mojang）产出运动向量，启动器侧接入时域放大会重新评估。";
-
-    LauncherHelpFaqItem *armAsr = [[LauncherHelpFaqItem alloc] init];
-    armAsr.iconName = @"speedometer";
-    armAsr.question = @"能不能用 Arm ASR（Arm Accuracy Super Resolution）代替 FSR？";
-    armAsr.answer = @"短答案：现阶段不引入。Arm ASR 与 MetalFX 时域不同，它没有运动向量的硬依赖（和 FSR 1.0 一样是单帧空间超分，本身就是从 FSR1 衍生调优来的），卡点在实现形态与收益两端：\n\n"
-                    @"【为什么接不上】\n"
-                    @"Arm ASR 的官方实现是面向 Vulkan/DX12 的计算着色器（compute shader），而 Zink 走系统 Vulkan 栈时给游戏的 OpenGL 上限是 4.1——不含 4.3 才有的计算着色器，参考实现原样跑不起来；要移植只能把它的算法改写成片元着色器（与启动器内置 FSR 同样的做法）。\n\n"
-                    @"【为什么收益小】\n"
-                    @"Arm ASR 的性能卖点主要来自为 Mali GPU（Arm 自家 GPU）调优的计算着色器分块与共享内存访存；在 Apple GPU 上经片元管线跑，这些优势全部消失，剩下的画质差异相对 FSR1 很小（同为 FSR1 衍生算法）。\n\n"
-                    @"【现在的建议】\n"
-                    @"Zink 上最实际的帧率提升就是把 FSR 用起来：最新版本已补齐 Zink 的 GLSL 4.1 适配（版本自动降级 + 半精度打包函数补齐）。若未来切换到原生 Vulkan/Metal 呈现路径（有计算着色器），ASR 与 MetalFX 空间版会重新评估。";
-
-    LauncherHelpFaqItem *upscalerAlt = [[LauncherHelpFaqItem alloc] init];
-    upscalerAlt.iconName = @"wand.and.stars";
-    upscalerAlt.question = @"FSR 1.0 有哪些替代方案？为什么最后还是选它？";
-    upscalerAlt.answer = @"单帧空间放大这一类算法里，可选方案和结论如下（2024-2025 年公开评测与源码调研）：\n\n"
-                    @"【NVIDIA NIS（Image Scaling）】开源（MIT）、单 pass 放大+锐化合一、跨平台（AMD/Intel 也能用）。公开对比评测的结论是画质与 FSR 1 同级、几乎一致；理论上单 pass 更省带宽。这是唯一值得未来考虑的同级替代——接入需要做一轮 GLSL 版本适配（与我们已完成的 FSR 适配同量级工作量）。\n\n"
-                    @"【Qualcomm GSR（Game Super Resolution）】开源（BSD-3）、单 pass 空间放大。卖点是专为 Adreno GPU 的波占用率调优——Apple GPU 上这些优化全部落空，画质又与 FSR1 同源同级，换它没有收益。\n\n"
-                    @"【Apple MetalFX 空间版】Digital Foundry 在生化危机 Mac 版的实测画质还不如 FSR 1（同一游戏引擎、同为空间放大），且接入需 iOS 16+／A13+ 与额外的纹理互操作层。\n\n"
-                    @"【Anime4K／FSRCNNX 等视频系算法】面向动画内容的边缘重建，通用 3D 场景收益不稳定，计算量也更高，不适合游戏实时全屏放大。\n\n"
-                    @"【时域家族（DLSS／FSR 2-3／XeSS／MetalFX Temporal／Arm ASR）】画质上限确实高一档，但全部依赖游戏引擎输出的运动向量／深度／抖动序列——启动器侧无法凭空合成，详见前两条 Arm ASR 与 MetalFX 的说明。\n\n"
-                    @"结论：FSR 1 的 EASU 在\"单帧空间放大\"类别里本就是第一梯队画质（部分实测还优于 MetalFX 空间版），我们且已完成 Zink 的 GL 4.1 适配；换任何同级算法收益都小于一次适配的风险。真正的画质跃升点在未来时域输入可用之时。";
-
-    LauncherHelpFaqItem *fpsUnlock = [[LauncherHelpFaqItem alloc] init];
-    fpsUnlock.iconName = @"timer";
-    fpsUnlock.question = @"帧率上限 / 垂直同步怎么调？";
-    fpsUnlock.answer = @"• 帧率上限：游戏内 视频设置 → 最大帧率（也可在启动器 Java 参数里看到 -Dmax.fps 解锁层）。设为\"无限制\"或高数值即靠上限；\n"
-                       @"• 垂直同步：游戏内 视频设置 → 垂直同步 关闭后，各渲染器的呈现模式会切到立即呈现（不再等待刷新率），高刷设备收益明显；\n"
-                       @"• 26.x 整合包加载中/不操作时被压在 30fps（曾误以为 FSR 问题）：MC 26.3 新增“不活动限帧”——默认 AFK 模式下 60 秒无输入自动降到 30fps（10 分钟降到 10fps），整合包加载期无触摸正好触发。启动器已修复（Task104）：写入 inactivityFpsLimit=minimized + 每阻 45s 注入零增量滚轮心跳重置计时；日志锚点 [InputDiag] Task104 AFK heartbeat。若修复后重负载游玩仍只有 ~30fps，优先降视距（重整合包建议视距 ≤16）并调低 FSR 档位；\n"
-                       @"• 26.x Zink+FSR 游玩期稳定 29-30fps（Task106 判读修正）：实测把 FSR 档位从 1.3x 调到 2.0x（渲染像素 -58%）帧率纹丝不动——瓶颈不是游戏渲染负载，而是每帧两次全幅 GPU→CPU 回读（驱动回读 + 权威回读）+ 行翻转拷贝的呈现常数。启动器已优化（Task106 bundle-direct）：双哨兵逐帧证明驱动缓冲持有当帧全幅画面后，跳过重复回读与行翻，直接上屏驱动缓冲；日志锚点 [OSMBridge] Task106 bundle-direct present engaged。心跳行新增相位计时可自证瓶颈分布：t=swap（启动器总耗时）、[pre+easu / glFinish / readback]（分相）、frame（完整帧周期）、MC-side = frame - swap（游戏自身耗时）——若 MC-side 占大头则只能靠降视距/换渲染器，若 glFinish/readback 占大头请反馈日志（下一轮继续压缩呈现常数）；\n"
-                       @"• \"整合包 30fps 但原版正常\"（Task110 根因定案）：dynamic-fps 模组（很多整合包自带，如本例 3.11.10）看到\"窗口未聚焦\"就会降频（原版没装它所以正常；游戏本体其实恒判聚焦）。启动器已根治（Task110）：让 SDL 窗口标志恒报\"聚焦+可见\"（嵌入模式下游戏视图就是前台焦点，iOS 退后台本就冻结渲染，无副作用），模组状态机进入正常的\"聚焦不限帧\"档。日志锚点 [SDLHook] Task110。若装了其它后台降帧类模组（如 IdleHandler 类）也一并免疫；\n"
-                       @"• 帧率仍上不去时先分辨瓶颈：GPU 满载（降视距/开 FSR）还是区块加载卡（换 Zink/降视距）；\n"
-                       @"• 帧率波动大但平均不低：多为区块流式风暴，参考 MobileGlues 卡顿一条。";
-
-    LauncherHelpFaqItem *blurry = [[LauncherHelpFaqItem alloc] init];
-    blurry.iconName = @"eye";
-    blurry.question = @"画面模糊 / 发虚怎么办？";
-    blurry.answer = @"常见原因与对策：\n\n"
-                    @"1. FSR 档位太低（均衡/性能优先）：换\"超高品质\"或关闭 FSR 对比；\n"
-                    @"2. 分辨率滑条被手动调低过：恢复 100%（降分辨率应优先用 FSR 档位，画质好得多）；\n"
-                    @"3. 历史版本的 1x 钉扎模糊已修复（渲染表面与物理像素 1:1），如再现请反馈；\n"
-                    @"4. UI 缩放调太低：游戏内 视频设置 → 界面缩放 调大；\n"
-                    @"5. sodium-extra 整合包的「Mac 下降低分辨率」选项：带 sodium-extra 的包（如 BMC2）在 Mac 伪装环境下若开启该选项（视频设置 → sodium-extra 设置 → 性能 → Mac 下降低分辨率），帧缓冲会被减半再放大回全屏（实测 590x410 渲染上采到 2360x1640，等效 4 倍放大=明显发糊）。这是模组自身的设置、不是启动器问题——觉得糊就到模组设置里把它关掉即可恢复全分辨率渲染；追求帧率则保留该选项或改用 FSR 档位（画质更好）。\n\n"
-                    @"提示：判断\"糊\"还是\"分辨率低\"——截图放大看方块边缘：锯齿状=分辨率，雾蒙蒙=滤镜/缩放。";
-
-    LauncherHelpFaqItem *shader = [[LauncherHelpFaqItem alloc] init];
-    shader.iconName = @"sun.max";
-    shader.question = @"光影（Iris/OptiFine）和优化模组能装吗？有哪些坑？";
-    shader.answer = @"可以，但务必注意版本配对（社区最高频崩溃原因）：\n\n"
-                    @"1. Iris 与 Sodium 版本强绑定：Iris 会固定要求的 Sodium 版本，只更新其中一个会报\"模组不兼容\"（Some of your mods are incompatible）——两个一起更新，或都用启动器推荐版本；\n"
-                    @"2. 26.x 的 Sodium 系列另有 Sodium Options API 等依赖，报错信息里出现 dependency conflicts 时按提示补齐/对齐版本；\n"
-                    @"3. OptiFine 与 Sodium/Iris 互斥，不要同时安装；\n"
-                    @"4. 光影对 GPU 压力大：先用中低档光影测试，稳定后再上高强度；开光影后建议 Zink 渲染器 + FSR；\n"
-                    @"5. 装完模组启动崩溃：先看崩溃报告\"Caused by\"段（游戏内菜单可查看），十有八九是版本不匹配而不是启动器问题。";
-
-    LauncherHelpFaqItem *keyboard = [[LauncherHelpFaqItem alloc] init];
-    keyboard.iconName = @"keyboard";
-    keyboard.question = @"游戏里怎么打字（聊天、命令、命名）？两个键盘按钮有什么区别？";
-    keyboard.answer = @"先说用法：打字前要先打开文本框（点聊天按钮或按 T 键打开聊天），再打字才会进框。\n\n"
-                      @"两种键盘，两个按钮，作用不同：\n\n"
-                      @"【系统键盘】✎ 图标（\"输入法\"按钮）\n"
-                      @"弹的是 iOS 系统软键盘，支持中文输入法、联想、emoji。触发方式：\n"
-                      @"1. 点按控件布局上的\"✎ 输入法\"按钮（再点一次收起）；\n"
-                      @"2. 或双指长按屏幕（需先在 设置 → 控制 → 双指呼出键盘 中开启）。\n\n"
-                      @"【按钮键盘】⌨ 图标（\"键盘\"抽屉）\n"
-                      @"展开后是一整面按键面板（QWERTY + 符号 + F 键），按字母直接上屏，不弹系统键盘：\n"
-                      @"• 按住 SHIFT 再按字母出大写；\"大写锁定\"按钮可切换大小写状态；\n"
-                      @"• 符号键受 SHIFT 影响（如 SHIFT+, 出 <）；\n"
-                      @"• Ctrl/Alt 按住时按字母是快捷键语义，不进文本（和真实键盘一致）。\n\n"
-                      @"排障：\n"
-                      @"1. 按字母没反应：确认聊天框已打开（T 键或聊天按钮）；\n"
-                      @"2. 早期版本⌨ 面板完全点不动（面板背景板吞掉了触摸，已修复）；老安装升级后第一次进游戏若仍异常，可在键位调整里“恢复默认控件”拿最新出厂布局；\n"
-                      @"3. 某个具体按键行为不对（如符号错位）：可能是自定义布局改过键位，恢复默认控件即可。\n"
-                      @"4. 仍无效请上传日志反馈（日志里能看到每个按钮的触发记录）。";
-
-    LauncherHelpFaqItem *joystick = [[LauncherHelpFaqItem alloc] init];
-    joystick.iconName = @"gamecontroller";
-    joystick.question = @"摇杆推了没反应 / 必须按住 Shift 才能动？";
-    joystick.answer = @"这类问题在新版本中已系统性修复（虚拟按键状态直写 + 键位档自动纠错 + 摇杆心跳重发），正常情况下推杆即走。\n\n"
-                      @"如果仍遇到：\n"
-                      @"1. 检查 设置 → 控制 → 默认控件方案 是否为\"custom\"（自定义布局）；\n"
-                      @"2. 检查游戏内 按键绑定 是否被改坏（恢复默认即可）；\n"
-                      @"3. 升级到最新构建后再试一次——旧构建的输入修复不完整。";
-
-    LauncherHelpFaqItem *peripheral = [[LauncherHelpFaqItem alloc] init];
-    peripheral.iconName = @"magicmouse";
-    peripheral.question = @"蓝牙鼠标 / 手柄连接有什么注意事项？";
-    peripheral.answer = @"• 蓝牙鼠标：最好在启动游戏之前连接/打开。游戏中途开启的鼠标偶尔不会被识别（上游已知问题），遇到时退出游戏重进一次即可；\n"
-                        @"• 鼠标指针锁定：进入游戏抓取视角后指针自动锁定；设置里有\"隐藏硬件指针\"选项按需开关；\n"
-                        @"• 手柄：支持 Xbox 布局（设置 → 控制 → 手柄类型 可切换），摇杆/扳机/肩键均有默认映射，可用按键绑定自定义；\n"
-                        @"• 手柄漂移/不识别：先在系统设置里确认手柄本身正常，再检查游戏内按键绑定是否被清空。";
-
-    LauncherHelpFaqItem *layout = [[LauncherHelpFaqItem alloc] init];
-    layout.iconName = @"rectangle.3.group";
-    layout.question = @"自定义控件布局怎么编辑？改坏了怎么恢复？";
-    layout.answer = @"编辑：游戏内打开菜单 → 键位调整（或在 设置 → 控制 → 默认控件方案 选 custom 后进入编辑），支持拖动、缩放、加按钮/抽屉/摇杆，改完保存为新布局。\n\n"
-                    @"恢复：编辑界面里有\"恢复默认控件\"——出厂布局会删除重建（自建的其他布局不受影响）。布局文件损坏导致进游戏零控件时，启动器会自动回落默认布局保住可玩性。\n\n"
-                    @"提示：出厂 custom 布局带一整面\"键盘图标\"抽屉（按键面板），常用键都有；\"恢复默认控件\"也会拿到修正过键位的最新出厂版本。";
-
-    LauncherHelpFaqItem *modpack = [[LauncherHelpFaqItem alloc] init];
-    modpack.iconName = @"shippingbox";
-    modpack.question = @"安装整合包提示\"缺少父版本 JSON / json 丢失\"？";
-    modpack.answer = @"新版已支持自动补拉：整合包安装过程中父版本 JSON 缺失或损坏时，启动器会自动从 Mojang 官方源与 BMCLAPI 镜像双源补拉，通常无需手动预装原版。\n\n"
-                     @"如果仍失败：\n"
-                      @"1. 检查网络（两个源都不通才会报错）；\n"
-                      @"2. 也可先在下载页手动安装对应原版版本再装整合包；\n"
-                      @"3. 重试前完全退出启动器再打开。";
-
-    LauncherHelpFaqItem *modInstall = [[LauncherHelpFaqItem alloc] init];
-    modInstall.iconName = @"puzzlepiece.extension";
-    modInstall.question = @"模组怎么安装？装完崩溃/报不兼容？";
-    modInstall.answer = @"安装：把 .jar 放进对应版本的 mods 文件夹（版本隔离开启时在 实例目录/versions/版本名/mods）。Fabric 模组需要先装 Fabric Loader，Forge 同理。\n\n"
-                        @"崩溃排查顺序：\n"
-                        @"1. 看崩溃报告的\"Caused by\"与\"Mixin apply failed\"段——绝大多数是模组间版本冲突或与 MC 版本不匹配；\n"
-                        @"2. 优化类模组（Sodium/Iris/Lithium 等）互相之间以及和其它渲染类模组冲突高发，新增模组后逐个排查；\n"
-                        @"3. 同名功能模组二选一（两种小地图、两种优化包不能共存）；\n"
-                        @"4. 全部移除后仍崩溃再来怀疑启动器——这时请带上日志反馈。";
-
-    LauncherHelpFaqItem *javaVersion = [[LauncherHelpFaqItem alloc] init];
-    javaVersion.iconName = @"curlybraces";
-    javaVersion.question = @"不同 MC 版本要用哪个 Java？";
-    javaVersion.answer = @"启动器会按游戏版本自动选择正确的 Java 运行时，一般无需手动干预：\n\n"
-                         @"• MC 26.x（年份制新版本）→ Java 25；\n"
-                         @"• MC 1.20.5 – 1.21.x → Java 21；\n"
-                         @"• MC 1.18 – 1.20.4 → Java 17；\n"
-                         @"• MC 1.17 → Java 16；\n"
-                         @"• MC 1.16.5 及更早 → Java 8。\n\n"
-                         @"整合包 profile 里声明的 javaVersion 启动器会自动纠正（旧版整合包写错的值不再影响启动）。手动安装 Forge 时若提示 Java 版本不符，检查启动器的 Java 运行时设置是否被改过。";
-
-    LauncherHelpFaqItem *memory = [[LauncherHelpFaqItem alloc] init];
-    memory.iconName = @"internaldrive";
-    memory.question = @"内存分配和性能有哪些建议？";
-    memory.answer = @"默认自动分配已按设备物理内存的合理比例设置（大内存设备约 50%），一般够用。手动调整参考：\n\n"
-                    @"• 4GB 设备：2–3GB；\n"
-                    @"• 6GB 设备：3–4GB；\n"
-                    @"• 8GB 及以上：4–5GB 足够（MC 本体吃不满更多；分太多反而让系统/渲染进程紧张）。\n\n"
-                    @"其它性价比提示：\n"
-                    @"• 视距 10 是甜点位，调大主要增加加载风暴时长和内存占用；\n"
-                    @"• 渲染分辨率：优先用 FSR 档位降分辨率，而不是手动调分辨率滑条；\n"
-                    @"• 卡顿时先分清是\"加载区块卡\"（换 Zink / 开 FSR / 降视距）还是\"整体帧率低\"（降视距/分辨率/光影），对症下药。";
-
-    LauncherHelpFaqItem *data = [[LauncherHelpFaqItem alloc] init];
-    data.iconName = @"folder";
-    data.question = @"启动器的数据（存档、模组、布局）存在哪里？怎么备份？";
-    data.answer = @"全部在应用沙盒 Documents 目录（POJAV_HOME）下：\n\n"
-                  @"• versions/：游戏版本与隔离的模组/配置；\n"
-                  @"• saves/：存档；\n"
-                  @"• controlmap/：自定义控件布局（default.json 为默认布局，可在 设置 → 键位调整 里编辑）；\n"
-                  @"• MG/：MobileGlues 渲染器配置（config.json，含 FSR 档位）。\n\n"
-                  @"备份：通过\"文件\"App 或侧边栏的文件管理入口把整个 Documents 目录拷出即可；换机/重装时拷回同位置。卸载重装启动器会清空沙盒数据，重要存档请先备份。\n\n"
-                  @"日志 latestlog.txt 也在这里——反馈问题时直接取用。";
-
-    LauncherHelpFaqItem *download = [[LauncherHelpFaqItem alloc] init];
-    download.iconName = @"arrow.down.circle";
-    download.question = @"下载版本/资源很慢或失败？";
-    download.answer = @"启动器使用 Mojang 官方源与 BMCLAPI 镜像双源，失败时会自动切换重试。仍慢/失败时：\n\n"
-                      @"1. 确认网络对 piston-meta.mojang.com 或 bmclapi2.bangbang93.com 至少一个可达；\n"
-                      @"2. 校验下载源设置（设置里可切换首选源），国内网络优先 BMCLAPI；\n"
-                      @"3. 版本清单加载失败：完全退出启动器重开（远端清单会重新拉取）；\n"
-                      @"4. 大文件（资源包/整合包）中断：重新点下载会续传/重试，不需要清数据。";
-
-    LauncherHelpFaqItem *xray = [[LauncherHelpFaqItem alloc] init];
-    xray.iconName = @"eye.fill";
-    xray.question = @"方块、实体、云层出现\"透视/穿透\"怎么办？";
-    xray.answer = @"这通常是 Sodium 模组的\"改进透明\"选项与渲染器之间的兼容性问题，不是启动器或存档坏了。\n\n"
-                  @"解决方法：游戏内打开 视频设置 → Sodium → 找到\"改进透明\"（Improve transparency / 半透明排序）并关闭，穿透即消失。\n\n"
-                  @"此问题与渲染器类型无关，换 Zink 或 MobileGlues 都可能遇到，关闭该选项即可。";
-
-    LauncherHelpFaqItem *greenFx = [[LauncherHelpFaqItem alloc] init];
-    greenFx.iconName = @"paintpalette";
-    greenFx.question = @"开 FSR 后画面出现绿色/花屏区域（尤其 Zink）？";
-    greenFx.answer = @"已修复（两轮）。原因：Zink 走系统 Vulkan 栈，其着色器语言（GLSL）上限是 4.1，而 FSR 升采样着色器声明的是 4.5——旧版本里编译失败后走了降级路径，但降级没能真正告诉游戏\"恢复全分辨率渲染\"，导致画面只有左下角一块在渲染、其余区域是未初始化的显存内容（表现为绿色/花屏大块区域）。\n\n"
-                     @"修复经历了两轮：\n"
-                     @"1. 第一轮：着色器版本自动适配 Zink 的 GLSL 上限 + 升采样不可用时真正切回全分辨率渲染（不再留绿屏）；\n"
-                     @"2. 第二轮：补齐 4.1 缺失的半精度打包函数、勘误着色器类型常量——Zink 下升采样从此可以正常启用（不再依赖降级）。\n\n"
-                     @"如仍见到绿色区域：请上传 latestlog.txt 反馈（日志里能看出走的是哪条路径）。";
-
-    LauncherHelpFaqItem *background = [[LauncherHelpFaqItem alloc] init];
-    background.iconName = @"rectangle.on.rectangle";
-    background.question = @"切到后台再回来，游戏冻结/黑屏/掉帧异常？";
-    background.answer = @"这是 iOS 对 GPU 后台权限的限制，Zink（Vulkan）路径下尤其明显：App 退到后台时，系统会立刻回收 GPU 提交权限，而游戏渲染线程若还在提交工作，Vulkan 设备就会永久丢失（日志里表现为 VK_ERROR_DEVICE_LOST / zink: DEVICE LOST），回到前台后画面冻结、触摸无响应。\n\n"
-                        @"现状与建议：\n"
-                        @"1. 游戏中尽量别切后台（分屏拉通知栏/控制中心一般没事，完整切换才会触发）；\n"
-                        @"2. 已发生冻结：只能退出游戏重进（Vulkan 设备丢失不可恢复）；\n"
-                        @"3. 需要频繁切后台的场景（查攻略等）：用 MobileGlues 渲染器（Metal 路径对后台切换更宽容）或用其他设备查攻略；\n"
-                        @"4. 短暂回前台后花屏但还能玩：属帧队列残留，多玩几秒会自愈。\n\n"
-                        @"注：这不是内存不足，也不是启动器杀进程——加大内存分配无效。设备丢失的自动恢复需要底层重建 Vulkan 设备，已在路线图上。";
-
-    LauncherHelpFaqItem *crash = [[LauncherHelpFaqItem alloc] init];
-    crash.iconName = @"exclamationmark.triangle";
-    crash.question = @"遇到崩溃/黑屏该怎么反馈？";
-    crash.answer = @"最有价值的是日志文件 latestlog.txt（位于启动器沙盒 Documents 目录，游戏内也可通过菜单查看）：每次游戏会话结束后它会自动保留，把它连同以下信息一起反馈即可：\n\n"
-                   @"1. 设备型号与系统版本（如 iPad Air M4 / iPadOS 26.6）；\n"
-                   @"2. 游戏版本与模组列表（如 26.3 + Sodium）；\n"
-                   @"3. 渲染器与 FSR 设置；\n"
-                   @"4. 问题发生的时机（进世界时/游玩中/暂停回来时）。\n\n"
-                   @"大多数问题可以只靠日志定位，不需要录屏。历史上仅凭日志就定位过的典型案例：取档瞬间的渲染竞态崩溃、区块管线上译开销、Sodium 透明排序穿透等。";
-
-    LauncherHelpFaqItem *stuck = [[LauncherHelpFaqItem alloc] init];
-    stuck.iconName = @"questionmark.circle";
-    stuck.question = @"\"卡在某个界面/转圈/闪退\"的通用自救步骤？";
-    stuck.answer = @"按顺序尝试（每步后重试）：\n\n"
-                   @"1. 完全退出启动器（上划杀进程）再打开——解决大部分瞬时状态问题；\n"
-                   @"2. 换一个渲染器试（Zink ↔ MobileGlues）——区分渲染器问题还是环境问题；\n"
-                   @"3. 关闭 FSR/降低分辨率——排除升采样路径；\n"
-                   @"4. 新建一个纯净存档/无模组版本进入——排除存档与模组因素；\n"
-                   @"5. 还不行：带着 latestlog.txt 反馈（见上条），说明走到第几步、卡在什么画面。\n\n"
-                   @"不要随手\"清除所有数据\"——多数问题与数据无关，清了既丢存档又不解决问题。";
-
-    LauncherHelpFaqItem *bigpack = [[LauncherHelpFaqItem alloc] init];
-    bigpack.iconName = @"hourglass";
-    bigpack.question = @"大型整合包（几百个模组）第一次启动就卡在加载界面？";
-    bigpack.answer = @"典型表现：启动浮层/进度画面长时间不动（几分钟以上），但游戏没有闪退。这与渲染器、内存分配都无关——加大内存无效。\n\n"
-                     @"已实锤的典型案例（BMC2 整合包，537 mods）：整合包里打包了“桌面弹窗类”工具模组（missingmodschecker——桌面端检测到缺失依赖时弹窗等确认），这类弹窗在 iOS 上永远显示不出来，主线程就无限等下去。日志里 [LaunchWatchdog] 会直接点名卡在哪个模组。\n\n"
-                     @"启动器已内置两层防护：\n"
-                     @"1. 启动前自动禁用已实锤的弹窗类模组（日志可见 [ModDialogGuard] 字样，把 mod 文件改名成了 .disabled；想恢复把文件名改回 .jar 即可）；\n"
-                     @"2. 启动看门狗：主线程超过 15 秒没有进展时，日志（latestlog.txt）自动记录正在执行的代码位置，行首标有 [LaunchWatchdog]，其中 \"at 某模组包名.类名\" 一行直接指出卡在哪个模组。\n\n"
-                     @"自救步骤：\n"
-                     @"1. 先耐心等 2~3 分钟——部分模组首次初始化确实慢；\n"
-                   @"2. 取消后重试一次——首次启动要复制整合包的默认文件，第二次会跳过这些工作；\n"
-                   @"3. 仍卡死：看日志里 [LaunchWatchdog] 点名的模组，在 mods 文件夹移除它（工具类模组大多可安全移除）后重试；\n"
-                   @"4. 都看不懂：上传 latestlog.txt 反馈，凭看门狗记录可直接定位。";
-
-    LauncherHelpFaqItem *sodiumLwjgl = [[LauncherHelpFaqItem alloc] init];
-    sodiumLwjgl.iconName = @"exclamationmark.triangle";
-    sodiumLwjgl.question = @"整合包启动几秒后闪退，日志说 LWJGL 版本不兼容？";
-    sodiumLwjgl.answer = @"典型表现：不是卡死而是快速退出（几秒内），换任何渲染器都一样。在 latestlog.txt 里搜 “LWJGL version is not compatible” 能看到：\n\n"
-                     @"Installed version: 3.4.1\nRequired version: 3.3.1\n\n"
-                     @"这是 Sodium 的启动前安全检查：它要求 LWJGL 版本与该 Minecraft 版本配套（如 1.20.1 配 3.3.1、26.x 配 3.4.1），不匹配就拒绝启动。旧版启动器为了让 26.x 通过而把版本号硬编码成 3.4.1，结果 1.20.1 的整合包（如 BMC2）被 Sodium 0.5.13 拒之门外。\n\n"
-                     @"启动器已修复（动态上报）：启动时自动从游戏版本元数据读取配套的 LWJGL 版本号再上报给 Sodium，各版本各报各的。验证方法：日志里搜 “[Tools] LWJGL report version”，应显示与游戏版本配套的值（1.20.1 → 3.3.1）。\n\n"
-                     @"若仍遇到此错误：确认安装的是最新构建（设置→关于看 Commit），然后带着 latestlog.txt 反馈。";
-
-    LauncherHelpFaqItem *missingMods = [[LauncherHelpFaqItem alloc] init];
-    missingMods.iconName = @"exclamationmark.triangle";
-    missingMods.question = @"整合包启动到一半闪退，日志说 Could not execute entrypoint stage？";
-    missingMods.answer = @"典型表现：模组列表都打印出来了、启动推进到 20~30 秒左右突然退出（exit(-1)），换渲染器无效。在 latestlog.txt 里搜 “Could not execute entrypoint stage”，下面跟着 NoClassDefFoundError / ClassNotFoundException 链——这不是渲染器或内存问题，是 mods 文件夹缺模组：某个已安装的模组要引用的类（如 FTB Library、Balm、TerraBlender 提供的）所在的 jar 根本不在。\n\n"
-                     @"实锤案例（BMC2 536 mods）：导入时 FTB 全家桶 + Balm + TerraBlender 等 8+ 个文件下载失败/被跳过，日志早处还有一行 “Dependencies overridden for ...”（来自 config/fabric-loader.json 的 dependencyOverrides）把 Fabric 的缺依赖报错也盖掉了，于是缺失一直潜伏到入口点阶段才爆。\n\n"
-                     @"启动器已内置三层防护：\n"
-                     @"1. 导入收尾会把失败/跳过清单写进实例目录的 import_report.json；\n"
-                     @"2. 下次启动检测到未确认的缺失会弹一次提醒（日志搜 [ImportGuard] Task95）；\n"
-                     @"3. 真崩了，崩溃界面会直接列出缺失的类和推断的组件名（FTB Quests/Balm 等）。\n\n"
-                     @"自救步骤：\n"
-                     @"1. 按崩溃界面/提醒弹窗点名的缺失组件，删实例重新导入（换个下载源），或在 Mod 管理器手动补齐（版本要和整合包要求一致）；\n"
-                     @"2. 若日志有 “Dependencies overridden for ...”：修好后可删掉 config/fabric-loader.json 里的 dependencyOverrides 条目，让缺失依赖恢复快速报错；\n"
-                     @"3. 分享 latestlog.txt 反馈时附上 import_report.json（实例根目录），可直接对账缺了哪些文件。";
-
-    LauncherHelpFaqItem *cwdMismatch = [[LauncherHelpFaqItem alloc] init];
-    cwdMismatch.iconName = @"folder.badge.questionmark";
-    cwdMismatch.question = @"整合包启动深处闪退，日志报 paintings 或 sparsestructures 相关报错（listFiles 空指针 / FileAlreadyExistsException）？";
-    cwdMismatch.answer = @"典型表现：模组全部加载完、启动推进到 30~40 秒（窗口初始化、资源加载阶段）突然退出，换渲染器无效。日志里搜这两类签名：\n\n"
-                     @"1. NullPointerException + Arrays.stream + PaintingPackReader.scanPacks（paintings 模组）；\n"
-                     @"2. FileAlreadyExistsException: config/sparsestructures.json5（sparsestructures 模组）。\n\n"
-                     @"这不是模组坏、也不是缺文件，是历史版本启动器的环境缺陷：Java 有两套相对路径解析——java.io.File 按进程工作目录、java.nio 按 user.dir，旧启动器只设置了后者，两套解析各看各的目录：paintings 检查“资源包文件夹存在”时走的一套、列目录时走的另一套（列了个不存在的位置→空指针）；sparsestructures 判断“配置文件不存在”后去创建时又落到了真目录里的同名文件上（→已存在异常）。同样的整合包在桌面端从不双标（桌面启动器的工作目录永远是游戏目录），所以这两个 mod 在桌面无恙。\n\n"
-                     @"启动器已修复（Task97）：JVM 启动前把进程工作目录对齐到游戏目录，与桌面完全一致。验证方法：日志搜 [CwdAlign] Task97，应有一行“process CWD aligned to game dir: …”；同时早前每必出现的“Cannot access RandomAccessFile logs/latest.log”报错也会消失（游戏自己的日志从此正常写进实例目录 logs/）。\n\n"
-                     @"若更新后仍见上述报错：确认安装的是最新构建（设置→关于看 Commit ≥ Task97 修复提交），然后带 latestlog.txt 反馈。";
-
-    LauncherHelpFaqItem *mc26sdl = [[LauncherHelpFaqItem alloc] init];
-    mc26sdl.iconName = @"gamecontroller.andsparkles";
-    mc26sdl.question = @"26.x 的 Fabric/NeoForge 整合包启动几秒就闪退，日志报 Loading library SDL 或找不到 org/lwjgl/sdl/SDL？";
-    mc26sdl.answer = @"典型表现：整合包（含 Sodium/Iris 的性能包居多）在模组列表打印完、进入原版引导阶段突然退出，换渲染器无效。日志签名：\n\n"
-                     @"1. “Description: Loading library SDL” + “java.lang.NoClassDefFoundError: org/lwjgl/sdl/SDL”；\n"
-                     @"2. 稍早还有一条 “Failed to get system info for SDL Platform”（同类前兆，可忽略严重性）。\n\n"
-                     @"原因：MC 26.3 起窗口与输入从 GLFW 迁到 SDL3，需要 LWJGL 的 SDL 绑定（lwjgl-sdl 模块，仅在启动器的 3.4.1 版本集合里）。旧版启动器按版本号自动挑 LWJGL 时，只认得原版形态的版本号（“26.3”），看不懂整合包的带前缀形态（“fabric-loader-0.19.5-26.3-e4ecd7db”），误挑了 3.3.3 版集合——里面没有 SDL 绑定，于是在加载第五个库（SDL）时必然崩溃。这与渲染器、内存、Sodium 本身都无关（Sodium 的版本检查此时已经通过）。\n\n"
-                     @"启动器已修复（Task98）：版本号提取改为前缀无关的锚定解析，Fabric/NeoForge/Forge 形态的 26.x 都会正确选 3.4.1。验证方法：日志搜 “Using LWJGL 341”，其上一行应有 “[LWJGLSel] Task98: MC major 26 extracted from version id …”；随后 SDL 加载通过，不再出现 Loading library SDL 崩溃。\n\n"
-                     @"若用的是旧构建：更新启动器即可；临时自救可在 设置 → 该实例的编辑页 把 LWJGL 版本手动指定为 3.4.1。";
-
-    LauncherHelpFaqItem *macMenuStub = [[LauncherHelpFaqItem alloc] init];
-    macMenuStub.iconName = @"menubar.rectangle";
-    macMenuStub.question = @"MC 26.3 正式版启动到一半闪退，崩溃报告写 Initializing game，堆栈里有 MacosUtil 或 NSApplication？";
-    macMenuStub.answer = @"典型表现：26.3 正式版（含整合包）模组加载完、主窗口都建好了，眼看要进游戏突然退出。日志签名：\n\n"
-                     @"“java.lang.NoSuchMethodException: Method cannot be found for signature …” + 堆栈 ca.weblite.objc.Client.sendProxy → MacosUtil.disableCloseWindowMenuItem → Window.<init>，Description: Initializing game。\n\n"
-                     @"原因：启动器为了在 iOS 上跑 LWJGL/JNA 而伪装成 macOS，MC 26.3 正式版信以为真，在窗口初始化时去调用 macOS 专有的 AppKit 菜单集成（禁用“关闭窗口”菜单项——通过 NSApplication/NSMenu 这些 macOS 才有的类）。iOS 只有 UIKit 没有 AppKit，类查找落空即崩溃。这与渲染器、Sodium、内存都无关（26.3-rc-3 及更早版本没有这层调用，所以同一启动器此前不崩）。\n\n"
-                     @"启动器已修复（Task99 + Task100 两层）：JVM 启动前在 Objective-C 运行时注册三个最小桩类（NSApplication/NSMenu/NSMenuItem）。第一层修好后 26.3 还会走到第二层——崩溃报告若写 “NullPointerException … because \"windowsMenu\" is null”（同为 MacosUtil/Initializing game），是桩缺 windowsMenu 菜单出口，Task100 已补齐（windowsMenu/appleMenu/helpMenu/servicesMenu 全家族）。验证方法：日志搜 “[AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed” 与 “[AppKitStub] Task100: windowsMenu requested”；若出现 “unexpected selector” 行请连同 latestlog.txt 一起反馈（说明 26.3+ 又调用了新的菜单接口，需要扩桩）。\n\n"
-                     @"若用的是旧构建：更新启动器即可，无需改任何游戏内设置。";
-
-    LauncherHelpFaqItem *fsrCorner = [[LauncherHelpFaqItem alloc] init];
-    fsrCorner.iconName = @"rectangle.inset.bottomleft";
-    fsrCorner.question = @"1.20.x 整合包 + Zink + FSR 开启时，游戏画面蜷缩在屏幕左下角（右上/下方大片空白）？";
-    fsrCorner.answer = @"典型表现：选了 Zink 渲染器并开启 FSR 超分档位后，游戏能正常进入与操作，但整个画面只占屏幕左下约三分之二，其余区域空白。\n\n"
-                     @"机制：FSR 开启时游戏以低分辨率（屏幕÷档位系数）渲染进全尺寸缓冲的左下角，再由升采样 pass 放大铺满全屏。26.3 会话此链路已验证正常；个别 1.20.x 整合包（BMC2 等）路径上升采样结果没有进入最终上屏的回读缓冲，裸低清帧直接上屏＝蜷角。\n\n"
-                     @"启动器已修复（Task99 探测 + Task100 权威呈现 + Task103 地面真值闭环 + Task104 远角哨兵 + Task105 视口自适应）：上屏不再依赖驱动的 glFinish 回读——每帧由启动器自己从帧缓冲直读权威画面并独立上屏。哨兵验证升级为双角落（Task104）：左下角哨兵只能证明“角落里有升采样片元”，证不了全幅覆盖；右下角对角哨兵（屏幕右上）是全幅光栅化的必经之地——双哨兵全部命中＝升采样真实全幅落地；任一缺失＝立即改把游戏原始画面交 CoreAnimation 拉伸到全屏（双线性滤质的拉伸，几何恒全屏）。Task105 进一步根治：升采样的输入区域不再假设为启动器告知的窗口尺寸，而是每帧实时读取游戏实际呈现视口（MC 1.20.1 的最终上屏绘制恰好在此之前设置该视口）并自适应跟随——个别整合包 mod 尺寸链把实际呈现区域改小时，升采样直接放大真实区域，几何恒全屏。验证方法：日志搜 “[OSMBridge] Task103 EASU sentinel verdict”——LANDED 表示双哨兵全中、EASU 全幅上屏；NOT LANDED 表示已启用拉伸兜底（画面即刻全屏）；far=N/M 为远角哨兵命中率；[OSMBridge] Task105 viewport evidence 一行可见游戏真实呈现视口 vs 启动器告知尺寸（DIVERGED = 已自适应接管）；[OSMBridge] Task104 EASU viewport check 一行可见驱动实际持有的视口尺寸。\n\n"
-                     @"不想等更新的临时自救：设置 → 视频设置 → FSR 1.0 超分辨率 选择“关闭”（画面以原生全分辨率渲染，帧率会相应降低）。";
-
-    LauncherHelpFaqItem *sodiumGlsl = [[LauncherHelpFaqItem alloc] init];
-    sodiumGlsl.iconName = @"chevron.left.forwardslash.chevron.right";
-    sodiumGlsl.question = @"26.3 整合包进存档/进世界瞬间崩溃，日志报 sodium 管线编译失败、preprocessor directive cannot be preceded by another token？";
-    sodiumGlsl.answer = @"典型表现：主菜单一切正常，点进存档加载世界的一瞬间闪退；崩溃报告 Description 为 Render Frame，直接原因是 Failed to find or load pipeline sodium:pipeline/solid_terrain。\n\n"
-                     @"机制：26.x 的渲染前端把 GLSL 统一编译为 SPIR-V，Sodium 的地形着色器用 #include 引用公共片段（globals/fog/chunk_vertex）。Sodium 打包的这三个片段文件实测都不以换行符结尾——启动器的 #include 展开器在片段末尾直接拼接行号恢复指令（#line），指令被粘在最后一个有效字符后面，形成非法 GLSL（正是日志里的 preprocessor directive 报错）。原版片段全部规范收尾，所以同一会话里几百个原版着色器全部编译通过、第一个 Sodium 着色器即崩——这也是它与渲染器、内存、LWJGL 都无关的原因。\n\n"
-                     @"启动器已修复（Task103）：展开器在拼接 #line 前保证输出以换行收尾，粘行不可能再发生；对原版着色器零影响（原本就规范收尾，不触发补换行）。验证方法：日志搜 “[amethyst-include] expanded”——Sodium 着色器（如 sodium:blocks/block_layer_opaque）展开后不再紧跟 GLSL 解析错误，进世界正常。\n\n"
-                     @"旧构建临时自救：整合包里移除 Sodium / Sodium Extra / Reese's Sodium Options（地形渲染回退原版管线，帧率会下降）。";
-
-    LauncherHelpFaqItem *sparkProfiler = [[LauncherHelpFaqItem alloc] init];
-    sparkProfiler.iconName = @"waveform.path.ecg";
-    sparkProfiler.question = @"整合包创建新世界时闪退（无崩溃报告、日志戛然而止）？";
-    sparkProfiler.answer = @"典型表现：主菜单/标题界面一切正常，点“创建新的世界”后画面卡住或直接闪退；latestlog.txt 最后一行戛然而止（无 exit、无崩溃堆栈、无 hs_err），常见结尾是 spark 的 Starting background profiler... 或 [Amethyst] Patching ...libasyncProfiler.so.tmp。\n\n"
-                         @"机制：spark 分析器在首次开启服务器（创建/进入世界）时会把自己内置的原生库 libasyncProfiler 解包到 config/spark/tmp 并加载。这个库是 macOS 平台且带代码签名——启动器把它的平台标签改写为 iOS 后，签名哈希不再匹配，系统加载器直接杀进程（静默闪退，无法捕获）。这是“已签名库改平台必死”：未签名库重标签无害，已签名库重标签必死。\n\n"
-                         @"启动器已修复（Task106 双层 + Task107 修正）：①拦截该库加载——spark 检测到加载失败会自动回退到纯 Java 采样器（分析功能照常可用，游戏继续）；②通用防护——平台重标签后自动重建 ad-hoc 签名（重算页哈希，Task107：原“中和为无签名”方案被证实会引发 JNA 加载失败——系统加载器对无签名库一律拒载，日志报 missing code signature；已签名库重标签必死但重签名后可正常加载）。验证方法：日志搜 “[Amethyst] Task106: blocked dlopen”（拦截生效）或 “[Amethyst] Task107: re-signed”（重签名生效）——出现后建档继续推进即修复生效；旧构建临时自救：整合包里移除 spark。\n\n"
-                         @"仍闪退且最后一行不是 spark 相关：留意内存——创建世界是内存峰值阶段（实测 537 mods 包建档前已 5.1GB），设备内存告急时系统也会静默杀进程；可适当调低启动器的最大内存或减少视距。";
-
-    self.categories = @[ @"渲染与性能", @"输入与控制", @"安装与数据", @"故障排除" ];
-    self.itemsByCategory = @[
-        @[ renderer, ltw26, mgLag, fsr, metalFx, armAsr, upscalerAlt, fpsUnlock, blurry, shader, fsrCorner ],
-        @[ keyboard, joystick, peripheral, layout ],
-        @[ modpack, modInstall, javaVersion, memory, data, download ],
-        @[ xray, greenFx, background, crash, stuck, bigpack, sodiumLwjgl, missingMods, cwdMismatch, mc26sdl, macMenuStub, sodiumGlsl, sparkProfiler ]
-    ];
+    NSMutableArray<NSString *> *catNames = [NSMutableArray array];
+    NSMutableArray<NSArray<LauncherHelpFaqItem *> *> *itemsByCat = [NSMutableArray array];
+    for (NSDictionary *cat in [cats isKindOfClass:[NSArray class]] ? cats : @[]) {
+        if (![cat isKindOfClass:[NSDictionary class]]) continue;
+        NSString *name = [cat[@"name"] isKindOfClass:[NSString class]] ? cat[@"name"] : @"";
+        if (name.length == 0) continue;
+        NSMutableArray<LauncherHelpFaqItem *> *items = [NSMutableArray array];
+        for (NSDictionary *raw in [cat[@"items"] isKindOfClass:[NSArray class]] ? cat[@"items"] : @[]) {
+            if (![raw isKindOfClass:[NSDictionary class]]) continue;
+            NSString *title = [raw[@"title"] isKindOfClass:[NSString class]] ? raw[@"title"] : @"";
+            NSString *desc = [raw[@"description"] isKindOfClass:[NSString class]] ? raw[@"description"] : @"";
+            if (title.length == 0 || desc.length == 0) continue;
+            LauncherHelpFaqItem *item = [[LauncherHelpFaqItem alloc] init];
+            item.question = title;
+            item.answer = desc;
+            item.iconName = ([raw[@"icon"] isKindOfClass:[NSString class]] && [(NSString *)raw[@"icon"] length] > 0)
+                ? (NSString *)raw[@"icon"] : @"questionmark.circle";
+            [items addObject:item];
+        }
+        if (items.count == 0) continue;
+        [catNames addObject:name];
+        [itemsByCat addObject:[items copy]];
+    }
+    if (catNames.count == 0) {
+        NSLog(@"[LauncherHelp] Task168 help-faq.json missing/unparsable -- FAQ rendered empty");
+    }
+    self.categories = [catNames copy];
+    self.itemsByCategory = [itemsByCat copy];
 }
 
 #pragma mark - Lifecycle

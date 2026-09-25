@@ -1,0 +1,95 @@
+{
+ "_meta": "Task168 级联基线（干净提交树实测既有失败清单）。E7 断言：当前失败 ⊆ 基线 = 零新增。子级联沙箱路径默认值/日志钉住漂移均为 HEAD 既有（详见 worklog Task168）。",
+ "baseline": {
+  "167": [
+   "FAIL  F3 verify_task130 级联（D4+I1 = stash 实证既有基线，零新增失败）  FAIL  D4 ApplyFSR directToSurface rcasOn 分支（EASU→targetFBO→RCAS→"
+  ],
+  "129": [
+   "FAIL  J verify_task119_124 ALL PASS",
+   "FAIL  J verify_task125_128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS"
+  ],
+  "130": [
+   "FAIL  D4 ApplyFSR directToSurface rcasOn 分支（EASU→targetFBO→RCAS→surface）",
+   "FAIL  I1 verify_task129 ALL PASS（含 119_124/125_128/112_118 子级联）  ASS",
+   "FAIL  J verify_task125_128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS"
+  ],
+  "131": [
+   "FAIL  H1 verify_task119_124 ALL PASS（含 mobilegl_backend 重锚 B7/B8/C3）",
+   "FAIL  H2 verify_task129 ALL PASS（I3 基线 1901）  ：cur == head + dep_sdl3_guard 在位）",
+   "FAIL  J verify_task119_124 ALL PASS",
+   "FAIL  J verify_task125_128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS",
+   "FAIL  H3 verify_task130 ALL PASS（H3 基线 1901）  129 ALL PASS（含 119_124/125_128/112_118 子级联）  ASS",
+   "FAIL  J verify_task125_128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS"
+  ],
+  "132": [
+   "FAIL  A2 守卫机制全链生效（Task144 重锚：现存 OSMesa 会话 = 守卫链全触发 + 游戏成功起图渲染，拦截链设计闭环）",
+   "FAIL  A15 libjnidispatch GOT 镜像 ALL PASS（la_symbol_ptr 恰 1 槽，可写 __DATA）  /home/z/.venv/bin/python3: can't open file '/ho",
+   "FAIL  F4 全量 key 审计归零（含新 renderer_backend 行）",
+   "FAIL  F5 hasDetail 动态审计归零（intensity 行已去 hasDetail）"
+  ],
+  "133": [
+   "FAIL  H1 全量 key 审计归零",
+   "FAIL  H2 hasDetail 精确审计归零",
+   "FAIL  H3 级联七验证器全绿（112_118/119_124/125_128/129/130/131/132）"
+  ],
+  "134": [
+   "FAIL  I 级联 verify_task112_118 ALL PASS",
+   "FAIL  I 级联 verify_task119_124 ALL PASS",
+   "FAIL  I 级联 verify_task125_128 ALL PASS",
+   "FAIL  I 级联 verify_task133 ALL PASS"
+  ],
+  "135": [
+   "FAIL  E. verify_task112_118 ALL PASS",
+   "FAIL  E. verify_task119_124 ALL PASS",
+   "FAIL  E. verify_task125_128 ALL PASS",
+   "FAIL  E. verify_task129 ALL PASS  级联 ==",
+   "FAIL  J verify_task119_124 ALL PASS",
+   "FAIL  J verify_task125_128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS",
+   "FAIL  E. verify_task130 ALL PASS  级联）  ASS",
+   "FAIL  J verify_task125_128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS",
+   "FAIL  E. verify_task131 ALL PASS  _128 ALL PASS",
+   "FAIL  J verify_task112_118 ALL PASS",
+   "FAIL  E. verify_task132 ALL PASS   行已去 hasDetail）",
+   "FAIL  E. verify_task133 ALL PASS  : FAIL",
+   "FAIL  H3 级联七验证器全绿（112_118/119_124/125_128/129/130/131/132）",
+   "FAIL  E. verify_task134 ALL PASS  sk130 ALL PASS",
+   "FAIL  I 级联 verify_task133 ALL PASS"
+  ],
+  "138": [
+   "FAIL  C1 会话证据（MobileGL-gles 渲染器启动成功无 SIGSEGV；Task143 修复后 FSR EASU 正常初始化）",
+   "FAIL  J verify_task136 ALL PASS（或仅剩提交后自愈类）  verify_task136: 60 passed, 3 failed",
+   "FAIL  J verify_task137 ALL PASS（或仅剩提交后自愈类）  verify_task137: 45 passed, 1 failed"
+  ],
+  "139": [
+   "FAIL  A1 病历证据（avfaudio 异常 + format mismatch + MicrophoneThread）",
+   "FAIL  B1 病历证据（GLES 会话：Task119 FSR heal 恢复全表面 + viewport 2360x1640）",
+   "FAIL  H1 宽度 168 → 96（图标轨）",
+   "FAIL  H2 内容精简（用户名 + 信息卡滚动区隐藏）",
+   "FAIL  H3 三按钮图标化（play.fill / folder / doc.badge.ellipsis）",
+   "FAIL  H4 头像 44pt（等宽约束停用 + 显式宽高）",
+   "FAIL  I1 十文件括号平衡（含宏续行跳过）  /home/z/.venv/bin/python3: can't open file '/home/z/my-project/scripts/task139_syntax_gate.py'",
+   "FAIL  J verify_task133.py ALL PASS（或仅剩提交后自愈类）  ==== RESULT: FAILED (41/44) ====",
+   "FAIL  J verify_task134.py ALL PASS（或仅剩提交后自愈类）  ==== RESULT: FAILED (64/68) ====",
+   "FAIL  J verify_task135.py ALL PASS（或仅剩提交后自愈类）  ==== RESULT: FAILED (24/33) ====",
+   "FAIL  J verify_task138.py ALL PASS（或仅剩提交后自愈类）  ==== RESULT: FAILED (48/51) ===="
+  ],
+  "142": [
+   "FAIL  E1 announcements summary mentions mg single entry",
+   "FAIL  E2 Task150: announcements bullet describes per-game mandatory selection + sodium install",
+   "FAIL  E4 Task150: English tail re-worded to per-game mandatory selection",
+   "FAIL  F6 verify_task140 fully green (re-anchored to Task142)"
+  ],
+  "143": [
+   "FAIL  G1 verify_task142 49/49 (re-anchored baseline holds)  ==== RESULT: 45 passed, 4 failed ===="
+  ],
+  "156": [
+   "[FAIL] G verify_task154 与基线一致（35 passed, 4 failed；实为   - E5 Forge 会话：bootclasspath 副作用实锤（isolation ON + AmethystAccountJ"
+  ]
+ }
+}

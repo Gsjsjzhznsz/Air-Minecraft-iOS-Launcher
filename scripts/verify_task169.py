@@ -2,7 +2,7 @@
 # Task169 verifier: four device-feedback fixes + announcements pin + 6.0.0 release prep
 import json, re, subprocess, sys, os
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Task168: portable (was a parallel-session sandbox path)
 results = []
 
 def check(name, ok, detail=""):

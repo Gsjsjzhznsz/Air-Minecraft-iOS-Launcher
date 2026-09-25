@@ -1743,3 +1743,24 @@
 // direct FSR ships via the Metal presentation layer; the old "Vulkan does
 // not support FSR" matrix retired) and redated. Info.plist 5.1.0 -> 6.0.0
 // (CFBundleShortVersionString + CFBundleVersion).
+// Task 168 (2026-09-25): neumorphism wallpaper-mode visibility + FAQ JSON.
+// (1) Root cause of "downloaded the latest commit but no neumorphism": the
+// Task163 raised-card pipeline only engaged WITHOUT a custom wallpaper --
+// with one set, cards fell back to the legacy frosted-glass branch and never
+// showed the spec surface/shadows. Fix: applyNeumorphCardEffectToView: and
+// applyEffectToCollectionViewCell: no longer early-return into the legacy
+// pipeline. With a wallpaper the card FACE still follows the user's
+// opacity/blur settings (dynamic neumorphism = face per wallpaper settings +
+// dual-shadow overlay via the new ame_attachNeumorphShadowOnly, which keeps
+// the face color untouched); the new "cardsNeumorphSolid" preference
+// (BackgroundSettingsViewController switch, default OFF) forces the solid
+// spec surface + dual shadows, giving up wallpaper transparency/blur.
+// (2) The 34 help-FAQ entries moved out of hardcoded ObjC into a bundled
+// JSON (help-faq.json, same pattern as announcements): repo root = editing
+// source, Natives/resources/help-faq.json = bundled copy read at runtime,
+// byte-identical, drift-guarded by verify_task168. LauncherHelpViewController
+// now parses it (icon/title/description fields, empty-groups on parse
+// failure). Stale FAQ conclusions updated in the same pass: FSR entry now
+// states all three backends are supported (Vulkan via the Metal presentation
+// layer, Task166/167), MobileGlues chunk-loading entry gains the
+// Vulkan+FSR recommendation.

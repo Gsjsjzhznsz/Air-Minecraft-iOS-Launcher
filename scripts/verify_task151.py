@@ -159,7 +159,7 @@ def main():
         missing = [k for k in bing_keys if k not in ks]
         check(f"G {lang} has all {len(bing_keys)} bing keys", not missing, f"missing={missing}")
     check("G gated baseline 1952 x4", len(set(counts.values())) == 1 and
-          counts["en"] == 1952, str(counts))
+          counts["en"] == 1953, str(counts))
     for lang in ["ja", "km"]:
         s = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
         ks = set(re.findall(r'^"([^"]+)"\s*=', s, re.M))
@@ -175,13 +175,15 @@ def main():
         if not (fn.startswith("verify_task") and fn.endswith(".py")) or fn == "verify_task151.py":
             continue
         s = rd(f"scripts/{fn}")
+        # Task168：l10n 基线 1952 -> 1953（净增 background.cards.neumorph.title），
+        # 本检查语义 = "所有脚本计数锚与当前基线一致"，随基线诚实重锚。
         for m in re.finditer(r'len\(sets\[0\]\)\s*==\s*(\d+)', s):
-            if m.group(1) != "1952":
+            if m.group(1) != "1953":
                 stale.append(f"{fn}:{m.group(1)}")
         for m in re.finditer(r'vals == \{(\d+)\}', s):
-            if m.group(1) != "1952":
+            if m.group(1) != "1953":
                 stale.append(f"{fn}:vals{m.group(1)}")
-    check("H no stale l10n anchors (expect 1952 everywhere)", not stale, str(stale))
+    check("H no stale l10n anchors (expect 1953 everywhere, Task168 baseline)", not stale, str(stale))
 
     print(f"\n{'=' * 40}\n{PASSED} passed, {len(FAILED)} failed")
     if FAILED:

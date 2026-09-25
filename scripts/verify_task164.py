@@ -21,7 +21,7 @@
 import os
 import sys
 
-ROOT = os.environ.get('TASK164_REPO', '/home/z/my-project/Amethyst-iOS-MyRemastered')
+ROOT = os.environ.get('TASK164_REPO', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # Task168: portable default
 
 def rd(rel):
     return open(f"{ROOT}/{rel}", encoding="utf-8", errors="replace").read()
@@ -110,9 +110,12 @@ check("D4 v6.0.0 失实表述已修正（旧'全后端 FSR 修复'退役；Task1
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("D5 version.h Task164 addendum（含上游不可行结论）",
       "Task 164" in vh and "upstream-impossible" in vh)
-faq = rd("Natives/LauncherHelpViewController.m")
-check("D6 FAQ fsr 条目矩阵仍在（Task164 前已有的准确指引）",
-      "Vulkan 直连无升采样呈现钩子" in faq)
+# Task168 重锚：FAQ 整体迁移到 help-faq.json（仓库根与随包双文件），且经用户
+# 定稿更新了过时结论——FSR 矩阵现为"三后端均支持（Vulkan 经 Metal 呈现层，
+# Task166/167）"，旧"Vulkan 暂不支持"句已在迁移中删除。
+faq = rd("help-faq.json")
+check("D6 FAQ fsr 条目矩阵仍在（Task168 重锚：JSON 化 + 三后端支持新口径）",
+      "Metal 呈现层拦截放大" in faq and "Vulkan 直连无升采样呈现钩子" not in faq)
 
 print("== E. 回归锚（zink 路径零扰动）==")
 osm = rd("Natives/ctxbridges/osm_bridge.mm")

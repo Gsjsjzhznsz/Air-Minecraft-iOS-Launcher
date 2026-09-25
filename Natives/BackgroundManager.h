@@ -35,6 +35,15 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 @property (nonatomic, assign) CGFloat uiOpacity;  // 0.0 ~ 1.0
 @property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度
 
+// Task168：卡片新拟态形态开关（用户定稿，设置页"外观"区切换）。
+//   NO（默认，动态）= 卡片面沿用壁纸管线（毛玻璃/半透明，随上面的透明度/
+//     模糊设置动态变化），只叠加新拟态双阴影承载层（"按照壁纸功能设置的
+//     透明度和模糊程度来动态调整新拟态"）；
+//   YES（实底）= 卡片一律规格表面色 + 双阴影（放弃壁纸透明度/模糊，壁纸
+//     从卡片间隙透出）。
+// 列表行 cell（applyCardEffectToCell）恒为平贴新拟态表面，不受此开关影响。
+@property (nonatomic, assign) BOOL cardsNeumorphSolid;
+
 // Global background container
 @property (nonatomic, strong, readonly, nullable) UIView *globalBackgroundContainer;
 

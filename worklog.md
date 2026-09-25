@@ -435,3 +435,44 @@ Stage Summary:
   ③ 双链确认：`[MGLFSR] Task154 ... RETIRED ... Task166: present-side Metal FSR owns upscaling`（预交换 GL 链不复活）
   ④ 分诊开关：Vulkan FSR 异常时设 `AME166_MGL_METAL_FSR=0` 强制回退全分辨率直呈（对比定位）
 - 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README + 6.0.0 发行文案收尾
+
+---
+Task ID: 167
+Agent: main (Super Z)
+Task: 【补记章节】Task 167 双根因修复——9d14c58 只提交了三个脚本（disas_getimage.py / task167_announcements.py / verify_task167.py），正文代码全部滞留工作区未提交，CI IPA（9d14c58 构建）实跑纯 Task166 代码；装机实证（f95a219 双日志，戳 Commit: 9d14c58）零 Task167 锚点、GLES/4.0 仍 DSA=1 黑屏、Vulkan 在同一 pc（libMobileGL.dylib+0x673a08 GetImage）崩溃。af9b807 补落全部代码。本章节为 Task168 会话按提交记录诚实重建（原章节在 9d14c58→af9b807 事故中随未提交工作区丢失）。
+
+### Work Log（按 af9b807/9d14c58 提交信息重建）
+- 根因一（Vulkan 启动崩）：MoltenVK 的 surface extent 源不是 CAMetalLayer.drawableSize 而是 MoltenVK 分类 naturalDrawableSizeMVK = bounds × contentsScale；Task166 Layer B 只写 drawableSize、bounds 留 CGRectZero → currentExtent {0,0} → MobileGL RecreateSwapchain 零面积守卫不装 swapchain → m_images 空 → MC 首帧 DSA glBlitNamedFramebuffer(fb0) 命中 SwapchainObject::GetImage(0) 空向量裸读 SIGSEGV。对发行 dylib 反汇编（scripts/disas_getimage.py，capstone）与装机崩溃 pc 逐字节吻合。修复：Layer B 在全部三处几何点（创建/既有层同步/update_size 钩子）同写 bounds + contentsScale(1.0)，natural == drawable == swapchain extent
+- 根因二（DSA 反向迁移从未执行）：Task166 把迁移挂在 application:configurationForConnectingSceneSession:，UIKit 只为【新建】场景会话调用——既有会话设备永不再触发（60+ 份历史日志该回调内零日志）；叠加 Task129d 时代 @YES 默认经 defaults 合并每次启动持久化进 plist，存量 1 压制 Task166 新 @NO。修复：常跑调用点搬进 main.m（toggleIsolatedPref 之后、任何消费者之前），ame166_migrateMgDsaBlackScreen 获得 NSNumber/NSString 双类型容错 + 无条件运行锚点日志 "[Preferences] Task167 MG DSA black-screen migration ran (stored=1, flipped=1)"
+- 验证：verify_task167 31/31；重锚 166 C2 / 130 E10 / 165 G1；级联 166=64/64、165=34/34、164=30/30、163=36/36、162=68/68、161=56/56、160=47/47、task166_syntax_mgl 绿、task130=47/49 stash 实证基线一致（D4 FSR1.cpp 锚 + I1 l10n E5/E6 级联，均既有）；公告 task167 置顶 + task166 诚实修订；version.h REVISION 17 addendum
+- CI：9d14c58 run 36098435674 success（但只有脚本）；af9b807 run 36099859758 success（真代码装机版）
+
+### Stage Summary
+- 装机锚点：Vulkan = [MGLFSR] engaged + first frame presented + steady（无 GetImage 崩溃）；GLES/4.0 = Task167 迁移日志（stored=1, flipped=1）+ DSA support not detected + 画面可见
+- 用户装机验证（485b18c 日志 + 用户确认）：af9b807 治愈 Vulkan + ES 黑屏 ✅（Task169 记录在案）
+- 教训：提交时"代码滞留工作区"事故二次发生（9d14c58 型）——提交前 git status --stat 必须与提交信息声明逐项对账
+
+---
+Task ID: 168
+Agent: main (Super Z)
+Task: ①新拟态装机反馈修复（"下载最新提交看不到新拟态"——范围判定失误：Task163 凸起管线只在无壁纸分支生效，有壁纸时卡片提前 return 进旧毛玻璃；用户定稿：全部卡片统一新拟态 + 动态形态（卡面随壁纸透明度/模糊 + 双阴影叠加，无把握不逞强）+ 新增"实底"开关）②使用问题条目 JSON 化（对齐公告双文件模式，含标题/图标id/简介，交付两个维护路径）
+
+### Work Log
+- 前置：fetch 对齐 8d5ca47（Task169 四连修 + v6.0.0 发布，168/169 间跳号：169 被并行会话占用），空号 168；AskUserQuestion 五问定稿（始终实底/全部卡片统一/双文件对齐公告/分类分组/顺带更新过时项 + 备注：动态随壁纸透明度模糊调整，没把握不逞强，加实底开关）
+- 引擎：UIKit+NativeSurface 新增 ame_attachNeumorphShadowOnly（仅挂双阴影承载层 + 规格等比圆角 + masksToBounds=NO，不写 backgroundColor——与实底版唯一差异），AmeNeumorphShadowView 机制复用
+- 管线（BackgroundManager）：applyNeumorphCardEffectToView 删 Task163 壁纸早退 return，改三分支（实底开关开→一律规格表面+双阴影 / 动态+壁纸→applyEffectToView 面 + attach 仅阴影 + blur 层圆角同步到宿主新值 / 无壁纸→规格表面）；applyEffectToCollectionViewCell 重构（实底或无壁纸→统一新拟态尾部前置；壁纸+动态→Task152 探测/毛玻璃/半透明面原样 + Task168 收口：attach + 圆角同步 + 宿主链逐层放行）；applyCardEffectToCell 列表行维持 Flat（边界：cell 阴影互叠，用户点名的是卡片）；TerracottaViewController statusCard 改走卡片管线；侧栏/右面板 Task163 平贴结论零波及
+- 开关：BackgroundManager.cardsNeumorphSolid（defaults 直读直写，键 background_cards_neumorph_solid，默认 NO=动态）+ BackgroundSettingsViewController section0 第四行（Value1+UISwitch tag410，回调落盘 + refreshUIEffect 统一刷新链）
+- FAQ JSON 化：scripts/task168_faq_extract.py 程序化抽取 .m 硬编码 34 条（相邻字面量状态机 + 转义还原），顺带更新两处过时结论（fsr 条目"Vulkan 暂不支持"→"三后端均支持，Vulkan 经 Metal 呈现层拦截放大 Task166/167"；mgLag 条目缓解办法首位补 Vulkan+FSR 推荐路径），生成 help-faq.json（仓库根维护源）+ Natives/resources/help-faq.json（随包，payload cp -R resources/* 自动进包，零 pbxproj/CMake 改动），双文件逐字节一致；LauncherHelpViewController.buildFaqData 重写为 bundle JSON 读取（解析失败空分组+日志，LauncherHelpFaqItem 模型零改动）
+- l10n：净增 1 键 background.cards.neumorph.title ×6 语言（en/zh-Hans/zh-CN/zh-Hant/ja/km），四主语言 1952→1953；14 个历史校验器计数断言同步重锚；verify_task151 H 检查（"无陈旧计数锚"）随基线 1953 诚实重锚
+- 公告/版本：task168 公告插 index 2（169 F5 钉死 anns[1]）；version.h REVISION 17 addendum
+- 校验：verify_task168 新建 42 项（A 引擎/管线 13 + B 开关/l10n 9 + C JSON 化 10 + D 公告/版本 3 + E 配平/级联 7）；stash 前后全 sweep 对拍实证零新增失败（脚本见 scripts/task168_baseline_sweep.py，before/after JSON 存 /home/z/my-project/scripts/）；历史失败均为 HEAD 既有（130 D4+I1、142 E组 anns[0] 被 169 置顶漂移、156 G 的 154 基线漂移、129/131/132/133/134/138/139 子级联沙箱路径默认值），本会话顺手修复：verify_task169/135/164 路径可移植化（164 复跑 30/30 全绿）
+- 已知边界：cell 列表行仍 Flat；磁贴间隙阴影叠加属新拟态正常形态；Terracotta 本体仍在 CMakeLists 注入名单外（启动崩溃排查中），其代码改动随回归一并生效
+
+### Stage Summary
+- 装机锚点（设壁纸 + Task163 后首次可见）：
+  ①主页磁贴/下载版本卡：动态默认 = 卡面毛玻璃/半透明（随透明度/模糊设置）+ 新拟态双阴影凸起，壁纸从磁贴间隙透出
+  ②设置 → 外观 → "卡片新拟态（实底）"开 → 卡片一律规格实底（浅 #e0e0e0/深 #2c2c2c）+ 双阴影，壁纸透明度/模糊对卡片失效
+  ③侧栏/右面板无阴影外溢（Task163 形态不变）；列表行平贴新拟态
+  ④侧栏 → 使用问题：34 条四分类渲染如旧（数据已从 JSON 读取）
+- 维护路径（用户交付物）：启动器公告 = 仓库根 announcements.json（随包回退 Natives/resources/announcements-fallback.json）；使用问题 = 仓库根 help-faq.json（维护源）+ Natives/resources/help-faq.json（随包运行时读取），两文件逐字节一致（verify_task168 C1 把守漂移）；改完重新构建生效
+- 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README/6.0.0 收尾、142 E组/156 G 基线漂移（169/166 时代既有，未纳入本会话）

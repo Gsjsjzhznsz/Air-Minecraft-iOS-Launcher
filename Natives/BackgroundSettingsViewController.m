@@ -152,7 +152,7 @@
     // 恢复/清除顺延为 3/4。
     // Sections: [UI效果设置], [选择背景类型], [Bing 壁纸(开关+画廊+刷新)], [图片背景, 视频背景], [恢复默认背景, 清除背景]
     self.sections = @[
-        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil)],
+        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.title", nil)],
         @[localize(@"i18n_str_60", nil)],
         @[localize(@"bing.section.header", nil), localize(@"bing.toggle.title", nil), localize(@"bing.gallery.title", nil), localize(@"bing.refresh.title", nil)],
         @[localize(@"i18n_str_61", nil), localize(@"i18n_str_55", nil)],
@@ -337,6 +337,26 @@
             cell.imageView.image = [UIImage systemImageNamed:@"drop.halffull"];
             
             return cell;
+            
+        } else if (indexPath.row == 3) {
+            // Task168：卡片新拟态形态开关（实底 = 放弃壁纸透明度/模糊，
+            // 一律规格表面色+双阴影；关 = 动态随透明度/模糊设置 + 双阴影叠加）
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphSolidCell"];
+            if (!cell) {
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"CardsNeumorphSolidCell"];
+                UISwitch *solidSwitch = [[UISwitch alloc] init];
+                [solidSwitch addTarget:self action:@selector(cardsNeumorphSolidToggleChanged:) forControlEvents:UIControlEventValueChanged];
+                solidSwitch.tag = 410;
+                cell.accessoryView = solidSwitch;
+            }
+            UISwitch *solidSwitch = (UISwitch *)cell.accessoryView;
+            solidSwitch.on = manager.cardsNeumorphSolid;
+
+            cell.textLabel.text = self.sections[0][3]; // background.cards.neumorph.title
+            cell.detailTextLabel.text = nil;
+            cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
+            [self styleCell:cell hasBackground:hasBackground];
+            return cell;
         }
     }
     
@@ -457,6 +477,12 @@
     }
     
     // 实时刷新UI效果
+    [[BackgroundManager sharedManager] refreshUIEffect];
+}
+
+// Task168：卡片新拟态形态开关（实底/动态）——落盘后走统一刷新链重建卡片
+- (void)cardsNeumorphSolidToggleChanged:(UISwitch *)sender {
+    [BackgroundManager sharedManager].cardsNeumorphSolid = sender.on;
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 

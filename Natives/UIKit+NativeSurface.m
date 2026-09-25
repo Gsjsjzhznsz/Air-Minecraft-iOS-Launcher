@@ -164,6 +164,23 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     [shadowView setNeedsLayout];
 }
 
+- (void)ame_attachNeumorphShadowOnly {
+    // Task168：动态新拟态——卡面颜色不动（毛玻璃/半透明由壁纸管线按用户的
+    // 透明度/模糊设置给出，"按照壁纸功能设置的透明度和模糊程度来动态调整
+    // 新拟态"），只挂双阴影承载层 + 规格等比圆角 + 放行裁剪。与实底版
+    // ame_applyNeumorphSurface 的唯一差异是不写 backgroundColor。
+    self.layer.masksToBounds = NO; // 外阴影必须越出卡片边界（Task137 教训同源）
+    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
+    if (!shadowView) {
+        shadowView = [[AmeNeumorphShadowView alloc] initWithFrame:self.bounds];
+        shadowView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [self insertSubview:shadowView atIndex:0];
+        objc_setAssociatedObject(self, kAmeNeumorphShadowViewKey, shadowView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    shadowView.frame = self.bounds; // 非自动布局场景立即对齐；autoresizing 兜后续
+    [shadowView setNeedsLayout];
+}
+
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {
     // Task160：cell/列表场景平贴版——只上规格表面色与圆角，无阴影层（避免
     // 被相邻 cell/tableView 裁剪互叠），裁剪保持（Task152 直角露出修复不变）
