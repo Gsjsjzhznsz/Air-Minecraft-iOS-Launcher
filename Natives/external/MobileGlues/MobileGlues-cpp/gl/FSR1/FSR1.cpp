@@ -567,6 +567,15 @@ void RecreateFSRFBO() {
 
 std::vector<std::pair<GLsizei, GLsizei>> g_viewportStack;
 
+// Task 165 (Amethyst fork): RCAS runtime bail-out latch. The first RCAS
+// frame's fb0 probe reads both the corner and the center pixel; both black
+// (with a successful read signature, alpha 0xff) means the composite never
+// produced an image this session -- rather than keep presenting black with
+// a healthy swap counter, ApplyFSR drops to the Task83 EASU-only path for
+// the rest of the session. Session-scoped on purpose: a RecreateFSRFBO
+// resize must not re-arm a chain that already proved broken.
+static bool s_ame165_rcasBailout = false;
+
 void ApplyFSR() {
     // Task 76 (Amethyst fork): guard for the zero-gain teardown below. The
     // render FBO is 0 when FSR1 has been torn down (render resolution pinned at
@@ -625,8 +634,27 @@ void ApplyFSR() {
         // keeps the Task83 single-pass shortcut untouched: EASU straight into
         // the surface, zero behavior change.
         const bool rcasOn = FSR1_Context::g_rcasProgram != 0 &&
-                            global_settings.fsr1_rcas_sharpness >= 0.0f;
+                            global_settings.fsr1_rcas_sharpness >= 0.0f &&
+                            !s_ame165_rcasBailout;
         if (rcasOn) {
+            // Task165（Amethyst fork）：一次性 renderTexture 探针——EASU 绘制
+            // 前读回渲染 FBO 中心像素。分诊矩阵：本探针非零 + 下方 fb0 探针
+            // 全零 = EASU/RCAS 绘制层故障；本探针全零 = 应用绘制从未进入
+            // 渲染 FBO（帧缓冲 0 重定向被绕过，函数解析层嫌疑，见 egl.cpp
+            // Task165 xglGetProcAddress 的完整病历）。单像素 glReadPixels
+            // 不走已退休的大回读（Task75 病历），READ 绑定由 guard 还原，
+            // 零风险。
+            static bool s_ame165_rtProbed = false;
+            if (!s_ame165_rtProbed) {
+                s_ame165_rtProbed = true;
+                unsigned char ame165_rtpx[4] = {0, 0, 0, 0};
+                GLES.glBindFramebuffer(GL_READ_FRAMEBUFFER, FSR1_Context::g_renderFBO);
+                GLES.glReadPixels(FSR1_Context::g_renderWidth > 0 ? FSR1_Context::g_renderWidth / 2 : 0,
+                                  FSR1_Context::g_renderHeight > 0 ? FSR1_Context::g_renderHeight / 2 : 0,
+                                  1, 1, GL_RGBA, GL_UNSIGNED_BYTE, ame165_rtpx);
+                LOG_I("[MG] Task165 render-texture probe: center pixel rgba=%02x%02x%02x%02x -- nonzero = app frame reached the render FBO (redirect healthy); all-zero = app draws bypassed the redirect (resolution-layer suspect, see Task165)",
+                      ame165_rtpx[0], ame165_rtpx[1], ame165_rtpx[2], ame165_rtpx[3]);
+            }
             // Depth/scissor/stencil/blend/cull would all silently eat the quad on a
             // default framebuffer that carries a depth/stencil attachment or
             // app-leftover state -- the target FBO never had those, the surface
@@ -695,6 +723,35 @@ void ApplyFSR() {
                     }
                     LOG_I("[MG] Task164 RCAS GPU probe: fb0 pixel (edge-4) rgba=%02x%02x%02x%02x glErr=0x%04x -- nonzero = draw landed on GPU; all-zero = RCAS quad never landed (state/shader suspect)",
                           ame164_px[0], ame164_px[1], ame164_px[2], ame164_px[3], ame164_err);
+                    // Task165：RCAS 运行期熔断——角像素与中心像素 RGB 全零
+                    // （且读回签名健康，alpha 0xff，排除读回失败很零）即判定
+                    // 本会话 RCAS 链不可用：立即以 EASU 直画 fb0 抢救本帧，
+                    // 后续帧走 Task83 单程路径（画面=无锐化的 EASU 上采样，
+                    // 5.1.0 已验证形态）。“黑屏但 swap 计数健康”不再上演。
+                    if (ame164_px[0] == 0 && ame164_px[1] == 0 && ame164_px[2] == 0 &&
+                        ame164_px[3] == 0xff) {
+                        unsigned char ame165_cx[4] = {0, 0, 0, 0};
+                        GLES.glReadPixels(FSR1_Context::g_targetWidth > 0 ? FSR1_Context::g_targetWidth / 2 : 0,
+                                          FSR1_Context::g_targetHeight > 0 ? FSR1_Context::g_targetHeight / 2 : 0,
+                                          1, 1, GL_RGBA, GL_UNSIGNED_BYTE, ame165_cx);
+                        if (ame165_cx[0] == 0 && ame165_cx[1] == 0 && ame165_cx[2] == 0 &&
+                            ame165_cx[3] == 0xff) {
+                            s_ame165_rcasBailout = true;
+                            LOG_W_FORCE("[MG] Task165 RCAS runtime bail-out: first-frame fb0 corner+center both black (alpha 0xff reads) -- this session falls back to EASU-only (Task83 single-pass); layer split: see the render-texture probe above");
+                            // 抢救本帧：从 RCAS 态切回 EASU 直画 fb0。
+                            // program/纹理是本函数已切到 RCAS 的状态，逐一
+                            // 切回；两尺寸 uniform 是 program 状态，仍有效。
+                            GLES.glUseProgram(FSR1_Context::g_fsrProgram);
+                            GLES.glActiveTexture(GL_TEXTURE0);
+                            GLES.glBindTexture(GL_TEXTURE_2D, FSR1_Context::g_renderTexture);
+                            if (FSR1_Context::g_inputTexLoc >= 0) {
+                                GLES.glUniform1i(FSR1_Context::g_inputTexLoc, 0);
+                            }
+                            GLES.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+                            GLES.glViewport(0, 0, FSR1_Context::g_targetWidth, FSR1_Context::g_targetHeight);
+                            GLES.glDrawArrays(GL_TRIANGLES, 0, 6);
+                        }
+                    }
                     // READ 绑定还回 guard 保存值由析构完成；此处不预还原。
                 }
             }

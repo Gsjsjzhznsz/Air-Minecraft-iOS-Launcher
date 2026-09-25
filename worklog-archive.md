@@ -2515,3 +2515,114 @@ Stage Summary:
 
 
 （Task 149 段由 worklog.md 于 Task 163 收尾时挪入，正文未改动）
+## Task 150（本会话，[可撤销] 删除渲染器全局控制 + Sodium 组件安装）
+
+### 用户需求（两点疑点已经用户确认：缺省渲染器=auto；Sodium 入口=一键装双模组）
+1. 启动器设置页面的渲染器选择删掉；实例页面的"跟随全局渲染器"开关删掉；有相关代码的也可删除——**每个实例强制单独选择渲染器**（初衷：促进玩家多更改渲染器以体现效果及兼容差异）。
+2. 实例页面组件安装：读取 Fabric API 安装逻辑，用相同逻辑开一个 Sodium 选项（火焰图标），安装 **Podium 和 Sodium** 模组（Podium = 禁用 Sodium 的 PojavLauncher 检查，Modrinth 实锤存在、与 Task145 的 POJAV_RENDERER 导出收敛互为双保险）。
+
+### 实施（撤销路径全部注释留档）
+- **设置页（LauncherPreferencesViewController）**：video.renderer 行字典/getPreference 分支/setPreference 分支 + ame140_writeRendererGlobal 块 + shadow toast + rendererKeys/rendererList 属性全删；MobileGlues 后端行（renderer_backend）原位幸存。
+- **实例页（ProfileSettingsViewController）**：advancedRows 去掉"跟随全局渲染器"；开关映射/构建器/回调三删；渲染器行永远可选（置灰态退役）；didSelect 直接弹选择器；popover 锚点 row 1→0；loadSettings 无键缺省 `@"auto"`；saveSettings 防御性写 auto（键永不再被删除）；rendererDisplayName nil→auto。
+- **启动链（PLProfiles.m）**：prefDefaults 的 `renderer→video.renderer` 全局回退退役（注释留档撤销路径）+ 新增 nil 守卫（getPrefObject(nil) 会抛 NSInvalidArgumentException）——ame_effective_renderer 解析链变为【profile 键 → auto】（用户确认缺省；1.17+ 经 Task144 升级逻辑解析为 MobileGL Vulkan 直连）。
+- **Sodium 组件安装（ProfileSettingsViewController）**：组件安装区新增 Sodium 行（flame.fill 火焰图标 + systemOrange，Fabric 门槛文案与 Fabric API 行同构）；`ame150_fetchModrinthPrimaryFileWithQuery:exactTitle:gameVersion:loader:completion:` ——Modrinth 搜索→**标题全等匹配**（containsString 会误命中 Sodium Extra / Podium Port）→getVersionsForModWithID→**gameVersions+loaders(fabric) 双过滤**→primaryFile；`startInstallSodiumWithGameVersion:` 注册统一下载任务（Sodium + Podium 单阶段）→两次取文件→串行下载→写实例 mods/ 目录→成功/失败 alert 与任务状态机对齐 Fabric API 流程。
+- **l10n**：退役 preference.profile.renderer_follow_global_toggle / preference.warning.renderer_shadowed_by_profile；新增 component.sodium.confirm_title/confirm_message/searching/not_found/download_failed/done——四语言键集一致，**基线 1952→1928**。
+- **发布资产**：announcements.json v6.0.0 渲染器 bullet/summary/英文尾段重写为"每游戏强制单选（无全局默认，缺省自动）+ Sodium+Podium 一键安装"；主页卡片 bullet 同步 Task149 语义；README/README_CN 渲染器行重写；version.h 追加 REVISION 17 addendum (Task 150, no bump)。
+
+### 校验
+- verify_task150 新增 43 项全绿（A 设置页 6 / B 实例页 9 / C 启动链 4 / D Sodium 8 / E l10n 5 / F 发布资产 6 / G 配平+UIColor 白名单 5）。
+- 重锚：task142（B4/B5/B6、C1-C4/C8-C11、D1/D5、E2/E4/E5/E6 —— Task142 的开关/置灰/删键/全局行锚点全面转 Task150 形态）、task140（C2/C4/C7/C9/C10/C12、E1/E2、F1/F4/F6 + G1 日志轮换重锚）、task139（E1-E4、I2）、task137（G3 增加 Task150 l10n diff 形态分支）、l10n 计数门 ×9（129-135/138/143 → 1928）。
+- 级联 stash 基线对拍（远端 HEAD 2775e2f）：**零新增失败**；顺带修复另一会话 Task147/148 日志轮换造成的 task140 G1 断链（142 F6/143 G1 级联随之自愈：140=58/58、142=49/49、143=31/31）；task139 26/36 与基线一致；129-135/138 环境性失败逐项一致；task132/135 沙箱路径环境性。
+- 四改动 ObjC 文件括号配平全 0；UIColor 白名单审计通过；ObjC 改动集中 4 文件，与另一会话 Task147/148 触及面（JavaLauncher/mgl_fsr/SurfaceViewController/egl_bridge/osm_bridge）零重叠。
+
+### Stage Summary
+- 用户预期：①设置页无渲染器选择、实例页无跟随全局开关、实例渲染器行永远可选、未设置实例走 auto（装机日志锚：无键实例启动日志 RENDERER is set to libMobileGL.dylib=auto 解析路径）②实例页组件安装出现火焰图标 Sodium 行，Fabric 实例一键下载 Sodium+Podium 进 mods/（非 Fabric 实例点击提示"仅 Fabric 有效"）。
+- [可撤销] 说明：git revert 单提交即可整体还原；代码内注释标注了各退役点的恢复方式（PLProfiles prefDefaults 映射行 / 实例页 pragma 区 / 设置页行字典）。
+- 待用户安装新 CI 工件实机验证；推送前 fetch 对齐（双会话并行）。
+
+---
+Task ID: 151
+Agent: Super Z (main agent, 另一会话)
+Task: 壁纸设置新增 Bing 每日壁纸（用户指定：搜索第三方接入方案 → 默认开启 → 基础功能完全）
+
+Work Log:
+- 搜索确认接入方案：业界第三方通用 = Bing 官方无鉴权接口 HPImageArchive.aspx?format=js&idx=0&n=8&mkt=zh-CN（返回 images[]：url/urlbase/copyright/title/startdate），图片 URL 补 host 即可下载；1920x1080→UHD 替换取 4K（404 静默回退）；th 服务附加 &w= 做缩略图（不支持则原样返回大图，零失败模式）
+- 新增 BingWallpaperManager.h/.m：cn.bing.com 主源 + www.bing.com 备源兜底；元数据 plist 持久化于 Application Support/BingWallpaper（避开 Caches 清理）；UHD→原图两级下载回退（>4KB 防 截断占位）；4h 节流 + 跨天检测；NSCache 缩略图 + 磁盘 _thumb.jpg；回前台自动补拉；BingWallpaperDidUpdate 通知
+- 默认开启语义：bing_wallpaper_enabled 键 nil→YES（显式默认，不依赖 registerDefaults 时序）；BackgroundManager 新增 background_source 标记（user/bing，历史数据→user 保证老用户自定义壁纸不被覆盖）；用户自定义永远优先；清除背景后立即回补 Bing；彻底关掉 = 关开关
+- BackgroundManager：isBingSource + setBingBackgroundImageAtPath（不重编码不复制，来源=bing，画廊勾选靠文件名前缀 startdate 匹配）；clearBackgroundInternal 删除守卫（仅 backgrounds/ 目录内文件，Bing 缓存保留离线回退）
+- 设置页 section 2 = Bing（开关行 Value1+UISwitch+今日状态副标题 / 浏览壁纸库 / 立即刷新），原图片/视频与恢复/清除顺延 3/4；footer 说明；BingWallpaperDidUpdate 监听刷新状态行
+- 新增 BingWallpaperGalleryViewController：近 8 天自适应 2/3/4 列网格（16:9 缩略图+日期+标题），异步缩略图（可见 indexPath 回填防复用错位），当前应用项蓝框，点按→操作面板（设为壁纸/保存到相册，message=版权+标题），下载 HUD，导航栏刷新，首进无缓存自动补同步，空态提示
+- 启动链：SceneDelegate applyBackgroundToWindow 之后 fire autoRefreshAndApplyIfEnabled（全异步不阻塞）
+- 基建：CMakeLists +2 源文件；Info.plist 加 NSPhotoLibraryAddUsageDescription（此前无相册权限键，保存相册功能必须）；l10n 17 个 bing.* 键 x6 语言（en/zh-CN/zh-Hans/zh-Hant 门禁基线 1928→1945）
+- 门禁重锚：12 个 verify 脚本 `== 1928`→`== 1945`（含 verify_task135.py vals=={1945} 代码级硬编码）+ 消息文本同步；新 verify_task151.py 46 项 ALL GREEN
+- 级联对拍：129-143/150 当前 vs HEAD~1 基线 FAIL 集合逐项 diff = **零新增失败**（现存失败均为既有环境性：112_118 括号 delta/139 H 块 Task146 撤销精简/132 135 沙箱路径）
+
+Stage Summary:
+- 产出：commit 86239549（本地 main，推送后由 CI 出包）；verify_task151 46/46 绿
+- 用户验证锚点（装机后）：① 首启/未设自定义壁纸 → 启动器背景自动变为 Bing 今日图（需联网）② 壁纸设置新增「Bing 壁纸」区块，开关默认开 ③「浏览壁纸库」网格 = 近 8 天，点按可设为壁纸/保存相册，当前项蓝框 ④ 设自定义壁纸后 Bing 让位（开关行副标题仍显示今日标题）⑤ 清除背景 → Bing 立即回来 ⑥ 关开关 → Bing 背景清除且不再自动应用 ⑦ 断网启动 → 上次缓存图兜底
+- 技术要点：HPImageArchive url 为相对路径需补 host；th?id 链接可直接附加 &w= 缩放；UHD 变体 = 替换 _1920x1080→_UHD；Application Support 而非 Caches 存图（防系统清理致离线首启无图）
+- 未动：FSR/渲染链（另一会话 Task148 已按用户硬性要求修复双后端 FSR）；用户上传的 3 份 latestlog（09-16 时间戳）尚未逐行判读，Task148 记录称 zink FSR 已 sentinel-verified landed、花屏倒转根因已修，待装机复核
+- CI 记录（3 跑 2 败 1 绿，均为本任务新增代码问题，基线无涉）：
+  * run 35846197362 FAIL = ①+galleryController 未在 .h 声明（设置页只见头文件）②ame_loadMetadataFromDisk 的 raw 缺 __block；顺带根治两处 -Warc-retain-cycles（自递归 block → 实例方法递归 ame_fetchWithHosts/ame_attemptDownloadURLs）
+  * run 35847353064 FAIL = 链接期 Undefined symbols PHAssetChangeRequest/PHPhotoLibrary —— PhotoLibrary 保存功能首次真正调用 Photos 框架；此前 BackgroundManager/settings 只 import 头文件不触发链接。修复 = target_link_libraries 加 "-framework Photos"
+  * run 35848334214 GREEN，产物 ipa/tipa/dSYM 全可用
+
+## Task 153（本会话，渲染器三案 + Forge 模块层根修）
+
+### 用户反馈（7d51c28/0aac3aa/68f5706 三批装机日志，4894876/d36a24f 构建）
+"vulkan花屏，es驱动后端方块不渲染，opengl4.0后端崩溃。可是4.0和es后端在5.1.0正式版发布的时候是完全正常的。而刚适配vulkan解决崩溃问题后也没有出现花屏，我怀疑是flash模型改了什么导致mg系列全部无法正常使用。还有不要恢复回把3个端放到渲染器列表的模式，保持现状就行了。还有forge的启动崩溃异常指向启动器问题。最后我说的问题在log都有。"
+
+### 判读与根因（逐条日志实锤）
+1. **Vulkan 花屏 + ES 方块不渲染（同一根因）**：最新双会话（latestlog.old.txt=Vulkan / latestlog.txt=ES，均 d36a24f）"Task148 仲裁探测 -> no redirect（err=0x500）→ 启动器预交换链 ACTIVE"且 "EASU 1180x820 -> offscreen 2360x1640 -> RCAS engaged 600+ 帧"——但 geo-probe 全程 `surface=1180x820`（viewport 同为 1180x820）。**MobileGL 渲染器把 EGL window surface 尺寸钉在 MC 窗口信念上**（Task83 FSR 联动已把窗口缩到 surface/2=1180x820 → 后缓冲只剩 1180x820），启动器链却按信念 ame_surfaceWidth（2360x1640）画 RCAS——全屏四边形按 2360x1640 视口栅格化进 1180x820 后缓冲，只有左下四分之一落图，其余区域每帧残留旧帧 = 花屏（Vulkan）/毁帧错位（ES 方块不渲染）。Task148 的"内置 FSR1 重定向"理论对当前二进制【证伪】：`strings libMobileGL.dylib` 零 fsr1Setting/FSR1 符号（配置只有 MOBILEGL_* 环境变量；MobileGlues-cpp 有 FSR1 的是另一个渲染器 libmobileglues.dylib——Task148 张冠李戴）。用户"flash 改坏了"的直觉方向正确：花屏正是 Task143 修好 shader 常量（链从 inert 变 live）+ Task148 恢复联动后，链第一次在"后缓冲=窗口信念"的真实几何下全速运转所致。
+2. **4.0 (Mithril) 崩溃**：Run #356（2c66887:latestlog.txt，7b4d7df 构建）`GlDevice.<init> -> GL.createCapabilities "There is no OpenGL context current"`——LWJGL GL$1 按裸名解析 libGLESv2 命中全局 ANGLE，其 glGetString 在 Mithril 上下文返 NULL。**Task152b（4894876，FunctionProvider 钉到 libmithril.dylib 绝对路径）已修，待装机验证**（本轮无 4894876 的 Mithril 会话日志）。
+3. **Forge 1.20.1 启动崩溃（4894876 最新构建仍崩）**：`java.lang.module.ResolutionException: Module minecraft contains package com.mojang.blaze3d.platform, module launcher exports package ...`。机理链：launcher.jar 含 com/mojang/** 影子类（MacosUtil/text2speech 桩，26.x 必需）+ PojavClassLoader.addURL 把游戏 jar 回写 java.class.path + BootstrapLauncher/FML 把 classpath 每个 jar 变成 GAME 层自动模块 → "launcher" 与 "minecraft" 在 com.mojang.* 上 split package。考古：上游 Android Pojav 无任何 com/mojang 影子类（Forge 因此不炸）；本 fork 09-01 引入影子后 Forge launch 从未走通过（Task146 期同点原为 native 崩溃掩蔽）。
+
+### 修复（4 文件 + 2 验证器，零 l10n 变更）
+- **mgl_fsr.mm（几何仲裁）**：目标尺寸改读渲染器自己的 `eglQuerySurface`（eglGetCurrentDisplay/CurrentSurface/QuerySurface 三入口 dlsym 自 mgHandle，绝不外溢 ANGLE——Task140 纪律）——**实测后缓冲 or 不画**（查询失败零开销跳过，绝不按信念盲画）；视口闸门同步按实测；自愈恢复窗口改用实测后缓冲（防二次溢出）。
+- **mgl_fsr.mm + SurfaceViewController.m（延迟缩窗，真 FSR 几何复位）**：FSR 联动 + MobileGL 时不再启动即缩窗，先按全尺寸窗口启动（渲染器建出全尺寸后缓冲——403a459 会话实证 surface 不随窗口缩小），链在确认后缓冲全尺寸后下发缩窗（nativeSendScreenSize(渲染尺寸)）；无余量兜底 = 全尺寸直呈 + CA 缩放（零花屏）+ 输入除数归一（Task139 同款）。environ.h 新增 4 全局（armed/pending render/believed surface）。
+- **JavaLauncher.m（Forge 隔离）**：版本 JSON mainClass 含 cpw.mods.bootstraplauncher 判定 Forge；启动器侧 jar（launcher/patchjna/patchsvc/gson/jsr305/arc_dns）整体转 `-Xbootclasspath/a`（boot 未命名模块不参与 split 检查；委托链仍先命中 = 影子语义保真；JVM 多值 -Xbootclasspath/a 追加语义已本地 JDK 实测），`-cp` 只留 lwjgl（游戏自身 lwjgl 已被 MCDL 跳过无冲突）。非 Forge（vanilla/Fabric）-cp 组装逐位不变；launchHeadlessJVM（安装器，需 launcher.jar 内 ForgeProcessorRunner）不动。
+
+### 校验
+- verify_task153 新增 29 项全绿（A 几何仲裁 7 / B 状态机 4 / C 武装侧 3 / D 全局 1 / E Forge 隔离 6 / F 配平 4 / G 既有锚点 4）。
+- 级联基线对拍（git stash 前后）：119_124（A9 重锚 Task153 形态后 61/62 与基线一致）、130=59/60、142=48+1、143=30+1、149=35/35（TASK149_REPO）、150=43/43（TASK150_REPO）、151=ALL GREEN——**零新增失败**（112_118 E5/E6、139 B 块、140 G1/G3 为既有环境性同类，与基线逐项一致）。
+
+### Stage Summary
+- 装机验证锚点：①Vulkan/ES 会话日志必现 `[MGLFSR] Task153 deferred shrink applied: backbuffer 2360x1640 ... -> pushing MC render window 1180x820`，随后 `EASU 1180x820 -> offscreen 2360x1640`（真 FSR）；或 `Task153 geometry arbitration: backbuffer ... == window ...（no upscale headroom）-- full-res direct present`（兜底，同样零花屏）；②花屏/方块不渲染消失（两形态都不再溢出裁切）；③Forge 会话日志必现 `[JavaLauncher] Task153 Forge bootclasspath isolation ON`，且不再出现 ResolutionException、游戏进入 mod 加载完成；④4.0 后端按 Task152b 锚点验证（`Task152b` 无新日志 = pin 生效未崩）。
+- 用户明确指令遵守：**未动渲染器选择 UI**（保持单 mg + 后端独立键现状，未恢复三后端列表模式）。
+- 后续观察项：Vulkan 直连后端的 CopyTexSubImage2D 翻转/迟滞风险（Run #356 曾报"倒转"）——若下轮日志显示 EASU engaged 但画面上下颠倒，在链内加行序翻转（shader 常量级修复）。
+
+---
+Task ID: 156
+Agent: Super Z (main agent, 本会话)
+Task: 用户五连反馈根修（0d45e3f/a1488ab 四份装机日志，0a22f51=Task154 构建）：①ES 仍透明（方块不渲染）②Mithril(4.0) 游戏内 /0 崩溃 ③Forge GLFWErrorCallback android.util.ArrayMap 崩溃 ④输入法无法正常输入（iPadOS 27.0）⑤毛玻璃下两个百分比滑块无名 + FSR 设置诚实化 + 右侧边栏信息卡点击直达。渲染器 UI 保持现状（单 mg + 后端独立键，用户明令）。FSR-on-mg 定案为架构性不支持（Task154 已退休），本轮做设置项诚实化而非重试。
+
+Work Log:
+- 四日志判读（latestlog=ES / latestlog.old.txt=Vulkan / latestlog.txt=Mithril / latestlog.forge=Forge-zink）：ES/Vulkan 会话 Task154 退休标记在位、全分辨率直呈、swap 链健康（ES 671 swaps fps59 exit(0)；Vulkan 684 swaps fps60）；Mithril 会话越过 GlDevice 后崩在 DynamicUniformStorage /0；Forge ignoreList 生效后崩在 android.util.ArrayMap
+- ES 考古定案：d089745（09-22 07:32，Task140 构建）ES 会话与当前会话启动器侧行为逐行一致（raw ANGLE/mg_init_gles not found/DSA 探针失败/同一 LWJGL 错误行），且 Task140 判读早已记录"方块不渲染"存在于该会话 + "若仍复现属 MobileGL 上游翻译层问题"——ES 透明自 Task131 上架起一直存在，非 da5918a 后启动器回归；Task113 vendoring 注释"the GLES variant ... misbehave upstream"为原始警告。两会话 mod 列表 diff 为零（排除 mod 变量）。二进制 strings 实锤 libMobileGL.dylib 只认 MOBILEGL_* 环境变量（config.json/MG_DIR_PATH 全部 inert，Task144 写配置对 mg 无效），且暴露 MOBILEGL_ESPRYT_MULTIDRAW_MODE 档位开关（ext|multiindirect|indirect|basevertex|drawelements|compute|auto）
+- ES 修复：DirectGLES 后端强制 multidraw 保守档 drawelements（逐子绘制 glDrawElements 循环，避开静默丢绘制的 native/ext 批绘制路径——方块消失而天空/实体/UI 正常的地形批绘制特征），JavaLauncher 主导出处 + egl_bridge 兑底双站点，已有值不覆盖，非 MobileGL 渲染器 unsetenv 清残留；Vulkan(Magma) 独立开关不触碰
+- Mithril /0 根因（反编译 /tmp/mc262_client.jar，CFR）：GlHeuristics.java:75 new DeviceLimits(..., GL33C.glGetInteger(35380))——35380=GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT，Mithril 包装层返 0 → DynamicUniformStorage.<init> 的 Mth.roundToward(uboSize, 0) → positiveCeilDiv 除零。修复：新增 Natives/mithril_gl_shim.c → libmithril_glshim.dylib（Makefile dep_mithril_glshim，dep_openal_shim 同款 -reexport_library 模式）：re-export libmithril 全部符号 + 本地 glGetIntegerv/glGetInteger64v（本地定义优先于 re-export）对 0 值 limit 枚举补下限（3379→1024/34852→8/35361→16384/35380→256 + 64 位路径）+ eglGetProcAddress 漏斗保证两种 GL$1 Delegate 状态（Task154 补丁在/不在）下解析语义一致；JavaLauncher Mithril libname 优先指向 shim（存在性守卫 + Task146 绝对路径 + 裸名三层回退）。不触碰 libmithril.dylib 二进制，不回退 Task154 jar 补丁
+- Forge ArrayMap 根因：GLFWErrorCallback$1.<init> → APIUtil.apiClassTokens → getDeclaredFields(GLFW.class) 解析字段类型 android/util/ArrayMap（lwjgl overlay 的 Pojav Android 血统 GLFW.java:511 ArrayMap<Long, GLFWWindowProperties>）→ MC-BOOTSTRAP ModuleClassLoader 父链为 boot layer（非 AppClassLoader），-cp 上 launcher.jar 里的既有 android.util 桩对模块层不可见（只有 Tools.java 经 app loader 用到它）。修复：5 个 android/util 桩源复制进 JavaApp/src/lwjgl/android/util/（overlay 编译进 lwjgl-333/341 双 jar，自动模块全包导出 → 模块层可见；launcher.jar 侧保留原件，双层各自解析互不冲突）
+- IME（iPadOS 27.0, 24A437）双路径加固：①TrackedTextField（启动器虚拟键盘）：字符送达链全建筑在 UIKit 私有 API（insertFilteredText:/replaceRangeWithTextWithoutClosingTyping:/setAttributedMarkedText:），iOS 26+ UIAsyncTextInput 管线下部分提交不再走私有入口 → 新增公有 UIKeyInput insertText: 兜底（80ms 同文本去重防双发，三处私有路径送达后登记）；setAttributedMarkedText 补 markedTextRange nil 守卫 + 长度钳制（NSNotFound → 百万级退格风暴）。②TouchController 文本框：子类化 Ame156TCIMEAwareTextField（组字更新补发 EditingChanged）+ sendTextInputStatus 上报真实 markedTextRange 组字边界（原硬编码 0/0，mod 把拼音字母当已提交文本）
+- UI 三案：①毛玻璃滑块命名——sections[0] 里本就有 i18n_str_1296"透明度"/1297"模糊程度"但原代码 textLabel.text=nil 从未显示；两行加 95pt 标题标签（tag 202/302，滑块右移），图标分化 circle.lefthalf.filled/drop.halffull，section 0 新页脚 background.effect.footer 语义说明（l10n 基线 1945→1946，13 个 verify 脚本门禁同步 bump）②FSR 设置诚实化——preference.detail.fsr1_setting 六语言重写：明示仅 MobileGlues/Zink 生效，mg 家族（Vulkan/ES/4.0）/MoltenVK/gl4es 不支持启动器侧 FSR，指向视频设置"分辨率"③右侧边栏 7 张信息卡可点击直达——关联对象路由 + 父链宿主定位（LauncherRoot/LauncherCardLayout 双布局适配），LauncherPreferencesViewController 新增 ameDeepLinkKey 深链（viewDidAppear 滚动到 prefContents 匹配行 + 0.45s 高亮闪烁），映射：启动器版本→设置·检查更新 / 游戏版本→版本管理 / JIT→设置·JIT 开启工具 / 内存两卡→设置·内存分配 / 设备/系统→设置首页
+- 过程事故与修复：Edit 工具对 tab 缩进的 Makefile 做了全文件空格化（recipe 行必须 tab，会弄坏构建）——git checkout 恢复后改用 scripts/task156_patch_makefile.py（tab 保真 + 幂等）重新打补丁；ObjC 文件均为空格缩进不受影响（git diff 确认只有目标 hunk）
+- 验证：verify_task156 新建 52/52（A Espryt 6 / B Mithril 8 / C Forge 4 / D IME 6 / E UI 9 / F l10n+配平+档案 17 / G 级联 2+2）；级联对拍 verify_task153=29/29 ALL GREEN、task151=46/46 ALL GREEN、task150=43/43（TASK150_REPO）、task154=36P/3F 与 git stash 基线逐项一致（E1/E3/E5 为用户日志轮换后的既有环境项）、task142=48/49 与基线一致；7 个改动 ObjC 文件括号配平全 0；Java 桩双源排布经模式规则（逐文件 javac + sourcepath 首命中）推演无 duplicate-class 风险
+- 协同纪律：另一会话 Task155（BackgroundManager/BingWallpaperManager 壁纸切换刷新修复）在工区未提交——本轮 git add 显式排除这两个文件，零接触零冲突
+
+Stage Summary:
+- 产出：Task156 九文件修复（JavaLauncher.m / egl_bridge.m / mithril_gl_shim.c(新) / Makefile / TrackedTextField.m / SurfaceViewController.m / BackgroundSettingsViewController.m / LauncherPreferencesViewController.h+.m / LauncherRightPanelViewController.m）+ android 桩复制进 lwjgl overlay + l10n 六语言（FSR 重写 + footer 新键）+ 13 个门禁 bump + disasm_gl1.py（GL$1 Delegate 常量池反汇编器）+ task156 两脚本 + verify_task156（52 项）+ version.h addendum
+- 装机验证锚点：①ES 会话 "[JavaLauncher] Task156: Espryt multidraw tier forced to 'drawelements'" + 方块渲染恢复（若仍透明，下一轮试 basevertex/ext 档位二分定位）；②Mithril 会话越过 DynamicUniformStorage（无 / by zero）"[JavaLauncher] Task156: Mithril libname -> GL shim ..."；③Forge 会话越过 DisplayWindow.initWindow（无 android.util.ArrayMap）进 mod 加载；④输入法：游戏内拼音组字/候选上屏正常送达（TrackedTextField 路径）+ TouchController 模式下组字边界正确；⑤毛玻璃下两行显示"透明度/模糊程度"标题 + 页脚说明；⑥右侧边栏 7 卡点击直达设置/版本管理
+- 关键决策：ES 透明按上游翻译层缺陷处置（保守档绕行而非修 dylib）；Mithril 走 re-export 垫片（不回退 Task154 jar 补丁、不改 libmithril.dylib）；FSR-on-mg 不再重试（8 轮失败后的架构性定案，设置项诚实化收口）；Bing 切换刷新归另一会话 Task155（未提交，不抢跑）
+
+---
+Task ID: 156 (续)
+Agent: Super Z (main agent, 本会话)
+Task: CI 确认
+
+Work Log:
+- CI run 35897091776（8b6ec05）completed success（约 8 分钟）——dep_mithril_glshim 新 dylib 编译通过（re-export libmithril + 本地 glGetIntegerv 覆盖）、JavaApp 双源排布（src/launcher + src/lwjgl 的 android/util 桩）无 duplicate-class、全部 ObjC 改动编译通过
+- 新 IPA 工件就绪，装机验证锚点见 Task156 主条目
+
+Stage Summary:
+- Task156 全链闭环：四案根修（ES multidraw 保守档 / Mithril GL shim / Forge android 模块层桩 / iPadOS 27 IME 双路径）+ 三案 UI（滑块命名 / FSR 诚实化 / 侧边栏深链）+ 验证器 52/52 + 级联零新增失败 + CI 绿
+- 下一轮装机反馈关注：①ES 方块是否恢复（若仍透明 → 二分试 basevertex/ext 档）②Mithril 是否越过 /0（若新崩点 → 附日志）③Forge 是否进 mod 加载④拼音组字/候选上屏⑤毛玻璃两行标题⑥侧边栏卡片点击
+- 下一轮装机反馈关注：①ES 方块是否恢复（若仍透明 → 二分试 basevertex/ext 档）②Mithril 是否越过 /0（若新崩点 → 附日志）③Forge 是否进 mod 加载④拼音组字/候选上屏⑤毛玻璃两行标题⑥侧边栏卡片点击

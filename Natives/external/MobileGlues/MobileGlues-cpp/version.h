@@ -1579,3 +1579,41 @@
 // and the announcements support matrix carry the guidance: use the
 // GLES / OpenGL 4.0 backend for the full MobileGlues FSR1
 // (EASU upscale + RCAS sharpening).
+
+// REVISION 17 addendum (Task 165, no bump): the REAL ES/4.0 black-screen
+// root cause, found on the cc9bfe4 log pair (bc6c0b5 build) after Task164's
+// four RCAS alignments changed nothing. Forensics: every black session (both
+// backends, both log rounds) shows glXGetProcAddress NEVER called (the
+// healthy 5.1.0 pair shows the own-image resolution + SYMBOL THEFT canary
+// lines -- that function only fires from the frontend eglGetProcAddress,
+// i.e. the app resolved through it), exactly 10 LWJGL "No context is
+// current or a function that is not available" prints (healthy: zero), and
+// the Task164 probe reading 000000ff (the Metal initial clear) with a
+// pending 0x0500. Chain: Task154's patch_lwjgl_delegate_dlsym.py renamed the
+// GL$1 Delegate's provider-library lookup "eglGetProcAddress" ->
+// "xglGetProcAddress" (correctly killing Mithril's broken indirect layer),
+// which silently forced MobileGlues sessions onto the per-name dlsym
+// fallback; the flat namespace hands glDrawArrays / glTexImage2D /
+// glFramebufferTexture2D (the canary trio) to the raw ANGLE image, so the
+// application's draws bypassed gl/framebuffer.cpp's framebuffer-0 redirect
+// and FSR1 upscaled a never-written render texture over the real frame.
+// Invisible until Task161 re-armed the FSR linkage (the "3 backends fine"
+// build ran libMobileGL for every backend setting). Fix: egl.cpp exports
+// xglGetProcAddress -- the Delegate's dead-named lookup finds it in
+// libmobileglues.dylib (pinned by -Dorg.lwjgl.opengl.libname) and gl*
+// resolution owns the layer again; gated on AMETHYST_RENDERER containing
+// "obileglues" (defense-in-depth -- other renderers keep Task154's dlsym
+// semantics, OSMesa's OSMesaGetProcAddress untouched). FSR1.cpp gains (a) a
+// one-shot render-texture probe (center pixel before the first EASU draw --
+// nonzero = the app frame reached the render FBO, all-zero = the redirect
+// was bypassed; splits the draw layer from the resolution layer on the next
+// log) and (b) an RCAS runtime bail-out: first-frame fb0 corner AND center
+// both black with healthy alpha-0xff reads latches EASU-only for the
+// session and rescues the current frame with a direct EASU redraw -- the
+// failure mode degrades from "black screen with healthy swap counter" to
+// "unsharpened upscale" instead. Vulkan-direct FSR assessment (user ask):
+// libMobileGL stays closed (zero FSR symbols, pseudo-EGL per Task154) and
+// the mgl_fsr pre-swap war stays retired; the safe launcher-side option is
+// a render-scale tier (window + drawableSize at render res, CA stretch)
+// which trades EASU sharpness for determinism -- deferred pending the
+// user's call, GLES/4.0 + full FSR1 at 60fps is the recommended path.

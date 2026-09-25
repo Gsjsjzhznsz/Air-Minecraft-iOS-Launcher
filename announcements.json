@@ -1,10 +1,21 @@
 {
  "announcements": [
   {
+   "id": "task165-blackscreen-rootcause-2026-09-25",
+   "title": "ES / OpenGL 4.0 黑屏真根因修复（函数解析层）+ Vulkan FSR 结论",
+   "date": "2026-09-25",
+   "summary": "ES / OpenGL 4.0 后端黑屏的真正根因已找到并修复：此前的 LWJGL 兼容补丁让游戏的 GL 函数解析绕过了 MobileGlues 前端，画面被渲染进了错误的缓冲区，FSR 升采样把空帧盖在了真实画面上；现已恢复 5.1.0 的解析路由。Vulkan 直连后端的 FSR 经两轮二进制取证确认属上游硬限制，需要 FSR 请使用 GLES / OpenGL 4.0 后端（同样 60fps）。",
+   "content": "## 本轮修复\n\n**ES / OpenGL 4.0 后端黑屏（真根因，重点修复）**\n\n- 症状：GLES / OpenGL 4.0 后端 + FSR 档位 = 整屏黑（渲染与交换计数全部健康，仅画面不显示）；上一轮的锐化边界修复未愈\n- 真根因：一个为兼容其他渲染器而打的 LWJGL 补丁，顺带改变了 MobileGlues 后端的函数解析路径——游戏的绘制调用绕过了渲染器前端的帧缓冲重定向，真实画面落在了错误的位置，FSR 升采样随即把空帧铺满全屏（黑屏但帧率正常即此形态）\n- 修复：前端补回补丁所需的解析入口，恢复 5.1.0 时代的解析路由；并加入两级保险——渲染纹理探针（下轮装机日志可直接分诊）与 RCAS 运行期熔断（锐化链异常时自动退回纯放大模式，宁可画质降档也不再黑屏）\n- 装机验证：GLES / 4.0 后端 + FSR 档位应恢复画面且更锐利；日志出现 `[MG] Task165 xglGetProcAddress: ... routed through the frontend`\n\n**FSR 支持矩阵（维持）**\n\n- ✅ **GLES 后端 / OpenGL 4.0 后端**：完整 FSR 1.0（EASU 放大 + RCAS 锐化），实测 60fps\n- ✅ **Zink 渲染器**：同一套 EASU + RCAS\n- ❌ **Vulkan 直连后端**：暂不支持（上游二进制零 FSR 接口、伪 EGL，两轮取证确认）。Vulkan 直连目前为全分辨率直呈（流畅）；需要 FSR 的画质/帧率取舍时请切 GLES / OpenGL 4.0 后端——两者同为 60fps 量级\n\n---\n\nFixes: the real ES/OpenGL 4.0 black-screen root cause (the Task154 LWJGL delegate dlsym patch silently bypassing the MobileGlues frontend resolution route -- app draws missed the framebuffer-0 redirect and FSR1 painted sharpened zeros over the real frame); frontend now exports the dead-named lookup so the delegate routes gl* names through the layer again (other renderers keep Task154 semantics). Added a one-shot render-texture probe (layer-split diagnostics) and an RCAS runtime bail-out (first-frame black latches EASU-only for the session -- degrades to unsharpened upscale instead of a black screen). Vulkan-direct FSR confirmed upstream-blocked after binary forensics; use the GLES / OpenGL 4.0 backend for full FSR1 at 60fps.",
+   "priority": "normal",
+   "action_url": "",
+   "action_title": "",
+   "image_url": ""
+  },
+  {
    "id": "task164-fsr-blackscreen-defaults-2026-09-25",
    "title": "ES / OpenGL 4.0 黑屏修复 + FSR 放大锐化说明 + 壁纸默认值修正",
    "date": "2026-09-25",
-   "summary": "mg 的 GLES / OpenGL 4.0 后端此前开启 FSR 后黑屏（渲染在跑、画面不显示）的问题已修复；FSR 支持矩阵：GLES/4.0 后端 = 完整 FSR（EASU 放大 + RCAS 锐化），Vulkan 直连暂不支持（上游限制）；壁纸初次使用默认值确认为毛玻璃、透明度 60%、模糊 100%。",
+   "summary": "第一轮修复（锐化边界钳制）经装机验证未愈黑屏——真根因见后续公告（函数解析层，Task165）；FSR 支持矩阵：GLES/4.0 后端 = 完整 FSR（EASU 放大 + RCAS 锐化），Vulkan 直连暂不支持（上游限制）；壁纸初次使用默认值确认为毛玻璃、透明度 60%、模糊 100%。",
    "content": "## 本轮修复\n\n**ES / OpenGL 4.0 后端 FSR 黑屏（重点修复）**\n\n- 症状：选了 GLES / OpenGL 4.0 后端并开启 FSR 档位后，游戏进入世界时整个画面黑屏（有声音、能操作，画面不显示）\n- 根因：FSR 的锐化管线（RCAS）在全屏边缘像素存在越界采样——桌面 GL 驱动容忍、ANGLE（Metal）上属未定义行为，可导致整帧作废；同时锐化 pass 的图形状态防护不完整（缺模板测试关闭）、纹理单元与采样器绑定依赖隐式初始状态\n- 修复：锐化采样边界钳制 + 状态防护对齐已验证的 Zink 实现 + 纹理单元显式绑定，四项全部落地；并加入首帧 GPU 探针日志用于装机验证\n\n**FSR 支持矩阵（请知悉）**\n\n- ✅ **GLES 后端 / OpenGL 4.0 后端**（mg 设置 → 渲染后端）：完整 FSR 1.0 —— EASU 高质量放大 + RCAS 锐化\n- ✅ **Zink 渲染器**：同一套 EASU + RCAS\n- ❌ **Vulkan 直连后端**：暂不支持。上游渲染器（MobileGL 二进制）不提供升采样呈现钩子（其 EGL 接口无上下文跟踪，强行插入升采样会导致花屏与触控错位），属上游硬限制；需要 FSR 时请把后端切到 GLES 或 OpenGL 4.0\n\n**壁纸初次使用默认值修正**\n\n- 确认默认值：**毛玻璃**效果、透明度 **60%**、模糊程度 **100%**\n- 此前新装设备会错误地落在\"半透明 / 模糊 0%\"（默认值判定逻辑把\"从未保存\"误当\"保存了 0\"），已修正；已在设置里显式保存过偏好的设备不受影响\n\n---\n\nFixes: ES/OpenGL 4.0 FSR black screen (RCAS edge-clamp + state guard alignment + explicit unit/sampler binding + one-shot GPU probe); wallpaper first-launch defaults now truly frosted glass / 60% / 100% (never-saved keys no longer read as saved zeros); Vulkan-direct FSR documented as upstream-unavailable -- switch to the GLES / OpenGL 4.0 backend for full FSR (EASU + RCAS).",
    "priority": "normal",
    "action_url": "",
