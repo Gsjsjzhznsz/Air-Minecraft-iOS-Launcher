@@ -14,7 +14,7 @@ Evidence chain:
 """
 import os, re, subprocess, sys, zipfile, io, tempfile
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(REPO)
 
 PASS = FAIL = 0

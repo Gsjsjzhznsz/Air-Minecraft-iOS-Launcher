@@ -112,8 +112,11 @@ bmh = read("Natives/BackgroundManager.h")
 check("C1  applyCardEffectToCell 保留，无背景 → 原生卡片行（contentView 平贴新拟态 12pt；Task170 重锚）",
       "applyCardEffectToCell" in bmh
       and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
-check("C2  applyCardEffectToCell 有背景 → 与 applyEffectToCell 同管线",
-      re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(\[self hasBackground\]\) \{\s*\[self applyEffectToCell:cell\];", bm))
+# Task173 诚实重锚：行管线被"新拟态界面"开关接管——关闭 → applyEffectToCell
+# 旧管线（有壁纸毛玻璃/半透明、无壁纸标准列表，原 C2 语义并入此门）；开启 →
+# Flat 平贴（壁纸无关）。
+check("C2  applyCardEffectToCell（Task173 重锚：开关门在先；关闭 → applyEffectToCell 同管线）",
+      re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(!self\.cardsNeumorphEnabled\) \{\s*\[self applyEffectToCell:cell\];", bm))
 check("C3  collection cell 无背景分支恢复 cell 级裁剪（原生卡片无需帧外阴影空间）",
       "cell.clipsToBounds = YES;" in bm and "cell.layer.masksToBounds = NO;" in bm)
 check("C4  collection cell 圆角来源保留：优先读 contentView 自身圆角",

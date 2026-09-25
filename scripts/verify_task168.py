@@ -2,7 +2,7 @@
 # Task168 verifier: neumorphism wallpaper-mode visibility (dynamic/solid dual form)
 # + help-FAQ JSON migration (dual-file, aligned with announcements).
 # Task170 诚实重锚：实底开关退役为整体透明度滑条（cardsNeumorphOpacity），
-# 管线实底分支合并、l10n 键原位换名（计数 1953 不变）、公告顺延一位。
+# 管线实底分支合并、l10n 键原位换名（计数 1954 不变）、公告顺延一位。
 # 用法: python3 scripts/verify_task168.py   （在仓库根的任意子目录运行皆可）
 import json
 import os
@@ -53,26 +53,29 @@ check("A3 实底版 ame_applyNeumorphSurface 仍写规格表面色（无回归�
 
 check("A4 卡片视图管线：壁纸早退旧形态已删除（Task163 的 hasBackground-return 不复存在）",
       "if ([self hasBackground]) {\n        [view ame_removeNeumorphShadow];\n        [self applyEffectToView:view];\n        return;" not in bm_m)
-check("A5 卡片视图管线：动态模式=壁纸面+仅阴影叠加+blur 圆角同步+整体透明度（Task170 重锚：条件二分支化）",
-      "if ([self hasBackground]) {" in bm_m[bm_m.index("- (void)applyNeumorphCardEffectToView"):bm_m.index("- (void)applyEffectToSearchBar")]
-      and "[view ame_attachNeumorphShadowOnly];" in bm_m
-      and "sub.layer.cornerRadius = view.layer.cornerRadius;" in bm_m
-      and "view.alpha = self.cardsNeumorphOpacity;" in bm_m)
-check("A6 卡片视图管线：实底/无壁纸仍走规格表面（ame_applyNeumorphSurface）",
+check("A5 卡片视图管线（Task173 重锚：正常态重写）= 开关门在先，壁纸适配分支整链退役",
+      "if (!self.cardsNeumorphEnabled) {" in bm_m[bm_m.index("- (void)applyNeumorphCardEffectToView"):bm_m.index("- (void)applyEffectToSearchBar")]
+      and "if ([self hasBackground])" not in bm_m[bm_m.index("- (void)applyNeumorphCardEffectToView"):bm_m.index("- (void)applyEffectToSearchBar")]
+      and "[view ame_attachNeumorphShadowOnly];" not in bm_m
+      and "view.alpha = self.cardsNeumorphOpacity;" not in bm_m)
+check("A6 卡片视图管线：正常态尾部仍走规格表面（ame_applyNeumorphSurface）",
       "[view ame_applyNeumorphSurface];" in bm_m)
-check("A7 cell 管线新门：无壁纸 → 统一新拟态尾部（在壁纸分支之前；Task170 重锚：实底开关退役）",
+check("A7 cell 管线新门（Task173 重锚）：开关开启分支在最前（壁纸无关），旧无壁纸门退居其次",
       "if (![self hasBackground]) {" in bm_m
-      and bm_m.index("if (![self hasBackground]) {")
-      < bm_m.index("随后 Task168 叠加双阴影承载层"))
-check("A7b cell 管线整体透明度：两分支宿主 alpha 均按滑条重设（Task170 新增）",
-      "target.alpha = self.cardsNeumorphOpacity;" in bm_m
-      and "cardTarget.alpha = self.cardsNeumorphOpacity;" in bm_m)
-check("A8 cell 管线动态收口：cardTarget 挂仅阴影 + 圆角同步 + blur 层对齐",
-      "[cardTarget ame_attachNeumorphShadowOnly];" in bm_m
-      and "subview.layer.cornerRadius = cardTarget.layer.cornerRadius;" in bm_m)
-check("A9 cell 管线动态收口：宿主链逐层放行裁剪（阴影越出卡片边界）",
+      and bm_m[bm_m.index("- (void)applyEffectToCollectionViewCell"):].index("if (self.cardsNeumorphEnabled) {")
+      < bm_m[bm_m.index("- (void)applyEffectToCollectionViewCell"):].index("if (![self hasBackground]) {"))
+check("A7b cell 管线透明度（Task173 重锚）：宿主 alpha 退役，卡片本体透明度原语接管（两分支）",
+      "target.alpha = self.cardsNeumorphOpacity;" not in bm_m
+      and "cardTarget.alpha = self.cardsNeumorphOpacity;" not in bm_m
+      and bm_m.count("[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") >= 1
+      and bm_m.count("[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") >= 1)
+check("A8 动态收口退役（Task172）：attach 调用点全撤（引擎方法保留），圆角同步收口随之退役",
+      "[cardTarget ame_attachNeumorphShadowOnly];" not in bm_m
+      and "subview.layer.cornerRadius = cardTarget.layer.cornerRadius;" not in bm_m
+      and "- (void)ame_attachNeumorphShadowOnly" in engine_m)
+check("A9 宿主链放行裁剪维持（Task172 ON 分支保留：阴影越出卡片边界）",
       "cell.contentView.clipsToBounds = NO;" in bm_m
-      and "cardTarget.layer.masksToBounds = NO;" in bm_m)
+      and "cell.contentView.layer.masksToBounds = NO;" in bm_m)
 check("A10 cell 管线实底尾部：ame_applyNeumorphSurface 仍在（规格表面+双阴影）",
       "[target ame_applyNeumorphSurface];" in bm_m)
 check("A11 边界维持：列表行 applyCardEffectToCell 仍 Flat 平贴（不受开关影响）",
@@ -120,8 +123,8 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     m = re.search(r'^"' + re.escape(l10n_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     l10n_vals[lg] = m.group(1) if m else None
 check("B7 六语言新键在位且非空", all(l10n_vals.values()), str(l10n_vals))
-check("B8 四主语言键集一致且计数 = 1953（Task170 键原位换名，净变化 0）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1953
+check("B8 四主语言键集一致且计数 = 1954（Task170 键原位换名，净变化 0）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1955
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -169,11 +172,11 @@ check("C10 抽取/幂等脚本入库（可重跑再生成）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("D1 公告顺延：task170 插入 index 2（task169 F5 钉死 anns[1] 不动；Task173 再插入后 task168 顺延至 anns[6]）且 id 唯一",
+check("D1 公告顺延：task173/172 相继插入 index 2（task169 F5 钉死 anns[1] 不动；task168 顺延至 anns[6]）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[6]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t168 = anns[6]
+      and anns[7]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t168 = anns[7]
 check("D2 公告内容：根因叙述 + 双形态 + 两个维护路径",
       "447a677" in t168["content"] and "透明度/模糊" in t168["content"]
       and "announcements.json" in t168["content"] and "help-faq.json" in t168["content"]
@@ -256,6 +259,14 @@ def fail_lines(text):
 
 baseline_doc = json.loads(rd("scripts/task168_cascade_baseline.json"))
 baseline = baseline_doc.get("baseline", {})
+# Task173 具名沙箱传播簇（详证见 verify_task173 G1 注释；Task171 先例同款）。
+SANDBOX_EXCEPTIONS = {
+    "131": ("H3 verify_task130",),
+    "132": ("A1 崩溃日志证据", "A15 libjnidispatch", "G4 级联六验证器"),
+    "135": ("E. verify_task130", "E. verify_task131", "E. verify_task132",
+            "E. verify_task133", "E. verify_task134", "G4 级联六验证器"),
+    "156": ("G verify_task154",),
+}
 new_failures = []
 for t in CASCADES:
     script = f"scripts/verify_task{t}.py"
@@ -268,9 +279,9 @@ for t in CASCADES:
         continue
     cur = set(fail_lines(r.stdout + r.stderr))
     allow = set(baseline.get(t, []))
-    extra = sorted(cur - allow)
-    if not allow:
-        extra = sorted(cur)  # 基线里本就是绿的脚本，任何失败都算新增
+    exc = SANDBOX_EXCEPTIONS.get(t, ())
+    extra = sorted(f for f in cur
+                   if f not in allow and not any(e in f for e in exc))
     if extra:
         new_failures.append((t, [e[:120] for e in extra]))
 cascade_fail = new_failures

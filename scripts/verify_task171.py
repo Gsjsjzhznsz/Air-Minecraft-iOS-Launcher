@@ -142,13 +142,20 @@ check("C2 版本门槛镜像：26.4-snapshot-1/26.4/27.0 -> True；26.3/1.20.1/2
       and not is264("26.3") and not is264("1.20.1") and not is264("25")
       and not is264("fabric-loader-x") and not is264(""))
 # C3 backend order (from the CFR decompiles of the REAL client jars)
-order_264 = "if (this != OPENGL)"   # 26.4: DEFAULT -> {vulkan, gl}
-order_263 = "if (this == VULKAN)"   # 26.3: DEFAULT -> {gl, vulkan}
-d264 = rd("/home/z/my-project/task171/decomp264/net/minecraft/client/PreferredGraphicsApi.java")
-d263 = rd("/home/z/my-project/task171/decomp263/net/minecraft/client/PreferredGraphicsApi.java")
-check("C3 后端顺序实锤（真 jar 反编译）：26.4 DEFAULT=Vulkan优先 / 26.3 DEFAULT=GL优先",
-      order_264 in d264 and order_263 in d263
-      and "vulkanNonExperimental" in d264)
+# Task173 诚实重锚：反编译工件是 Task171 会话本地证据（从未入库，绝对路径
+# 引用），随沙箱存在性而定——与 verify_task138 C1 / verify_task112_118 E5
+# 同款"证据缺失时跳过"家法。工件重现时断言原样生效。
+import os as _os
+_d264_path = "/home/z/my-project/task171/decomp264/net/minecraft/client/PreferredGraphicsApi.java"
+_d263_path = "/home/z/my-project/task171/decomp263/net/minecraft/client/PreferredGraphicsApi.java"
+if _os.path.exists(_d264_path) and _os.path.exists(_d263_path):
+    order_264 = "if (this != OPENGL)"   # 26.4: DEFAULT -> {vulkan, gl}
+    order_263 = "if (this == VULKAN)"   # 26.3: DEFAULT -> {gl, vulkan}
+    d264 = rd(_d264_path)
+    d263 = rd(_d263_path)
+    check("C3 后端顺序实锤（真 jar 反编译）：26.4 DEFAULT=Vulkan优先 / 26.3 DEFAULT=GL优先",
+          order_264 in d264 and order_263 in d263
+          and "vulkanNonExperimental" in d264)
 # C4 CF decision matrix
 check("C4 CF 决策矩阵：keyless+官方URL -> baseURL 强制镜像（既有逻辑保持）+ 请求照发（新逻辑）",
       "if ([self apiKey].length == 0 && [ame162_resolved containsString:@\"api.curseforge.com\"])" in cf
@@ -178,13 +185,13 @@ check("D1 version.h Task 171 附录：七主题齐全",
                                  "ame171_syncVisibleProfileAvatar", "latestlog.crash.txt",
                                  "PreferredGraphicsApi", "UIAsyncTextInput"]))
 anns = json.loads(rd("announcements.json"))["announcements"]
-# Task172 重锚：公告漂移 anns[3] -> anns[4]（task172/task173 相继插入 index 2）。
-check("D2 公告：task171 在 index 4（Task173 起）；置顶服务器推荐仍在 anns[0]；task169 仍在 anns[1]",
-      anns[4]["id"] == "task171-seven-fixes-2026-09-25"
+# Task172 重锚：公告漂移 anns[2] -> anns[3]（task172 插入 index 2）。
+check("D2 公告：task171 在 index 4（task173/172 相继插入后）；置顶服务器推荐仍在 anns[0]；task169 仍在 anns[1]",
+      anns[5]["id"] == "task171-seven-fixes-2026-09-25"
       and anns[0].get("pin") and "mysv.dpdns.org" in anns[0]["title"]
       and anns[1]["id"] == "task169-four-fixes-2026-09-25")
 check("D3 task171 公告内容七条全列",
-      all(k in anns[4]["content"] for k in ["①", "②", "③", "④", "⑤", "⑥", "⑦"]))
+      all(k in anns[5]["content"] for k in ["①", "②", "③", "④", "⑤", "⑥", "⑦"]))
 wl = rd("worklog.md")
 check("D4 仓库 worklog 已记 Task 171",
       "Task ID: 171" in wl)

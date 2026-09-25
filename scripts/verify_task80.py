@@ -5,6 +5,7 @@
 + C. FSR1.cpp 行为回放（编译失败安全网 / target 钳制 / 全表面 blit / ctx 往返）
 + D. 括号平衡 + 级联回归
 """
+import os
 import re, os, sys, math, subprocess
 
 ROOT = "/home/z/my-project/Amethyst-iOS-MyRemastered"

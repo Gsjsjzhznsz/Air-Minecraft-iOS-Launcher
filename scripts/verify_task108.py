@@ -24,7 +24,7 @@ import re
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(REPO)
 SCRIPTS = os.path.join(REPO, "scripts")
 

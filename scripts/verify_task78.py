@@ -10,9 +10,10 @@ Checks:
   D. gl_bridge exemption matrix (FSR smaller-both exempt; transpose NOT exempt)
   E. Brace balance delta vs HEAD for edited C/ObjC files
 """
+import os
 import re, subprocess, sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FAILED = []
 
 def check(name, cond, detail=""):

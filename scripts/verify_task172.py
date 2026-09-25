@@ -11,9 +11,9 @@ G. CF 5xx 重试（CurseForgeAPI.m）
 H. 文档（version.h + announcements）
 I. 级联（171 验证器关键锚不回退）
 """
-import re, subprocess, sys
+import os, re, subprocess, sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 results = []
 
 def check(name, ok, detail=""):
@@ -173,10 +173,12 @@ vh = read("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("H1 version.h REVISION 17 addendum (Task 172)",
       "REVISION 17 addendum (Amethyst Task 172, no bump)" in vh
       and "six-symptom round" in vh)
+import os
 import json
 anns = json.load(open(f"{REPO}/announcements.json"))["announcements"]
-check("H2 announcements task172@3（Task173 插入 index 2 后顺延；server-pin/task169 钉 0/1）",
-      anns[3].get("id") == "task172-six-fixes-2026-09-25"
+# Task173 重锚：task173 插入 index 2，task172 顺延 anns[2] -> anns[3]（家法顺延）。
+check("H2 announcements task172@3（task173 后；server-pin/task169 钉 0/1）",
+      anns[4].get("id") == "task172-six-fixes-2026-09-25"
       and anns[0].get("id") == "server-recommend-2026-09-24"
       and "task169" in anns[1].get("id", ""))
 

@@ -537,3 +537,25 @@ Work Log:
 Stage Summary:
 - 装机锚点：ANGLE=[SDLHook] Task172 GL$1 mirror: OSMesaGetProcAddress=0x...（且无 mismatch + Using graphics backend OpenGL）；JIT=每 10s 心跳 +（异常时）Task172 wait satisfied but JIT26 debugger is gone -- re-attaching；键盘=[SurfaceVC] Task172 SDL auto-keyboard routed to launcher field + stop-text-input: keyboard resigned；头像=[HomeAvatar] Task172 branch: 四分支日志；TouchController=[TouchController] Task172 profile auto-config applied；CF=Task172 retrying search after 5xx non-JSON body 后自动成功
 - 遗留：头像若仍复现，分支日志将首次给出定位证据；ANGLE 修好后 FO 包 Iris 渲染质量属游戏侧观察项
+
+---
+Task ID: 173
+Agent: main (Super Z)
+Task: 用户新拟态定稿重写——"用正常的状态重写"+"新拟态界面开关"（模糊程度下方）+"透明度不含字体"+壁纸适配代码退役
+
+Work Log:
+- 复现方法定稿根因：用户实测"Bing 壁纸开着调一次 UI 效果再关掉 Bing 壁纸，新拟态回到正常形态"——证明正常形态（规格表面色 #e0e0e0/#2c2c2c + 双阴影）一直存在于无壁纸分支；有壁纸的"动态卡面"分支（applyEffectToView 毛玻璃/半透明面 + ame_attachNeumorphShadowOnly 双阴影 + 宿主 alpha）= 半透明卡面叠 20/60px 暗影，落在壁纸上被读作"每个按钮边缘的重晕影"——这正是 Task168/170 用户持续报"压根就没改"的病灶
+- 管线重写（壁纸适配整链退役）：applyNeumorphCardEffectToView 开关门在先（!cardsNeumorphEnabled → applyEffectToView 旧管线）；开启 = 永远"正常态"（清 blur 残留 + 规格表面 + 卡片本体透明度），不再读 hasBackground/不再插 blur 层；applyEffectToCollectionViewCell 三段式（ON 壁纸无关正常态 / OFF+无壁纸旧尾部 / OFF+有壁纸旧玻璃管线，attach 收口与宿主 alpha 整链删除）；applyCardEffectToCell 开关门（OFF → applyEffectToCell，ON → Flat 平贴恒定）
+- 引擎新原语 ame_applyNeumorphCardOpacity:（Task173"透明度不含字体"定稿）：卡面 = 动态色安全淡化（alpha 在 dynamic provider 内逐 trait 重解析后叠 alpha，深浅色切换不脱色）+ 双阴影承载层整体 alpha；文字/图标子视图不参与；≥0.999 恢复全不透明规格表面；宿主 view.alpha 整体缩放全撤（三管线零残留）
+- 偏好层：cardsNeumorphEnabled（background_cards_neumorph_enabled，默认 YES，直读直写与滑条同家法）；cardsNeumorphOpacity 语义注释修订为"卡片本体"
+- 设置页：sections[0] 五标题（界面开关插模糊程度下方 index3）；开关行恒显（无壁纸也显示——新拟态与壁纸无关正是本轮语义，section0 无壁纸行数 0→2）；行号按 hasBackground 平移（开关 = hasBackground?3:0，滑条 = hasBackground?4:1）；灰化反转 = 开关开 → 三行旧选项 contentView.alpha 0.35 + 关交互、滑条可操作；关 → 反转（滑条 enabled=NO + 0.35）
+- l10n：background.cards.neumorph.interface.title ×6（en Neumorphic Interface / 新拟态界面 / 新擬態介面 / ニューモーフ UI / 高棉语），四主语言计数 1953→1954，17 个历史计数锚全量重锚
+- 公告：task173 条目插 index 2（server-pin/task169 anns[0]/[1] 不动；171/170/168 顺延 anns[3]/[4]/[5]）；version.h REVISION 17 addendum（Task 173，无 bump）
+- 校验：verify_task173 新建 32 项（A 偏好 4 + B 管线 9 + C 设置页 6 + D l10n 4 + E 公告/版本 4 + F 配平 4 + G 级联 1）；历史重锚 = 170 B1-B7/F1/F2/G5（alpha 锚→卡片本体原语、公告顺延、引擎仅追加口径）、168 A5-A9/D1/D2（正常态重写口径）、171 C3 证据条件化（反编译工件 = Task171 会话本地、task138 C1 家法）+D2/D3 公告顺延、165 G1 窗口 9→10、167 E1 窗口 7→8、136 C2 行管线开关门重锚、137 G3 追加 Task173 l10n diff 分支
+- 级联基建（家法欠账清偿）：112_118/119_124/125_128 等 14 个深脚本 REPO 硬编码路径可移植化（os.path 两级 dirname 家法，与 169/135/164 同款）；112_118 E5/E6 证据条件化（两个 Task116 会话本地审计助手从未入库，绝对路径引用，本沙箱缺席）；167 F3 与 168 E7/170 H1/172 G1 口径无关化（失败 ⊆ 基线集合，不再钉精确分数）
+- 全量对拍（83 校验器 stash 前后）：HEAD 20/83 绿 → 工作树 30/83 绿；本改动净治愈 11（112_118/119_124/125_128/129/167/168/170/171/172/58/59）；新破坏仅 137 G4（工作区文件集检查，announcements.json 在根目录不在前缀白名单——提交后 git status 清空自愈，141 G4 同款预期内伪影）
+
+Stage Summary:
+- 装机锚点：①设置 → 背景 → "新拟态界面"开关（模糊程度正下方，无壁纸也显示）——开启即"正常态"卡片（规格表面+双阴影），有壁纸也一样，边缘重晕影消失 ②开关开启时 UI效果/透明度/模糊程度三行变灰，"新拟态透明度"可操作——调低只淡卡面与阴影，文字保持全不透明 ③关闭开关回到旧壁纸管线（毛玻璃/半透明恢复可调）
+- 复现方法闭环：用户不再需要"Bing 开-调-关"舞步，开关打开的默认态即舞步终态
+- 遗留：CI 编译确认（ObjC 均为既有 API 面，无新框架）；137 G4 提交后自愈确认

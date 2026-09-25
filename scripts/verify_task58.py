@@ -23,11 +23,12 @@
      B3 全帧仿真（swap#1..#1570）：修正后 0 次 geo-heal、0 次 present-align
         写入、Task55 realign 0 次触发
 """
+import os
 import re
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GL = f"{REPO}/Natives/ctxbridges/gl_bridge.m"
 
 results = []

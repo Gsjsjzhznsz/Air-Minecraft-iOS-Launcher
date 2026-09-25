@@ -152,7 +152,7 @@
     // 恢复/清除顺延为 3/4。
     // Sections: [UI效果设置], [选择背景类型], [Bing 壁纸(开关+画廊+刷新)], [图片背景, 视频背景], [恢复默认背景, 清除背景]
     self.sections = @[
-        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.opacity.title", nil)],
+        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.interface.title", nil), localize(@"background.cards.neumorph.opacity.title", nil)],
         @[localize(@"i18n_str_60", nil)],
         @[localize(@"bing.section.header", nil), localize(@"bing.toggle.title", nil), localize(@"bing.gallery.title", nil), localize(@"bing.refresh.title", nil)],
         @[localize(@"i18n_str_61", nil), localize(@"i18n_str_55", nil)],
@@ -171,9 +171,11 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    // 如果没有自定义背景，隐藏UI效果设置部分
+    // 如果没有自定义背景，隐藏旧壁纸管线选项（行 0-2：UI效果/透明度/模糊程度）；
+    // Task172：新拟态界面开关行 + 卡片本体透明度滑条行恒显（新拟态与壁纸
+    // 无关，正是本轮重写的语义）。
     if (section == 0 && ![[BackgroundManager sharedManager] hasBackground]) {
-        return 0;
+        return 2;
     }
     return [self.sections[section] count];
 }
@@ -206,9 +208,13 @@
     BackgroundManager *manager = [BackgroundManager sharedManager];
     BOOL hasBackground = [manager hasBackground];
     
-    // UI效果设置部分
-    if (indexPath.section == 0 && hasBackground) {
-        if (indexPath.row == 0) {
+    // UI效果设置部分（Task172：行 0-2 = 旧壁纸管线选项，仅在有壁纸时存在；
+    // 新拟态界面开关行 + 卡片本体透明度滑条行恒显——新拟态与壁纸无关。
+    // 开关开启时行 0-2 变灰（contentView.alpha 0.35 + 关交互），透明度滑条
+    // 可操作；关闭反转——滑条变灰，行 0-2 恢复。）
+    if (indexPath.section == 0) {
+        BOOL neumorphOn = manager.cardsNeumorphEnabled;
+        if (hasBackground && indexPath.row == 0) {
             // UI效果选择
             UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
             if (!cell) {
@@ -221,55 +227,51 @@
             cell.detailTextLabel.text = effectName;
             cell.imageView.image = [UIImage systemImageNamed:@"rectangle.split.3x3"];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            // Task172：新拟态界面开启时本行（其余 UI 效果选项）变灰停用
+            cell.contentView.alpha = neumorphOn ? 0.35 : 1.0;
+            cell.userInteractionEnabled = !neumorphOn;
             
             [self styleCell:cell hasBackground:hasBackground];
             return cell;
             
-        } else if (indexPath.row == 1 || indexPath.row == 2 || indexPath.row == 3) {
-            // Task173：三个滑块行（透明度/模糊程度/卡片透明度）改用统一的
-            // Auto Layout 构建（用户反馈"壁纸设置默认配置调反了界面尺寸就会
-            // 与点击位置错位"——旧实现三重错位源：①滑块/标签 y=0 h=30 顶对齐，
-            // 可见拇指位置与行中心（用户点击预期）错开；②固定 x 偏移
-            //（150/165 + width-230/-245）按预布局宽度计算，iPad 宽 form sheet
-            // 与旋转后数值标签与滑块尾端重叠互相吞点击；③autoresizing 对初次
-            // 布局前的错误宽度无能为力。统一构建：图标后标题，滑块垂直居中
-            // 占满剩余宽度，数值标签固定尾端，全部约束驱动任意宽度自适应）。
+        } else if (hasBackground && (indexPath.row == 1 || indexPath.row == 2)) {
+            // Task173（十连修会话）：透明度/模糊程度两行改用统一的 Auto Layout
+            // 构建（用户反馈"壁纸设置默认配置调反了界面尺寸就会与点击位置
+            // 错位"——旧实现三重错位源：①滑块/标签 y=0 h=30 顶对齐，可见拇指
+            // 位置与行中心（用户点击预期）错开；②固定 x 偏移（150/165 +
+            // width-230/-245）按预布局宽度计算，iPad 宽 form sheet 与旋转后
+            // 数值标签与滑块尾端重叠互相吞点击；③autoresizing 对初次布局前
+            // 的错误宽度无能为力）。
+            // 合并保留并行会话（新拟态重写）的灰化语义：开关开启时本行变灰停用。
             NSDictionary *ame173_rowSpec = @{
                 @1: @[@"SliderCell", @200, @202, @201, NSStringFromSelector(@selector(opacitySliderChanged:))],
                 @2: @[@"BlurSliderCell", @300, @302, @301, NSStringFromSelector(@selector(blurIntensitySliderChanged:))],
-                @3: @[@"CardsNeumorphOpacityCell", @500, @502, @501, NSStringFromSelector(@selector(cardsNeumorphOpacitySliderChanged:))],
             }[@(indexPath.row)];
-            NSString *ame173_reuse = ame173_rowSpec[0];
-            NSInteger ame173_sliderTag = [ame173_rowSpec[1] integerValue];
-            NSInteger ame173_titleTag = [ame173_rowSpec[2] integerValue];
-            NSInteger ame173_valueTag = [ame173_rowSpec[3] integerValue];
-            SEL ame173_action = NSSelectorFromString(ame173_rowSpec[4]);
-
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:ame173_reuse];
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:ame173_rowSpec[0]];
             if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:ame173_reuse];
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:ame173_rowSpec[0]];
                 cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
                 UILabel *titleLabel = [[UILabel alloc] init];
                 titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
                 titleLabel.font = [UIFont systemFontOfSize:15];
                 titleLabel.textColor = [UIColor labelColor];
-                titleLabel.tag = ame173_titleTag;
+                titleLabel.tag = [ame173_rowSpec[2] integerValue];
                 [cell.contentView addSubview:titleLabel];
 
                 UISlider *slider = [[UISlider alloc] init];
                 slider.translatesAutoresizingMaskIntoConstraints = NO;
-                // Task173：透明度行保持 0.1 下限（旧语义），模糊/卡片行 0.0 起步
+                // Task173：透明度行保持 0.1 下限（旧语义），模糊行 0.0 起步
                 slider.minimumValue = (indexPath.row == 1) ? 0.1f : 0.0f;
                 slider.maximumValue = 1.0f;
-                slider.tag = ame173_sliderTag;
-                [slider addTarget:self action:ame173_action forControlEvents:UIControlEventValueChanged];
+                slider.tag = [ame173_rowSpec[1] integerValue];
+                [slider addTarget:self action:NSSelectorFromString(ame173_rowSpec[4]) forControlEvents:UIControlEventValueChanged];
                 [cell.contentView addSubview:slider];
 
                 UILabel *valueLabel = [[UILabel alloc] init];
                 valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
                 valueLabel.textAlignment = NSTextAlignmentRight;
-                valueLabel.tag = ame173_valueTag;
+                valueLabel.tag = [ame173_rowSpec[3] integerValue];
                 valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
                 [cell.contentView addSubview:valueLabel];
 
@@ -292,27 +294,118 @@
 
             [self styleCell:cell hasBackground:hasBackground];
 
-            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:ame173_titleTag];
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:[ame173_rowSpec[2] integerValue]];
             titleLabel.text = self.sections[0][indexPath.row];
 
-            UISlider *slider = [cell.contentView viewWithTag:ame173_sliderTag];
-            UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:ame173_valueTag];
+            UISlider *slider = [cell.contentView viewWithTag:[ame173_rowSpec[1] integerValue]];
+            UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:[ame173_rowSpec[3] integerValue]];
             if (indexPath.row == 1) {
                 slider.value = manager.uiOpacity;
                 valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.uiOpacity * 100];
                 self.opacityValueLabel = valueLabel;
                 cell.imageView.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
-            } else if (indexPath.row == 2) {
+            } else {
                 slider.value = manager.blurIntensity;
                 valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.blurIntensity * 100];
                 cell.imageView.image = [UIImage systemImageNamed:@"drop.halffull"];
-            } else {
-                slider.value = manager.cardsNeumorphOpacity;
-                valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
-                cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
             }
             valueLabel.textColor = [UIColor labelColor]; // Task91
             cell.textLabel.text = nil;
+            // 并行会话灰化：新拟态开关开启时旧 UI 效果行变灰停用
+            cell.contentView.alpha = neumorphOn ? 0.35 : 1.0;
+            cell.userInteractionEnabled = !neumorphOn;
+
+            return cell;
+
+        }
+
+        // Task172（并行会话）：新拟态界面开关行（模糊程度下方，用户定稿）——
+        // 恒显（与壁纸无关）。开启 = 卡片永远"正常态"规格表面 + 双阴影，其余
+        // UI 效果选项变灰、透明度滑条可操作；关闭反转（旧壁纸管线接管）。
+        if (indexPath.row == (hasBackground ? 3 : 0)) {
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphToggleCell"];
+            if (!cell) {
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"CardsNeumorphToggleCell"];
+                UISwitch *neumorphSwitch = [[UISwitch alloc] init];
+                [neumorphSwitch addTarget:self action:@selector(cardsNeumorphToggleChanged:) forControlEvents:UIControlEventValueChanged];
+                neumorphSwitch.tag = 410;
+                cell.accessoryView = neumorphSwitch;
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
+            }
+            UISwitch *neumorphSwitch = (UISwitch *)cell.accessoryView;
+            neumorphSwitch.on = manager.cardsNeumorphEnabled;
+
+            cell.textLabel.text = self.sections[0][3]; // background.cards.neumorph.interface.title
+            cell.imageView.image = [UIImage systemImageNamed:@"square.3.layers.3d"];
+            [self styleCell:cell hasBackground:hasBackground];
+            return cell;
+        }
+
+        // 恒显：卡片本体透明度滑条行（原 Task170 row3 / 无壁纸时 row1）。
+        // Task172 语义 = 卡片本体（卡面 + 双阴影）透明度，文字/图标不动；
+        // 仅在开关开启时可操作，关闭时变灰。Task173（十连修会话）构建改用
+        // 统一 Auto Layout（与透明度/模糊行同款：图标后标题、滑块垂直居中
+        // 占满剩余宽度、数值标签固定尾端——任意行宽/旋转不错位）。
+        if (indexPath.row == (hasBackground ? 4 : 1)) {
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphOpacityCell"];
+            if (!cell) {
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CardsNeumorphOpacityCell"];
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
+
+                UILabel *titleLabel = [[UILabel alloc] init];
+                titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+                titleLabel.font = [UIFont systemFontOfSize:15];
+                titleLabel.textColor = [UIColor labelColor];
+                titleLabel.tag = 502;
+                [cell.contentView addSubview:titleLabel];
+
+                UISlider *slider = [[UISlider alloc] init];
+                slider.translatesAutoresizingMaskIntoConstraints = NO;
+                // Task170 语义：0%~100% 全开（0% = 卡体全透明，文字仍可见）
+                slider.minimumValue = 0.0f;
+                slider.maximumValue = 1.0f;
+                slider.tag = 500;
+                [slider addTarget:self action:@selector(cardsNeumorphOpacitySliderChanged:) forControlEvents:UIControlEventValueChanged];
+                [cell.contentView addSubview:slider];
+
+                UILabel *valueLabel = [[UILabel alloc] init];
+                valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
+                valueLabel.textAlignment = NSTextAlignmentRight;
+                valueLabel.tag = 501;
+                valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
+                [cell.contentView addSubview:valueLabel];
+
+                [NSLayoutConstraint activateConstraints:@[
+                    [titleLabel.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:50],
+                    [titleLabel.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                    [titleLabel.widthAnchor constraintEqualToConstant:110],
+                    [slider.leadingAnchor constraintEqualToAnchor:titleLabel.trailingAnchor constant:8],
+                    [slider.trailingAnchor constraintEqualToAnchor:valueLabel.leadingAnchor constant:-8],
+                    [slider.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                    [valueLabel.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
+                    [valueLabel.centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor],
+                    [valueLabel.widthAnchor constraintEqualToConstant:60],
+                ]];
+                cell.contentView.layoutMargins = UIEdgeInsetsMake(8, 16, 8, 16);
+            }
+
+            [self styleCell:cell hasBackground:hasBackground];
+
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:502];
+            titleLabel.text = self.sections[0][4]; // background.cards.neumorph.opacity.title
+
+            UISlider *slider = [cell.contentView viewWithTag:500];
+            slider.value = manager.cardsNeumorphOpacity;
+            // 并行会话灰化（反转语义）：开关关闭时滑条变灰停用
+            slider.enabled = neumorphOn;
+            cell.contentView.alpha = neumorphOn ? 1.0 : 0.35;
+
+            UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:501];
+            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
+            valueLabel.textColor = [UIColor labelColor]; // Task91
+
+            cell.textLabel.text = nil;
+            cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
 
             return cell;
         }
@@ -438,12 +531,21 @@
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 
-// Task170：卡片新拟态整体透明度滑条（替换 Task168 实底开关）——落盘后走统一刷新链重建卡片
+// Task170：卡片新拟态透明度滑条——落盘后走统一刷新链重建卡片
+// （Task172 语义 = 卡片本体透明度，引擎原语 ame_applyNeumorphCardOpacity
+// 重写卡面动态色与阴影承载层 alpha，文字不动；每次重挂全量重设，无残留）
 - (void)cardsNeumorphOpacitySliderChanged:(UISlider *)slider {
-    // Task170：落盘 + refreshUIEffect（通知驱动统一刷新链，双管线重挂时
-    // 每个终端分支都会重设宿主 alpha，无残留）。
     [BackgroundManager sharedManager].cardsNeumorphOpacity = slider.value;
     [[BackgroundManager sharedManager] refreshUIEffect];
+}
+
+// Task172：新拟态界面开关——落盘 + 统一刷新链 + 重载表格（灰化态反转）。
+// 开启 = 卡片永远"正常态"（规格表面 + 双阴影，壁纸无关）；关闭 = 旧壁纸
+// 管线接管，其余 UI 效果选项恢复可操作。
+- (void)cardsNeumorphToggleChanged:(UISwitch *)sender {
+    [BackgroundManager sharedManager].cardsNeumorphEnabled = sender.on;
+    [[BackgroundManager sharedManager] refreshUIEffect];
+    [self.tableView reloadData];
 }
 
 #pragma mark - Task151：Bing 每日壁纸

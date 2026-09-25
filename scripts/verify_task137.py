@@ -380,6 +380,11 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       # Task158 重锚：FSR 详情/renderer_backend 详情与 mithril 标签的纯值更新
       # （4 语言 ×3 行，零键增删——G3 的键集守卫仍在位）。
       or all(("fsr1_setting" in l or "renderer_backend" in l)
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task173 重锚：新拟态界面开关键 background.cards.neumorph.interface.title
+      # 新增（4 语言各 1 行，四主语言计数 1953 -> 1954，与键集守卫一致）；
+      # 提交后 diff 清空走第二分支自愈。
+      or all("background.cards.neumorph.interface.title" in l
              for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（提交后自愈）",

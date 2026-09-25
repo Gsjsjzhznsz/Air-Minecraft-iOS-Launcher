@@ -18,6 +18,7 @@ B. 默认控件 = custom.json：
 C. 行为回放：相位统计 avg/max/重置语义 + 迁移决策表
 D. 括号平衡：全部触碰文件 vs HEAD 差量 = 0
 """
+import os
 import re
 import subprocess
 import sys

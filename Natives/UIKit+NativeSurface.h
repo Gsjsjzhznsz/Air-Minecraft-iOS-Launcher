@@ -118,6 +118,14 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 调用点负责把卡面子视图（如 blur 层）的圆角同步到宿主新值。
 - (void)ame_attachNeumorphShadowOnly;
 
+/// Task172：卡片本体透明度（不含文字）——在 ame_applyNeumorphSurface 之后
+/// 调用。卡面背景色按 opacity 淡化（动态色安全：dynamic provider 内逐
+/// trait 重解析后再叠 alpha，深浅色切换不脱色），双阴影承载层整体 alpha
+/// 同步淡化；文字/图标等内容子视图不参与（保持全不透明）。
+///   100%（默认）= 规格表面原样；0% = 卡面与阴影完全透明（文字仍可见）。
+/// 未挂阴影承载层时只处理卡面（无害）。重复调用幂等（每次全量重写）。
+- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity;
+
 @end
 
 /// 带左右内边距的胶囊徽章标签（Task137：列表右侧小字框的统一实现）。

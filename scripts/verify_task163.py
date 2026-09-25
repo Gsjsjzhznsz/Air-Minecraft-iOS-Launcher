@@ -158,9 +158,11 @@ ps = read('Natives/ProfileSettingsViewController.m')
 
 check("C1  系统 DisclosureIndicator 代码清零（注释除外）",
       "cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;" not in ps)
-check("C2  helper ame163_disclosureChevron 存在（同款 chevron.right）",
+# Task173 重锚：并行 Task172（six-fix）新增 TouchController 行后，自绘箭头
+# 行数 13 -> 14（新增行复用同款 chevron helper，视觉语义不变）。
+check("C2  helper ame163_disclosureChevron 存在（同款 chevron.right；Task172 触控行并入后 14）",
       "- (UIView *)ame163_disclosureChevron {" in ps
-      and ps.count("[self ame163_disclosureChevron];") == 13)
+      and ps.count("[self ame163_disclosureChevron];") == 14)
 check("C3  helper 视觉规格（tertiaryLabel 灰 + 8x13 + 容器 14x30）",
       "chevron.tintColor = [UIColor tertiaryLabelColor];" in ps
       and "chevron.frame = CGRectMake(0, 8.5, 8, 13);" in ps
@@ -168,8 +170,8 @@ check("C3  helper 视觉规格（tertiaryLabel 灰 + 8x13 + 容器 14x30）",
 check("C4  分辨率行容器尾端 chevron 保持（整页统一基准）",
       "UIImage *chevronImage = [UIImage systemImageNamed:@\"chevron.right\"];" in ps
       and "chevronView.frame = CGRectMake(82, 9, 8, 13);" in ps)
-check("C5  渲染器行换用自绘箭头（用户点名行）",
-      ps.count("cell.accessoryView = [self ame163_disclosureChevron];") == 13
+check("C5  渲染器行换用自绘箭头（用户点名行；Task172 触控行并入后 14）",
+      ps.count("cell.accessoryView = [self ame163_disclosureChevron];") == 14
       and "[self rendererDisplayName:self.selectedRenderer];" in ps)
 check("C6  复用重置逻辑幸存（accessoryView/accessoryType 复位不动）",
       "cell.accessoryView = nil;" in ps

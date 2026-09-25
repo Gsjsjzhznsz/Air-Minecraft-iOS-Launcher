@@ -26,7 +26,7 @@ import os
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK = "/home/z/my-project/task110"
 DECOMP = "/home/z/my-project/task66_decomp/out"
 os.chdir(REPO)

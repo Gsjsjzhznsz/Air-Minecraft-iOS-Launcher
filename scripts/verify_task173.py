@@ -249,8 +249,9 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("M1 version.h addendum", "Task 173" in vh and "desktop-GL completion layer" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
-check("M3 announcement at index 2 (below server-pin & task169)",
-      ann["announcements"][2]["id"] == "task173-ten-fixes-2026-09-26")
+check("M3 announcement at index 3 (below server-pin/task169/neumorph-173)",
+      ann["announcements"][3]["id"] == "task173-ten-fixes-2026-09-26"
+      and ann["announcements"][2]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")
