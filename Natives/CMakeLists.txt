@@ -281,6 +281,7 @@ set(VGPU_CORE_SRC
   "${VGPU_DIR}/src/gl/uniform.c"
   "${VGPU_DIR}/src/gl/vertexattrib.c"
   "${VGPU_DIR}/src/gl/wrap/gl4eswraps.c"
+  "${VGPU_DIR}/src/gl/wrap/vgpu_darwin_aliases.c"
   "${VGPU_DIR}/src/gl/wrap/gles.c"
   "${VGPU_DIR}/src/gl/wrap/glstub.c"
   "${VGPU_DIR}/src/gl/math/matheval.c"
