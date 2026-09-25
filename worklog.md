@@ -370,3 +370,21 @@ Task: 用户报"es和4.0依旧黑屏。vulkan你能不能想一下怎么利用fs
   5. 若仍黑：看两探针分诊（renderTexture 全零 = 解析层仍被绕过；renderTexture 非零 + fb0 全零 = RCAS 还有独立 bug，熔断应已自动退 EASU-only 保画面）
 - Vulkan FSR：上游硬限制维持，推荐 GLES/4.0（60fps + 完整 FSR1）；CA 拉伸渲染缩放档方案留档待用户拍板
 - 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README + 6.0.0 发行文案收尾
+
+---
+Task ID: 165-CI
+Agent: main (Super Z)
+Task: Task 165 CI 收尾
+
+Work Log:
+- 推送 ea7b123 → run 36085386102 轮询确认 completed success
+- Artifacts 三件就绪：com.air-devs.air-ios.ipa (205.8MB) / trollstore.tipa (205.8MB) / AngelAuraAmethyst.dSYM (3.8MB)，均未过期
+
+Stage Summary:
+- Task165 构建产物可装机；装机验证锚点（mg GLES / OpenGL 4.0 后端 + FSR 档位）：
+  ① 画面正常显示（黑屏痊愈判定）
+  ② 日志 "[MG] Task165 xglGetProcAddress: LWJGL delegate resolution routed through the frontend (renderer=libmobileglues.dylib)"（根修生效铁证）
+  ③ 5.1.0 健康签名回归："[MG] 2.0.16 own-image resolution" / "SYMBOL THEFT" 哨兵行
+  ④ "[MG] Task165 render-texture probe: center pixel rgba=..." 非零 + "[MG] Task164 RCAS GPU probe" 非零
+  ⑤ "No context is current" 10 连消失
+- 若仍黑屏：两探针分诊（renderTexture 全零 = 解析层仍被绕过；renderTexture 非零 + fb0 全零 = RCAS 独立 bug 且熔断应已自动退 EASU-only 保画面）
