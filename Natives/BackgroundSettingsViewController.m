@@ -152,7 +152,7 @@
     // 恢复/清除顺延为 3/4。
     // Sections: [UI效果设置], [选择背景类型], [Bing 壁纸(开关+画廊+刷新)], [图片背景, 视频背景], [恢复默认背景, 清除背景]
     self.sections = @[
-        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.title", nil)],
+        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.opacity.title", nil)],
         @[localize(@"i18n_str_60", nil)],
         @[localize(@"bing.section.header", nil), localize(@"bing.toggle.title", nil), localize(@"bing.gallery.title", nil), localize(@"bing.refresh.title", nil)],
         @[localize(@"i18n_str_61", nil), localize(@"i18n_str_55", nil)],
@@ -339,23 +339,63 @@
             return cell;
             
         } else if (indexPath.row == 3) {
-            // Task168：卡片新拟态形态开关（实底 = 放弃壁纸透明度/模糊，
-            // 一律规格表面色+双阴影；关 = 动态随透明度/模糊设置 + 双阴影叠加）
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphSolidCell"];
+            // Task170：卡片新拟态整体透明度滑条（替换 Task168 实底开关——
+            // 用户定稿"用拉条从 0%~100% 调节整个卡片的透明度，而不是实底
+            // 啥的"）。行内布局与透明度/模糊程度两行同款（Task156 形态）：
+            // 图标 + 标题 + 滑块 + 百分比。语义 = 整个卡片（卡面 + 双阴影
+            // 承载层 + 内容）作为单元做 alpha 缩放；0% = 整卡不可见（极端
+            // 档），100% = Task168 形态原样。用户反馈"按钮边缘晕影很重"
+            // 的自助调节入口（调低时边缘阴影晕影随之变淡）。
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphOpacityCell"];
             if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"CardsNeumorphSolidCell"];
-                UISwitch *solidSwitch = [[UISwitch alloc] init];
-                [solidSwitch addTarget:self action:@selector(cardsNeumorphSolidToggleChanged:) forControlEvents:UIControlEventValueChanged];
-                solidSwitch.tag = 410;
-                cell.accessoryView = solidSwitch;
-            }
-            UISwitch *solidSwitch = (UISwitch *)cell.accessoryView;
-            solidSwitch.on = manager.cardsNeumorphSolid;
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CardsNeumorphOpacityCell"];
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
-            cell.textLabel.text = self.sections[0][3]; // background.cards.neumorph.title
-            cell.detailTextLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
+                // 标题标签（Task156 同款：位于图标右侧，固定宽度，垂直居中）
+                UILabel *titleLabel = [[UILabel alloc] initWithFrame:CGRectMake(50, 0, 110, 30)];
+                titleLabel.autoresizingMask = UIViewAutoresizingFlexibleRightMargin;
+                titleLabel.font = [UIFont systemFontOfSize:15];
+                titleLabel.textColor = [UIColor labelColor];
+                titleLabel.tag = 502;
+                [cell.contentView addSubview:titleLabel];
+
+                // 创建滑块（Task156 同款：起点右移到标题之后；Task170 按用户
+                // 定稿全开 0%~100%，不设 0.1 下限——0% 是合法的"整卡隐藏"档）
+                UISlider *slider = [[UISlider alloc] initWithFrame:CGRectMake(165, 0, cell.bounds.size.width - 245, 30)];
+                slider.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+                slider.minimumValue = 0.0f;
+                slider.maximumValue = 1.0f;
+                slider.tag = 500;
+                [slider addTarget:self action:@selector(cardsNeumorphOpacitySliderChanged:) forControlEvents:UIControlEventValueChanged];
+
+                // 创建数值标签
+                UILabel *valueLabel = [[UILabel alloc] initWithFrame:CGRectMake(cell.bounds.size.width - 80, 0, 60, 30)];
+                valueLabel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+                valueLabel.textAlignment = NSTextAlignmentRight;
+                valueLabel.tag = 501;
+                valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
+
+                [cell.contentView addSubview:slider];
+                [cell.contentView addSubview:valueLabel];
+
+                cell.contentView.layoutMargins = UIEdgeInsetsMake(8, 16, 8, 16);
+            }
+
             [self styleCell:cell hasBackground:hasBackground];
+
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:502];
+            titleLabel.text = self.sections[0][3]; // background.cards.neumorph.opacity.title
+
+            UISlider *slider = [cell.contentView viewWithTag:500];
+            slider.value = manager.cardsNeumorphOpacity;
+
+            UILabel *valueLabel = [cell.contentView viewWithTag:501];
+            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
+            valueLabel.textColor = hasBackground ? [UIColor labelColor] : [UIColor labelColor]; // Task91
+
+            cell.textLabel.text = nil;
+            cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
+
             return cell;
         }
     }
@@ -480,9 +520,11 @@
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 
-// Task168：卡片新拟态形态开关（实底/动态）——落盘后走统一刷新链重建卡片
-- (void)cardsNeumorphSolidToggleChanged:(UISwitch *)sender {
-    [BackgroundManager sharedManager].cardsNeumorphSolid = sender.on;
+// Task170：卡片新拟态整体透明度滑条（替换 Task168 实底开关）——落盘后走统一刷新链重建卡片
+- (void)cardsNeumorphOpacitySliderChanged:(UISlider *)slider {
+    // Task170：落盘 + refreshUIEffect（通知驱动统一刷新链，双管线重挂时
+    // 每个终端分支都会重设宿主 alpha，无残留）。
+    [BackgroundManager sharedManager].cardsNeumorphOpacity = slider.value;
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 

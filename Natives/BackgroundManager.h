@@ -35,14 +35,17 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 @property (nonatomic, assign) CGFloat uiOpacity;  // 0.0 ~ 1.0
 @property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度
 
-// Task168：卡片新拟态形态开关（用户定稿，设置页"外观"区切换）。
-//   NO（默认，动态）= 卡片面沿用壁纸管线（毛玻璃/半透明，随上面的透明度/
-//     模糊设置动态变化），只叠加新拟态双阴影承载层（"按照壁纸功能设置的
-//     透明度和模糊程度来动态调整新拟态"）；
-//   YES（实底）= 卡片一律规格表面色 + 双阴影（放弃壁纸透明度/模糊，壁纸
-//     从卡片间隙透出）。
-// 列表行 cell（applyCardEffectToCell）恒为平贴新拟态表面，不受此开关影响。
-@property (nonatomic, assign) BOOL cardsNeumorphSolid;
+// Task170（用户定稿，替换 Task168 实底开关）：卡片新拟态整体透明度滑条
+// （设置页"外观"区，0% ~ 100%）。
+//   语义 = "整个卡片"作为一个单元做透明度缩放：卡面（毛玻璃/半透明/规格
+//   表面色）+ 新拟态双阴影承载层 + 卡片内容一起按比例淡化（宿主视图 alpha，
+//   阴影子视图随之等比淡出）。
+//   100%（默认）= Task168 形态原样（动态卡面 + 规格双阴影）；
+//   调低 = 卡片连同边缘阴影晕影一起变淡（用户反馈"按钮边缘晕影很重"的
+//   自助调节入口）；
+//   0% = 卡片整体不可见（极端档，一般不用）。
+// 列表行 cell（applyCardEffectToCell）恒为平贴新拟态表面，不受此滑条影响。
+@property (nonatomic, assign) CGFloat cardsNeumorphOpacity; // 0.0 ~ 1.0
 
 // Global background container
 @property (nonatomic, strong, readonly, nullable) UIView *globalBackgroundContainer;

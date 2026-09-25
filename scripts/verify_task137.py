@@ -213,9 +213,16 @@ print("=" * 72)
 print("E. 层级与裁剪还原")
 print("=" * 72)
 bm = read("Natives/BackgroundManager.m")
-check("E1  collection cell 裁剪恢复（clipsToBounds YES；新拟态阴影放开退役）",
-      "cell.clipsToBounds = YES;" in bm
-      and not re.search(r"applyEffectToCollectionViewCell:[\s\S]{0,4000}?cell\.clipsToBounds = NO;", bm))
+# Task170 诚实重锚：Task163/168 把 collection cell 裁剪放开已是用户定稿语义
+# （新拟态双阴影越出卡片边界投到磁贴间隙），本锚自 163 起漂移、仅经 138 J
+# 行豁免。现锚定现行语义：cell 管线两分支均逐层放行裁剪；applyCardEffectToCell
+# 表格行（1239 行区）仍保持 YES 裁剪边界。
+check("E1  collection cell 裁剪放开（Task163/168 阴影越界语义；Task170 重锚）",
+      re.search(r"applyEffectToCollectionViewCell:[\s\S]{0,6000}?cell\.clipsToBounds = NO;", bm)
+      and "cell.contentView.clipsToBounds = NO;" in bm
+      and "cell.contentView.layer.masksToBounds = NO;" in bm)
+check("E1b  表格行裁剪边界维持（applyCardEffectToCell 仍 clipsToBounds YES）",
+      "cell.clipsToBounds = YES;" in bm)
 check("E2  卡片行（applyCardEffectToCell）裁剪恢复",
       re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,600}?cell\.clipsToBounds = YES;", bm))
 check("E3  磁贴 cell 阴影路径生成退役（原生卡片无自绘阴影）",

@@ -82,8 +82,10 @@ check("A3  原生表面辅助 UIKit+NativeSurface 就位",
 check("A4  CMake 不再登记 Kit 源，登记原生辅助",
       "NeomorphKit/" not in read("Natives/CMakeLists.txt")
       and "UIKit+NativeSurface.m" in read("Natives/CMakeLists.txt"))
-check("A5  原生卡片表面 = secondarySystemGroupedBackground（Task136 色板的语义色替代）",
-      "secondarySystemGroupedBackgroundColor" in read("Natives/UIKit+NativeSurface.m"))
+# Task170 诚实重锚：Task160 新拟态回归把卡片表面语义色替换为规格表面色，
+# 本锚自 Task160 起即为漂移失败（此前仅经 138 J 行豁免）。现锚定现行语义。
+check("A5  原生卡片表面 = 新拟态规格表面色（Task160 回归后语义；Task170 重锚）",
+      "AmeNeumorphSurfaceColor" in read("Natives/UIKit+NativeSurface.m"))
 
 print()
 print("=" * 72)
@@ -106,17 +108,19 @@ print("C. BackgroundManager 枢纽（原生表面分发 / 裁剪恢复 / 检测�
 print("=" * 72)
 bm = read("Natives/BackgroundManager.m")
 bmh = read("Natives/BackgroundManager.h")
-check("C1  applyCardEffectToCell 保留，无背景 → 原生卡片行（contentView 卡片表面 12pt）",
+# Task170 诚实重锚：Task160/163 后列表行表面为平贴新拟态（Flat 无阴影）。
+check("C1  applyCardEffectToCell 保留，无背景 → 原生卡片行（contentView 平贴新拟态 12pt；Task170 重锚）",
       "applyCardEffectToCell" in bmh
-      and "[cell.contentView ame_applyCardSurfaceWithRadius:12];" in bm)
+      and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
 check("C2  applyCardEffectToCell 有背景 → 与 applyEffectToCell 同管线",
       re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(\[self hasBackground\]\) \{\s*\[self applyEffectToCell:cell\];", bm))
 check("C3  collection cell 无背景分支恢复 cell 级裁剪（原生卡片无需帧外阴影空间）",
       "cell.clipsToBounds = YES;" in bm and "cell.layer.masksToBounds = NO;" in bm)
 check("C4  collection cell 圆角来源保留：优先读 contentView 自身圆角",
       "cell.contentView.layer.cornerRadius > 0" in bm)
-check("C5  applyEffectToView 无背景 → 原生表面分派（有圆角=卡片，无圆角=systemBackground）",
-      "[view ame_applyCardSurfaceWithRadius:radius];" in bm
+# Task170 诚实重锚：无背景分派在 Task160 后为等比圆角平贴新拟态/整页 systemBackground。
+check("C5  applyEffectToView 无背景 → 原生表面分派（有圆角=平贴新拟态，无圆角=systemBackground；Task170 重锚）",
+      "[view ame_applyNeumorphSurfaceFlatWithRadius:radius];" in bm
       and "view.backgroundColor = [UIColor systemBackgroundColor];" in bm)
 check("C6  检测并切换架构原样保留（hasBackground 双分支 + SystemThinMaterial 旧管线）",
       bm.count("[self hasBackground]") >= 5 and "SystemThinMaterial" in bm

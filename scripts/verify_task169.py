@@ -14,7 +14,11 @@ def rd(p):
 
 # ---------------------------------------------------------------- A. 破案证据锚（git 钉住 485b18c 日志）
 print("== A. 装机日志法证（485b18c，af9b807）==")
-log = rd("latestlog.txt")
+# Task170 诚实修复：本组注释一直声称"git 钉住 485b18c 日志"，实现却读工作区
+# latestlog.txt——用户上传 76895f3 轮换了日志文件后六个锚全数失真。现真正
+# 从 git 对象读 485b18c 上传的法证日志（断言零改动，证据永久钉住）。
+_r = subprocess.run(["git", "show", "485b18c:latestlog.txt"], capture_output=True)
+log = _r.stdout.decode("utf-8", errors="replace") if _r.returncode == 0 else ""
 check("A1 日志盖 af9b807（Task167 修复版）", "Commit: af9b807" in log)
 check("A2 CF 四连搜索均无完成日志（静默路径特征）",
       log.count("searchModWithFilters starting request") == 4

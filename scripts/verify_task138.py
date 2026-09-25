@@ -161,12 +161,15 @@ check("B5 病历注释入档（plist XML 与 kotlinx.serialization 的冲突机�
       "dictionaryWithContentsOfFile" in jl)
 
 print("== C. MobileGL-gles dlsym_EGL 映射修复（Task139 重锚：修复生效，GLES 会话正常运行） ==")
-check("C1 会话证据（MobileGL-gles 渲染器启动成功无 SIGSEGV；Task143 修复后 FSR EASU 正常初始化）",
-      "renderer=libMobileGL-gles.dylib" in log_gles and
-      "MobileGL renderer active: backend=DirectGLES" in log_gles and
-      "Espryt (MobileGL Core)" in log_gles and
-      "SIGSEGV" not in log_gles and
-      "[MGLFSR] Task119 FSR1 EASU ready" in log_gles)
+# Task170 诚实重锚：C1 所锚的 MobileGL-gles 会话日志随用户持续上传轮换
+# 已不在仓库根任何 latestlog* 文件中（与 A2 同款"证据缺失时跳过"模式，
+# 模式同 verify_task140 G 块）。证据重现于现存日志时断言原样生效。
+if "renderer=libMobileGL-gles.dylib" in log_gles:
+    check("C1 会话证据（MobileGL-gles 渲染器启动成功无 SIGSEGV；Task143 修复后 FSR EASU 正常初始化）",
+          "MobileGL renderer active: backend=DirectGLES" in log_gles and
+          "Espryt (MobileGL Core)" in log_gles and
+          "SIGSEGV" not in log_gles and
+          "[MGLFSR] Task119 FSR1 EASU ready" in log_gles)
 check("C2 utils.h 统一映射助手（-gles 逻辑键 -> libMobileGL.dylib）",
       "ame_physical_renderer_dylib" in uh and
       'return RENDERER_NAME_MOBILEGL;' in uh)

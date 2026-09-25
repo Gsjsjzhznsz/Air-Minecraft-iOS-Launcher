@@ -1764,3 +1764,17 @@
 // states all three backends are supported (Vulkan via the Metal presentation
 // layer, Task166/167), MobileGlues chunk-loading entry gains the
 // Vulkan+FSR recommendation.
+
+// Task 170 (2026-09-25): user followup on Task 168 -- the binary
+// cardsNeumorphSolid toggle is retired in favor of a continuous
+// "Neumorphism Opacity" slider (defaults key
+// background_cards_neumorph_opacity, 0.0~1.0, default 1.0 = Task 168
+// form untouched). The slider scales the WHOLE card as one unit
+// (face + dual-shadow carrier + content) via the host view alpha,
+// set in every terminal branch of applyNeumorphCardEffectToView /
+// applyEffectToCollectionViewCell, so heavy edge halos reported on
+// device can be dialed down directly. Home tile collection layout
+// gaps unified to 20pt (item insets 10 + section insets 10), equal
+// to the card-to-sidebar outer margin. l10n key renamed in place
+// (background.cards.neumorph.opacity.title x6, count 1953). No
+// engine (UIKit+NativeSurface) changes.

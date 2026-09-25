@@ -2110,7 +2110,7 @@
 "bing.refresh.title" = "立即重新整理";
 "bing.footer.hint" = "開啟後，若未設定自訂壁紙，將自動套用 Bing 每日壁紙並每天更新；設定自訂壁紙會暫時停用，清除背景後自動恢復。";
 "background.effect.footer" = "上方「透明度」控制介面材質的不透明程度（數值越低，桌布透出越多）；下方「模糊程度」控制背景高斯模糊的強度（數值越低，背景越清晰）。僅在「UI效果」選擇毛玻璃或半透明時生效。";
-"background.cards.neumorph.title" = "卡片新擬態（實底）";
+"background.cards.neumorph.opacity.title" = "新擬態透明度";
 "bing.gallery.nav.title" = "Bing 壁紙庫";
 "bing.setwallpaper.title" = "設為壁紙";
 "bing.save.title" = "儲存到相簿";

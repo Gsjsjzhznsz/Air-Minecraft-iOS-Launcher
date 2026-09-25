@@ -15,8 +15,8 @@ static NSString * const kBackgroundPathKey = @"background_path";
 static NSString * const kBackgroundUIEffectKey = @"background_ui_effect";
 static NSString * const kBackgroundUIOpacityKey = @"background_ui_opacity";
 static NSString * const kBackgroundBlurIntensityKey = @"background_blur_intensity";
-// Task168：卡片新拟态形态开关（YES=实底，NO=动态随壁纸透明度/模糊+双阴影）
-static NSString * const kBackgroundCardsNeumorphSolidKey = @"background_cards_neumorph_solid";
+// Task170：卡片新拟态整体透明度（0.0~1.0，默认 1.0；Task168 实底开关退役）
+static NSString * const kBackgroundCardsNeumorphOpacityKey = @"background_cards_neumorph_opacity";
 // Task151：背景来源标记（"user" = 用户手动设置，"bing" = Bing 每日壁纸自动应用）
 static NSString * const kBackgroundSourceKey = @"background_source";
 static NSString * const kBackgroundsFolder = @"backgrounds";
@@ -214,16 +214,22 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     [self saveUISettings];
 }
 
-#pragma mark - Task168 卡片新拟态形态开关
+#pragma mark - Task170 卡片新拟态整体透明度
 
-// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链）——开关是
-// 布尔语义，无默认值合并/范围钳制诉求，读侧永远拿到最新落盘值。
-- (BOOL)cardsNeumorphSolid {
-    return [[NSUserDefaults standardUserDefaults] boolForKey:kBackgroundCardsNeumorphSolidKey];
+// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链）——读侧
+// 永远拿到最新落盘值。语义见 BackgroundManager.h：整个卡片（卡面 + 双阴影
+// 承载层 + 内容）作为单元做 alpha 缩放，替换 Task168 的实底布尔开关。
+- (CGFloat)cardsNeumorphOpacity {
+    // 未落盘时默认 1.0 = Task168 形态原样（动态卡面 + 规格双阴影不缩水）
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:kBackgroundCardsNeumorphOpacityKey] == nil) {
+        return 1.0;
+    }
+    return MAX(0.0, MIN(1.0, [[NSUserDefaults standardUserDefaults] doubleForKey:kBackgroundCardsNeumorphOpacityKey]));
 }
 
-- (void)setCardsNeumorphSolid:(BOOL)cardsNeumorphSolid {
-    [[NSUserDefaults standardUserDefaults] setBool:cardsNeumorphSolid forKey:kBackgroundCardsNeumorphSolidKey];
+- (void)setCardsNeumorphOpacity:(CGFloat)cardsNeumorphOpacity {
+    [[NSUserDefaults standardUserDefaults] setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))
+                                              forKey:kBackgroundCardsNeumorphOpacityKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
@@ -1063,10 +1069,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
     if (!cell) return;
 
-    // Task168（用户定稿重构）：实底开关开或无自定义背景 → 统一新拟态凸起
-    // 尾部（规格表面色+双阴影，壁纸从卡片间隙透出）。这正是"下载了最新
-    // 提交却看不到新拟态"的范围修正——有壁纸时不再提前 return 进旧管线。
-    if (self.cardsNeumorphSolid || ![self hasBackground]) {
+    // Task168（用户定稿重构）：无自定义背景 → 新拟态凸起尾部（规格表面色
+    // +双阴影，壁纸从卡片间隙透出）。这正是"下载了最新提交却看不到新拟态"
+    // 的范围修正。Task170：实底开关退役为整体透明度滑条，此处仅余无壁纸
+    // 分支；有壁纸统一走下方动态分支（卡面随壁纸管线 + 阴影 + 整体 alpha）。
+    if (![self hasBackground]) {
         // Task163：回归新拟态凸起卡片（用户实测"主页的卡片一点
         // 没改"——Task160 把 cell 管线统一成 Flat 平贴后磁贴完全丢失凸起感；
         // 现对卡片容器挂规格双阴影：暗影右下/高光左上，短边等比）。宿主链
@@ -1100,6 +1107,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         cell.layer.masksToBounds = NO;
         cell.contentView.layer.masksToBounds = NO;
         [target ame_applyNeumorphSurface];
+        // Task170：整个卡片（含双阴影/内容）按用户滑条做整体透明度缩放
+        target.alpha = self.cardsNeumorphOpacity;
         return;
     }
 
@@ -1206,6 +1215,9 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         cell.contentView.clipsToBounds = NO;
         cell.contentView.layer.masksToBounds = NO;
         cardTarget.layer.masksToBounds = NO;
+        // Task170：整个卡片（含阴影承载层/内容）按用户滑条做整体透明度缩放
+        // （100% = Task168 形态原样；调低时边缘阴影晕影随之变淡）
+        cardTarget.alpha = self.cardsNeumorphOpacity;
         return;
     }
 }
@@ -1237,12 +1249,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     //
     // Task168 范围修正（用户定稿）：壁纸模式不再"转调旧管线后什么都不加"
     // （这正是"下载了最新提交却看不到新拟态"的根源——有壁纸时卡片完全
-    // 走旧毛玻璃）。现在：
-    //   实底开关开 → 一律规格表面色+双阴影（壁纸从卡片间隙透出）；
-    //   动态（默认，无把握不逞强）→ 有壁纸时卡面沿用壁纸管线（毛玻璃/
-    //   半透明，随透明度/模糊设置动态变化），只叠加双阴影承载层；
-    //   无壁纸 → 规格表面色+双阴影（Task163 原形态）。
-    if (!self.cardsNeumorphSolid && [self hasBackground]) {
+    // 走旧毛玻璃）。现在（Task170：实底开关退役，二分支化）：
+    //   有壁纸（动态）→ 卡面沿用壁纸管线（毛玻璃/半透明，随透明度/模糊
+    //   设置动态变化），叠加双阴影承载层 + 整体透明度；
+    //   无壁纸 → 规格表面色+双阴影（Task163 原形态）+ 整体透明度。
+    if ([self hasBackground]) {
         [view ame_removeNeumorphShadow];
         [self applyEffectToView:view];
         [view ame_attachNeumorphShadowOnly];
@@ -1253,6 +1264,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 sub.layer.cornerRadius = view.layer.cornerRadius;
             }
         }
+        // Task170：整个卡片（含阴影承载层/内容）按用户滑条做整体透明度缩放
+        view.alpha = self.cardsNeumorphOpacity;
         return;
     }
 
@@ -1261,6 +1274,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // masksToBounds = NO，阴影可越出卡片边界投到列表间隙。
     if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;
     [view ame_applyNeumorphSurface];
+    // Task170：整个卡片（含双阴影/内容）按用户滑条做整体透明度缩放
+    view.alpha = self.cardsNeumorphOpacity;
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

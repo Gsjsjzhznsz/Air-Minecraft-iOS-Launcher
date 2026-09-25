@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Task168 verifier: neumorphism wallpaper-mode visibility (dynamic/solid dual form)
 # + help-FAQ JSON migration (dual-file, aligned with announcements).
+# Task170 诚实重锚：实底开关退役为整体透明度滑条（cardsNeumorphOpacity），
+# 管线实底分支合并、l10n 键原位换名（计数 1953 不变）、公告顺延一位。
 # 用法: python3 scripts/verify_task168.py   （在仓库根的任意子目录运行皆可）
 import json
 import os
@@ -51,16 +53,20 @@ check("A3 实底版 ame_applyNeumorphSurface 仍写规格表面色（无回归�
 
 check("A4 卡片视图管线：壁纸早退旧形态已删除（Task163 的 hasBackground-return 不复存在）",
       "if ([self hasBackground]) {\n        [view ame_removeNeumorphShadow];\n        [self applyEffectToView:view];\n        return;" not in bm_m)
-check("A5 卡片视图管线：动态模式=壁纸面+仅阴影叠加+blur 圆角同步",
-      "!self.cardsNeumorphSolid && [self hasBackground]" in bm_m
+check("A5 卡片视图管线：动态模式=壁纸面+仅阴影叠加+blur 圆角同步+整体透明度（Task170 重锚：条件二分支化）",
+      "if ([self hasBackground]) {" in bm_m[bm_m.index("- (void)applyNeumorphCardEffectToView"):bm_m.index("- (void)applyEffectToSearchBar")]
       and "[view ame_attachNeumorphShadowOnly];" in bm_m
-      and "sub.layer.cornerRadius = view.layer.cornerRadius;" in bm_m)
+      and "sub.layer.cornerRadius = view.layer.cornerRadius;" in bm_m
+      and "view.alpha = self.cardsNeumorphOpacity;" in bm_m)
 check("A6 卡片视图管线：实底/无壁纸仍走规格表面（ame_applyNeumorphSurface）",
       "[view ame_applyNeumorphSurface];" in bm_m)
-check("A7 cell 管线新门：实底开关或无壁纸 → 统一新拟态尾部（在壁纸分支之前）",
-      "if (self.cardsNeumorphSolid || ![self hasBackground]) {" in bm_m
-      and bm_m.index("self.cardsNeumorphSolid || ![self hasBackground]")
+check("A7 cell 管线新门：无壁纸 → 统一新拟态尾部（在壁纸分支之前；Task170 重锚：实底开关退役）",
+      "if (![self hasBackground]) {" in bm_m
+      and bm_m.index("if (![self hasBackground]) {")
       < bm_m.index("随后 Task168 叠加双阴影承载层"))
+check("A7b cell 管线整体透明度：两分支宿主 alpha 均按滑条重设（Task170 新增）",
+      "target.alpha = self.cardsNeumorphOpacity;" in bm_m
+      and "cardTarget.alpha = self.cardsNeumorphOpacity;" in bm_m)
 check("A8 cell 管线动态收口：cardTarget 挂仅阴影 + 圆角同步 + blur 层对齐",
       "[cardTarget ame_attachNeumorphShadowOnly];" in bm_m
       and "subview.layer.cornerRadius = cardTarget.layer.cornerRadius;" in bm_m)
@@ -78,39 +84,43 @@ check("A13 联机页状态卡改走新拟态卡片管线（全部卡片统一）
       "applyNeumorphCardEffectToView:self.statusCard]" in rd("Natives/TerracottaViewController.m"))
 
 # ============================================================
-# B. 实底开关（偏好 + 设置页 + l10n）
+# B. 卡片新拟态整体透明度滑条（Task170 重锚：替换 Task168 实底开关）
 # ============================================================
 bsvc = rd("Natives/BackgroundSettingsViewController.m")
 
-check("B1 BackgroundManager.h cardsNeumorphSolid 属性（含双形态语义注释）",
-      '@property (nonatomic, assign) BOOL cardsNeumorphSolid;' in bm_h
-      and "cardsNeumorphSolid" in bm_h)
-check("B2 defaults 键 + getter/setter（读侧永远最新落盘值）",
-      'kBackgroundCardsNeumorphSolidKey = @"background_cards_neumorph_solid"' in bm_m
-      and "boolForKey:kBackgroundCardsNeumorphSolidKey" in bm_m
-      and "setBool:cardsNeumorphSolid forKey:kBackgroundCardsNeumorphSolidKey" in bm_m)
-check("B3 设置页 section0 追加第四行（background.cards.neumorph.title）",
-      'localize(@"background.cards.neumorph.title", nil)' in bsvc)
-check("B4 设置页 row==3 开关行（Value1+UISwitch tag410+回调接线）",
-      '"CardsNeumorphSolidCell"' in bsvc
-      and "solidSwitch.tag = 410;" in bsvc
-      and "cardsNeumorphSolidToggleChanged:" in bsvc)
-check("B5 开关回调：落盘 + 统一刷新链",
-      "cardsNeumorphSolid = sender.on;" in bsvc
+check("B1 BackgroundManager.h cardsNeumorphOpacity 属性（含整体透明度语义注释）",
+      '@property (nonatomic, assign) CGFloat cardsNeumorphOpacity; // 0.0 ~ 1.0' in bm_h
+      and "cardsNeumorphOpacity" in bm_h)
+check("B2 defaults 键 + getter/setter（默认 1.0 + 范围钳制，读侧永远最新落盘值）",
+      'kBackgroundCardsNeumorphOpacityKey = @"background_cards_neumorph_opacity"' in bm_m
+      and "doubleForKey:kBackgroundCardsNeumorphOpacityKey" in bm_m
+      and "setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))" in bm_m
+      and "objectForKey:kBackgroundCardsNeumorphOpacityKey" in bm_m)
+check("B3 实底开关全链退役（Task170：代码零残留）",
+      "cardsNeumorphSolid" not in bm_m and "cardsNeumorphSolid" not in bm_h
+      and "cardsNeumorphSolid" not in bsvc
+      and "background_cards_neumorph_solid" not in bm_m)
+check("B4 设置页 section0 第四行改透明度滑条行（同款 Task156 行内布局）",
+      '"CardsNeumorphOpacityCell"' in bsvc
+      and "slider.tag = 500;" in bsvc
+      and "slider.minimumValue = 0.0f;" in bsvc
+      and "cardsNeumorphOpacitySliderChanged:" in bsvc)
+check("B5 滑条回调：落盘 + 统一刷新链",
+      "cardsNeumorphOpacity = slider.value;" in bsvc
       and "[[BackgroundManager sharedManager] refreshUIEffect];" in bsvc)
 check("B6 既有行不受影响（透明度/模糊滑块行仍在位）",
       "opacitySliderChanged:" in bsvc and "blurIntensitySliderChanged:" in bsvc
       and bsvc.count("- (void)blurIntensitySliderChanged:") == 1
       and bsvc.count("- (void)opacitySliderChanged:") == 1)
 
-l10n_key = "background.cards.neumorph.title"
+l10n_key = "background.cards.neumorph.opacity.title"  # Task170：原位换名（旧 background.cards.neumorph.title 退役）
 l10n_vals = {}
 for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     s = rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
     m = re.search(r'^"' + re.escape(l10n_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     l10n_vals[lg] = m.group(1) if m else None
 check("B7 六语言新键在位且非空", all(l10n_vals.values()), str(l10n_vals))
-check("B8 四主语言键集一致且计数 = 1953（Task168 净增 1）",
+check("B8 四主语言键集一致且计数 = 1953（Task170 键原位换名，净变化 0）",
       all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1953
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
@@ -159,11 +169,11 @@ check("C10 抽取/幂等脚本入库（可重跑再生成）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("D1 公告插入 index 2（task169 F5 钉死 anns[1] 不动）且 id 唯一",
+check("D1 公告顺延：task170 插入 index 2（task169 F5 钉死 anns[1] 不动；task168 顺延至 anns[3]）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t168 = anns[2]
+      and anns[3]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t168 = anns[3]
 check("D2 公告内容：根因叙述 + 双形态 + 两个维护路径",
       "447a677" in t168["content"] and "透明度/模糊" in t168["content"]
       and "announcements.json" in t168["content"] and "help-faq.json" in t168["content"]

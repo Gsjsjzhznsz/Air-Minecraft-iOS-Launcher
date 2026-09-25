@@ -476,3 +476,26 @@ Task: ①新拟态装机反馈修复（"下载最新提交看不到新拟态"—
   ④侧栏 → 使用问题：34 条四分类渲染如旧（数据已从 JSON 读取）
 - 维护路径（用户交付物）：启动器公告 = 仓库根 announcements.json（随包回退 Natives/resources/announcements-fallback.json）；使用问题 = 仓库根 help-faq.json（维护源）+ Natives/resources/help-faq.json（随包运行时读取），两文件逐字节一致（verify_task168 C1 把守漂移）；改完重新构建生效
 - 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README/6.0.0 收尾、142 E组/156 G 基线漂移（169/166 时代既有，未纳入本会话）
+
+## Task 170（本会话，卡片新拟态整体透明度滑条（替换实底开关）+ 主页卡片间距统一 20pt + 法证锚诚实修复）
+
+### 背景（用户反馈，附图未达服务器——按文字描述实施）
+- "每一个按钮的边缘都有很重的晕影"（图一正常但无法复现/图二现状）：机理 = 新拟态双阴影承载层 shadowOpacity 1.0 全不透明色（#bebebe/#ffffff），叠加在壁纸上即重晕影；全代码库仅此一处"每按钮边缘光晕"机制
+- "主页面每个卡片中间的间距改成外围的卡片距离侧边栏的间距一样长"：主页外沿 = section 15 + item 5 = 20pt，卡间 = 5+5 = 10pt
+- "把新增的选项替换为新拟态透明度，用拉条从 0%~100% 调节整个卡片的透明度，而不是实底啥的"
+
+### Work Log
+- 偏好：cardsNeumorphOpacity（CGFloat 0.0~1.0，defaults 键 background_cards_neumorph_opacity，默认 1.0 = Task168 形态原样；直读直写不进缓存链；setter 钳制）；cardsNeumorphSolid 全链退役（Task168 开关从未到达用户设备——装机日志 Commit: 8d5ca47 实证，无迁移负担）
+- 管线：applyNeumorphCardEffectToView 二分支化（hasBackground 门）+ 动态/无壁纸两分支宿主 alpha；applyEffectToCollectionViewCell 无壁纸门 `if (![self hasBackground])` + 两分支 alpha（cardTarget/target）；语义 = 整个卡片（卡面 + 双阴影承载层 + 内容）作为单元缩放（阴影承载层是宿主子视图，随 alpha 等比淡出）——引擎 UIKit+NativeSurface 零改动；列表行 applyCardEffectToCell Flat 边界维持
+- 设置页：row3 改透明度滑条行（Task156 行内布局同款，tag 500/501/502，min 0.0 满足"0%~100%"全开口径，回调 cardsNeumorphOpacitySliderChanged 落盘 + refreshUIEffect）
+- 主页间距：item (0,5,0,5)→(0,10,0,10) ×2、section (5,15,5,15)→(10,10,10,10) ×2、interGroupSpacing 10→20——外沿 10+10=20 与旧观感一致，卡间横向 20、行间纵向 20 全部对齐
+- l10n：键原位换名 background.cards.neumorph.title → background.cards.neumorph.opacity.title ×6 语言（en/zh-Hans/zh-CN/zh-Hant/ja/km），四主语言计数 1953 不变（净变化 0，14 个历史计数锚零扰动）
+- 公告/版本：task170 公告插 index 2（169 F5 anns[1] pin 保护；168 顺延 anns[3]）+ version.h REVISION 17 addendum（Task 170，无 bump）
+- 校验：verify_task170 新建 34 项（A 偏好 4 + B 管线 8 + C 设置页 4 + D 间距 4 + E l10n 4 + F 公告/版本 4 + G 配平/引擎 5 + H 级联 1）；verify_task168 诚实重锚（A5/A7 条件、B1-B7 滑条化、D1/D2 公告顺延）
+- 级联诚实修复（用户上传 76895f3 轮换 latestlog* 引发的工作区日志锚漂移 + 历史欠账）：169 A 组六个断言真正 git 钉住 485b18c:latestlog.txt（注释一直声称钉住但实现读工作区——补齐承诺，断言零改动，复跑 49/49）；136 A5/C1/C5 重锚到 Task160 新拟态语义（自 Task160 起漂移、仅经 138 J 行豁免的历史欠账，复跑 63/63）；138 C1 改证据条件锚（GLES 会话日志已轮换出仓库根，同文件 A2 先例，复跑 50/50 ALL PASS）；165 G1 置顶窗口 7→8（task170 prepend 顺延，家法 top-N 先例，复跑 34/34）；166/167 的级联继承失败随 165 根修消除
+- 遗留伪影：141 G4"工作区改动仅限预期集"提交前必挂（本会话 scripts/task170_announcements.py 不在白名单）、提交后自愈；139 A1/B1/H 组/I1 为基线内既有（沙箱路径/病历证据轮换）
+
+### Stage Summary
+- 装机锚点：①设置 → 外观 → "新拟态透明度"拉条——觉得卡片边缘晕影重就往低调（推荐 60%~80% 起步），阴影随卡面一起变淡；100% = 上一版形态原样 ②主页面卡片间距与外围对齐（20pt）③下载页版本卡/联机页状态卡同受滑条影响
+- 用户诊断备注：装机日志（8d5ca47 会话）显示游戏已在 zink（libOSMesa，Mesa 4.1 MoltenVK）正常启动越过启动器界面——Task169 JIT 有界等待修复路径生效；`ARB_direct_state_access detected` 为 zink 桌面 GL 合法行为（Task167 DSA 迁移仅针对 GLES/MobileGL）；FSR 锚点仍需 Vulkan/GLES-4.0 会话验证（zink 不在 FSR 能力集）
+- 维护路径不变：公告 = 仓库根 announcements.json；使用问题 = 仓库根 help-faq.json + 随包副本（逐字节一致）

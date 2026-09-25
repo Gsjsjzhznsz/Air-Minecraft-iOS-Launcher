@@ -228,8 +228,10 @@ t165 = next((a for a in anns if a.get("id") == "task165-blackscreen-rootcause-20
 # v6.0.0 发行文案改写插入，2026-09-25 同日组现有 6 条——置顶区口径放宽为
 # 前六位（task165 现居第 6：server(pin) / task169 / v6.0.0 / task167 /
 # task166 / task165）。
-check("G1 task165 公告置顶区（2026-09-25 同日组前七位；server-pin + Task169/168 prepend 后）且内容含根因与装机锚点",
-      t165 is not None and any(anns[i]["id"] == "task165-blackscreen-rootcause-2026-09-25" for i in range(min(7, len(anns))))
+# Task170 诚实重锚：task170 公告 prepend 后同日组再增一位，窗口 7 -> 8
+# （家法先例：task169 时代 top-3 -> top-6 -> top-7 同款顺延）。
+check("G1 task165 公告置顶区（2026-09-25 同日组前八位；server-pin + Task169/168/170 prepend 后）且内容含根因与装机锚点",
+      t165 is not None and any(anns[i]["id"] == "task165-blackscreen-rootcause-2026-09-25" for i in range(min(8, len(anns))))
       and "Task165 xglGetProcAddress" in t165.get("content", ""))
 t164 = next((a for a in anns if a.get("id") == "task164-fsr-blackscreen-defaults-2026-09-25"), None)
 check("G2 task164 表述纠正（第一轮未愈，指向真根因）",

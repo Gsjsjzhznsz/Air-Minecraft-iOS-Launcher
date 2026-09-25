@@ -1019,13 +1019,17 @@ static NSString *festivalGreeting(void) {
         BOOL isCompact = (firstTile.tileSize == HomeTileSizeCompact);
         CGFloat height = [weakSelf heightForTileConfig:firstTile];
         
+        // Task170（用户定稿）："主页面每个卡片中间的间距改成外围的卡片距离
+        // 侧边栏的间距一样长"——统一 20pt：外沿 = section 10 + item 10 = 20
+        // （与旧形态 15+5=20 一致，外围观感不变）；卡间横向 = 10+10 = 20
+        // （旧 5+5=10，加倍）；行间纵向 = 10+10 = 20（旧 5+5=10，加倍）。
         if (isCompact && sectionTiles.count >= 2) {
             // 双列紧凑布局
             NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize
                 sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:0.5]
                 heightDimension:[NSCollectionLayoutDimension fractionalHeightDimension:1.0]];
             NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
-            item.contentInsets = NSDirectionalEdgeInsetsMake(0, 5, 0, 5);
+            item.contentInsets = NSDirectionalEdgeInsetsMake(0, 10, 0, 10);
             
             NSCollectionLayoutSize *groupSize = [NSCollectionLayoutSize
                 sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:1.0]
@@ -1033,8 +1037,8 @@ static NSString *festivalGreeting(void) {
             NSCollectionLayoutGroup *group = [NSCollectionLayoutGroup horizontalGroupWithLayoutSize:groupSize subitems:@[item]];
             
             NSCollectionLayoutSection *section = [NSCollectionLayoutSection sectionWithGroup:group];
-            section.contentInsets = NSDirectionalEdgeInsetsMake(5, 15, 5, 15);
-            section.interGroupSpacing = 10;
+            section.contentInsets = NSDirectionalEdgeInsetsMake(10, 10, 10, 10);
+            section.interGroupSpacing = 20; // 每节单组，防御性对齐 Task170 间距口径
             return section;
             
         } else {
@@ -1044,7 +1048,7 @@ static NSString *festivalGreeting(void) {
                 sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:wFrac]
                 heightDimension:[NSCollectionLayoutDimension fractionalHeightDimension:1.0]];
             NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
-            item.contentInsets = NSDirectionalEdgeInsetsMake(0, 5, 0, 5);
+            item.contentInsets = NSDirectionalEdgeInsetsMake(0, 10, 0, 10);
             
             NSCollectionLayoutSize *groupSize = [NSCollectionLayoutSize
                 sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:1.0]
@@ -1052,7 +1056,7 @@ static NSString *festivalGreeting(void) {
             NSCollectionLayoutGroup *group = [NSCollectionLayoutGroup horizontalGroupWithLayoutSize:groupSize subitems:@[item]];
             
             NSCollectionLayoutSection *section = [NSCollectionLayoutSection sectionWithGroup:group];
-            section.contentInsets = NSDirectionalEdgeInsetsMake(5, 15, 5, 15);
+            section.contentInsets = NSDirectionalEdgeInsetsMake(10, 10, 10, 10);
             return section;
         }
     }];
