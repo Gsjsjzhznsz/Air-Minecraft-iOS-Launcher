@@ -1874,3 +1874,29 @@
 // retries 5xx (empty or non-JSON bodies) with a 2s backoff (max 2), and the
 // sync getEndpoint wraps AFNetworking 5xx failures into the existing
 // code-543 retry loop.
+// REVISION 17 addendum (Amethyst Task 173, no bump): neumorphism rewritten to
+// the "normal state" as the single card path. User's repro pinned the root
+// cause: with a Bing wallpaper active, toggling any UI effect and then
+// disabling the wallpaper made neumorphism snap back to normal -- proving the
+// good form (spec surface #e0e0e0/#2c2c2c + dual shadows) always lived in the
+// no-wallpaper branch, while the wallpaper-adaptive "dynamic face" (glass/
+// translucent card + attachNeumorphShadowOnly + host alpha) read as heavy
+// edge halos (dark 20/60px shadows over a translucent face on a wallpaper).
+// Changes: (1) new cardsNeumorphEnabled preference (background_cards_neumorph_
+// enabled, default YES) gates a rewritten three-stage card pipeline -- ON =
+// wallpaper-agnostic normal state everywhere (applyNeumorphCardEffectToView,
+// applyEffectToCollectionViewCell, applyCardEffectToCell; stray blur layers
+// stripped, host chain unclipped for shadow overflow); OFF = legacy pipeline
+// (glass/translucent with wallpaper per the other UI-effect options, native
+// flat without). The dynamic-face wallpaper-adaptation branch is retired
+// wholesale. (2) Settings: a "Neumorphic Interface" switch row now sits under
+// Blur Intensity (always visible, even without a wallpaper): ON greys the
+// legacy UI-effect rows (picker + opacity + blur sliders, alpha 0.35 +
+// interaction off) and enables the card-opacity slider; OFF reverses.
+// (3) Opacity respecified as CARD-BODY opacity (user: fonts excluded): new
+// engine primitive ame_applyNeumorphCardOpacity fades the dynamic surface
+// color (alpha applied inside the dynamic provider per-trait, so dark/light
+// stays correct) and the shadow carrier's alpha, leaving text/icon subviews
+// fully opaque -- the old whole-host view.alpha scaling is gone from all
+// terminal branches. l10n: new key background.cards.neumorph.interface.title
+// x6 (four-main count 1953 -> 1954, historical anchors re-locked).

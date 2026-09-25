@@ -138,8 +138,8 @@ for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
 vals = set(base.values())
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first），
 # 唯一键基线 1916 -> 1918
-check("D3 四语言唯一键集一致且为 Task151 基线 1953（Task150 的 1928 + Bing 组件 17）",
-      vals == {1953}, str(base))
+check("D3 四语言唯一键集一致且为 Task151 基线 1954（Task150 的 1928 + Bing 组件 17）",
+      vals == {1954}, str(base))
 r2 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_sdl3_eventfilter_guard.py"),
                      os.path.join(REPO, "Natives/resources/Frameworks/libSDL3.dylib")],
                     capture_output=True, text=True, timeout=60)

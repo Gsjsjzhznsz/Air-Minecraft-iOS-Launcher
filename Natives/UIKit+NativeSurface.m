@@ -181,6 +181,40 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     [shadowView setNeedsLayout];
 }
 
+- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity {
+    // Task172：卡片本体透明度（不含文字）。设为独立引擎原语的原因：
+    //   1) 不能用宿主 view.alpha——alpha 沿层级连乘，文字/图标子视图会
+    //      一起被淡掉（用户定稿"透明度指的是卡片的透明度，不要包括字体"）；
+    //   2) 卡面 = 宿主 backgroundColor（动态色），不能简单地
+    //      colorWithAlphaComponent 一次了事——那会把动态色解析成静态色，
+    //      深浅色切换后 alpha 叠在错误的底色上。正确做法是在 dynamic
+    //      provider 内部逐 trait 重解析规格表面色后再叠 alpha；
+    //   3) 双阴影承载视图是宿主的直接子视图，整体 alpha 淡化即可与卡面
+    //      同步（阴影 CALayer 不透明度由视图 alpha 统一缩放）。
+    CGFloat o = MAX(0.0, MIN(1.0, opacity));
+    if (o >= 0.999) {
+        // 100% 档：恢复全不透明规格表面（动态色原样，等价未调用过本方法）
+        self.backgroundColor = AmeNeumorphSurfaceColor();
+    } else {
+        UIColor *base = AmeNeumorphSurfaceColor();
+        if (@available(iOS 13.0, *)) {
+            self.backgroundColor = [UIColor colorWithDynamicProvider:
+                ^UIColor *(UITraitCollection *traitCollection) {
+                    return [[base resolvedColorWithTraitCollection:traitCollection]
+                        colorWithAlphaComponent:o];
+                }];
+        } else {
+            // pre-iOS13：规格色本身回退为静态浅色，直接叠 alpha
+            self.backgroundColor = [base colorWithAlphaComponent:o];
+        }
+    }
+    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
+    if (shadowView) {
+        shadowView.alpha = o;
+        [shadowView setNeedsLayout];
+    }
+}
+
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {
     // Task160：cell/列表场景平贴版——只上规格表面色与圆角，无阴影层（避免
     // 被相邻 cell/tableView 裁剪互叠），裁剪保持（Task152 直角露出修复不变）

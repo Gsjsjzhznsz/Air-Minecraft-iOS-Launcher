@@ -35,16 +35,23 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 @property (nonatomic, assign) CGFloat uiOpacity;  // 0.0 ~ 1.0
 @property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度
 
-// Task170（用户定稿，替换 Task168 实底开关）：卡片新拟态整体透明度滑条
-// （设置页"外观"区，0% ~ 100%）。
-//   语义 = "整个卡片"作为一个单元做透明度缩放：卡面（毛玻璃/半透明/规格
-//   表面色）+ 新拟态双阴影承载层 + 卡片内容一起按比例淡化（宿主视图 alpha，
-//   阴影子视图随之等比淡出）。
-//   100%（默认）= Task168 形态原样（动态卡面 + 规格双阴影）；
-//   调低 = 卡片连同边缘阴影晕影一起变淡（用户反馈"按钮边缘晕影很重"的
-//   自助调节入口）；
-//   0% = 卡片整体不可见（极端档，一般不用）。
-// 列表行 cell（applyCardEffectToCell）恒为平贴新拟态表面，不受此滑条影响。
+// Task172（用户定稿，重写卡片管线）：新拟态界面开关。
+//   开启（默认）→ 卡片永远按"正常态"渲染：规格表面色 + 双阴影（即用户
+//   复现方法"Bing 壁纸开着调一次 UI 效果再关掉 Bing 壁纸后看到的形态"），
+//   与是否有壁纸完全无关——壁纸适配分支整链退役，不再有"动态卡面"。
+//   关闭 → 回归旧管线：有壁纸走毛玻璃/半透明（设置页其余 UI 效果选项
+//   恢复可操作），无壁纸走原生平铺。设置页"模糊程度"下方的开关行控制，
+//   开启时其余 UI 效果选项变灰、新拟态透明度可操作，关闭反转。
+@property (nonatomic, assign) BOOL cardsNeumorphEnabled; // defaults background_cards_neumorph_enabled，默认 YES
+
+// Task170（Task172 语义修订）：卡片新拟态"本体"透明度滑条（0% ~ 100%）。
+//   语义 = 卡片本体（卡面规格表面色 + 双阴影承载层）按比例淡化；文字/
+//   图标等内容子视图不参与（保持全不透明）——不再使用宿主 view.alpha
+//   整体缩放（那会把文字一起淡掉，用户定稿"不要包括字体"）。
+//   100%（默认）= 规格表面原样；调低 = 卡面连同边缘阴影晕影一起变淡；
+//   0% = 卡面与阴影完全透明（文字仍可见，极端档）。
+//   仅在新拟态界面开关开启时参与渲染；列表行（applyCardEffectToCell）
+//   恒为平贴新拟态表面，不受此滑条影响。
 @property (nonatomic, assign) CGFloat cardsNeumorphOpacity; // 0.0 ~ 1.0
 
 // Global background container
@@ -111,10 +118,10 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 /// 对齐的页面专用）——无自定义背景时 cell 整体应用凸出表面（圆角 50 基准、
 /// 双外阴影）；有自定义背景时行为与 applyEffectToCell: 一致（毛玻璃/半透明）。
 - (void)applyCardEffectToCell:(UITableViewCell *)cell;
-/// Task163：独立卡片容器的新拟态凸起管线（下载版本卡等"该改的"）——
-/// 无自定义背景时对传入容器挂规格双阴影（ame_applyNeumorphSurface，凸起感
-/// 由暗影右下/高光左上呈现）；有自定义背景时转调 applyEffectToView:（毛玻璃/
-/// 半透明旧管线），并在转调前清掉可能残留的阴影承载视图防投影穿帮。
+/// Task163：独立卡片容器的新拟态凸起管线（下载版本卡等"该改的"）。
+/// Task172 重写（用户定稿）：新拟态界面开关开启时与壁纸完全无关——永远
+/// 规格表面色 + 双阴影（"正常态"），并按卡片本体透明度淡化（文字不动）；
+/// 关闭时回归旧管线 applyEffectToView:（毛玻璃/半透明/原生平铺）。
 - (void)applyNeumorphCardEffectToView:(UIView *)view;
 // 适配 UISearchBar：移除默认不透明背景，让 searchBar 透出底层自定义启动器背景
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar;

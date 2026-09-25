@@ -24,6 +24,14 @@
       "image_url": ""
     },
     {
+      "id": "task173-neumorph-rewrite-toggle-2026-09-25",
+      "title": "新拟态界面重写（正常态统一渲染）+ 新拟态界面开关 + 卡片本体透明度",
+      "date": "2026-09-25",
+      "priority": "normal",
+      "summary": "针对\"新拟态BUG压根就没改\"的定稿重写：用户给出复现方法（Bing 壁纸开着调一次 UI 效果再关掉 Bing 壁纸，新拟态即回到正常形态），证明正常形态一直存在于无壁纸分支。本轮把该\"正常态\"（规格表面色 + 双阴影）提为唯一卡片渲染路径——新拟态界面开关开启时与壁纸完全无关，此前\"动态卡面（毛玻璃/半透明）+ 阴影承载层\"的壁纸适配分支整链退役（半透明卡面叠 20/60px 双阴影正是边缘重晕影的来源）。设置页模糊程度下方新增\"新拟态界面\"开关：开启时其余 UI 效果选项（UI效果/透明度/模糊程度）变灰、卡片本体透明度滑条可操作，关闭反转回归旧壁纸管线。透明度语义改为\"卡片本体\"——卡面与双阴影淡化，文字/图标保持全不透明（不再用宿主 alpha 整体缩放）。",
+      "content": "## 本轮改动（用户复现方法驱动 + 定稿重写）\n\n**① 新拟态管线按\"正常态\"重写**\n\n- 复现方法确认：Bing 壁纸开启时任意调整一次 UI 效果，再取消 Bing 壁纸，新拟态即回到正常形态——说明正常形态（规格表面色 #e0e0e0/#2c2c2c + 双阴影）一直都在，坏的只是有壁纸时的\"动态卡面\"分支（半透明毛玻璃卡面叠 20/60px 双阴影，暗影落在壁纸上被读作边缘重晕影）。\n- 重写：新拟态界面开关开启时，所有卡片（主页磁贴/版本卡/公告卡/下载卡等）永远按正常态渲染，不再读壁纸状态、不再插 blur 层、不再有\"动态卡面\"——壁纸适配分支整链退役。\n\n**② \"新拟态界面\"开关（模糊程度下方）**\n\n- 开启（默认）：卡片正常态渲染；其余 UI 效果选项（UI效果选择/界面透明度/模糊程度）变灰停用，卡片本体透明度滑条可操作。\n- 关闭：回归旧壁纸管线（毛玻璃/半透明随其余选项变化；无壁纸为原生平铺），滑条变灰，其余选项恢复。\n- 无壁纸时开关与滑条也恒显（新拟态与壁纸无关，这正是本轮重写的语义）。\n\n**③ 卡片本体透明度（不含字体）**\n\n- 滑条语义从\"整个卡片 alpha 缩放\"改为\"卡片本体\"：卡面规格表面色与双阴影承载层按比例淡化，文字/图标保持全不透明（引擎新原语 ame_applyNeumorphCardOpacity，卡面走动态色安全淡化，深浅色切换不脱色）。\n- 100% = 规格表面原样；0% = 卡体全透明（文字仍可见）。\n\nEN: Neumorphism rewritten to the \"normal state\" (spec surface + dual shadows) as the single card path whenever the new \"Neumorphic Interface\" toggle (under Blur Intensity) is on -- the wallpaper-adaptive dynamic-face branch is fully retired (it was the source of the heavy edge halos). Toggle on: other UI-effect options grey out and the card-body opacity slider becomes active; off: legacy wallpaper pipeline takes over. Opacity now fades the card body (face + shadows) only -- text stays fully opaque."
+    },
+    {
       "id": "task172-six-fixes-2026-09-25",
       "title": "装机反馈六连修（ANGLE 依旧崩溃 / JIT 卡死闪退 / 键盘 / 头像 / 版本级 TouchController / CF 镜像 502）",
       "date": "2026-09-25",

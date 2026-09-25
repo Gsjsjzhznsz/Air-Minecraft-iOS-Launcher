@@ -152,7 +152,7 @@
     // 恢复/清除顺延为 3/4。
     // Sections: [UI效果设置], [选择背景类型], [Bing 壁纸(开关+画廊+刷新)], [图片背景, 视频背景], [恢复默认背景, 清除背景]
     self.sections = @[
-        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.opacity.title", nil)],
+        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.interface.title", nil), localize(@"background.cards.neumorph.opacity.title", nil)],
         @[localize(@"i18n_str_60", nil)],
         @[localize(@"bing.section.header", nil), localize(@"bing.toggle.title", nil), localize(@"bing.gallery.title", nil), localize(@"bing.refresh.title", nil)],
         @[localize(@"i18n_str_61", nil), localize(@"i18n_str_55", nil)],
@@ -171,9 +171,11 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    // 如果没有自定义背景，隐藏UI效果设置部分
+    // 如果没有自定义背景，隐藏旧壁纸管线选项（行 0-2：UI效果/透明度/模糊程度）；
+    // Task172：新拟态界面开关行 + 卡片本体透明度滑条行恒显（新拟态与壁纸
+    // 无关，正是本轮重写的语义）。
     if (section == 0 && ![[BackgroundManager sharedManager] hasBackground]) {
-        return 0;
+        return 2;
     }
     return [self.sections[section] count];
 }
@@ -207,9 +209,13 @@
     BackgroundManager *manager = [BackgroundManager sharedManager];
     BOOL hasBackground = [manager hasBackground];
     
-    // UI效果设置部分
-    if (indexPath.section == 0 && hasBackground) {
-        if (indexPath.row == 0) {
+    // UI效果设置部分（Task172：行 0-2 = 旧壁纸管线选项，仅在有壁纸时存在；
+    // 新拟态界面开关行 + 卡片本体透明度滑条行恒显——新拟态与壁纸无关。
+    // 开关开启时行 0-2 变灰（contentView.alpha 0.35 + 关交互），透明度滑条
+    // 可操作；关闭反转——滑条变灰，行 0-2 恢复。）
+    if (indexPath.section == 0) {
+        BOOL neumorphOn = manager.cardsNeumorphEnabled;
+        if (hasBackground && indexPath.row == 0) {
             // UI效果选择
             UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
             if (!cell) {
@@ -222,11 +228,14 @@
             cell.detailTextLabel.text = effectName;
             cell.imageView.image = [UIImage systemImageNamed:@"rectangle.split.3x3"];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            // Task172：新拟态界面开启时本行（其余 UI 效果选项）变灰停用
+            cell.contentView.alpha = neumorphOn ? 0.35 : 1.0;
+            cell.userInteractionEnabled = !neumorphOn;
             
             [self styleCell:cell hasBackground:hasBackground];
             return cell;
             
-        } else if (indexPath.row == 1) {
+        } else if (hasBackground && indexPath.row == 1) {
             // 透明度滑块
             // Task156：行内标题（用户反馈“毛玻璃下两个百分比无名”）——
             // sections[0][1]（i18n_str_1296“透明度”）此前从未被显示（原代码
@@ -281,10 +290,13 @@
             
             cell.textLabel.text = nil;
             cell.imageView.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
+            // Task172：新拟态界面开启时本行（其余 UI 效果选项）变灰停用
+            cell.contentView.alpha = neumorphOn ? 0.35 : 1.0;
+            cell.userInteractionEnabled = !neumorphOn;
             
             return cell;
             
-        } else if (indexPath.row == 2) {
+        } else if (hasBackground && indexPath.row == 2) {
             // 模糊程度滑块
             // Task156：行内标题（同透明度行，sections[0][2]“模糊程度”首次显示）。
             UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:blurSliderCellIdentifier];
@@ -335,17 +347,44 @@
             
             cell.textLabel.text = nil;
             cell.imageView.image = [UIImage systemImageNamed:@"drop.halffull"];
+            // Task172：新拟态界面开启时本行（其余 UI 效果选项）变灰停用
+            cell.contentView.alpha = neumorphOn ? 0.35 : 1.0;
+            cell.userInteractionEnabled = !neumorphOn;
             
             return cell;
             
-        } else if (indexPath.row == 3) {
-            // Task170：卡片新拟态整体透明度滑条（替换 Task168 实底开关——
-            // 用户定稿"用拉条从 0%~100% 调节整个卡片的透明度，而不是实底
-            // 啥的"）。行内布局与透明度/模糊程度两行同款（Task156 形态）：
-            // 图标 + 标题 + 滑块 + 百分比。语义 = 整个卡片（卡面 + 双阴影
-            // 承载层 + 内容）作为单元做 alpha 缩放；0% = 整卡不可见（极端
-            // 档），100% = Task168 形态原样。用户反馈"按钮边缘晕影很重"
-            // 的自助调节入口（调低时边缘阴影晕影随之变淡）。
+        }
+        
+        // Task172：新拟态界面开关行（模糊程度下方，用户定稿）——恒显（与
+        // 壁纸无关）。开启 = 卡片永远"正常态"规格表面 + 双阴影，其余 UI
+        // 效果选项变灰、透明度滑条可操作；关闭反转（旧壁纸管线接管）。
+        if (indexPath.row == (hasBackground ? 3 : 0)) {
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphToggleCell"];
+            if (!cell) {
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:@"CardsNeumorphToggleCell"];
+                UISwitch *neumorphSwitch = [[UISwitch alloc] init];
+                [neumorphSwitch addTarget:self action:@selector(cardsNeumorphToggleChanged:) forControlEvents:UIControlEventValueChanged];
+                neumorphSwitch.tag = 410;
+                cell.accessoryView = neumorphSwitch;
+                cell.selectionStyle = UITableViewCellSelectionStyleNone;
+            }
+            UISwitch *neumorphSwitch = (UISwitch *)cell.accessoryView;
+            neumorphSwitch.on = manager.cardsNeumorphEnabled;
+            
+            cell.textLabel.text = self.sections[0][3]; // background.cards.neumorph.interface.title
+            cell.imageView.image = [UIImage systemImageNamed:@"square.3.layers.3d"];
+            [self styleCell:cell hasBackground:hasBackground];
+            return cell;
+        }
+        
+        // 恒显：卡片本体透明度滑条行（原 Task170 row3 / 无壁纸时 row1）。
+        // Task172 语义 = 卡片本体（卡面 + 双阴影）透明度，文字/图标不动；
+        // 仅在开关开启时可操作，关闭时变灰。
+        if (indexPath.row == (hasBackground ? 4 : 1)) {
+            // Task170：卡片新拟态透明度滑条行（Task156 形态：图标 + 标题 +
+            // 滑块 + 百分比）。Task172 语义修订 = 卡片本体（卡面 + 双阴影
+            // 承载层）透明度，文字/图标不动；0% = 卡体全透明（文字仍可见），
+            // 100% = 规格表面原样。仅在开关开启时可操作，关闭时变灰。
             UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphOpacityCell"];
             if (!cell) {
                 cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CardsNeumorphOpacityCell"];
@@ -384,10 +423,13 @@
             [self styleCell:cell hasBackground:hasBackground];
 
             UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:502];
-            titleLabel.text = self.sections[0][3]; // background.cards.neumorph.opacity.title
+            titleLabel.text = self.sections[0][4]; // background.cards.neumorph.opacity.title
 
             UISlider *slider = [cell.contentView viewWithTag:500];
             slider.value = manager.cardsNeumorphOpacity;
+            // Task172：开关关闭时滑条变灰停用（反转语义的一部分）
+            slider.enabled = neumorphOn;
+            cell.contentView.alpha = neumorphOn ? 1.0 : 0.35;
 
             UILabel *valueLabel = [cell.contentView viewWithTag:501];
             valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
@@ -520,12 +562,21 @@
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 
-// Task170：卡片新拟态整体透明度滑条（替换 Task168 实底开关）——落盘后走统一刷新链重建卡片
+// Task170：卡片新拟态透明度滑条——落盘后走统一刷新链重建卡片
+// （Task172 语义 = 卡片本体透明度，引擎原语 ame_applyNeumorphCardOpacity
+// 重写卡面动态色与阴影承载层 alpha，文字不动；每次重挂全量重设，无残留）
 - (void)cardsNeumorphOpacitySliderChanged:(UISlider *)slider {
-    // Task170：落盘 + refreshUIEffect（通知驱动统一刷新链，双管线重挂时
-    // 每个终端分支都会重设宿主 alpha，无残留）。
     [BackgroundManager sharedManager].cardsNeumorphOpacity = slider.value;
     [[BackgroundManager sharedManager] refreshUIEffect];
+}
+
+// Task172：新拟态界面开关——落盘 + 统一刷新链 + 重载表格（灰化态反转）。
+// 开启 = 卡片永远"正常态"（规格表面 + 双阴影，壁纸无关）；关闭 = 旧壁纸
+// 管线接管，其余 UI 效果选项恢复可操作。
+- (void)cardsNeumorphToggleChanged:(UISwitch *)sender {
+    [BackgroundManager sharedManager].cardsNeumorphEnabled = sender.on;
+    [[BackgroundManager sharedManager] refreshUIEffect];
+    [self.tableView reloadData];
 }
 
 #pragma mark - Task151：Bing 每日壁纸

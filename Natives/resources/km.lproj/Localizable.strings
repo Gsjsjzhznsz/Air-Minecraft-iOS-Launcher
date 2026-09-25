@@ -1965,6 +1965,7 @@
 "bing.refresh.title" = "ធ្វើឱ្យថ្មីឥឡូវនេះ";
 "bing.footer.hint" = "នៅពេលបើក ប្រសិនបើមិនបានកំណត់រូបភាពផ្ទាល់ខ្លួន រូបភាពប្រចាំថ្ងៃរបស់ Bing នឹងត្រូវបានអនុវត្តស្វ័យប្រវត្តិ និងធ្វើឱ្យថ្មីរាល់ថ្ងៃ។";
 "background.effect.footer" = "Opacity គ្រប់គ្រងភាពស្រអាប់នៃវត្ថុ UI (កាន់តែទាប = ផ្ទាំងរូបភាពបង្ហាញច្រើនជាង)។ Blur Level គ្រប់គ្រងកម្រិតនៃការធ្វើឱ្យព្រិល Gaussian នៃផ្ទៃខាងក្រោយ (កាន់តែទាប = ផ្ទៃខាងក្រោយច្បាស់ជាង)។ មានប្រសិទ្ធភាពនៅពេល UI Effect ត្រូវបានកំណត់ទៅ Blur ឬ Translucent ប៉ុណ្ណោះ។";
+"background.cards.neumorph.interface.title" = "ចំណុចប្រទាក់ Neumorphism";
 "background.cards.neumorph.opacity.title" = "តម្លាភាព Neumorphism";
 "bing.gallery.nav.title" = "វិចិត្រសាល Bing";
 "bing.setwallpaper.title" = "កំណត់ជារូបភាពផ្ទៃខាងក្រោយ";

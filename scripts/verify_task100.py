@@ -33,7 +33,7 @@ import re
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PASS, FAIL = 0, 0
 
 

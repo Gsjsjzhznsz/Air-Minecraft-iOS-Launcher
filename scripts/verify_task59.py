@@ -43,7 +43,7 @@ import sys
 import tempfile
 import os
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 IB = f"{REPO}/Natives/input_bridge_v3.m"
 SVC = f"{REPO}/Natives/SurfaceViewController.m"
 SDL = f"{REPO}/Natives/sdl3_hook.m"

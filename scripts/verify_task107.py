@@ -22,7 +22,7 @@ import struct
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WORK = "/home/z/my-project/task107"          # 会话工作区（法证产物）
 JNA_LIB_REL = "jna/extracted/com/sun/jna/darwin-aarch64/libjnidispatch.jnilib"
 os.chdir(REPO)

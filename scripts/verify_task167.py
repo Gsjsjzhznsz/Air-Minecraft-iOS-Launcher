@@ -155,9 +155,9 @@ a167 = [a for a in anns if a.get("id") == "task167-crashfix-migration-2026-09-25
 # 与 v6.0.0 发行文案改写插入——task167 现居 unpinned 组首位（数组第 4：
 # server(pin) / task169 / v6.0.0 / task167）。置顶断言改为"2026-09-25 同日
 # 组内、task166/task165/task164 之前"。
-check("E1 task167 公告置顶（Task172 重锚：task172 插入 index 2 后窗口 7->8；双根因 + 装机验证清单）",
+check("E1 task167 公告置顶（Task173 重锚：task173 prepend 后居同日组第 9；双根因 + 装机验证清单）",
       len(a167) == 1
-      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(8, len(anns))))
+      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(9, len(anns))))
       and all(anns.index(a167[0]) < anns.index(x) for x in anns
               if x.get("id") in ("task166-vulkan-fsr-dsa-2026-09-25",
                                  "task165-blackscreen-rootcause-2026-09-25",
@@ -213,12 +213,15 @@ for tid, script in (("F2 verify_task166 级联（C2 重锚后全绿）", "verify
 # 失败集合与基线完全相同（零新增失败）。
 r = subprocess.run([sys.executable, os.path.join(REPO, "scripts", "verify_task130.py")],
                    capture_output=True, text=True, timeout=600)
-m130 = re.search(r"==== RESULT: FAILED \(47/49\) ====", r.stdout)
+# Task173 口径修订（家法 = 零新增失败，分数无关化）：130 的既有环境基线 =
+# {D4 ApplyFSR（FSR1.cpp 锚，Task164/165 改动面，stash 实证）,
+#  I1 verify_task129（深子级联 112_118/119_124/125_128 的会话本地审计助手
+# 依赖，112_118 E5/E6 已证据条件化后 I1 可自愈）}。当前失败 ⊆ 基线集合
+# 即通过；出现集合外失败 = 新增失败，FAIL。
 fails130 = [l.strip() for l in r.stdout.splitlines() if l.strip().startswith("FAIL ")]
-baseline_ok = (m130 is not None
-               and len(fails130) == 2
-               and any("D4 ApplyFSR" in f for f in fails130)
-               and any("I1 verify_task129" in f for f in fails130))
+BASELINE130 = ("D4 ApplyFSR", "I1 verify_task129")
+unexpected130 = [f for f in fails130 if not any(b in f for b in BASELINE130)]
+baseline_ok = (not unexpected130)
 check("F3 verify_task130 级联（D4+I1 = stash 实证既有基线，零新增失败）", baseline_ok,
       "; ".join(fails130) if not baseline_ok else "")
 
