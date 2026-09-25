@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 5.1.0
-[Pre-Init] Commit: bc6c0b5 (main)
+[Pre-Init] Commit: ea7b123 (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -19,8 +19,6 @@
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260924)
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Library/Caches/IconLoader, mirror enabled: YES
 [LauncherRootVC] Loaded 918 remote versions
-[PLPrefTable] Task131: pick opened: mobileglues.renderer_backend (3 options)
-[PLPrefTable] Task142: renderer_backend written to OWN KEY = libMobileGL-gles.dylib (video.renderer untouched; legacy tier retired)
 [MCDL] SHA1 passed for 26.2.json
 [MCDL] insertSafety: how to insert assetIndex?
 [MCDL] insertSafety: how to insert assets?
@@ -123,7 +121,6 @@
 [JIT] [RightPanel] Task134 enabler=auto noScript=0
 sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [IconLoader] App entered background: cancelled all ongoing downloads
-[BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260924)
 [SurfaceViewController] FPS counter setup: profileRenderer=mg, envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
 [SurfaceVC] Task83 FSR linkage: renderer=libmobileglues.dylib preset=4 scale=2.00 -- MC render window = surface/2.00 (renderer-side upscale: MobileGlues FSR1); resolution=100%
 [SurfaceVC] CAMetalLayer configured: drawableSize=2360x1640, maximumDrawableCount=3, presentsWithTransaction=0, drawsAsynchronously=1, contentsScale=2.00
@@ -188,7 +185,7 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [JavaLauncher] Task68 GC/safepoint pause logging enabled (-Xlog:gc,safepoint -> stdout)
 [JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks
 [Amethyst] Task112: OpenAL pinned to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks/libopenal.dylib
-[JavaLauncher] Published Metallum surface view: 0x1273aa300 (scale=2)
+[JavaLauncher] Published Metallum surface view: 0x1552cdc00 (scale=2)
 [JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
 [JavaLauncher] Adding authlib-injector arguments for third party account
 [ThirdPartyAuthenticator] Added prefetched metadata parameter (length=1780)
@@ -218,9 +215,9 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 OpenJDK 64-Bit Server VM warning: Option UseCompressedClassPointers was deprecated in version 25.0 and will likely be removed in a future release.
 [PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [JIT26] Requesting 64 MB for JIT mapping
-[JIT26] Got JIT mapping 0x16526c000 from debugger
-[JIT26] mapping at RW=0x16d928000, RX=0x16526c000
-[2026-09-25T09:25:52.181+0800][0.271s] Using G1
+[JIT26] Got JIT mapping 0x15fe6c000 from debugger
+[JIT26] mapping at RW=0x163e6c000, RX=0x15fe6c000
+[2026-09-25T10:38:54.732+0800][0.253s] Using G1
 WARNING: Unknown module: cpw.mods.bootstraplauncher specified to --add-exports
 WARNING: package sun.security.action not in java.base
 [authlib-injector] [INFO] Logging file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/authlib-injector.log
@@ -230,8 +227,8 @@ PatchJNAAgent: premain called
 Arc Capes DNS Injector
 Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
 Added DNS cache entry: s.optifine.net/23.95.137.176
-[2026-09-25T09:25:52.445+0800][0.535s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 11M->2M(128M) 1.384ms
-[2026-09-25T09:25:52.445+0800][0.535s] Safepoint "G1CollectForAllocation", Time since last: 234681041 ns, Reaching safepoint: 1292 ns, At safepoint: 1409417 ns, Leaving safepoint: 2083 ns, Total: 1412792 ns, Threads: 0 runnable, 12 total
+[2026-09-25T10:38:54.966+0800][0.488s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 11M->2M(128M) 1.433ms
+[2026-09-25T10:38:54.966+0800][0.488s] Safepoint "G1CollectForAllocation", Time since last: 211383084 ns, Reaching safepoint: 1125 ns, At safepoint: 1456125 ns, Leaving safepoint: 2375 ns, Total: 1459625 ns, Threads: 0 runnable, 12 total
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
 WARNING: Please consider reporting this to the maintainers of class com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
@@ -268,23 +265,24 @@ Launching Minecraft fabric-loader-0.19.3-26.2-db6fa7a3
 [Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
 [Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
 Args init finished. Now starting game
-[2026-09-25T09:25:52.772+0800][0.862s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 66M->18M(128M) 2.066ms
-[2026-09-25T09:25:52.772+0800][0.862s] Safepoint "G1CollectForAllocation", Time since last: 324921708 ns, Reaching safepoint: 1917 ns, At safepoint: 2081542 ns, Leaving safepoint: 8833 ns, Total: 2092292 ns, Threads: 0 runnable, 16 total
-[2026-09-25T09:25:52.827+0800][0.917s] GC(2) Pause Young (Concurrent Start) (Metadata GC Threshold) 35M->20M(128M) 2.187ms
-[2026-09-25T09:25:52.827+0800][0.917s] GC(3) Concurrent Mark Cycle
-[2026-09-25T09:25:52.827+0800][0.917s] Safepoint "CollectForMetadataAllocation", Time since last: 52864125 ns, Reaching safepoint: 18917 ns, At safepoint: 2211791 ns, Leaving safepoint: 6959 ns, Total: 2237667 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:52.829+0800][0.919s] GC(3) Pause Remark 20M->20M(128M) 0.772ms
-[2026-09-25T09:25:52.829+0800][0.919s] Safepoint "G1PauseRemark", Time since last: 1017041 ns, Reaching safepoint: 20875 ns, At safepoint: 779209 ns, Leaving safepoint: 7625 ns, Total: 807709 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:52.829+0800][0.919s] GC(3) Pause Cleanup 20M->20M(128M) 0.007ms
-[2026-09-25T09:25:52.829+0800][0.919s] Safepoint "G1PauseCleanup", Time since last: 309916 ns, Reaching safepoint: 2709 ns, At safepoint: 25750 ns, Leaving safepoint: 4416 ns, Total: 32875 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:52.829+0800][0.919s] GC(3) Concurrent Mark Cycle 2.339ms
-[09:25:52] [main/INFO]: Loading Minecraft 26.2 with Fabric Loader 0.19.3
-[09:25:52] [main/INFO]: Mappings not present!
-[09:25:53] [ForkJoinPool-1-worker-2/WARN]: Mod dev_isxander_libsdl4j uses the version 3.2.18.release-3.2.18-79 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[09:25:53] [main/INFO]: Dependencies overridden for minecraft, fabricloader
-[2026-09-25T09:25:53.110+0800][1.200s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 93M->44M(128M) 1.901ms
-[2026-09-25T09:25:53.110+0800][1.200s] Safepoint "G1CollectForAllocation", Time since last: 279216625 ns, Reaching safepoint: 1250 ns, At safepoint: 1916834 ns, Leaving safepoint: 2750 ns, Total: 1920834 ns, Threads: 0 runnable, 17 total
-[09:25:53] [main/WARN]: Warnings were found!
+[2026-09-25T10:38:55.327+0800][0.849s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 66M->18M(128M) 2.803ms
+[2026-09-25T10:38:55.327+0800][0.849s] Safepoint "G1CollectForAllocation", Time since last: 358324291 ns, Reaching safepoint: 3750 ns, At safepoint: 2819209 ns, Leaving safepoint: 8833 ns, Total: 2831792 ns, Threads: 0 runnable, 16 total
+[2026-09-25T10:38:55.385+0800][0.907s] GC(2) Pause Young (Concurrent Start) (Metadata GC Threshold) 35M->20M(128M) 2.476ms
+[2026-09-25T10:38:55.385+0800][0.907s] GC(3) Concurrent Mark Cycle
+[2026-09-25T10:38:55.385+0800][0.907s] Safepoint "CollectForMetadataAllocation", Time since last: 54928750 ns, Reaching safepoint: 18417 ns, At safepoint: 2497541 ns, Leaving safepoint: 8750 ns, Total: 2524708 ns, Threads: 1 runnable, 17 total
+[2026-09-25T10:38:55.387+0800][0.908s] GC(3) Pause Remark 20M->20M(128M) 0.694ms
+[2026-09-25T10:38:55.387+0800][0.908s] Safepoint "G1PauseRemark", Time since last: 1012209 ns, Reaching safepoint: 2583 ns, At safepoint: 701792 ns, Leaving safepoint: 4500 ns, Total: 708875 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:55.387+0800][0.909s] GC(3) Pause Cleanup 20M->20M(128M) 0.021ms
+[2026-09-25T10:38:55.387+0800][0.909s] Safepoint "G1PauseCleanup", Time since last: 551916 ns, Reaching safepoint: 2417 ns, At safepoint: 26750 ns, Leaving safepoint: 1875 ns, Total: 31042 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:55.387+0800][0.909s] GC(3) Concurrent Mark Cycle 2.523ms
+[10:38:55] [main/INFO]: Loading Minecraft 26.2 with Fabric Loader 0.19.3
+[10:38:55] [main/INFO]: Mappings not present!
+[BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260924)
+[10:38:55] [ForkJoinPool-1-worker-2/WARN]: Mod dev_isxander_libsdl4j uses the version 3.2.18.release-3.2.18-79 which isn't compatible with Loader's extended semantic version format (Could not parse version number component 'release'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[10:38:55] [main/INFO]: Dependencies overridden for minecraft, fabricloader
+[2026-09-25T10:38:55.667+0800][1.188s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 93M->44M(128M) 1.891ms
+[2026-09-25T10:38:55.667+0800][1.188s] Safepoint "G1CollectForAllocation", Time since last: 277499542 ns, Reaching safepoint: 1041 ns, At safepoint: 1907625 ns, Leaving safepoint: 3000 ns, Total: 1911666 ns, Threads: 0 runnable, 17 total
+[10:38:55] [main/WARN]: Warnings were found!
  - Mod 'Dynamic FPS' (dynamic_fps) 3.11.9 recommends any version of modmenu, which is missing!
 	 - You should install any version of modmenu for the optimal experience.
  - Mod 'Forge Config API Port' (forgeconfigapiport) 26.2.0 recommends any version of modmenu, which is missing!
@@ -293,7 +291,7 @@ Args init finished. Now starting game
 	 - You should install any version after 14.0.0-alpha.1 of Fabulously Optimized for the optimal experience.
  - Mod 'Reese's Sodium Options' (reeses-sodium-options) 2.0.5+mc26.2 recommends version 0.4.2 or later of sodium-extra, which is missing!
 	 - You should install version 0.4.2 or later of sodium-extra for the optimal experience.
-[09:25:53] [main/INFO]: Loading 102 mods:
+[10:38:55] [main/INFO]: Loading 102 mods:
 	- betterblockentities 1.3.6+mc26.2
 	- bettergrass 1.8.7+fabric.26.2
 	- cloth-config 26.1.154
@@ -407,10 +405,10 @@ Args init finished. Now starting game
 	   |-- com_twelvemonkeys_imageio_imageio-webp 3.12.0
 	   |-- org_quiltmc_parsers_gson 0.2.1
 	   \-- org_quiltmc_parsers_json 0.2.1
-[09:25:53] [main/INFO]: No flag found, running a usual copy
-[09:25:53] [main/WARN]: Stream injection failed; legacy loggers may retain blocking behavior.
-[09:25:53] [main/INFO]: Launching CrashAssistantApp (CrashAssistant-fabric-26.2-1.11.10.jar)
-[09:25:53] [main/ERROR]: Error while launching GUI: 
+[10:38:55] [main/INFO]: No flag found, running a usual copy
+[10:38:55] [main/WARN]: Stream injection failed; legacy loggers may retain blocking behavior.
+[10:38:55] [main/INFO]: Launching CrashAssistantApp (CrashAssistant-fabric-26.2-1.11.10.jar)
+[10:38:55] [main/ERROR]: Error while launching GUI: 
 java.lang.RuntimeException: Operation not permitted
 	at java.base/java.lang.ProcessHandleImpl$Info.info0(Native Method)
 	at java.base/java.lang.ProcessHandleImpl$Info.info(Unknown Source)
@@ -434,71 +432,64 @@ java.lang.RuntimeException: Operation not permitted
 	at net.kdt.pojavlaunch.Tools.launchMinecraft(Tools.java:134)
 	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:312)
 	at net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
-[09:25:53] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application%20Support/minecraft/libraries/net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[09:25:53] [main/INFO]: Compatibility level set to JAVA_25
-[09:25:53] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Ixeris is not supported on Android!
-[09:25:53] [main/WARN]: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message
-[2026-09-25T09:25:53.444+0800][1.534s] GC(5) Pause Young (Normal) (G1 Evacuation Pause) 98M->52M(128M) 2.432ms
-[2026-09-25T09:25:53.444+0800][1.534s] Safepoint "G1CollectForAllocation", Time since last: 331507500 ns, Reaching safepoint: 17833 ns, At safepoint: 2448042 ns, Leaving safepoint: 4166 ns, Total: 2470041 ns, Threads: 1 runnable, 18 total
-[09:25:53] [main/INFO]: Loaded configuration file for Lithium: 171 options available, 0 override(s) found.
-[09:25:53] [main/WARN]: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/INFO]: Loaded configuration file for Sodium: 36 options available, 1 override(s) found
-[09:25:53] [main/WARN]: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message
-[09:25:53] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message
-[2026-09-25T09:25:53.550+0800][1.641s] GC(6) Pause Young (Normal) (G1 Evacuation Pause) 107M->67M(128M) 4.541ms
-[2026-09-25T09:25:53.550+0800][1.641s] Safepoint "G1CollectForAllocation", Time since last: 101749792 ns, Reaching safepoint: 4792 ns, At safepoint: 4558125 ns, Leaving safepoint: 5833 ns, Total: 4568750 ns, Threads: 0 runnable, 17 total
-[2026-09-25T09:25:53.578+0800][1.668s] GC(7) Pause Young (Concurrent Start) (G1 Humongous Allocation) 86M->77M(128M) 3.441ms
-[2026-09-25T09:25:53.578+0800][1.668s] Safepoint "G1TryInitiateConcMark", Time since last: 23859667 ns, Reaching safepoint: 1875 ns, At safepoint: 3456750 ns, Leaving safepoint: 4916 ns, Total: 3463541 ns, Threads: 0 runnable, 17 total
-[2026-09-25T09:25:53.578+0800][1.668s] GC(8) Concurrent Mark Cycle
-[2026-09-25T09:25:53.585+0800][1.675s] GC(8) Pause Remark 95M->80M(130M) 1.404ms
-[2026-09-25T09:25:53.585+0800][1.675s] Safepoint "G1PauseRemark", Time since last: 5900000 ns, Reaching safepoint: 40750 ns, At safepoint: 1415959 ns, Leaving safepoint: 5958 ns, Total: 1462667 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:53.588+0800][1.679s] GC(8) Pause Cleanup 82M->82M(130M) 0.008ms
-[2026-09-25T09:25:53.588+0800][1.679s] Safepoint "G1PauseCleanup", Time since last: 3264125 ns, Reaching safepoint: 36458 ns, At safepoint: 14667 ns, Leaving safepoint: 3708 ns, Total: 54833 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:53.588+0800][1.679s] GC(8) Concurrent Mark Cycle 10.804ms
-[2026-09-25T09:25:53.608+0800][1.699s] GC(9) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 102M->83M(130M) 4.953ms
-[2026-09-25T09:25:53.608+0800][1.699s] Safepoint "G1CollectForAllocation", Time since last: 15093334 ns, Reaching safepoint: 1666 ns, At safepoint: 4977709 ns, Leaving safepoint: 4958 ns, Total: 4984333 ns, Threads: 0 runnable, 17 total
-[2026-09-25T09:25:53.645+0800][1.736s] GC(10) Pause Young (Mixed) (G1 Evacuation Pause) 104M->82M(130M) 3.321ms
-[2026-09-25T09:25:53.645+0800][1.736s] Safepoint "G1CollectForAllocation", Time since last: 33617375 ns, Reaching safepoint: 24625 ns, At safepoint: 3342917 ns, Leaving safepoint: 10208 ns, Total: 3377750 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:53.673+0800][1.764s] GC(11) Pause Young (Concurrent Start) (G1 Evacuation Pause) 105M->86M(130M) 3.164ms
-[2026-09-25T09:25:53.673+0800][1.764s] GC(12) Concurrent Mark Cycle
-[2026-09-25T09:25:53.673+0800][1.764s] Safepoint "G1CollectForAllocation", Time since last: 24599833 ns, Reaching safepoint: 3417 ns, At safepoint: 3181917 ns, Leaving safepoint: 10333 ns, Total: 3195667 ns, Threads: 0 runnable, 17 total
-[2026-09-25T09:25:53.685+0800][1.775s] GC(12) Pause Remark 92M->74M(130M) 1.274ms
-[2026-09-25T09:25:53.685+0800][1.775s] Safepoint "G1PauseRemark", Time since last: 10495042 ns, Reaching safepoint: 22583 ns, At safepoint: 1286792 ns, Leaving safepoint: 6125 ns, Total: 1315500 ns, Threads: 1 runnable, 17 total
-[2026-09-25T09:25:53.689+0800][1.780s] GC(12) Pause Cleanup 75M->75M(130M) 0.019ms
-[2026-09-25T09:25:53.689+0800][1.780s] Safepoint "G1PauseCleanup", Time since last: 4188500 ns, Reaching safepoint: 55125 ns, At safepoint: 38875 ns, Leaving safepoint: 4958 ns, Total: 98958 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:53.689+0800][1.780s] GC(12) Concurrent Mark Cycle 16.202ms
-[2026-09-25T09:25:53.710+0800][1.801s] GC(13) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 90M->70M(130M) 2.497ms
-[2026-09-25T09:25:53.710+0800][1.801s] Safepoint "G1CollectForAllocation", Time since last: 18593458 ns, Reaching safepoint: 19959 ns, At safepoint: 2511125 ns, Leaving safepoint: 12083 ns, Total: 2543167 ns, Threads: 1 runnable, 17 total
-[2026-09-25T09:25:53.747+0800][1.838s] GC(14) Pause Young (Mixed) (G1 Evacuation Pause) 104M->62M(260M) 2.769ms
-[2026-09-25T09:25:53.747+0800][1.838s] Safepoint "G1CollectForAllocation", Time since last: 34046583 ns, Reaching safepoint: 21209 ns, At safepoint: 2786208 ns, Leaving safepoint: 11375 ns, Total: 2818792 ns, Threads: 2 runnable, 17 total
-[2026-09-25T09:25:53.871+0800][1.962s] GC(15) Pause Young (Normal) (G1 Evacuation Pause) 182M->75M(260M) 4.633ms
-[2026-09-25T09:25:53.871+0800][1.962s] Safepoint "G1CollectForAllocation", Time since last: 119544667 ns, Reaching safepoint: 4083 ns, At safepoint: 4651542 ns, Leaving safepoint: 7250 ns, Total: 4662875 ns, Threads: 0 runnable, 17 total
-[09:25:53] [main/WARN]: Error loading class: com/terraformersmc/modmenu/event/ModMenuEventHandler (java.lang.ClassNotFoundException: com/terraformersmc/modmenu/event/ModMenuEventHandler)
-[09:25:53] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[2026-09-25T09:25:54.023+0800][2.114s] GC(16) Pause Young (Normal) (G1 Evacuation Pause) 214M->94M(260M) 7.562ms
-[2026-09-25T09:25:54.023+0800][2.114s] Safepoint "G1CollectForAllocation", Time since last: 144379208 ns, Reaching safepoint: 23042 ns, At safepoint: 7596166 ns, Leaving safepoint: 13709 ns, Total: 7632917 ns, Threads: 1 runnable, 17 total
-[09:25:54] [main/INFO]: Searching for graphics cards...
+[10:38:55] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application%20Support/minecraft/libraries/net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[10:38:55] [main/INFO]: Compatibility level set to JAVA_25
+[10:38:55] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[10:38:55] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[10:38:55] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[10:38:55] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[10:38:55] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[10:38:55] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[10:38:55] [main/WARN]: Ixeris is not supported on Android!
+[10:38:55] [main/WARN]: Reference map 'ixeris.mixins.refmap.json' for ixeris.mixins.json could not be read. If this is a development environment you can ignore this message
+[2026-09-25T10:38:55.992+0800][1.513s] GC(5) Pause Young (Normal) (G1 Evacuation Pause) 97M->52M(128M) 3.001ms
+[2026-09-25T10:38:55.992+0800][1.513s] Safepoint "G1CollectForAllocation", Time since last: 321925625 ns, Reaching safepoint: 18167 ns, At safepoint: 3016542 ns, Leaving safepoint: 2625 ns, Total: 3037334 ns, Threads: 1 runnable, 17 total
+[10:38:56] [main/INFO]: Loaded configuration file for Lithium: 171 options available, 0 override(s) found.
+[10:38:56] [main/WARN]: Reference map 'reeses-sodium-options.refmap.json' for reeses-sodium-options.mixins.json could not be read. If this is a development environment you can ignore this message
+[10:38:56] [main/INFO]: Loaded configuration file for Sodium: 36 options available, 1 override(s) found
+[10:38:56] [main/WARN]: Reference map 'sspb.refmap.json' for sspb.mixins.json could not be read. If this is a development environment you can ignore this message
+[10:38:56] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl.mixins.json could not be read. If this is a development environment you can ignore this message
+[10:38:56] [main/WARN]: Reference map 'yet_another_config_lib_v3.refmap.json' for yacl-fabric.mixins.json could not be read. If this is a development environment you can ignore this message
+[2026-09-25T10:38:56.095+0800][1.617s] GC(6) Pause Young (Normal) (G1 Evacuation Pause) 107M->67M(128M) 3.914ms
+[2026-09-25T10:38:56.095+0800][1.617s] Safepoint "G1CollectForAllocation", Time since last: 99551208 ns, Reaching safepoint: 2292 ns, At safepoint: 3932208 ns, Leaving safepoint: 5208 ns, Total: 3939708 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:56.122+0800][1.644s] GC(7) Pause Young (Concurrent Start) (G1 Humongous Allocation) 88M->78M(128M) 4.810ms
+[2026-09-25T10:38:56.122+0800][1.644s] GC(8) Concurrent Mark Cycle
+[2026-09-25T10:38:56.122+0800][1.644s] Safepoint "G1TryInitiateConcMark", Time since last: 21965042 ns, Reaching safepoint: 1375 ns, At safepoint: 4828125 ns, Leaving safepoint: 7000 ns, Total: 4836500 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:56.133+0800][1.654s] GC(8) Pause Remark 103M->89M(132M) 1.416ms
+[2026-09-25T10:38:56.133+0800][1.654s] Safepoint "G1PauseRemark", Time since last: 9232167 ns, Reaching safepoint: 23125 ns, At safepoint: 1425333 ns, Leaving safepoint: 4000 ns, Total: 1452458 ns, Threads: 2 runnable, 17 total
+[2026-09-25T10:38:56.136+0800][1.658s] GC(8) Pause Cleanup 91M->91M(132M) 0.024ms
+[2026-09-25T10:38:56.136+0800][1.658s] Safepoint "G1PauseCleanup", Time since last: 3392083 ns, Reaching safepoint: 39417 ns, At safepoint: 53000 ns, Leaving safepoint: 2792 ns, Total: 95209 ns, Threads: 1 runnable, 17 total
+[2026-09-25T10:38:56.136+0800][1.658s] GC(8) Concurrent Mark Cycle 14.308ms
+[2026-09-25T10:38:56.150+0800][1.671s] GC(9) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 104M->84M(132M) 4.501ms
+[2026-09-25T10:38:56.150+0800][1.672s] Safepoint "G1CollectForAllocation", Time since last: 9245708 ns, Reaching safepoint: 1625 ns, At safepoint: 4514583 ns, Leaving safepoint: 10750 ns, Total: 4526958 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:56.186+0800][1.708s] GC(10) Pause Young (Mixed) (G1 Evacuation Pause) 105M->81M(132M) 3.078ms
+[2026-09-25T10:38:56.186+0800][1.708s] Safepoint "G1CollectForAllocation", Time since last: 33460959 ns, Reaching safepoint: 2375 ns, At safepoint: 3092833 ns, Leaving safepoint: 10875 ns, Total: 3106083 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:56.221+0800][1.742s] GC(11) Pause Young (Concurrent Start) (G1 Evacuation Pause) 105M->85M(264M) 3.763ms
+[2026-09-25T10:38:56.221+0800][1.742s] GC(12) Concurrent Mark Cycle
+[2026-09-25T10:38:56.221+0800][1.742s] Safepoint "G1CollectForAllocation", Time since last: 30388458 ns, Reaching safepoint: 3500 ns, At safepoint: 3780334 ns, Leaving safepoint: 9791 ns, Total: 3793625 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:56.239+0800][1.761s] GC(12) Pause Remark 95M->79M(234M) 2.041ms
+[2026-09-25T10:38:56.239+0800][1.761s] Safepoint "G1PauseRemark", Time since last: 16182709 ns, Reaching safepoint: 22125 ns, At safepoint: 2066625 ns, Leaving safepoint: 7541 ns, Total: 2096291 ns, Threads: 1 runnable, 17 total
+[2026-09-25T10:38:56.243+0800][1.765s] GC(12) Pause Cleanup 82M->82M(234M) 0.028ms
+[2026-09-25T10:38:56.243+0800][1.765s] Safepoint "G1PauseCleanup", Time since last: 4278292 ns, Reaching safepoint: 21792 ns, At safepoint: 57208 ns, Leaving safepoint: 3458 ns, Total: 82458 ns, Threads: 2 runnable, 17 total
+[2026-09-25T10:38:56.243+0800][1.765s] GC(12) Concurrent Mark Cycle 22.919ms
+[2026-09-25T10:38:56.354+0800][1.876s] GC(13) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 165M->77M(234M) 4.965ms
+[2026-09-25T10:38:56.354+0800][1.876s] Safepoint "G1CollectForAllocation", Time since last: 105644375 ns, Reaching safepoint: 4042 ns, At safepoint: 4983167 ns, Leaving safepoint: 7166 ns, Total: 4994375 ns, Threads: 0 runnable, 17 total
+[2026-09-25T10:38:56.471+0800][1.993s] GC(14) Pause Young (Mixed) (G1 Evacuation Pause) 181M->85M(234M) 6.325ms
+[2026-09-25T10:38:56.471+0800][1.993s] Safepoint "G1CollectForAllocation", Time since last: 111135292 ns, Reaching safepoint: 4708 ns, At safepoint: 6343667 ns, Leaving safepoint: 13708 ns, Total: 6362083 ns, Threads: 0 runnable, 17 total
+[10:38:56] [main/WARN]: Error loading class: com/terraformersmc/modmenu/event/ModMenuEventHandler (java.lang.ClassNotFoundException: com/terraformersmc/modmenu/event/ModMenuEventHandler)
+[10:38:56] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[2026-09-25T10:38:56.594+0800][2.116s] GC(15) Pause Young (Normal) (G1 Evacuation Pause) 185M->101M(234M) 8.252ms
+[2026-09-25T10:38:56.595+0800][2.116s] Safepoint "G1CollectForAllocation", Time since last: 114899542 ns, Reaching safepoint: 4125 ns, At safepoint: 8285917 ns, Leaving safepoint: 7166 ns, Total: 8297208 ns, Threads: 0 runnable, 17 total
+[10:38:56] [main/INFO]: Searching for graphics cards...
 [authlib-injector] [INFO] Transformed [net.minecraft.client.main.Main] with [Main Arguments Transformer]
-[09:25:54] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.4).
+[2026-09-25T10:38:56.677+0800][2.199s] GC(16) Pause Young (Normal) (G1 Evacuation Pause) 189M->108M(234M) 5.755ms
+[2026-09-25T10:38:56.677+0800][2.199s] Safepoint "G1CollectForAllocation", Time since last: 76624875 ns, Reaching safepoint: 3917 ns, At safepoint: 5773083 ns, Leaving safepoint: 8792 ns, Total: 5785792 ns, Threads: 0 runnable, 17 total
+[10:38:56] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.4).
 [authlib-injector] [INFO] Transformed [com.mojang.authlib.properties.Property] with [Yggdrasil Public Key Transformer]
-[2026-09-25T09:25:54.226+0800][2.316s] GC(17) Pause Young (Normal) (G1 Evacuation Pause) 213M->102M(260M) 6.893ms
-[2026-09-25T09:25:54.226+0800][2.316s] Safepoint "G1CollectForAllocation", Time since last: 195254291 ns, Reaching safepoint: 1750 ns, At safepoint: 6950375 ns, Leaving safepoint: 3209 ns, Total: 6955334 ns, Threads: 0 runnable, 17 total
 [SDLHook] hooked SDL_GetKeyboardState (real=0x0, Task67 kb-state poll observability)
-[InputDiag] initSDLEventFuncs: PushEvent=0x0 GetWindowID=0x0 g_sdlWindow=0x0 Task66GetKBState=0x10c4628a4 SetModState=0x0
-[JNI] JNI_OnLoadGLFW registered, class=0x125b89242, method=0x12441afc0, keyDownBuffer=0x1354bc280
+[InputDiag] initSDLEventFuncs: PushEvent=0x0 GetWindowID=0x0 g_sdlWindow=0x0 Task66GetKBState=0x10a3fa8a4 SetModState=0x0
+[JNI] JNI_OnLoadGLFW registered, class=0x11fd6b54a, method=0x12fb90080, keyDownBuffer=0x14ae9b340
 [spvc-shim] impl loaded via @loader_path/libspirv-cross-c-shared.0.impl.dylib
-[Amethyst] Task129: OpenAL shim active (ALC_SOFT_system_events stubs advertised over openal-soft 1.20.1 impl; isSupported->ALC_FALSE => MC polling fallback)
-[shaderc-shim] impl loaded via @loader_path/libshaderc_impl.dylib
-[shaderc-shim] impl base = 0x12e000000 (shaderc_compiler_initialize @ 0x12e004000, image offset 0x4000)
-[shaderc-shim] impl base = 0x12e000000 (_ZN7glslang17InitializeProcessEv @ 0x12e0c2390, image offset 0xc2390)
-[shaderc-shim] impl base = 0x12e000000 (_ZN7glslang15FinalizeProcessEv @ 0x12e0c23f8, image offset 0xc23f8)
 Initializing MobileGlues ...
 The Open Source License of MobileGlues: 
   GNU LGPL-2.1 License
@@ -516,96 +507,101 @@ config.json loaded successfully
 [MobileGlues] Setting: fsr1Setting                 = 4
 [MobileGlues] Setting: fsr1RcasSharpness           = 0.200 (Task 130 RCAS, mpv scale, negative=off)
 [MobileGlues] Setting: hideMGEnvLevel              = 0
-[2026-09-25T09:25:54.711+0800][2.801s] GC(18) Pause Young (Normal) (G1 Evacuation Pause) 218M->113M(358M) 6.557ms
-[2026-09-25T09:25:54.711+0800][2.801s] Safepoint "G1CollectForAllocation", Time since last: 478549125 ns, Reaching safepoint: 24333 ns, At safepoint: 6580250 ns, Leaving safepoint: 13500 ns, Total: 6618083 ns, Threads: 1 runnable, 17 total
+[shaderc-shim] impl loaded via @loader_path/libshaderc_impl.dylib
+[shaderc-shim] impl base = 0x12c950000 (shaderc_compiler_initialize @ 0x12c954000, image offset 0x4000)
+[shaderc-shim] impl base = 0x12c950000 (_ZN7glslang17InitializeProcessEv @ 0x12ca12390, image offset 0xc2390)
+[shaderc-shim] impl base = 0x12c950000 (_ZN7glslang15FinalizeProcessEv @ 0x12ca123f8, image offset 0xc23f8)
+[Amethyst] Task129: OpenAL shim active (ALC_SOFT_system_events stubs advertised over openal-soft 1.20.1 impl; isSupported->ALC_FALSE => MC polling fallback)
+[2026-09-25T10:38:57.063+0800][2.585s] GC(17) Pause Young (Normal) (G1 Evacuation Pause) 193M->111M(359M) 3.134ms
+[2026-09-25T10:38:57.063+0800][2.585s] Safepoint "G1CollectForAllocation", Time since last: 382601792 ns, Reaching safepoint: 137541 ns, At safepoint: 3149667 ns, Leaving safepoint: 10167 ns, Total: 3297375 ns, Threads: 1 runnable, 17 total
 PatchJNAAgent: Replacing class
 Platform.isMac called from com.sun.jna.Native
 Platform.isMac called from com.sun.jna.Native
 Platform.isMac called from com.sun.jna.Native
-[SDLHook] Task133: libjnidispatch image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Caches/JNA/temp/jna70699131646037760.tmp / install libjnidispatch.jnilib) -- invoking Task132 dlsym rebind (direct hdr+slide)
-[SDLHook] Task135: _dlsym slot 0x1233b0040 already == hooked_dlsym (idempotent hit, __DATA,__la_symbol_ptr) -- fishhook add-image callback or earlier pass won the race
+[SDLHook] Task133: libjnidispatch image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Caches/JNA/temp/jna409402390862400470.tmp / install libjnidispatch.jnilib) -- invoking Task132 dlsym rebind (direct hdr+slide)
+[SDLHook] Task135: _dlsym slot 0x122730040 already == hooked_dlsym (idempotent hit, __DATA,__la_symbol_ptr) -- fishhook add-image callback or earlier pass won the race
 Platform.isMac called from com.sun.jna.Native
 Platform.isMac called from com.sun.jna.NativeLibrary
 Platform.isMac called from com.sun.jna.NativeLibrary
-[09:25:54] [main/WARN]: Failed sysctl call: hw.packages, Error code: 1
+[10:38:57] [main/WARN]: Failed sysctl call: hw.packages, Error code: 1
 Platform.isMac called from com.sun.jna.NativeLibrary
 Platform.isMac called from com.sun.jna.NativeLibrary
 Platform.isMac called from com.sun.jna.NativeLibrary
 Platform.isMac called from com.sun.jna.NativeLibrary
 [input_bridge] Blocked fork/exec of 'sysctl' (iOS sandbox forbids fork/exec)
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.brand_string, Error code: 1
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.vendor, Error code: 2
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.stepping, Error code: 2
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.model, Error code: 2
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.family, Error code: 2
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.signature, Error code: 2
-[09:25:54] [main/WARN]: Failed sysctl call: machdep.cpu.feature_bits, Error code: 2
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.brand_string, Error code: 1
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.vendor, Error code: 2
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.stepping, Error code: 2
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.model, Error code: 2
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.family, Error code: 2
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.signature, Error code: 2
+[10:38:57] [main/WARN]: Failed sysctl call: machdep.cpu.feature_bits, Error code: 2
 [input_bridge] Blocked fork/exec of 'system_profiler' (iOS sandbox forbids fork/exec)
 [input_bridge] Blocked fork/exec of 'system_profiler' (iOS sandbox forbids fork/exec)
-[09:25:54] [main/WARN]: Failed sysctl call: vm.swapusage, Error code: 1
-[09:25:54] [main/WARN]: Unable to parse version 27.0 to a codename.
+[10:38:57] [main/WARN]: Failed sysctl call: vm.swapusage, Error code: 1
+[10:38:57] [main/WARN]: Unable to parse version 27.0 to a codename.
 [input_bridge] Blocked fork/exec of 'id' (iOS sandbox forbids fork/exec)
-[09:25:54] [main/WARN]: Failed sysctl call: kern.argmax, Error code: 1
-[09:25:54] [Datafixer Bootstrap #0/INFO]: 295 Datafixer optimizations took 194 milliseconds
-[2026-09-25T09:25:54.942+0800][3.033s] GC(19) Pause Young (Normal) (G1 Evacuation Pause) 317M->154M(364M) 13.662ms
-[2026-09-25T09:25:54.942+0800][3.033s] Safepoint "G1CollectForAllocation", Time since last: 217935750 ns, Reaching safepoint: 25208 ns, At safepoint: 13680417 ns, Leaving safepoint: 15667 ns, Total: 13721292 ns, Threads: 1 runnable, 19 total
-[2026-09-25T09:25:55.111+0800][3.202s] GC(20) Pause Young (Concurrent Start) (CodeCache GC Threshold) 225M->162M(364M) 10.719ms
-[2026-09-25T09:25:55.111+0800][3.202s] GC(21) Concurrent Mark Cycle
-[2026-09-25T09:25:55.111+0800][3.202s] Safepoint "G1TryInitiateConcMark", Time since last: 158164083 ns, Reaching safepoint: 23250 ns, At safepoint: 10741167 ns, Leaving safepoint: 10333 ns, Total: 10774750 ns, Threads: 1 runnable, 18 total
-[2026-09-25T09:25:55.160+0800][3.251s] GC(21) Pause Remark 182M->182M(364M) 2.534ms
-[2026-09-25T09:25:55.160+0800][3.251s] Safepoint "G1PauseRemark", Time since last: 46121167 ns, Reaching safepoint: 38333 ns, At safepoint: 2550833 ns, Leaving safepoint: 3459 ns, Total: 2592625 ns, Threads: 1 runnable, 18 total
-[2026-09-25T09:25:55.183+0800][3.273s] GC(21) Pause Cleanup 189M->189M(364M) 0.018ms
-[2026-09-25T09:25:55.183+0800][3.273s] Safepoint "G1PauseCleanup", Time since last: 22573541 ns, Reaching safepoint: 41334 ns, At safepoint: 33625 ns, Leaving safepoint: 3208 ns, Total: 78167 ns, Threads: 1 runnable, 18 total
-[2026-09-25T09:25:55.183+0800][3.274s] GC(21) Concurrent Mark Cycle 71.806ms
-[2026-09-25T09:25:55.481+0800][3.572s] GC(22) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 317M->166M(364M) 3.761ms
-[2026-09-25T09:25:55.481+0800][3.572s] Safepoint "G1CollectForAllocation", Time since last: 294602208 ns, Reaching safepoint: 1917 ns, At safepoint: 3793667 ns, Leaving safepoint: 13375 ns, Total: 3808959 ns, Threads: 0 runnable, 18 total
-[2026-09-25T09:25:55.719+0800][3.809s] GC(23) Pause Young (Mixed) (G1 Evacuation Pause) 323M->171M(364M) 9.788ms
-[2026-09-25T09:25:55.719+0800][3.809s] Safepoint "G1CollectForAllocation", Time since last: 227804583 ns, Reaching safepoint: 4833 ns, At safepoint: 9822750 ns, Leaving safepoint: 7625 ns, Total: 9835208 ns, Threads: 0 runnable, 18 total
-[2026-09-25T09:25:55.893+0800][3.983s] GC(24) Pause Young (Normal) (G1 Evacuation Pause) 325M->180M(364M) 6.911ms
-[2026-09-25T09:25:55.893+0800][3.983s] Safepoint "G1CollectForAllocation", Time since last: 166871084 ns, Reaching safepoint: 1833 ns, At safepoint: 6927667 ns, Leaving safepoint: 10291 ns, Total: 6939791 ns, Threads: 0 runnable, 18 total
-[2026-09-25T09:25:56.246+0800][4.336s] GC(25) Pause Young (Concurrent Start) (G1 Evacuation Pause) 329M->186M(364M) 5.904ms
-[2026-09-25T09:25:56.246+0800][4.336s] Safepoint "G1CollectForAllocation", Time since last: 347070209 ns, Reaching safepoint: 1666 ns, At safepoint: 5926000 ns, Leaving safepoint: 5209 ns, Total: 5932875 ns, Threads: 0 runnable, 18 total
-[2026-09-25T09:25:56.246+0800][4.336s] GC(26) Concurrent Mark Cycle
-[2026-09-25T09:25:56.313+0800][4.403s] GC(26) Pause Remark 203M->203M(364M) 3.362ms
-[2026-09-25T09:25:56.313+0800][4.403s] Safepoint "G1PauseRemark", Time since last: 63503291 ns, Reaching safepoint: 136209 ns, At safepoint: 3377833 ns, Leaving safepoint: 13708 ns, Total: 3527750 ns, Threads: 2 runnable, 18 total
-[2026-09-25T09:25:56.338+0800][4.429s] GC(26) Pause Cleanup 207M->207M(364M) 0.020ms
-[2026-09-25T09:25:56.338+0800][4.429s] Safepoint "G1PauseCleanup", Time since last: 25351792 ns, Reaching safepoint: 29833 ns, At safepoint: 36875 ns, Leaving safepoint: 4750 ns, Total: 71458 ns, Threads: 2 runnable, 18 total
-[2026-09-25T09:25:56.338+0800][4.429s] GC(26) Concurrent Mark Cycle 92.713ms
-[2026-09-25T09:25:56.555+0800][4.646s] GC(27) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 333M->195M(364M) 5.765ms
-[2026-09-25T09:25:56.555+0800][4.646s] Safepoint "G1CollectForAllocation", Time since last: 211450542 ns, Reaching safepoint: 1917 ns, At safepoint: 5798833 ns, Leaving safepoint: 10792 ns, Total: 5811542 ns, Threads: 0 runnable, 18 total
-[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=718MB layer=0x12d51cc40 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
-[2026-09-25T09:25:56.847+0800][4.937s] GC(28) Pause Young (Mixed) (G1 Evacuation Pause) 335M->194M(364M) 6.984ms
-[2026-09-25T09:25:56.847+0800][4.937s] Safepoint "G1CollectForAllocation", Time since last: 284306083 ns, Reaching safepoint: 3333 ns, At safepoint: 7002625 ns, Leaving safepoint: 7417 ns, Total: 7013375 ns, Threads: 0 runnable, 18 total
-[2026-09-25T09:25:57.088+0800][5.178s] GC(29) Pause Young (Concurrent Start) (G1 Evacuation Pause) 338M->206M(367M) 7.114ms
-[2026-09-25T09:25:57.088+0800][5.178s] GC(30) Concurrent Mark Cycle
-[2026-09-25T09:25:57.088+0800][5.178s] Safepoint "G1CollectForAllocation", Time since last: 233802042 ns, Reaching safepoint: 21791 ns, At safepoint: 7157084 ns, Leaving safepoint: 11083 ns, Total: 7189958 ns, Threads: 1 runnable, 19 total
+[10:38:57] [main/WARN]: Failed sysctl call: kern.argmax, Error code: 1
+[2026-09-25T10:38:57.457+0800][2.979s] GC(18) Pause Young (Normal) (G1 Evacuation Pause) 317M->155M(359M) 10.668ms
+[2026-09-25T10:38:57.457+0800][2.979s] Safepoint "G1CollectForAllocation", Time since last: 383946125 ns, Reaching safepoint: 2083 ns, At safepoint: 10686042 ns, Leaving safepoint: 10583 ns, Total: 10698708 ns, Threads: 0 runnable, 19 total
+[10:38:57] [Datafixer Bootstrap #0/INFO]: 295 Datafixer optimizations took 198 milliseconds
+[2026-09-25T10:38:57.603+0800][3.124s] GC(19) Pause Young (Concurrent Start) (CodeCache GC Threshold) 261M->165M(359M) 10.225ms
+[2026-09-25T10:38:57.603+0800][3.124s] GC(20) Concurrent Mark Cycle
+[2026-09-25T10:38:57.603+0800][3.124s] Safepoint "G1TryInitiateConcMark", Time since last: 134917750 ns, Reaching safepoint: 36292 ns, At safepoint: 10245458 ns, Leaving safepoint: 14917 ns, Total: 10296667 ns, Threads: 2 runnable, 18 total
+[2026-09-25T10:38:57.654+0800][3.176s] GC(20) Pause Remark 191M->191M(359M) 2.181ms
+[2026-09-25T10:38:57.654+0800][3.176s] Safepoint "G1PauseRemark", Time since last: 49069083 ns, Reaching safepoint: 22417 ns, At safepoint: 2196208 ns, Leaving safepoint: 8208 ns, Total: 2226833 ns, Threads: 2 runnable, 18 total
+[2026-09-25T10:38:57.671+0800][3.193s] GC(20) Pause Cleanup 195M->195M(359M) 0.041ms
+[2026-09-25T10:38:57.671+0800][3.193s] Safepoint "G1PauseCleanup", Time since last: 16933084 ns, Reaching safepoint: 22500 ns, At safepoint: 67083 ns, Leaving safepoint: 4250 ns, Total: 93833 ns, Threads: 2 runnable, 18 total
+[2026-09-25T10:38:57.671+0800][3.193s] GC(20) Concurrent Mark Cycle 68.631ms
+[2026-09-25T10:38:57.903+0800][3.425s] GC(21) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 308M->170M(359M) 3.924ms
+[2026-09-25T10:38:57.903+0800][3.425s] Safepoint "G1CollectForAllocation", Time since last: 228117917 ns, Reaching safepoint: 4125 ns, At safepoint: 3941000 ns, Leaving safepoint: 12541 ns, Total: 3957666 ns, Threads: 0 runnable, 18 total
+[2026-09-25T10:38:58.179+0800][3.701s] GC(22) Pause Young (Mixed) (G1 Evacuation Pause) 317M->171M(359M) 8.083ms
+[2026-09-25T10:38:58.179+0800][3.701s] Safepoint "G1CollectForAllocation", Time since last: 267663500 ns, Reaching safepoint: 5125 ns, At safepoint: 8102209 ns, Leaving safepoint: 10458 ns, Total: 8117792 ns, Threads: 0 runnable, 18 total
+[2026-09-25T10:38:58.313+0800][3.835s] GC(23) Pause Young (Normal) (G1 Evacuation Pause) 319M->179M(359M) 6.893ms
+[2026-09-25T10:38:58.313+0800][3.835s] Safepoint "G1CollectForAllocation", Time since last: 127036042 ns, Reaching safepoint: 2791 ns, At safepoint: 6912084 ns, Leaving safepoint: 12333 ns, Total: 6927208 ns, Threads: 0 runnable, 18 total
+[2026-09-25T10:38:58.595+0800][4.117s] GC(24) Pause Young (Concurrent Start) (G1 Evacuation Pause) 323M->186M(359M) 5.392ms
+[2026-09-25T10:38:58.595+0800][4.117s] GC(25) Concurrent Mark Cycle
+[2026-09-25T10:38:58.595+0800][4.117s] Safepoint "G1CollectForAllocation", Time since last: 276814000 ns, Reaching safepoint: 2083 ns, At safepoint: 5424417 ns, Leaving safepoint: 8333 ns, Total: 5434833 ns, Threads: 0 runnable, 18 total
+[2026-09-25T10:38:58.656+0800][4.178s] GC(25) Pause Remark 217M->217M(359M) 3.019ms
+[2026-09-25T10:38:58.656+0800][4.178s] Safepoint "G1PauseRemark", Time since last: 58092292 ns, Reaching safepoint: 38417 ns, At safepoint: 3045708 ns, Leaving safepoint: 5250 ns, Total: 3089375 ns, Threads: 1 runnable, 18 total
+[2026-09-25T10:38:58.679+0800][4.201s] GC(25) Pause Cleanup 227M->227M(359M) 0.018ms
+[2026-09-25T10:38:58.679+0800][4.201s] Safepoint "G1PauseCleanup", Time since last: 22843583 ns, Reaching safepoint: 21584 ns, At safepoint: 36583 ns, Leaving safepoint: 4208 ns, Total: 62375 ns, Threads: 2 runnable, 18 total
+[2026-09-25T10:38:58.679+0800][4.201s] GC(25) Concurrent Mark Cycle 84.325ms
+[2026-09-25T10:38:58.936+0800][4.458s] GC(26) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 329M->193M(359M) 4.737ms
+[2026-09-25T10:38:58.936+0800][4.458s] Safepoint "G1CollectForAllocation", Time since last: 252415167 ns, Reaching safepoint: 1750 ns, At safepoint: 4755167 ns, Leaving safepoint: 3583 ns, Total: 4760500 ns, Threads: 0 runnable, 18 total
+[2026-09-25T10:38:59.161+0800][4.683s] GC(27) Pause Young (Mixed) (G1 Evacuation Pause) 331M->194M(359M) 7.999ms
+[2026-09-25T10:38:59.161+0800][4.683s] Safepoint "G1CollectForAllocation", Time since last: 216428458 ns, Reaching safepoint: 26459 ns, At safepoint: 8018500 ns, Leaving safepoint: 6208 ns, Total: 8051167 ns, Threads: 1 runnable, 18 total
+[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=699MB layer=0x12514c7c0 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
+[2026-09-25T10:38:59.368+0800][4.890s] GC(28) Pause Young (Concurrent Start) (G1 Evacuation Pause) 331M->199M(359M) 4.706ms
+[2026-09-25T10:38:59.368+0800][4.890s] GC(29) Concurrent Mark Cycle
+[2026-09-25T10:38:59.368+0800][4.890s] Safepoint "G1CollectForAllocation", Time since last: 202588875 ns, Reaching safepoint: 1583 ns, At safepoint: 4724834 ns, Leaving safepoint: 5375 ns, Total: 4731792 ns, Threads: 0 runnable, 18 total
+[2026-09-25T10:38:59.431+0800][4.953s] GC(29) Pause Remark 227M->227M(359M) 2.476ms
+[2026-09-25T10:38:59.431+0800][4.953s] Safepoint "G1PauseRemark", Time since last: 60365541 ns, Reaching safepoint: 22167 ns, At safepoint: 2492208 ns, Leaving safepoint: 7834 ns, Total: 2522209 ns, Threads: 1 runnable, 18 total
+[2026-09-25T10:38:59.459+0800][4.981s] GC(29) Pause Cleanup 239M->239M(359M) 0.029ms
+[2026-09-25T10:38:59.459+0800][4.981s] Safepoint "G1PauseCleanup", Time since last: 28396083 ns, Reaching safepoint: 20750 ns, At safepoint: 44125 ns, Leaving safepoint: 2125 ns, Total: 67000 ns, Threads: 1 runnable, 18 total
+[2026-09-25T10:38:59.460+0800][4.981s] GC(29) Concurrent Mark Cycle 91.541ms
 [authlib-injector] [INFO] Transformed [com.mojang.authlib.HttpAuthenticationService] with [ConcatenateURL Workaround]
-[2026-09-25T09:25:57.158+0800][5.248s] GC(30) Pause Remark 225M->225M(367M) 2.418ms
-[2026-09-25T09:25:57.158+0800][5.248s] Safepoint "G1PauseRemark", Time since last: 67775208 ns, Reaching safepoint: 4875 ns, At safepoint: 2432042 ns, Leaving safepoint: 4542 ns, Total: 2441459 ns, Threads: 0 runnable, 19 total
-[authlib-injector] [INFO] Httpd is running on port 58386
+[authlib-injector] [INFO] Httpd is running on port 59686
 [authlib-injector] [INFO] Transformed [com.mojang.authlib.yggdrasil.YggdrasilEnvironment] with [Constant URL Transformer]
-[09:25:57] [Render thread/INFO]: Environment: Environment[sessionHost=http://127.0.0.1:58386/https/sessionserver.mojang.com, servicesHost=http://127.0.0.1:58386/https/api.minecraftservices.com, profilesHost=http://127.0.0.1:58386/https/api.mojang.com, name=PROD]
+[10:38:59] [Render thread/INFO]: Environment: Environment[sessionHost=http://127.0.0.1:59686/https/sessionserver.mojang.com, servicesHost=http://127.0.0.1:59686/https/api.minecraftservices.com, profilesHost=http://127.0.0.1:59686/https/api.mojang.com, name=PROD]
 [authlib-injector] [INFO] Transformed [com.mojang.authlib.yggdrasil.YggdrasilServicesKeyInfo] with [Yggdrasil Public Key Transformer]
-[2026-09-25T09:25:57.182+0800][5.272s] GC(30) Pause Cleanup 227M->227M(367M) 0.019ms
-[2026-09-25T09:25:57.182+0800][5.272s] Safepoint "G1PauseCleanup", Time since last: 23746916 ns, Reaching safepoint: 116917 ns, At safepoint: 42708 ns, Leaving safepoint: 1875 ns, Total: 161500 ns, Threads: 1 runnable, 20 total
-[2026-09-25T09:25:57.182+0800][5.272s] GC(30) Concurrent Mark Cycle 94.383ms
-[09:25:57] [Render thread/INFO]: Setting user: yiqiu4178
+[10:38:59] [Render thread/INFO]: Setting user: yiqiu4178
 [authlib-injector] [INFO] Transformed [net.minecraft.server.network.ServerLoginPacketListenerImpl] with [Username Character Check Transformer]
-[09:25:57] [Render thread/INFO]: Checking for loaded mods for compact...
-[09:25:57] [Render thread/INFO]: Building config cache from user defined config file...
-[09:25:57] [Render thread/INFO]: Collecting API Entrypoint's...
-[09:25:57] [Render thread/INFO]: [BetterGrassify] [FAST] Gamers can finally touch grass!?
-[09:25:57] [Render thread/INFO]: Pre-initializing Controlify...
-[2026-09-25T09:25:57.456+0800][5.547s] GC(31) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 342M->221M(371M) 7.759ms
-[2026-09-25T09:25:57.456+0800][5.547s] Safepoint "G1CollectForAllocation", Time since last: 266972000 ns, Reaching safepoint: 24084 ns, At safepoint: 7781000 ns, Leaving safepoint: 12666 ns, Total: 7817750 ns, Threads: 1 runnable, 30 total
-[09:25:57] [Render thread/INFO]: [Indigo] Different rendering plugin detected; not applying Indigo.
-[09:25:57] [Render thread/INFO]: Deserializing SkyboxifyConfig from '/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/config/skyboxify.json'
-[09:25:57] [Render thread/INFO]: [SSPB] Broken dirt path lighting is best dirt path lighting lol
-[09:25:57] [Render thread/INFO]: Deserializing YACLConfig from '/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/config/yacl.json5'
-[09:25:57] [Render thread/INFO]: Backend library: LWJGL version 3.4.1
-[2026-09-25T09:25:57.845+0800][5.935s] GC(32) Pause Young (Mixed) (G1 Evacuation Pause) 345M->224M(440M) 5.834ms
-[2026-09-25T09:25:57.845+0800][5.935s] Safepoint "G1CollectForAllocation", Time since last: 382232917 ns, Reaching safepoint: 2417 ns, At safepoint: 5851083 ns, Leaving safepoint: 5208 ns, Total: 5858708 ns, Threads: 0 runnable, 30 total
-[MG-Bridge] MobileGlues frontend image loaded (0x3a6779000, mg_init_gles=0x139b877a0); lifecycle EGL will route through it after bootstrap
+[2026-09-25T10:38:59.706+0800][5.228s] GC(30) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 340M->217M(368M) 7.981ms
+[2026-09-25T10:38:59.706+0800][5.228s] Safepoint "G1CollectForAllocation", Time since last: 238517625 ns, Reaching safepoint: 156208 ns, At safepoint: 7998500 ns, Leaving safepoint: 10209 ns, Total: 8164917 ns, Threads: 1 runnable, 27 total
+[10:38:59] [Render thread/INFO]: Checking for loaded mods for compact...
+[10:38:59] [Render thread/INFO]: Building config cache from user defined config file...
+[10:38:59] [Render thread/INFO]: Collecting API Entrypoint's...
+[10:38:59] [Render thread/INFO]: [BetterGrassify] [FAST] Gamers can finally touch grass!?
+[10:38:59] [Render thread/INFO]: Pre-initializing Controlify...
+[10:38:59] [Render thread/INFO]: [Indigo] Different rendering plugin detected; not applying Indigo.
+[10:38:59] [Render thread/INFO]: Deserializing SkyboxifyConfig from '/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/config/skyboxify.json'
+[2026-09-25T10:39:00.007+0800][5.528s] GC(31) Pause Young (Mixed) (G1 Evacuation Pause) 339M->221M(440M) 7.314ms
+[2026-09-25T10:39:00.007+0800][5.528s] Safepoint "G1CollectForAllocation", Time since last: 293104250 ns, Reaching safepoint: 2625 ns, At safepoint: 7330583 ns, Leaving safepoint: 12583 ns, Total: 7345791 ns, Threads: 0 runnable, 30 total
+[10:39:00] [Render thread/INFO]: [SSPB] Broken dirt path lighting is best dirt path lighting lol
+[10:39:00] [Render thread/INFO]: Deserializing YACLConfig from '/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/config/yacl.json5'
+[10:39:00] [Render thread/INFO]: Backend library: LWJGL version 3.4.1
+[MG-Bridge] MobileGlues frontend image loaded (0x3a6778010, mg_init_gles=0x13424f7a0); lifecycle EGL will route through it after bootstrap
 [egl_bridge] pojavCreateContext: clientAPI=196609 (GLFW_NO_API=0), renderer=libmobileglues.dylib, graphicsApi=default
 [egl_bridge] OpenGL path: creating EGL/GL context via br_init_context
 mg_init_gles: loading GL ES function pointers (Apple platform)
@@ -633,38 +629,43 @@ mg_init_gles: done (2936 GL ES functions resolved)
 [MG-Bridge] EGL lifecycle routed through MobileGlues frontend (MGContext tracking + presentSurface active)
 EGLBridge: Binding to OpenGL ES
 [GLGeo] Task60 native-scale alignment (main thread): bounds=1180x820 drawableSize 2360x1640 scale 2.00 -> drawableSize 2360x1640 scale 2.00 (surface==drawable==physical px; Task50 1x retired -- CA linear 2x upscale was the blur)
-[RenderDiag] EGL window surface created: surface=0x1 layer=0x12d51cc40 bounds=1180x820 contentsScale=2.00 drawableSize=2360x1640 ownerInWindow=1
+[RenderDiag] EGL window surface created: surface=0x1 layer=0x12514c7c0 bounds=1180x820 contentsScale=2.00 drawableSize=2360x1640 ownerInWindow=1
 [RenderDiag] eglQuerySurface: 2360x1640
 [RenderDiag] Task41 ES probe pinned to @executable_path/Frameworks/libGLESv2.framework/libGLESv2
-[GLGeo] Task48 creation recorded: layer=0x12d51cc40 expectedSurface=2360x1640
-[gl_bridge] Task146 make-current #1: self=0x127079580 surface=0x1 ctx=0x2 thread=0x16d923000 main=0
+[GLGeo] Task48 creation recorded: layer=0x12514c7c0 expectedSurface=2360x1640
+[gl_bridge] Task146 make-current #1: self=0x136bdcb20 surface=0x1 ctx=0x2 thread=0x16f98f000 main=0
 [gl_bridge] Task140 make-current readback: ctx=0x2 (current context confirmed)
-[gl_bridge] Task146 glGetString tri-probe: default=0x26b6ead70 ver=<NULL> | renderer=0x139f06498 ver=OpenGL ES 3.0.0 (ANGLE 2.1.2440 git hash: 6024e9c05548) | ¿À¥
+[gl_bridge] Task146 glGetString tri-probe: default=0x26b6ead70 ver=<NULL> | renderer=0x1345ce498 ver=OpenGL ES 3.0.0 (ANGLE 2.1.2440 git hash: 6024e9c05548) | ¿À¥
 [MG-Bridge] eglMakeCurrent via frontend OK (ctx=0x2) -- MGContext tracked, per-context state bound
 [gl_bridge] mg_init_gles() called after eglMakeCurrent
-[gl_bridge] eglSwapInterval(0) after eglMakeCurrent (POJAV_DISABLE_VSYNC=1, renderer=libmobileglues.dylib) frontend=1 raw=1(rawPtr=0x12397d7a8)
-[09:25:57] [Render thread/INFO]: Debug functionality is disabled.
-[09:25:57] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[09:25:57] [Render thread/INFO]: Shaders are disabled because enableShaders is set to false in iris.properties
-[09:25:57] [Render thread/INFO]: Using graphics backend OpenGL, using drivers: 3.2.0 §4§l(4.0.0) MobileGlues§r 2.0.17
-[09:25:57] [Render thread/INFO]: Using graphics device: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 27.0 (Build 24A437)) | OpenGL ES 3.0.0 (Swung0x48, BZLZHH, Tungsten)
-[09:25:57] [Render thread/INFO]: Using graphics device extensions: GL_ARB_direct_state_access
-[2026-09-25T09:25:58.166+0800][6.257s] GC(33) Pause Young (Normal) (G1 Evacuation Pause) 390M->229M(440M) 3.844ms
-[2026-09-25T09:25:58.166+0800][6.257s] Safepoint "G1CollectForAllocation", Time since last: 317688459 ns, Reaching safepoint: 2541 ns, At safepoint: 3878667 ns, Leaving safepoint: 7708 ns, Total: 3888916 ns, Threads: 0 runnable, 32 total
+[gl_bridge] eglSwapInterval(0) after eglMakeCurrent (POJAV_DISABLE_VSYNC=1, renderer=libmobileglues.dylib) frontend=1 raw=1(rawPtr=0x1211d17a8)
+[MG] Task165 xglGetProcAddress: LWJGL delegate resolution routed through the frontend (renderer=libmobileglues.dylib) -- gl* names own the layer again, flat-namespace theft neutralized
+[MG] 2.0.16 own-image resolution: handle for /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks/libmobileglues.dylib
+[MG] SYMBOL THEFT: flat namespace resolves glFramebufferTexture2D to 0x26b6ea020, this layer's export is 0x13426c338 -- the application is calling someone else for this function
+[MG] SYMBOL THEFT: flat namespace resolves glTexImage2D to 0x26b6e9cf4, this layer's export is 0x134273b44 -- the application is calling someone else for this function
+[MG] SYMBOL THEFT: flat namespace resolves glDrawArrays to 0x26b6ea154, this layer's export is 0x13427b7c4 -- the application is calling someone else for this function
+[10:39:00] [Render thread/INFO]: Debug functionality is disabled.
+[10:39:00] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[10:39:00] [Render thread/INFO]: Shaders are disabled because enableShaders is set to false in iris.properties
+[10:39:00] [Render thread/INFO]: Using graphics backend OpenGL, using drivers: 3.2.0 §4§l(4.0.0) MobileGlues§r 2.0.17
+[10:39:00] [Render thread/INFO]: Using graphics device: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 27.0 (Build 24A437)) | OpenGL ES 3.0.0 (Swung0x48, BZLZHH, Tungsten)
+[10:39:00] [Render thread/INFO]: Using graphics device extensions: GL_ARB_direct_state_access
+[2026-09-25T10:39:00.505+0800][6.027s] GC(32) Pause Young (Normal) (G1 Evacuation Pause) 403M->229M(440M) 5.115ms
+[2026-09-25T10:39:00.505+0800][6.027s] Safepoint "G1CollectForAllocation", Time since last: 493537334 ns, Reaching safepoint: 5666 ns, At safepoint: 5132709 ns, Leaving safepoint: 10125 ns, Total: 5148500 ns, Threads: 1 runnable, 32 total
 [MG] depth alloc #1: GL_DEPTH_COMPONENT32F 1180x820, shadow tex 9, driver-bound tex 9, upload err 0x0, depth bits -1
-[09:25:58] [Render thread/INFO]: Hardware information:
-[09:25:58] [Render thread/WARN]: Failed sysctl call: hw.packages, Error code: 1
+[10:39:00] [Render thread/INFO]: Hardware information:
+[10:39:00] [Render thread/WARN]: Failed sysctl call: hw.packages, Error code: 1
 [input_bridge] Blocked fork/exec of 'sysctl' (iOS sandbox forbids fork/exec)
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.brand_string, Error code: 1
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.vendor, Error code: 2
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.stepping, Error code: 2
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.model, Error code: 2
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.family, Error code: 2
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.signature, Error code: 2
-[09:25:58] [Render thread/WARN]: Failed sysctl call: machdep.cpu.feature_bits, Error code: 2
-[09:25:58] [Render thread/INFO]: CPU: 8x 
-[09:25:58] [Render thread/INFO]: GPU: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 27.0 (Build 24A437)) | OpenGL ES 3.0.0 (Supports OpenGL 3.2.0 §4§l(4.0.0) MobileGlues§r 2.0.17)
-[09:25:58] [Render thread/INFO]: OS: Mac OS X (27.0)
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.brand_string, Error code: 1
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.vendor, Error code: 2
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.stepping, Error code: 2
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.model, Error code: 2
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.family, Error code: 2
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.signature, Error code: 2
+[10:39:00] [Render thread/WARN]: Failed sysctl call: machdep.cpu.feature_bits, Error code: 2
+[10:39:00] [Render thread/INFO]: CPU: 8x 
+[10:39:00] [Render thread/INFO]: GPU: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 27.0 (Build 24A437)) | OpenGL ES 3.0.0 (Supports OpenGL 3.2.0 §4§l(4.0.0) MobileGlues§r 2.0.17)
+[10:39:00] [Render thread/INFO]: OS: Mac OS X (27.0)
 [MG] depth alloc #2: GL_DEPTH_COMPONENT32F 1180x820, shadow tex 10, driver-bound tex 10, upload err 0x0, depth bits -1
 [MG] Shader 2 converted OK (glslver=450 -> essl ver=300)
 [MG] Shader 3 converted OK (glslver=450 -> essl ver=300)
@@ -684,14 +685,14 @@ GLSL parse OK (glslver=450)
 [MG] Shader 8 converted OK (glslver=330 -> essl ver=300)
 [MG] Shader 10 converted OK (glslver=330 -> essl ver=300)
 [MG] Shader 11 converted OK (glslver=330 -> essl ver=300)
-[09:25:58] [Render thread/INFO]: Reloading ResourceManager: vanilla, betterblockentities, bettergrass, cloth-config, config_manager, continuity, controlify, dynamic_fps, dynamic_fps_common, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-getter-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-creative-tab-api-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-debug-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-key-mapping-api-v1, fabric-language-kotlin, fabric-lifecycle-events-v1, fabric-loot-api-v3, fabric-menu-api-v1, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-permission-api-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, forgeconfigapiport, iris, lithium, morechathistory, reeses-sodium-options, skyboxify, sodium, sspb, yet_another_config_lib_v3
-[2026-09-25T09:25:58.468+0800][6.558s] GC(34) Pause Young (Normal) (G1 Evacuation Pause) 398M->239M(440M) 5.400ms
-[2026-09-25T09:25:58.468+0800][6.558s] Safepoint "G1CollectForAllocation", Time since last: 296328584 ns, Reaching safepoint: 31166 ns, At safepoint: 5420084 ns, Leaving safepoint: 22166 ns, Total: 5473416 ns, Threads: 5 runnable, 40 total
-[2026-09-25T09:25:58.489+0800][6.580s] GC(35) Pause Young (Concurrent Start) (CodeCache GC Threshold) 253M->239M(440M) 4.187ms
-[2026-09-25T09:25:58.489+0800][6.580s] GC(36) Concurrent Mark Cycle
-[2026-09-25T09:25:58.489+0800][6.580s] Safepoint "G1TryInitiateConcMark", Time since last: 17090584 ns, Reaching safepoint: 34416 ns, At safepoint: 4214667 ns, Leaving safepoint: 16958 ns, Total: 4266041 ns, Threads: 3 runnable, 40 total
-[InputDiag] pojavPumpEvents: isInputReady set to YES, showingWindow=0x127079580
-[InputDiag] pojavPumpEvents #1: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[10:39:00] [Render thread/INFO]: Reloading ResourceManager: vanilla, betterblockentities, bettergrass, cloth-config, config_manager, continuity, controlify, dynamic_fps, dynamic_fps_common, fabric-api, fabric-api-base, fabric-api-lookup-api-v1, fabric-biome-api-v1, fabric-block-api-v1, fabric-block-getter-api-v2, fabric-command-api-v2, fabric-content-registries-v0, fabric-convention-tags-v2, fabric-crash-report-info-v1, fabric-creative-tab-api-v1, fabric-data-attachment-api-v1, fabric-data-generation-api-v1, fabric-debug-api-v1, fabric-dimensions-v1, fabric-entity-events-v1, fabric-events-interaction-v0, fabric-game-rule-api-v1, fabric-item-api-v1, fabric-key-mapping-api-v1, fabric-language-kotlin, fabric-lifecycle-events-v1, fabric-loot-api-v3, fabric-menu-api-v1, fabric-message-api-v1, fabric-model-loading-api-v1, fabric-networking-api-v1, fabric-object-builder-api-v1, fabric-particles-v1, fabric-permission-api-v1, fabric-recipe-api-v1, fabric-registry-sync-v0, fabric-renderer-api-v1, fabric-renderer-indigo, fabric-rendering-fluids-v1, fabric-rendering-v1, fabric-resource-conditions-api-v1, fabric-resource-loader-v0, fabric-resource-loader-v1, fabric-screen-api-v1, fabric-serialization-api-v1, fabric-sound-api-v1, fabric-tag-api-v1, fabric-transfer-api-v1, fabric-transitive-access-wideners-v1, fabricloader, forgeconfigapiport, iris, lithium, morechathistory, reeses-sodium-options, skyboxify, sodium, sspb, yet_another_config_lib_v3
+[2026-09-25T10:39:00.821+0800][6.342s] GC(33) Pause Young (Normal) (G1 Evacuation Pause) 405M->237M(440M) 4.730ms
+[2026-09-25T10:39:00.821+0800][6.342s] Safepoint "G1CollectForAllocation", Time since last: 310646333 ns, Reaching safepoint: 29750 ns, At safepoint: 4762708 ns, Leaving safepoint: 18834 ns, Total: 4811292 ns, Threads: 7 runnable, 39 total
+[2026-09-25T10:39:00.838+0800][6.360s] GC(34) Pause Young (Concurrent Start) (CodeCache GC Threshold) 259M->238M(440M) 4.239ms
+[2026-09-25T10:39:00.838+0800][6.360s] GC(35) Concurrent Mark Cycle
+[2026-09-25T10:39:00.839+0800][6.360s] Safepoint "G1TryInitiateConcMark", Time since last: 13459083 ns, Reaching safepoint: 91000 ns, At safepoint: 4279958 ns, Leaving safepoint: 19042 ns, Total: 4390000 ns, Threads: 6 runnable, 39 total
+[InputDiag] pojavPumpEvents: isInputReady set to YES, showingWindow=0x136bdcb20
+[InputDiag] pojavPumpEvents #1: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
 Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
 [MG] depth filter scan: FSR1 active (Task 81) -- enforcement re-enabled, depth hints driver-confirmed
 [egl_bridge] shaderc quiescence signal acquired -- first-present gate armed (Task 39)
@@ -702,48 +703,26 @@ Thread[#3,Render thread,10,main]: No context is current or a function that is no
 [RenderDiag] swap#1 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=0 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
 [RenderDiag] Task41 latch: NORMAL present (geometry aligned, readback retired by Task75)
 [MG] FSR1 upscale engaged (Task78): render 1180x820 -> target 2360x1640 -> surface 2360x1640 (viewport-latched render, launcher FSR linkage)
-[GLGeo] Task51 hierarchy #1: layer=0x12d51cc40 drawable=2360x1640 scale=2.00 surface=2360x1640 inTree=1 chain= -> [CAMetalLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1210x820 pos=(605,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [UIWindowLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [_UIWindowTransformLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [_UIWindowTransformLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [UIWindowLayer 1180x820 pos=(590,410) hid=0 op=1.00]
+[GLGeo] Task51 hierarchy #1: layer=0x12514c7c0 drawable=2360x1640 scale=2.00 surface=2360x1640 inTree=1 chain= -> [CAMetalLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1210x820 pos=(605,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [CALayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [UIWindowLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [_UIWindowTransformLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [_UIWindowTransformLayer 1180x820 pos=(590,410) hid=0 op=1.00] -> [UIWindowLayer 1180x820 pos=(590,410) hid=0 op=1.00]
 [RenderDiag] first eglSwapBuffers OK surface=0x1 (presentation path confirmed)
-[09:25:58] [Render thread/INFO]: Thread[#3,Render thread,10,main]
-[09:25:58] [Render thread/INFO]: OpenGL Vendor: Swung0x48, BZLZHH, Tungsten
-[09:25:58] [Render thread/INFO]: OpenGL Renderer: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 27.0 (Build 24A437)) | OpenGL ES 3.0.0
-[09:25:58] [Render thread/INFO]: OpenGL Version: 3.2.0 §4§l(4.0.0) MobileGlues§r 2.0.17
-[InputDiag] pojavPumpEvents #2: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[10:39:00] [Render thread/INFO]: Thread[#3,Render thread,10,main]
+[10:39:00] [Render thread/INFO]: OpenGL Vendor: Swung0x48, BZLZHH, Tungsten
+[10:39:00] [Render thread/INFO]: OpenGL Renderer: ANGLE (Apple, ANGLE Metal Renderer: Apple M4 GPU, Version 27.0 (Build 24A437)) | OpenGL ES 3.0.0
+[10:39:00] [Render thread/INFO]: OpenGL Version: 3.2.0 §4§l(4.0.0) MobileGlues§r 2.0.17
+[2026-09-25T10:39:01.006+0800][6.528s] GC(35) Pause Remark 322M->322M(440M) 3.175ms
+[2026-09-25T10:39:01.006+0800][6.528s] Safepoint "G1PauseRemark", Time since last: 163963458 ns, Reaching safepoint: 27875 ns, At safepoint: 3190917 ns, Leaving safepoint: 6208 ns, Total: 3225000 ns, Threads: 2 runnable, 40 total
+[InputDiag] pojavPumpEvents #2: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
 Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
 [RenderDiag] swap#2 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
+[MG] Task165 render-texture probe: center pixel rgba=00000000 -- nonzero = app frame reached the render FBO (redirect healthy); all-zero = app draws bypassed the redirect (resolution-layer suspect, see Task165)
 [MG] Task130 RCAS engaged: render 1180x820 -> EASU -> target 2360x1640 -> RCAS -> surface, sharpness=0.200
 [MG] Task164 RCAS GPU probe: fb0 pixel (edge-4) rgba=000000ff glErr=0x0500 -- nonzero = draw landed on GPU; all-zero = RCAS quad never landed (state/shader suspect)
-[InputDiag] pojavPumpEvents #3: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-[2026-09-25T09:25:58.619+0800][6.709s] GC(36) Pause Remark 277M->277M(440M) 3.481ms
-[2026-09-25T09:25:58.619+0800][6.709s] Safepoint "G1PauseRemark", Time since last: 125761459 ns, Reaching safepoint: 26458 ns, At safepoint: 3497917 ns, Leaving safepoint: 7250 ns, Total: 3531625 ns, Threads: 4 runnable, 40 total
-[RenderDiag] swap#3 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
-[InputDiag] pojavPumpEvents #4: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-[RenderDiag] swap#4 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
-[InputDiag] pojavPumpEvents #5: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-[RenderDiag] swap#5 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-[2026-09-25T09:25:58.671+0800][6.762s] GC(36) Pause Cleanup 289M->289M(440M) 0.025ms
-[2026-09-25T09:25:58.671+0800][6.762s] Safepoint "G1PauseCleanup", Time since last: 52556208 ns, Reaching safepoint: 20750 ns, At safepoint: 40833 ns, Leaving safepoint: 2834 ns, Total: 64417 ns, Threads: 4 runnable, 40 total
-[2026-09-25T09:25:58.677+0800][6.768s] GC(36) Concurrent Mark Cycle 188.062ms
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-[09:25:58] [Worker-Main-2/INFO]: Found unifont_all_no_pua-17.0.01.hex, loading
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
-[09:25:58] [Worker-Main-5/INFO]: Found unifont_pua-17.0.01.hex, loading
-[2026-09-25T09:25:58.812+0800][6.903s] GC(37) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 407M->255M(440M) 6.121ms
-[2026-09-25T09:25:58.812+0800][6.903s] Safepoint "G1CollectForAllocation", Time since last: 134710958 ns, Reaching safepoint: 36542 ns, At safepoint: 6138833 ns, Leaving safepoint: 10083 ns, Total: 6185458 ns, Threads: 4 runnable, 41 total
-[09:25:58] [Worker-Main-2/INFO]: Found unifont_jp_patch-17.0.01.hex, loading
-[2026-09-25T09:25:58.865+0800][6.955s] GC(38) Pause Young (Mixed) (G1 Evacuation Pause) 402M->263M(442M) 6.765ms
-[2026-09-25T09:25:58.865+0800][6.955s] Safepoint "G1CollectForAllocation", Time since last: 45301584 ns, Reaching safepoint: 724208 ns, At safepoint: 6785500 ns, Leaving safepoint: 10625 ns, Total: 7520333 ns, Threads: 6 runnable, 41 total
-[2026-09-25T09:25:58.916+0800][7.007s] GC(39) Pause Young (Concurrent Start) (G1 Humongous Allocation) 377M->266M(442M) 3.496ms
-[2026-09-25T09:25:58.916+0800][7.007s] GC(40) Concurrent Mark Cycle
-[2026-09-25T09:25:58.916+0800][7.007s] Safepoint "G1TryInitiateConcMark", Time since last: 47841542 ns, Reaching safepoint: 58291 ns, At safepoint: 3539500 ns, Leaving safepoint: 17250 ns, Total: 3615041 ns, Threads: 5 runnable, 41 total
-[09:25:58] [Download-2/INFO]: Could not authorize you against Realms server: javax.ws.rs.NotAuthorizedException: HTTP 401 Unauthorized
-[09:25:58] [Download-2/ERROR]: Failed to fetch Realms feature flags
+[MG] Task165 RCAS runtime bail-out: first-frame fb0 corner+center both black (alpha 0xff reads) -- this session falls back to EASU-only (Task83 single-pass); layer split: see the render-texture probe above
+[2026-09-25T10:39:01.059+0800][6.581s] GC(35) Pause Cleanup 337M->337M(440M) 0.026ms
+[2026-09-25T10:39:01.059+0800][6.581s] Safepoint "G1PauseCleanup", Time since last: 53523667 ns, Reaching safepoint: 20750 ns, At safepoint: 42500 ns, Leaving safepoint: 3583 ns, Total: 66833 ns, Threads: 6 runnable, 40 total
+[2026-09-25T10:39:01.062+0800][6.584s] GC(35) Concurrent Mark Cycle 223.440ms
+[10:39:01] [Download-2/INFO]: Could not authorize you against Realms server: javax.ws.rs.NotAuthorizedException: HTTP 401 Unauthorized
+[10:39:01] [Download-2/ERROR]: Failed to fetch Realms feature flags
 com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'javax.ws.rs.NotAuthorizedException: HTTP 401 Unauthorized'
 	at knot//com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:528)
 	at knot//com.mojang.realmsclient.client.RealmsClient.fetchFeatureFlags(RealmsClient.java:187)
@@ -751,16 +730,42 @@ com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication 
 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
 	at java.base/java.lang.Thread.run(Unknown Source)
-[2026-09-25T09:25:59.018+0800][7.109s] GC(40) Pause Remark 420M->420M(470M) 3.814ms
-[2026-09-25T09:25:59.018+0800][7.109s] Safepoint "G1PauseRemark", Time since last: 97943500 ns, Reaching safepoint: 44542 ns, At safepoint: 3831125 ns, Leaving safepoint: 8208 ns, Total: 3883875 ns, Threads: 1 runnable, 42 total
-[2026-09-25T09:25:59.032+0800][7.123s] GC(41) Pause Young (Normal) (G1 Evacuation Pause) 425M->276M(470M) 4.311ms
-[2026-09-25T09:25:59.032+0800][7.123s] Safepoint "G1CollectForAllocation", Time since last: 9339750 ns, Reaching safepoint: 117792 ns, At safepoint: 4334292 ns, Leaving safepoint: 12083 ns, Total: 4464167 ns, Threads: 1 runnable, 42 total
-[2026-09-25T09:25:59.058+0800][7.149s] GC(40) Pause Cleanup 314M->314M(470M) 0.050ms
-[2026-09-25T09:25:59.058+0800][7.149s] Safepoint "G1PauseCleanup", Time since last: 26200083 ns, Reaching safepoint: 8959 ns, At safepoint: 65083 ns, Leaving safepoint: 1875 ns, Total: 75917 ns, Threads: 0 runnable, 42 total
-[2026-09-25T09:25:59.059+0800][7.149s] GC(40) Concurrent Mark Cycle 142.310ms
-[SurfaceViewController] Launch overlay dismissed after 6.7 seconds
-[2026-09-25T09:25:59.218+0800][7.308s] GC(42) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 438M->279M(470M) 4.767ms
-[2026-09-25T09:25:59.218+0800][7.308s] Safepoint "G1CollectForAllocation", Time since last: 154639958 ns, Reaching safepoint: 28000 ns, At safepoint: 4785625 ns, Leaving safepoint: 14625 ns, Total: 4828250 ns, Threads: 5 runnable, 42 total
+[InputDiag] pojavPumpEvents #3: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+[RenderDiag] swap#3 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
+[10:39:01] [Worker-Main-2/INFO]: Found unifont_all_no_pua-17.0.01.hex, loading
+[InputDiag] pojavPumpEvents #4: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+[RenderDiag] swap#4 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
+[10:39:01] [Worker-Main-5/INFO]: Found unifont_pua-17.0.01.hex, loading
+[InputDiag] pojavPumpEvents #5: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+[RenderDiag] swap#5 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+[2026-09-25T10:39:01.194+0800][6.716s] GC(36) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 412M->253M(440M) 5.461ms
+[2026-09-25T10:39:01.194+0800][6.716s] Safepoint "G1CollectForAllocation", Time since last: 129626625 ns, Reaching safepoint: 59042 ns, At safepoint: 5480375 ns, Leaving safepoint: 9625 ns, Total: 5549042 ns, Threads: 4 runnable, 40 total
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+Thread[#3,Render thread,10,main]: No context is current or a function that is not available in the current context was called. Are you running essential and/or <1.13?
+[10:39:01] [Worker-Main-2/INFO]: Found unifont_jp_patch-17.0.01.hex, loading
+[2026-09-25T10:39:01.263+0800][6.784s] GC(37) Pause Young (Mixed) (G1 Evacuation Pause) 407M->263M(449M) 7.477ms
+[2026-09-25T10:39:01.263+0800][6.784s] Safepoint "G1CollectForAllocation", Time since last: 60630708 ns, Reaching safepoint: 51084 ns, At safepoint: 7494791 ns, Leaving safepoint: 17084 ns, Total: 7562959 ns, Threads: 5 runnable, 41 total
+[2026-09-25T10:39:01.290+0800][6.811s] GC(38) Pause Young (Concurrent Start) (G1 Humongous Allocation) 303M->266M(449M) 3.174ms
+[2026-09-25T10:39:01.290+0800][6.811s] GC(39) Concurrent Mark Cycle
+[2026-09-25T10:39:01.290+0800][6.811s] Safepoint "G1TryInitiateConcMark", Time since last: 23714500 ns, Reaching safepoint: 21250 ns, At safepoint: 3194000 ns, Leaving safepoint: 12333 ns, Total: 3227583 ns, Threads: 5 runnable, 41 total
+[2026-09-25T10:39:01.412+0800][6.934s] GC(39) Pause Remark 410M->410M(472M) 7.178ms
+[2026-09-25T10:39:01.412+0800][6.934s] Safepoint "G1PauseRemark", Time since last: 114929792 ns, Reaching safepoint: 20125 ns, At safepoint: 7193583 ns, Leaving safepoint: 11208 ns, Total: 7224916 ns, Threads: 4 runnable, 41 total
+[2026-09-25T10:39:01.425+0800][6.947s] GC(40) Pause Young (Normal) (G1 Evacuation Pause) 420M->271M(472M) 2.826ms
+[2026-09-25T10:39:01.425+0800][6.947s] Safepoint "G1CollectForAllocation", Time since last: 10098709 ns, Reaching safepoint: 271166 ns, At safepoint: 2842292 ns, Leaving safepoint: 9125 ns, Total: 3122583 ns, Threads: 2 runnable, 42 total
+[2026-09-25T10:39:01.471+0800][6.993s] GC(39) Pause Cleanup 363M->363M(472M) 0.028ms
+[2026-09-25T10:39:01.471+0800][6.993s] Safepoint "G1PauseCleanup", Time since last: 45952833 ns, Reaching safepoint: 34250 ns, At safepoint: 46375 ns, Leaving safepoint: 2625 ns, Total: 83250 ns, Threads: 4 runnable, 42 total
+[2026-09-25T10:39:01.472+0800][6.994s] GC(39) Concurrent Mark Cycle 182.879ms
+[2026-09-25T10:39:01.503+0800][7.024s] GC(41) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 429M->276M(472M) 3.250ms
+[2026-09-25T10:39:01.503+0800][7.024s] Safepoint "G1CollectForAllocation", Time since last: 28344042 ns, Reaching safepoint: 3292 ns, At safepoint: 3267000 ns, Leaving safepoint: 4208 ns, Total: 3274500 ns, Threads: 0 runnable, 42 total
+[SurfaceViewController] Launch overlay dismissed after 6.6 seconds
+[2026-09-25T10:39:01.742+0800][7.264s] GC(42) Pause Young (Mixed) (G1 Evacuation Pause) 434M->286M(645M) 8.383ms
+[2026-09-25T10:39:01.742+0800][7.264s] Safepoint "G1CollectForAllocation", Time since last: 230836583 ns, Reaching safepoint: 28292 ns, At safepoint: 8402958 ns, Leaving safepoint: 12459 ns, Total: 8443709 ns, Threads: 6 runnable, 42 total
 [MG] Shader 7 converted OK (glslver=330 -> essl ver=300)
 [MG] Shader 8 converted OK (glslver=330 -> essl ver=300)
 [MG] Shader 12 converted OK (glslver=330 -> essl ver=300)
@@ -894,33 +899,31 @@ GLSL parse OK (glslver=330)
 [MG] Shader 190 converted OK (glslver=330 -> essl ver=300)
 [MG] Shader 193 converted OK (glslver=330 -> essl ver=300)
 [MG] Shader 194 converted OK (glslver=330 -> essl ver=300)
-[09:25:59] [Render thread/INFO]: OpenAL initialized on device CoreAudio Default
-[09:25:59] [Render thread/INFO]: Sound engine started
-[09:25:59] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[10:39:01] [Render thread/INFO]: OpenAL initialized on device CoreAudio Default
+[10:39:01] [Render thread/INFO]: Sound engine started
+[10:39:01] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[10:39:01] [Render thread/INFO]: Created: 128x128x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[10:39:01] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
 [MG] FSR1 viewport latch rejected (Task 82): 2048x1024 is not a window viewport (surface 2360x1640) -- intermediate render pass kept out of the upscale geometry
-[09:25:59] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/blocks.png-atlas
+[10:39:01] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[10:39:01] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[10:39:01] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/blocks.png-atlas
 [MG] FSR1 viewport latch rejected (Task 82): 1024x1024 is not a window viewport (surface 2360x1640) -- intermediate render pass kept out of the upscale geometry
-[09:25:59] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[09:25:59] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[2026-09-25T09:25:59.693+0800][7.784s] GC(43) Pause Young (Mixed) (G1 Evacuation Pause) 456M->306M(510M) 12.220ms
-[2026-09-25T09:25:59.694+0800][7.784s] Safepoint "G1CollectForAllocation", Time since last: 463497334 ns, Reaching safepoint: 22166 ns, At safepoint: 12262625 ns, Leaving safepoint: 11292 ns, Total: 12296083 ns, Threads: 1 runnable, 42 total
-[09:25:59] [Render thread/INFO]: [KeyboardLayoutManager] Loaded 3 keyboard layouts
-[09:25:59] [Render thread/INFO]: Geometry registry populated! Task successfully completed
-[09:25:59] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[09:25:59] [Render thread/INFO]: Initializing Controlify...
-[09:25:59] [Render thread/INFO]: Config loaded successfully from /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/config/controlify.json
-[09:25:59] [Render thread/INFO]: [SDLNativesLoader] Detected PojavLauncher.
-[09:25:59] [Render thread/INFO]: [SDLNativesLoader] Attempting to load SDL3 from /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so
-[09:25:59] [Render thread/ERROR]: [SDLNativesLoader] Failed to find SDL. Need darwin-aarch64
+[10:39:02] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/chest.png-atlas
+[10:39:02] [Render thread/INFO]: Created: 256x128x0 minecraft:textures/atlas/celestials.png-atlas
+[10:39:02] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[10:39:02] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/items.png-atlas
+[10:39:02] [Render thread/INFO]: Created: 1024x1024x0 minecraft:textures/atlas/gui.png-atlas
+[10:39:02] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[10:39:02] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[10:39:02] [Render thread/INFO]: [KeyboardLayoutManager] Loaded 3 keyboard layouts
+[10:39:02] [Render thread/INFO]: Geometry registry populated! Task successfully completed
+[10:39:02] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[10:39:02] [Render thread/INFO]: Initializing Controlify...
+[10:39:02] [Render thread/INFO]: Config loaded successfully from /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_906ACC72-A040-4427-9B35-9A6560D650F6/config/controlify.json
+[10:39:02] [Render thread/INFO]: [SDLNativesLoader] Detected PojavLauncher.
+[10:39:02] [Render thread/INFO]: [SDLNativesLoader] Attempting to load SDL3 from /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so
+[10:39:02] [Render thread/ERROR]: [SDLNativesLoader] Failed to find SDL. Need darwin-aarch64
 java.lang.UnsatisfiedLinkError: Unable to load library '/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so':
 dlopen(/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so, 0x0009): tried: '/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so' (no such file), '/private/preboot/Cryptexes/OS/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so' (no such file), '/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so' (no such file)
 dlopen(/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so, 0x0009): tried: '/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so' (no such file), '/private/preboot/Cryptexes/OS/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so' (no such file), '/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/libSDL3.so' (no such file)
@@ -968,19 +971,14 @@ Native library (private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DA
 		at knot//com.sun.jna.Native.extractFromResourcePath(Native.java:1145)
 		at knot//com.sun.jna.NativeLibrary.loadLibrary(NativeLibrary.java:295)
 		... 25 more
-[2026-09-25T09:25:59.836+0800][7.926s] GC(44) Pause Young (Concurrent Start) (G1 Humongous Allocation) 379M->318M(510M) 7.669ms
-[2026-09-25T09:25:59.836+0800][7.926s] GC(45) Concurrent Mark Cycle
-[2026-09-25T09:25:59.836+0800][7.926s] Safepoint "G1TryInitiateConcMark", Time since last: 134605750 ns, Reaching safepoint: 7208 ns, At safepoint: 7691084 ns, Leaving safepoint: 8958 ns, Total: 7707250 ns, Threads: 0 runnable, 42 total
-[09:25:59] [Render thread/ERROR]: Failed to load gamepad mappings: 0
-[09:25:59] [Render thread/WARN]: No controller found via USB hardware scan! Using SDL if available.
-[09:25:59] [Render thread/ERROR]: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhaned driver.
-[09:25:59] [Render thread/INFO]: [ControllerManager] Controller connected: 'Unknown'#GLFWUniqueControllerID[jid=0]-hid (null)
+[10:39:02] [Render thread/ERROR]: Failed to load gamepad mappings: 0
+[10:39:02] [Render thread/WARN]: No controller found via USB hardware scan! Using SDL if available.
+[10:39:02] [Render thread/ERROR]: [SteamDeckUtil] Skipping Steam Deck checks as steamOS has temporarily broken the enhaned driver.
+[10:39:02] [Render thread/INFO]: [ControllerManager] Controller connected: 'Unknown'#GLFWUniqueControllerID[jid=0]-hid (null)
 [HotbarDiag] Task63 native guiScale refresh: 1 -> 3 (raw=0 auto=3 win=1180x820)
-[09:25:59] [Render thread/INFO]: Steam Deck state: NOT_STEAM_DECK
-[2026-09-25T09:25:59.939+0800][8.029s] GC(45) Pause Remark 332M->332M(537M) 3.158ms
-[2026-09-25T09:25:59.939+0800][8.029s] Safepoint "G1PauseRemark", Time since last: 99787500 ns, Reaching safepoint: 4250 ns, At safepoint: 3172792 ns, Leaving safepoint: 2541 ns, Total: 3179583 ns, Threads: 0 runnable, 42 total
-[09:25:59] [Download-2/INFO]: Could not authorize you against Realms server: javax.ws.rs.NotAuthorizedException: HTTP 401 Unauthorized
-[09:25:59] [Download-2/ERROR]: Couldn't connect to realms
+[10:39:02] [Render thread/INFO]: Steam Deck state: NOT_STEAM_DECK
+[10:39:02] [Download-2/INFO]: Could not authorize you against Realms server: javax.ws.rs.NotAuthorizedException: HTTP 401 Unauthorized
+[10:39:02] [Download-2/ERROR]: Couldn't connect to realms
 com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication error with message 'javax.ws.rs.NotAuthorizedException: HTTP 401 Unauthorized'
 	at knot//com.mojang.realmsclient.client.RealmsClient.execute(RealmsClient.java:528)
 	at knot//com.mojang.realmsclient.client.RealmsClient.clientCompatible(RealmsClient.java:308)
@@ -989,24 +987,34 @@ com.mojang.realmsclient.exception.RealmsServiceException: Realms authentication 
 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
 	at java.base/java.lang.Thread.run(Unknown Source)
-[2026-09-25T09:25:59.978+0800][8.069s] GC(45) Pause Cleanup 332M->332M(537M) 0.029ms
-[2026-09-25T09:25:59.978+0800][8.069s] Safepoint "G1PauseCleanup", Time since last: 39225542 ns, Reaching safepoint: 3042 ns, At safepoint: 64916 ns, Leaving safepoint: 3542 ns, Total: 71500 ns, Threads: 0 runnable, 42 total
-[2026-09-25T09:25:59.978+0800][8.069s] GC(45) Concurrent Mark Cycle 142.611ms
-[RenderDiag] fps=59 swapOK=159 swapFail=0 maxGap=311ms avgGap=20ms pres=4/14ms build=15/309ms mem=1221MB layer=0x12d51cc40 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
+[RenderDiag] fps=58 swapOK=167 swapFail=0 maxGap=293ms avgGap=20ms pres=4/74ms build=15/292ms mem=1329MB layer=0x12514c7c0 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
 [RenderDiag] swap#200 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
-[InputDiag] pojavPumpEvents #300: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[InputDiag] pojavPumpEvents #300: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
 [RenderDiag] swap#400 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
-[RenderDiag] fps=58 swapOK=449 swapFail=0 maxGap=25ms avgGap=17ms pres=0/0ms build=17/25ms mem=1162MB layer=0x12d51cc40 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
-[09:26:07] [Launch-Watchdog/INFO]: [STDOUT]: [LaunchWatchdog] Task86 game thread renamed: main -> Render thread
-[09:26:07] [Launch-Watchdog/INFO]: [STDOUT]: [LaunchWatchdog] Task86 launch reached MinecraftClient (window init), sample #1
-[InputDiag] pojavPumpEvents #600: window=0x127079580 GLFW_invoke_Key=0x120c580f0 GLFW_invoke_CursorPos=0x120c58110 GLFW_invoke_Char=0x120c58100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
+[RenderDiag] fps=57 swapOK=458 swapFail=0 maxGap=25ms avgGap=17ms pres=1/5ms build=15/24ms mem=1252MB layer=0x12514c7c0 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
+[10:39:10] [Launch-Watchdog/INFO]: [STDOUT]: [LaunchWatchdog] Task86 game thread renamed: main -> Render thread
+[10:39:10] [Launch-Watchdog/INFO]: [STDOUT]: [LaunchWatchdog] Task86 launch reached MinecraftClient (window init), sample #1
+[2026-09-25T10:39:10.890+0800][16.412s] GC(43) Pause Young (Concurrent Start) (CodeCache GC Threshold) 538M->321M(645M) 21.268ms
+[2026-09-25T10:39:10.890+0800][16.413s] GC(44) Concurrent Mark Cycle
+[2026-09-25T10:39:10.890+0800][16.413s] Safepoint "G1TryInitiateConcMark", Time since last: 9127464375 ns, Reaching safepoint: 6833 ns, At safepoint: 21309125 ns, Leaving safepoint: 12625 ns, Total: 21328583 ns, Threads: 0 runnable, 37 total
+[2026-09-25T10:39:10.968+0800][16.490s] GC(44) Pause Remark 322M->322M(645M) 3.106ms
+[2026-09-25T10:39:10.968+0800][16.490s] Safepoint "G1PauseRemark", Time since last: 74071417 ns, Reaching safepoint: 3500 ns, At safepoint: 3118916 ns, Leaving safepoint: 1084 ns, Total: 3123500 ns, Threads: 0 runnable, 37 total
+[2026-09-25T10:39:10.999+0800][16.521s] GC(44) Pause Cleanup 323M->323M(645M) 0.022ms
+[2026-09-25T10:39:10.999+0800][16.521s] Safepoint "G1PauseCleanup", Time since last: 31375875 ns, Reaching safepoint: 2291 ns, At safepoint: 35042 ns, Leaving safepoint: 500 ns, Total: 37833 ns, Threads: 0 runnable, 37 total
+[2026-09-25T10:39:10.999+0800][16.522s] GC(44) Concurrent Mark Cycle 109.017ms
+[InputDiag] pojavPumpEvents #600: window=0x136bdcb20 GLFW_invoke_Key=0x10a2280f0 GLFW_invoke_CursorPos=0x10a228110 GLFW_invoke_Char=0x10a228100 isGrabbing=0 isUseStackQueue=1 eventCounter=0
 [RenderDiag] swap#600 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
-[HotbarDiag] REJECT isGrabbing=0 | x=963.0 y=904.0 | phys=2360x1640 guiScale=3 resScale=1.00 sdlWin=0x0
-[InputDiag] sendCursorPos #1: event=0 x=590.0 y=410.0 GLFW_invoke_CursorPos=0x120c58110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #2: event=2 x=589.0 y=408.5 GLFW_invoke_CursorPos=0x120c58110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
-[RenderDiag] fps=58 swapOK=735 swapFail=0 maxGap=21ms avgGap=17ms pres=0/0ms build=17/20ms mem=1159MB layer=0x12d51cc40 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
-[InputDiag] sendCursorPos #3: event=2 x=604.5 y=393.0 GLFW_invoke_CursorPos=0x120c58110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #4: event=2 x=621.5 y=370.0 GLFW_invoke_CursorPos=0x120c58110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
-[InputDiag] sendCursorPos #5: event=1 x=621.5 y=370.0 GLFW_invoke_CursorPos=0x120c58110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[HotbarDiag] REJECT isGrabbing=0 | x=1977.0 y=635.0 | phys=2360x1640 guiScale=3 resScale=1.00 sdlWin=0x0
+[InputDiag] sendCursorPos #1: event=0 x=590.0 y=410.0 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #2: event=2 x=600.5 y=409.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #3: event=2 x=613.0 y=409.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #4: event=2 x=632.5 y=401.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #5: event=2 x=658.5 y=385.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #6: event=2 x=685.0 y=367.0 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #7: event=2 x=708.0 y=353.0 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #8: event=2 x=723.5 y=344.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #9: event=2 x=736.0 y=336.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[InputDiag] sendCursorPos #10: event=2 x=746.5 y=331.5 GLFW_invoke_CursorPos=0x10a228110 isInputReady=1 g_sdlWindow=0x0 isGrabbing=0
+[RenderDiag] fps=58 swapOK=746 swapFail=0 maxGap=33ms avgGap=17ms pres=0/0ms build=17/32ms mem=1254MB layer=0x12514c7c0 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
 [RenderDiag] swap#800 (Task75 geo-probe): drawFb=0 readFb=0 viewport=0,0 1180x820 surface=2360x1640 mode=1 (readback retired -- CopyBGRA8ToRGBA8 SIGBUS @4770b53)
 [IconLoader] App entered background: cancelled all ongoing downloads
