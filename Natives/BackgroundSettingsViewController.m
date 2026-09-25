@@ -536,12 +536,25 @@
 // 重写卡面动态色与阴影承载层 alpha，文字不动；每次重挂全量重设，无残留）
 - (void)cardsNeumorphOpacitySliderChanged:(UISlider *)slider {
     [BackgroundManager sharedManager].cardsNeumorphOpacity = slider.value;
+
+    // Task174：百分比实时回显。Task170 起本回调从未更新数值标签——标签只在
+    // cellForRow 重铺时取落盘值，拖动全程冻结在上一次的读数（装机实测"新拟
+    // 态透明度的百分比没有正确显示"）。与 blurIntensitySliderChanged 同款
+    // 取回范式：slider→contentView→cell，按 tag 501 找标签即时重写。
+    UITableViewCell *cell = (UITableViewCell *)slider.superview.superview;
+    if ([cell isKindOfClass:[UITableViewCell class]]) {
+        UILabel *valueLabel = [cell.contentView viewWithTag:501];
+        valueLabel.text = [NSString stringWithFormat:@"%.0f%%", slider.value * 100];
+    }
+
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 
 // Task172：新拟态界面开关——落盘 + 统一刷新链 + 重载表格（灰化态反转）。
-// 开启 = 卡片永远"正常态"（规格表面 + 双阴影，壁纸无关）；关闭 = 旧壁纸
-// 管线接管，其余 UI 效果选项恢复可操作。
+// Task174 语义定稿：开启 = 全局画布接管（refreshUIEffect 收起壁纸容器、底色
+// 回归原生系统色）+ 卡片"正常态"——开关打开的默认态即用户复现方法（Bing 开
+// →调→关）的终态本体；关闭 = 旧壁纸管线接管（容器原位重建，壁纸即时回归），
+// 其余 UI 效果选项恢复可操作。
 - (void)cardsNeumorphToggleChanged:(UISwitch *)sender {
     [BackgroundManager sharedManager].cardsNeumorphEnabled = sender.on;
     [[BackgroundManager sharedManager] refreshUIEffect];

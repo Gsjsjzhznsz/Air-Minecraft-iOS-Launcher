@@ -268,6 +268,18 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // Remove existing
     [self removeGlobalBackground];
 
+    // Task174：新拟态界面开关 = 全局画布接管。开关开启时壁纸/毛玻璃容器整层
+    // 不再铺设（壁纸状态保留，仅视觉收起），宿主底色回归原生系统色——即用户
+    // 复现方法（"Bing 壁纸开着调 UI 效果再取消 Bing 壁纸"）的终态背景。规格
+    // 双阴影只有在与卡面同族的原生底上才读作"正常态"，垫在照片上必然读作
+    // 晕影（Task173 只重写了卡片层、壁纸仍垫底，装机实测"全都是晕影"）。
+    // Bing 自动刷新在开启期间的落盘照旧（setBingBackgroundImageAtPath 走到
+    // 这里即被本门拦下），开关关闭时由 refreshUIEffect 原位重建。
+    if (self.cardsNeumorphEnabled) {
+        window.backgroundColor = [UIColor systemBackgroundColor];
+        return;
+    }
+
     // Task111：检测并切换（用户实测反馈：Task89 的强制纯色底把启动器背景照片
     // 功能全部顶掉了）。用户设置了自定义背景（图片/视频）时，恢复 Task89 之前的
     // 全局背景管线：容器插入窗口最底层（insertSubview:atIndex:0，即"调低层级"），
@@ -318,6 +330,13 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 
     // Remove existing
     [self removeGlobalBackground];
+
+    // Task174：画布接管门，与 applyBackgroundToWindow 同款（见彼处注释）——
+    // 开关开启时壁纸容器不铺、底色回归原生系统色，开启期间 Bing 刷新落盘照旧。
+    if (self.cardsNeumorphEnabled) {
+        splitVC.view.backgroundColor = [UIColor systemBackgroundColor];
+        return;
+    }
 
     // Task111：同 applyBackgroundToWindow 的检测并切换——有自定义背景时恢复
     // Task89 之前的容器管线（最底层插入 + 图片/视频 + 子 VC 透明化），
@@ -994,15 +1013,40 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 }
 
 - (void)refreshUIEffect {
-    if (self.currentSplitVC && self.currentType != BackgroundTypeNone) {
-        [self makeSplitViewControllerTransparent:self.currentSplitVC];
+    // Task174：新拟态界面开关 = 全局画布接管（语义见 applyBackgroundToWindow
+    // 顶部注释）。开启：壁纸容器整层收起 + 宿主底色回归原生系统色（复现方法
+    // 终态）+ 一次性日志供装机取证；关闭：若壁纸容器在开启期间被收起则原位
+    // 重建（透明化由 applyBackgroundTo* 内部链路自带），再走既有 blur 重挂。
+    if (self.cardsNeumorphEnabled) {
+        if (self.globalBackgroundContainer) {
+            [self removeGlobalBackground];
+        }
+        if (self.currentWindow) {
+            self.currentWindow.backgroundColor = [UIColor systemBackgroundColor];
+        }
+        if (self.currentSplitVC) {
+            self.currentSplitVC.view.backgroundColor = [UIColor systemBackgroundColor];
+        }
+        static dispatch_once_t ame174CanvasLogOnce;
+        dispatch_once(&ame174CanvasLogOnce, ^{
+            NSLog(@"[Task174] neumorph UI canvas active -- wallpaper layer retracted, cards render the 'normal state' (spec surface + dual shadows on the native background)");
+        });
+    } else {
+        if ([self hasBackground] && !self.globalBackgroundContainer) {
+            if (self.currentSplitVC) {
+                [self applyBackgroundToSplitViewController:self.currentSplitVC];
+            } else if (self.currentWindow) {
+                [self applyBackgroundToWindow:self.currentWindow];
+            }
+        }
+        if (self.currentSplitVC && self.currentType != BackgroundTypeNone) {
+            [self makeSplitViewControllerTransparent:self.currentSplitVC];
+        }
+        if (self.globalBackgroundContainer) {
+            [self addBlurEffectToContainer:self.globalBackgroundContainer];
+        }
     }
-    
-    // Re-apply blur intensity to background container
-    if (self.globalBackgroundContainer) {
-        [self addBlurEffectToContainer:self.globalBackgroundContainer];
-    }
-    
+
     // Post notification for other views to refresh
     [[NSNotificationCenter defaultCenter] postNotificationName:@"BackgroundUIEffectChanged" object:nil];
 }

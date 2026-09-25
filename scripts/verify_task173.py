@@ -17,7 +17,9 @@
 #   N. no-regression cascade (balance gates + core verifiers)
 import subprocess, sys, os, json
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+# Task174 可移植化收尾（169/135/164 家法）：会话本地旧仓硬编码路径在此
+# 沙箱缺席导致本脚本中途 FileNotFoundError；改为脚本仓两级 dirname。
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PASS = 0
 FAIL = 0
 FAILED = []
@@ -249,9 +251,10 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("M1 version.h addendum", "Task 173" in vh and "desktop-GL completion layer" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
-check("M3 announcement at index 3 (below server-pin/task169/neumorph-173)",
-      ann["announcements"][3]["id"] == "task173-ten-fixes-2026-09-26"
-      and ann["announcements"][2]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25")
+check("M3 announcement at index 4 (Task174 重锚：task174@2 插入后 ten-fixes 自 anns[3] 顺延 anns[4]；neumorph-173 顺延 anns[3])",
+      ann["announcements"][4]["id"] == "task173-ten-fixes-2026-09-26"
+      and ann["announcements"][3]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][2]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")

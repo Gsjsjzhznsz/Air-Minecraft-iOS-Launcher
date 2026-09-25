@@ -2001,3 +2001,26 @@
 // annotated (1.17+), and auto's legacy-MC branch switched from ANGLE to
 // gl4es (per-version assignment, matching the CMake positioning of
 // tinygl4angle as the 1.17+ wrapper).
+// REVISION 17 addendum (Amethyst Task 174, no bump): neumorph canvas takeover
+// + live opacity-percentage echo. Device feedback on the Task 173 neumorph
+// build: "cannot reproduce the normal neumorphism at all -- everything has
+// heavy halos" and "the neumorph opacity percentage does not display
+// correctly". Root cause pinned: the neumorph Task 173 rewrote the CARDS to
+// the normal state but kept the wallpaper layer underneath -- CSS-spec dual
+// shadows (20pt offset / 60pt blur / opacity 1.0) cast onto a photo ALWAYS
+// read as edge halos; the user's repro (Bing on -> tweak any UI effect ->
+// Bing off) ends with the wallpaper REMOVED, so the terminal state's
+// BACKGROUND is part of the normal state. Changes: (1) canvas takeover --
+// with cardsNeumorphEnabled on, applyBackgroundToWindow /
+// applyBackgroundToSplitViewController retire the wallpaper container behind
+// a top gate (hosts painted native systemBackground; wallpaper state
+// preserved on disk, Bing auto-refresh keeps persisting while veiled), and
+// refreshUIEffect splits: ON retracts any live container + paints hosts
+// native + one-shot forensic log; OFF rebuilds the wallpaper container in
+// place if it was retracted (legacy blur re-apply unchanged). The toggle's
+// terminal state now equals the repro's terminal state, background included.
+// (2) cardsNeumorphOpacitySliderChanged now updates the % value label live
+// (blur-slider pattern: slider -> contentView -> viewWithTag 501); the label
+// previously froze at the last cellForRow value for the whole drag. Device
+// anchor: the one-shot forensic line "[Task174] neumorph UI canvas active --
+// wallpaper layer retracted" prints once per launch when the canvas governs.

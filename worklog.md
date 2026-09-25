@@ -559,3 +559,29 @@ Stage Summary:
 - 装机锚点：①设置 → 背景 → "新拟态界面"开关（模糊程度正下方，无壁纸也显示）——开启即"正常态"卡片（规格表面+双阴影），有壁纸也一样，边缘重晕影消失 ②开关开启时 UI效果/透明度/模糊程度三行变灰，"新拟态透明度"可操作——调低只淡卡面与阴影，文字保持全不透明 ③关闭开关回到旧壁纸管线（毛玻璃/半透明恢复可调）
 - 复现方法闭环：用户不再需要"Bing 开-调-关"舞步，开关打开的默认态即舞步终态
 - 遗留：CI 编译确认（ObjC 均为既有 API 面，无新框架）；137 G4 提交后自愈确认
+
+---
+Task ID: 174
+Agent: main (Super Z)
+Task: Task173 构建装机反馈——"怎么都无法复现正常的新拟态，全都是晕影" + "新拟态透明度的百分比没有正确显示"
+
+Work Log:
+- 晕影根因定稿：Task173 只把【卡片】重写为正常态，壁纸层仍垫在卡片底下——规格双阴影（20pt 偏移/60pt 模糊/opacity 1.0）投在照片上必然读作边缘晕影；用户复现方法（Bing 开→调→关）的终态是壁纸被【取消后】的整体形态，背景本身就是"正常态"的一部分。结论：新拟态界面开关必须是画布级接管，只改卡片物理上不可能消除晕影
+- 修复①画布接管：applyBackgroundToWindow / applyBackgroundToSplitViewController 顶部 cardsNeumorphEnabled 门（开启 = 壁纸容器不铺 + 宿主底色回归原生系统色 = 复现终态；壁纸状态保留，Bing 自动刷新照常落盘仅视觉收起）；refreshUIEffect 双分支——ON 收起在挂容器 + 双宿主底色原生 + 一次性取证日志 "[Task174] neumorph UI canvas active"，OFF 对被收起的壁纸容器原位重建（hasBackground && !container → applyBackgroundTo* 原链路自带透明化）+ 既有 blur 重挂不变
+- 修复②百分比实时回显：cardsNeumorphOpacitySliderChanged 自 Task170 起从不更新数值标签（只在 cellForRow 取落盘值，拖动全程冻结）——blurIntensitySliderChanged 同款取回范式（slider→superview→superview→contentView viewWithTag:501）即时重写 %.0f%%
+- 文档：announcements task174@2（173/172/171/170/168 顺延 3/4/5/6/7）；version.h REVISION 17 addendum（Task 174，含装机日志锚）；l10n 零新增（四主语言计数 1954 不动）
+- 验证：verify_task174 新建 24 项（A 画布门 6 + B 回显 4 + C 不回潮 4 + D l10n 2 + E 公告/版本 4 + F 配平 3 + G 级联 1）；诚实重锚 = 129 E1/E2（底色双分支计数 2→3，画布门新增第三条原生早退路径）、165 G1（置顶窗口 11→12）、167 E1（窗口 9→10）、173 E1/E2、172 H2、171 D2/D3、170 F1、168 D1（公告顺延）
+- 级联收尾：verify_task165 ROOT 默认值仍是会话本地旧仓路径（173 移植 14 个深验证器时的漏网之鱼——级联跑被 env 救、单跑 FileNotFoundError）→ 可移植化收尾（脚本仓两级 dirname，169/135/164 家法），166 L5 / 167 F2/F4 / 171 E1 三处子级联传染同源痊愈
+- 全量对拍：174 24/24、173 32/32、172 51/51、171 30/0、170 34/34、169 49/49、168 43/43、167 31/31、166 64/64、165 34/34 全绿
+
+Stage Summary:
+- 装机锚点：①开关开启（默认）后壁纸整层消失、底色回归原生系统色、卡片规格表面+双阴影 = 复现方法的终态本体，边缘重晕影不再存在 ②日志出现一次性 "[Task174] neumorph UI canvas active -- wallpaper layer retracted" 即画布模式生效 ③拖动"新拟态透明度"滑条百分比即时跟随 ④关闭开关壁纸容器原位回归（毛玻璃/半透明旧管线）
+- 语义定稿：新拟态界面开关 = 画布级模式开关（开启期间壁纸被新拟态画布盖住属预期行为，公告已写明）；开关关闭恢复壁纸，两态一键互切
+- 遗留：CI 编译确认（改动均为既有 API 面：UIView.backgroundColor / UIVisualEffectView tag 清理，无新框架）
+
+### Task 174 补记：rebase 到十症状并行合并树
+- 推送时发现并行会话已合并"Task 173 十症状轮"（839034d 合并树 + 两枚 CI 修复）：设置页滑条重构为统一 Auto Layout（透明度/模糊合并共享块，灰化点 3→2 但仍覆盖三行）、l10n 计数 1954→1955、verify_task173 拆分为十症状版 / verify_task173b_neumorph
+- 本 Task 重放到合并树：标签取回链核验成立（slider/valueLabel 仍直挂 contentView，Auto Layout 不改层级）；画布门与 refreshUIEffect 双分支完整幸存
+- 重锚终态：公告序 = server/task169/task174@2/新拟态173@3/十症状173@4/172@5/171@6/170@7/168@8；174 E1/C2/D1、173b E1、173 M3、172 H2、171 D2/D3、170 F1、168 D1/D2、167 E1（窗口 11）、165 G1（窗口 13）全部对齐
+- 连带治愈：verify_task173（十症状版）ROOT 硬编码路径可移植化（tinygl4angle.c FileNotFoundError，同 165 家法）；171/172 级联随之全绿
+- 合并树终局对拍：174 24/24、173 123/0、173b 32/32、172 51/51、171 30/0、170 34/34、169 49/49、168 43/43、167 31/31、166 64/64、165 34/34 全绿
