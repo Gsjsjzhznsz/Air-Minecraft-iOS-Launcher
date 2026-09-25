@@ -292,9 +292,10 @@
         @try {
             NSFileManager *fm = [NSFileManager defaultManager];
             [self ame169_cleanupStaleImportCopies];
+            unsigned long long ame169_ms = (unsigned long long)([[NSDate date] timeIntervalSince1970] * 1000.0);
             NSString *localCopy = [NSTemporaryDirectory() stringByAppendingPathComponent:
-                [NSString stringWithFormat:@"ame169_modpack_%@.%@",
-                 @((NSUInteger)([[NSDate date] timeIntervalSince1970] * 1000)).stringValue,
+                [NSString stringWithFormat:@"ame169_modpack_%llu.%@",
+                 ame169_ms,
                  fileURL.pathExtension ?: @"zip"]];
             NSError *copyError = nil;
             if (![fm copyItemAtPath:fileURL.path toPath:localCopy error:&copyError]) {
@@ -338,7 +339,7 @@
 - (void)ame169_cleanupStaleImportCopies {
     @try {
         NSFileManager *fm = [NSFileManager defaultManager];
-        NSString *tmp = NSTemporaryDirectory;
+        NSString *tmp = NSTemporaryDirectory();
         for (NSString *name in [fm contentsOfDirectoryAtPath:tmp error:nil]) {
             if ([name hasPrefix:@"ame169_modpack_"]) {
                 [fm removeItemAtPath:[tmp stringByAppendingPathComponent:name] error:nil];
