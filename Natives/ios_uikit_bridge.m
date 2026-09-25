@@ -66,6 +66,9 @@ void ame173_showJvmUsedRestartDialog(NSString *profileName) {
                 @"Forge 安装器占用了本次会话的 Java 运行时（进程内只能创建一次 JVM）。\n\n点击「重启并启动」后启动器将退出，重新打开后将自动启动「%@」并完成 JIT 授权。\n\nThe mod installer used this session's Java runtime (one JVM per process). Tap Restart & Launch, reopen the launcher, and %@ will auto-launch.",
                 profileName ?: @"", profileName ?: @""]
             preferredStyle:UIAlertControllerStyleAlert];
+        // Task173 CI 修复：previousKeyWindow 必须在 action 捕获之前声明
+        //（旧顺序：Cancel handler 引用后才声明 = undeclared identifier）。
+        UIWindow *previousKeyWindow = UIWindow.mainWindow;
         [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil)
                                                   style:UIAlertActionStyleCancel
                                                 handler:^(UIAlertAction *action) {
@@ -89,7 +92,6 @@ void ame173_showJvmUsedRestartDialog(NSString *profileName) {
                 exit(0);
             });
         }]];
-        UIWindow *previousKeyWindow = UIWindow.mainWindow;
         UIWindow *alertWindow = [[UIWindow alloc] initWithWindowScene:UIWindow.mainWindow.windowScene];
         alertWindow.frame = UIScreen.mainScreen.bounds;
         alertWindow.rootViewController = [UIViewController new];

@@ -13,8 +13,10 @@
 #include <setjmp.h>
 #include <signal.h>
 #include <sys/sysctl.h>
-// Task173：os_proc_available_memory（Jetsam 剩余量，iOS 13+）
-#include <libproc.h>
+// Task173：os_proc_available_memory（Jetsam 剩余量，iOS 13+）。iOS SDK 的
+// 公共头不带 <libproc.h>（CI 实测 file not found）——按 dyld_get_active_platform
+// 的 Task108 先例裸 extern 声明（链接期由 libSystem 解析）。
+extern uint64_t os_proc_available_memory(void);
 
 #include "utils.h"
 #import "LauncherPreferences.h"
