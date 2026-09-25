@@ -417,8 +417,22 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
             }
             dispatch_group_leave(group);
         } failure:^(NSURLSessionTask *operation, NSError *error) {
-            failure = error;
-            dispatch_group_leave(group);
+        failure = error;
+        // Task172：镜像 5xx（AFNetworking 把 HTTP 502/504 归为 failure）同
+        // 网关错误待遇——包装成 code 543 让下方既有重试循环接管（装机日志
+        // 实锤 502 瞬态，几秒后重发即成功）。
+        if ([operation respondsToSelector:@selector(response)]) {
+            NSURLResponse *resp = [(NSURLSessionTask *)operation response];
+            if ([self ame172_isTransientServerStatus:resp]) {
+                NSInteger sc = [(NSHTTPURLResponse *)resp statusCode];
+                NSLog(@"[CurseForgeAPI] getEndpoint mirror %ld server error on %@ (attempt %lu) -- will retry",
+                      (long)sc, endpoint, (unsigned long)(ame169_attempt + 1));
+                failure = [NSError errorWithDomain:@"CurseForgeAPI"
+                                               code:543
+                                           userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"mirror server error %ld", (long)sc]}];
+            }
+        }
+        dispatch_group_leave(group);
         }];
         dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
         if (result != nil) return result;
@@ -768,6 +782,27 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 /// 从 searchModWithFilters:completion: 拆出：NSURLRequest 不可变可安全复用，
 /// 镜像网关错误（HTTP 200 + JSON 但无 "data"）为瞬态上游故障，隔 1.5s
 /// 重发一次；仍失败才把错误浮出。
+/// Task172：镜像 5xx 判定（NSHTTPURLResponse 状态码 >= 500 = 瞬态上游
+/// 故障，值得自动重试；4xx 是确定性错误不重试）。
+- (BOOL)ame172_isTransientServerStatus:(NSURLResponse *)response {
+    if (![response isKindOfClass:NSHTTPURLResponse.class]) return NO;
+    return ((NSHTTPURLResponse *)response).statusCode >= 500;
+}
+
+/// Task172：搜索请求退避重试（2s，后台队列；attempt 上限由调用方把关）。
+- (void)ame172_retrySearchRequest:(NSURLRequest *)request
+                          attempt:(NSUInteger)attempt
+                       projectType:(NSString *)projectType
+                        completion:(void (^)(NSArray * _Nullable, NSError * _Nullable))completion
+                           reason:(NSString *)reason {
+    NSLog(@"[CurseForgeAPI] Task172 retrying search after %@ (attempt %lu -> %lu)",
+          reason, (unsigned long)(attempt + 1), (unsigned long)(attempt + 2));
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                   dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+        [self ame169_issueSearchRequest:request attempt:attempt + 1 projectType:projectType completion:completion];
+    });
+}
+
 - (void)ame169_issueSearchRequest:(NSURLRequest *)request
                           attempt:(NSUInteger)attempt
                         projectType:(NSString *)projectType
@@ -785,6 +820,11 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
             // 响应数据为空：返回包含 HTTP 状态码的 NSError
             NSLog(@"[CurseForgeAPI] searchModWithFilters empty response");
             [self debugLogRequest:request response:response data:data jsonError:nil];
+            // Task172：5xx 空体也是镜像瞬态——同 502 HTML 页待遇，退避重试
+            if ([self ame172_isTransientServerStatus:response] && attempt < 2) {
+                [self ame172_retrySearchRequest:request attempt:attempt projectType:projectType completion:completion reason:@"empty 5xx body"];
+                return;
+            }
             NSError *emptyError = [NSError errorWithDomain:@"CurseForgeAPI"
                                                       code:2
                                                   userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned empty response"}];
@@ -799,6 +839,14 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
             // JSON 解析失败：输出完整调试日志，便于诊断 401 HTML 错误页等场景
             NSLog(@"[CurseForgeAPI] searchModWithFilters JSON parse failed");
             [self debugLogRequest:request response:response data:data jsonError:jsonError];
+            // Task172：镜像 5xx（如 502 Bad Gateway HTML 页）是瞬态上游故障
+            // ——760c07c 装机日志实锤：classId=4471 搜索 502，用户手动重刷
+            // 5 秒后即成功。旧代码直接把 502 浮出为错误（用户被迫手动重试），
+            // 现与网关错误同待遇：退避 2s 自动重试（最多 2 次）。
+            if ([self ame172_isTransientServerStatus:response] && attempt < 2) {
+                [self ame172_retrySearchRequest:request attempt:attempt projectType:projectType completion:completion reason:@"5xx non-JSON body"];
+                return;
+            }
             NSError *baseError = jsonError ?: [NSError errorWithDomain:@"CurseForgeAPI"
                                                                    code:3
                                                                userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned non-JSON response"}];

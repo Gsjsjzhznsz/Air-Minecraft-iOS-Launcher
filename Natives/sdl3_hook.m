@@ -1128,23 +1128,37 @@ static bool ame_SDL_GL_SwapWindow(void *window) {
 //
 // 2.0.16 改为按构造对齐：ame_rendererHandle() 通过 LWJGL provider 的确切
 // 路径（NOLOAD）取回 LWJGL 正在使用的同一镜像句柄，然后逐条镜像 GL$1
-// 的 macOS 解析链 ——
-//   构造：GetProcAddress = dlsym(lib, "eglGetProcAddress")，
-//         否则 dlsym(lib, "OSMesaGetProcAddress")；
-//   查询：GetProcAddress(name) 非空则取其结果，否则 dlsym(lib, name)。
-// 两条腿由此执行同一条链、调用同一个函数对象，指针一致性按构造成立，
-// 不再依赖 dyld 的任何 caller-image 语义。
+// 的 macOS 解析链。Task 172 修正镜像本身：对本仓 JavaApp/libs/lwjgl-333/
+// lwjgl-opengl.jar 里 GL$1.class 的 CFR 反编译实证，macOS 平台分支的
+// 构造链是 ——
+//   switch (Platform.get()) { case LINUX: glXGetProcAddress / ARB;
+//                              case WINDOWS: wglGetProcAddress; }   // macOS 无 case
+//   if (GetProcAddress == 0) GetProcAddress = OSMesaGetProcAddress;
+//   查询：GetProcAddress(name) 非空则取其结果，否则 library.getFunctionAddress(name)
+//         （= dlsym(lib, name)）。
+// 即 GL$1 在 macOS 上【从不查询 eglGetProcAddress】。旧镜像的
+// “eglGetProcAddress 优先”是错误的反推：对 MG/zink 恰好两条链殊途同归
+// （要么都不导出 eglGetProcAddress，要么 GPA 与 dlsym 同址），装机验证
+// 通过纯属侥幸；对 libtinygl4angle（ANGLE 家族，依赖链的 libEGL 导出
+// eglGetProcAddress，而 glGetError 是依赖链 libGLESv2 的直接导出）则
+// 两条链拿到不同地址 —— 9be2b53 装机日志（latestlog.old，FO 包 26.3）
+// 实锤：bridge 已接管（"hooked SDL_GL_LoadLibrary -> EGL bridge"）但
+// GlBackend.loadLibrary 仍报 "glGetError mismatch" → 回落 Vulkan →
+// Iris No GLCapabilities 崩溃。修法 = 镜像链逐字对齐 GL$1 的 macOS 分支
+// （只查 OSMesaGetProcAddress），指针一致性对所有渲染器按构造成立。
 static void *ame_SDL_GL_GetProcAddress(const char *proc) {
     if (proc == NULL) return NULL;
     void *h = ame_rendererHandle();
     if (h != NULL) {
-        // 镜像 GL$1 的 FunctionProvider 解析（macOS 分支无 glXGetProcAddress 环节）
+        // 镜像 GL$1 的 FunctionProvider 解析（macOS 平台分支：仅
+        // OSMesaGetProcAddress —— eglGetProcAddress 从不参与，见上方注释）
         static void *g_lwjglMirrorGPA = NULL;
         static bool  g_lwjglMirrorTried = false;
         if (!g_lwjglMirrorTried) {
             g_lwjglMirrorTried = true;
-            g_lwjglMirrorGPA = dlsym(h, "eglGetProcAddress");
-            if (g_lwjglMirrorGPA == NULL) g_lwjglMirrorGPA = dlsym(h, "OSMesaGetProcAddress");
+            g_lwjglMirrorGPA = dlsym(h, "OSMesaGetProcAddress");
+            NSDebugLog(@"[SDLHook] Task172 GL$1 mirror: OSMesaGetProcAddress=%p (renderer image %p; eglGetProcAddress deliberately NOT consulted per decompiled GL.1 macOS branch)",
+                       g_lwjglMirrorGPA, h);
         }
         if (g_lwjglMirrorGPA != NULL) {
             void *p = ((void *(*)(const char *))g_lwjglMirrorGPA)(proc);
@@ -1606,6 +1620,24 @@ void *ame_hook_getEmbeddedSDLView(void) {
 
 #pragma mark - Task 114：文本输入主线程化 + 启动器 hint（键盘自动弹出修复）
 
+// Task172 病历（760c07c 装机 latestlog.old.txt，26.3 多人会话键盘段）：
+//   用户反馈"键盘输入依旧异常"——每次按 ✎ 输入法按钮日志都是
+//   "becomeFirstResponder=1"（而非 "dismissing"）= 启动器字段反复丢失
+//   first responder；字符全部经启动器字段（Task82 pushSDLTextInput）到达
+//   MC，而 SDL 自己的 UIKit textField 一条都没送达。机理：MC 26.3 的
+//   EditBox 聚焦时调用 SDL_StartTextInputWithProperties → SDL 的 iOS 后端
+//   把自己的 textField（位于被 Task32 隐藏的 SDL UIWindow 里）立为
+//   first responder、抢走启动器字段——但它的文本投递链在本嵌入架构下
+//   不可靠，用户的击键石沉大海，直到再按一次 ✎ 把启动器字段抢回来。
+//   Task171 的哨兵空格 + 自愈重挂只治了启动器字段的会话竞争，治不了
+//   SDL 字段的反复抢占（自愈重挂零触发即为证据）。
+//   修法：Start/Stop 钩子在真实调用之后追加通知（AME172_SDLStartTextInput /
+//   AME172_SDLStopTextInput），SurfaceViewController 收到后把 inputTextField
+//   立为/退出 first responder——真实调用保持 SDL 内部状态一致，通知保证
+//   键盘服务的是经过验证的启动器投递链；Stop 时同步收起，键盘不再滞留。
+//   通知在本钩子的主队列 block 内同步派发，顺序必然在 SDL UIKit 操作之后
+//   （启动器字段稳赢 first responder 竞争）。
+
 // 病历（用户反馈：输入框有闪竖线时键盘不自动弹出；上游正常）：
 //   (1) MC 26.x 桌面惯例在 SDL_Init 前把 SDL_ENABLE_SCREEN_KEYBOARD 设为 0
 //      （自绘 IME UI 用），移动端恰恰依赖 SDL 唤起系统软键盘——不覆盖回来，
@@ -1631,6 +1663,8 @@ static bool ame_dispatchTextInputToMain(void (^work)(void)) {
 static bool ame_SDL_StartTextInput(void *window) {
     return ame_dispatchTextInputToMain(^{
         if (ame_real_StartTextInput != NULL) ame_real_StartTextInput(window);
+        // Task172：路由到启动器输入框（见下方 Task172 病历注释）
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"AME172_SDLStartTextInput" object:nil];
     });
 }
 
@@ -1640,12 +1674,19 @@ static bool ame_SDL_StartTextInputWithProperties(void *window,
         if (ame_real_StartTextInputWithProperties != NULL) {
             ame_real_StartTextInputWithProperties(window, props);
         }
+        // Task172：真实调用先行（SDL 内部状态保持一致），随后启动器字段
+        // 抢占 first responder——SDL UIKit 自己的 textField 位于被隐藏的
+        // SDL UIWindow 里，其文本投递链在本嵌入架构下不可靠。
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"AME172_SDLStartTextInput" object:nil];
     });
 }
 
 static bool ame_SDL_StopTextInput(void *window) {
     return ame_dispatchTextInputToMain(^{
         if (ame_real_StopTextInput != NULL) ame_real_StopTextInput(window);
+        // Task172：MC 关闭文本上下文（聊天发送/ESC）时同步收起启动器字段，
+        // 键盘跟随 MC 的输入状态而非永久滞留。
+        [[NSNotificationCenter defaultCenter] postNotificationName:@"AME172_SDLStopTextInput" object:nil];
     });
 }
 
@@ -1682,6 +1723,9 @@ static bool ame_SDL_SetTextInputArea(void *window, const void *rect, int cursor)
 //   SDL_OPENGL_FORCE_SRGB_FRAMEBUFFER=0
 //                                  转译型渲染器（gl bridge）无法传入正确的
 //                                  EGL 参数支持它；仅对走 EGL bridge 的渲染器关闭
+// Task172 补充：SDL_ENABLE_SCREEN_KEYBOARD=1 保留不动（MC 的
+// HasScreenKeyboardSupport 查询仍报“有”）；键盘由 AME172_SDLStartTextInput
+// 通知路由到启动器自己的 inputTextField（见 ame_SDL_StartTextInput* 注释）。
 static bool ame_SDL_InitSubSystem(uint32_t flags) {
     if (ame_real_SetHint == NULL) {
         ame_real_SetHint = (ame_fn_SDL_SetHint)ame_real_dlsym("SDL_SetHint");

@@ -84,10 +84,12 @@ check("B3 CF：无 nil 拦截（if (!headers) 归零）+ keyless Accept-only + 4
       and cf.count("ame171_key") >= 4
       and "no API key configured" in cf)
 news = rd("Natives/LauncherNewsViewController.m")
-check("B4 头像：helper + viewDidAppear + 三处调用（updateSkinDisplay 尾 / 网络回调 / viewDidAppear）",
-      news.count("ame171_syncVisibleProfileAvatar") >= 4
+# Task172 重锚：helper nil 分支改为取证日志（不再裸 return）；viewDidAppear
+# 增加 0.35s 延迟补刷调用（调用点 4 -> 5）。
+check("B4 头像：helper + viewDidAppear + 三处调用（updateSkinDisplay 尾 / 网络回调 / viewDidAppear；Task172 起另有延迟补刷）",
+      news.count("ame171_syncVisibleProfileAvatar") >= 5
       and "- (void)viewDidAppear:(BOOL)animated" in news
-      and "if (self.currentAvatar == nil) return;" in news)
+      and "sync skipped: currentAvatar is nil" in news)
 mainm = rd("Natives/main.m")
 check("B5 main.m：latestlog.crash.txt 保全 + exit 标记检测 + 仅在无标记时复制",
       "latestlog.crash.txt" in mainm
@@ -101,10 +103,12 @@ check("B6 Tools.java：appendGraphicsBackendArg + 版本门槛 + MoltenVK 跳过
       and '"--graphicsBackend".equals(a)' in tools
       and "Vulkan-first backend order" in tools)
 svc = rd("Natives/SurfaceViewController.m")
-check("B7 键盘：clearsOnBeginEditing=NO + 两处 text 先于 become + 收起代数 3 处递增 + 自愈重挂（深度上限 2）",
+# Task172 重锚：SDL Stop 路由新增第 4 处代数递增；SDL Start 路由新增第 3 处
+# re-arm 调用与第 3 处 text 先于 become。
+check("B7 键盘：clearsOnBeginEditing=NO + 两处 text 先于 become + 收起代数递增 + 自愈重挂（深度上限 2；Task172 起 4 处递增/3 处 re-arm）",
       "self.inputTextField.clearsOnBeginEditing = NO;" in svc
-      and svc.count("ame171_keyboardDismissGeneration++") == 3
-      and svc.count("[self ame171_armKeyboardRecheck:0];") == 2
+      and svc.count("ame171_keyboardDismissGeneration++") == 4
+      and svc.count("[self ame171_armKeyboardRecheck:0];") == 3
       and "if (depth > 2) return;" in svc
       and "keyboard auto re-arm depth=%d" in svc)
 # text-before-become ordering in the two trigger sites
@@ -174,12 +178,13 @@ check("D1 version.h Task 171 附录：七主题齐全",
                                  "ame171_syncVisibleProfileAvatar", "latestlog.crash.txt",
                                  "PreferredGraphicsApi", "UIAsyncTextInput"]))
 anns = json.loads(rd("announcements.json"))["announcements"]
-check("D2 公告：task171 在 index 2；置顶服务器推荐仍在 anns[0]；task169 仍在 anns[1]",
-      anns[2]["id"] == "task171-seven-fixes-2026-09-25"
+# Task172 重锚：公告漂移 anns[2] -> anns[3]（task172 插入 index 2）。
+check("D2 公告：task171 在 index 3（Task172 起）；置顶服务器推荐仍在 anns[0]；task169 仍在 anns[1]",
+      anns[3]["id"] == "task171-seven-fixes-2026-09-25"
       and anns[0].get("pin") and "mysv.dpdns.org" in anns[0]["title"]
       and anns[1]["id"] == "task169-four-fixes-2026-09-25")
 check("D3 task171 公告内容七条全列",
-      all(k in anns[2]["content"] for k in ["①", "②", "③", "④", "⑤", "⑥", "⑦"]))
+      all(k in anns[3]["content"] for k in ["①", "②", "③", "④", "⑤", "⑥", "⑦"]))
 wl = rd("worklog.md")
 check("D4 仓库 worklog 已记 Task 171",
       "Task ID: 171" in wl)

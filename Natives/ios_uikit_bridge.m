@@ -5,6 +5,7 @@
 #import "LauncherPreferences.h"
 #import "LauncherSplitViewController.h"
 #import "PLLogOutputView.h"
+#import "PLProfiles.h"
 #import "SurfaceViewController.h"
 
 #include <objc/runtime.h>
@@ -120,12 +121,42 @@ jstring UIKit_accessClipboard(JNIEnv* env, jint action, jbyteArray copySrc) {
     }
 }
 
+// Task172：版本级 TouchController 自动配置（用户指令"顺便自动配置设置
+//（udp 模式，屏蔽控件）"）。当前 profile 的 touchController 键为 YES 时，
+// 启动前把全局三项自动配好：control.mod_touch_enable=YES、
+// control.mod_touch_mode=1（UDP）、control.mod_touch_hide_controls=YES
+//（Task140 语义：只隐藏启动器自身控件层，模组自己的虚拟按钮保留）。
+// 键缺失/NO 时【不碰】全局设置（用户可能在全局 TouchController 页单独
+// 配置过，关闭实例开关不应破坏它）。SurfaceViewController 的
+// ame139_modControlsHidden 与 UDP 触摸转发在游戏进程内实时读这些键，
+// 此处只需在换根 VC 前落值。
+static void ame172_applyProfileTouchController(void) {
+    @autoreleasepool {
+        NSString *profName = PLProfiles.current.selectedProfileName;
+        NSDictionary *prof = profName ? PLProfiles.current.profiles[profName] : nil;
+        BOOL on = [prof isKindOfClass:NSDictionary.class] && [prof[@"touchController"] boolValue];
+        if (on) {
+            setPrefBool(@"control.mod_touch_enable", YES);
+            setPrefObject(@"control.mod_touch_mode", @1);  // UDP 协议
+            setPrefBool(@"control.mod_touch_hide_controls", YES);
+            NSLog(@"[TouchController] Task172 profile auto-config applied for '%@' (enable=1 mode=UDP hideControls=1)",
+                  profName);
+        } else {
+            NSLog(@"[TouchController] Task172 profile '%@' TouchController off -- global settings untouched",
+                  profName);
+        }
+    }
+}
+
 void UIKit_launchMinecraftSurfaceVC(UIWindow* window, NSDictionary* metadata) {
     // Leave this pref, might be useful later for launching with Quick Actions/Shortcuts/URL Scheme
     //setPreference(@"internal_launch_on_boot", getPreference(@"restart_before_launch"));
     BaseAuthenticator *currentAuth = BaseAuthenticator.current;
     // selected_account 存储 accountId（唯一标识），确保重启后能按 accountId 恢复登录状态
     setPrefObject(@"internal.selected_account", currentAuth.authData[@"accountId"]);
+    // Task172：版本级 TouchController 自动配置（必须在 SurfaceViewController
+    // 读控件/触摸偏好之前落值——本函数是两条启动路径共用的换根入口）
+    ame172_applyProfileTouchController();
     dispatch_async(dispatch_get_main_queue(), ^{
         tmpRootVC = window.rootViewController;
         [UIView animateWithDuration:0.2 animations:^{

@@ -1971,6 +1971,19 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
                                              selector:@selector(onFirstFrameRendered)
                                                  name:@"PojavFirstFrameRendered"
                                                object:nil];
+
+    // Task172：SDL 文本输入路由（sdl3_hook.m 的 Start/StopTextInput 钩子派发）。
+    // MC 26.3 EditBox 聚焦时 SDL UIKit 自己的 textField 会抢走 first responder
+    // 但其投递链不可靠——键盘必须服务启动器的 inputTextField（病历见
+    // sdl3_hook.m 的 Task172 注释）。
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(ame172_sdlStartTextInput:)
+                                                 name:@"AME172_SDLStartTextInput"
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(ame172_sdlStopTextInput:)
+                                                 name:@"AME172_SDLStopTextInput"
+                                               object:nil];
 }
 
 /// 取消启动：用户点击"取消启动"按钮时调用。
@@ -2208,6 +2221,33 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
               depth, ok);
         [strongSelf ame171_armKeyboardRecheck:depth + 1];
     });
+}
+
+// Task172：SDL StartTextInput 路由——把键盘拉到启动器字段（在 SDL UIKit
+// 的 textField 抢占之后，同轮主队列内执行，稳赢 first responder）。
+// 已是 first responder 时不动（MC 在两个文本框间切换焦点时不得打断
+// 进行中的输入会话）。
+- (void)ame172_sdlStartTextInput:(NSNotification *)n {
+    if (!self.inputTextField) return;
+    if (self.inputTextField.isFirstResponder) return;
+    // Task171 哨兵空格先于 becomeFirstResponder 写入（防 UIAsyncTextInput
+    // 首会话竞争，与 ✎ 按钮同序）
+    self.inputTextField.text = @" ";
+    BOOL ok = [self.inputTextField becomeFirstResponder];
+    NSLog(@"[SurfaceVC] Task172 SDL auto-keyboard routed to launcher field (becameFR=%d)", ok);
+    [self ame171_armKeyboardRecheck:0];
+}
+
+// Task172：SDL StopTextInput 路由——MC 关闭文本上下文（发送/ESC）时同步
+// 收起启动器字段。代数计数器照常递增，作废可能还在飞的自愈重挂。
+- (void)ame172_sdlStopTextInput:(NSNotification *)n {
+    if (!self.inputTextField) return;
+    if (self.inputTextField.isFirstResponder) {
+        ame171_keyboardDismissGeneration++;
+        [self.inputTextField resignFirstResponder];
+        self.inputTextField.alpha = 1.0f;
+        NSLog(@"[SurfaceVC] Task172 SDL stop-text-input: keyboard resigned with MC text context");
+    }
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
@@ -2976,6 +3016,8 @@ static UIView *findSDL_uikitview(UIView *root) {
 
     // 清理启动遮罩层资源
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"PojavFirstFrameRendered" object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AME172_SDLStartTextInput" object:nil];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AME172_SDLStopTextInput" object:nil];
     self.launchOverlayView = nil;
     self.launchGradientLayer = nil;
 

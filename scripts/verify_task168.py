@@ -169,11 +169,11 @@ check("C10 抽取/幂等脚本入库（可重跑再生成）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("D1 公告顺延：task170 插入 index 2（task169 F5 钉死 anns[1] 不动；Task171 再插入后 task168 顺延至 anns[4]）且 id 唯一",
+check("D1 公告顺延：task170 插入 index 2（task169 F5 钉死 anns[1] 不动；Task172 再插入后 task168 顺延至 anns[5]）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[4]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t168 = anns[4]
+      and anns[5]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t168 = anns[5]
 check("D2 公告内容：根因叙述 + 双形态 + 两个维护路径",
       "447a677" in t168["content"] and "透明度/模糊" in t168["content"]
       and "announcements.json" in t168["content"] and "help-faq.json" in t168["content"]

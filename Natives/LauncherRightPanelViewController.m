@@ -1612,33 +1612,9 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
             !getPrefBool(@"debug.jit26_script_disable")) {
             NSLog(@"[JIT] [RightPanel] CS_DEBUGGED set but no live JIT26 debugger (ppid=%d traced=%d exn=%d) — re-attaching script via stikjit://",
                   getppid(), JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
-            NSString *scriptDataString = @"";
-            NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
-            if (scriptData) {
-                scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
-            }
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
-            self.progressLabel.text = localize(@"i18n_str_436", nil);
-            UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                                                                           message:localize(@"i18n_str_439", nil)
-                                                                    preferredStyle:UIAlertControllerStyleAlert];
-            [self presentViewController:alert animated:YES completion:nil];
-            dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                // Wait for the JIT26 debugger to actually attach (P_TRACED /
-                // exception ports / spawned-by-debugger), not for CS_DEBUGGED
-                // -- that flag is already set and would race the first brk.
-                // Task169：有界等待（120s）+心跳日志，超时走重试弹窗。
-                BOOL ok = ame169_waitForJITCondition(^{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"JIT26 debugger attach");
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    if (ok) {
-                        [alert dismissViewControllerAnimated:YES completion:handler];
-                    } else {
-                        [alert dismissViewControllerAnimated:YES completion:^{
-                            [self ame169_showJITTimeoutAlertWithRetry:handler];
-                        }];
-                    }
-                });
-            });
+            // Task172：重挂逻辑抽取为共用助手（本分支 + 等待成功后的存活性
+            // 复查两处调用，见 ame172_reattachJIT26ThenLaunch）。
+            [self ame172_reattachJIT26ThenLaunch:handler];
             return;
         }
         NSLog(@"[JIT] [RightPanel] JIT enabled with live JIT26 debugger, launching game directly");
@@ -1720,14 +1696,42 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [self presentViewController:alert animated:YES completion:nil];
     
+    // Task172：后台任务断言。stikjit:// 必然把 App 切到后台（切去 StikJIT），
+    // 无断言时 iOS 立即挂起本进程——760c07c 装机日志实锤等待循环被冻结
+    //（"still waiting after 0s" 后零心跳零超时，App 停在后台直到用户手动
+    // 切回）。断言让进程在宽限期内继续运行：StikJIT 可在后台完成附加，
+    // 心跳/超时日志照常输出，切回失败时超时重试弹窗也能照常出现。
+    __block UIBackgroundTaskIdentifier ame172_bgt = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"ame172-jit-wait" expirationHandler:^{
+        // 宽限期到由系统挂起；恢复后循环按剩余预算继续（NSDate 计时包含
+        // 挂起时长，超时语义不变）。
+    }];
+    
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // Task169：有界等待（120s）+每 10s 心跳日志。旧裸循环在 stikjit://
         // 偶发没开成 JIT 时永不退出（装机 485b18c：冷启动首次启动卡在
         // 启动器界面，只能杀进程）。超时后撤弹窗并给出重试/取消。
         BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (ame172_bgt != UIBackgroundTaskInvalid) {
+                [UIApplication.sharedApplication endBackgroundTask:ame172_bgt];
+                ame172_bgt = UIBackgroundTaskInvalid;
+            }
             if (ok) {
-                [alert dismissViewControllerAnimated:YES completion:handler];
+                [alert dismissViewControllerAnimated:YES completion:^{
+                    // Task172：等待成功 ≠ 能安全启动。StikJIT 在我们被挂起
+                    // 期间附加又死亡时，CS_DEBUGGED 已置而 JIT26 调试器无人
+                    // 服务 brk #0x69 —— 旧代码直接跑 handler 即用户实测的
+                    // "二级菜单启动卡 JIT 等待 120s 后闪退"。与入口
+                    // CS_DEBUGGED 分支同款存活性复查：需要重挂就重挂。
+                    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+                        !JIT26IsLikelyDebuggerKeepAttached() &&
+                        !getPrefBool(@"debug.jit26_script_disable")) {
+                        NSLog(@"[JIT] [RightPanel] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
+                        [self ame172_reattachJIT26ThenLaunch:handler];
+                    } else {
+                        handler();
+                    }
+                }];
             } else {
                 [alert dismissViewControllerAnimated:YES completion:^{
                     [self ame169_showJITTimeoutAlertWithRetry:handler];
@@ -1753,6 +1757,80 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         retry.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds), 0, 0);
     }
     [self presentViewController:retry animated:YES completion:nil];
+}
+
+// Task172：JIT26 调试器重挂统一助手（stikjit:// + 有界等待 + 前台等待 +
+// 后台任务断言）。原为 invokeAfterJITEnabled 的 CS_DEBUGGED 分支内联代码，
+// 现另供等待成功后的存活性复查使用（两处语义一致：拉起 StikJIT 带脚本
+// 重附加，等调试器真正存活后才执行 handler）。
+// 病历（760c07c 装机 latestlog.txt）：stikjit:// 切后台后若 StikJIT 没把
+// 用户带回来，App 被挂起、循环冻结（零心跳）；用户手动切回时若
+// CS_DEBUGGED 已置而调试器已死，直接启动 → brk #0x69 无人服务 = 闪退。
+// 助手三道防线：①App 非激活态先等前台（openURL 后台无效，一次性监听 +
+// 10s 兜底，双 nil 防护防双发）；②拉起 stikjit://（附 UniversalJIT26.js）；
+// ③断言防挂起冻结 + 有界等调试器存活，超时走重试弹窗。
+- (void)ame172_reattachJIT26ThenLaunch:(void(^)(void))handler {
+    self.progressLabel.text = localize(@"i18n_str_436", nil);
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
+                                                                   message:localize(@"i18n_str_439", nil)
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:alert animated:YES completion:nil];
+    
+    __block UIBackgroundTaskIdentifier ame172_bgt = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"ame172-jit26-reattach" expirationHandler:^{
+        // 同上：宽限期到由系统挂起，恢复后继续。
+    }];
+    
+    void (^ame172_fireURL)(void) = ^{
+        NSString *scriptDataString = @"";
+        NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
+        if (scriptData) {
+            scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
+        }
+        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+        NSLog(@"[JIT] [RightPanel] Task172 stikjit:// re-attach fired (script=%lu bytes)",
+              (unsigned long)scriptData.length);
+    };
+    
+    if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) {
+        // 后台态：openURL 无效，先等回前台再拉起（一次性监听 + 10s 兜底，
+        // 双 nil 防护防双发）。
+        __block id ame172_obs = nil;
+        ame172_obs = [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *ame172_n) {
+            [[NSNotificationCenter defaultCenter] removeObserver:ame172_obs];
+            ame172_obs = nil;
+            ame172_fireURL();
+        }];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (ame172_obs) {
+                [[NSNotificationCenter defaultCenter] removeObserver:ame172_obs];
+                ame172_obs = nil;
+                ame172_fireURL();
+            }
+        });
+    } else {
+        ame172_fireURL();
+    }
+    
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // Wait for the JIT26 debugger to actually attach (P_TRACED /
+        // exception ports / spawned-by-debugger), not for CS_DEBUGGED
+        // -- that flag is already set and would race the first brk.
+        // Task169：有界等待（120s）+心跳日志，超时走重试弹窗。
+        BOOL ok = ame169_waitForJITCondition(^{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"JIT26 debugger attach");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (ame172_bgt != UIBackgroundTaskInvalid) {
+                [UIApplication.sharedApplication endBackgroundTask:ame172_bgt];
+                ame172_bgt = UIBackgroundTaskInvalid;
+            }
+            if (ok) {
+                [alert dismissViewControllerAnimated:YES completion:handler];
+            } else {
+                [alert dismissViewControllerAnimated:YES completion:^{
+                    [self ame169_showJITTimeoutAlertWithRetry:handler];
+                }];
+            }
+        });
+    });
 }
 
 - (void)showAlert:(NSString *)message {

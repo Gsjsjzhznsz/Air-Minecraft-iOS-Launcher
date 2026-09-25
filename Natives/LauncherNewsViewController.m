@@ -887,6 +887,18 @@ static NSString *festivalGreeting(void) {
     // 装机实测"切换标签页返回后头像缺失"。此刻 cells 必然已可见，直写
     // image 是最后的兑底（与 updateSkinDisplay 尾部的直刷同一 helper）。
     [self ame171_syncVisibleProfileAvatar];
+    // Task172：转场完全落定后再补一刷（0.35s）。Task169/171 两轮装机仍
+    // 复现"切标签页回来头像要点一下才显示"，且本类每次返回主页都是全新
+    // 实例（showHomePage 每次 alloc）——viewDidAppear 时刻的直写仍可能
+    // 落在集合视图与转场动画的窗口期内，此次延迟兑底保证至少有一次
+    // 在完全静止的布局上写入。取证日志同步输出分支与可见卡计数。
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        [strongSelf ame171_syncVisibleProfileAvatar];
+    });
 }
 
 // Task171：把 currentAvatar 直写所有可见 Profile 卡。Task169 的直刷只挂在
@@ -894,12 +906,23 @@ static NSString *festivalGreeting(void) {
 // （布局时序下不重绘）——头像缺失。本 helper 全分支兑底：updateSkinDisplay
 // 尾部 + viewDidAppear + 网络完成回调三处共用。
 - (void)ame171_syncVisibleProfileAvatar {
-    if (self.currentAvatar == nil) return;
+    if (self.currentAvatar == nil) {
+        // Task172 取证：头像缺失时必须能从日志分辨"数据层就没有"还是
+        // "写入了但没渲染"——前者看 updateSkinDisplay 的分支日志，后者
+        // 看本方法后续的可见卡计数。
+        NSLog(@"[HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)");
+        return;
+    }
+    NSInteger ame172_profileCells = 0;
     for (UICollectionViewCell *cell in self.collectionView.visibleCells) {
         if ([cell isKindOfClass:HomeProfileTileCell.class]) {
+            ame172_profileCells++;
             ((HomeProfileTileCell *)cell).avatarImageView.image = self.currentAvatar;
         }
     }
+    NSLog(@"[HomeAvatar] Task172 direct-sync: %ld visible profile cell(s), image %ldx%ld",
+          (long)ame172_profileCells,
+          (long)self.currentAvatar.size.width, (long)self.currentAvatar.size.height);
 }
 
 - (void)dealloc {
@@ -1365,6 +1388,8 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
         UIImage *ame162_local = [[AvatarManager sharedManager] avatarForAccount:auth.authData[@"accountId"]];
         if (ame162_local) {
             self.currentAvatar = ame162_local;
+            NSLog(@"[HomeAvatar] Task172 branch: AvatarManager local hit (%ldx%ld)",
+                  (long)ame162_local.size.width, (long)ame162_local.size.height);
         } else {
             NSString *avatarURL = auth.authData[@"profilePicURL"];
             if (avatarURL) {
@@ -1373,12 +1398,19 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                 if (ame162_cached) {
                     // 命中缓存：同步上屏，本次不再发起网络请求
                     self.currentAvatar = ame162_cached;
+                    NSLog(@"[HomeAvatar] Task172 branch: session cache hit (%ldx%ld)",
+                          (long)ame162_cached.size.width, (long)ame162_cached.size.height);
                 } else {
+                    NSLog(@"[HomeAvatar] Task172 branch: network fetch started (URL present, length=%lu)",
+                          (unsigned long)avatarURL.length);
                     [[AvatarManager sharedManager] fetchAvatarFromURL:avatarURL completion:^(UIImage *img) {
                         if (img) {
                             [ame162_avatarCache() setObject:img forKey:avatarURL];
                         }
                         self.currentAvatar = img;
+                        NSLog(@"[HomeAvatar] Task172 fetch completion: img=%@ (%ldx%ld)",
+                              img ? @"yes" : @"nil",
+                              (long)img.size.width, (long)img.size.height);
                         [self reloadProfileSection];
                         // Task169：直接同步可见 Profile 卡（保险路径）
                         if (img) {
@@ -1386,6 +1418,11 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                         }
                     }];
                 }
+            } else {
+                // Task172 取证：authData 在但没有 profilePicURL——旧代码静默
+                // 保持 nil（显示占位头像），用户感知"头像消失"无从定位。
+                NSLog(@"[HomeAvatar] Task172 branch: auth present but profilePicURL is MISSING (keys: %@)",
+                      [auth.authData.allKeys componentsJoinedByString:@","]);
             }
         }
     } else {

@@ -151,7 +151,11 @@
                        completion:(void (^)(UIImage * _Nullable))completion {
     NSURL *url = [NSURL URLWithString:urlString];
     if (!url) {
-        if (completion) completion(nil);
+        // Task172：坏 URL 路径也必须回主线程（契约：completion 恰好一次、
+        // 永远在主线程；此前这里同步调，若调用方在后台线程则违反契约）。
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(nil);
+        });
         return;
     }
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
@@ -162,7 +166,13 @@
             // Task169：失败必须有日志（旧实现静默，装机日志零痕迹）
             NSLog(@"[AvatarManager] Task169 avatar fetch failed (%@): %@",
                   urlString.lastPathComponent ?: urlString, error.localizedDescription);
-            if (completion) completion(nil);
+            // Task172：失败路径同样必须回主线程——旧代码在 NSURLSession 的
+            // 回调线程里直接调 completion，消费方（主页 Profile 卡）会在非
+            // 主线程触碰 UICollectionView（reloadProfileSection）与 UIImageView，
+            // 更新静默失效或延迟到下一次交互（用户感知"点一下才显示"）。
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (completion) completion(nil);
+            });
             return;
         }
         UIImage *img = data ? [UIImage imageWithData:data] : nil;

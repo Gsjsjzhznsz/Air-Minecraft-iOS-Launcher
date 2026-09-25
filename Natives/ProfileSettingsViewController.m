@@ -25,6 +25,9 @@
 
 @property (nonatomic, strong) NSArray<NSArray *> *sections;
 @property (nonatomic, strong) NSString *selectedRenderer;
+// Task172：版本级 TouchController 开关（开启 = 启动时自动配置 UDP 模式 +
+// 屏蔽启动器控件；关闭 = 仅移除本键，不碰全局设置）
+@property (nonatomic, assign) BOOL touchControllerEnabled;
 @property (nonatomic, strong) NSString *selectedGraphicsApi;  // MC 26.2+ 图形 API: default/prefer_vulkan/prefer_opengl
 @property (nonatomic, strong) NSString *selectedJavaVersion;
 @property (nonatomic, assign) NSInteger allocatedMemory;
@@ -87,6 +90,7 @@ static NSString * localizeProfileTitle(NSString *title) {
             @"内存分配": @"i18n_str_2037",
             @"JVM 启动参数": @"preference.title.java_args",
             @"清除JVM参数": @"i18n_str_2038",
+            // Task172：TouchController 行标题语言中立，无需翻译键（回退标题本身）
             @"名称": @"preference.profile.title.name",
             @"游戏版本": @"i18n_str_2031",
             @"游戏目录": @"preference.title.game_directory",
@@ -525,6 +529,9 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 图形 API（MC 26.2+ 游戏内 OpenGL/Vulkan 切换）
     self.selectedGraphicsApi = self.profile[@"graphicsApi"] ?: @"default";
 
+    // Task172：版本级 TouchController（无键 = 关闭）
+    self.touchControllerEnabled = [self.profile[@"touchController"] boolValue];
+
     // Task160：分辨率缩放（per-instance，25~150，与旧全局滑条同口径）。profile 无键时
     // 显示全局回退值（与启动解析链 resolveKeyForCurrentProfile 同口径）——存量设备
     // 全局行删除后存量值继续生效直到显式设置；编辑结束 clamp [25,150]。
@@ -588,6 +595,9 @@ static NSString * localizeProfileTitle(NSString *title) {
         [advancedRows addObject:@"图形 API"];
     }
     [advancedRows addObjectsFromArray:@[@"Java版本", @"内存分配", @"JVM 启动参数", @"清除JVM参数"]];
+    // Task172：版本级 TouchController（用户指令"在版本配置中添加
+    // TouchController，顺便自动配置设置（udp 模式，屏蔽控件）"）
+    [advancedRows addObject:@"TouchController"];
 
     // 重构（Air-Design v1.2）：5 个 Bento 分组
     // 顺序与横屏布局对应：左侧（0,1）+ 右侧（2,3,4）
@@ -713,6 +723,13 @@ static NSString * localizeProfileTitle(NSString *title) {
               ame162_targetKey, self.selectedRenderer);
     }
     existing[@"graphicsApi"] = self.selectedGraphicsApi;
+    // Task172：版本级 TouchController——开启落 YES，关闭删键（无键 = 关闭，
+    // 启动链 ame172_applyProfileTouchController 同口径；关闭不碰全局设置）
+    if (self.touchControllerEnabled) {
+        existing[@"touchController"] = @YES;
+    } else {
+        [existing removeObjectForKey:@"touchController"];
+    }
     existing[@"javaVersion"] = self.selectedJavaVersion;
     // Task159：分辨率缩放落 profile 层（NSString，与 PLProfiles resolveKey 的
     // NSString 读取约定一致）；用户未设置时 loadSettings 已把全局回退值填进
@@ -923,6 +940,14 @@ static NSString * localizeProfileTitle(NSString *title) {
                 cell.imageView.tintColor = [UIColor systemRedColor];
                 cell.textLabel.textColor = [UIColor systemRedColor];
                 cell.detailTextLabel.text = self.javaArgs.length > 0 ? localize(@"i18n_str_2044", nil) : localize(@"i18n_str_889", nil);
+            } else if ([title isEqualToString:@"TouchController"]) {
+                // Task172：版本级 TouchController（显示复用既有 l10n 键，
+                // 与全局 TouchController 设置页同文案家族，零新键零计数级联）
+                cell.imageView.image = [UIImage systemImageNamed:@"hand.tap"];
+                cell.accessoryView = [self ame163_disclosureChevron];
+                cell.detailTextLabel.text = self.touchControllerEnabled
+                    ? localize(@"preference.touchcontroller.mode.udp", nil)
+                    : localize(@"preference.touchcontroller.mode.disabled", nil);
             }
             break;
 
@@ -1402,6 +1427,8 @@ static NSString * localizeProfileTitle(NSString *title) {
                 if (self.javaArgsTextField) [self.javaArgsTextField becomeFirstResponder];
             } else if ([title isEqualToString:@"清除JVM参数"]) {
                 [self clearJavaArgs];
+            } else if ([title isEqualToString:@"TouchController"]) {
+                [self showTouchControllerSelector];
             }
             break;
 
@@ -2574,6 +2601,48 @@ static NSString * localizeProfileTitle(NSString *title) {
 
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         UITableViewCell *cell = [self cellForGlobalSection:3 row:1];
+        alert.popoverPresentationController.sourceView = cell ?: self.view;
+        alert.popoverPresentationController.sourceRect = cell ? cell.bounds : self.view.bounds;
+    }
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+/// Task172：版本级 TouchController 选择器（开启/关闭）。
+/// 用户指令："在版本配置中添加 TouchController，顺便自动配置设置（udp 模式，
+/// 屏蔽控件）"。开启后此实例启动时自动配置：control.mod_touch_enable=YES、
+/// control.mod_touch_mode=1（UDP）、control.mod_touch_hide_controls=YES
+/// （隐藏启动器自带控件层，保留模组自己的虚拟按钮——Task140 语义）；
+/// 关闭仅删本键，不碰全局 TouchController 设置。
+/// 说明文案硬编码中英双语（与 Task169 JIT 超时弹窗同款先例），避免
+/// l10n 计数级联。
+- (void)showTouchControllerSelector {
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"TouchController"
+                                                                   message:@"开启后此实例启动时自动配置：UDP 通信模式 + 屏蔽启动器自带控件（保留模组自己的虚拟按钮）。需要游戏内已安装 TouchController 模组。\nWhen enabled, launching this instance auto-configures UDP mode and hides the launcher's own on-screen controls (the mod's virtual buttons stay). Requires the TouchController mod installed in the game."
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
+
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"preference.touchcontroller.mode.udp", nil)
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        self.touchControllerEnabled = YES;
+        [self saveSettings];
+        [self reloadAllTableViews];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"preference.touchcontroller.mode.disabled", nil)
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction * _Nonnull action) {
+        self.touchControllerEnabled = NO;
+        [self saveSettings];
+        [self reloadAllTableViews];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        // 行位置随"图形 API"的条件行漂移，从 sections 实时反查
+        NSUInteger rowIdx = [self.sections[3] indexOfObject:@"TouchController"];
+        UITableViewCell *cell = (rowIdx != NSNotFound)
+            ? [self cellForGlobalSection:3 row:(NSInteger)rowIdx]
+            : nil;
         alert.popoverPresentationController.sourceView = cell ?: self.view;
         alert.popoverPresentationController.sourceRect = cell ? cell.bounds : self.view.bounds;
     }

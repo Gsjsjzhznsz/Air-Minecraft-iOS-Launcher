@@ -520,3 +520,20 @@ Stage Summary:
 - 七症状修复齐发；装机锚点：①ANGLE 会话 "[SDLHook] SDL_GL_LoadLibrary(...) -> pojavInitOpenGLForSDL3"（桥接接管）+ "Using graphics backend OpenGL" + Iris 不再崩 ②"[HotbarDiag] Task171 FSR-aware hotbar geometry ... ratio=1.70" + 物品栏上半段可点中 ③"[CurseForgeAPI] Task171: no API key configured -- requests go keyless" + CF 源无 key 可用 ④切标签页头像即显 ⑤下次崩溃后容器内有 latestlog.crash.txt ⑥26.4 会话 "[Tools] Task171: ... forcing --graphicsBackend opengl" + "Using graphics backend OpenGL" ⑦"[SurfaceVC] Task171: keyboard auto re-arm"（若系统仍拆会话）或键盘首开即可连续输入
 - 多人游戏崩溃本体无日志证据（会话干净），证据保全机制已就位，待下一轮 crash.txt
 - 遗留：CI 编译确认（Tools.java 无法本地编译验证）
+
+---
+Task ID: 172
+Task: 用户六症状装机反馈（9be2b53 构建，760c07c 上传三日志）：ANGLE 依旧崩溃 / CF 功能异常 / 键盘依旧异常 / 头像切标签页回来要点一下 / 版本配置加 TouchController（自动配置 UDP+屏蔽控件）/ 二级菜单启动卡 JIT 等待 120s 闪退
+
+Work Log:
+- ANGLE：CFR 反编译本仓 lwjgl-333 的 GL$1.class 实锤 macOS 平台【从不查 eglGetProcAddress】（switch 只有 LINUX/WINDOWS case + OSMesaGetProcAddress 兜底）——旧镜像链 eglGetProcAddress 优先是错误反推，对 libtinygl4angle（libEGL 依赖导出 eglGPA、glGetError 是 libGLESv2 直接导出）两链不同地址 = mismatch。镜像链逐字对齐反编译结果
+- JIT 卡死：stikjit:// 切后台后 StikJIT 没切回 → 进程冻结（零心跳零超时，日志戛然而止）；切回时调试器已死 → brk #0x69 闪退。三处 invokeAfterJITEnabled：后台任务断言 + 等待成功后 TXM 调试器存活性复查 + ame172_reattachJIT26ThenLaunch（前台等待 + 重挂 + 有界等存活）
+- 键盘：SDL UIKit 自己的 textField（隐藏窗口内）反复抢 FR 但投递链不可靠。Start/Stop 钩子真实调用后派发 AME172 通知 → SurfaceVC 把键盘路由到启动器 inputTextField（Task171 哨兵同序）；MC 关聊天键盘同步收起
+- 头像：fetch 失败/坏 URL 路径离主线程调 completion（契约违反）→ 静默失效到下次触摸。两路径回主线程 + 四分支取证日志 + 0.35s 转场后补刷
+- TouchController 版本级：ProfileSettings 高级区新行（复用既有 l10n 键零级联）；UIKit_launchMinecraftSurfaceVC 换根前 ame172_applyProfileTouchController（enable=YES + mode=UDP + hide_controls=YES；OFF 不碰全局）
+- CF：镜像 502 瞬态（装机日志实锤手动重刷即成功）→ 异步搜索空体/JSON 失败两分支 5xx 退避重试（2s×2）+ 同步 getEndpoint failure 5xx 包装 code 543 走既有循环
+- 文档/验证：version.h 附录 + announcements task172@2；verify_task172 51/51；重锚 task171(B4/B7/D2/D3)/165(G1 9→10)/167(E1 7→8)/168/170(索引+1)；169 49/49、166 64/64、167 31/31、165 34/34；168 42/43、170 33/34 仅剩沙箱遗留路径子级联（163 FileNotFoundError 核实为 workspace 旧路径，既有条件）
+
+Stage Summary:
+- 装机锚点：ANGLE=[SDLHook] Task172 GL$1 mirror: OSMesaGetProcAddress=0x...（且无 mismatch + Using graphics backend OpenGL）；JIT=每 10s 心跳 +（异常时）Task172 wait satisfied but JIT26 debugger is gone -- re-attaching；键盘=[SurfaceVC] Task172 SDL auto-keyboard routed to launcher field + stop-text-input: keyboard resigned；头像=[HomeAvatar] Task172 branch: 四分支日志；TouchController=[TouchController] Task172 profile auto-config applied；CF=Task172 retrying search after 5xx non-JSON body 后自动成功
+- 遗留：头像若仍复现，分支日志将首次给出定位证据；ANGLE 修好后 FO 包 Iris 渲染质量属游戏侧观察项

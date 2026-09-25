@@ -1817,3 +1817,60 @@
 // activation). Fix: sentinel text now written BEFORE becomeFirstResponder,
 // clearsOnBeginEditing=NO, plus ame171_armKeyboardRecheck auto re-arm (0.4s
 // health check, generation-guarded against user dismissal, max depth 2).
+
+// REVISION 17 addendum (Amethyst Task 172, no bump): six-symptom round from
+// the 9be2b53 device logs (760c07c upload: latestlog.txt = launch stuck at
+// JIT wait, latestlog.old.txt = mg 26.3 multiplayer, latestlog.old = ANGLE
+// 26.3 FO pack). (1) ANGLE glGetError mismatch PERSISTS with the bridge
+// hooked -- CFR decompile of the bundled lwjgl-333 GL$1.class proves the
+// macOS-platform provider chain NEVER consults eglGetProcAddress (LINUX:
+// glXGetProcAddress/ARB, WINDOWS: wglGetProcAddress, fallback-for-all:
+// OSMesaGetProcAddress; query: GPA(name) then library dlsym). The old mirror
+// tried eglGetProcAddress first: harmless for MG/zink (both chains converge),
+// fatal for libtinygl4angle whose dependency libEGL exports
+// eglGetProcAddress while glGetError is a direct libGLESv2 export -- two
+// different addresses, mismatch, Vulkan fallback, Iris No GLCapabilities.
+// ame_SDL_GL_GetProcAddress now mirrors the true GL.1 macOS branch
+// (OSMesaGetProcAddress only) -- pointer identity holds by construction for
+// every renderer. (2) Launch stuck at JIT wait >120s then crash: the
+// stikjit:// URL backgrounds the app; if StikJIT fails to switch back, iOS
+// suspends the process and the 120s poll loop FREEZES (device log: zero
+// heartbeats after "still waiting after 0s", zero timeout, log just ends).
+// On manual return, CS_DEBUGGED can already be set while the JIT26 debugger
+// died -- launching then hits brk #0x69 with no one servicing it = the
+// reported crash. All three invokeAfterJITEnabled implementations now (a)
+// hold a beginBackgroundTask assertion across the wait (heartbeats/timeout
+// keep printing, StikJIT can attach while we are backgrounded), and (b)
+// after the wait succeeds re-check debugger liveness on TXM devices and
+// route through the extracted ame172_reattachJIT26ThenLaunch (foreground
+// wait + stikjit:// + bounded debugger-live wait) instead of launching
+// blind. (3) Keyboard "must press the IME button once": the field loses
+// first responder because MC 26.3's SDL_StartTextInputWithProperties makes
+// SDL's OWN UIKit textField first-responder -- its window is the hidden SDL
+// UIWindow (Task32 embed), its text delivery is dead, so keystrokes vanish
+// until the user re-arms the launcher field via the IME button. Start/Stop
+// hooks now post AME172_SDLStartTextInput / AME172_SDLStopTextInput right
+// AFTER the real calls; SurfaceViewController routes the keyboard to its own
+// inputTextField (Task171 sentinel order + re-arm) and resigns it when MC
+// closes the text context. (4) Home avatar still needs a tap after tab
+// return: AvatarManager's fetch-failure and bad-URL paths called the
+// completion OFF the main thread (contract violation) -- UICollectionView
+// reloads from a session thread silently no-op until the next UI touch.
+// Both paths now dispatch to main; updateSkinDisplay logs every branch
+// (local / session-cache / fetch / missing-URL) and the visible-cell sync
+// reports cell count + image size; viewDidAppear adds a 0.35s
+// post-transition re-sync pass. (5) Per-profile TouchController (user
+// request): ProfileSettingsViewController gains a TouchController row
+// (advanced section; picker on/off; summary reuses existing
+// preference.touchcontroller.mode.* l10n keys -- zero new keys, zero count
+// cascade). UIKit_launchMinecraftSurfaceVC now calls
+// ame172_applyProfileTouchController before the root-VC swap: profile key
+// touchController=YES auto-configures control.mod_touch_enable=YES,
+// control.mod_touch_mode=1 (UDP) and control.mod_touch_hide_controls=YES
+// (Task140 semantics: launcher's own control layer hidden, the mod's virtual
+// buttons stay); OFF leaves the global settings untouched. (6) CurseForge
+// mirror 5xx: the device log shows a transient 502 on classId=4471 that
+// succeeded on the user's manual retry 5s later -- the async search now
+// retries 5xx (empty or non-JSON bodies) with a 2s backoff (max 2), and the
+// sync getEndpoint wraps AFNetworking 5xx failures into the existing
+// code-543 retry loop.
