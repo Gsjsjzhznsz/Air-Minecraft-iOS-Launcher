@@ -279,8 +279,39 @@
         NSError *error = nil;
         NSDictionary *modpackInfo = nil;
 
+        // Task169：安全作用域存活期间先把文件拷贝进应用沙盒 tmp，之后
+        // 解析/预览/安装全程只用本地副本。病历（装机 485b18c，"本地整合包
+        // 要导入到应用文件之后再导入才能正常安装"）：文件选择器给出的
+        // URL 是安全作用域资源，旧代码解析一完就 stopAccessing，而安装
+        // 阶段（importModpack:）还会按 info[@"filePath"] 重新读取整个
+        // 压缩包——从"文件"App/下载/iCloud 选的包这时已无权访问，只有
+        // 先拷进应用沙盒（"我的 iPhone"）的包才碰巧可用。拷贝同时会把
+        // iCloud 占位文件实体化。失败则原路径回退（沙盒内文件本就不需要
+        // 作用域，行为不变）。
+        NSURL *parseURL = fileURL;
         @try {
-            modpackInfo = [self.importService parseModpackAtURL:fileURL error:&error];
+            NSFileManager *fm = [NSFileManager defaultManager];
+            [self ame169_cleanupStaleImportCopies];
+            NSString *localCopy = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                [NSString stringWithFormat:@"ame169_modpack_%@.%@",
+                 @((NSUInteger)([[NSDate date] timeIntervalSince1970] * 1000)).stringValue,
+                 fileURL.pathExtension ?: @"zip"]];
+            NSError *copyError = nil;
+            if (![fm copyItemAtPath:fileURL.path toPath:localCopy error:&copyError]) {
+                NSLog(@"[ModpackImport] Task169 scoped copy failed (%@), falling back to original path: %@",
+                      copyError.localizedDescription, fileURL.lastPathComponent);
+            } else {
+                parseURL = [NSURL fileURLWithPath:localCopy];
+                NSLog(@"[ModpackImport] Task169 scoped copy OK: %@ -> %@ (%.1f MB)",
+                      fileURL.lastPathComponent, localCopy,
+                      (double)[[[fm attributesOfItemAtPath:localCopy error:nil] fileSize] unsignedLongLongValue] / 1048576.0);
+            }
+        } @catch (NSException *copyException) {
+            NSLog(@"[ModpackImport] Task169 scoped copy threw (%@), falling back to original path", copyException.reason);
+        }
+
+        @try {
+            modpackInfo = [self.importService parseModpackAtURL:parseURL error:&error];
         } @catch (NSException *exception) {
             error = [NSError errorWithDomain:@"ModpackImportError" code:9999
                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"i18n_str_573", nil), exception.reason]}];
@@ -296,9 +327,26 @@
             }
             self.currentImportingModpack = modpackInfo;
             [self hideLoadingHUD];
-            [self showModpackPreview:modpackInfo fileURL:fileURL];
+            [self showModpackPreview:modpackInfo fileURL:parseURL];
         });
     });
+}
+
+/// Task169：清理上一轮遗留的沙盒拷贝（tmp 里的 ame169_modpack_*）。
+/// 拷贝在导入成功后不再需要；预览/安装正在进行的文件不会被误删
+/// （导入流程串行，清理只发生在下一次选择的入口）。
+- (void)ame169_cleanupStaleImportCopies {
+    @try {
+        NSFileManager *fm = [NSFileManager defaultManager];
+        NSString *tmp = NSTemporaryDirectory;
+        for (NSString *name in [fm contentsOfDirectoryAtPath:tmp error:nil]) {
+            if ([name hasPrefix:@"ame169_modpack_"]) {
+                [fm removeItemAtPath:[tmp stringByAppendingPathComponent:name] error:nil];
+            }
+        }
+    } @catch (NSException *e) {
+        // 清理失败不影响导入（tmp 由系统择机回收）
+    }
 }
 
 - (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {}

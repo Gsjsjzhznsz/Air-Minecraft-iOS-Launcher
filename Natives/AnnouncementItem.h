@@ -29,6 +29,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *summary;
 @property (nonatomic, copy) NSString *content;     // Markdown 格式正文
 @property (nonatomic, copy) NSString *priority;    // "high" / "normal" / "low"
+/// Task169：置顶（JSON "pin": true）。置顶项无条件排到公告列表最前
+///（用户点名：服务器推荐摆到第一个），其余仍按日期降序。
+@property (nonatomic, assign) BOOL pinned;
 @property (nonatomic, copy) NSString *actionURL;
 @property (nonatomic, copy) NSString *actionTitle;
 @property (nonatomic, copy) NSString *imageURL;

@@ -1332,6 +1332,10 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
         // Task162：三层链——① AvatarManager 本地自定义头像（与右面板
         // updateAccountInfo 同源，磁盘直读零延迟）；② 会话缓存（切标签页
         // 返回同步命中，不再闪烁默认头像）；③ 网络拉取（成功后回填缓存）。
+        // Task169：第③层换 AvatarManager fetchAvatarFromURL（10s 超时 +
+        // Caches 磁盘缓存 + 失败日志）——旧裸 dataWithContentsOfURL 默认
+        // 60s 挂起且失败静默，装机实测"头像要点一下才能显示"；另加可见
+        // Profile 卡直刷兜底（reloadSections 在个别布局时序下不触发重绘）。
         UIImage *ame162_local = [[AvatarManager sharedManager] avatarForAccount:auth.authData[@"accountId"]];
         if (ame162_local) {
             self.currentAvatar = ame162_local;
@@ -1344,19 +1348,21 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                     // 命中缓存：同步上屏，本次不再发起网络请求
                     self.currentAvatar = ame162_cached;
                 } else {
-                    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                        NSData *data = [NSData dataWithContentsOfURL:[NSURL URLWithString:avatarURL]];
-                        if (data) {
-                            UIImage *img = [UIImage imageWithData:data];
-                            if (img) {
-                                [ame162_avatarCache() setObject:img forKey:avatarURL];
-                            }
-                            dispatch_async(dispatch_get_main_queue(), ^{
-                                self.currentAvatar = img;
-                                [self reloadProfileSection];
-                            });
+                    [[AvatarManager sharedManager] fetchAvatarFromURL:avatarURL completion:^(UIImage *img) {
+                        if (img) {
+                            [ame162_avatarCache() setObject:img forKey:avatarURL];
                         }
-                    });
+                        self.currentAvatar = img;
+                        [self reloadProfileSection];
+                        // Task169：直接同步可见 Profile 卡（保险路径）
+                        if (img) {
+                            for (UICollectionViewCell *cell in self.collectionView.visibleCells) {
+                                if ([cell isKindOfClass:HomeProfileTileCell.class]) {
+                                    ((HomeProfileTileCell *)cell).avatarImageView.image = img;
+                                }
+                            }
+                        }
+                    }];
                 }
             }
         }

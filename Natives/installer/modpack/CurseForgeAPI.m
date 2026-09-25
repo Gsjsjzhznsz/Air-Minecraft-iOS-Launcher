@@ -33,7 +33,17 @@ static NSString *CFACompiledAPIKey(void) {
     }
     // 宏未定义时预处理器字符串化后得到宏名本身 "CONFIG_CURSEFORGE_API_KEY"，或为 nil 时得到 "nil"
     if ([compiledKey isEqualToString:@"nil"] || compiledKey.length == 0 ||
-        [compiledKey isEqualToString:@"CONFIG_CURSEFORGE_API_KEY"]) {
+        [compiledKey isEqualToString:@"CONFIG_CURSEFORGE_API_KEY"] ||
+        // Task169：宏被定义为 NULL 指针字面量时（CI 传 -DCONFIG_CURSEFORGE_API_KEY=NULL
+        // 或构数系统展开成 ((void *)0)），字符串化产物形如 "((void *)0)"/"NULL"/"0"——
+        // 装机 485b18c 实测：这些垃圾（恰好 11 字符）被当成合法 key（日志
+        // "compile-time macro (length=11, prefix=((void *...)"），以
+        // x-api-key: ((void *)0 污染镜像请求，且 isAPIKeyConfigured=YES 阻断了
+        // keyless 设备的强制镜像回退。统一归空，交由镜像 keyless 路径。
+        [compiledKey isEqualToString:@"((void *)0)"] ||
+        [compiledKey isEqualToString:@"(nil)"] ||
+        [compiledKey isEqualToString:@"NULL"] ||
+        [compiledKey isEqualToString:@"0"]) {
         return @"";
     }
     return compiledKey;
@@ -64,7 +74,60 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
     return resolved.absoluteString ?: urlString;
 }
 
+// ============================================================================
+// Task169：镜像网关错误检测 + gameVersion 规范化
+//
+// 病历（装机 485b18c，"CurseForge 加载源无法使用"）：MCIM 镜像
+// (mod.mcimirror.top) 的上游 key 池间歇性失败，此时返回 HTTP 200 + 合法
+// JSON，但载荷是 {"error":"Internal Server Error","code":500,"detail":
+// "Curseforge API service error: Request failed with status: 403 ..."}——
+// 没有 "data" 数组。旧解析把这种响应当"无结果"静默 completion(@[], nil)
+// （四种日志路径一条都不走 = 装机日志只见 starting request 不见任何结果），
+// UI 空列表无报错；沙盒复现实测同一请求时好时坏（上游 key 池波动）。
+// 修复：识别网关错误形态 → 打日志 → 自动重试一次（瞬态故障）→ 仍失败则
+// 把 detail 浮出成真 NSError，UI 显示可读错误而非空列表。
+// ============================================================================
+
+/// CF gameVersion 规范化：安装器版本筛选传入的是实例版本 id，fabric 快照
+/// 形如 "26.3-0a78cefc"（带 7~8 位十六进制构建哈希后缀），原样传给 CF 的
+/// gameVersion 精确匹配必然落空 → 空列表。剥掉该形态的构建后缀；其它
+/// 形态（如 Modrinth 风格 "1.20.1-1.2.3"）原样保留。
+static NSString *CFA169NormalizeGameVersion(NSString *v) {
+    if (![v isKindOfClass:NSString.class] || v.length == 0) return v;
+    NSRange dash = [v rangeOfString:@"-" options:NSBackwardsSearch];
+    if (dash.location == NSNotFound || dash.location == 0) return v;
+    NSString *suffix = [v substringFromIndex:dash.location + 1];
+    if (suffix.length >= 7 && suffix.length <= 8) {
+        static NSCharacterSet *nonHex = nil;
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            nonHex = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789abcdefABCDEF"] invertedSet];
+        });
+        if ([suffix rangeOfCharacterFromSet:nonHex].location == NSNotFound) {
+            return [v substringToIndex:dash.location];
+        }
+    }
+    return v;
+}
+
 @implementation CurseForgeAPI
+
++ (BOOL)ame169_isGatewayErrorJSON:(NSDictionary *)json {
+    if (![json isKindOfClass:NSDictionary.class]) return NO;
+    if ([json[@"data"] isKindOfClass:NSArray.class]) return NO;              // 正常载荷
+    if ([json[@"pagination"] isKindOfClass:NSDictionary.class]) return NO;   // 正常分页响应
+    return (json[@"error"] != nil || json[@"code"] != nil);
+}
+
++ (NSError *)ame169_gatewayErrorFromJSON:(NSDictionary *)json {
+    NSString *detail = [json[@"detail"] isKindOfClass:NSString.class] ? json[@"detail"] :
+                       ([json[@"error"] isKindOfClass:NSString.class] ? json[@"error"] : @"unknown");
+    return [NSError errorWithDomain:@"CurseForgeAPI" code:543
+                           userInfo:@{
+        NSLocalizedDescriptionKey: [NSString stringWithFormat:
+            @"CurseForge mirror gateway error (transient upstream failure, retried once already): %@", detail]
+    }];
+}
 
 /// 重写 baseURL getter，根据 PLMirrorCenter 的资源搜索（AssetSearch）策略
 /// 动态返回官方或 MCIM 镜像 URL，这样所有使用 self.baseURL 的请求都会自动走镜像
@@ -310,22 +373,49 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
         self.lastError = [self missingAPIKeyError];
         return nil;
     }
-    
-    __block id result;
-    dispatch_group_t group = dispatch_group_create();
-    dispatch_group_enter(group);
+
     NSString *url = [self.baseURL stringByAppendingPathComponent:endpoint];
-    AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
-    [manager GET:url parameters:params headers:headers progress:nil
-          success:^(NSURLSessionTask *task, id obj) {
-        result = obj;
-        dispatch_group_leave(group);
-    } failure:^(NSURLSessionTask *operation, NSError *error) {
-        self.lastError = error;
-        dispatch_group_leave(group);
-    }];
-    dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
-    return result;
+    // Task169：网关错误（HTTP 200 + JSON 无 "data"）是瞬态上游故障，最多
+    // 试 2 次（间隔 1.5s），仍失败置 lastError 返回 nil——同步调用方
+    // （searchModWithFilters:previousPageResult: 等）拿 nil 后会把
+    // lastError 浮出到错误 UI，不再是无声空列表。
+    for (NSUInteger ame169_attempt = 0; ame169_attempt < 2; ame169_attempt++) {
+        if (ame169_attempt > 0) {
+            NSLog(@"[CurseForgeAPI] getEndpoint retrying %@ after gateway error (attempt %lu)",
+                  endpoint, (unsigned long)(ame169_attempt + 1));
+            [NSThread sleepForTimeInterval:1.5];
+        }
+        __block id result;
+        __block NSError *failure = nil;
+        dispatch_group_t group = dispatch_group_create();
+        dispatch_group_enter(group);
+        AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
+        [manager GET:url parameters:params headers:headers progress:nil
+              success:^(NSURLSessionTask *task, id obj) {
+            // Task169：网关错误检测（镜像上游 key 池瞬态 403/500 包装）。
+            if ([obj isKindOfClass:NSDictionary.class] && [CurseForgeAPI ame169_isGatewayErrorJSON:obj]) {
+                NSLog(@"[CurseForgeAPI] getEndpoint gateway error on %@ (attempt %lu): error=%@ detail=%@",
+                      endpoint, (unsigned long)(ame169_attempt + 1),
+                      obj[@"error"], obj[@"detail"]);
+                result = nil;
+                failure = [CurseForgeAPI ame169_gatewayErrorFromJSON:obj];
+            } else {
+                result = obj;
+            }
+            dispatch_group_leave(group);
+        } failure:^(NSURLSessionTask *operation, NSError *error) {
+            failure = error;
+            dispatch_group_leave(group);
+        }];
+        dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+        if (result != nil) return result;
+        if (failure != nil) {
+            self.lastError = failure;
+            // 网关错误才重试；普通网络错误（离线/超时）直接返回
+            if (![failure.domain isEqualToString:@"CurseForgeAPI"] || failure.code != 543) return nil;
+        }
+    }
+    return nil;
 }
 
 - (id)postEndpoint:(NSString *)endpoint params:(NSDictionary *)params {
@@ -514,7 +604,8 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
         params[@"searchFilter"] = query;
     }
     if (searchFilters[@"mcVersion"].length > 0) {
-        params[@"gameVersion"] = searchFilters[@"mcVersion"];
+        // Task169：剥 fabric 构建哈希后缀（"26.3-0a78cefc" -> "26.3"）
+        params[@"gameVersion"] = CFA169NormalizeGameVersion(searchFilters[@"mcVersion"]);
     }
     if ([projectType isEqualToString:@"minecraft_java_server"]) {
         params[@"categoryId"] = @(kCurseForgeCategoryIDServerUtility);
@@ -640,7 +731,8 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
         [urlString appendFormat:@"&searchFilter=%@", encodedQuery];
     }
     if (mcVersion.length > 0) {
-        [urlString appendFormat:@"&gameVersion=%@", mcVersion];
+        // Task169：剥 fabric 构建哈希后缀（"26.3-0a78cefc" -> "26.3"）
+        [urlString appendFormat:@"&gameVersion=%@", CFA169NormalizeGameVersion(mcVersion)];
     }
     
     NSURL *url = [NSURL URLWithString:urlString];
@@ -662,6 +754,16 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
     request.timeoutInterval = 30.0;
     NSLog(@"[CurseForgeAPI] searchModWithFilters starting request: %@", urlString);
 
+    [self ame169_issueSearchRequest:request attempt:0 completion:completion];
+}
+
+/// Task169：异步搜索请求的实际执行（带网关错误检测 + 一次自动重试）。
+/// 从 searchModWithFilters:completion: 拆出：NSURLRequest 不可变可安全复用，
+/// 镜像网关错误（HTTP 200 + JSON 但无 "data"）为瞬态上游故障，隔 1.5s
+/// 重发一次；仍失败才把错误浮出。
+- (void)ame169_issueSearchRequest:(NSURLRequest *)request
+                          attempt:(NSUInteger)attempt
+                       completion:(void (^)(NSArray * _Nullable, NSError * _Nullable))completion {
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
             // 网络错误：透传原 NSError 并附带 HTTP 诊断信息（如可获取）
@@ -696,9 +798,32 @@ static NSString *CFAMirrorResolvedURL(NSString *urlString) {
             if (completion) completion(nil, diagnosticError);
             return;
         }
-        
+
         NSArray *projects = json[@"data"];
-        if (![projects isKindOfClass:NSArray.class]) { if (completion) completion(@[], nil); return; }
+        if (![projects isKindOfClass:NSArray.class]) {
+            // Task169：网关错误 JSON（镜像把上游 403/500 包成 HTTP 200 的
+            // {"error":..,"code":..}，无 "data"）。旧代码在这里静默
+            // completion(@[], nil) —— UI 空列表、日志零痕迹（装机
+            // 485b18c 四连空搜索的根因）。现在：识别 → 日志 → 重试一次
+            // → 仍失败浮出真错误。
+            if ([CurseForgeAPI ame169_isGatewayErrorJSON:json]) {
+                NSLog(@"[CurseForgeAPI] searchModWithFilters gateway error (attempt %lu): %@",
+                      (unsigned long)(attempt + 1),
+                      [self printableStringFromData:data maxLen:512]);
+                if (attempt < 1) {
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                                   dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+                        NSLog(@"[CurseForgeAPI] searchModWithFilters retrying after gateway error");
+                        [self ame169_issueSearchRequest:request attempt:attempt + 1 completion:completion];
+                    });
+                    return;
+                }
+                if (completion) completion(nil, [CurseForgeAPI ame169_gatewayErrorFromJSON:json]);
+                return;
+            }
+            if (completion) completion(@[], nil);
+            return;
+        }
 
         NSMutableArray *results = [NSMutableArray array];
         for (NSDictionary *project in projects) {

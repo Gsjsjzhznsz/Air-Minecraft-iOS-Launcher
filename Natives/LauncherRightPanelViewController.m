@@ -1627,11 +1627,16 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 // Wait for the JIT26 debugger to actually attach (P_TRACED /
                 // exception ports / spawned-by-debugger), not for CS_DEBUGGED
                 // -- that flag is already set and would race the first brk.
-                while (!JIT26IsLikelyDebuggerKeepAttached()) {
-                    usleep(1000 * 200);
-                }
+                // Task169：有界等待（120s）+心跳日志，超时走重试弹窗。
+                BOOL ok = ame169_waitForJITCondition(^{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"JIT26 debugger attach");
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    [alert dismissViewControllerAnimated:YES completion:handler];
+                    if (ok) {
+                        [alert dismissViewControllerAnimated:YES completion:handler];
+                    } else {
+                        [alert dismissViewControllerAnimated:YES completion:^{
+                            [self ame169_showJITTimeoutAlertWithRetry:handler];
+                        }];
+                    }
                 });
             });
             return;
@@ -1716,13 +1721,38 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     [self presentViewController:alert animated:YES completion:nil];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        while (!isJITEnabled(false)) {
-            usleep(1000 * 200);
-        }
+        // Task169：有界等待（120s）+每 10s 心跳日志。旧裸循环在 stikjit://
+        // 偶发没开成 JIT 时永不退出（装机 485b18c：冷启动首次启动卡在
+        // 启动器界面，只能杀进程）。超时后撤弹窗并给出重试/取消。
+        BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
         dispatch_async(dispatch_get_main_queue(), ^{
-            [alert dismissViewControllerAnimated:YES completion:handler];
+            if (ok) {
+                [alert dismissViewControllerAnimated:YES completion:handler];
+            } else {
+                [alert dismissViewControllerAnimated:YES completion:^{
+                    [self ame169_showJITTimeoutAlertWithRetry:handler];
+                }];
+            }
         });
     });
+}
+
+/// Task169：JIT 等待超时后的出路弹窗（重试 = 重新走一轮 invokeAfterJITEnabled，
+/// 会重新拉起 stikjit://；取消 = 回到启动器，用户可手动附加调试器后重试）。
+- (void)ame169_showJITTimeoutAlertWithRetry:(void(^)(void))handler {
+    NSLog(@"[JIT] [RightPanel] Task169 JIT wait timed out, showing retry alert");
+    UIAlertController *retry = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
+                                                                   message:@"JIT 开启等待超时（120 秒）。请确认 JIT 工具（StikDebug 等）已安装并可正常拉起后选择重试；也可在设置中选择其它 JIT 开启方式。\nTimeout waiting for JIT (120s). Make sure your JIT enabler app is alive, then retry."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [retry addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [retry addAction:[UIAlertAction actionWithTitle:@"重试 / Retry" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self invokeAfterJITEnabled:handler];
+    }]];
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        retry.popoverPresentationController.sourceView = self.view;
+        retry.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds), 0, 0);
+    }
+    [self presentViewController:retry animated:YES completion:nil];
 }
 
 - (void)showAlert:(NSString *)message {
@@ -1748,6 +1778,9 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
 
         // 加载头像：本地自定义头像优先，回退到在线 URL
         // 头像文件名使用 accountId（唯一标识），同名账户头像不再冲突
+        // Task169：在线回退换 AvatarManager fetchAvatarFromURL（10s 超时 +
+        // 磁盘缓存 + 失败日志），替换裸 dataWithContentsOfURL（60s 挂起、
+        // 失败静默——主页头像"点一下才有"同源病灶）。
         UIImage *localAvatar = [[AvatarManager sharedManager] avatarForAccount:currentAuth.authData[@"accountId"]];
         if (localAvatar) {
             self.avatarImageView.image = localAvatar;
@@ -1755,15 +1788,9 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
             NSString *avatarURL = currentAuth.authData[@"profilePicURL"];
             if (avatarURL) {
                 avatarURL = [avatarURL stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
-                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                    NSData *imageData = [NSData dataWithContentsOfURL:[NSURL URLWithString:avatarURL]];
-                    if (imageData) {
-                        UIImage *image = [UIImage imageWithData:imageData];
-                        dispatch_async(dispatch_get_main_queue(), ^{
-                            self.avatarImageView.image = image;
-                        });
-                    }
-                });
+                [[AvatarManager sharedManager] fetchAvatarFromURL:avatarURL completion:^(UIImage *image) {
+                    self.avatarImageView.image = image;
+                }];
             }
         }
     } else {

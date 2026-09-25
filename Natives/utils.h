@@ -180,6 +180,11 @@ void* JIT26CreateRegionLegacySafe(size_t len);
 // 目录）。签名里预写的 jb.pmap_cs.custom_trust 字符串在普通侧载包上同样存在，
 // 单独使用会把非 TrollStore 环境误导入 apple-magnifier:// 死路。
 BOOL isTrollStoreInstall(void);
+// Task169：JIT 等待轮询的有界版本（最长 timeout 秒；每 10s 心跳日志；
+// 超时返回 NO）。替代三处 invokeAfterJITEnabled 里的裸
+// while (!isJITEnabled) 死循环——stikjit:// 偶发没开成 JIT 时旧循环
+// 永不退出（装机实测"启动卡在启动器界面"，只能杀进程）。
+BOOL ame169_waitForJITCondition(BOOL (^condition)(void), NSTimeInterval timeout, NSString *label);
 // used for large memory regions
 void* JIT26PrepareRegion(void *addr, size_t len);
 // same as JIT26PrepareRegion, but used for smaller memory regions

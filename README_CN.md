@@ -42,9 +42,10 @@
 | **应用内语言切换** | 在设置 > 通用中新增语言选择器，支持跟随系统、简体中文、English 三种选项，切换后立即生效无需重启。 |
 | **增强中文本地化** | 完整中文界面翻译（2000+ 行），覆盖比上游更全面。 |
 | **上游议题审计 Bug 修复** | 通过系统性审查上游及上上游 GitHub 议题，修复了 8+ 个 Bug，包括 JIT 脚本加载 nil 崩溃、UIKit 线程安全、KVO 观察者清理等。 |
+| **v6.0.0：mg 全后端 FSR + 装机反馈四连修** | **mg 三个后端（Vulkan 直连 / GLES / OpenGL 4.0）全部支持 FSR 1.0 超分**——其中 Vulkan 直连通过 Metal 呈现层拦截方案实现（私有低分辨率交换层 + AMD FSR1 EASU/RCAS 移植到 Metal，MobileGL/MoltenVK 二进制零改动）；另修复装机反馈四项：CurseForge 镜像网关错误不再被静默吞掉（自动重试 + 真实错误显示）、本地整合包从"文件"App/下载/iCloud 任意位置可直接安装、主页头像 10s 超时 + 磁盘缓存秒显、JIT 等待 120s 超时 + 重试弹窗（不再无限卡在"正在开启 JIT"）；公告支持置顶（推荐服务器 mysv.dpdns.org 置顶显示）。 |
 | **Makefile 健壮性** | 修复 TAB 缩进被转为空格导致 CI 构建失败的问题。 |
 | **Zink（Mesa 25.0.7）渲染器 + FSR1 管线** | 完整的 OSMesa/zink 桥接：分相位呈现计时、双哨兵 EASU 验证、视口自适应上采样、消灭重复全幅回读的 bundle-direct 快路径。设置 > 视频内五档 FSR 预设可在分辨率与帧率间取舍。 |
-| **MobileGL 渲染后端单一选项** | 设置 > 视频 > 「MobileGL 渲染后端」（与 ANGLE ES 驱动并排，不占渲染器列表）：Vulkan（默认，DirectVulkan 直呈，无逐帧 CPU 回读，实测最流畅）/ GLES / Mithril / 关闭。仅对"自动"渲染器生效——显式选择的渲染器永远优先。MobileGL 路径同样支持 FSR 画质档（预交换 EASU 升采样）。 |
+| **MobileGL 渲染后端单一选项** | 设置 > MobileGlues > 「渲染后端」（v6.0.0 口径，不占渲染器列表）：Vulkan 直连（默认，DirectVulkan 直呈，无逐帧 CPU 回读，实测最流畅，且经 Metal 呈现层拦截方案支持 FSR）/ GLES / OpenGL 4.0。仅对"自动"渲染器生效——显式选择的渲染器永远优先；GLES/4.0 路径同样支持 FSR 画质档。 |
 | **崩溃根治系列** | 二进制级修复：glslang 左值栈踩踏（7 重防护机器码补丁 + SIGSEGV 恢复网）、spark 签名 macOS 采样库（dlopen 拦截 + iPadOS 27 平台重标签后的 ad-hoc 重签名）、26.3 OpenAL `alcEventIsSupportedSOFT` NPE（绝对路径 pin，阻断 classpath natives 劫持）。 |
 | **帧率解锁系列** | 26.x AFK/闲置限帧器中和（options.txt 去重写入 + 45s 滚轮心跳）；dynamic_fps 模组的窗口状态机前台读到 FOCUSED（30fps 钉死根因修复）、后台读到 UNFOCUSED（限帧类模组在后台过渡期合法省电）。 |
 | **键盘自动弹出修复** | SDL 文本输入入口（Start/Stop TextInput、SetTextInputArea）主线程化 + 将 `SDL_ENABLE_SCREEN_KEYBOARD=1` 覆盖回 MC 桌面惯例的 0 —— 游戏内输入框光标闪烁时键盘正常自动弹出。 |

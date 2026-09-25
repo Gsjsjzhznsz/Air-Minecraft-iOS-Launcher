@@ -224,8 +224,12 @@ static NSString * const kLegacyAnnouncementURL =
         AnnouncementItem *item = [AnnouncementItem itemFromDictionary:dict];
         if (item) [items addObject:item];
     }
-    // 按日期降序排列
+    // Task169：置顶优先（"pin": true 的公告无条件排最前——用户点名把
+    // 服务器推荐摆到第一个），置顶组内与其余项各自仍按日期降序。
     [items sortUsingComparator:^NSComparisonResult(AnnouncementItem *a, AnnouncementItem *b) {
+        if (a.pinned != b.pinned) {
+            return a.pinned ? NSOrderedAscending : NSOrderedDescending;
+        }
         return [b.date compare:a.date];
     }];
     return [items copy];

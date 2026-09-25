@@ -25,6 +25,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// 删除指定账户的自定义头像（恢复使用在线 URL 头像）。
 - (void)removeAvatarForAccount:(NSString *)accountName;
 
+/// Task169：网络头像获取（10s 超时 + Caches 磁盘缓存 + 失败日志）。
+/// completion 恰好回调一次（主线程），参数 = 最佳可用图片
+/// （磁盘缓存 > 网络 > nil）；磁盘命中后仍在后台刷新缓存。
+/// 替代各处裸 NSData dataWithContentsOfURL（默认 60s 挂起、失败静默、
+/// 无持久化——装机实测主页头像"要点一下才能显示"的根因）。
+- (void)fetchAvatarFromURL:(NSString *)urlString
+                completion:(void (^)(UIImage * _Nullable image))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

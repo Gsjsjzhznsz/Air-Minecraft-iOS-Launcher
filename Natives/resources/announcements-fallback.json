@@ -10,6 +10,18 @@
       "action_url": "",
       "action_title": "",
       "image_url": ""
+    },
+    {
+      "id": "server-recommend-2026-09-24",
+      "title": "推荐服务器：mysv.dpdns.org",
+      "date": "2026-09-24",
+      "summary": "社区生存服 mysv.dpdns.org 现已开放，Java 版直连，欢迎加入一起玩！在游戏内添加服务器或多人间联机输入该地址即可加入。",
+      "content": "## 推荐服务器\n\n**mysv.dpdns.org**\n\n社区生存服务器现已开放，使用 Java 版即可直连：\n\n- 在主菜单选择「多人游戏」→「添加服务器」，地址栏输入 `mysv.dpdns.org` 即可加入\n- 若启动器实例设置了「自动加入服务器」，也可以把地址填进实例设置的服务器一栏\n- 遇到版本不匹配时，按服务器公告选择对应的游戏版本\n\n祝玩得开心！\n\n---\n\nRecommended community server: mysv.dpdns.org -- Java Edition, direct connect. Add it via Multiplayer -> Add Server, or fill it into the per-instance server field in launcher settings.",
+      "priority": "normal",
+      "action_url": "",
+      "action_title": "",
+      "image_url": "",
+      "pin": true
     }
   ]
 }

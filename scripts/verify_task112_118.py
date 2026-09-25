@@ -169,8 +169,10 @@ check("F7 设计注释：刻意不进 INVISIBLE 档（保守后台态）",
 
 print("== G. 版本与语法门 ==")
 plist = rd("Natives/Info.plist")
-check("G1 Info.plist CFBundleShortVersionString = 5.1.0",
-      '<string>5.1.0</string>' in plist and '<string>5.0.0</string>' not in plist)
+# Task169 重锚：v6.0.0 正式版发布，Info.plist 双键 5.1.0 -> 6.0.0。
+check("G1 Info.plist CFBundleShortVersionString = 6.0.0（Task169 版本升级重锚）",
+      '<string>6.0.0</string>' in plist and '<string>5.1.0</string>' not in plist
+      and '<string>5.0.0</string>' not in plist)
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("G2 version.h REVISION 17 addendum（Tasks 112-118）",
       'Tasks 112-118' in vh and 'REVISION 17 addendum (Tasks 112-118' in vh)

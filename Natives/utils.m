@@ -228,6 +228,32 @@ BOOL isTrollStoreInstall(void) {
     return access(tsPath.UTF8String, F_OK) == 0;
 }
 
+// Task169：JIT 等待轮询的有界版本。病历（装机 485b18c，zink 冷启动首次
+// 启动）：三处 invokeAfterJITEnabled 的等待循环都是裸
+// while (!isJITEnabled(false)) usleep(200ms)——无超时、无日志、无出路。
+// stikjit:// 偶发没把 JIT 开成时（工具未驻留/系统竞态），用户面对的是
+// 永不消失的"正在开启 JIT"弹窗 = "启动卡在启动器界面"，只能杀进程。
+// 本助手：最长 timeout 秒（超时返回 NO，调用方走超时弹窗/重试），每 10s
+// 打一条心跳日志（装机日志从此能看到等待状态而不是静默死等）。
+// JIT26 附加等待（JIT26IsLikelyDebuggerKeepAttached）同样复用。
+BOOL ame169_waitForJITCondition(BOOL (^condition)(void), NSTimeInterval timeout, NSString *label) {
+    NSDate *start = [NSDate date];
+    for (;;) {
+        if (condition()) return YES;
+        NSTimeInterval waited = -[start timeIntervalSinceNow];
+        if (waited >= timeout) {
+            NSLog(@"[JIT] Task169 %@ wait TIMED OUT after %.0fs (traced=%d exn=%d)",
+                  label ?: @"JIT", waited, JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
+            return NO;
+        }
+        if (fmod(waited, 10.0) < 0.2) {
+            NSLog(@"[JIT] Task169 %@: still waiting after %.0fs (traced=%d exn=%d)",
+                  label ?: @"JIT", waited, JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
+        }
+        usleep(1000 * 200);
+    }
+}
+
 #ifndef P_TRACED
 #define P_TRACED 0x00000800 /* process is being traced by a debugger (ptrace) */
 #endif

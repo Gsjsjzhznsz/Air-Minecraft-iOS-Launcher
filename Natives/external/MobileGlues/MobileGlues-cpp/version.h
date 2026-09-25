@@ -1693,3 +1693,53 @@
 // black-screen migration ran (stored=1, flipped=1)" + "DSA support not
 // detected" + a visible frame. verify_task166 C2 + verify_task130 E10
 // re-anchored to the Task167 forms.
+
+// Task 169 (REVISION 17 addendum, no bump; app version 6.0.0): device feedback
+// quadruple fix + release prep (upload 485b18c, af9b807 -- the build where
+// Task167 finally shipped: user confirmed Vulkan + ES/4.0 fixed, "OK了").
+// (1) CurseForge source "completely unusable": the MCIM mirror's upstream key
+// pool intermittently fails, returning HTTP 200 + valid JSON with NO "data"
+// array ({"error":"Internal Server Error","code":500,"detail":"... 403 ..."}).
+// The old parser treated that shape as "no results" and silently completed
+// with @[] -- all four logged searches showed starting-request lines with
+// zero completion logs, and the UI showed an empty list with no error.
+// Sandbox reproduction confirmed the intermittency (3 failures in one window,
+// then 6 straight successes). Fixes in CurseForgeAPI.m: gateway-error JSON
+// detection (no "data"/"pagination" + error/code keys) with logging, ONE
+// automatic retry after 1.5s (transient upstream failure), then a real NSError
+// carrying the upstream detail (both async search and sync getEndpoint);
+// CFACompiledAPIKey now rejects stringified NULL literals ("((void *)0)",
+// "(nil)", "NULL", "0" -- the 11-char garbage the device logs showed being
+// sent as x-api-key while suppressing the keyless forced-mirror fallback);
+// gameVersion normalized (fabric build-hash suffix like "26.3-0a78cefc"
+// stripped to "26.3") at both search builders.
+// (2) Local modpack import required pre-copying into the app container: the
+// document picker URL is a security-scoped resource; the old flow released
+// the scope right after parsing, while the install phase (importModpack:)
+// re-read the whole archive via info[@"filePath"] -- out-of-sandbox picks
+// lost access by then (only "On My iPhone" copies happened to work).
+// ModpackImportViewController now copies the picked file into app tmp WHILE
+// the scope is alive (also materializing iCloud placeholders), and parse/
+// preview/install all use the local copy; stale copies cleaned at next pick.
+// (3) Home avatar sometimes required a tap: the fetch used dataWithContentsOfURL
+// (default 60s hang, fully silent failure, no persistence). AvatarManager
+// gains fetchAvatarFromURL:completion: (10s timeout, Caches disk cache keyed
+// by djb2 of the URL, failure logging, main-thread single-shot completion);
+// LauncherNewsViewController and the right panel use it; the news VC also
+// directly updates visible ProfileTileCells (reloadSections can miss repaints
+// in some layout timings).
+// (4) "zink renderer launch stuck at the launcher screen": the log ends at
+// the FIRST JIT-wait round (f95a219's successful sessions show the game
+// launching 2 lines after the same dance) -- the stikjit:// enabler failed
+// that time and all three invokeAfterJITEnabled implementations had
+// unbounded while(!isJITEnabled) polls: the wait alert never dismissed.
+// utils.m gains ame169_waitForJITCondition (120s bound, 10s heartbeat logs);
+// all six wait loops (RightPanel/NavCtrl/DownloadVC x isJITEnabled/
+// JIT26DebuggerKeepAttached) bounded, with a retry/cancel alert on timeout.
+// (5) Announcements: AnnouncementItem gains a "pin" field (bool/string
+// tolerant) sorted ahead of date-desc by AnnouncementService; the server
+// recommendation (mysv.dpdns.org) is pinned first per user request; task169
+// announcement added; v6-0-0-release rewritten to the FINAL truth (Vulkan-
+// direct FSR ships via the Metal presentation layer; the old "Vulkan does
+// not support FSR" matrix retired) and redated. Info.plist 5.1.0 -> 6.0.0
+// (CFBundleShortVersionString + CFBundleVersion).

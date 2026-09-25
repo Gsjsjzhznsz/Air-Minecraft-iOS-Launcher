@@ -94,14 +94,19 @@ print("== D. Vulkan FSR 矩阵（公告 + version.h + libMobileGL 实证）==")
 an = rd("announcements.json")
 check("D1 Task164 公告在列（id 锚点）",
       "task164-fsr-blackscreen-defaults-2026-09-25" in an)
-check("D2 公告明示 Vulkan 直连不支持 + 切后端指引",
-      "Vulkan 直连后端暂不支持 FSR" in an
+# Task169 重锚（诚实勘误，同 Task166 对 task165 矩阵的处理）：本检查原锚
+# "Vulkan 直连后端暂不支持 FSR"——该结论已被 Task166/167 推翻（Metal 呈现层
+# 拦截方案让 Vulkan 直连支持 FSR，装机实测工作）。旧口径在 Task169 的
+# v6.0.0 发行文案改写中从发行公告退役；现在锚定发行公告的正式版口径。
+check("D2 发行公告明示 Vulkan 直连支持 FSR（Task166/169 修订口径；旧『暂不支持』结论已退役）",
+      "Vulkan 直连后端通过 Metal 呈现层拦截方案支持 FSR" in an
       and "切到 GLES 或 OpenGL 4.0" in an)
 check("D3 公告明示 GLES/4.0 = 完整 FSR（EASU+RCAS）",
       "EASU 高质量放大 + RCAS 锐化" in an)
-check("D4 v6.0.0 失实表述已修正（旧'全后端 FSR 修复'退役）",
+check("D4 v6.0.0 失实表述已修正（旧'全后端 FSR 修复'退役；Task169 重锚：错误的『Vulkan 暂不支持』矩阵同步退役，正式版口径=三后端全支持）",
       "MobileGL 全后端 FSR 修复" not in an
-      and "Vulkan 直连后端暂不支持" in an)
+      and "暂不支持 FSR" not in an
+      and "全部三个后端均支持 FSR" in an)
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("D5 version.h Task164 addendum（含上游不可行结论）",
       "Task 164" in vh and "upstream-impossible" in vh)

@@ -95,4 +95,85 @@
     }
 }
 
+#pragma mark - Task169：网络头像获取（超时受控 + 磁盘缓存）
+
+/// 网络头像的磁盘缓存目录（按 URL 哈希存原始字节，Caches 下系统可回收）。
+- (NSString *)ame169_urlCacheDirectory {
+    NSString *dir = [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject
+        stringByAppendingPathComponent:@"Ame169RemoteAvatars"];
+    if (![self.fileManager fileExistsAtPath:dir]) {
+        [self.fileManager createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    return dir;
+}
+
+- (NSString *)ame169_cachePathForURL:(NSString *)urlString {
+    // 简单稳定哈希（djb2）——缓存文件名只需唯一可复现，不需要密码学强度
+    unsigned long long h = 5381;
+    for (NSUInteger i = 0; i < urlString.length; i++) {
+        h = ((h << 5) + h) + [urlString characterAtIndex:i];
+    }
+    return [[self ame169_urlCacheDirectory] stringByAppendingPathComponent:[NSString stringWithFormat:@"avatar_%llu.img", h]];
+}
+
+/// Task169：网络头像获取（10s 超时 + 磁盘缓存 + 失败日志）。
+/// 病历（装机 485b18c，"主页上方头像有时要点一下才能显示"）：旧实现
+/// NSData dataWithContentsOfURL 默认 60s 挂起、失败完全静默、无任何持久
+/// 化——xboxlive 头像域在境内网络慢/失败时，主页顶卡长时间默认头像，
+/// 网络恰好完成后才因下次 cellForItem 显示（用户感知成"点一下才有"）。
+/// 契约：completion 恰好回调一次（主线程），参数 = 最佳可用图片
+/// （磁盘缓存 > 网络 > nil）。磁盘命中后仍在后台刷新缓存（下次冷启动
+/// 才生效，头像变更低频，不双回调）。
+- (void)fetchAvatarFromURL:(NSString *)urlString
+                completion:(void (^)(UIImage * _Nullable))completion {
+    if (![urlString isKindOfClass:NSString.class] || urlString.length == 0) {
+        if (completion) completion(nil);
+        return;
+    }
+    NSString *cachePath = [self ame169_cachePathForURL:urlString];
+    NSData *cached = [self.fileManager contentsAtPath:cachePath];
+    UIImage *cachedImage = cached ? [UIImage imageWithData:cached] : nil;
+    if (cachedImage) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(cachedImage);
+        });
+        // 后台静默刷新（成功仅更新缓存，不再回调）
+        [self ame169_networkFetchAvatar:urlString cachePath:cachePath completion:nil];
+        return;
+    }
+    [self ame169_networkFetchAvatar:urlString cachePath:cachePath completion:^(UIImage *img) {
+        if (completion) completion(img);
+    }];
+}
+
+- (void)ame169_networkFetchAvatar:(NSString *)urlString
+                        cachePath:(NSString *)cachePath
+                       completion:(void (^)(UIImage * _Nullable))completion {
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (!url) {
+        if (completion) completion(nil);
+        return;
+    }
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    req.timeoutInterval = 10.0;  // Task169：受控超时（旧实现默认 60s 挂起）
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:req
+        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        if (error) {
+            // Task169：失败必须有日志（旧实现静默，装机日志零痕迹）
+            NSLog(@"[AvatarManager] Task169 avatar fetch failed (%@): %@",
+                  urlString.lastPathComponent ?: urlString, error.localizedDescription);
+            if (completion) completion(nil);
+            return;
+        }
+        UIImage *img = data ? [UIImage imageWithData:data] : nil;
+        if (img && data) {
+            [data writeToFile:cachePath atomically:YES];
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) completion(img);
+        });
+    }];
+    [task resume];
+}
+
 @end

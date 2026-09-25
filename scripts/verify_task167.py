@@ -151,8 +151,17 @@ print("== E. 文档 ==")
 import json
 anns = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
 a167 = [a for a in anns if a.get("id") == "task167-crashfix-migration-2026-09-25"]
-check("E1 task167 公告置顶（双根因 + 装机验证清单）",
-      len(a167) == 1 and anns[0]["id"] == "task167-crashfix-migration-2026-09-25"
+# Task169 重锚：用户点名服务器推荐置顶（pin 字段，anns[0]）+ task169 公告
+# 与 v6.0.0 发行文案改写插入——task167 现居 unpinned 组首位（数组第 4：
+# server(pin) / task169 / v6.0.0 / task167）。置顶断言改为"2026-09-25 同日
+# 组内、task166/task165/task164 之前"。
+check("E1 task167 公告置顶（Task169 重锚：服务器 pin 后居同日组第 4；双根因 + 装机验证清单）",
+      len(a167) == 1
+      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(6, len(anns))))
+      and all(anns.index(a167[0]) < anns.index(x) for x in anns
+              if x.get("id") in ("task166-vulkan-fsr-dsa-2026-09-25",
+                                 "task165-blackscreen-rootcause-2026-09-25",
+                                 "task164-fsr-blackscreen-defaults-2026-09-25"))
       and "Vulkan 崩溃" in a167[0]["title"] and "黑屏" in a167[0]["title"]
       and "migration ran (stored=1, flipped=1)" in a167[0]["content"])
 check("E2 task166 公告诚实补记（勘误 + 指向 Task167）",

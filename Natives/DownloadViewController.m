@@ -3672,12 +3672,15 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                 // Wait for the JIT26 debugger to actually attach (P_TRACED /
                 // exception ports / spawned-by-debugger), not for CS_DEBUGGED
                 // -- that flag is already set and would race the first brk.
-                while (!JIT26IsLikelyDebuggerKeepAttached()) {
-                    usleep(1000 * 200);
-                }
+                // Task169：有界等待（120s）+心跳日志，超时走错误提示（不无限转圈）。
+                BOOL ok = ame169_waitForJITCondition(^{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"JIT26 debugger attach");
                 dispatch_async(dispatch_get_main_queue(), ^{
                     [jitAlert dismiss];
-                    if (handler) handler();
+                    if (ok) {
+                        if (handler) handler();
+                    } else {
+                        [self ame169_showJITTimeoutInlineWithRetry:handler];
+                    }
                 });
             });
             return;
@@ -3715,14 +3718,36 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                                                                     type:InlineMessageTypeLoading];
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        while (!isJITEnabled(false)) {
-            usleep(1000 * 200);
-        }
+        // Task169：有界等待（120s）+每 10s 心跳日志，超时走错误提示
+        //（同 RightPanel/NavCtrl 两处，病历见 utils.m）。
+        BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
         dispatch_async(dispatch_get_main_queue(), ^{
             [jitAlert dismiss];
-            if (handler) handler();
+            if (ok) {
+                if (handler) handler();
+            } else {
+                [self ame169_showJITTimeoutInlineWithRetry:handler];
+            }
         });
     });
+}
+
+/// Task169：JIT 等待超时后的出路（重试 = 重新走一轮 invokeAfterJITEnabled，
+/// 会重新拉起 stikjit://；取消 = 回到当前页）。
+- (void)ame169_showJITTimeoutInlineWithRetry:(void(^)(void))handler {
+    NSLog(@"[JIT] [DownloadVC] Task169 JIT wait timed out, showing retry alert");
+    UIAlertController *retry = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
+                                                                   message:@"JIT 开启等待超时（120 秒）。请确认 JIT 工具（StikDebug 等）已安装并可正常拉起后选择重试；也可在设置中选择其它 JIT 开启方式。\nTimeout waiting for JIT (120s). Make sure your JIT enabler app is alive, then retry."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [retry addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    [retry addAction:[UIAlertAction actionWithTitle:@"重试 / Retry" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [self invokeAfterJITEnabled:handler ?: ^{}];
+    }]];
+    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
+        retry.popoverPresentationController.sourceView = self.view;
+        retry.popoverPresentationController.sourceRect = CGRectMake(CGRectGetMidX(self.view.bounds), CGRectGetMidY(self.view.bounds), 0, 0);
+    }
+    [self presentViewController:retry animated:YES completion:nil];
 }
 
 - (void)handleInstallerDownloadResultWithVendorName:(NSString *)vendorName
