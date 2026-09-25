@@ -754,7 +754,7 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     request.timeoutInterval = 30.0;
     NSLog(@"[CurseForgeAPI] searchModWithFilters starting request: %@", urlString);
 
-    [self ame169_issueSearchRequest:request attempt:0 completion:completion];
+    [self ame169_issueSearchRequest:request attempt:0 projectType:projectType completion:completion];
 }
 
 /// Task169：异步搜索请求的实际执行（带网关错误检测 + 一次自动重试）。
@@ -763,6 +763,7 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 /// 重发一次；仍失败才把错误浮出。
 - (void)ame169_issueSearchRequest:(NSURLRequest *)request
                           attempt:(NSUInteger)attempt
+                        projectType:(NSString *)projectType
                        completion:(void (^)(NSArray * _Nullable, NSError * _Nullable))completion {
     NSURLSessionDataTask *task = [self.session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
@@ -814,7 +815,7 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
                                    dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
                         NSLog(@"[CurseForgeAPI] searchModWithFilters retrying after gateway error");
-                        [self ame169_issueSearchRequest:request attempt:attempt + 1 completion:completion];
+                        [self ame169_issueSearchRequest:request attempt:attempt + 1 projectType:projectType completion:completion];
                     });
                     return;
                 }
