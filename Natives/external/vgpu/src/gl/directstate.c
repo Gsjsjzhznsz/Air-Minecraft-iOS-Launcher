@@ -366,7 +366,13 @@ void gl4es_glEnableClientStateIndexed(GLenum array, GLuint index) {
         errorShim(GL_INVALID_ENUM);
     }
 }
-void gl4es_glEnableClientStatei(GLenum array, GLuint index) __attribute__((alias("gl4es_glEnableClientStateIndexed")));
+// Task173 (iOS port): bare __attribute__((alias)) is rejected by Apple clang
+// ("aliases are not supported on darwin") -- the same reason the project-wide
+// AliasExport macro expands to nothing on __APPLE__. Both entry points are
+// referenced by gl_lookup.c's proc table, so they get real forwarding bodies.
+void gl4es_glEnableClientStatei(GLenum array, GLuint index) {
+    gl4es_glEnableClientStateIndexed(array, index);
+}
 void gl4es_glDisableClientStateIndexed(GLenum array, GLuint index) {
     DBG(printf("glDisableClientStateIndexed(%s, %d)\n", PrintEnum(array), index);)
     if (array == GL_TEXTURE_COORD_ARRAY) {
@@ -379,7 +385,9 @@ void gl4es_glDisableClientStateIndexed(GLenum array, GLuint index) {
         errorShim(GL_INVALID_ENUM);
     }
 }
-void gl4es_glDisableClientStatei(GLenum array, GLuint index) __attribute__((alias("gl4es_glDisableClientStateIndexed")));
+void gl4es_glDisableClientStatei(GLenum array, GLuint index) {
+    gl4es_glDisableClientStateIndexed(array, index);
+}
 
 void gl4es_glEnableVertexArray(GLuint vaobj, GLenum array) {
     DBG(printf("glEnableVertexArray(%d, %s)\n", vaobj, PrintEnum(array));)
