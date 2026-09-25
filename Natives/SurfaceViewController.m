@@ -225,6 +225,11 @@ int memorystatus_control(uint32_t command, int32_t pid, uint32_t flags, void *bu
 static int currentHotbarSlot = -1;
 static GameSurfaceView* pojavWindow;
 
+// Task171：键盘主动收起代数（定义与用法见 Input: on-surface functions 区
+// 的 ame171_armKeyboardRecheck；此处前置声明供 updateGrabState 等早于定义
+// 的收起点使用）。
+static NSUInteger ame171_keyboardDismissGeneration = 0;
+
 // Task 78：FSR 预设 → 渲染缩放系数（与 MobileGlues-cpp FSR1.cpp
 // CalculateTargetResolution 的 scale 表同步：UQ=1.3 / Q=1.5 / B=1.7 / P=2.0）。
 // Task 83（FSR 独立化）：不再仅限 MobileGlues——见 ame83_fsr_capable_renderer。
@@ -1291,7 +1296,13 @@ void ame139_fsr_heal_reset_input_scale(void) {
     self.inputTextField.backgroundColor = UIColor.secondarySystemBackgroundColor;
     self.inputTextField.delegate = self;
     self.inputTextField.font = [UIFont fontWithName:@"Menlo-Regular" size:20];
-    self.inputTextField.clearsOnBeginEditing = YES;
+    // Task171：clearsOnBeginEditing 改 NO。哨兵空格由触发点在
+    // becomeFirstResponder 之前写入（text = @" "），旧序"become 后赋值
+    // + begin 时清空"与 iPadOS 26+ UIAsyncTextInput 的异步会话激活竞争
+    // （装机日志实锤：首会话每输一个字符字段即被系统拆会话，用户必须
+    // 每打一个字按一次输入法按钮）。TrackedTextField.deleteBackward 自带
+    // @" " 兜底，不清空不改变任何键盘行为。
+    self.inputTextField.clearsOnBeginEditing = NO;
     self.inputTextField.textAlignment = NSTextAlignmentCenter;
     self.inputTextField.sendChar = ^(jchar keychar){ CallbackBridge_nativeSendChar(keychar); };
     self.inputTextField.sendCharMods = ^(jchar keychar, int mods){ CallbackBridge_nativeSendCharMods(keychar, mods); };
@@ -1673,6 +1684,7 @@ void ame139_fsr_heal_reset_input_scale(void) {
             NSLog(@"[SurfaceVC] Task161: chat key + ungrab -> keyboard auto-shown (GLFW path, MC <=26.2)");
         } else if (isGrabbing == JNI_TRUE && ame161_autoShown) {
             if (self.inputTextField.isFirstResponder) {
+                ame171_keyboardDismissGeneration++;   // Task171：主动收起，作废在途自愈检查
                 [self.inputTextField resignFirstResponder];
                 self.inputTextField.alpha = 1.0f;
             }
@@ -2174,6 +2186,30 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
 
 #pragma mark - Input: on-surface functions
 
+// Task171：键盘首会话自愈重挂——becomeFirstResponder 成功后 0.4s 复查；
+// 若系统（UIAsyncTextInput 首会话竞争）已把字段打回非 first responder，
+// 自动重挂一次（最多递归 2 层，防硬件键盘场景死循环）。装机日志实锤
+// "触发键盘后直接输入各种问题，必须再按一次输入法按钮才能正常输入"
+// ——本方法就是把用户手动做的那"再按一次"自动化。
+// （ame171_keyboardDismissGeneration 的定义在文件前部静态区。）
+- (void)ame171_armKeyboardRecheck:(int)depth {
+    if (depth > 2) return;
+    NSUInteger gen = ame171_keyboardDismissGeneration;
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (gen != ame171_keyboardDismissGeneration) return;   // 用户已主动收起
+        if (strongSelf.inputTextField.isFirstResponder) return; // 会话健康
+        strongSelf.inputTextField.text = @" ";
+        BOOL ok = [strongSelf.inputTextField becomeFirstResponder];
+        NSLog(@"[SurfaceVC] Task171: keyboard auto re-arm depth=%d (system dismissed the field after show; ok=%d)",
+              depth, ok);
+        [strongSelf ame171_armKeyboardRecheck:depth + 1];
+    });
+}
+
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer {
     return YES;
 }
@@ -2186,11 +2222,15 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
 
     if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
         if (self.inputTextField.isFirstResponder) {
+            ame171_keyboardDismissGeneration++;
             [self.inputTextField resignFirstResponder];
             self.inputTextField.alpha = 1.0f;
         } else {
-            [self.inputTextField becomeFirstResponder];
+            // Task171：哨兵空格先于 becomeFirstResponder 写入（旧序反着来，
+            // 与 UIAsyncTextInput 异步会话激活竞争，首会话被系统拆掉）
             self.inputTextField.text = @" ";
+            [self.inputTextField becomeFirstResponder];
+            [self ame171_armKeyboardRecheck:0];
         }
     }
 }
@@ -2473,13 +2513,25 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
                         // （26.3 下打字靠 input_bridge_v3 的 SDL_EVENT_TEXT_INPUT 路径）
                         BOOL wasFirst = self.inputTextField.isFirstResponder;
                         if (wasFirst) {
+                            ame171_keyboardDismissGeneration++;
                             [self.inputTextField resignFirstResponder];
                             self.inputTextField.alpha = 1.0f;
                             NSLog(@"[Task82] Keyboard widget: dismissing (was first responder)");
                         } else {
-                            BOOL ok = [self.inputTextField becomeFirstResponder];
+                            // Task171：哨兵空格先于 becomeFirstResponder 写入。
+                            // 病历（f26337d 装机日志 latestlog.old.txt，多人服务器
+                            // 聊天登录）：每次按 ✎输入法 按钮日志都是
+                            // "becomeFirstResponder=1"（而非 "dismissing"）——
+                            // 字段在每输一个字符后被系统自行拆会话（旧序：
+                            // become 后立即改 text，与 iPadOS 26+ UIAsyncTextInput
+                            // 的异步会话激活竞争），用户被迫每打一个字按一次
+                            // 输入法按钮；几个循环后（或 ESC+重开聊天后）
+                            // 输入才稳定。修法：写入顺序反转 + 清空位退役
+                            // （初始化处）+ ame171_armKeyboardRecheck 自愈重挂。
                             self.inputTextField.text = @" ";
+                            BOOL ok = [self.inputTextField becomeFirstResponder];
                             NSLog(@"[Task82] Keyboard widget: becomeFirstResponder=%d (on-screen keyboard should appear; typing delivered via SDL text-input on 26.3)", ok);
+                            [self ame171_armKeyboardRecheck:0];
                         }
                     }
                     break;

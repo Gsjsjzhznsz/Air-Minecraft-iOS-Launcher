@@ -15,6 +15,7 @@
 #include <dlfcn.h>
 #include <libgen.h>
 #include <limits.h>
+#include <math.h>
 #include <stdlib.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -1419,17 +1420,52 @@ int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
         return -1;
     }
 
-    int barHeight = mcscale(20);
+    // Task 171：物品栏命中矩形改为 FSR 感知。
+    // 病历（f26337d 装机日志 latestlog.old.txt，mg + FSR preset3 scale=1.70，
+    // phys=2360x1640 / MC 窗口信念 1388x964 / guiScale=4）：
+    //   [HotbarDiag] REJECT above bar | y=1516.0 < barY=1560
+    //   [HotbarDiag] REJECT above bar | y=1556.0 < barY=1560
+    // MC 画在【窗口空间】（1388x964）底部的物品栏（22 GUI 像素高 = 88 窗口
+    // 像素），经 FSR 放大到物理表面后视觉顶边在 1640 - 88*1.70 ≈ 1490；
+    // 而旧几何 barY = physH - 20*guiScale = 1560 —— 视觉物品栏的上半段
+    // （1490~1560，约 70 物理像素）全部被 REJECT，用户必须点到物品栏的
+    // 下半截才能选中槽位（实测"物品栏点击位置有点偏下"）。X 方向同理：
+    // 旧 barW=720 只覆盖视觉 1238 宽的中间一段，左右各两个槽位点不到、
+    // 中段槽位映射整体左偏一格。
+    // 修法：用"物理像素 / MC 窗口像素"的单一事实源比例（= fsr/resolutionScale
+    // 的合成，windowHeight 是 updateSavedResolution 单点写入的 MC 窗口信念）
+    // 把 MC 的 182x22 精灵矩形放大到物理空间。注意不能用 mcscale()——它内部
+    // 已除以 resolutionScale，而本比例同样含该因子，叠加会双重除法。无 FSR
+    // 且 resolutionScale=100% 时比例恒 1.0，新几何 22*guiScale 比旧
+    // 20*guiScale 只宽出精灵自带上边框（2*guiScale 像素），命中区更贴合
+    // 视觉、行为无回退。比例异常（窗口未初始化/旋转间隙）回退 1.0 保持旧行为。
+    float ame171_winToPhys = 1.0f;
+    if (windowHeight > 0 && physicalHeight > 0) {
+        float ratio = (float)physicalHeight / (float)windowHeight;
+        if (ratio >= 0.25f && ratio <= 8.0f) ame171_winToPhys = ratio;
+    }
+    int barHeight = (int)((float)(22 * guiScale) * ame171_winToPhys + 0.5f);
     int barY = physicalHeight - barHeight;
+    {
+        static bool s_task171Logged = false;
+        if (!s_task171Logged && ame171_winToPhys != 1.0f) {
+            s_task171Logged = true;
+            NSLog(@"[HotbarDiag] Task171 FSR-aware hotbar geometry: phys=%dx%d win=%dx%d ratio=%.2f barH=%d barY=%d (was barY=%d, old 20xguiScale/resScale)",
+                  (int)physicalWidth, (int)physicalHeight, windowWidth, windowHeight,
+                  (double)ame171_winToPhys, barHeight, barY,
+                  (int)(physicalHeight - mcscale(20)));
+        }
+    }
     if (y < barY) {
         if (shouldLog) {
-            NSLog(@"[HotbarDiag] REJECT above bar | y=%.1f < barY=%d (barH=%d physH=%d guiScale=%d resScale=%.2f)",
-                  y, barY, barHeight, (int)physicalHeight, guiScale, (double)resolutionScale);
+            NSLog(@"[HotbarDiag] REJECT above bar | y=%.1f < barY=%d (barH=%d physH=%d guiScale=%d resScale=%.2f ratio=%.2f)",
+                  y, barY, barHeight, (int)physicalHeight, guiScale, (double)resolutionScale,
+                  (double)ame171_winToPhys);
         }
         return -1;
     }
 
-    int barWidth = mcscale(180);
+    int barWidth = (int)((float)(182 * guiScale) * ame171_winToPhys + 0.5f);
     int barX = (physicalWidth / 2) - (barWidth / 2);
     if (x < barX || x >= barX + barWidth) {
         if (shouldLog) {

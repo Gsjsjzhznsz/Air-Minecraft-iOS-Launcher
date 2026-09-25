@@ -194,9 +194,25 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 }
 
 - (NSDictionary *)headers {
+    // Task 171：keyless 不再返回 nil。旧实现把 [self headers] == nil 当作
+    // "API key 缺失"的致命门（getEndpoint / postEndpoint / searchModWithFilters
+    // 三处直接返回 missingAPIKeyError，请求根本不发出）——而 baseURL getter
+    // 在无 key 时早已强制回落 MCIM 镜像（Task162），镜像无 key 实测 200
+    // （sandbox 复测：GET /mods/search 无任何 x-api-key 返回 200，冷启动首
+    // 请求 ~11s、后续 ~2s；官方 API 无 key 恒 403）。两条路径的语义互相
+    // 打架：镜像回退成了死代码，无 key 设备（构建时 GitHub secret
+    // CONFIG_CURSEFORGE_API_KEY 未配置 = 所有 CI 构建）在 CurseForge 源
+    // 上一律报 "CurseForge API key is missing..." 错误——用户实测
+    // "curseforge 的 key 构建时没有设置，导致错误"。
+    // 新语义：keyless = 照常发请求但不带 x-api-key（走镜像），有 key 照旧。
     NSString *key = [self apiKey];
     if (key.length == 0) {
-        return nil;
+        static BOOL s_task171Logged = NO;
+        if (!s_task171Logged) {
+            s_task171Logged = YES;
+            NSLog(@"[CurseForgeAPI] Task171: no API key configured -- requests go keyless to the MCIM mirror (field-tested 200)");
+        }
+        return @{@"Accept" : @"application/json"};
     }
     return @{
         @"Accept": @"application/json",
@@ -369,10 +385,7 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 
 - (id)getEndpoint:(NSString *)endpoint params:(NSDictionary *)params {
     NSDictionary *headers = [self headers];
-    if (!headers) {
-        self.lastError = [self missingAPIKeyError];
-        return nil;
-    }
+    // Task 171：keyless 镜像路径不再拦截（headers 恒非 nil，见其实现注释）。
 
     NSString *url = [self.baseURL stringByAppendingPathComponent:endpoint];
     // Task169：网关错误（HTTP 200 + JSON 无 "data"）是瞬态上游故障，最多
@@ -420,10 +433,7 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 
 - (id)postEndpoint:(NSString *)endpoint params:(NSDictionary *)params {
     NSDictionary *headers = [self headers];
-    if (!headers) {
-        self.lastError = [self missingAPIKeyError];
-        return nil;
-    }
+    // Task 171：keyless 镜像路径不再拦截（headers 恒非 nil）。
     
     __block id result;
     dispatch_group_t group = dispatch_group_create();
@@ -743,11 +753,8 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     NSDictionary *headers = [self headers];
-    if (!headers) {
-        NSLog(@"[CurseForgeAPI] Warning: searchModWithFilters failed: API Key not configured");
-        if (completion) completion(nil, [self missingAPIKeyError]);
-        return;
-    }
+    // Task 171：keyless 镜像路径不再拦截（旧：headers==nil -> missingAPIKeyError，
+    // Task162 的镜像回退成死代码）；headers 无 key 时也返回 Accept-only 字典。
     for (NSString *key in headers) {
         [request setValue:headers[key] forHTTPHeaderField:key];
     }
@@ -881,7 +888,13 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     if (!url) return nil;
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = @"POST";
-    [request setValue:[self apiKey] forHTTPHeaderField:@"x-api-key"];
+    // Task 171：空 key 不发空 x-api-key 头（空值头会被镜像网关当成坏请求）
+    {
+        NSString *ame171_key = [self apiKey];
+        if (ame171_key.length > 0) {
+            [request setValue:ame171_key forHTTPHeaderField:@"x-api-key"];
+        }
+    }
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     NSDictionary *body = @{@"fingerprints": @[fingerprint]};
     NSError *jsonError = nil;
@@ -924,7 +937,13 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     if (!url) return @[];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = @"POST";
-    [request setValue:[self apiKey] forHTTPHeaderField:@"x-api-key"];
+    // Task 171：空 key 不发空 x-api-key 头（空值头会被镜像网关当成坏请求）
+    {
+        NSString *ame171_key = [self apiKey];
+        if (ame171_key.length > 0) {
+            [request setValue:ame171_key forHTTPHeaderField:@"x-api-key"];
+        }
+    }
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     NSDictionary *body = @{@"fingerprints": fingerprints};
     NSError *bodyError = nil;
@@ -979,7 +998,13 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         return;
     }
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    [request setValue:[self apiKey] forHTTPHeaderField:@"x-api-key"];
+    // Task 171：空 key 不发空 x-api-key 头（keyless 镜像路径；两处同构调用点）
+    {
+        NSString *ame171_key = [self apiKey];
+        if (ame171_key.length > 0) {
+            [request setValue:ame171_key forHTTPHeaderField:@"x-api-key"];
+        }
+    }
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     request.timeoutInterval = 30.0;
     NSLog(@"[CurseForgeAPI] loadDetailsOfMod starting request modID=%@: %@", modID, urlStr);
@@ -1076,7 +1101,13 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         return;
     }
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    [request setValue:[self apiKey] forHTTPHeaderField:@"x-api-key"];
+    // Task 171：空 key 不发空 x-api-key 头（keyless 镜像路径；两处同构调用点）
+    {
+        NSString *ame171_key = [self apiKey];
+        if (ame171_key.length > 0) {
+            [request setValue:ame171_key forHTTPHeaderField:@"x-api-key"];
+        }
+    }
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
     request.timeoutInterval = 30.0;
     NSLog(@"[CurseForgeAPI] 🔍 getServerPackFilesForModpack: %@", urlStr);

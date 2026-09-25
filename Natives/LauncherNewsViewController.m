@@ -880,6 +880,28 @@ static NSString *festivalGreeting(void) {
     [self updateSkinDisplay];
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // Task171：转场结束后补一次可见 Profile 卡直刷——viewWillAppear 期的
+    // reloadSections 可能落在标签页转场中途被 UIKit 丢弃（重绘不发生），
+    // 装机实测"切换标签页返回后头像缺失"。此刻 cells 必然已可见，直写
+    // image 是最后的兑底（与 updateSkinDisplay 尾部的直刷同一 helper）。
+    [self ame171_syncVisibleProfileAvatar];
+}
+
+// Task171：把 currentAvatar 直写所有可见 Profile 卡。Task169 的直刷只挂在
+// 网络完成回调上，切标签页返回走会话缓存命中分支时只有 reloadSections
+// （布局时序下不重绘）——头像缺失。本 helper 全分支兑底：updateSkinDisplay
+// 尾部 + viewDidAppear + 网络完成回调三处共用。
+- (void)ame171_syncVisibleProfileAvatar {
+    if (self.currentAvatar == nil) return;
+    for (UICollectionViewCell *cell in self.collectionView.visibleCells) {
+        if ([cell isKindOfClass:HomeProfileTileCell.class]) {
+            ((HomeProfileTileCell *)cell).avatarImageView.image = self.currentAvatar;
+        }
+    }
+}
+
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
@@ -1360,11 +1382,7 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                         [self reloadProfileSection];
                         // Task169：直接同步可见 Profile 卡（保险路径）
                         if (img) {
-                            for (UICollectionViewCell *cell in self.collectionView.visibleCells) {
-                                if ([cell isKindOfClass:HomeProfileTileCell.class]) {
-                                    ((HomeProfileTileCell *)cell).avatarImageView.image = img;
-                                }
-                            }
+                            [self ame171_syncVisibleProfileAvatar];
                         }
                     }];
                 }
@@ -1376,6 +1394,9 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
     }
     
     [self reloadProfileSection];
+    // Task171：缓存命中/本地头像分支同样直刷可见 Profile 卡（reloadSections
+    // 的布局时序兑底，详见 ame171_syncVisibleProfileAvatar 注释）。
+    [self ame171_syncVisibleProfileAvatar];
 }
 
 - (void)loadSkinForUUID:(NSString *)uuid {

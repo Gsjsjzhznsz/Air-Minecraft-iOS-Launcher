@@ -24,6 +24,15 @@
       "image_url": ""
     },
     {
+      "id": "task171-seven-fixes-2026-09-25",
+      "title": "装机反馈七连修（ANGLE 崩溃 / 物品栏偏移 / CF 无 key / 头像 / 26.4 后端 / 键盘）",
+      "date": "2026-09-25",
+      "priority": "normal",
+      "summary": "上一轮装机日志（f26337d，3 个日志文件）反馈的七个问题全部处理：①ANGLE 渲染器崩溃 = 它从未进过 SDL_GL 桥接接管列表，renderpearl 的 glGetError 指针一致性检查失败后回落原生 Vulkan，Iris 在无 GL 上下文的 Vulkan 后端上直接崩——ANGLE 现已接入桥接；②物品栏点击偏下 = FSR 联动下命中矩形没乘窗口比例，视觉物品栏的上半段全被拒绝——几何现已 FSR 感知；③CurseForge 无构建 key 报错 = 无 key 时请求被\"key 缺失\"门直接拦截而从不发出（镜像回退成了死代码）——现在无 key 也照常走 MCIM 镜像（实测免 key 200）；④主页头像切标签页缺失 = 可见卡直刷只挂在网络回调上，缓存命中分支漏了——三处全兜底；⑤多人游戏偶发崩溃的日志已被轮换覆盖，新增 latestlog.crash.txt 异常死亡自动保全；⑥26.4 回退 Vulkan = MC 26.4 把默认后端顺序翻成 Vulkan 优先，启动器现在对 26.4+ 强制 --graphicsBackend opengl（原生 Vulkan 渲染器除外）；⑦键盘首会话每输一个字被系统拆一次 = 哨兵空格改在激活前写入 + 自动重挂自愈。",
+      "content": "## 本轮修复（装机日志 f26337d 反馈七项）\n\n**① ANGLE 渲染器崩溃**\n\n- 根因：libtinygl4angle 从未进过 SDL_GL 桥接列表（Task 79 只收编了 zink 系），真实 SDL 拒载\"OpenGL library already loaded\"后，renderpearl 的 glGetError 指针一致性检查失败 → 回落 MC 原生 Vulkan 后端 → 整合包里的 Iris 在 initRenderer 阶段拿不到 GLCapabilities 直接崩。\n- 修复：ANGLE 接入桥接（同款镜像链保证指针一致性），GL 失败仍会自动回落 Vulkan，零新增风险。\n\n**② 物品栏点击位置偏下**\n\n- 根因：FSR 联动下 MC 窗口是表面的 1/1.7，视觉物品栏顶边在物理 y≈1490，而拦截门槛算的是 1560——上半段全被拒绝，必须点到下半截才能选中。\n- 修复：命中矩形按\"物理/窗口\"比例放大（182x22 完整精灵），X 方向槽位映射同步修正。\n\n**③ CurseForge 未配置 key 报错**\n\n- 根因：无 key 时请求头返回 nil，三条请求路径把它当致命错误直接拦下——请求根本没发出，镜像回退成了死代码。\n- 修复：无 key = 照常发请求（不带 x-api-key 头）走 MCIM 镜像，实测免 key 返回 200。有 key 的设备行为不变。\n\n**④ 主页头像切换标签页缺失**\n\n- 根因：可见卡直刷只挂在网络完成回调上；切标签页返回走的是会话缓存命中分支，只有 reloadSections（转场时序下不重绘）。\n- 修复：本地/缓存/网络三个分支全部直刷可见 Profile 卡，并在转场结束后（viewDidAppear）补一次。\n\n**⑤ 多人游戏偶发崩溃（证据保全）**\n\n- 你指的 log.old.txt 那局多人会话本身是干净的（全程 60fps、正常退出）——崩溃那局的日志已被后续启动的轮换覆盖。\n- 新增：上一会话若非正常退出（无 exit 标记），下次启动自动把日志保全为 latestlog.crash.txt，崩溃现场不再丢失。\n\n**⑥ 26.4 回退 Vulkan（zink / mg 都会）**\n\n- 根因：MC 26.4 把默认后端尝试顺序翻转为 Vulkan 优先（26.3 是 GL 优先），且升级 datafix 会把已存的后端选项重置回默认——启动器选的 GL 转译渲染器被原生 Vulkan 整层绕过。\n- 修复：26.4+ 自动追加 --graphicsBackend opengl（原生 Vulkan 渲染器除外）。26.3 及以下完全不变。\n\n**⑦ 键盘触发后必须按一次输入法键**\n\n- 根因：键盘激活后才写入哨兵空格 + 开启\"开始编辑时清空\"，与 iPadOS 26+ 异步输入会话激活竞争——首会话每输一个字符字段就被系统拆一次。\n- 修复：哨兵空格改在激活前写入、清空位退役，另加 0.4 秒健康检查自动重挂（你手动做的那\"再按一次\"现在自动完成）。",
+      "pin": false
+    },
+    {
       "id": "task170-neumorph-opacity-spacing-2026-09-25",
       "date": "2026-09-25",
       "title": "卡片新拟态透明度滑条 + 主页卡片间距统一",

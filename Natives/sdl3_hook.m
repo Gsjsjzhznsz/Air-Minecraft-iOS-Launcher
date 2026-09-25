@@ -981,6 +981,26 @@ static bool ame_glBridgeEnabled(void) {
     // 原生 Vulkan 自身走 Vulkan 路径，不需要 GL bridge
     if (strstr(renderer, "libMoltenVK") != NULL) return false;
 
+    // Task 171：ANGLE（libtinygl4angle.dylib）加入接管列表。
+    // 病历（f26337d 装机日志 latestlog.txt，FO 整合包选 ANGLE 渲染器）：
+    //   [SDLGL] SDL_GL_LoadLibrary(.../libtinygl4angle.dylib) -> failed:
+    //           OpenGL library already loaded（真实 SDL 拒载，本 bridge 未接管）
+    //   [Render thread/ERROR]: Failed to create backend OpenGL
+    //           BackendCreationException: glGetError mismatch
+    //   → renderpearl 回落 MC 原生 Vulkan 后端（MoltenVK）→ 整合包里的
+    //     Iris 在 RenderSystem.initRenderer 阶段 GL.getCapabilities() 拿到
+    //     空（GL 上下文从未建立）→ ExceptionInInitializerError 崩溃。
+    // tinygl4angle 此前从未进过本列表（Task 79 只收编了 zink 系）——它
+    // 与 opengles/gl4es 同为 raw ANGLE 家族（EGL 经其依赖的 libEGL 解析，
+    // isDesktopGLRenderer 早已包含 MTL_ANGLE = EGL_OPENGL_BIT + eglBindAPI
+    // 路径就绪），bridge 接管后 SDL_GL_LoadLibrary/GetProcAddress 走镜像
+    // 链（同一 NOLOAD 句柄 + 同一 eglGetProcAddress/dlsym 链），指针一致性
+    // 按构造成立 → GL backend 被接受 → 不再回落 Vulkan → Iris 正常。
+    // 逃生阀与 zink 同款：AMETHYST_ANGLE_GL_BRIDGE=0 一行回退旧行为。
+    if (strstr(renderer, "libtinygl4angle") != NULL) {
+        return ame_envFlagOn("AMETHYST_ANGLE_GL_BRIDGE", true);
+    }
+
     // 需要 EGL bridge 的转译型渲染器：它们提供 EGL + GL 符号，SDL 的 EAGL
     // 后端无法对接，必须由 bridge 建上下文并供给 GL 函数指针。
     if (strstr(renderer, "libMobileGL") != NULL) return true;    // MobileGL 双后端

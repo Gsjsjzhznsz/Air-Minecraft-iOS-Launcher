@@ -159,6 +159,45 @@ void init_redirectStdio() {
     NSString *home = @(getenv("POJAV_HOME"));
     NSString *currName = [home stringByAppendingPathComponent:@"latestlog.txt"];
     NSString *oldName = [home stringByAppendingPathComponent:@"latestlog.old.txt"];
+    // Task 171：异常死亡证据保全（多人游戏偶发崩溃的日志总被轮换吃掉）。
+    // 病历：用户报"多人游戏有时候会崩溃，参考上一个提交的 log.old.txt"，
+    // 但该文件是干净的 26.3 多人会话（mysv.dpdns.org，60fps，干净
+    // exit(0)）——崩溃会话的 latestlog 在下一次启动的"先删后移"轮换里
+    // 只能存活一代，用户再玩一局就永远丢了（本会话日志即被覆盖）。
+    // 保全员：轮换前读旧 latestlog.txt 尾部 8KB，若没有 hooked_exit 的
+    // "exit(N) called" 终止标记（正常退出/退出码非零都会留痕；原生
+    // SIGSEGV/SIGKILL 类死亡无标记），把它复制为 latestlog.crash.txt
+    // （只保留最近一份，不参与轮换链）。下次崩溃后从应用容器直接取回
+    // 完整现场。
+    {
+        NSString *crashName = [home stringByAppendingPathComponent:@"latestlog.crash.txt"];
+        if ([fm fileExistsAtPath:currName]) {
+            NSData *tail = nil;
+            NSFileHandle *h = [NSFileHandle fileHandleForReadingAtPath:currName];
+            if (h) {
+                unsigned long long len = [h seekToEndOfFile];
+                unsigned long long off = (len > 8192) ? (len - 8192) : 0;
+                [h seekToFileOffset:off];
+                tail = [h readDataToEndOfFile];
+                [h closeFile];
+            }
+            BOOL hasExitMarker = NO;
+            if (tail) {
+                NSString *tailStr = [[NSString alloc] initWithData:tail
+                                                           encoding:NSUTF8StringEncoding];
+                hasExitMarker = (tailStr != nil) && [tailStr containsString:@") called"];
+            }
+            if (!hasExitMarker) {
+                NSError *cpErr = nil;
+                [fm removeItemAtPath:crashName error:nil];
+                if ([fm copyItemAtPath:currName toPath:crashName error:&cpErr]) {
+                    NSLog(@"[Pre-init] Task171: previous session died without an exit marker -- log preserved to latestlog.crash.txt (unclean-death forensics)");
+                } else {
+                    NSLog(@"[Pre-init] Task171: crash-log preservation failed: %@", cpErr.localizedDescription);
+                }
+            }
+        }
+    }
     [fm removeItemAtPath:oldName error:nil];
     [fm moveItemAtPath:currName toPath:oldName error:nil];
 

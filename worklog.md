@@ -499,3 +499,24 @@ Task: ①新拟态装机反馈修复（"下载最新提交看不到新拟态"—
 - 装机锚点：①设置 → 外观 → "新拟态透明度"拉条——觉得卡片边缘晕影重就往低调（推荐 60%~80% 起步），阴影随卡面一起变淡；100% = 上一版形态原样 ②主页面卡片间距与外围对齐（20pt）③下载页版本卡/联机页状态卡同受滑条影响
 - 用户诊断备注：装机日志（8d5ca47 会话）显示游戏已在 zink（libOSMesa，Mesa 4.1 MoltenVK）正常启动越过启动器界面——Task169 JIT 有界等待修复路径生效；`ARB_direct_state_access detected` 为 zink 桌面 GL 合法行为（Task167 DSA 迁移仅针对 GLES/MobileGL）；FSR 锚点仍需 Vulkan/GLES-4.0 会话验证（zink 不在 FSR 能力集）
 - 维护路径不变：公告 = 仓库根 announcements.json；使用问题 = 仓库根 help-faq.json + 随包副本（逐字节一致）
+
+---
+Task ID: 171
+Agent: main (Super Z)
+Task: 用户七症状装机反馈（f26337d 构建，3 个日志：latestlog.txt=ANGLE 26.3 FO 包 / latestlog.old.txt=mg 26.3 多人 / latestlog.old=mg 26.4-snapshot-1）
+
+Work Log:
+- ANGLE 崩溃取证：renderpearl GlBackend.loadLibrary（26.3 真 jar 反编译）要求 LWJGL provider 与 SDL_GL_GetProcAddress 对 glGetError 返回同址；ANGLE 会话日志实锤真实 SDL 拒载（"OpenGL library already loaded"）+ glGetError mismatch → 回落原生 Vulkan → Iris 在 initRenderer 拿空 GLCapabilities → ExceptionInInitializerError。根因 = libtinygl4angle 从未进 ame_glBridgeEnabled 列表（Task 79 只收编 zink 系）。修复：接入桥接（镜像链指针一致按构造成立）+ AMETHYST_ANGLE_GL_BRIDGE=0 逃生阀
+- 物品栏偏移取证：HotbarDiag REJECT above bar y=1516/1556 < barY=1560；FSR preset3（scale 1.70）下 MC 窗口 1388x964，视觉物品栏物理顶边 = 1640-88*1.7 ≈ 1490，旧几何 1640-20*guiScale=1560 拒掉上半段（且旧 barW=720 漏掉左右各两槽、中段槽位左偏一格）。修复：touchHotbar 几何改用物理/窗口单源比例（不能用 mcscale——内部已除 resolutionScale 会双重除法），182x22 完整精灵 × guiScale × ratio，比例护栏 [0.25,8] 异常回退 1.0
+- CF key 取证：三请求路径（getEndpoint/postEndpoint/searchModWithFilters）以 [self headers]==nil 为致命门直接返回 missingAPIKeyError——请求从不发出，Task162 的 keyless 镜像回退成死代码；sandbox 实测镜像免 key 200（冷启动 11s、后续 2s；官方 403）。修复：keyless 返回 Accept-only 头照常发请求；4 处直发 setValue 增加空值保护
+- 头像取证：Task169 的可见卡直刷只挂网络完成回调；切标签页返回走会话缓存命中分支只有 reloadSections（转场时序下不重绘）。修复：ame171_syncVisibleProfileAvatar 三分支兜底 + viewDidAppear 补刷
+- 多人崩溃取证：所指 latestlog.old.txt 会话干净（mysv.dpdns.org、60fps、exit(0)）——崩溃会话日志已被"先删后移"轮换覆盖（只存活一代）。修复：init_redirectStdio 轮换前读旧尾部 8KB，无 ") called" exit 标记则保全为 latestlog.crash.txt
+- 26.4 回退 Vulkan 取证：26.4-snapshot-1 真 jar 反编译 PreferredGraphicsApi：DEFAULT.getBackendsToTry() 从 26.3 的 {gl, vulkan} 翻转为 {vulkan, gl}（Vulkan 优先）+ OptionsForceDefaultGraphicsApiFix datafix 重置存量选项；装机日志实锤 26.4 会话 GL 路径从未被尝试（无 RenderPearl GL 探窗、无 GL 失败行）直接 "Using graphics backend Vulkan"。修复：Tools.java appendGraphicsBackendArg——版本 ≥26.4（前导 major.minor 数值解析）且渲染器非 libMoltenVK 时追加 --graphicsBackend opengl（26.3/26.4 Main 均支持该参数；GL 失败仍按顺序表回落 Vulkan）
+- 键盘取证：多人聊天登录段日志实锤每次按 ✎输入法 按钮都是 becomeFirstResponder=1（零 dismissing 行）= 字段每输一个字符后被系统拆会话（旧序 become 后立即写 text=@" " + clearsOnBeginEditing=YES 与 iPadOS 26+ UIAsyncTextInput 异步会话激活竞争）。修复：哨兵空格先于 become 写入 + clearsOnBeginEditing=NO + ame171_armKeyboardRecheck 0.4s 健康检查自动重挂（收起代数护栏防与用户打架，深度上限 2）
+- 文档：version.h Task171 附录（七主题）；announcements.json task171 条目插入 index 2（task169 anns[1] 钉不动，task170/168 顺延 3/4）；verify_task170 F1 与 verify_task168 D1 公告位置锚重锚
+- 验证：verify_task171 A7 B8 C6 D4 E2 + 级联 168/170 重锚后全绿；括号 delta 对 HEAD 基线全平衡（sdl3_hook 的 6 个多余 ')' 为剥离器对 HEAD 既有误报，非本轮引入）；ECJ 本沙箱不可用，Java 侧靠人工复核 + CI 编译门
+
+Stage Summary:
+- 七症状修复齐发；装机锚点：①ANGLE 会话 "[SDLHook] SDL_GL_LoadLibrary(...) -> pojavInitOpenGLForSDL3"（桥接接管）+ "Using graphics backend OpenGL" + Iris 不再崩 ②"[HotbarDiag] Task171 FSR-aware hotbar geometry ... ratio=1.70" + 物品栏上半段可点中 ③"[CurseForgeAPI] Task171: no API key configured -- requests go keyless" + CF 源无 key 可用 ④切标签页头像即显 ⑤下次崩溃后容器内有 latestlog.crash.txt ⑥26.4 会话 "[Tools] Task171: ... forcing --graphicsBackend opengl" + "Using graphics backend OpenGL" ⑦"[SurfaceVC] Task171: keyboard auto re-arm"（若系统仍拆会话）或键盘首开即可连续输入
+- 多人游戏崩溃本体无日志证据（会话干净），证据保全机制已就位，待下一轮 crash.txt
+- 遗留：CI 编译确认（Tools.java 无法本地编译验证）

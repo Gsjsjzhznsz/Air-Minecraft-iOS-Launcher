@@ -1778,3 +1778,42 @@
 // to the card-to-sidebar outer margin. l10n key renamed in place
 // (background.cards.neumorph.opacity.title x6, count 1953). No
 // engine (UIKit+NativeSurface) changes.
+
+// Task 171 (2026-09-25): seven-symptom device-feedback round on the f26337d
+// build (3 uploaded logs: latestlog.txt = ANGLE 26.3 FO pack, latestlog.old.txt
+// = mg 26.3 multiplayer on mysv.dpdns.org, latestlog.old = mg 26.4-snapshot-1).
+// (1) ANGLE renderer crash: libtinygl4angle.dylib was never in
+// ame_glBridgeEnabled (sdl3_hook.m), so renderpearl's GlBackend pointer
+// consistency check failed ("glGetError mismatch") -> Vulkan fallback ->
+// Iris ExceptionInInitializerError (No GLCapabilities). The bridge now takes
+// over SDL_GL for ANGLE too (AMETHYST_ANGLE_GL_BRIDGE=0 escape hatch).
+// (2) Hotbar taps "a bit low": touchHotbar's hit rect ignored the FSR window
+// ratio -- the visual bar spans physical 1640-88*1.7=1490..1640 but the gate
+// was barY=1560 (device log: REJECT above bar y=1516/1556). Geometry is now
+// ratio-aware (182x22 sprite x guiScale x physH/windowH; mcscale NOT used to
+// avoid double resolutionScale division). (3) CurseForge "key not set at
+// build time -> error": [headers] returning nil for keyless devices gated all
+// three request paths on missingAPIKeyError BEFORE sending, while baseURL
+// already forces the MCIM mirror -- keyless now sends Accept-only headers
+// (mirror verified 200 keyless; official API is 403). (4) Home avatar missing
+// on tab return: Task169's visible-cell direct sync only ran in the fetch
+// completion; the session-cache-hit branch relied on reloadSections (dropped
+// mid-transition). New ame171_syncVisibleProfileAvatar covers all branches +
+// viewDidAppear. (5) Multiplayer intermittent crash: the referenced
+// latestlog.old.txt session is CLEAN (60fps, exit(0)); the crashed session's
+// log was lost to the one-generation rotation -- init_redirectStdio now
+// preserves an exit-marker-less previous log as latestlog.crash.txt.
+// (6) MC 26.4 falls back to Vulkan on zink and mg alike:
+// PreferredGraphicsApi.DEFAULT.getBackendsToTry() flipped to {vulkan, gl} in
+// 26.4 (26.3: {gl, vulkan}) + the OptionsForceDefaultGraphicsApiFix datafix
+// resets the stored option -- Tools.java now appends --graphicsBackend opengl
+// for MC >= 26.4 when the renderer is not native MoltenVK (both 26.3 and
+// 26.4-snapshot-1 Main accept the argument; GL failure still falls through to
+// Vulkan via the same order table). (7) Keyboard first-session race ("must
+// press the IME button once after the keyboard appears"): device log shows
+// becomeFirstResponder=1 on EVERY input-method press = the field loses first
+// responder after each typed character (text=@" " assigned AFTER become +
+// clearsOnBeginEditing fighting iPadOS 26+ UIAsyncTextInput session
+// activation). Fix: sentinel text now written BEFORE becomeFirstResponder,
+// clearsOnBeginEditing=NO, plus ame171_armKeyboardRecheck auto re-arm (0.4s
+// health check, generation-guarded against user dismissal, max depth 2).

@@ -401,8 +401,70 @@ public final class Tools {
         // （versionName 优先取 inheritsFrom，避免 modded 版本 id 干扰比较）
         argsFromJson = appendServerArgs(argsFromJson, serverIp, versionName);
 
+        // Task171：MC 26.4+ 的 PreferredGraphicsApi.DEFAULT 把后端尝试顺序
+        // 翻转为 Vulkan 优先（26.3 是 GL 优先），且 26.4 的
+        // OptionsForceDefaultGraphicsApiFix datafix 会把存量
+        // preferredGraphicsBackend 重置回 "default"——本启动器选择的 GL
+        // 转译渲染器（mg/zink/ANGLE/gl4es/...）会被 MC 原生 Vulkan 后端
+        // 整层绕过（zink 配置全空转、Iris/光影失效；f26337d 装机日志
+        // latestlog.old：26.4-snapshot-1 + mg 渲染器 -> "Using graphics
+        // backend Vulkan, using drivers: 1.2.357 MoltenVK 1.4.2"，GL 路径
+        // 从未被尝试）。追加 --graphicsBackend opengl 强制 GL 优先（26.3
+        // 与 26.4-snapshot-1 的 Main 均已支持该参数，值域
+        // default/opengl/vulkan）；GL 失败仍按 getBackendsToTry 顺序表回落
+        // Vulkan，零新增风险。原生 Vulkan 渲染器（libMoltenVK）不追加——
+        // 默认即 Vulkan 优先，语义正确。
+        argsFromJson = appendGraphicsBackendArg(argsFromJson, versionName);
+
         // Tools.dialogOnUiThread(this, "Result args", Arrays.asList(argsFromJson).toString());
         return argsFromJson;
+    }
+
+    /**
+     * Task 171：MC >= 26.4 时追加 --graphicsBackend opengl（GL 转译渲染器）。
+     * 版本判定解析前导 "major.minor"（26.4-snapshot-1 -> 26.4），解析失败
+     * 不追加（旧版本 joptsimple 对未知参数会直接抛异常，宁可漏加不可错加）。
+     * 渲染器来自 AMETHYST_RENDERER 环境变量（JavaLauncher 在 JVM 启动前
+     * setenv，System.getenv 可见）；含 MoltenVK = 原生 Vulkan 渲染器，跳过。
+     */
+    private static String[] appendGraphicsBackendArg(String[] args, String versionId) {
+        if (versionId == null || !ame171IsMc264OrLater(versionId.trim())) {
+            return args;
+        }
+        String renderer = System.getenv("AMETHYST_RENDERER");
+        if (renderer != null && renderer.contains("MoltenVK")) {
+            System.out.println("[Tools] Task171: MC " + versionId + " + native Vulkan renderer -> keep default backend order (vulkan first)");
+            return args;
+        }
+        for (String a : args) {
+            if ("--graphicsBackend".equals(a)) {
+                System.out.println("[Tools] Task171: --graphicsBackend already present, not overriding");
+                return args;
+            }
+        }
+        List<String> argList = new ArrayList<String>(Arrays.asList(args));
+        argList.add("--graphicsBackend");
+        argList.add("opengl");
+        System.out.println("[Tools] Task171: MC " + versionId
+                + " defaults to Vulkan-first backend order; forcing --graphicsBackend opengl (renderer="
+                + (renderer == null ? "<unset>" : renderer) + ")");
+        return argList.toArray(new String[0]);
+    }
+
+    /** Task 171：解析前导 major.minor，判断是否 >= 26.4。 */
+    private static boolean ame171IsMc264OrLater(String versionId) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("^(\\d+)\\.(\\d+)").matcher(versionId);
+        if (!m.find()) {
+            return false;
+        }
+        try {
+            int major = Integer.parseInt(m.group(1));
+            int minor = Integer.parseInt(m.group(2));
+            return major > 26 || (major == 26 && minor >= 4);
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     /**

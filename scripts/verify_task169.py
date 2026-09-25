@@ -155,8 +155,12 @@ check("D6 主页 VC 头像路径换用助手（updateSkinDisplay 内不再裸下
 check("D7 右面板换用助手（updateAccountInfo 内不再裸下载；注释提及不算）",
       "fetchAvatarFromURL:avatarURL" in rp_acct
       and "NSData dataWithContentsOfURL" not in rp_acct)
-check("D8 可见 Profile 卡直刷兜底", "HomeProfileTileCell.class]" in news
-      and "avatarImageView.image = img" in news)
+# Task171 诚实重锚：内联循环已提炼为 ame171_syncVisibleProfileAvatar（缓存
+# 命中/viewDidAppear 分支同样直刷），此处改锚 helper 本体与三处调用。
+check("D8 可见 Profile 卡直刷兑底（Task171 重锚：helper 化 + 三处调用）",
+      "HomeProfileTileCell.class]" in news
+      and "avatarImageView.image = self.currentAvatar" in news
+      and news.count("ame171_syncVisibleProfileAvatar") >= 4)
 check("D9 括号平衡（AvatarManager/News）",
       am.count("{") == am.count("}") and news.count("{") == news.count("}"))
 
