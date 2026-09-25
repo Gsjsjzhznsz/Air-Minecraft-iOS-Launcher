@@ -117,12 +117,17 @@ check("C3 Task121 ✓ 存储值比较保留",
 
 print("== D. MG Vulkan 性能默认值 ==")
 plp = rd("Natives/PLPreferences.m")
-check("D1 enable_ext_direct_state_access 默认 YES（对齐代码安全默认值）",
-      '@"enable_ext_direct_state_access": @YES,' in plp)
+# Task166 重锚：DSA 默认改为 NO（三会话 A/B 实锤 DSAWrapper 在 FSR1 重定向下
+# 黑屏；性能依据来自 zink 原生 DSA，与 MobileGlues 无关；详见 Task166 病历）。
+check("D1 enable_ext_direct_state_access 默认 NO（Task166 黑屏反向；原 YES 时代结束）",
+      '@"enable_ext_direct_state_access": @NO,' in plp)
 check("D2 max_glsl_cache_size 默认 128",
       '@"max_glsl_cache_size": @(128),' in plp)
-check("D3 修正说明入档（bd71210 日志实锚）",
-      "enable_ext_direct_state_access = 0" in plp)
+# Task166 重锚：原 D3 锚（bd71210 "= 0" 实锚）随 PLPreferences 注释重写而迁移；
+# 现锚指向 Task166 反向迁移哨兵 + 病历注释（Task129d 历史现场转入注释链）。
+check("D3 修正说明入档（Task166 重锚：黑屏反向迁移哨兵 + 病历注释链）",
+      "task166_dsa_blackscreen_migrated" in plp
+      and "DSAWrapper" in plp)
 
 print("== E. 白背景双层兜底 ==")
 bm = rd("Natives/BackgroundManager.m")

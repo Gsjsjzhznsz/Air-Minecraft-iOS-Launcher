@@ -314,6 +314,7 @@ add_executable(AngelAuraAmethyst
   ctxbridges/gl_bridge.m
   ctxbridges/osm_bridge.mm
   ctxbridges/mgl_fsr.mm
+  ctxbridges/mgl_metal_fsr.mm
   ctxbridges/vk_bridge.m
 
   customcontrols/ControlButton.m
@@ -580,6 +581,12 @@ set_source_files_properties(ctxbridges/osm_bridge.mm PROPERTIES
 # 依赖，同方言同标准）。实现见 Natives/ctxbridges/mgl_fsr.mm 头注释。
 set_source_files_properties(ctxbridges/mgl_fsr.mm PROPERTIES
   COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc;-std=gnu++17")
+# Task 166：MobileGL DirectVulkan 的 Metal 层 FSR1 模块（双 CAMetalLayer
+# 交换层拦截 + MSL EASU/RCAS，与 osm_bridge/mgl_fsr 同为 ObjC++ 方言；
+# 含 Metal/Metal 依赖与 ObjC 协议实现）。实现见
+# Natives/ctxbridges/mgl_metal_fsr.mm 文件头。
+set_source_files_properties(ctxbridges/mgl_metal_fsr.mm PROPERTIES
+  COMPILE_OPTIONS "-x;objective-c++;-fobjc-arc;-std=gnu++17")
 
 # Add ModLoaderIcons PNG files into the app bundle Resources/ModLoaderIcons so they are available at runtime.
 # This will copy all *.png under Natives/ModLoaderIcons into the bundle at Resources/ModLoaderIcons/<name>.png
@@ -629,6 +636,8 @@ target_link_libraries(AngelAuraAmethyst
   "-framework CoreMotion"
   "-framework GameController"
   "-framework IOKit"
+  # Task 166：Metal 层 FSR1（mgl_metal_fsr.mm 的 MTLDevice/管线/命令缓冲）。
+  "-framework Metal"
   "-framework QuartzCore"
   "-framework UIKit"
   "-framework UniformTypeIdentifiers"

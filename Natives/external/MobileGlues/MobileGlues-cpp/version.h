@@ -1617,3 +1617,41 @@
 // a render-scale tier (window + drawableSize at render res, CA stretch)
 // which trades EASU sharpness for determinism -- deferred pending the
 // user's call, GLES/4.0 + full FSR1 at 60fps is the recommended path.
+
+// Task 166 (REVISION 17 addendum, no bump): Vulkan-direct FSR ships + the
+// real ES/4.0 black-screen config culprit. (1) Vulkan FSR: the Task154/165
+// "upstream hard limit" verdict was re-litigated after finding the
+// open-source upstream (MobileGL-Dev/MobileGL, LGPL) -- libMobileGL still
+// has zero built-in FSR, but MoltenVK consumes its swapchain images through
+// the id<CAMetalDrawable> ObjC protocol, so the launcher intercepts
+// presentation instead: a private CAMetalLayer subclass (Layer B, render-res
+// via explicit EGL_WIDTH/HEIGHT attribs) feeds MobileGL's pseudo-EGL ->
+// vkCreateMetalSurfaceEXT -> MoltenVK swapchain at render resolution, while
+// Layer B's overridden nextDrawable hands MoltenVK a wrapped drawable backed
+// by an 8-slot MTLTexture ring; the wrapper's present runs AMD FSR1
+// EASU (12-tap) + RCAS (5-tap, AMETHYST_FSR_RCAS_SHARPNESS, negative = off)
+// ported verbatim to MSL (ffx_a.h 32-bit constants 0x7ef07ebb / 0x7ef19fff /
+// 0x5f347d74, Task164-style OOB clamps inside the load helpers) into the
+// view's real full-res layer. Zero changes to the MobileGL/MoltenVK
+// binaries; the Task154 pre-swap GL war stays retired (pseudo-EGL root
+// cause unchanged; double-upscale guarded); ame83_fsr_capable_renderer
+// re-includes libMobileGL.dylib only (libMobileGL-gles stays excluded);
+// ame48_swap_geometry_guard records Layer B so the surface-vs-layer
+// comparison stays still; kill switch AME166_MGL_METAL_FSR=0; any init
+// failure falls back to da5918a full-res direct semantics. Install anchors:
+// "[MGLFSR] Task166 Metal FSR engaged", "first frame presented",
+// "steady: 600 frames". (2) ES/4.0 black screen: after Task164 (RCAS edge
+// clamps) and Task165 (xglGetProcAddress resolution routing) each failed to
+// heal it, a three-session A/B on the same device/modpack/MobileGlues
+// 2.0.17 isolated the sole config delta: enable_ext_direct_state_access
+// (DSA). DSA=0 (9e6fc27 healthy pair) = "DSA support not detected" =
+// playable with FSR; DSA=1 (cc9bfe4 pair + 3368468) = "ARB_direct_state_
+// access detected, enabling DSA" = black screen with healthy swap counters.
+// Task129d had forced DSA=1 citing zink perf (Mesa native DSA -- never
+// applied to MobileGlues' DSAWrapper emulation under the FSR1 fb0
+// redirect). Fix: default @NO in three places (PLPreferences,
+// JavaLauncher config.json, ame130 migration branch retired) plus a one-shot
+// reverse migration ame166_migrateMgDsaBlackScreen (persisted 1 -> 0,
+// sentinel task166_dsa_blackscreen_migrated; Task130's 0->1 neutralized so
+// fresh zeros are not flipped back); the settings toggle remains for manual
+// override. verify_task129 D1/D3 and verify_task130 E9/E10 re-anchored.

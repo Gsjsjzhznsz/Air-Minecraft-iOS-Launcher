@@ -12,6 +12,8 @@
 #include "environ.h"
 #include "gl_bridge.h"
 #include "utils.h"
+// Task 166：MobileGL DirectVulkan 的 Metal 层 FSR1（双 CAMetalLayer 交换层拦截）。
+#include "mgl_metal_fsr.h"
 
 static EGLDisplay g_EglDisplay;
 static egl_library handle;
@@ -1630,6 +1632,42 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_HEIGHT, (EGLint)MAX(1.0, round(layer.bounds.size.height * layer.contentsScale)),
         EGL_NONE
     };
+    // Task 166（MobileGL DirectVulkan 的 Metal 层 FSR1）：FSR 联动在场时，
+    // 把 native window 从视图真层（Layer A，全分辨率、上屏目标）换成私有
+    // 交换层（Layer B，renderW x renderH，由本模块持有），EGL 尺寸 attribs
+    // 同步改为渲染分辨率（windowWidth/windowHeight = surface/fsr_scale，
+    // updateSavedResolution 单一写者）。链路：MobileGL 伪 EGL ->
+    // vkCreateMetalSurfaceEXT(Layer B) -> MoltenVK swapchain（render-res）。
+    // 呈现端：MoltenVK [drawable present] 经 Layer B 的 nextDrawable 重写
+    // 进入包装器 -> Metal EASU(+RCAS) -> Layer A 真 drawable -> CA 上屏。
+    // 门控失败/初始化失败 -> swapLayerForEGL 保持视图层 + 全分辨率 attribs
+    // （da5918a 语义，零回归）。仅 libMobileGL.dylib（严格匹配，-gles 变体
+    // 不动）。ame166_metal_fsr_should_engage 内部四重门：渲染器名 + 几何
+    // （windowWidth < ame_surfaceWidth）+ 表面就绪 + 环境开关。
+    CALayer *swapLayerForEGL = layer;
+    const EGLint *attribsForEGL = mobileGL ? mobileGLSurfaceAttribs : NULL;
+    if (mobileGL) {
+        const char *ame166_rendererEnv = getenv("AMETHYST_RENDERER");
+        if (ame166_metal_fsr_should_engage(ame166_rendererEnv)) {
+            CAMetalLayer *ame166_layerB = ame166_metal_fsr_acquire_layer(
+                (CAMetalLayer *)layer, windowWidth, windowHeight);
+            if (ame166_layerB != nil) {
+                swapLayerForEGL = ame166_layerB;
+                static EGLint ame166_fsrAttribs[5];
+                ame166_fsrAttribs[0] = EGL_WIDTH;
+                ame166_fsrAttribs[1] = (EGLint)MAX(1, windowWidth);
+                ame166_fsrAttribs[2] = EGL_HEIGHT;
+                ame166_fsrAttribs[3] = (EGLint)MAX(1, windowHeight);
+                ame166_fsrAttribs[4] = EGL_NONE;
+                attribsForEGL = ame166_fsrAttribs;
+                NSLog(@"[GLGeo] Task166 FSR surface: EGL attribs %dx%d on private swap layer %p (display layer %p stays full %dx%d)",
+                      (int)MAX(1, windowWidth), (int)MAX(1, windowHeight),
+                      (__bridge void *)ame166_layerB, (__bridge void *)layer,
+                      (int)round(((CAMetalLayer *)layer).drawableSize.width),
+                      (int)round(((CAMetalLayer *)layer).drawableSize.height));
+            }
+        }
+    }
     // 单次创建（无重试环）：原生 scale 对齐后 ANGLE 无论读 bounds×scale 还是
     // drawableSize 都得到与 MC viewport 相同的尺寸，无需执法。
     // Task 124（诊断探针，非写入）：MobileGL + CAMetalLayer 且 drawableSize
@@ -1644,7 +1682,7 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         NSLog(@"[GLGeo] Task124 WARN: MobileGL CAMetalLayer drawableSize still zero before surface creation (Task60 align invariant broken?)");
     }
     bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
-        (__bridge EGLNativeWindowType)layer, mobileGL ? mobileGLSurfaceAttribs : NULL);
+        (__bridge EGLNativeWindowType)swapLayerForEGL, attribsForEGL);
     if (!bundle->surface) {
         NSDebugLog(@"EGLBridge: eglCreateWindowSurface finished with error: 0x%x", handle.eglGetError());
         free(bundle);
@@ -1674,13 +1712,19 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         }
         // Task 48：记录呈现 layer（CFBridgingRetain）与期望表面尺寸，
         // 供 ame48_swap_geometry_guard 逐帧自愈使用。
-        ame48_record_creation(layer, g_EglDisplay, bundle->surface);
+        // Task 166：记录的是【EGL surface 的真实宿主层】——Metal FSR 会话下
+        // 即私有交换层 Layer B（drawableSize=render-res，与 EGL attribs 同源），
+        // 卫兵的 surface-vs-layer 比较因此恒等静止；视图真层（Layer A）不在此
+        // 记录，其全分辨率 drawable 由 EASU 输出消费，与卫兵无关。
+        ame48_record_creation(swapLayerForEGL, g_EglDisplay, bundle->surface);
         // Task 50：GL 拥有呈现层（跨线程标志）——此后主线程
         // updateSavedResolution 走原生 scale 对齐分支（bounds x scale 跟随旋转）。
         atomic_store(&g_ame50_gl_owns_layer, 1);
         // Task 119：MobileGL FSR 状态复位——新上下文意味着旧 program/VAO/纹理
         // 已随旧上下文销毁，必须重编（首次调用为无日志空操作）。
         ame_mgl_fsr_context_reset();
+        // Task 166：Metal 层 FSR 会话态复位（帧计数/锚点日志；层与管线复用）。
+        ame166_metal_fsr_context_reset();
     }
 
     const EGLint gles_ctx_attribs[] = {
@@ -1924,6 +1968,8 @@ void gl_swap_interval(int swapInterval) {
 void gl_terminate() {
     // Task 50：GL 不再拥有呈现层（下次 updateSavedResolution 回到 2x 默认）。
     atomic_store(&g_ame50_gl_owns_layer, 0);
+    // Task 166：Metal 层 FSR 释放（私有交换层/管线/环形纹理）。
+    ame166_metal_fsr_teardown();
     handle.eglMakeCurrent(g_EglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     handle.eglDestroySurface(g_EglDisplay, br_get_current()->gl.surface);
     handle.eglDestroyContext(g_EglDisplay, br_get_current()->gl.context);

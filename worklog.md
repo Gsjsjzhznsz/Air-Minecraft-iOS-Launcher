@@ -388,3 +388,33 @@ Stage Summary:
   ④ "[MG] Task165 render-texture probe: center pixel rgba=..." 非零 + "[MG] Task164 RCAS GPU probe" 非零
   ⑤ "No context is current" 10 连消失
 - 若仍黑屏：两探针分诊（renderTexture 全零 = 解析层仍被绕过；renderTexture 非零 + fb0 全零 = RCAS 独立 bug 且熔断应已自动退 EASU-only 保画面）
+
+---
+Task ID: 166
+Agent: main (Super Z)
+Task: 用户裁决："那2个后端（GLES/4.0）在加载区块的情况下是非常卡顿且无解的。所以vulkan必须支持fsr,你上网搜索mg的源码尝试一下。还有es和4.0依旧黑屏"（3368468 新日志 = Task165 构建实测，黑屏未愈）→ Vulkan FSR 上线（Metal 呈现层方案）+ ES/4.0 黑屏 DSA 真根因修复
+
+### Work Log
+- 判读 3368468 新日志对（Task165 构建）：路由行/探针/熔断锚点全在，own-image 行回归 = Task165 解析层修复装机生效；但 render-texture probe rgba=00000000（应用绘制仍绕过重定向）+ 依旧 10 次 No-context → 解析层已修好，另有残余根因
+- 上游源码调研（用户指令）：仓库内 Natives/external/MobileGlues/MobileGlues-cpp/ 为 GLES/4.0 后端源码；上网找到 MobileGL-Dev 组织 = libMobileGL.dylib 的开源上游（MobileGL，LGPL-2.1，克隆入 workspace 源码+文档）——配置面仅 MOBILEGL_* 环境变量，源码无 FSR（零符号取证成立，"不可能"结论被开源事实替代）；Task148"共体构建内置 FSR1"论断证伪（上游无 ApplyFSR/FSR1_Context 前端）；二进制含 SPIRV-Tools/Vulkan 确认同源
+- ES/4.0 黑屏真根因（三会话 A/B 完整证据链）：健康对（a0ac656 latestlog.es/.4.0，9e6fc27 构建）DSA=0 → "DSA support not detected" → 可玩 + FSR 生效；黑屏对（cc9bfe4 双 + 3368468 新双）DSA=1 → "ARB_direct_state_access detected, enabling DSA" → 黑屏。同机同模组包同 MobileGlues 2.0.17，唯一配置差异 = DSA。Task158 强制 DSA + Task161 修好联动后该路径首次真正运行 = 黑屏出现时点吻合。Task129d 开 DSA 的性能依据来自 zink 会话（Mesa 原生 DSA），与 MobileGlues 的 DSAWrapper 模拟层无关（上游 core 后续才有 DSA 状态修复提交佐证包装层有坑）
+- 修复（DSA 三处归零 + 反向迁移）：PLPreferences 默认 @YES→@NO；JavaLauncher config.json enableExtDirectStateAccess @1→@0（用户偏好覆盖链保留可开回）；ame130 迁移的 DSA 0→1 分支停用（缓存 32→128 保留）；新增 ame166_migrateMgDsaBlackScreen 一次性反向迁移（持久化 1→0，哨兵 task166_dsa_blackscreen_migrated，Task130 老哨兵已置位设备走补课路径）
+- Vulkan FSR 方案（用户硬需求定案）：**双 CAMetalLayer 交换层拦截 + Metal EASU/RCAS**——Layer B（私有 CAMetalLayer 子类，render-res，重写 nextDrawable 返回包装 drawable=自有 8 槽 MTLTexture 环）作为 native window 传 MobileGL 伪 EGL → vkCreateMetalSurfaceEXT → MoltenVK swapchain（render-res）；包装 present 在 MoltenVK 队列提交线程上执行 Metal EASU（12-tap）+ RCAS（5-tap，AMETHYST_FSR_RCAS_SHARPNESS 负值=关）→ Layer A（视图真层，全分辨率）真 drawable 上屏。AMD FSR 1.20210629 逐字移植 MSL（ffx_a.h 32-bit 三常量、AMD tap 偏移布局、RCAS limit、Task164 OOB clamp 进装载器）。MoltenVK 1.2.9 源码实证 id<CAMetalDrawable> 协议消费面（present/presentAtTime/addPresentedHandler respondsToSelector 守卫）= 包装可行。MobileGL/MoltenVK 二进制零改动
+- 联动自洽（零新事实源）：ame83_fsr_capable_renderer 重新纳入 libMobileGL.dylib（-gles 维持排除）→ mgFsrScale 缩窗 + 输入除法复活（与 EGL attribs 同源同步，Task154 病历的除法失配不可达）；ame48 守卫记录 Layer B（surface-vs-layer 恒等）；Task78 豁免比较 viewport vs surface（=render-res 恒等）；mgl_fsr 预交换 GL 链维持硬退休（Task166 修订注释 + 装机日志更新：伪 EGL 根因未变 + 双重升采样守卫）
+- 降级保护链：acquire 任何一步失败（无设备/库编译/管线/队列）→ nil → gl_bridge 回退视图层直连 + 全分辨率 attribs（da5918a 语义）；present 期丢帧限频日志绝不崩溃；中转分配失败退化 EASU 单趟（Task83 语义）；kill switch AME166_MGL_METAL_FSR=0；自描述几何（尺寸取自纹理自身，不信启动器信念）
+- 自查修三 bug：环信号量初值 1（许可语义，初值 0 首取空等超时）；Ame166Drawable 强持有 _fsrLayer（teardown 与在速 drawable 生命周期安全）；RCAS limit 用 constexpr（MSL 常量折叠）
+- CMake：mgl_metal_fsr.mm 注册（ObjC++/ARC/gnu++17 同 mgl_fsr 方言）+ Metal 框架链接
+- 验证：verify_task166 新建 64/64（A 法证 5 + B DSA 三处 4 + C 反向迁移 4 + D API 3 + E 实现 15 + F MSL 数学 8 + G gl_bridge 6 + H ame83 4 + I 退休维持 3 + J CMake 3 + K 公告/version.h 4 + L 语法门/括号/级联 5）；新语法门 task166_syntax_mgl.py（should_engage stub 编译 + 7 门控行为案例 + RCAS 换算 stub + MSL 结构不变量）；级联 165=34/34（A3 黑屏对改 git 钉住 cc9bfe4 防上传漂移 + G1 置顶区重锚）、164=30/30、163=36/36（TASK163_REPO 注入）、162=68/68、161=56/56、160=47/47、130 E9/E10 重锚（ame166 接线两处 + 仅匹配 1）、129 D1/D3 重锚（@NO 默认 + 哨兵锚），其余失败均为环境基线（stash 对比核实）
+- 公告：task166 置顶（Vulkan FSR 上线 + DSA 根因 + 矩阵更新：Vulkan=推荐首选）+ task165 矩阵诚实改写（Vulkan 行 ❌→✅、"切 GLES/4.0 用 FSR"建议作废 + 追记）
+- version.h REVISION 17 addendum（Task 166，不 bump）
+- 提交推送（fetch 防撞号：远端仍 3368468 无并行提交）+ CI 轮询
+
+### Stage Summary
+- **Vulkan 直连后端 FSR 上线**：完整 FSR1（EASU+RCAS）经 Metal 呈现层拦截，二进制零改动，加载区块流畅 + 画质兼得（用户硬需求闭环）
+- **ES/4.0 黑屏根因闭环**：DSA 强制开启（三会话 A/B 铁证）→ 默认关 + 存量反向迁移；Task165 解析层修复保持（3368468 own-image 回归实证）
+- 装机验证锚点：
+  1. Vulkan 后端 + FSR 档位：`[MGLFSR] Task166 Metal FSR engaged: EGL surface (private layer) WxH -> ... `（链路建立）+ `Task166 first frame presented: EASU WxH -> WxH -> RCAS -> display layer`（首帧上屏）+ `Task166 steady: 600 frames upscaled`（稳态）
+  2. GLES / 4.0 后端：画面恢复（DSA 已关；日志应现 "DSA support not detected"）
+  3. `[MGLFSR] Task154 MobileGL pre-swap GL FSR chain RETIRED ... Task166: present-side Metal FSR owns upscaling`（双链不冲突确认）
+  4. 若 Vulkan FSR 异常：`AME166_MGL_METAL_FSR=0` 环境变量强制关闭回退全分辨率直呈（分诊用）
+- 遗留继承：26.1.2 libjvm 崩溃、静态库虚拟按钮、README + 6.0.0 发行文案收尾

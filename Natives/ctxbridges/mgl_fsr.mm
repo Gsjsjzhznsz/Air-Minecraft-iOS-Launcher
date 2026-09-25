@@ -846,12 +846,21 @@ extern "C" bool ame_mgl_fsr_before_swap(void) {
     // 天然失效），本入口直接返回 false：零绘制、零几何干预、零输入干预。
     // 代码体完整保留（Task119-153 的机制与病历存档）；未来若 MobileGL 提供
     // 真实 EGL current 跟踪或内置 FSR1，移除本门禁即可复用。
+    //
+    // ---- Task 166 修订：退休维持，理由更新 ----
+    // ame83_fsr_capable_renderer 已把 libMobileGL.dylib（DirectVulkan）重新
+    // 纳入 FSR 联动（mgFsrScale 生效、缩窗 + 输入除法复活），但升采样改由
+    // 呈现端的 Metal 层 FSR1 承担（mgl_metal_fsr.mm：双 CAMetalLayer 交换层
+    // 拦截，MoltenVK nextDrawable 包装 -> EASU/RCAS -> 视图真层）。本预交换
+    // GL 链【必须】保持退休：伪 EGL 无 current 跟踪的根因未变（7c32bc3 三重
+    // 实证），且若两链同时活跃 = 双重升采样毁帧。-gles 变体维持全排除
+    // （ame83 仍返回 NO，全分辨率直呈）。
     static bool s_ame154_logged = false;
     if (!s_ame154_logged) {
         s_ame154_logged = true;
         const char *ame154_renderer = getenv("AMETHYST_RENDERER");
         if (isMobileGLRenderer(ame154_renderer)) {
-            NSLog(@"[MGLFSR] Task154 MobileGL pre-swap FSR chain RETIRED (renderer=%s) -- full-res direct present, da5918a semantics restored; FSR remains available on MobileGlues/zink",
+            NSLog(@"[MGLFSR] Task154 MobileGL pre-swap GL FSR chain RETIRED (renderer=%s) -- Task166: present-side Metal FSR owns upscaling for libMobileGL.dylib (render-res swapchain -> EASU/RCAS -> display layer); libMobileGL-gles stays full-res direct; FSR also on MobileGlues/zink",
                   ame154_renderer ?: "<unset>");
         }
     }

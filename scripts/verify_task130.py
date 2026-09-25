@@ -149,14 +149,25 @@ check("E8 l10n 9 键四语言齐备",
 lp2 = rd("Natives/LauncherPreferences.m")
 lph = rd("Natives/LauncherPreferences.h")
 ad = rd("Natives/AppDelegate.m")
-check("E9 性能默认值治愈迁移（7a680d1 装机日志实锤：持久化旧默认压制 Task129d）",
+# Task166 重锚：DSA 0->1 分支整段停用（三会话 A/B 实锤 DSAWrapper 在
+# FSR1 重定向下黑屏；性能依据来自 zink 原生 DSA），原 E9 的 dsa==0 锚
+# 随分支退役而消失；现锚 = 迁移函数骨架 + Task130 哨兵 + 缓存 32 分支
+# （保留）+ Task166 修订注释 + ame166 反向迁移接线（两处：哨兵已置位
+# 老设备补课路径 + 新设备迁移后立即跑）。
+check("E9 性能默认值治愈迁移（Task166 重锚：DSA 分支停用，缓存 32->128 保留 + ame166 接线）",
       "void ame130_migrateMgPerfDefaults(void)" in lp2
       and 'task130_perf_defaults_migrated") boolValue]' in lp2
-      and "[(NSNumber *)dsa intValue] == 0" in lp2
+      and "dsa branch retired by Task166" in lp2
       and "[(NSNumber *)cache intValue] == 32" in lp2
-      and "void ame130_migrateMgPerfDefaults(void);" in lph)
-check("E10 迁移仅匹配旧默认值（自选值 64 不动，DSA 0->1 / 缓存 32->128）",
-      'setPrefObject(@"mobileglues.enable_ext_direct_state_access", @YES)' in lp2
+      and "void ame130_migrateMgPerfDefaults(void);" in lph
+      and lp2.count("ame166_migrateMgDsaBlackScreen();") == 2)
+# Task166 重锚：原 E10 锚（DSA 0->1 迁移写入 @YES）已随分支停用退役；
+# 现锚 = Task166 反向迁移形态——仅匹配持久化 1（boolValue == YES）才
+# 归 0、task166 哨兵一次性、自选 0 不动；缓存 32->128 写入保留。
+check("E10 Task166 反向迁移（DSA 仅匹配 1 归 0 / 缓存 32->128；自选 64/0 不动）",
+      'setPrefObject(@"mobileglues.enable_ext_direct_state_access", @NO)' in lp2
+      and "[(NSNumber *)dsa boolValue] == YES" in lp2
+      and 'task166_dsa_blackscreen_migrated") boolValue]' in lp2
       and 'setPrefObject(@"mobileglues.max_glsl_cache_size", @(128))' in lp2)
 check("E11 AppDelegate 接线 + PLPreferences 哨兵默认键注册（setPrefObject 只能写已存在键）",
       "ame130_migrateMgPerfDefaults();" in ad

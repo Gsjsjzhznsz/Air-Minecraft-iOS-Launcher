@@ -21,7 +21,20 @@ void migrateDefaultControlPref(void);
 /// Task129d 的新默认（1/128）——默认合并只补缺失键，已存在的不覆盖。
 /// 迁移仅匹配旧默认值（0/32），用户自选值（如 64）不动；哨兵键
 /// mobileglues.task130_perf_defaults_migrated 保证只执行一次。
+/// Task 166 修订：DSA 0→1 分支已停用（DSA=1 实锤为 MG GLES/4.0 黑屏
+/// 唯一配置差异，见 ame166_migrateMgDsaBlackScreen），仅保留缓存 32→128。
 void ame130_migrateMgPerfDefaults(void);
+
+/// Task 166 一次性迁移：MobileGlues DSA 黑屏反向治愈——把 Task129d/130
+/// 时代持久化的 enable_ext_direct_state_access=1 归 0。三会话 A/B 实锤
+/// （同机同模组包同 MobileGlues 2.0.17）：DSA=0 全程可玩（9e6fc27 两档），
+/// DSA=1 黑屏（Task158 后三会话：swap 100% 健康 + render-texture 探针
+/// 全零 + 首秒 10 次一次性 No-context）。机理：MobileGlues 2.0.17 的
+/// DSAWrapper 模拟层在 FSR1 fb0 重定向下自洽性不足，MC 26.x 检测到
+/// ARB_direct_state_access 即切 DSA 路径。哨兵键
+/// mobileglues.task166_dsa_blackscreen_migrated 保证只执行一次；用户此后
+/// 仍可在偏好分区手动开回（mobileglues.enable_ext_direct_state_access）。
+void ame166_migrateMgDsaBlackScreen(void);
 
 id getPrefObject(NSString *key);
 BOOL getPrefBool(NSString *key);

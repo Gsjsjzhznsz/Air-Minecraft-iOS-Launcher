@@ -113,22 +113,46 @@ void migrateDefaultControlPref(void) {
 // ImmediatelyFast 低开销路径的探测点）；后者 = 用户滑条自选（旧默认是
 // 32，64 从未当过默认——保留不动，缓存大小非性能主因）。仅匹配旧默认
 // 值才迁移，哨兵保证一次性；用户此后仍可自由改回。
+//
+// Task 166（修订）：DSA 分支整段停用——后续三会话 A/B 实锤 DSA=1 是
+// MG GLES/4.0 黑屏的唯一配置差异（9e6fc27 两档 DSA=0 全程可玩；Task158
+// 后 DSA=1 黑屏，render-texture 探针全零 + 首秒 10 次一次性 No-context）。
+// MobileGlues 2.0.17 的 DSAWrapper 模拟层在 FSR1 fb0 重定向下自洽性
+// 不足；Task129d 的性能依据来自 zink（Mesa 原生 DSA）。取而代之：
+// Task166 反向迁移（持久化 1 → 0，仅一次，新哨兵），之后用户仍可自由
+// 开回。GLSL 缓存 32→128 分支保留（良性，与黑屏无关）。
 void ame130_migrateMgPerfDefaults(void) {
-    if ([getPrefObject(@"mobileglues.task130_perf_defaults_migrated") boolValue]) return;
-
-    id dsa = getPrefObject(@"mobileglues.enable_ext_direct_state_access");
-    if ([dsa isKindOfClass:NSNumber.class] && [(NSNumber *)dsa intValue] == 0) {
-        setPrefObject(@"mobileglues.enable_ext_direct_state_access", @YES);
-        NSLog(@"[Preferences] Task130 migrated MG DSA default: 0 -> 1 (v5.1.0-era persisted default was suppressing the Task129d default)");
+    if ([getPrefObject(@"mobileglues.task130_perf_defaults_migrated") boolValue]) {
+        // Task130 哨兵已置位的老设备：Task130 当年可能已把 DSA 翻成 1——
+        // 走 Task166 反向迁移补课。
+        ame166_migrateMgDsaBlackScreen();
+        return;
     }
+
+    // Task166：DSA 0→1 迁移停用（原分支在此，见上方修订注释）。
     id cache = getPrefObject(@"mobileglues.max_glsl_cache_size");
     if ([cache isKindOfClass:NSNumber.class] && [(NSNumber *)cache intValue] == 32) {
         setPrefObject(@"mobileglues.max_glsl_cache_size", @(128));
         NSLog(@"[Preferences] Task130 migrated MG GLSL cache default: 32 -> 128");
     }
     setPrefObject(@"mobileglues.task130_perf_defaults_migrated", @YES);
-    NSLog(@"[Preferences] Task130 MG perf defaults migration checked (dsa=%@ cache=%@)",
-          dsa, cache);
+    NSLog(@"[Preferences] Task130 MG perf defaults migration checked (dsa branch retired by Task166; cache=%@)",
+          cache);
+    ame166_migrateMgDsaBlackScreen();
+}
+
+// Task 166：MobileGlues DSA 黑屏反向迁移——把 Task129d/130 时代持久化的
+// enable_ext_direct_state_access=1 一次性归 0（新默认 @NO 只对未设键生效，
+// 存量 1 会经 getPrefObject 覆盖链继续压制新默认，必须显式翻转）。
+// 仅匹配 1；用户此后手动开回的 1 不再被动（哨兵只跑一次）。
+void ame166_migrateMgDsaBlackScreen(void) {
+    if ([getPrefObject(@"mobileglues.task166_dsa_blackscreen_migrated") boolValue]) return;
+    id dsa = getPrefObject(@"mobileglues.enable_ext_direct_state_access");
+    if ([dsa isKindOfClass:NSNumber.class] && [(NSNumber *)dsa boolValue] == YES) {
+        setPrefObject(@"mobileglues.enable_ext_direct_state_access", @NO);
+        NSLog(@"[Preferences] Task166 migrated MG DSA default: 1 -> 0 (DSAWrapper under FSR1 redirect = MG GLES/4.0 black screen; see Task166 forensics)");
+    }
+    setPrefObject(@"mobileglues.task166_dsa_blackscreen_migrated", @YES);
 }
 
 id getPrefObject(NSString *key) {

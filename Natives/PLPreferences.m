@@ -188,13 +188,14 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"enable_no_error": @(0),
             @"enable_ext_timer_query": @YES,
             @"enable_ext_compute_shader": @NO,
-            // Task 129d：DSA 默认开启。init_loadMobileGluesConfig 的"安全默认值"
-            // 本就写入 enableExtDirectStateAccess=1（DSA 显著降低 MC/sodium
-            // 纹理与缓冲对象的 GL 调用开销；zink 会话实证 MC 检测到
-            // ARB_direct_state_access 即启用），但旧偏好默认 @NO 走
-            // getPrefObject 覆盖链把它静默改回 0（bd71210 26.3 会话日志：
-            // "enable_ext_direct_state_access = 0"）——意图与现实不符的纯 bug。
-            @"enable_ext_direct_state_access": @YES,
+            // Task 166：DSA 默认改为【关】（Task129d 的 @YES 曾把 MC 26.x
+            // 推进 DSA 路径——MobileGlues 2.0.17 的 DSAWrapper 模拟层在 FSR1
+            // fb0 重定向下自洽性不足，三会话 A/B 实锤黑屏；性能依据本就
+            // 来自 zink（Mesa 原生 DSA）而非 MobileGlues）。用户仍可在偏好
+            // 分区强制开回；zink 会话的 DSA 由 Mesa 自身暴露，不经此键。
+            // Task129d 原注释（"意图与现实不符的纯 bug"）的历史现场见
+            // LauncherPreferences.m 的 ame130 迁移函数与 Task166 反向迁移。
+            @"enable_ext_direct_state_access": @NO,
             // Task 129d：着色器缓存 128MB（对齐代码内"安全默认值"；旧默认 32MB
             // 对重型整合包偏小，缓存逐出意味着着色器重编译卡顿）。
             @"max_glsl_cache_size": @(128),
@@ -211,7 +212,10 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             // Task 130：性能默认值治愈迁移哨兵（ame130_migrateMgPerfDefaults，
             // 见 LauncherPreferences.h 根因注释——v5.1.0 持久化的旧默认 0/32
             // 压制 Task129d 新默认 1/128，本哨兵保证迁移只跑一次）
-            @"task130_perf_defaults_migrated": @NO
+            @"task130_perf_defaults_migrated": @NO,
+            // Task 166：DSA 黑屏反向迁移哨兵（ame166_migrateMgDsaBlackScreen，
+            // 持久化 1 -> 0 一次性归零；见 LauncherPreferences.h 的 Task166 注释）
+            @"task166_dsa_blackscreen_migrated": @NO
         }.mutableCopy,
         // 游戏内覆盖层（GameMenuOverlayView）的位置持久化与开关
         // 位置以屏幕宽高百分比存储（0.0~1.0），哨兵值 -1 表示未设置，

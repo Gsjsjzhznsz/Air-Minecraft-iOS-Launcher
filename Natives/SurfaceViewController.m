@@ -24,6 +24,8 @@
 #import "ios_uikit_bridge.h"
 #import "LanPortDetector.h"
 #import "BackgroundManager.h"
+// Task 166：MobileGL DirectVulkan 的 Metal 层 FSR1（updateSavedResolution 钩子）。
+#import "ctxbridges/mgl_metal_fsr.h"
 // ZeroTier/Terracotta 联机暂时移除（排查启动崩溃）
 // #import "MultiplayerManager.h"
 
@@ -275,8 +277,19 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
     if (renderer.length == 0) return NO;
     if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) return YES;
     if ([renderer hasPrefix:@"libOSMesa"]) return YES;
-    // Task 154：MobileGL 两后端退出 FSR 联动（见上方退休病历）——
-    // isMobileGLRenderer 命中时维持 1.0（不缩窗、不除输入、零链路介入）。
+    // Task 166：mg 的 Vulkan 后端（libMobileGL.dylib，DirectVulkan）重新
+    // 纳入 FSR 联动——升采样由 Task166 的 Metal 层 FSR1 承担（双
+    // CAMetalLayer 交换层拦截：render-res swapchain -> Metal EASU+RCAS
+    // -> 全分辨率显示层，MobileGL/MoltenVK 二进制零改动）。Task154 的
+    // 退休针对的是 mgl_fsr.mm 的【预交换 GL 链】（伪 EGL 无 current 跟踪
+    // -> 信念几何失配 -> 花屏/输入错位）；Task166 的战场在 Metal 呈现端，
+    // 几何不再依赖启动器信念（EGL attribs = windowWidth 单点下发，输入
+    // 除法与缩窗同源同步），Task154 病历的三重形态均不再可达。
+    // -gles 变体（DirectGLES）维持不联动（保守范围，用户指令只要求
+    // Vulkan）。
+    if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGL]) return YES;
+    // Task 154：MobileGL-gles 后端退出 FSR 联动（见上方退休病历）——
+    // isMobileGLRenderer 命中 -gles 时维持 1.0（不缩窗、不除输入）。
     if (isMobileGLRenderer(renderer.UTF8String)) return NO;
     return NO;
 }
@@ -1547,6 +1560,12 @@ void ame139_fsr_heal_reset_input_scale(void) {
     ame153_fsr_deferred_armed = 0;
     windowWidth = ame153_renderW;
     windowHeight = ame153_renderH;
+    // Task 166：MobileGL(DirectVulkan) Metal-FSR 的私有交换层尺寸同步
+    // （旋转/分辨率缩放后）：非活跃态零开销；活跃态下 gl_bridge 的 EGL
+    // attribs 已固定于建 surface 时刻，但 MoltenVK swapchain 跟随层几何
+    // （上游文档：“follows real surface resizes without rebuilding”），
+    // 环形纹理在 nextDrawable 的尺寸自查里惰性重建。
+    ame166_metal_fsr_update_size(windowWidth, windowHeight);
     if ([self.surfaceView.layer isKindOfClass:CAMetalLayer.class]) {
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.surfaceView.layer;
         // Task 60（画面模糊根因修复，5f1df50 真机日志实证）：

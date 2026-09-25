@@ -250,7 +250,21 @@ void init_loadMobileGluesConfig() {
     // customGLVersion 约束（settings.cpp 第 71-79 行）：>46 截断为 46，<32 且非 0 截断为 32，
     // 33-39 截断为 33，0 使用默认值 40。
     // 因此必须写入十进制数（40, 41, 42, ..., 46），不能写入十六进制 0x040000。
-    config[@"enableExtDirectStateAccess"] = @1;
+    //
+    // Task 166：DSA 默认改为【关】。三会话 A/B 实锤（同机同模组包同
+    // MobileGlues 2.0.17）：9e6fc27 两档（latestlog.es/.4.0，
+    // enable_ext_direct_state_access=0）→ "DSA support not detected" →
+    // 全程可玩 + FSR 生效；Task158 后的会话（cc9bfe4 双黑 + 3368468 新黑，
+    // =1）→ "ARB_direct_state_access detected, enabling DSA" → 黑屏
+    // （swap 100% 健康 + render-texture 探针全零 + 首秒固定 10 次一次性
+    // "No context is current"）。机理：MobileGlues 2.0.17 的 DSA 是
+    // DSAWrapper 模拟层（temporarilyBindFramebuffer 的状态往返在 FSR1
+    // fb0 重定向下的自洽性未经上游验证，上游 core 仓后续才有“stop asking
+    // the driver what we know”类的 DSA 状态修复），MC 26.x 的 DSA 路径
+    // 一旦激活即不再走经典路径。Task129d 开启它的性能依据来自 zink 会话
+    // （Mesa 原生 DSA，与 MobileGlues 无关）。用户偏好分区
+    // mobileglues.enable_ext_direct_state_access 仍可强制开回（下方覆盖链）。
+    config[@"enableExtDirectStateAccess"] = @0;
     config[@"maxGlslCacheSize"] = @128;
     // 默认 GL 4.0（MobileGlues 2.0.0 DEFAULT_GL_VERSION=40，
     // 内置 glslang+SPIRV-Cross 从源码编译，GLSL→SPIRV→ESSL 转换链可靠工作）
