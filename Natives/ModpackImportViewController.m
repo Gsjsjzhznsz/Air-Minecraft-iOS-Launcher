@@ -305,7 +305,7 @@
                 parseURL = [NSURL fileURLWithPath:localCopy];
                 NSLog(@"[ModpackImport] Task169 scoped copy OK: %@ -> %@ (%.1f MB)",
                       fileURL.lastPathComponent, localCopy,
-                      (double)[[[fm attributesOfItemAtPath:localCopy error:nil] fileSize] unsignedLongLongValue] / 1048576.0);
+                      (double)[[fm attributesOfItemAtPath:localCopy error:nil] fileSize] / 1048576.0);
             }
         } @catch (NSException *copyException) {
             NSLog(@"[ModpackImport] Task169 scoped copy threw (%@), falling back to original path", copyException.reason);
