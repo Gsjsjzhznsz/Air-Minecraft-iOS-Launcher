@@ -164,9 +164,14 @@ check("E9 性能默认值治愈迁移（Task166 重锚：DSA 分支停用，缓�
 # Task166 重锚：原 E10 锚（DSA 0->1 迁移写入 @YES）已随分支停用退役；
 # 现锚 = Task166 反向迁移形态——仅匹配持久化 1（boolValue == YES）才
 # 归 0、task166 哨兵一次性、自选 0 不动；缓存 32->128 写入保留。
+# Task167 重锚：翻转判定改局部变量双类型形态（NSNumber boolValue +
+# NSString intValue，见 LauncherPreferences.m 的 Task167 修订注释——
+# 迁移原挂载点 configurationForConnectingSceneSession 在既有场景会话
+# 设备上永不执行，调用点已搬 main.m）。
 check("E10 Task166 反向迁移（DSA 仅匹配 1 归 0 / 缓存 32->128；自选 64/0 不动）",
       'setPrefObject(@"mobileglues.enable_ext_direct_state_access", @NO)' in lp2
-      and "[(NSNumber *)dsa boolValue] == YES" in lp2
+      and "dsaOn = [(NSNumber *)dsa boolValue];" in lp2
+      and "dsaOn = ([(NSString *)dsa intValue] != 0);" in lp2
       and 'task166_dsa_blackscreen_migrated") boolValue]' in lp2
       and 'setPrefObject(@"mobileglues.max_glsl_cache_size", @(128))' in lp2)
 check("E11 AppDelegate 接线 + PLPreferences 哨兵默认键注册（setPrefObject 只能写已存在键）",

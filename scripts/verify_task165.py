@@ -222,8 +222,10 @@ anns = json.load(open(f"{ROOT}/announcements.json"))["announcements"]
 t165 = next((a for a in anns if a.get("id") == "task165-blackscreen-rootcause-2026-09-25"), None)
 # Task166 重锚：task166 公告（Vulkan FSR + DSA 根因）置顶后，task165
 # 退居第二位——置顶区口径从 anns[0] 放宽为前两位（新公告惯例： prepend）。
-check("G1 task165 公告置顶区（前两位；Task166 后退居第二）且内容含根因与装机锚点",
-      t165 is not None and any(anns[i]["id"] == "task165-blackscreen-rootcause-2026-09-25" for i in range(min(2, len(anns))))
+# Task167 重锚：task167（双失效根因修复）置顶后，task165 退居第三位——
+# 置顶区口径放宽为前三位（同惯例）。
+check("G1 task165 公告置顶区（前三位；Task166/167 后续 prepend）且内容含根因与装机锚点",
+      t165 is not None and any(anns[i]["id"] == "task165-blackscreen-rootcause-2026-09-25" for i in range(min(3, len(anns))))
       and "Task165 xglGetProcAddress" in t165.get("content", ""))
 t164 = next((a for a in anns if a.get("id") == "task164-fsr-blackscreen-defaults-2026-09-25"), None)
 check("G2 task164 表述纠正（第一轮未愈，指向真根因）",

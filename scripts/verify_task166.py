@@ -78,8 +78,9 @@ print("== C. ame166 反向迁移 ==")
 check("C1 函数声明 + 定义（.h 与 .m 双锚）",
       "void ame166_migrateMgDsaBlackScreen(void);" in lph
       and "void ame166_migrateMgDsaBlackScreen(void) {" in lp)
-check("C2 仅匹配持久化 1（boolValue == YES；自选 0 不动）",
-      "[(NSNumber *)dsa boolValue] == YES" in lp)
+check("C2 仅匹配持久化 1（boolValue 路径保留；Task167 重锚为局部变量形态 + 双类型容错）",
+      "dsaOn = [(NSNumber *)dsa boolValue];" in lp
+      and "dsaOn = ([(NSString *)dsa intValue] != 0);" in lp)
 check("C3 一次性哨兵（已迁移即返回；哨兵默认键注册）",
       'task166_dsa_blackscreen_migrated") boolValue]' in lp
       and '@"task166_dsa_blackscreen_migrated": @NO' in plp)

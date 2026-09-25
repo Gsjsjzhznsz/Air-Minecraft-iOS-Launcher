@@ -422,6 +422,15 @@ int main(int argc, char *argv[]) {
     init_setupResolvConf();
     init_setupMultiDir();
     toggleIsolatedPref(NO);
+    // Task 167：MobileGlues DSA 黑屏反向迁移的【常跑】调用点。原挂载点
+    // application:configurationForConnectingSceneSession: 只在新建场景会话时
+    // 触发（既有会话设备永不再调——60+ 份历史上传日志零出现该回调内日志，
+    // Task166 迁移因此在装机设备上从未执行，DSA 存量 1 压制新默认，
+    // GLES/4.0 黑屏修复失效）。本点位于 toggleIsolatedPref 之后（读到的是
+    // 生效存储）、任何偏好消费者（JavaLauncher/设置页）之前；哨兵保证
+    // 幂等，与 AppDelegate 的保留调用点互为冗余。装机锚点：
+    // "[Preferences] Task167 MG DSA black-screen migration ran (stored=1, flipped=1)"。
+    ame130_migrateMgPerfDefaults();
     [PLProfiles updateCurrent];
     init_setupAccounts();
     init_setupCustomControls();

@@ -50,6 +50,10 @@ extern dispatch_group_t fatalExitGroup;
     migrateDefaultControlPref();
     // Task 130：一次性治愈 MobileGlues 性能默认值（v5.1.0 持久化的旧默认
     // 0/32 压制 Task129d 新默认 1/128；幂等，仅匹配旧默认值，自选值不动）
+    // Task 167 修订：本挂载点只在【新建】场景会话时被 UIKit 调用，既有
+    // 会话的设备永不再触发（Task166 的 DSA 反向迁移因此从未执行）——
+    // 常跑调用点已搬到 main.m（toggleIsolatedPref 之后），此处保留作为
+    // 新装机/场景重建时的最早触发点，哨兵保证两处幂等互斥。
     ame130_migrateMgPerfDefaults();
     // Called when a new scene session is being created.
     return [[UISceneConfiguration alloc] initWithName:@"Default Configuration" sessionRole:connectingSceneSession.role];

@@ -1655,3 +1655,41 @@
 // sentinel task166_dsa_blackscreen_migrated; Task130's 0->1 neutralized so
 // fresh zeros are not flipped back); the settings toggle remains for manual
 // override. verify_task129 D1/D3 and verify_task130 E9/E10 re-anchored.
+
+// Task 167 (REVISION 17 addendum, no bump): the Task166 IPA's two fixes both
+// failed on device (upload 1b76d19: Vulkan crashed, GLES/4.0 still black) --
+// both root causes found and fixed the same session. (1) Vulkan crash:
+// MoltenVK's surface extent source is NOT CAMetalLayer.drawableSize but the
+// CAMetalLayer+MoltenVK category's naturalDrawableSizeMVK = bounds x
+// contentsScale (MVKSurface::getNaturalExtent feeds surface capabilities'
+// currentExtent). Task166's Layer B only set drawableSize, leaving bounds at
+// CGRectZero -> currentExtent = {0,0} -> MobileGL's RecreateSwapchain
+// zero-area guard installed NO swapchain -> m_images empty + first acquire
+// deferred -> MC's first DSA glBlitNamedFramebuffer(fb0) hit
+// SwapchainObject::GetImage(0) on an empty vector = nullptr load. The
+// disassembly of the shipping dylib matches the device crash pc byte-for-
+// byte (GetImage+0x28 is exactly the ldr x0,[x0] of m_images[index]; the
+// assert is compiled out at INFO level, so the OOB/empty read is a raw
+// SIGSEGV). Fix: Layer B writes bounds + contentsScale(1.0) alongside
+// drawableSize at all three geometry sites (create / existing-layer sync /
+// update_size hook); contentsScale=1.0 keeps natural == drawable ==
+// swapchain extent so MVKSwapchain::hasOptimalSurface stays optimal. (2)
+// The DSA reverse migration never executed: it was wired into
+// application:configurationForConnectingSceneSession:, which UIKit only
+// calls for NEW scene sessions -- devices whose session predates the code
+// never run it again (60+ uploaded device logs contain zero log lines from
+// anything inside that callback, including Task130-era unconditional
+// lines). Meanwhile the Task129d-era @YES default was persisted into the
+// plist by the defaults merge at every launch of those builds, so the
+// stored 1 suppressed Task166's fresh @NO default and both 1b76d19 sessions
+// still read enable_ext_direct_state_access = 1. Fix: the always-run call
+// site moved to main.m right after toggleIsolatedPref (effective store
+// active, before any consumer), the AppDelegate site kept as a fresh-install
+// early trigger (sentinel makes the two idempotent), and
+// ame166_migrateMgDsaBlackScreen gained NSNumber/NSString dual-type
+// tolerance plus an unconditional run anchor log. Install anchors:
+// Vulkan = "[MGLFSR] Task166 Metal FSR engaged" + "first frame presented"
+// (and no GetImage crash); GLES/4.0 = "[Preferences] Task167 MG DSA
+// black-screen migration ran (stored=1, flipped=1)" + "DSA support not
+// detected" + a visible frame. verify_task166 C2 + verify_task130 E10
+// re-anchored to the Task167 forms.

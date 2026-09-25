@@ -588,6 +588,19 @@ static int s_ame166_ringNext = 0;
 // nextDrawable 永不调用 super（Layer B 自身的 drawable 池零消耗）；返回
 // 环形槽位包装器。MoltenVK 在 swapchain 创建时会写 pixelFormat/drawableSize
 // —— 两者均被读取为本层的纹理分配参数，天然一致。
+//
+// Task 167（崩溃根因补丁）：MoltenVK 的表面尺寸真源不足 drawableSize，
+// 而是 CAMetalLayer+MoltenVK 分类的 naturalDrawableSizeMVK = bounds ×
+// contentsScale（MVKSurface::getNaturalExtent -> MVKDevice 表面能力
+// currentExtent）。Task166 只写了 drawableSize，bounds 保持 CGRectZero
+// -> currentExtent={0,0} -> MobileGL RecreateSwapchain 的 zero-area 守卫
+// 直接返回（不建 swapchain）-> m_images 空 + 首次 acquire 被推迟
+// -> MC 启用 DSA 后第一个 glBlitNamedFramebuffer(fb0) 走
+// ResolveColorBlitBinding -> SwapchainObject::GetImage(0) -> 空向量
+// data()=nullptr 解引用 = SIGSEGV（装机 1b76d19 实测：崩溃 pc 恰为
+// GetImage+0x28 的 ldr x0,[x0]，反汇编逐字节比对吻合）。修复：
+// bounds 与 drawableSize 同源同写（contentsScale 钉 1.0，乘法无精度损失），
+// 三个几何写入点（新建/已存在同步/update_size 钩子）全部成对更新。
 // ============================================================================
 @interface Ame166SwapchainLayer : CAMetalLayer
 @end
@@ -666,7 +679,10 @@ CAMetalLayer *ame166_metal_fsr_acquire_layer(CAMetalLayer *viewLayer, int render
         os_unfair_lock_lock(&s_ame166_lock);
         if (s_ame166_layerB != nil) {
             // 已存在（同会话二次建 surface / 旋转重建）：仅同步几何。
+            // Task 167：bounds 必须与 drawableSize 成对写（naturalDrawableSizeMVK
+            // 是 MoltenVK 的 currentExtent 真源，见类注释）。
             s_ame166_layerB.drawableSize = CGSizeMake(renderW, renderH);
+            s_ame166_layerB.bounds = CGRectMake(0.0, 0.0, renderW, renderH);
             s_ame166_renderW = renderW;
             s_ame166_renderH = renderH;
             os_unfair_lock_unlock(&s_ame166_lock);
@@ -741,6 +757,11 @@ CAMetalLayer *ame166_metal_fsr_acquire_layer(CAMetalLayer *viewLayer, int render
         Ame166SwapchainLayer *layerB = [[Ame166SwapchainLayer alloc] init];
         layerB.device = device;
         layerB.drawableSize = CGSizeMake(renderW, renderH);
+        // Task 167：MoltenVK currentExtent 真源 = bounds × contentsScale
+        // （naturalDrawableSizeMVK），与 drawableSize 同源同写，缺一即
+        // zero-area 守卫拒建 swapchain（见类注释的崩溃链）。
+        layerB.bounds = CGRectMake(0.0, 0.0, renderW, renderH);
+        layerB.contentsScale = 1.0;
         layerB.framebufferOnly = NO;       // 我们只借用其 drawable 分发，防御性
         layerB.maximumDrawableCount = 3;   // 与 MoltenVK imageCount 期望对齐
         layerB.presentsWithTransaction = NO;
@@ -793,6 +814,8 @@ void ame166_metal_fsr_update_size(int renderW, int renderH) {
     os_unfair_lock_lock(&s_ame166_lock);
     if (s_ame166_layerB != nil) {
         s_ame166_layerB.drawableSize = CGSizeMake(renderW, renderH);
+        // Task 167：bounds 成对同步（currentExtent 真源，见类注释）。
+        s_ame166_layerB.bounds = CGRectMake(0.0, 0.0, renderW, renderH);
         s_ame166_renderW = renderW;
         s_ame166_renderH = renderH;
     }

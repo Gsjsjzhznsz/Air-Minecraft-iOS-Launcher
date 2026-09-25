@@ -145,13 +145,38 @@ void ame130_migrateMgPerfDefaults(void) {
 // enable_ext_direct_state_access=1 一次性归 0（新默认 @NO 只对未设键生效，
 // 存量 1 会经 getPrefObject 覆盖链继续压制新默认，必须显式翻转）。
 // 仅匹配 1；用户此后手动开回的 1 不再被动（哨兵只跑一次）。
+//
+// Task 167（迁移失效根因修订）：Task166 把本迁移接在
+// application:configurationForConnectingSceneSession: 里——但 UIKit 只为
+// 【新建】场景会话调该回调，既有会话的设备（本机场景会话建立于更早版本）
+// 永不再触发（60+ 份历史上传日志中该回调内任何日志零出现，含 Task130
+// 时代的无条件日志）。叠加第二个事实：Task129d 时代默认 @YES 经
+// PLPreferences 的 defaults 合并在每次启动时被写进 plist（持久化），
+// 存量 1 压制 Task166 新默认 @NO——装机 1b76d19 双会话实测
+// enable_ext_direct_state_access 仍读出 1、无任何 Task166 迁移日志。
+// 修复：常跑调用点搬到 main.m（toggleIsolatedPref 之后、任何消费者之前），
+// 本函数同步强化：①存储值 NSNumber/NSString 双类型容错（Task142
+// pick-row 存字符串的同款防御）；②无论是否翻转都打一条运行锚点日志
+// （装机验证迁移真正跑过）；③翻转判定改用局部变量（boolValue/intValue
+// 双路径），哨兵与翻转语义不变。
 void ame166_migrateMgDsaBlackScreen(void) {
     if ([getPrefObject(@"mobileglues.task166_dsa_blackscreen_migrated") boolValue]) return;
     id dsa = getPrefObject(@"mobileglues.enable_ext_direct_state_access");
-    if ([dsa isKindOfClass:NSNumber.class] && [(NSNumber *)dsa boolValue] == YES) {
+    // Task 167：双类型容错（NSNumber 是常规路径；NSString 是 pick-row
+    // 历史写入的防御，同 ame130_export_rcas_env 的双解析口径）。
+    BOOL dsaOn = NO;
+    if ([dsa isKindOfClass:NSNumber.class]) {
+        dsaOn = [(NSNumber *)dsa boolValue];
+    } else if ([dsa isKindOfClass:NSString.class]) {
+        dsaOn = ([(NSString *)dsa intValue] != 0);
+    }
+    if (dsaOn) {
         setPrefObject(@"mobileglues.enable_ext_direct_state_access", @NO);
         NSLog(@"[Preferences] Task166 migrated MG DSA default: 1 -> 0 (DSAWrapper under FSR1 redirect = MG GLES/4.0 black screen; see Task166 forensics)");
     }
+    // Task 167：运行锚点（无论翻转与否都打——装机日志凭此确认迁移真正
+    // 执行过，而非又一个从未触发的挂载点）。
+    NSLog(@"[Preferences] Task167 MG DSA black-screen migration ran (stored=%@, flipped=%d)", dsa, dsaOn);
     setPrefObject(@"mobileglues.task166_dsa_blackscreen_migrated", @YES);
 }
 
