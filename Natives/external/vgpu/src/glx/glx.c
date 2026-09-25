@@ -433,7 +433,9 @@ static void init_vsync() {
 static void xrefresh() {
     // Task173 (iOS port): system() is unavailable on iOS; xrefresh is an
     // X11-era no-op here anyway (LIBGL_XREFRESH is never set on device).
-#if defined(__APPLE__) && defined(TARGET_OS_IPHONE)
+    // Guard on plain __APPLE__ (TargetConditionals.h is not in this TU's
+    // include set; this dylib is iOS-only in this project).
+#if defined(__APPLE__)
     (void)0;
 #else
     int dummy = system("xrefresh");
