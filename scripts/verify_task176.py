@@ -127,8 +127,9 @@ check("E4 dispatch_once 单例（多 VC 不重复挂）",
 
 print("== F. CF 资源包 tab 取证 ==")
 dl = rd("Natives/DownloadViewController.m")
-check("F1 入口一行（api 类型 + 源 + filters）",
-      "[DLForensics] Task176 resourcepack load: api=%@ source=%@ filters=%@" in dl)
+check("F1 入口一行（api 类型 + 源 + filters）",  # NSStringFromClass 形态（id 上点语法 .class 在 clang 报 property not found —— CI run 36220503790）
+      "[DLForensics] Task176 resourcepack load: api=%@ source=%@ filters=%@" in dl
+      and "NSStringFromClass([api class])" in dl)
 check("F2 结果一行（条数 + 错误）",
       "[DLForensics] Task176 resourcepack result: %lu items, error=%@" in dl)
 check("F3 病历注释（classId=12 请求从未出现 → 入口/回调无从分辨）",

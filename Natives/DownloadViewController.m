@@ -2222,7 +2222,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     // 日志里 classId=12 的请求一次都没出现过——请求根本没发出，还是发出
     // 了没回调，日志无从分辨）。入口一行 + 结果一行，下轮日志直接钉死。
     NSLog(@"[DLForensics] Task176 resourcepack load: api=%@ source=%@ filters=%@",
-          api.class, [PLPreferences currentDownloadSourceForType:@"resourcepack"], filters);
+          NSStringFromClass([api class]), [PLPreferences currentDownloadSourceForType:@"resourcepack"], filters);
     [api searchModWithFilters:filters completion:^(NSArray * _Nullable results, NSError * _Nullable error) {
         NSLog(@"[DLForensics] Task176 resourcepack result: %lu items, error=%@",
               (unsigned long)results.count, error.localizedDescription);

@@ -140,9 +140,11 @@ faq = json.loads(root_bytes.decode("utf-8"))
 cats = faq.get("categories", [])
 check("C2 结构：四分类且组名正确",
       [c["name"] for c in cats] == ["渲染与性能", "输入与控制", "安装与数据", "故障排除"])
-check("C3 条数口径（11/4/6/13，总 34，与 Task82-166 硬编码版一致）",
-      [len(c["items"]) for c in cats] == [11, 4, 6, 13]
-      and sum(len(c["items"]) for c in cats) == 34)
+check("C3 条数口径（11/4/7/13，总 35 —— Task176 重锚：用户并行编辑 3d36ea5/407b710 把"
+      "「内存分配建议」拆成「正确分配内存」+「内存权限」两条，安装与数据 6→7；"
+      "Task82-166 硬编码时代的 34 已过时）",
+      [len(c["items"]) for c in cats] == [11, 4, 7, 13]
+      and sum(len(c["items"]) for c in cats) == 35)
 allit = [i for c in cats for i in c["items"]]
 check("C4 每条 icon/title/description 三字段全非空",
       all(i.get("icon") and i.get("title") and i.get("description") for i in allit))
