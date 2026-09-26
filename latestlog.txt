@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 6.0.0
-[Pre-Init] Commit: e0c68e7 (main)
+[Pre-Init] Commit: f484eb7 (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -17,6 +17,7 @@
 [SceneDelegate] Failed to update geometry: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
 [HomeAvatar] Task172 branch: network fetch started (URL present, length=211)
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
+[PLPreferences] Getter could not find preference internal.autolaunch_profile
 [HomeAvatar] Task172 branch: network fetch started (URL present, length=211)
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
 [SceneDelegate] Terracotta temporarily disabled for crash investigation
@@ -26,18 +27,117 @@
 [HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260925)
-[HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Library/Caches/IconLoader, mirror enabled: YES
+[HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [LauncherRootVC] Loaded 918 remote versions
-[ProfileSettings] Task150: renderer picker opened (7 options incl. single 'mg'; follow-global retired)
-[ProfileSettings] Task150: renderer written to PROFILE ONLY 'Smooth Journey 0.1 for Minecraft 1.8.9' = libgl4es_114.dylib
+[Task173] safe heap ceiling: os_proc_available_memory=12214MB -> Xmx ceiling 11014MB (native reserve 1200MB)
+[DownloadVC] Task173 version manifest candidates: 2
+[DownloadVC] Task173 version manifest loaded from piston-meta.mojang.com (916 versions)
+[DownloadVC] Task173 version manifest candidates: 2
+[DownloadVC] Task173 version manifest loaded from piston-meta.mojang.com (916 versions)
+2026-09-26 09:20:22.338 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:22.338 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:22.338 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Task171: no API key configured -- requests go keyless to the MCIM mirror (field-tested 200)
+2026-09-26 09:20:22.338 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] searchModWithFilters starting request: https://mod.mcimirror.top/curseforge/v1/mods/search?gameId=432&classId=4471&pageSize=30&index=0&gameVersion=1.8.9
+2026-09-26 09:20:24.007 AngelAuraAmethyst[2387:346941] [CurseForgeAPI] searchModWithFilters success: returned 30 items (total=306)
+2026-09-26 09:20:37.267 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:37.267 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:37.267 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] searchModWithFilters starting request: https://mod.mcimirror.top/curseforge/v1/mods/search?gameId=432&classId=6&pageSize=30&index=0&gameVersion=1.8.9&sortField=2&sortOrder=desc&modLoaderType=1
+2026-09-26 09:20:42.349 AngelAuraAmethyst[2387:346941] [CurseForgeAPI] searchModWithFilters success: returned 30 items (total=1868)
+2026-09-26 09:20:47.643 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:47.643 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:47.643 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] searchModWithFilters starting request: https://mod.mcimirror.top/curseforge/v1/mods/search?gameId=432&classId=6&pageSize=30&index=30&gameVersion=1.8.9&sortField=2&sortOrder=desc&modLoaderType=1
+2026-09-26 09:20:51.363 AngelAuraAmethyst[2387:347149] [CurseForgeAPI] searchModWithFilters success: returned 30 items (total=1868)
+2026-09-26 09:20:52.996 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:52.996 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] Warning: API Key not configured!
+2026-09-26 09:20:52.996 AngelAuraAmethyst[2387:346880] [CurseForgeAPI] searchModWithFilters starting request: https://mod.mcimirror.top/curseforge/v1/mods/search?gameId=432&classId=6552&pageSize=30&index=0&gameVersion=1.8.9
+2026-09-26 09:20:55.760 AngelAuraAmethyst[2387:347149] [CurseForgeAPI] searchModWithFilters success: returned 30 items (total=119)
+[ModpackDownload] Modpack download attempt 1: https://cdn.modrinth.com/data/aOOJ2mte/versions/CPaYb1rU/Optimized%20fps%201.8.9%201.1.2.mrpack
+[DownloadVC] Vanilla 1.8.9 already installed (JSON + jar exist), skip preinstall
+[ModpackDL] Extracted overrides/config/FpsReducer/FpsReducer.cfg
+[ModpackDL] Extracted overrides/config/MouseTweaks.cfg
+[ModpackDL] Extracted overrides/config/antighost.cfg
+[ModpackDL] Extracted overrides/config/ascribe.cfg
+[ModpackDL] Extracted overrides/config/bbm/AI_Improvements.cfg
+[ModpackDL] Extracted overrides/config/entityculling.json
+[ModpackDL] Extracted overrides/config/foamfix.cfg
+[ModpackDL] Extracted overrides/config/forge.cfg
+[ModpackDL] Extracted overrides/config/forgeChunkLoading.cfg
+[ModpackDL] Extracted overrides/config/idletweaks.cfg
+[ModpackDL] Extracted overrides/config/phosphor.json
+[ModpackDL] Extracted overrides/config/randompatches.cfg
+[ModpackDL] Extracted overrides/config/smoothfont/smoothfont.cfg
+[ModpackDL] Extracted overrides/config/splash.properties
+[ModpackDL] Extracted overrides/mods/AIImprovements-1.8.9-0.0.1b20160401184840-universal.jar
+[ModpackDL] Extracted overrides/mods/MouseTweaks-2.6.2-mc1.8.9.jar
+[ModpackDL] Extracted overrides/mods/SmoothFont-1.8.9-1.15.2.jar
+[ModpackDL] Extracted overrides/mods/antighost-1.8.9-forge11.15.1.1722-1.1.jar
+[ModpackDL] Extracted overrides/mods/randompatches-1.12.2-1.22.1.10.jar
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[PLDownload] Attempt 1/2 retry=0 cdn.modrinth.com
+[ModpackImport] Mod download completed: 8/8 succeeded, 0 failed, 0 skipped(404), 5.73 MB transferred
+[ModpackImport] Task95: import report written to import_report.json (total=8 success=8 failed=0 skipped=0)
+[PLDownload] Attempt 1/2 retry=0 maven.minecraftforge.net
+[PLDownload] Attempt failed (candidate 1, retry 0/3): HTTP 404（https://maven.minecraftforge.net/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 1/2 retry=1 maven.minecraftforge.net
+[PLDownload] Attempt failed (candidate 1, retry 1/3): HTTP 404（https://maven.minecraftforge.net/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 1/2 retry=2 maven.minecraftforge.net
+[PLDownload] Attempt failed (candidate 1, retry 2/3): HTTP 404（https://maven.minecraftforge.net/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 1/2 retry=3 maven.minecraftforge.net
+[PLDownload] Attempt failed (candidate 1, retry 3/3): HTTP 404（https://maven.minecraftforge.net/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 2/2 retry=0 bmclapi2.bangbang93.com
+[PLDownload] Attempt failed (candidate 2, retry 0/3): HTTP 404（https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 2/2 retry=1 bmclapi2.bangbang93.com
+[PLDownload] Attempt failed (candidate 2, retry 1/3): HTTP 404（https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 2/2 retry=2 bmclapi2.bangbang93.com
+[PLDownload] Attempt failed (candidate 2, retry 2/3): HTTP 404（https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[PLDownload] Attempt 2/2 retry=3 bmclapi2.bangbang93.com
+[PLDownload] Attempt failed (candidate 2, retry 3/3): HTTP 404（https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar）
+[ModpackImport] Forge installer.jar download failed, falling back to placeholder JSON: https://maven.minecraftforge.net/net/minecraftforge/forge/1.8.9-11.15.1.2318/forge-1.8.9-11.15.1.2318-installer.jar
+[ModpackImport] Loader installation failed (user may have already installed): Forge installer.jar 下载失败，已写入占位 JSON。请手动安装加载器。
+[ModpackImport] Ensuring complete version is installed: 1.8.9-forge-11.15.1.2318-f71270f5 (parent version: 1.8.9)
+[ForgeDirect] Parent version JSON already exists: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/versions/1.8.9/1.8.9.json
 [MCDL] SHA1 passed for 1.8.9.json
 [MCDL] insertSafety: how to insert assetIndex?
 [MCDL] insertSafety: how to insert assets?
 [MCDL] insertSafety: how to insert minecraftArguments?
 [MCDL] insertSafety: how to insert releaseTime?
 [MCDL] insertSafety: how to insert time?
-[MCDL] Replacing JNA 3.4.0 with 5.13.0 for iOS compatibility (required by 1.8.9-forge-11.15.1.2318-bbc7aad9)
+[MCDL] Replacing JNA 3.4.0 with 5.13.0 for iOS compatibility (required by 1.8.9-forge-11.15.1.2318-f71270f5)
+[MDCL] Skipped library org.lwjgl.lwjgl:lwjgl:2.9.4-nightly-20150209
+[MDCL] Skipped library org.lwjgl.lwjgl:lwjgl_util:2.9.4-nightly-20150209
+[MDCL] Skipped library org.lwjgl.lwjgl:lwjgl-platform:2.9.4-nightly-20150209
+[MDCL] Skipped library org.lwjgl.lwjgl:lwjgl:2.9.2-nightly-20140822
+[MDCL] Skipped library org.lwjgl.lwjgl:lwjgl_util:2.9.2-nightly-20140822
+[MCDL] Unknown artifact object for org.lwjgl.lwjgl:lwjgl-platform:2.9.2-nightly-20140822, attempting to generate one
+[MDCL] Skipped library org.lwjgl.lwjgl:lwjgl-platform:2.9.2-nightly-20140822
+[MCDL] Unknown artifact object for net.java.jinput:jinput-platform:2.0.5, attempting to generate one
+[MDCL] Skipped library net.java.jinput:jinput-platform:2.0.5
+[MCDL] Unknown artifact object for tv.twitch:twitch-platform:6.5, attempting to generate one
+[MDCL] Skipped library tv.twitch:twitch-platform:6.5
+[MCDL] Unknown artifact object for tv.twitch:twitch-external-platform:4.5, attempting to generate one
+[MDCL] Skipped library tv.twitch:twitch-external-platform:4.5
+[MCDL] Downloading 1.8.9-forge-11.15.1.2318-f71270f5.jar
+[ModpackImport] Full version download completed: 1.8.9-forge-11.15.1.2318-f71270f5
+[ModpackImport] Task72 ReloadProfileList posted after online modpack install
+[LauncherRootVC] Loaded 918 remote versions
+[ProfileSettings] Task150: renderer picker opened (8 options incl. single 'mg'; follow-global retired)
+[ProfileSettings] Task150: renderer written to PROFILE ONLY '1.8.9' = libvgpu.dylib
+[ProfileSettings] Task150: renderer picker opened (8 options incl. single 'mg'; follow-global retired)
+[ProfileSettings] Task150: renderer picker opened (8 options incl. single 'mg'; follow-global retired)
+[MCDL] SHA1 passed for 1.8.9.json
+[MCDL] insertSafety: how to insert assetIndex?
+[MCDL] insertSafety: how to insert assets?
+[MCDL] insertSafety: how to insert minecraftArguments?
+[MCDL] insertSafety: how to insert releaseTime?
+[MCDL] insertSafety: how to insert time?
+[MCDL] Replacing JNA 3.4.0 with 5.13.0 for iOS compatibility (required by 1.8.9-forge-11.15.1.2318-f71270f5)
 [MDCL] Skipped library org.lwjgl.lwjgl:lwjgl:2.9.4-nightly-20150209
 [MDCL] Skipped library org.lwjgl.lwjgl:lwjgl_util:2.9.4-nightly-20150209
 [MDCL] Skipped library org.lwjgl.lwjgl:lwjgl-platform:2.9.4-nightly-20150209
@@ -56,9 +156,9 @@
 sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [JIT] Task169 isJITEnabled: still waiting after 0s (traced=0 exn=0)
 [IconLoader] App entered background: cancelled all ongoing downloads
-[TouchController] Task172 profile 'Smooth Journey 0.1 for Minecraft 1.8.9' TouchController off -- global settings untouched
+[TouchController] Task172 profile '1.8.9' TouchController off -- global settings untouched
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260925)
-[SurfaceViewController] FPS counter setup: profileRenderer=libgl4es_114.dylib, envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
+[SurfaceViewController] FPS counter setup: profileRenderer=libvgpu.dylib, envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
 [SurfaceVC] CAMetalLayer configured: drawableSize=2360x1640, maximumDrawableCount=3, presentsWithTransaction=0, drawsAsynchronously=1, contentsScale=2.00
 [CustomControls] Task83b decorative sub-button pass-through enabled #1 (name=, touch no longer swallowed)
 [CustomControls] Task83b decorative sub-button pass-through enabled #2 (name=, touch no longer swallowed)
@@ -147,22 +247,22 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [DyldLVBypass] hook dyld_mmap succeed!
 [DyldLVBypass] found dyld_fcntl at 0x18873d6cc
 [DyldLVBypass] hook dyld_fcntl succeed!
-[JavaLauncher] init_loadMobileGluesConfig: renderer=libgl4es_114.dylib
+[JavaLauncher] init_loadMobileGluesConfig: renderer=libvgpu.dylib
 [JavaLauncher] MobileGlues config not written (renderer is not mobileglues/auto/vulkan/mgfamily)
 [JavaLauncher] Task130: AMETHYST_FSR_RCAS_SHARPNESS=0.2000 exported (RCAS sharpness, mpv scale, default 0.2, negative = off)
 [JavaLauncher] Task138: POJAV_NATIVEDIR=/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents (controlify JNA direct-mapping guard: libsdl4j ffi closure thunks are non-executable on iOS, steer Pojav-aware mods to graceful GLFW fallback)
-[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [JavaLauncher] Task158: library gate clean (26 present, 12 skipped)
 [PLProfiles] Applying javaVersion (8)
-[JavaLauncher] RENDERER is set to libgl4es_114.dylib
+[JavaLauncher] RENDERER is set to libvgpu.dylib
 [JavaLauncher] GRAPHICS_API is set to default
+[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [JavaLauncher] Looking for Java 8 or later
 [JavaLauncher] JAVA_HOME has been set to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk
 [Task141] launch memory from instance profile: 2048 MB
 [JavaLauncher] Max RAM allocation is set to 2048 MB
 [JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks
 [Amethyst] Task112: OpenAL pinned to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks/libopenal.dylib
-[JavaLauncher] Published Metallum surface view: 0x10ca341c0 (scale=2)
+[JavaLauncher] Published Metallum surface view: 0x11f274c40 (scale=2)
 [JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
 [JavaLauncher] Adding authlib-injector arguments for third party account
 [ThirdPartyAuthenticator] Added prefetched metadata parameter (length=1780)
@@ -177,28 +277,38 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [JavaLauncher] Caciocavallo: isJava8=1 libs=libs_caciocavallo mode=/p
 [JavaLauncher] Reading custom JVM flags
 [Init] Found JLI lib
-[JavaLauncher] Using LWJGL 333 (mcVersion=1.8.9-forge-11.15.1.2318-bbc7aad9)
+[JavaLauncher] Using LWJGL 333 (mcVersion=1.8.9-forge-11.15.1.2318-f71270f5)
 [JavaLauncher] Using LWJGL jar at /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/libs/lwjgl-333/lwjgl.jar
-[CwdAlign] Task97: process CWD aligned to game dir: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_45A5917F-A4B2-4A80-91D8-6BE7A121B3CA
+[CwdAlign] Task97: process CWD aligned to game dir: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_75688DFC-7F56-4D30-952C-D31B40FE85BC
 [AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed (iOS has no AppKit; MC 26.3 MacosUtil menu walk no-ops, numberOfItems=0)
 [Init] Calling JLI_Launch
 [PLDisplayLinkTarget] displayLinkTick #2 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [SDLHook] Task133: libjvm image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib) -- rebinding its _dlopen slots
 [SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
 [SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
-[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [JIT26] Requesting 64 MB for JIT mapping
-[JIT26] Got JIT mapping 0x138c00000 from debugger
-[JIT26] mapping at RW=0x13cc00000, RX=0x138c00000
-[authlib-injector] [INFO] Logging file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_45A5917F-A4B2-4A80-91D8-6BE7A121B3CA/authlib-injector.log
+[JIT26] Got JIT mapping 0x13a800000 from debugger
+[JIT26] mapping at RW=0x13e800000, RX=0x13a800000
+[authlib-injector] [INFO] Logging file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_75688DFC-7F56-4D30-952C-D31B40FE85BC/authlib-injector.log
 [authlib-injector] [INFO] Version: 1.2.8
 [authlib-injector] [INFO] Authentication server: https://littleskin.cn/api/yggdrasil/
 PatchJNAAgent: premain called
 Arc Capes DNS Injector
 Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
 Added DNS cache entry: s.optifine.net/23.95.137.176
+Could not load options.txt
+java.io.FileNotFoundException: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/custom_gamedir/modrinth_75688DFC-7F56-4D30-952C-D31B40FE85BC/options.txt (No such file or directory)
+	at java.io.FileInputStream.open0(Native Method)
+	at java.io.FileInputStream.open(FileInputStream.java:195)
+	at java.io.FileInputStream.<init>(FileInputStream.java:138)
+	at java.io.FileInputStream.<init>(FileInputStream.java:93)
+	at java.io.FileReader.<init>(FileReader.java:58)
+	at net.kdt.pojavlaunch.utils.MCOptionUtils.load(MCOptionUtils.java:20)
+	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:65)
+	at net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
 [PojavLauncher] VSync disabled, maxFps/maxFramerate/framerateLimit set to 260
 [PojavLauncher]   enableVsync=false
 [PojavLauncher]   maxFps=260
@@ -207,30 +317,36 @@ Added DNS cache entry: s.optifine.net/23.95.137.176
 [PojavLauncher]   inactivityFpsLimit=minimized
 [PojavLauncher] Task104 on-disk verification: inactivityFpsLimit=minimized maxFps=260 enableVsync=false
 [PojavLauncher] MC 26.2+ graphicsApi cleared (default)
-java.lang.RuntimeException: java.lang.NullPointerException
-	at net.kdt.pojavlaunch.Tools.getVersionInfo(Tools.java:815)
-	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:249)
+[Tools] Replacing JNA 3.4.0 with 5.13.0 for iOS compatibility
+Launching Minecraft 1.8.9-forge-11.15.1.2318-f71270f5
+[PojavLauncher] LWJGL selected by launcher: 333, reported version: 3.3.1 (metadata: not captured)
+Ignored non-exists file: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/libraries/net/java/jinput/jinput-platform/2.0.5/jinput-platform-2.0.5.jar
+Args init finished. Now starting game
+java.lang.ClassNotFoundException: net.angelaura.installer.MissingLoader
+	at java.net.URLClassLoader.findClass(URLClassLoader.java:387)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:418)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:351)
+	at net.kdt.pojavlaunch.Tools.launchMinecraft(Tools.java:130)
+	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:312)
 	at net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
-Caused by: java.lang.NullPointerException
-	at net.kdt.pojavlaunch.Tools.getVersionInfo(Tools.java:752)
-	... 2 more
 [RenderDiag] exit(1) snapshot: swapOK=0 swapFail=0
 exit(1) called
 
-===== [Amethyst fatal trace] 2026-09-26 00:02:58.116 =====
+===== [Amethyst fatal trace] 2026-09-26 09:22:10.506 =====
 reason: exit(1) called
 thread: (unnamed)
-  #00 0x10bf6104c  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 69708
-  #01 0x10bf61908  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 71944
-  #02 0x136d2b6dc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _Z18notify_vm_shutdownv + 2569948
-  #03 0x136fdc668  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 5391976
-  #04 0x136fdbdb4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 5389748
-  #05 0x136fdba40  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN8VMThread4loopEv + 5388864
-  #06 0x136fdb688  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 5387912
-  #07 0x136ecd2fc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZL10java_startP6Thread + 4281084
+  #00 0x10b3b904c  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 69708
+  #01 0x10b3b9908  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 71944
+  #02 0x135a736dc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _Z18notify_vm_shutdownv + 2569948
+  #03 0x135d24668  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 5391976
+  #04 0x135d23db4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 5389748
+  #05 0x135d23a40  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN8VMThread4loopEv + 5388864
+  #06 0x135d23688  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 5387912
+  #07 0x135c152fc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-8-openjdk/lib/server/libjvm.dylib  _ZL10java_startP6Thread + 4281084
   #08 0x1887ee038  /usr/lib/system/libsystem_pthread.dylib  _pthread_start + 16440
   #09 0x1887ea91c  /usr/lib/system/libsystem_pthread.dylib  thread_start + 2332
 
+[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=185MB layer=0x125005bc0 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
 [PLCrashView] User tapped exit launcher, exiting process directly
 [RenderDiag] exit(0) snapshot: swapOK=0 swapFail=0
 exit(0) called
