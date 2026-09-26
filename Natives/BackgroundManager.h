@@ -35,24 +35,17 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 @property (nonatomic, assign) CGFloat uiOpacity;  // 0.0 ~ 1.0
 @property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度
 
-// Task172（用户定稿，重写卡片管线）：新拟态界面开关。
-//   开启（默认）→ 卡片永远按"正常态"渲染：规格表面色 + 双阴影（即用户
-//   复现方法"Bing 壁纸开着调一次 UI 效果再关掉 Bing 壁纸后看到的形态"），
-//   与是否有壁纸完全无关——壁纸适配分支整链退役，不再有"动态卡面"。
+// Task172（用户定稿，重写卡片管线）：新拟态界面开关。Task177 规格定稿：
+//   开启（默认）→ 卡片永远按 CSS 参考规格渲染：渐变表面 + 全不透明固定档
+//   双阴影，与是否有壁纸完全无关，也不读任何透明度/模糊偏好。
 //   关闭 → 回归旧管线：有壁纸走毛玻璃/半透明（设置页其余 UI 效果选项
 //   恢复可操作），无壁纸走原生平铺。设置页"模糊程度"下方的开关行控制，
-//   开启时其余 UI 效果选项变灰、新拟态透明度可操作，关闭反转。
+//   开启时其余 UI 效果选项变灰，关闭反转。
 @property (nonatomic, assign) BOOL cardsNeumorphEnabled; // defaults background_cards_neumorph_enabled，默认 YES
-
-// Task170（Task172 语义修订）：卡片新拟态"本体"透明度滑条（0% ~ 100%）。
-//   语义 = 卡片本体（卡面规格表面色 + 双阴影承载层）按比例淡化；文字/
-//   图标等内容子视图不参与（保持全不透明）——不再使用宿主 view.alpha
-//   整体缩放（那会把文字一起淡掉，用户定稿"不要包括字体"）。
-//   100%（默认）= 规格表面原样；调低 = 卡面连同边缘阴影晕影一起变淡；
-//   0% = 卡面与阴影完全透明（文字仍可见，极端档）。
-//   仅在新拟态界面开关开启时参与渲染；列表行（applyCardEffectToCell）
-//   恒为平贴新拟态表面，不受此滑条影响。
-@property (nonatomic, assign) CGFloat cardsNeumorphOpacity; // 0.0 ~ 1.0
+// Task177：卡片透明度滑条（Task170/172 机制）整体退役——用户定稿"不要加
+// 任何的透明度"：卡片恒为 CSS 参考规格（渐变表面 + 全不透明固定档双阴影），
+// 不读任何透明度/模糊偏好；仅存开关控制开/关。背景卡片透明度遗留落盘键
+// 不再读取（无害闲置）。
 
 // Global background container
 @property (nonatomic, strong, readonly, nullable) UIView *globalBackgroundContainer;

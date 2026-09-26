@@ -208,43 +208,45 @@ print("== F. 新拟态壁纸共存 ==")
 win_fn = bm[bm.index("- (void)applyBackgroundToWindow:"):bm.index("// Task111：检测并切换")]
 split_fn_start = bm.index("- (void)applyBackgroundToSplitViewController:")
 split_fn = bm[split_fn_start:bm.index("// Task111：同 applyBackgroundToWindow", split_fn_start)]
-check("F1 画布门退役（两个 apply 函数体内无 cardsNeumorphEnabled 早退）",
+check("F1 画布门退役（Task177 重锚：两个 apply 函数体内无 cardsNeumorphEnabled 早退；注释链演化）",
       "if (self.cardsNeumorphEnabled)" not in win_fn
       and "if (self.cardsNeumorphEnabled)" not in split_fn
-      and "Task174→Task175（画布接管退役，壁纸共存定稿）" in bm)
+      and "Task174→Task175→Task177" in bm)
 rui = bm[bm.index("- (void)refreshUIEffect"):]
-check("F2 refreshUIEffect ON 分支：容器缺席重建 + 双宿主原生底色 + blur 重挂 + 共存日志",
+check("F2 refreshUIEffect ON 分支：容器缺席重建 + 双宿主原生底色 + blur 重挂 + 规格定稿日志（Task177 重锚）",
       "if (self.cardsNeumorphEnabled) {" in rui
       and "if ([self hasBackground] && !self.globalBackgroundContainer) {" in rui
-      and "ame175CoexistLogOnce" in rui
-      and "[Task175] neumorph UI wallpaper coexist" in rui
+      and "ame177CoexistLogOnce" in rui
+      and "[Task177] neumorph UI spec rewrite" in rui
       and "[self addBlurEffectToContainer:self.globalBackgroundContainer];" in rui)
-check("F3 柔和档引擎（属性 + 透传原语 + 0.35/0.37/0.45/0.50 + 下限 2/6）",
-      "@property (nonatomic, assign) BOOL ame_wallpaperSoftProfile;" in engine_h
-      and "- (void)ame_setNeumorphWallpaperSoft:(BOOL)soft;" in engine_h
-      and "offset = MAX(2.0, offset * 0.35);" in engine_m
-      and "blur = MAX(6.0, blur * 0.37);" in engine_m
-      and "darkOpacity = 0.45;" in engine_m
-      and "lightOpacity = 0.50;" in engine_m
-      and "ame_wallpaperSoftProfile != soft" in engine_m)
-check("F4 卡片管线双点挂柔和档（view + cell 两分支）",
-      bm.count("ame_setNeumorphWallpaperSoft:[self hasBackground]") == 2)
-check("F5 规格档不回退（无壁纸时 offset/blur/opacity 原语义：默认 1.0 走变量）",
-      "CGFloat darkOpacity = 1.0, lightOpacity = 1.0;" in engine_m)
+check("F3 柔和档引擎整体退役（Task177 重锚：属性/透传原语/0.35/0.37/0.45/0.50 全退；不透明渐变表面层在位）",
+      "ame_wallpaperSoftProfile" not in engine_h
+      and "- (void)ame_setNeumorphWallpaperSoft:(BOOL)soft;" not in engine_h
+      and "offset * 0.35" not in engine_m
+      and "darkOpacity = 0.45" not in engine_m
+      and "lightOpacity = 0.50" not in engine_m
+      and "ame_wallpaperSoftProfile != soft" not in engine_m
+      and "ame177_surfaceLayer" in engine_m)
+check("F4 柔和档管线挂载退役（Task177 重锚：view + cell 两分支调用全退）",
+      bm.count("ame_setNeumorphWallpaperSoft") == 0
+      and bm.count("ame_applyNeumorphCardOpacity") == 0)
+check("F5 规格档不回退（Task177 重锚：恒 1.0 不透明度 = shadowOpacity = 1.0 ×2 层）",
+      engine_m.count("shadowOpacity = 1.0") == 2)
 
 # ============================================================
 # G. 文档
 # ============================================================
 print("== G. 文档 ==")
 anns = json.loads(rd("announcements.json"))["announcements"]
-check("G1 公告 task175@2（server/task169 pin 不动；174/双173/172/171/170/168 顺延 3-9）",
+check("G1 公告 task175@3（Task177 重锚：task177@2 插入；server/task169 pin 不动；174/双173/172/171/170/168 顺延 4-10）",
       anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[3]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[6]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[9]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t175 = anns[2]
+      and anns[2]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[3]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[4]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[7]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[10]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t175 = anns[3]
 check("G2 公告内容六条全列 + EN 尾注 + 装机锚点",
       all(k in t175["content"] for k in
           ["ANGLE", "下载量", "头像", "物品栏", "Forge", "壁纸", "[Task175]"])
@@ -261,8 +263,8 @@ check("G3 version.h Task 175 addendum（六主题 + 三个装机锚点 + 六条�
       and "11.15.1.2318" in vh)
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
-check("G4 l10n 零新增（四主语言计数 1955 不动）",
-      all(len(k) == 1955 for k in KEYSETS)
+check("G4 l10n 零新增（Task177 重锚：neumorph.opacity.title 键退役后 1954）",
+      all(len(k) == 1954 for k in KEYSETS)
       and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 fb = json.loads(rd("Natives/resources/announcements-fallback.json"))
 fbi = fb["announcements"]

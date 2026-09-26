@@ -9,42 +9,55 @@
 //  深浅色对比需要额外扫描器兜底。用户最终决定：删除全部新拟态代码，回归
 //  iOS 原生 UI（系统语义色 + 标准圆角，无任何自绘阴影）。
 //
-//  ===== Task160：新拟态回归（按用户 CSS 规格重建） =====
+//  ===== Task177：按用户给过的 CSS 样式参考（bigbear-ui）定稿重写 =====
 //
-//  用户指令："所有自创UI全部更改为新拟态UI，按照css样式来写启动器原生的代码
-//  而不是webview，按照比例调整阴影和高光"。规格（CSS 100% 基准）：
+//  用户指令："先重写新拟态，用我给过的css样式参考，不要加任何的透明度，
+//  不要让UI效果的模糊度透明度来影响到"。参考实现 = bigbear-ui 的
+//  neu-white 系列 mixin（styles/mixin/_index.scss + _variables.scss）：
 //
-//    浅色：background #e0e0e0；box-shadow  20px 20px 60px #bebebe（暗影）
-//                                         -20px -20px 60px #ffffff（高光）
-//          主要文字 #333333；次要文字 #888888
-//    深色：background #2c2c2c；box-shadow  20px 20px 60px #1e1e1e（暗影）
-//                                         -20px -20px 60px #3a3a3a（高光）
-//          主要文字 #f5f5f5；次要文字 #a0a0a0
+//    $btn-neu-normal: 2px;  $btn-neu-large: 4px;
+//    @mixin neu-white($n) {
+//        background: linear-gradient(145deg, #e6e6e6, #fff);
+//        box-shadow: $n $n $n*2 #d6d6d6, -$n -$n $n*2 #fff;
+//    }
 //
-//  Task137 三类历史问题的本轮对策：
-//    1) 阴影被父视图裁剪 → 阴影承载视图插在宿主 subview 最底层，宿主与承载
-//       层 masksToBounds 一律 NO（内容裁剪交给卡片内部容器，卡片内容本身在
-//       约束内不溢出）；
-//    2) 统一圆角 50 对小元素过圆 → 圆角/阴影偏移/模糊全部按元素短边等比缩放
-//       （340pt = 100% 规格），并设下限（圆角 8 / 偏移 4 / 模糊 12）；
-//    3) 深浅色对比 → 全部颜色用 dynamic provider 动态色，承载视图在
-//       traitCollectionDidChange 时重刷 CGColor，无需广播。
+//  换算成原生规格（卡片 = large 档，小元素 = normal 档）：
 //
-//  尺寸与位置不受影响——只改底色/圆角/阴影/文字色四个样式维度。
+//    表面：linear-gradient(145deg, 起点→终点)；浅色 #e6e6e6→#ffffff，
+//          深色同构 #333333→#2c2c2c（145° 轴向 = start(0.213,0.090)→
+//          end(0.787,0.910)，全不透明）
+//    双阴影：偏移 = N、模糊 = 2N（N=4pt 卡片档 / 2pt 小件档），颜色
+//          全不透明（opacity 1.0）：浅色 #d6d6d6（右下暗影）+#ffffff
+//          （左上高光）；深色 #1e1e1e / #3a3a3a。阴影 = 纯投影层垫在
+//          不透明渐变表面之后（CSS box-shadow 在元素之后合成的语义），
+//          投影内侧被表面遮住，只留外侧微晕——2~4pt 量级，不再是
+//          Task160 短边等比的 20/60pt 重晕影，也没有 Task175 柔和档的
+//          0.45/0.5 透明度。
+//    透明度隔离：新拟态表面/阴影不读任何透明度/模糊偏好（
+//          cardsNeumorphOpacity / uiOpacity / blurIntensity 全部无关），
+//          卡面恒全不透明。
+//
+//  Task160 沿用的稳定决策保留：圆角按元素短边等比 clamp[8,50]；
+//  dynamic provider 深浅色自适应；宿主 masksToBounds = NO 放行外阴影。
 //
 
 #import <UIKit/UIKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// 新拟态 CSS 规格基准尺寸：340pt 宽的元素 = 100% 规格（圆角 50/偏移 20/模糊 60）。
-/// 小于基准的元素按 短边/340 等比缩放，带下限；大于基准封顶 100%。
+/// 新拟态 CSS 规格基准尺寸：仅用于圆角的短边等比（340pt = 圆角 50）。
 FOUNDATION_EXPORT const CGFloat AmeNeumorphBaseDimension;
 
-/// 新拟态表面色（Task160 规格）：浅色 #e0e0e0 / 深色 #2c2c2c（动态色）
+/// 新拟态平贴表面色（Flat 行/回退底用）：浅色 #e0e0e0 / 深色 #2c2c2c（动态色）。
+/// 凸起卡片的可见表面 = 渐变（见下），本色仅作阴影未铺前的兜底底色。
 FOUNDATION_EXPORT UIColor *AmeNeumorphSurfaceColor(void);
 
-/// 新拟态暗影色：浅色 #bebebe / 深色 #1e1e1e（动态色）
+/// Task177：渐变表面起点/终点色（CSS linear-gradient(145deg, 起点, 终点)）。
+/// 浅色 #e6e6e6→#ffffff；深色 #333333→#2c2c2c（动态色，全不透明）。
+FOUNDATION_EXPORT UIColor *AmeNeumorphSurfaceGradientStartColor(void);
+FOUNDATION_EXPORT UIColor *AmeNeumorphSurfaceGradientEndColor(void);
+
+/// 新拟态暗影色（CSS 参考 #d6d6d6）：浅色 #d6d6d6 / 深色 #1e1e1e（动态色）
 FOUNDATION_EXPORT UIColor *AmeNeumorphShadowColor(void);
 
 /// 新拟态高光色：浅色 #ffffff / 深色 #3a3a3a（动态色）
@@ -56,39 +69,34 @@ FOUNDATION_EXPORT UIColor *AmeNeumorphPrimaryTextColor(void);
 /// 新拟态次要文字色：浅色 #888888 / 深色 #a0a0a0（动态色）
 FOUNDATION_EXPORT UIColor *AmeNeumorphSecondaryTextColor(void);
 
-/// 按元素短边等比计算新拟态度量（Task160）：
-///   scale = clamp(短边 / 340, 0, 1)；圆角 = clamp(50*scale, 8, 50)；
-///   偏移 = clamp(20*scale, 4, 20)；模糊 = 偏移 * 3（CSS 20:60 同比例）。
+/// Task177 度量：圆角沿用短边等比 clamp[8,50]；偏移/模糊改为 CSS 参考
+/// 固定档（不再等比缩放——20/60pt 的等比放大正是历轮装机"重晕影"的根源）：
+///   偏移 = 4pt（$btn-neu-large），模糊 = 8pt（2N，写入 CALayer 时再除 2
+///   折算 shadowRadius）。小件档（2/4）由阴影视图按宿主短边 < 60pt 自动降档。
 FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
                                                  CGFloat *radiusOut,
                                                  CGFloat *offsetOut,
                                                  CGFloat *blurOut);
 
-/// 双阴影承载视图（Task160 新拟态引擎）：
-/// 两个 CALayer（暗影 + 高光）只画投影不画块（backgroundColor = clear），
-/// 元素本体色由宿主 view 自绘；layoutSubviews 按 bounds 短边重算度量并写
-/// 宿主 layer.cornerRadius；traitCollectionDidChange 时重刷阴影颜色。
-/// 作为宿主的第一个 subview 自动随 bounds 缩放（autoresizing W|H），
-/// userInteractionEnabled = NO 不拦截触摸。
+/// Task177 新拟态引擎（三层承载视图）：
+///   底层 = 暗影投影层（clear，右下 +N）+ 高光投影层（clear，左上 -N），
+///   顶层 = 不透明渐变表面层（CSS linear-gradient(145deg)）。表面盖住两层
+///   投影的边界内侧，只留外侧 2~4pt 微晕——即 CSS "box-shadow 在元素之后
+///   合成"的原生等价物，也是 Task160 透明承载层把整卡染出晕影的根治
+///   （透明投影层的边界内侧直接叠在卡面上，20/60pt 模糊把整卡罩进晕影）。
+/// layoutSubviews 按 bounds 重算度量/颜色/宿主圆角；
+/// traitCollectionDidChange 时重刷。作为宿主第一个 subview 自动随 bounds
+/// 缩放（autoresizing W|H），userInteractionEnabled = NO 不拦截触摸。
 @interface AmeNeumorphShadowView : UIView
 /// 强制立即按宿主当前 bounds 重算度量/颜色（宿主 frame 变化后调用）
 - (void)ame_refreshForHostBounds;
-
-/// Task175：壁纸共存柔和档（新拟态界面开启且有壁纸时启用）。规格双阴影
-/// （20pt 偏移/60pt 模糊/不透明度 1.0）垫在原生底色上是经典新拟态，但
-/// 落在照片上必读作重晕影（Task173/174 两轮装机实测）；用户定稿改为
-/// 壁纸可见 + 卡片保持实底，阴影整体降档：偏移/模糊缩到约 1/3，不透明度
-/// 压到 0.45/0.5，在壁纸上读作轻微悬浮感而非晕影。默认 NO（原生底色上
-/// 维持 Task160 规格档不变）。
-@property (nonatomic, assign) BOOL ame_wallpaperSoftProfile;
 @end
 
 /// 原生卡片/面板表面（Task137 起替代 nm_convex / nm_flat 系列引擎调用）
 ///
-/// Task160：三个方法的内部实现统一升级为新拟态表面（表面色/圆角/双阴影按
-/// 上文规格），调用点无需改动——传入的 cornerRadius 参数仍被尊重（调用点
-/// 既有圆角设计不变），双阴影度量按元素短边等比。仅 Panel 平贴面板沿用
-/// "不强制改裁剪"的旧约定，但为露出阴影会保证 masksToBounds = NO。
+/// Task177：凸起三方法（Card/Raised/NeumorphSurface）统一为 CSS 参考规格
+/// （渐变表面 + 固定档全不透明双阴影），调用点无需改动；Panel/Flat 平贴
+/// 家族不变（无阴影承载层）。
 @interface UIView (AmeNativeSurface)
 
 /// 原生卡片表面（Task160 新拟态：规格表面色 + 双外阴影 + 指定圆角）。
@@ -105,8 +113,9 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 不变，masksToBounds = YES 与侧栏容器创建态一致）。
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius;
 
-/// Task160：纯新拟态表面（规格表面色 + 双阴影承载视图 + masksToBounds = NO；
-/// 圆角按宿主短边等比自动写入规格值）。供三方法外的自创卡片直接使用。
+/// Task177：纯新拟态表面（CSS 参考规格：渐变表面 + 全不透明双阴影承载
+/// 视图 + masksToBounds = NO；圆角按宿主短边等比自动写入）。供三方法外的
+/// 自创卡片直接使用。
 - (void)ame_applyNeumorphSurface;
 
 /// Task160：cell/列表场景专用的平贴新拟态表面——阴影会被相邻 cell 与
@@ -114,31 +123,10 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// （尊重调用点传入值，clamp [8,50]），裁剪保持（Task152 直角露出修复不变）。
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius;
 
-/// Task163：移除 ame_applyNeumorphSurface 挂载的双阴影承载视图并清空
+/// Task163：移除 ame_applyNeumorphSurface 挂载的承载视图并清空
 /// 关联对象（背景模式切换场景的残留清理——新拟态卡片切回毛玻璃/半透明
 /// 管线时旧投影会漏在 blur/半透明底外面穿帮）。未挂载时为无害空操作。
 - (void)ame_removeNeumorphShadow;
-
-/// Task168：仅阴影挂载（动态新拟态）——保留宿主现有卡面（壁纸管线的毛
-/// 玻璃/半透明底，随用户的透明度/模糊设置动态变化），只追加双阴影承载
-/// 视图并把宿主圆角统一到规格等比值；masksToBounds = NO 放行阴影外溢。
-/// 与实底版 ame_applyNeumorphSurface 的唯一差异是不写 backgroundColor。
-/// 调用点负责把卡面子视图（如 blur 层）的圆角同步到宿主新值。
-- (void)ame_attachNeumorphShadowOnly;
-
-/// Task175：壁纸共存柔和档开关（透传到关联的双阴影承载视图；未挂载时
-/// 无害空操作）。BackgroundManager 在新拟态界面开启且有壁纸时调用 YES——
-/// 卡片仍走规格实底表面（Task172/173 语义不变），仅阴影降档避免照片上
-/// 的重晕影；无壁纸/开关关闭时回 NO（规格档）。
-- (void)ame_setNeumorphWallpaperSoft:(BOOL)soft;
-
-/// Task172：卡片本体透明度（不含文字）——在 ame_applyNeumorphSurface 之后
-/// 调用。卡面背景色按 opacity 淡化（动态色安全：dynamic provider 内逐
-/// trait 重解析后再叠 alpha，深浅色切换不脱色），双阴影承载层整体 alpha
-/// 同步淡化；文字/图标等内容子视图不参与（保持全不透明）。
-///   100%（默认）= 规格表面原样；0% = 卡面与阴影完全透明（文字仍可见）。
-/// 未挂阴影承载层时只处理卡面（无害）。重复调用幂等（每次全量重写）。
-- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity;
 
 @end
 

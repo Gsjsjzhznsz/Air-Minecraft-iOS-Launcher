@@ -92,8 +92,8 @@ check("A1  Panel 方法转 Flat 路由（表面+圆角，不挂阴影承载层�
       "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm
       and nsm.count("[self ame_applyNeumorphSurface];") == 2,
       "Panel 实现必须走 Flat；NeumorphSurface 直调仅剩 Card/Raised 两处")
-check("A2  Panel 注释留档（用户指令与溢出根因）",
-      "不该改的你改了" in nsm
+check("A2  Panel 注释留档（Task177 重锚：退役阴影语义延续到新注释——全屏大容器不挂阴影承载层）",
+      "平贴面板退役阴影" in nsm
       and "ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius {" in nsm)
 check("A3  调用点保持 Panel 语义（LauncherRoot 无壁纸分支两行不变）",
       "[self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];" in root
@@ -145,10 +145,10 @@ check("B8  HomeTileBaseCell 基类结构未动（磁贴圆角/容器创建保持
       and "applyEffectToCollectionViewCell:self];" in read('Natives/LauncherNewsViewController.m'))
 check("B9  表格卡片行 applyCardEffectToCell 保持 Flat（用户未点名，不扩散）",
       "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
-check("B10 引擎凸起契约幸存（双阴影方向/只投影不画块）",
+check("B10 引擎凸起契约幸存（Task177 重锚：双阴影方向维持；透明承载层改投影对+不透明渐变表面三层结构）",
       "CGSizeMake(offset, offset)" in nsm
       and "CGSizeMake(-offset, -offset)" in nsm
-      and "_ame160_darkLayer.backgroundColor = [UIColor clearColor].CGColor;" in nsm)
+      and "ame177_darkLayer" in nsm and "ame177_surfaceLayer" in nsm)
 
 print()
 print("=" * 72)
@@ -185,11 +185,11 @@ print("=" * 72)
 check("D1  引擎五色动态函数幸存（Task160 规格）",
       all(f"AmeNeumorph{x}Color" in nsm for x in
           ["Surface", "Shadow", "Highlight", "PrimaryText", "SecondaryText"]))
-check("D2  等比度量幸存（340 基准 + clamp 下限）",
+check("D2  度量幸存（Task177 重锚：340 基准圆角等比保留；偏移/模糊改固定档 4/8（小件 2/4））",
       "AmeNeumorphBaseDimension = 340.0" in nsm
       and "MAX(8.0, 50.0 * scale)" in nsm
-      and "MAX(4.0, 20.0 * scale)" in nsm
-      and "MAX(12.0, 60.0 * scale)" in nsm)
+      and "? 2.0 : 4.0" in nsm
+      and "? 4.0 : 8.0" in nsm)
 check("D3  traitCollectionDidChange 深浅色重刷幸存",
       "traitCollectionDidChange:" in nsm)
 check("D4  NMToast/DownloadVC 的 Card 表面不受影响（仍凸起）",

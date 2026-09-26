@@ -153,20 +153,20 @@ nsh = read('Natives/UIKit+NativeSurface.h')
 check("D1  规格动态色五件套（表面/暗影/高光/主文字/次文字）",
       all(f"AmeNeumorph{x}Color(void)" in nsm for x in
           ["Surface", "Shadow", "Highlight", "PrimaryText", "SecondaryText"]))
-check("D2  CSS 色值核对（e0e0e0/2c2c2c/bebebe/1e1e1e/3a3a3a/333333/f5f5f5/888888/a0a0a0）",
+check("D2  CSS 色值核对（Task177 重锚：暗影 bebebe -> bigbear-ui d6d6d6；渐变端 e6e6e6/ffffff 入列）",
       all(hexv in nsm for hexv in
-          ["0xE0/255.0", "0x2C/255.0", "0xBE/255.0", "0x1E/255.0", "0x3A/255.0",
-           "0x33/255.0", "0xF5/255.0", "0x88/255.0", "0xA0/255.0"]))
-check("D3  等比度量（340pt 基准，圆角 50/偏移 20/模糊 60，下限 8/4/12）",
+          ["0xE0/255.0", "0x2C/255.0", "0xD6/255.0", "0x1E/255.0", "0x3A/255.0",
+           "0x33/255.0", "0xF5/255.0", "0x88/255.0", "0xA0/255.0", "0xE6/255.0"]))
+check("D3  度量（Task177 重锚：圆角仍 340 基准等比 clamp[8,50]；偏移/模糊改固定档 4/8（小件 2/4）——20/60 等比放大退役）",
       "AmeNeumorphBaseDimension = 340.0" in nsm
       and "MAX(8.0, 50.0 * scale)" in nsm
-      and "MAX(4.0, 20.0 * scale)" in nsm
-      and "MAX(12.0, 60.0 * scale)" in nsm)
-check("D4  双阴影承载视图（暗影右下 + 高光左上，只投影不画块）",
+      and "? 2.0 : 4.0" in nsm
+      and "? 4.0 : 8.0" in nsm)
+check("D4  双阴影承载视图（Task177 重锚：暗影右下 + 高光左上维持；透明承载层改三层结构——投影对垫底 + 不透明渐变表面盖内侧）",
       "AmeNeumorphShadowView : UIView" in nsh
       and "CGSizeMake(offset, offset)" in nsm
       and "CGSizeMake(-offset, -offset)" in nsm
-      and "_ame160_darkLayer.backgroundColor = [UIColor clearColor].CGColor;" in nsm)
+      and "ame177_surfaceLayer" in nsm and "shadowOpacity = 1.0" in nsm)
 check("D5  深浅色切换自动重刷（traitCollectionDidChange）",
       "traitCollectionDidChange:" in nsm
       and "AmeNeumorphDynamicColor" in nsm)

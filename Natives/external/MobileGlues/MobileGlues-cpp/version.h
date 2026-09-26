@@ -2121,3 +2121,23 @@
 // installer runs natively in Objective-C (ForgeDirect: universal-jar
 // extraction + library downloads + version JSON write); only 1.17+
 // new-format installers execute processors in a headless JVM and need JIT.
+
+// REVISION 17 addendum (Amethyst Task 177, no bump): neumorphism finalized
+// rewrite per the user-provided CSS reference (bigbear-ui neu-white mixin:
+// background linear-gradient(145deg,#e6e6e6,#fff); box-shadow N N 2N
+// #d6d6d6 / -N -N 2N #fff with N=2px normal / 4px large). Native equivalent
+// shipped in AmeNeumorphShadowView: a shadow PAIR (clear layers, offsets
+// +/-N, shadowOpacity 1.0, shadowRadius = blur/2; light #d6d6d6/#ffffff,
+// dark #1e1e1e/#3a3a3a) BEHIND an opaque CAGradientLayer surface
+// (145deg axis start (0.2132,0.0904) end (0.7868,0.9096); light
+// #e6e6e6->#ffffff, dark #333333->#2c2c2c) -- the surface occludes the
+// shadow pair's inner spill, mirroring CSS box-shadow compositing behind
+// the element. Root cause this kills: the Task160/175 transparent shadow
+// carriers painted the blurred silhouettes ON TOP of the card interior
+// (whole-card tint) and metrics scaled offset/blur to 20/60pt with the
+// short side; fixed tiers now: cards 4/8pt, small elements 2/4pt, radius
+// scaling unchanged. Transparency retired per the user's "no transparency
+// at all": ame_applyNeumorphCardOpacity + cardsNeumorphOpacity + the
+// settings slider row + ame_setNeumorphWallpaperSoft/soft profile are
+// deleted; cards no longer read uiOpacity/blurIntensity. Device anchor:
+// one-shot "[Task177] neumorph UI spec rewrite" log.

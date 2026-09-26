@@ -4,6 +4,9 @@
 //
 //  Task137：原生表面样式辅助实现（设计说明见头文件）。
 //  Task160：新拟态回归——表面/阴影/文字色按用户 CSS 规格重建（见 .h 注释）。
+//  Task177：按用户给过的 CSS 样式参考（bigbear-ui neu-white）定稿重写——
+//          渐变表面 + 固定档全不透明双阴影；透明承载层内侧染色（晕影根源）
+//          与壁纸柔和档/卡片透明度原语全部退役。
 //
 
 #import "UIKit+NativeSurface.h"
@@ -27,8 +30,22 @@ UIColor *AmeNeumorphSurfaceColor(void) {
                                    [UIColor colorWithRed:0x2C/255.0 green:0x2C/255.0 blue:0x2C/255.0 alpha:1.0]);  // #2c2c2c
 }
 
+// Task177：CSS linear-gradient(145deg, 起点, 终点) 的两端（全不透明）。
+// 浅色 = bigbear-ui neu-white 原样（#e6e6e6→#ffffff）；深色同构（#333333→#2c2c2c）。
+UIColor *AmeNeumorphSurfaceGradientStartColor(void) {
+    return AmeNeumorphDynamicColor([UIColor colorWithRed:0xE6/255.0 green:0xE6/255.0 blue:0xE6/255.0 alpha:1.0],   // #e6e6e6
+                                   [UIColor colorWithRed:0x33/255.0 green:0x33/255.0 blue:0x33/255.0 alpha:1.0]);  // #333333
+}
+
+UIColor *AmeNeumorphSurfaceGradientEndColor(void) {
+    return AmeNeumorphDynamicColor([UIColor whiteColor],                                                            // #ffffff
+                                   [UIColor colorWithRed:0x2C/255.0 green:0x2C/255.0 blue:0x2C/255.0 alpha:1.0]);  // #2c2c2c
+}
+
 UIColor *AmeNeumorphShadowColor(void) {
-    return AmeNeumorphDynamicColor([UIColor colorWithRed:0xBE/255.0 green:0xBE/255.0 blue:0xBE/255.0 alpha:1.0],   // #bebebe
+    // Task177：暗影色改 CSS 参考 #d6d6d6（原 #bebebe 是 neumorphism.io 默认，
+    // 配合 20/60pt 等比阴影过重；bigbear-ui 用 #d6d6d6 + 2~4pt 微阴影）
+    return AmeNeumorphDynamicColor([UIColor colorWithRed:0xD6/255.0 green:0xD6/255.0 blue:0xD6/255.0 alpha:1.0],   // #d6d6d6
                                    [UIColor colorWithRed:0x1E/255.0 green:0x1E/255.0 blue:0x1E/255.0 alpha:1.0]);  // #1e1e1e
 }
 
@@ -51,22 +68,31 @@ void AmeNeumorphMetricsForSide(CGFloat side,
                                CGFloat *radiusOut,
                                CGFloat *offsetOut,
                                CGFloat *blurOut) {
-    // Task160：按元素短边等比（340pt = 100% 规格），下限防小元素过圆/阴影不可见
+    // Task177：圆角沿用短边等比（340pt = 圆角 50，clamp [8,50]）；
+    // 偏移/模糊不再随尺寸放大——固定 CSS 参考档：卡片（large）= 4pt 偏移 /
+    // 8pt 模糊；小件（normal，宿主短边 < 60pt）= 2pt / 4pt。历轮装机
+    // "很重的晕影"的量级根源就是这里的 20*scale / 60*scale 等比放大。
     CGFloat scale = side / AmeNeumorphBaseDimension;
     if (scale < 0.0) scale = 0.0;
     if (scale > 1.0) scale = 1.0;
     if (radiusOut) *radiusOut = MAX(8.0, 50.0 * scale);
-    if (offsetOut) *offsetOut = MAX(4.0, 20.0 * scale);
-    if (blurOut) *blurOut = MAX(12.0, 60.0 * scale); // CSS 20:60 = 1:3
+    if (offsetOut) *offsetOut = (side > 0.0 && side < 60.0) ? 2.0 : 4.0;   // $btn-neu-large / $btn-neu-normal
+    if (blurOut)   *blurOut   = (side > 0.0 && side < 60.0) ? 4.0 : 8.0;   // CSS 模糊 = 2N
 }
 
-#pragma mark - Task160 双阴影承载视图
+#pragma mark - Task177 新拟态承载视图（投影对 + 不透明渐变表面）
 
 static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
 
 @interface AmeNeumorphShadowView ()
-@property (nonatomic, strong) CALayer *ame160_darkLayer;
-@property (nonatomic, strong) CALayer *ame160_lightLayer;
+/// 右下暗影投影层（clear，只画投影；边界内侧被表面层遮住）
+@property (nonatomic, strong) CALayer *ame177_darkLayer;
+/// 左上高光投影层（clear，只画投影）
+@property (nonatomic, strong) CALayer *ame177_lightLayer;
+/// 不透明渐变表面层（顶层）：CSS linear-gradient(145deg) 的原生等价物，
+/// 盖住两层投影的边界内侧——即 CSS "box-shadow 在元素之后合成"的语义，
+/// 也是 Task160 透明承载层把整卡染出晕影的根治。
+@property (nonatomic, strong) CAGradientLayer *ame177_surfaceLayer;
 @end
 
 @implementation AmeNeumorphShadowView
@@ -76,18 +102,23 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     if (self) {
         self.backgroundColor = [UIColor clearColor];
         self.userInteractionEnabled = NO;
-        _ame_wallpaperSoftProfile = NO;
 
-        // 只画投影不画块：元素本体色由宿主自绘，两层 backgroundColor = clear
-        _ame160_darkLayer = [CALayer layer];
-        _ame160_darkLayer.backgroundColor = [UIColor clearColor].CGColor;
-        _ame160_darkLayer.masksToBounds = NO;
-        [self.layer addSublayer:_ame160_darkLayer];
+        // 暗影投影层（右下）：纯投影不画块，表面由 ame177_surfaceLayer 负责
+        _ame177_darkLayer = [CALayer layer];
+        _ame177_darkLayer.backgroundColor = [UIColor clearColor].CGColor;
+        _ame177_darkLayer.masksToBounds = NO;
+        [self.layer addSublayer:_ame177_darkLayer];
 
-        _ame160_lightLayer = [CALayer layer];
-        _ame160_lightLayer.backgroundColor = [UIColor clearColor].CGColor;
-        _ame160_lightLayer.masksToBounds = NO;
-        [self.layer addSublayer:_ame160_lightLayer];
+        // 高光投影层（左上）
+        _ame177_lightLayer = [CALayer layer];
+        _ame177_lightLayer.backgroundColor = [UIColor clearColor].CGColor;
+        _ame177_lightLayer.masksToBounds = NO;
+        [self.layer addSublayer:_ame177_lightLayer];
+
+        // 不透明渐变表面层（顶层，后加 = 最上）
+        _ame177_surfaceLayer = [CAGradientLayer layer];
+        _ame177_surfaceLayer.masksToBounds = NO;
+        [self.layer addSublayer:_ame177_surfaceLayer];
 
         [self ame_refreshForHostBounds];
     }
@@ -108,48 +139,56 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     }
 }
 
-/// 按宿主（superview）当前 bounds 短边重算度量并同步两层投影与宿主圆角
+/// 按 iOS 13+ 动态色在当前 trait 下解析 CGColor（pre-13 动态色函数本身回退静态浅色）
+static CGColorRef Ame176ResolvedCGColor(UIColor *color, UITraitCollection *trait) {
+    if (@available(iOS 13.0, *)) {
+        return [[color resolvedColorWithTraitCollection:trait] CGColor];
+    }
+    return color.CGColor;
+}
+
+/// 按宿主（superview）当前 bounds 重算度量并同步两层投影 + 渐变表面 + 宿主圆角
 - (void)ame_refreshForHostBounds {
     UIView *host = self.superview;
-    CGFloat side = 0.0;
     CGFloat radius = 8.0;
     if (host) {
-        side = MIN(host.bounds.size.width, host.bounds.size.height);
-        // 宿主圆角：等比度量（调用点显式圆角由三方法写入 host.layer 后被本
-        // 方法覆盖为新拟态规格圆角；AME160 约定新拟态元素圆角统一跟随规格）
-        CGFloat offset = 4.0, blur = 12.0;
+        CGFloat side = MIN(host.bounds.size.width, host.bounds.size.height);
+        CGFloat offset = 4.0, blur = 8.0;
         AmeNeumorphMetricsForSide(side, &radius, &offset, &blur);
 
-        // Task175：壁纸共存柔和档——偏移/模糊缩到约 1/3、不透明度降档。
-        // 柔和档自带最小下限（2/6pt）：照片背景上任何 ≥2pt 的暗影都读得
-        // 出，规格档的 4/12 下限是为原生底色可见性设的，这里不沿用；
-        // 太小的阴影在壁纸上完全消失反而丢失“悬浮”语义。
-        CGFloat darkOpacity = 1.0, lightOpacity = 1.0;
-        if (self.ame_wallpaperSoftProfile) {
-            offset = MAX(2.0, offset * 0.35);
-            blur = MAX(6.0, blur * 0.37);
-            darkOpacity = 0.45;
-            lightOpacity = 0.50;
-        }
-
-        self.ame160_darkLayer.frame = self.bounds;
-        self.ame160_lightLayer.frame = self.bounds;
+        self.ame177_darkLayer.frame = self.bounds;
+        self.ame177_lightLayer.frame = self.bounds;
+        self.ame177_surfaceLayer.frame = self.bounds;
         UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bounds cornerRadius:radius];
-        self.ame160_darkLayer.shadowPath = path.CGPath;
-        self.ame160_lightLayer.shadowPath = path.CGPath;
-        self.ame160_darkLayer.cornerRadius = radius;
-        self.ame160_lightLayer.cornerRadius = radius;
+        self.ame177_darkLayer.shadowPath = path.CGPath;
+        self.ame177_lightLayer.shadowPath = path.CGPath;
+        self.ame177_darkLayer.cornerRadius = radius;
+        self.ame177_lightLayer.cornerRadius = radius;
+        self.ame177_surfaceLayer.cornerRadius = radius;
 
-        // 暗影：右下（+offset, +offset）；高光：左上（-offset, -offset）
-        self.ame160_darkLayer.shadowColor = AmeNeumorphShadowColor().CGColor;
-        self.ame160_darkLayer.shadowOpacity = darkOpacity;
-        self.ame160_darkLayer.shadowOffset = CGSizeMake(offset, offset);
-        self.ame160_darkLayer.shadowRadius = blur;
+        UITraitCollection *trait = self.traitCollection;
+        // 暗影：右下（+offset, +offset）；不透明度恒 1.0（CSS 纯色阴影无 alpha）
+        self.ame177_darkLayer.shadowColor = Ame176ResolvedCGColor(AmeNeumorphShadowColor(), trait);
+        self.ame177_darkLayer.shadowOpacity = 1.0;
+        self.ame177_darkLayer.shadowOffset = CGSizeMake(offset, offset);
+        // CSS 模糊半径 ≈ CALayer.shadowRadius 的两倍（高斯 σ 映射）
+        self.ame177_darkLayer.shadowRadius = blur / 2.0;
 
-        self.ame160_lightLayer.shadowColor = AmeNeumorphHighlightColor().CGColor;
-        self.ame160_lightLayer.shadowOpacity = lightOpacity;
-        self.ame160_lightLayer.shadowOffset = CGSizeMake(-offset, -offset);
-        self.ame160_lightLayer.shadowRadius = blur;
+        // 高光：左上（-offset, -offset）
+        self.ame177_lightLayer.shadowColor = Ame176ResolvedCGColor(AmeNeumorphHighlightColor(), trait);
+        self.ame177_lightLayer.shadowOpacity = 1.0;
+        self.ame177_lightLayer.shadowOffset = CGSizeMake(-offset, -offset);
+        self.ame177_lightLayer.shadowRadius = blur / 2.0;
+
+        // 不透明渐变表面（CSS linear-gradient(145deg, start, end)）：
+        // 145° 轴向单位向量 (sin145°, -cos145°) ≈ (0.5736, 0.8192)，
+        // 折算 start = center - v/2 = (0.2132, 0.0904)，end = center + v/2 = (0.7868, 0.9096)
+        self.ame177_surfaceLayer.colors = @[
+            Ame176ResolvedCGColor(AmeNeumorphSurfaceGradientStartColor(), trait),
+            Ame176ResolvedCGColor(AmeNeumorphSurfaceGradientEndColor(), trait),
+        ];
+        self.ame177_surfaceLayer.startPoint = CGPointMake(0.2132, 0.0904);
+        self.ame177_surfaceLayer.endPoint   = CGPointMake(0.7868, 0.9096);
     }
     if (host) host.layer.cornerRadius = radius;
 }
@@ -160,10 +199,10 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
 
 @implementation UIView (AmeNativeSurface)
 
-/// 新拟态表面（Task160）：规格表面色 + 双阴影承载视图 + masksToBounds = NO。
-/// 圆角由阴影承载视图按宿主短边等比写入规格值（下限 8，封顶 50）。
+/// 新拟态表面（Task177 CSS 参考规格）：渐变表面 + 全不透明双阴影承载视图
+/// + masksToBounds = NO。圆角由承载视图按宿主短边等比写入（下限 8，封顶 50）。
 - (void)ame_applyNeumorphSurface {
-    self.backgroundColor = AmeNeumorphSurfaceColor();
+    self.backgroundColor = AmeNeumorphSurfaceColor(); // 兜底底色（渐变表面铺上后不可见）
     self.layer.masksToBounds = NO; // Task137 教训：YES 会裁掉外阴影
 
     AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
@@ -177,67 +216,6 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     [shadowView setNeedsLayout];
 }
 
-- (void)ame_attachNeumorphShadowOnly {
-    // Task168：动态新拟态——卡面颜色不动（毛玻璃/半透明由壁纸管线按用户的
-    // 透明度/模糊设置给出，"按照壁纸功能设置的透明度和模糊程度来动态调整
-    // 新拟态"），只挂双阴影承载层 + 规格等比圆角 + 放行裁剪。与实底版
-    // ame_applyNeumorphSurface 的唯一差异是不写 backgroundColor。
-    self.layer.masksToBounds = NO; // 外阴影必须越出卡片边界（Task137 教训同源）
-    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
-    if (!shadowView) {
-        shadowView = [[AmeNeumorphShadowView alloc] initWithFrame:self.bounds];
-        shadowView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [self insertSubview:shadowView atIndex:0];
-        objc_setAssociatedObject(self, kAmeNeumorphShadowViewKey, shadowView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    shadowView.frame = self.bounds; // 非自动布局场景立即对齐；autoresizing 兜后续
-    [shadowView setNeedsLayout];
-}
-
-- (void)ame_setNeumorphWallpaperSoft:(BOOL)soft {
-    // Task175：壁纸共存柔和档透传（见 .h 注释）。改值即刷（bounds 不变时
-    // layoutSubviews 不会自发重跑，必须主动 ame_refreshForHostBounds）。
-    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
-    if (shadowView && shadowView.ame_wallpaperSoftProfile != soft) {
-        shadowView.ame_wallpaperSoftProfile = soft;
-        [shadowView ame_refreshForHostBounds];
-    }
-}
-
-- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity {
-    // Task172：卡片本体透明度（不含文字）。设为独立引擎原语的原因：
-    //   1) 不能用宿主 view.alpha——alpha 沿层级连乘，文字/图标子视图会
-    //      一起被淡掉（用户定稿"透明度指的是卡片的透明度，不要包括字体"）；
-    //   2) 卡面 = 宿主 backgroundColor（动态色），不能简单地
-    //      colorWithAlphaComponent 一次了事——那会把动态色解析成静态色，
-    //      深浅色切换后 alpha 叠在错误的底色上。正确做法是在 dynamic
-    //      provider 内部逐 trait 重解析规格表面色后再叠 alpha；
-    //   3) 双阴影承载视图是宿主的直接子视图，整体 alpha 淡化即可与卡面
-    //      同步（阴影 CALayer 不透明度由视图 alpha 统一缩放）。
-    CGFloat o = MAX(0.0, MIN(1.0, opacity));
-    if (o >= 0.999) {
-        // 100% 档：恢复全不透明规格表面（动态色原样，等价未调用过本方法）
-        self.backgroundColor = AmeNeumorphSurfaceColor();
-    } else {
-        UIColor *base = AmeNeumorphSurfaceColor();
-        if (@available(iOS 13.0, *)) {
-            self.backgroundColor = [UIColor colorWithDynamicProvider:
-                ^UIColor *(UITraitCollection *traitCollection) {
-                    return [[base resolvedColorWithTraitCollection:traitCollection]
-                        colorWithAlphaComponent:o];
-                }];
-        } else {
-            // pre-iOS13：规格色本身回退为静态浅色，直接叠 alpha
-            self.backgroundColor = [base colorWithAlphaComponent:o];
-        }
-    }
-    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
-    if (shadowView) {
-        shadowView.alpha = o;
-        [shadowView setNeedsLayout];
-    }
-}
-
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {
     // Task160：cell/列表场景平贴版——只上规格表面色与圆角，无阴影层（避免
     // 被相邻 cell/tableView 裁剪互叠），裁剪保持（Task152 直角露出修复不变）
@@ -247,31 +225,25 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
 }
 
 - (void)ame_applyCardSurfaceWithRadius:(CGFloat)cornerRadius {
-    // Task160：新拟态表面（表面色/圆角/双阴影统一规格口径；传入圆角仅作为
-    // 小于等比结果时的视觉保底——规格圆角不低于 min(传入值, 等比结果) 由
-    // 度量下限 8 兜底）。Task137 语义的 secondarySystemGroupedBackground 退役。
+    // Task177：凸起卡片 = CSS 参考规格（渐变表面 + 全不透明固定档双阴影）；
+    // Task137 语义的 secondarySystemGroupedBackground 退役。
     [self ame_applyNeumorphSurface];
 }
 
 - (void)ame_applyRaisedCardSurfaceWithRadius:(CGFloat)cornerRadius {
-    // Task160：嵌套凸起卡片同款新拟态表面（凸起感由双阴影 + 层级关系呈现）
+    // 嵌套凸起卡片同款表面（凸起感由双阴影 + 层级关系呈现）
     [self ame_applyNeumorphSurface];
 }
 
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius {
-    // Task163：平贴面板退役阴影——用户实测侧栏/右面板等全屏高大容器的
-    // 等比阴影（短边接近基准，offset 接近封顶 20/模糊 60）直接溢出到中央
-    // 卡片上（"不该改的你改了"）。面板语义回归平贴：规格表面色 + 圆角
-    // （clamp 8~50），不挂阴影承载层；Flat 版 masksToBounds = YES 与侧栏
-    // 容器创建态（masks = YES + maskedCorners 只圆外侧两角）一致，
-    // maskedCorners 不被触碰。Task160 的"显式 masksToBounds = NO 露外阴影"
-    // 仅对需要凸起感的卡片有意义，面板不作此要求。
+    // Task163：平贴面板退役阴影（侧栏/右面板等全屏高大容器不挂阴影承载层）。
+    // Task177 后此家族仍为 Flat 表面（无渐变无阴影）——面板不在凸起规格内。
     [self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];
 }
 
 - (void)ame_removeNeumorphShadow {
     // Task163：背景模式切换的残留清理——新拟态卡片切回毛玻璃/半透明管线
-    // 时，旧阴影承载视图（关联对象持有）会漏在 blur/半透明底外面穿帮。
+    // 时，旧承载视图（关联对象持有）会漏在 blur/半透明底外面穿帮。
     // 未挂载时为无害空操作；只移视图与关联，不动表面色/圆角/裁剪
     // （后续管线会按自己的形态重设）。
     AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);

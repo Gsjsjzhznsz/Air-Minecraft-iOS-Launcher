@@ -612,3 +612,25 @@ Task: 用户六症状装机反馈（f484eb7 构建，b1e9723/e54aca5 三日志�
 - 装机验证锚点：①ANGLE = "[spvc-shim] Task175 ANGLE ES rewrite: desktop GLSL -> GLSL ES 300" 且不再有 "Couldn't compile vertex shader for pipeline"（若出现 "rewrite FAILED" 则 impl 选项 API 形态问题，看 A9 法证）②CF 卡片显示真实下载量 + 整合包 tab 排序/加载器筛选生效 ③切标签页回来头像即显（首次也显）④换分辨率后游戏内触控/物品栏对位（"[HotbarDiag] Task175 geometry snapshot" 一行钉死全部输入）⑤1.8.9 整合包直装成功（"installer.jar download completed ... (via ...-1.8.9-installer.jar)"）；已装坏的重装一次即愈；启动坏版本不再裸崩改弹中文提示 ⑥新拟态开启壁纸可见 + 卡片轻阴影（"[Task175] neumorph UI wallpaper coexist"）
 - ANGLE 修复的边界：ES 300 是首档（ANGLE Metal 通用支持）；若后续着色器需要 ES3.1+ 特性（compute/binding），日志会给出具体报错再升档。vgpu 的 GL 面是桌面语义（gl4es 族转换器），不在重写门内
 - 遗留：mg 26.4 正常会话的 swapOK=6767 供后续呈现常数分析；ANGLE 治愈后 FO 包 Iris 渲染质量属游戏侧观察项
+
+---
+Task ID: 177
+Agent: main (Super Z)
+Task: 新拟态按用户 CSS 参考定稿重写（bigbear-ui neu-white）——全不透明渐变表面 + 固定档微阴影 + 透明度机制整体退役（"不要加任何的透明度，不要让UI效果的模糊度透明度来影响到"）
+
+### Work Log
+- 同步：fetch 对齐 48a7055（Task175 已交付），空号 176；用户复述"新拟态根本就没动过，还是很重的晕影"，策略改为从用户给过的 CSS 参考出发的干净重写（upload/bigbear-ui-1.0.0.zip = styles/mixin/_index.scss neu-white 族 + _variables.scss）
+- CSS 参考原文：background linear-gradient(145deg,#e6e6e6,#fff)；box-shadow N N 2N #d6d6d6, -N -N 2N #fff（$btn-neu-normal 2px / $btn-neu-large 4px）——与在用的 20/60pt 短边等比阴影差一个数量级，晕影量级根源实锤
+- 晕影根因定稿（结构级）：旧 AmeNeumorphShadowView 两层【透明】投影承载层的模糊剪影直接叠画在卡面内侧之上（CALayer clear 背景 = 自身投影无遮挡），20/60pt 模糊把整卡罩进晕影；壁纸模式再叠 Task175 柔和档 0.45/0.50 透明度。修复 = 三层结构：暗影/高光两个 clear 投影层垫底 + 不透明 CAGradientLayer 表面盖住投影内侧（CSS box-shadow 在元素之后合成的原生等价物），投影只剩外侧微晕
+- 引擎重写（UIKit+NativeSurface.h/.m）：AmeNeumorphSurfaceGradientStart/EndColor 新增（浅 #e6e6e6→#ffffff、深 #333333→#2c2c2c，全不透明）；暗影色 #bebebe→#d6d6d6（CSS 参考）；度量改固定档（卡片 4pt 偏移/8pt 模糊、宿主短边<60pt 小件 2/4；圆角短边等比 clamp[8,50] 保留；CALayer.shadowRadius = 模糊/2 折算）；145° 轴向精确换算 startPoint(0.2132,0.0904)/endPoint(0.7868,0.9096)；shadowOpacity 恒 1.0；ame176_darkLayer/lightLayer/surfaceLayer 三层；traitCollectionDidChange 重刷 resolvedColor
+- 透明度机制整体退役（"不要加任何的透明度"）：引擎 ame_applyNeumorphCardOpacity / ame_attachNeumorphShadowOnly（零调用死原语）/ ame_setNeumorphWallpaperSoft+ame_wallpaperSoftProfile 全删；BackgroundManager cardsNeumorphOpacity 属性/存取器/kBackgroundCardsNeumorphOpacityKey 全删（遗留落盘键不再读取）；卡片管线不再读 hasBackground/透明度/模糊偏好；壁纸共存语义保留（Task175 容器重建链不动），日志锚演化 [Task177] neumorph UI spec rewrite
+- 设置页：透明度滑条行（CardsNeumorphOpacityCell/tags 500-502/回调）整删；无壁纸 section0 返回 1；sections[0] 四项；"新拟态界面"开关行保留（Task173 用户定稿不撤销），灰化反转逻辑不变
+- l10n：background.cards.neumorph.opacity.title ×6 语言删除，四主语言唯一键 1955→1954；20 个历史校验器计数锚 1955→1954 批量重锚（含 task151 H 锚扫描器口径）
+- verify_task177 新建 39 项（A 引擎 12 + B Manager 8 + C 设置页 7 + D l10n 4 + E 文档 5 + F 配平 2 + G 级联对拍 1）；诚实重锚：168（A1/A2/A3/A7b/A8/B1/B2/B4/B5/B7/D1）、160（D2/D3/D4）、163（A2/B10/D2）、170（A1/A2/A3/B3/B5/B7/C1/C2/C3/E1/F1/G5）、173b（B3/B5/B9/C1/C3/C4/D4/E1）、173（M3）、174（A1/A2/A3/A5/A5b/B1-B4/C2/C4/D2/E1）、175（F1-F5/G1）、171（D2/D3）、172（H2）、165（G1 窗口 15）、167（E1 窗口 13）
+- 级联对拍（家法 stash 口径）：全 33 校验器 sweep，失败集 ⊆ 具名豁免基线 = 130 D4 / 131 H3 / 132 A1A2A15 / 133+138（latestlog.txt.old.txt 会话本地证据缺失，基线同崩）/ 134（同文件崩溃，级联捕获行 READBACK 字样）/ 135 E / 142 E1E2E4（mg 公告锚历轮遗留）/ 143 G1 / 156 G（task154 环境性）——零新增失败；156 的 task151 计数项被本轮治愈（51→1 残）
+- 文档：announcements task177@2（server/task169 钉 0/1；175/174/双173/172/171/170/168 顺延 3-10）；version.h REVISION 17 addendum（Task 177 + 装机日志锚）；scripts/task177_docs.py 留档
+
+### Stage Summary
+- 提交待推送；装机锚点：设置→外观→"新拟态界面"开启（默认开）→ 全部卡片 = 浅色 145° 渐变白瓷面（#e6e6e6→#ffffff）+ 边缘 4pt 微阴影（深色模式同构），任何壁纸/开关状态下零晕影、零透明度；模糊程度/透明度滑条对卡片彻底失效（开启态置灰）
+- 引擎口径：卡片 large 档 4/8pt、小件 normal 档 2/4pt，颜色全不透明（浅 #d6d6d6+#ffffff、深 #1e1e1e+#3a3a3a）；圆角/尺寸/位置零变化；列表行/侧栏/右面板平贴家族不变
+- 透明度滑条已随"不要加任何的透明度"退役——若后续要"可调浓淡"，应做阴影档位（规格浓度系数）而非 alpha

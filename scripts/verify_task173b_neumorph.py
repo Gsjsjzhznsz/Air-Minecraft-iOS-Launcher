@@ -89,18 +89,19 @@ check("B2 视图管线：壁纸适配分支整链退役（无 hasBackground 门 
       "if ([self hasBackground])" not in card_fn
       and "ame_attachNeumorphShadowOnly" not in card_fn
       and "view.alpha" not in card_fn)
-check("B3 视图管线：正常态尾部 = 清 blur 残留 + 规格表面 + 卡片本体透明度",
+check("B3 视图管线：正常态尾部 = 清 blur 残留 + 规格表面收口（Task177 重锚：本体透明度原语退役）",
       "kBackgroundBlurTag" in card_fn
-      and card_fn.index("[view ame_applyNeumorphSurface];")
-      < card_fn.index("[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];"))
+      and "[view ame_applyNeumorphSurface];" in card_fn
+      and "[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];" not in card_fn)
 check("B4 cell 管线：开关门在先且壁纸无关（ON 分支不读 hasBackground）",
       cell_fn.strip().startswith("- (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {")
       and cell_fn.index("if (self.cardsNeumorphEnabled) {") < cell_fn.index("if (![self hasBackground]) {"))
-check("B5 cell 管线 ON 分支：清残留（contentView + 容器内 blur）+ 规格表面 + 卡片本体透明度",
+check("B5 cell 管线 ON 分支：清残留（contentView + 容器内 blur）+ 规格表面收口（Task177 重锚：本体透明度退役）",
       cell_fn.count("kBackgroundBlurTag") >= 3
       and "[cell.contentView ame_removeNeumorphShadow]" not in cell_fn[:cell_fn.index("if (![self hasBackground])")]
+      and "[target ame_applyNeumorphSurface];" in cell_fn
+      and "[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];" not in cell_fn
       and cell_fn.index("[target ame_applyNeumorphSurface];")
-      < cell_fn.index("[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];")
       < cell_fn.index("if (![self hasBackground]) {"))
 check("B6 cell 管线：动态收口退役（无 attach / 无圆角同步收口 / 无宿主 alpha），旧壁纸玻璃分支保留",
       "[cardTarget ame_attachNeumorphShadowOnly];" not in cell_fn
@@ -115,36 +116,33 @@ check("B8 宿主整体 alpha 全撤（三管线零 view./target./cardTarget.alph
       "view.alpha = self.cardsNeumorphOpacity" not in bm_m
       and "target.alpha = self.cardsNeumorphOpacity" not in bm_m
       and "cardTarget.alpha = self.cardsNeumorphOpacity" not in bm_m)
-check("B9 引擎原语：ame_applyNeumorphCardOpacity 声明 + 实现（动态色安全 + 阴影承载层 alpha）",
-      "- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity;" in engine_h
-      and "ame_applyNeumorphCardOpacity:(CGFloat)opacity {" in engine_m
-      and "colorWithDynamicProvider" in engine_m[engine_m.index("ame_applyNeumorphCardOpacity"):]
-      and "shadowView.alpha = o;" in engine_m
-      and "self.backgroundColor = AmeNeumorphSurfaceColor();" in engine_m[engine_m.index("ame_applyNeumorphCardOpacity"):])
+check("B9 引擎原语退役（Task177 重锚：透明度原语/声明/阴影层 alpha 全退；规格恒全不透明 shadowOpacity 1.0）",
+      "- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity;" not in engine_h
+      and "ame_applyNeumorphCardOpacity:(CGFloat)opacity {" not in engine_m
+      and "shadowView.alpha = o;" not in engine_m
+      and "shadowOpacity = 1.0" in engine_m)
 
 # ============================================================
 # C. 设置页
 # ============================================================
-check("C1 section0 五标题序（界面开关在 opacity 之前）",
+check("C1 section0 四标题序（Task177 重锚：opacity 标题随滑条退役，开关为末项 sections[0][3]）",
       'localize(@"background.cards.neumorph.interface.title", nil)' in bsvc
-      and bsvc.index("background.cards.neumorph.interface.title")
-      < bsvc.index("background.cards.neumorph.opacity.title")
-      and 'self.sections[0][3]; // background.cards.neumorph.interface.title' in bsvc
-      and 'self.sections[0][4]; // background.cards.neumorph.opacity.title' in bsvc)
+      and "background.cards.neumorph.opacity.title" not in bsvc
+      and 'self.sections[0][3]; // background.cards.neumorph.interface.title' in bsvc)
 check("C2 开关行接线（CardsNeumorphToggleCell + tag 410 + 回调）",
       '"CardsNeumorphToggleCell"' in bsvc
       and "neumorphSwitch.tag = 410;" in bsvc
       and "cardsNeumorphToggleChanged:" in bsvc
       and "neumorphSwitch.on = manager.cardsNeumorphEnabled;" in bsvc)
-check("C3 灰化反转：开关开启时旧选项行变灰关交互；滑条随开关启停（Task173 十连修合并重锚：透明度/模糊两行统一 Auto Layout 构建后灰化表达式 3->2）",
+check("C3 灰化反转：开关开启时旧选项行变灰关交互（Task177 重锚：滑条随行退役，灰化表达式维持 2 处）",
       bsvc.count("cell.contentView.alpha = neumorphOn ? 0.35 : 1.0;") == 2
       and bsvc.count("cell.userInteractionEnabled = !neumorphOn;") == 2
-      and "slider.enabled = neumorphOn;" in bsvc
-      and "cell.contentView.alpha = neumorphOn ? 1.0 : 0.35;" in bsvc)
-check("C4 开关行 + 滑条行恒显（无壁纸时 section0 返回 2；行号按 hasBackground 平移）",
-      "return 2;" in bsvc
+      and "slider.enabled = neumorphOn;" not in bsvc
+      and "cell.contentView.alpha = neumorphOn ? 1.0 : 0.35;" not in bsvc)
+check("C4 开关行恒显（Task177 重锚：无壁纸时 section0 返回 1，滑条行号断言退役）",
+      "return 1;" in bsvc
       and "indexPath.row == (hasBackground ? 3 : 0)" in bsvc
-      and "indexPath.row == (hasBackground ? 4 : 1)" in bsvc)
+      and "indexPath.row == (hasBackground ? 4 : 1)" not in bsvc)
 check("C5 开关回调：落盘 + 统一刷新链 + 表格重载（灰化态反转）",
       "cardsNeumorphEnabled = sender.on;" in bsvc
       and bsvc.count("- (void)cardsNeumorphToggleChanged:") == 1
@@ -166,34 +164,38 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     vals[lg] = m.group(1) if m else None
 check("D1 六语言新键在位且非空", all(vals.values()), str(vals))
 check("D2 四主语言键集一致且计数 = 1954（净增 1）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1955
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1954
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
 check("D3 四主语言键集逐键一致", keysets[0] == keysets[1] == keysets[2] == keysets[3])
-check("D4 opacity 键原位保留（Task170 滑条语义仍在）",
-      all("background.cards.neumorph.opacity.title" in
+check("D4 opacity 键随滑条退役（Task177 重锚：六语言全退，interface 开关键保留）",
+      all("background.cards.neumorph.opacity.title" not in
           rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
-          for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
+          for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"])
+      and all("background.cards.neumorph.interface.title" in
+              rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
+              for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
 
 # ============================================================
 # E. 公告 + version.h
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告（Task175 重锚：task175@2 插入，task174 顺延 anns[3]，本条（新拟态 task173）顺延 anns[4]，十症状 task173@5；server/task169 pin 不动，172/171/170/168 顺延 anns[6]/[7]/[8]/[9]）且 id 唯一",
+check("E1 公告（Task177 重锚：task177@2 插入，task175/174 顺延 anns[3]/[4]，本条（新拟态 task173）顺延 anns[5]，十症状 task173@6；server/task169 pin 不动，172/171/170/168 顺延 anns[7]/[8]/[9]/[10]）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[3]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[4]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[5]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[6]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[7]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[8]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[9]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t173 = anns[4]
+      and anns[2]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[3]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[4]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[5]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[6]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[7]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[8]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[9]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[10]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t173 = anns[5]
 check("E2 公告内容锚（复现方法/正常态/晕影/字体 + EN 尾注）",
       "正常态" in t173["content"] and "晕影" in t173["content"]
       and "字体" in t173["content"] and "EN:" in t173["content"]
