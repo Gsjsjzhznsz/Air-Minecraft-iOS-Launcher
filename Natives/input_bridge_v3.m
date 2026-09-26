@@ -1399,8 +1399,13 @@ void ame67_sanitizeOptionsKeybinds(void) {
     free(buf);
 
     if (repairs > 0) {
-        // 备份 + 原子写回
-        NSString *bak = [NSString stringWithFormat:@"%s/options.txt.amethyst-bak", gameDir];
+        // 备份 + 原子写回。
+        // Task179（CI 修复轮）：旧代码此处引用 gameDir 变量——上方 Task179
+        // 改造把函数开头的 gameDir 声明换成了 ame67_dir/CWD 三级解析后，
+        // 这个残留引用成了 "use of undeclared identifier 'gameDir'"（CI run
+        // 462/463/464 实锤）。备份路径改为从实际解析出的 path 派生——
+        // 备份文件永远躺在被修复的那份 options.txt 旁边，语义更准。
+        NSString *bak = [NSString stringWithFormat:@"%s.amethyst-bak", path];
         NSString *src = [NSString stringWithFormat:@"%s", path];
         NSError *err = nil;
         [[NSFileManager defaultManager] removeItemAtPath:bak error:nil];

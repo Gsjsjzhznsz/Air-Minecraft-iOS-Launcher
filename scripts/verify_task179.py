@@ -309,6 +309,20 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("J3 version.h Task179 addendum present",
       "REVISION 17 addendum (Amethyst Task 179, no bump)" in vh)
 
+# ---------------- K. CI 修复轮 ----------------
+ibv3 = rd("Natives/input_bridge_v3.m")
+check("K1 gameDir 孤儿引用已修（CI run 462/463/464 实锤的编译错误）",
+      'stringWithFormat:@"%s/options.txt.amethyst-bak", gameDir' not in ibv3
+      and 'stringWithFormat:@"%s.amethyst-bak", path' in ibv3)
+glb = rd("Natives/ctxbridges/gl_bridge.m")
+check("K2 gl_bridge ARC 修复在位（NSString 不再直传 strstr）",
+      "strstr(renderer" not in glb
+      and "strcmp(ame179_rendererUtf8, RENDERER_NAME_MTL_ANGLE) == 0" in glb)
+check("K3 ES3 判定先于三处消费点（attribs/eglBindAPI/ctx-attribs）",
+      glb.find("if (ame179_angleEs) {") < glb.find("EGL_RENDERABLE_TYPE, desktopGL ?")
+      and glb.find("if (ame179_angleEs) {") < glb.find("handle.eglBindAPI(EGL_OPENGL_API)")
+      and glb.find("if (ame179_angleEs) {") < glb.find("desktopGL ? desktop_ctx_attribs : gles_ctx_attribs"))
+
 print()
 print(f"RESULT: {PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
