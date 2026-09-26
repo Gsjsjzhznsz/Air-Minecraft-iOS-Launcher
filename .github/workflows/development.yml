@@ -136,14 +136,11 @@ jobs:
             echo "::error::build failed before producing build_output.log (configure/setup stage)"
             exit 0
           fi
-          grep -nE "error:|fatal error|Error [0-9]+|Undefined symbols|symbol.*not found|ld: " "$LOG" | grep -vE "warning:" | head -15 | while IFS= read -r line; do
-            msg=$(printf '%s' "$line" | cut -c1-250 | sed 's/\\/\\\\/g; s/"/\\"/g')
-            echo "::error::${msg}"
-          done
-          tail -10 "$LOG" | while IFS= read -r line; do
-            msg=$(printf '%s' "$line" | cut -c1-250 | sed 's/\\/\\\\/g; s/"/\\"/g')
-            echo "::error::[tail] ${msg}"
-          done
+          ann() { m=$(printf '%s' "$1" | cut -c1-250 | sed 's/"//g' ); echo "::error::$m"; }
+          grep -nE '\*\*\*.*Error [0-9]+' "$LOG" | tail -5 | while IFS= read -r l; do ann "make-fail $l"; done
+          grep -n ' error: ' "$LOG" | grep -vE 'deprecat|note:|warning' | head -12 | while IFS= read -r l; do ann "diag $l"; done
+          grep -nE 'fatal error|Undefined symbols|not found|^ld: ' "$LOG" | head -8 | while IFS= read -r l; do ann "linker $l"; done
+          tail -8 "$LOG" | while IFS= read -r l; do ann "tail $l"; done
 
       - name: Upload MobileGL dylib (if built)
         # MobileGL 从源码编译，产物在 Natives/build/ 下。单独上传一份，
