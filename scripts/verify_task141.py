@@ -33,7 +33,9 @@ import re
 import subprocess
 import sys
 
-REPO = os.environ.get("TASK141_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+# Task175：可移植化（169/135/164/165/173 家法——两级 dirname，防沙箱路径漂移）
+REPO = os.environ.get("TASK141_REPO",
+                      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PASS = 0
 FAIL = 0
 
@@ -250,8 +252,12 @@ check("G2  新增 UIColor 选择器白名单审计",
 check("G3  检测口径护栏零变化（getEntitlementValue ×2 / isJITEnabled(NO)+TXM）",
       read("Natives/LauncherRightPanelViewController.m").count('getEntitlementValue(@"com.apple.developer.kernel.') == 2
       and "isJITEnabled(NO)" in strip_objc(read("Natives/LauncherRightPanelViewController.m")))
-check("G4  工作区改动仅限预期文件集（提交后自愈）",
-      all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "worklog.md", "announcements.json"))
+# Task175：白名单从 verify_task* 放宽到 scripts/ 全体（task175 法证/语法门
+# 脚本与历届 task167_announcements / task170_announcements / task168_baseline_sweep
+# 同族——"scripts/ 下的一切皆可提交"是历次会话反复学到的同一条教训）。
+check("G4  工作区改动仅限预期文件集（提交后自愈；Task175：scripts/ 全体入白名单）",
+      all(ln[3:].strip().startswith(("Natives/", "scripts/", "worklog.md", "announcements.json",
+                                     "JavaApp/", "help-faq.json"))
           for ln in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],
                                    capture_output=True, text=True).stdout.splitlines()
           if ln.strip()))

@@ -176,9 +176,9 @@ check("H1 version.h REVISION 17 addendum (Task 172)",
 import os
 import json
 anns = json.load(open(f"{REPO}/announcements.json"))["announcements"]
-# Task174 重锚：task174@2 + 十症状 task173@4 相继插入，task172 顺延 anns[3] -> anns[5]。
-check("H2 announcements task172@5（task174/双 task173 后；server-pin/task169 钉 0/1）",
-      anns[5].get("id") == "task172-six-fixes-2026-09-25"
+# Task175 重锚：task175@2 插入，task172 顺延 anns[5] -> anns[6]。
+check("H2 announcements task172@6（task175/174/双 task173 后；server-pin/task169 钉 0/1）",
+      anns[6].get("id") == "task172-six-fixes-2026-09-25"
       and anns[0].get("id") == "server-recommend-2026-09-24"
       and "task169" in anns[1].get("id", ""))
 

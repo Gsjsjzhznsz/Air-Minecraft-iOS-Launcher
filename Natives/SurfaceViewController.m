@@ -1571,6 +1571,15 @@ void ame139_fsr_heal_reset_input_scale(void) {
     ame153_fsr_deferred_armed = 0;
     windowWidth = ame153_renderW;
     windowHeight = ame153_renderH;
+    // Task175：物理/窗口合成比例单点写入（物品栏命中几何的单一事实源，
+    // 见 environ.h 声明处注释）。异常值写 0 = 消费者自行回退本地重算。
+    ame_windowToPhysRatio = 0.0f;
+    if (windowHeight > 0 && physicalHeight > 0) {
+        float ame175_ratio = (float)physicalHeight / (float)windowHeight;
+        if (ame175_ratio >= 0.25f && ame175_ratio <= 8.0f) {
+            ame_windowToPhysRatio = ame175_ratio;
+        }
+    }
     // Task 166：MobileGL(DirectVulkan) Metal-FSR 的私有交换层尺寸同步
     // （旋转/分辨率缩放后）：非活跃态零开销；活跃态下 gl_bridge 的 EGL
     // attribs 已固定于建 surface 时刻，但 MoltenVK swapchain 跟随层几何
@@ -2170,12 +2179,16 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
     CGFloat screenScale = self.screenScale;
     // Task 78（FSR 输入口径）：输入像素空间必须等于 MC 窗口信念
     // windowWidth×windowHeight（Task59 定案：MC 按告知窗口尺寸归一化）。
-    // view 点 × screenScale（非 grabbing 再 ×resolutionScale）= 物理（×resScale）
-    // 空间；FSR 联动下 windowWidth = surface/fsr_scale，故再除 fsr_scale。
-    // fsr_scale=1（FSR 关/非 MG）时恒等除法，行为与旧版逐位一致。
+    // view 点 × screenScale = 物理空间；窗口 = 物理 × resolutionScale
+    // 再 ÷ fsr_scale（window = surface/fsr，surface = 物理×resolutionScale）。
+    // Task175 修正：×resolutionScale 从 "!isGrabbing" 分支提出为无条件——
+    // 旧代码只在非抓取（菜单）态乘，抓取（游戏内）态漏乘：分辨率 ≠100% 的
+    // 会话里游戏内触点/视角映射整体偏大 1/resolutionScale 倍（用户实测
+    // "更换分辨率后位置偏移"的存活根因之一；历史会话 resScale 恒 1.00
+    // 所以从未暴露）。FSR 除法保持原位（Task78 锚点）。
     if (mgFsrScale > 0.0f) screenScale /= mgFsrScale;
+    screenScale *= resolutionScale;
     if (!isGrabbing) {
-        screenScale *= resolutionScale;
         if (virtualMouseEnabled) {
             if (event == ACTION_MOVE) {
                 virtualMouseFrame.origin.x += (location.x - lastVirtualMousePoint.x) * self.mouseSpeed;

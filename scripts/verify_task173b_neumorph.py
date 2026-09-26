@@ -181,18 +181,19 @@ check("D4 opacity 键原位保留（Task170 滑条语义仍在）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告插入 index 2（Task174 重锚：task174@2，本条顺延 anns[3]，十症状 task173@4；server/task169 pin 不动，172/171/170/168 顺延 anns[5]/[6]/[7]/[8]）且 id 唯一",
+check("E1 公告（Task175 重锚：task175@2 插入，task174 顺延 anns[3]，本条（新拟态 task173）顺延 anns[4]，十症状 task173@5；server/task169 pin 不动，172/171/170/168 顺延 anns[6]/[7]/[8]/[9]）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[3]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[4]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[5]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[6]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[7]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[8]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t173 = anns[3]
+      and anns[2]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[3]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[4]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[5]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[6]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[7]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[8]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[9]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t173 = anns[4]
 check("E2 公告内容锚（复现方法/正常态/晕影/字体 + EN 尾注）",
       "正常态" in t173["content"] and "晕影" in t173["content"]
       and "字体" in t173["content"] and "EN:" in t173["content"]

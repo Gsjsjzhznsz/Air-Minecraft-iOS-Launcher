@@ -131,10 +131,10 @@ check("D3 修正说明入档（Task166 重锚：黑屏反向迁移哨兵 + 病�
 
 print("== E. 白背景双层兜底 ==")
 bm = rd("Natives/BackgroundManager.m")
-check("E1 window 底色双分支兜底（hasBackground + 无背景；Task137 重锚：原生系统底色；Task174 画布门新增第三条原生底色早退路径）",
-      bm.count("window.backgroundColor = [UIColor systemBackgroundColor];") == 3)
-check("E2 splitVC.view 底色双分支兜底（Task137 重锚：原生系统底色；Task174 画布门 +1）",
-      bm.count("splitVC.view.backgroundColor = [UIColor systemBackgroundColor];") == 3)
+check("E1 window 底色双分支兜底（hasBackground + 无背景；Task137 重锚：原生系统底色；Task175 重锚：画布门退役回 2 处 = applyBackgroundToWindow 尾 + refreshUIEffect ON 分支）",
+      bm.count("window.backgroundColor = [UIColor systemBackgroundColor];") == 2)
+check("E2 splitVC.view 底色双分支兜底（Task137 重锚：原生系统底色；Task175 重锚：画布门退役回 2 处）",
+      bm.count("splitVC.view.backgroundColor = [UIColor systemBackgroundColor];") == 2)
 check("E3 图片解码失败铺系统底色兜底层（不再静默 return；Task137 重锚）",
       "background image failed to decode" in bm
       and "falling back to system base" in bm)

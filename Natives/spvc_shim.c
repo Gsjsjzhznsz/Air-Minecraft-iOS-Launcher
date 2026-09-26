@@ -32,12 +32,220 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 static pthread_mutex_t ame_spvc_shim_lock;  // 本地回退锁（master 协商失败时用）
 static pthread_mutex_t *g_ame_master_lock = NULL;
 static void *ame_spvc_shim_impl = NULL;
 static void *(*ame_spvc_shim_real_dlsym)(void *, const char *) = NULL;
+
+// 前置声明（Task175 区块在文件前部使用，定义在 impl 加载段之后）
+static void *ame_spvc_shim_resolve(const char *sym);
+
+// ============================================================================
+// Task175：ANGLE 渲染器的桌面 GLSL → GLSL ES 300 重写（pipeline/gui 崩溃根修）
+//
+// 病历（f484eb7 装机会话 latestlog.old.txt，ANGLE 26.3 FO 包）：
+//   [09:19:59] [Render thread/ERROR]: Couldn't compile vertex shader for
+//   pipeline (minecraft:core/gui): ERROR: 1:1: '' : syntax error
+//   java.lang.IllegalStateException: Failed to find or load pipeline
+//   minecraft:pipeline/gui → 崩溃。
+// 机制：Task171/172 桥接 + Task173 桌面 GL 补全层生效后游戏已能走到着色器
+// 编译；MC 26.3 的 RenderPearl 管线把 GLSL 经 shaderc 编到 SPIR-V 再由
+// spirv-cross 交叉编译回【桌面 GLSL 330】（MC 以为是桌面 GL 3.3 上下文——
+// tinygl4angle 的 GL_VERSION 就是这么伪装的），glShaderSource 把这份桌面
+// GLSL 原样递给底下的 ANGLE GLES3 上下文 → ES 编译器在 1:1 直接语法报错
+// （ES 语境的 #version 330 非法）。tinygl4angle.c 的 ES 直通分支（Task173
+// 修好上传的那条）只认 "#version NNN es" 开头的源，桌面源走版本改写路径
+// 但从不加 "es"——1.1 着色器语法层面无解。
+//
+// 修法（本垫片内闭环，tinygl4angle/ANGLE 二进制零改动）：拦截
+// spvc_compiler_compile —— 真实编译拿到桌面 GLSL（#version >= 130 且非 es）
+// 后，用【同一 context 上留存的 SPIR-V 字】重新 parse 一份新鲜 parsed_ir，
+// 创建第二个 GLSL 后端编译器并设置 ES 选项（GLSL_ES=1, GLSL_VERSION=300）
+// 编译出 ES 源，替换 *source 返回给 MC。MC 随后把 ES 源递给 glShaderSource，
+// tinygl4angle 的 ES 直通分支原样上传 → ANGLE GLES3 编译通过。
+// 生命周期：ES 编译器挂在与 MC 编译器相同的 context 上，随 MC 自己的
+// context_destroy 一并释放；返回的字符串存活期与原始桌面源完全同构
+// （都由 context 的 arena 持有到 destroy）。
+//
+// 门控（防误伤其他渲染器）：AMETHYST_RENDERER（JavaLauncher 对全进程导出）
+// 包含 "tinygl4angle" 才启用——mg/zink/vgpu 都是桌面 GL 语义，MC 的桌面
+// GLSL 输出是正确的，绝不能重写。逃生阀 AME175_ANGLE_ES_REWRITE=0 强制
+// 关闭（分诊用）。
+// 选项 API 双形：新版（spvc_context_create_compile_options +
+// spvc_compile_options_set_option + spvc_compiler_set_compile_options）优先，
+// 旧版（spvc_compiler_create_compiler_options + set_bool/set_uint +
+// install_compiler_options）兜底——随包 impl 的导出面两者至少居一。
+// 枚举值钉 vendored spirv_cross_c.h：SPVC_COMPILER_OPTION_GLSL_VERSION =
+// 8 | 0x2000000，SPVC_COMPILER_OPTION_GLSL_ES = 9 | 0x2000000；
+// SPVC_BACKEND_GLSL = 1；SPVC_CAPTURE_MODE_TAKE_OWNERSHIP = 1。
+// ============================================================================
+
+#define AME175_OPTION_GLSL_VERSION (8u | 0x2000000u)
+#define AME175_OPTION_GLSL_ES (9u | 0x2000000u)
+#define AME175_BACKEND_GLSL 1
+#define AME175_CAPTURE_TAKE_OWNERSHIP 1
+#define AME175_REGISTRY_MAX 96
+
+typedef struct {
+    void *ctx;
+    unsigned *words;   // parse_spirv 时留存的 SPIR-V 字副本（本垫片所有）
+    size_t word_count;
+    void *last_parsed_ir;
+    int live;
+} ame175_ctx_entry;
+
+typedef struct {
+    void *compiler;
+    void *ctx;
+    void *parsed_ir;
+    int backend;
+    int live;
+} ame175_compiler_entry;
+
+static ame175_ctx_entry ame175_ctx_registry[AME175_REGISTRY_MAX];
+static ame175_compiler_entry ame175_compiler_registry[AME175_REGISTRY_MAX];
+
+/// 门控：仅 ANGLE（tinygl4angle）渲染器会话启用重写；逃生阀可强制关闭。
+static int ame175_rewrite_enabled(void) {
+    const char *kill = getenv("AME175_ANGLE_ES_REWRITE");
+    if (kill != NULL && strcmp(kill, "0") == 0) return 0;
+    const char *renderer = getenv("AMETHYST_RENDERER");
+    if (renderer == NULL) return 0;
+    return strstr(renderer, "tinygl4angle") != NULL;
+}
+
+static void ame175_record_parse(void *ctx, const unsigned *spirv, size_t word_count,
+                                void *parsed_ir) {
+    for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+        ame175_ctx_entry *e = &ame175_ctx_registry[i];
+        if (e->live && e->ctx == ctx) {
+            free(e->words);
+            e->words = NULL;
+            if (word_count > 0 && spirv != NULL) {
+                e->words = (unsigned *)malloc(word_count * sizeof(unsigned));
+                if (e->words != NULL) memcpy(e->words, spirv, word_count * sizeof(unsigned));
+            }
+            e->word_count = (e->words != NULL) ? word_count : 0;
+            e->last_parsed_ir = parsed_ir;
+            return;
+        }
+    }
+    for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+        ame175_ctx_entry *e = &ame175_ctx_registry[i];
+        if (!e->live) {
+            e->live = 1;
+            e->ctx = ctx;
+            e->words = NULL;
+            if (word_count > 0 && spirv != NULL) {
+                e->words = (unsigned *)malloc(word_count * sizeof(unsigned));
+                if (e->words != NULL) memcpy(e->words, spirv, word_count * sizeof(unsigned));
+            }
+            e->word_count = (e->words != NULL) ? word_count : 0;
+            e->last_parsed_ir = parsed_ir;
+            return;
+        }
+    }
+}
+
+static void ame175_forget_context(void *ctx) {
+    for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+        ame175_ctx_entry *e = &ame175_ctx_registry[i];
+        if (e->live && e->ctx == ctx) {
+            free(e->words);
+            memset(e, 0, sizeof(*e));
+        }
+    }
+    for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+        ame175_compiler_entry *c = &ame175_compiler_registry[i];
+        if (c->live && c->ctx == ctx) memset(c, 0, sizeof(*c));
+    }
+}
+
+/// 桌面 GLSL 判定：#version >= 130 且非 "es" 后缀（spirv-cross 输出必以
+/// #version 行开头；#version 100/110 是 ES2/上古语义，tinygl4angle 自己
+/// 的改写路径能消化，不归本重写管）。
+static int ame175_is_desktop_glsl(const char *src) {
+    if (src == NULL) return 0;
+    if (strncmp(src, "#version ", 9) != 0) return 0;
+    if (strncmp(&src[13], "es", 2) == 0) return 0;
+    long ver = strtol(&src[9], NULL, 10);
+    return ver >= 130;
+}
+
+/// 在同一 context 上重建 ES 编译器并编译；失败返回 NULL（调用方回落原源）。
+static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
+                                            size_t word_count) {
+    typedef int (*parse_fn_t)(void *, const unsigned *, size_t, void **);
+    typedef int (*create_compiler_fn_t)(void *, int, void *, int, void **);
+    typedef int (*compile_fn_t)(void *, const char **);
+    typedef void *(*ctx_create_opts_fn_t)(void *);
+    typedef int (*set_option_fn_t)(void *, unsigned, unsigned);
+    typedef int (*compiler_set_opts_fn_t)(void *, void *);
+    typedef int (*comp_create_opts_fn_t)(void *, void **);
+    typedef int (*set_uint_fn_t)(void *, unsigned, unsigned);
+    typedef int (*set_bool_fn_t)(void *, unsigned, int);
+    typedef int (*install_opts_fn_t)(void *, void *);
+
+    parse_fn_t real_parse = (parse_fn_t)ame_spvc_shim_resolve("spvc_context_parse_spirv");
+    create_compiler_fn_t real_create =
+        (create_compiler_fn_t)ame_spvc_shim_resolve("spvc_context_create_compiler");
+    compile_fn_t real_compile = (compile_fn_t)ame_spvc_shim_resolve("spvc_compiler_compile");
+    if (real_parse == NULL || real_create == NULL || real_compile == NULL) return NULL;
+
+    void *fresh_ir = NULL;
+    if (real_parse(ctx, words, word_count, &fresh_ir) != 0 || fresh_ir == NULL) return NULL;
+
+    void *es_compiler = NULL;
+    if (real_create(ctx, AME175_BACKEND_GLSL, fresh_ir, AME175_CAPTURE_TAKE_OWNERSHIP,
+                    &es_compiler) != 0 ||
+        es_compiler == NULL)
+        return NULL;
+
+    // 选项双形：新版 API 优先，旧版兜底（两套至少有一套在 impl 导出面上）。
+    int options_ok = 0;
+    ctx_create_opts_fn_t new_create_opts =
+        (ctx_create_opts_fn_t)ame_spvc_shim_resolve("spvc_context_create_compile_options");
+    set_option_fn_t new_set_opt =
+        (set_option_fn_t)ame_spvc_shim_resolve("spvc_compile_options_set_option");
+    compiler_set_opts_fn_t new_install =
+        (compiler_set_opts_fn_t)ame_spvc_shim_resolve("spvc_compiler_set_compile_options");
+    if (new_create_opts != NULL && new_set_opt != NULL && new_install != NULL) {
+        void *opts = new_create_opts(ctx);
+        if (opts != NULL) {
+            new_set_opt(opts, AME175_OPTION_GLSL_VERSION, 300u);
+            new_set_opt(opts, AME175_OPTION_GLSL_ES, 1u);
+            if (new_install(es_compiler, opts) == 0) options_ok = 1;
+        }
+    }
+    if (!options_ok) {
+        comp_create_opts_fn_t old_create_opts =
+            (comp_create_opts_fn_t)ame_spvc_shim_resolve("spvc_compiler_create_compiler_options");
+        set_uint_fn_t old_set_uint =
+            (set_uint_fn_t)ame_spvc_shim_resolve("spvc_compiler_options_set_uint");
+        set_bool_fn_t old_set_bool =
+            (set_bool_fn_t)ame_spvc_shim_resolve("spvc_compiler_options_set_bool");
+        install_opts_fn_t old_install =
+            (install_opts_fn_t)ame_spvc_shim_resolve("spvc_compiler_install_compiler_options");
+        if (old_create_opts != NULL && old_set_uint != NULL && old_set_bool != NULL &&
+            old_install != NULL) {
+            void *opts = NULL;
+            if (old_create_opts(es_compiler, &opts) == 0 && opts != NULL) {
+                old_set_uint(opts, AME175_OPTION_GLSL_VERSION, 300u);
+                old_set_bool(opts, AME175_OPTION_GLSL_ES, 1);
+                if (old_install(es_compiler, opts) == 0) options_ok = 1;
+            }
+        }
+    }
+    if (!options_ok) return NULL;  // ES 编译器留在 ctx 上随 destroy 释放
+
+    const char *es_source = NULL;
+    if (real_compile(es_compiler, &es_source) != 0 || es_source == NULL) return NULL;
+    return es_source;
+}
 
 // ---- Task 37：与 libshaderc.dylib（shaderc_shim）协商跨库编译总锁 ----
 // 惰性一次性：首个取锁的调用触发。dlopen 同 install name 的已加载镜像
@@ -158,6 +366,11 @@ int spvc_context_parse_spirv(void *context, const unsigned *spirv, size_t word_c
     fprintf(stderr, "[spvc-shim] parse_spirv words=%zu ctx=%p (t=%.0fms tid=%lx)\n",
             word_count, context, ame_spvc_shim_ms(), ame_spvc_shim_tid());
     int rc = ((ame_spvc_shim_parse_fn_t)real)(context, spirv, word_count, parsed_ir);
+    // Task175：留存 SPIR-V 字副本 + 本 context 最新 parsed_ir（ES 重写的原料；
+    // 失败 parse 不记录，rc==0 且 parsed_ir 非空才算数）
+    if (rc == 0 && parsed_ir != NULL && *parsed_ir != NULL) {
+        ame175_record_parse(context, spirv, word_count, *parsed_ir);
+    }
     pthread_mutex_unlock(ame_spvc_master_or_local());
     return rc;
 }
@@ -173,6 +386,51 @@ int spvc_compiler_compile(void *compiler, const char **source) {
     fprintf(stderr, "[spvc-shim] compiler_compile comp=%p (t=%.0fms tid=%lx)\n",
             compiler, ame_spvc_shim_ms(), ame_spvc_shim_tid());
     int rc = ((ame_spvc_shim_compile_fn_t)real)(compiler, source);
+    // Task175：ANGLE 渲染器会话里，MC 要的其实是 ES GLSL——桌面源在
+    // tinygl4angle 的 GLES3 上下文上必炸（1:1 syntax error，pipeline/gui
+    // 崩溃链）。用留存的 SPIR-V 字重开一个 ES 编译器编译，替换 *source。
+    // 任何一步不满足（非 ANGLE / 非 GLSL 后端 / 非桌面源 / 字已失配 /
+    // ES 编译失败）都静默回落原始桌面源（行为与旧版一致）。
+    if (rc == 0 && source != NULL && *source != NULL && ame175_rewrite_enabled()) {
+        ame175_compiler_entry *ame175_ce = NULL;
+        for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+            ame175_compiler_entry *c = &ame175_compiler_registry[i];
+            if (c->live && c->compiler == compiler) {
+                ame175_ce = c;
+                break;
+            }
+        }
+        if (ame175_ce != NULL && ame175_ce->backend == AME175_BACKEND_GLSL &&
+            ame175_is_desktop_glsl(*source)) {
+            ame175_ctx_entry *ame175_ctxe = NULL;
+            for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+                ame175_ctx_entry *e = &ame175_ctx_registry[i];
+                if (e->live && e->ctx == ame175_ce->ctx) {
+                    ame175_ctxe = e;
+                    break;
+                }
+            }
+            // 字与编译器同源校验（context 被复用解析过别的模块时放弃重写）
+            if (ame175_ctxe != NULL && ame175_ctxe->last_parsed_ir == ame175_ce->parsed_ir &&
+                ame175_ctxe->words != NULL && ame175_ctxe->word_count > 0) {
+                const char *ame175_es = ame175_compile_es_source(
+                    ame175_ce->ctx, ame175_ctxe->words, ame175_ctxe->word_count);
+                if (ame175_es != NULL) {
+                    fprintf(stderr,
+                            "[spvc-shim] Task175 ANGLE ES rewrite: desktop GLSL -> GLSL ES "
+                            "300 (comp=%p ctx=%p words=%zu, t=%.0fms)\n",
+                            compiler, ame175_ce->ctx, ame175_ctxe->word_count,
+                            ame_spvc_shim_ms());
+                    *source = ame175_es;
+                } else {
+                    fprintf(stderr,
+                            "[spvc-shim] Task175 ANGLE ES rewrite FAILED -- falling back to "
+                            "desktop source (comp=%p, t=%.0fms)\n",
+                            compiler, ame_spvc_shim_ms());
+                }
+            }
+        }
+    }
     pthread_mutex_unlock(ame_spvc_master_or_local());
     return rc;
 }
@@ -197,6 +455,8 @@ void spvc_context_destroy(void *context) {
     if (real == NULL || context == NULL) return;
     ame_spvc_shim_lock_or_report_blocked("context_destroy", context);
     ((void (*)(void *))real)(context);
+    // Task175：context 亡，登记项与留存字一并清（防悬垂指针/泄漏）
+    ame175_forget_context(context);
     pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] context_destroy %p done (t=%.0fms tid=%lx)\n",
             context, ame_spvc_shim_ms(), ame_spvc_shim_tid());
@@ -209,6 +469,9 @@ void spvc_context_release_allocations(void *context) {
     if (real == NULL || context == NULL) return;
     ame_spvc_shim_lock_or_report_blocked("release_allocations", context);
     ((void (*)(void *))real)(context);
+    // Task175：子对象全释 = 本 context 上一切 parsed_ir/编译器/字符串已亡，
+    // 留存字与登记项必须同步作废（后续同 context 的新 parse 会重新登记）
+    ame175_forget_context(context);
     pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] release_allocations %p done (t=%.0fms tid=%lx)\n",
             context, ame_spvc_shim_ms(), ame_spvc_shim_tid());
@@ -221,6 +484,25 @@ int spvc_context_create_compiler(void *context, int backend, void *parsed_ir,
     pthread_mutex_lock(ame_spvc_master_or_local());
     int rc = ((int (*)(void *, int, void *, int, void **))real)(
         context, backend, parsed_ir, capture_mode, compiler);
+    // Task175：登记编译器 ->（context, parsed_ir, backend）供 ES 重写定位
+    if (rc == 0 && compiler != NULL && *compiler != NULL) {
+        int ame175_slot = -1;
+        for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+            ame175_compiler_entry *c = &ame175_compiler_registry[i];
+            if (c->live && c->compiler == *compiler) {
+                ame175_slot = i;
+                break;
+            }
+            if (!c->live && ame175_slot < 0) ame175_slot = i;
+        }
+        if (ame175_slot >= 0) {
+            ame175_compiler_registry[ame175_slot].live = 1;
+            ame175_compiler_registry[ame175_slot].compiler = *compiler;
+            ame175_compiler_registry[ame175_slot].ctx = context;
+            ame175_compiler_registry[ame175_slot].parsed_ir = parsed_ir;
+            ame175_compiler_registry[ame175_slot].backend = backend;
+        }
+    }
     pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] create_compiler backend=%d -> %p rc=%d (t=%.0fms "
                     "tid=%lx)\n",

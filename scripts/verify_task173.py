@@ -251,10 +251,11 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("M1 version.h addendum", "Task 173" in vh and "desktop-GL completion layer" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
-check("M3 announcement at index 4 (Task174 重锚：task174@2 插入后 ten-fixes 自 anns[3] 顺延 anns[4]；neumorph-173 顺延 anns[3])",
-      ann["announcements"][4]["id"] == "task173-ten-fixes-2026-09-26"
-      and ann["announcements"][3]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann["announcements"][2]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26")
+check("M3 announcement at index 5 (Task175 重锚：task175@2 插入后 ten-fixes 自 anns[4] 顺延 anns[5]；neumorph-174 顺延 anns[3] -> anns[4] 由 173b 钉；task175 钉 anns[2])",
+      ann["announcements"][5]["id"] == "task173-ten-fixes-2026-09-26"
+      and ann["announcements"][4]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][3]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann["announcements"][2]["id"] == "task175-six-fixes-2026-09-26")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")

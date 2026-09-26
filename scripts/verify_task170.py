@@ -144,17 +144,18 @@ check("E4 四主语言键集逐键一致", keysets[0] == keysets[1] == keysets[2
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("F1 公告插入 index 2（anns[1] task169 pin 不动；task174 + 双 task173（新拟态@3/十症状@4）相继插入后 task172/171/170/168 顺延 anns[5]/[6]/[7]/[8]）且 id 唯一",
+check("F1 公告（Task175 重锚：task175@2 插入，task174 + 双 task173 顺延 anns[3]/[4]/[5]，task172/171/170/168 顺延 anns[6]/[7]/[8]/[9]；anns[1] task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[3]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[4]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[5]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[6]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[7]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[8]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[7]
+      and anns[2]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[3]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[4]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[5]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[6]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[7]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[8]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[9]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[8]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]
@@ -209,8 +210,13 @@ check("G1 配平：BackgroundManager.m", balance("Natives/BackgroundManager.m"))
 check("G2 配平：BackgroundManager.h", balance("Natives/BackgroundManager.h"))
 check("G3 配平：BackgroundSettingsViewController.m", balance("Natives/BackgroundSettingsViewController.m"))
 check("G4 配平：LauncherNewsViewController.m", balance("Natives/LauncherNewsViewController.m"))
-check("G5 引擎改动仅追加（Task172：卡片本体透明度原语，Task160 主体未动）",
-      "AmeNeumorphShadowColor()" in engine_m and "shadowOpacity = 1.0" in engine_m)
+# Task175 重锚：壁纸共存柔和档把 shadowOpacity 从字面量 1.0 改为变量
+# （darkOpacity/lightOpacity，规格档仍为 1.0，柔和档 0.45/0.5）——"仅追加"
+# 口径随之更新：颜色源 + 规格档默认值 + 柔和档开关原语三锚。
+check("G5 引擎改动保持受控（Task172 透明度原语 + Task175 柔和档，Task160 主体语义未动）",
+      "AmeNeumorphShadowColor()" in engine_m
+      and "CGFloat darkOpacity = 1.0, lightOpacity = 1.0;" in engine_m
+      and "ame_setNeumorphWallpaperSoft" in engine_m)
 
 # ============================================================
 # H. 级联零新增失败（家法：当前失败 ⊆ 提交树基线）

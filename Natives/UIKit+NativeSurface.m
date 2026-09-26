@@ -76,6 +76,7 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     if (self) {
         self.backgroundColor = [UIColor clearColor];
         self.userInteractionEnabled = NO;
+        _ame_wallpaperSoftProfile = NO;
 
         // 只画投影不画块：元素本体色由宿主自绘，两层 backgroundColor = clear
         _ame160_darkLayer = [CALayer layer];
@@ -119,6 +120,18 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
         CGFloat offset = 4.0, blur = 12.0;
         AmeNeumorphMetricsForSide(side, &radius, &offset, &blur);
 
+        // Task175：壁纸共存柔和档——偏移/模糊缩到约 1/3、不透明度降档。
+        // 柔和档自带最小下限（2/6pt）：照片背景上任何 ≥2pt 的暗影都读得
+        // 出，规格档的 4/12 下限是为原生底色可见性设的，这里不沿用；
+        // 太小的阴影在壁纸上完全消失反而丢失“悬浮”语义。
+        CGFloat darkOpacity = 1.0, lightOpacity = 1.0;
+        if (self.ame_wallpaperSoftProfile) {
+            offset = MAX(2.0, offset * 0.35);
+            blur = MAX(6.0, blur * 0.37);
+            darkOpacity = 0.45;
+            lightOpacity = 0.50;
+        }
+
         self.ame160_darkLayer.frame = self.bounds;
         self.ame160_lightLayer.frame = self.bounds;
         UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.bounds cornerRadius:radius];
@@ -129,12 +142,12 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
 
         // 暗影：右下（+offset, +offset）；高光：左上（-offset, -offset）
         self.ame160_darkLayer.shadowColor = AmeNeumorphShadowColor().CGColor;
-        self.ame160_darkLayer.shadowOpacity = 1.0;
+        self.ame160_darkLayer.shadowOpacity = darkOpacity;
         self.ame160_darkLayer.shadowOffset = CGSizeMake(offset, offset);
         self.ame160_darkLayer.shadowRadius = blur;
 
         self.ame160_lightLayer.shadowColor = AmeNeumorphHighlightColor().CGColor;
-        self.ame160_lightLayer.shadowOpacity = 1.0;
+        self.ame160_lightLayer.shadowOpacity = lightOpacity;
         self.ame160_lightLayer.shadowOffset = CGSizeMake(-offset, -offset);
         self.ame160_lightLayer.shadowRadius = blur;
     }
@@ -179,6 +192,16 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
     }
     shadowView.frame = self.bounds; // 非自动布局场景立即对齐；autoresizing 兜后续
     [shadowView setNeedsLayout];
+}
+
+- (void)ame_setNeumorphWallpaperSoft:(BOOL)soft {
+    // Task175：壁纸共存柔和档透传（见 .h 注释）。改值即刷（bounds 不变时
+    // layoutSubviews 不会自发重跑，必须主动 ame_refreshForHostBounds）。
+    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
+    if (shadowView && shadowView.ame_wallpaperSoftProfile != soft) {
+        shadowView.ame_wallpaperSoftProfile = soft;
+        [shadowView ame_refreshForHostBounds];
+    }
 }
 
 - (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity {

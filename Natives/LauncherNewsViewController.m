@@ -897,6 +897,12 @@ static NSString *festivalGreeting(void) {
                    dispatch_get_main_queue(), ^{
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
+        // Task175：直写 image 不足以对抗 crossDissolve 转场快照——静态层
+        // 在转场窗口内被拍走后，真实 imageView 的更新要等下一次布局才上
+        // 屏（装机实测"要点一下才显示"）。这里先 reloadProfileSection 走
+        // cellForItemAt 全链（与首屏成功渲染同一条代码路径），再直写兜底：
+        // 两道都过，静态快照论与重绘论同时封死。
+        [strongSelf reloadProfileSection];
         [strongSelf ame171_syncVisibleProfileAvatar];
     });
 }

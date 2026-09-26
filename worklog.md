@@ -590,3 +590,25 @@ Stage Summary:
 - 推送后与并行会话就 VGPU/ObjC 编译失败连跑三轮拉锯：round-4 别名生成器缺预处理器感知（glX 族在 NOX11 下零实现 → 36 个未定义符号）；我提了文本剪除版 round 5（737 条），并行会话随即推出预处理器级重生成（944/819/0 missing）覆盖之——认领对方方案，弃我的窄修
 - round 6 双方撞同一诊断（previousKeyWindow 先声明后使用 + libproc.h 不在 iPhoneOS SDK → extern 原型），并行会话先推，认领；round 7 独我发现：ame173_rowSpec 字典下标取出的内层数组被静态标成 NSDictionary *，九处整数下标同根因报错，一行类型修复（NSArray *）
 - CI 终局：run 36179256757 = **success**（02107f7），承载 Task 174 画布接管 + 百分比实时回显 + 双 173 合并树全部内容
+
+---
+Task ID: 175
+Agent: main (Super Z)
+Task: 用户六症状装机反馈（f484eb7 构建，b1e9723/e54aca5 三日志：latestlog.txt=Forge 1.8.9+vgpu 会话 / latestlog.old.txt=ANGLE 26.3 FO 包崩溃 / latestlog.old=mg 26.4 正常会话）：ANGLE 依旧闪退 / CF 不显示下载量且不按筛选排序 / 主页头像切标签页回来不显示 / 物品栏切界面尺寸或换分辨率后位置大小偏移 / forge1.8.9+vgpu 崩溃且装包时无 JIT 申请弹窗 / 新拟态开启时壁纸被覆盖
+
+### Work Log
+- ANGLE 取证定案：桥接+补全层全部生效（"Using graphics backend OpenGL, ANGLE 2.1.2400"），崩溃点后移到 minecraft:pipeline/gui —— "Couldn't compile vertex shader ... ERROR: 1:1: '' : syntax error"。机制：MC 26.3 RenderPearl 管线 shaderc→SPIR-V→spirv-cross 产出【桌面 GLSL 330】（信了 tinygl4angle 的桌面 3.3 伪装），glShaderSource 原样递给 ANGLE GLES3 上下文 = ES 编译器对桌面版本号 1:1 语法报错；tinygl4angle 的 ES 直通分支只认 "#version NNN es"
+- 修复（spvc_shim.c 拦截闭环，ANGLE/MobileGlues 二进制零改动）：spvc_compiler_compile 出口拦截——桌面源（#version>=130 非 es）时用同 ctx 留存的 SPIR-V 字重 parse，建第二个 GLSL 后端编译器 + ES 选项（GLSL_ES=1/VERSION=300）编译，替换 *source；登记表（ctx→字副本 / compiler→ctx+parsed_ir+backend）在 parse/create_compiler 登记、destroy/release_allocations 作废；同源校验（last_parsed_ir == compiler 的 parsed_ir）防 ctx 复用错配。门控：AMETHYST_RENDERER 含 tinygl4angle 才启用（mg/zink/vgpu 不动）+ AME175_ANGLE_ES_REWRITE=0 逃生阀。选项 API 双形（新版 spvc_context_create_compile_options 优先、旧版 spvc_compiler_create_compiler_options 兜底）；二进制法证（scripts/task175_spvc_symtab.py，nlist 解析——导出 trie 解析器两轮翻车后改走 symtab 实锤 impl 只导出旧版四件套）
+- CF 双修：projectFromCurseForgeProject 丢 downloadCount（UI 读 downloads 键，Modrinth 同名）→ 恒显 0 次；loadModpackList 从不传 sort/loader（模组页一直传）→ 整合包 tab 两源都不排序。镜像 curl 实证 sortField/downloadCount 响应一直正常 = 纯字段/参数断层
+- 头像第五轮（日志铁证）：初始主页实例（setupChildViewControllers 创建）从未写入 cachedHomeVC → 首次切标签页回来 showHomePage 缓存未命中 → 新建实例（日志 "Task173 home VC created" 出现在首次切换后）→ Task169/171/172 修过的全部时序病灶在新实例复发。侧栏布局补注册（卡片布局本就注册）；另 0.35s 兜底先 reloadProfileSection（走 cellForItemAt 全链 = 首屏成功渲染同路径）再直写（crossDissolve 快照防御）
+- 物品栏/输入双修：sendTouchPoint 抓取态漏乘 resolutionScale（×在 !isGrabbing 分支内；窗口=物理×resScale/fsr，历史会话 resScale 恒 1.00 从未暴露——"更换分辨率后位置偏移"的实锤根因）→ 提出为无条件；touchHotbar 比例改 ame_windowToPhysRatio 单写者全局（environ.h 声明，updateSavedResolution 钳制 [0.25,8] 写入，防 nativeSendScreenSize 改写 window 全局）+ 本地重算回退 + guiScale 2s 节流保鲜（改界面尺寸立即生效）+ "Task175 geometry snapshot" 一次性全量取证行（phys/surface/win/resScale/guiScale/ratio/来源）
+- 旧版 Forge 双修：installer URL 无后缀形在 maven/bmclapi 双 404（1.8.9-11.15.1.2318 实锤；后缀形 1.8.9-11.15.1.2318-1.8.9 = HTTP 200）→ buildInstallerURLCandidatesForLoader（1.x minor<=12 追加后缀候选）+ installModLoader 逐候选循环；launchJVM 预检占位 mainClass（net.angelaura.installer.MissingLoader）→ 主线程弹窗（_comment_ 即导入期 i18n_str_555 全句）+ return 1，不再裸 ClassNotFoundException。JIT 疑问结案：日志 "[DyldLVBypass] TXM debug JIT mapping active" = 调试器已挂着，JIT 已启用无需申请弹窗（设计行为，已写进公告）
+- 新拟态壁纸共存：Task174 画布接管（开启即收壁纸）被用户读作 bug → 退役。两个 applyBackgroundTo* 的 cardsNeumorphEnabled 早退门删除（壁纸照常铺设）；refreshUIEffect ON 分支改"容器缺席原位重建 + 双宿主原生底色 + blur 重挂 + 一次性 [Task175] coexist 日志"；AmeNeumorphShadowView 增 ame_wallpaperSoftProfile 柔和档（offset×0.35 下限 2 / blur×0.37 下限 6 / 暗影 0.45 亮影 0.50）+ ame_setNeumorphWallpaperSoft: 透传原语；卡片管线双点（view/cell 分支）按 hasBackground 挂档——照片上读作轻悬浮而非晕影，无壁纸维持规格档（Task160 语义不回退）
+- 文档：announcements task175@2（174/双173/172/171/170/168 顺延 3-9；fallback 最小集误覆盖已还原 = Task169 两条目口径）；version.h REVISION 17 addendum（Task 175 六主题 + 三装机锚点）；l10n 零新增（1955 不动）
+- 验证：verify_task175 新建 41/41（A ANGLE 9 + B CF 5 + C 头像 3 + D 物品栏 7 + E Forge 5 + F 新拟态 5 + G 文档 5 + H 语法门+级联 2）；级联重锚：129 E1/E2（画布门退役回 2 处）、170 G5（引擎受控口径）、141 G4（scripts/ 全体入白名单）+ ROOT 可移植化（漏网旧路径）、165 G1（窗口 13→14）、167 E1（11→12）、168/171/172/173/173b/174 公告顺延 +1、78/79 A7（Task153 间接化锚重锚，HEAD 既有漂移顺手治愈）；173 123/123、174 24/24、172 51/51、171 30/30、170 34/34、169 49/49、168 43/43、167 31/31、166 64/64（task175 级联内）、165 34/34、141 36/36、129 47/47 全绿；79 失败集 2→1（余 B10 设备证据既有）；83/139/154 与 HEAD 基线逐位一致（沙箱证据文件既有缺席）
+- 语法门：task175_syntax_gates.py 状态机版 13 文件全配平（朴素剥离器对 URL 字符串内 "//" 的误报已换 proper 状态机对拍定案）
+
+### Stage Summary
+- 装机验证锚点：①ANGLE = "[spvc-shim] Task175 ANGLE ES rewrite: desktop GLSL -> GLSL ES 300" 且不再有 "Couldn't compile vertex shader for pipeline"（若出现 "rewrite FAILED" 则 impl 选项 API 形态问题，看 A9 法证）②CF 卡片显示真实下载量 + 整合包 tab 排序/加载器筛选生效 ③切标签页回来头像即显（首次也显）④换分辨率后游戏内触控/物品栏对位（"[HotbarDiag] Task175 geometry snapshot" 一行钉死全部输入）⑤1.8.9 整合包直装成功（"installer.jar download completed ... (via ...-1.8.9-installer.jar)"）；已装坏的重装一次即愈；启动坏版本不再裸崩改弹中文提示 ⑥新拟态开启壁纸可见 + 卡片轻阴影（"[Task175] neumorph UI wallpaper coexist"）
+- ANGLE 修复的边界：ES 300 是首档（ANGLE Metal 通用支持）；若后续着色器需要 ES3.1+ 特性（compute/binding），日志会给出具体报错再升档。vgpu 的 GL 面是桌面语义（gl4es 族转换器），不在重写门内
+- 遗留：mg 26.4 正常会话的 swapOK=6767 供后续呈现常数分析；ANGLE 治愈后 FO 包 Iris 渲染质量属游戏侧观察项

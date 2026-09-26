@@ -2024,3 +2024,55 @@
 // previously froze at the last cellForRow value for the whole drag. Device
 // anchor: the one-shot forensic line "[Task174] neumorph UI canvas active --
 // wallpaper layer retracted" prints once per launch when the canvas governs.
+// REVISION 17 addendum (Amethyst Task 175, no bump): six-fix device-feedback
+// round. (1) ANGLE renderer crash root fix: MC 26.3's RenderPearl pipeline
+// cross-compiles GLSL through shaderc to SPIR-V and back through spirv-cross
+// into DESKTOP GLSL 330 (it believes the desktop-GL 3.3 facade tinygl4angle
+// presents), but the context underneath is ANGLE GLES3 -- the desktop source
+// fails with "ERROR: 1:1: '' : syntax error" and the game dies at
+// minecraft:pipeline/gui (f484eb7 session forensics). Fix lives inside
+// spvc_shim.c: spvc_compiler_compile intercepts desktop-GLSL outputs and
+// recompiles the retained SPIR-V words through a second GLSL-backend compiler
+// with ES options (GLSL_ES=1, VERSION=300, old-API option setters per the
+// impl dylib's real export face) on the SAME context; tinygl4angle's
+// ES-passthrough branch (Task173) uploads the ES source verbatim. Gated on
+// AMETHYST_RENDERER containing "tinygl4angle" (mg/zink/vgpu untouched) with
+// the AME175_ANGLE_ES_REWRITE=0 kill switch. Device anchors:
+// "[spvc-shim] Task175 ANGLE ES rewrite: desktop GLSL -> GLSL ES 300" and the
+// disappearance of "Couldn't compile vertex shader for pipeline".
+// (2) CurseForge downloads + modpack sorting: projectFromCurseForgeProject
+// dropped the downloadCount field (every CF card read "0 downloads"; the
+// UI reads the Modrinth-style "downloads" key) -- now passed through; and
+// loadModpackList never forwarded the sidebar sort/loader filters (mods tab
+// always did) -- both sources now honor them. (3) Home avatar round 5: the
+// INITIAL home VC (created in setupChildViewControllers) was never written
+// into cachedHomeVC, so the FIRST tab-away-and-back allocated a fresh
+// instance and re-ran every timing bug Tasks 169/171/172 had fixed (log
+// proof: "Task173 home VC created" appearing AFTER the first switch);
+// registered now (card layout already did), plus the 0.35s deferred pass
+// reloads the profile section before the direct write (crossDissolve
+// snapshot defense). (4) Hotbar/touch offsets after resolution changes:
+// sendTouchPoint's grabbing path skipped the x resolutionScale factor
+// (in-game touch mapping off by 1/resolutionScale whenever resolution !=
+// 100%; historical sessions all ran 100% so it never showed); the hotbar
+// hit ratio is now a single-writer global ame_windowToPhysRatio
+// (updateSavedResolution), with a guiScale 2s-throttled options.txt refresh
+// and a one-shot "[HotbarDiag] Task175 geometry snapshot" forensic.
+// (5) Legacy Forge (<=1.12.2) modpack installs: the installer URL used the
+// unsuffixed maven layout which 404s for old promoted builds (1.8.9-
+// 11.15.1.2318 curls 404; the "-1.8.9"-suffixed path is 200) -- the
+// placeholder JSON's MissingLoader mainClass then crashed the launch with a
+// raw ClassNotFoundException. Fix: suffixed-variant URL candidates for MC
+// 1.x minor<=12, plus a launchJVM pre-check that refuses the placeholder
+// version with a localized alert (reuses the import-time i18n_str_555
+// message) instead of the raw crash. Note: JIT requests do not pop when the
+// TXM debugger is already attached ("keeping debugger attached for dyld
+// bypass") -- by design, JIT is already enabled. (6) Neumorphism-wallpaper
+// coexistence: the Task 174 canvas takeover retracted the wallpaper entirely
+// and the user read that as a bug ("wallpaper covered, cannot display");
+// retired -- with the switch ON the wallpaper installs normally, cards keep
+// the spec surface, and the dual shadows switch to a wallpaper-soft profile
+// (AmeNeumorphShadowView.ame_wallpaperSoftProfile: offset/blur scaled to
+// ~1/3, opacity 0.45/0.5) so photos read a light float instead of halos;
+// no-wallpaper keeps the spec profile. Device anchor (single line):
+// the one-shot "[Task175] neumorph UI wallpaper coexist" log.

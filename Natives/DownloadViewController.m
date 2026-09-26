@@ -2133,6 +2133,18 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     if (self.currentGameVersion.length > 0) {
         filters[@"version"] = self.currentGameVersion;
     }
+    // Task175：整合包列表补排序 + 加载器筛选（用户实测"CF 不会依据筛选排序"）。
+    // 侧栏的排序/加载器筛选是全 tab 共用状态，但本方法从未把它们放进
+    // filters——模组 tab（loadModList）一直带、整合包 tab 一直丢，CF 与
+    // Modrinth 两源都受害（镜像实测两者都支持这些参数：CF 走 Task173 的
+    // ame173_applySortAndLoaderParams 映射，Modrinth 走 index + categories
+    // facet）。零新增 l10n/UI，纯参数透传。
+    if (self.currentSortField.length > 0) {
+        filters[@"sort"] = self.currentSortField;
+    }
+    if (self.currentModLoader.length > 0) {
+        filters[@"loader"] = self.currentModLoader;
+    }
     
     __weak typeof(self) weakSelf = self;
     id api = [self currentAPIForTabType:@"modpack"];

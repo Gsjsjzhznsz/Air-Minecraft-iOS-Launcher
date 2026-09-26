@@ -2219,10 +2219,12 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
     // Forge/NeoForge: 下载 installer.jar 并调用直装器写入 modpack 的 gameDir
     // 直装器会写完整的 version.json（含正确的 mainClass、arguments、libraries）+ 下载 Forge 库
     // 这样整合包启动时能正确加载 Forge，不再因占位 JSON 缺库/缺参数而崩溃
-    NSString *installerURL = [self buildInstallerURLForLoader:loader
-                                               loaderVersion:loaderVersion
-                                              minecraftVersion:minecraftVersion];
-    if (!installerURL) {
+    // Task175：单 URL 改候选列表（旧版 Forge 的 maven 后缀形布局，见
+    // buildInstallerURLCandidatesForLoader 注释），逐个尝试直到成功。
+    NSArray<NSString *> *installerURLCandidates = [self buildInstallerURLCandidatesForLoader:loader
+                                                                                 loaderVersion:loaderVersion
+                                                                              minecraftVersion:minecraftVersion];
+    if (installerURLCandidates.count == 0) {
         if (error) {
             *error = [NSError errorWithDomain:@"ModpackImportError"
                                          code:4003
@@ -2250,10 +2252,25 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
     NSString *installerTaskId = installerItem.taskId;
 
     NSError *dlError = nil;
-    if (![self downloadFileFromURL:installerURL toPath:tmpInstallerPath taskId:installerTaskId resourceType:PLMirrorResourceTypeModLoader error:&dlError]) {
+    NSString *installerURL = nil;
+    BOOL installerDownloaded = NO;
+    for (NSString *ame175_candidate in installerURLCandidates) {
+        NSError *ame175_candError = nil;
+        if ([self downloadFileFromURL:ame175_candidate toPath:tmpInstallerPath taskId:installerTaskId resourceType:PLMirrorResourceTypeModLoader error:&ame175_candError]) {
+            installerDownloaded = YES;
+            installerURL = ame175_candidate;
+            break;
+        }
+        dlError = ame175_candError;
+        NSLog(@"[ModpackInstall] Task175 installer candidate failed (%@): %@",
+              ame175_candidate, ame175_candError.localizedDescription ?: @"unknown");
+    }
+    if (!installerDownloaded) {
         // installer.jar 下载失败：写显式失败的占位 JSON（mainClass 指向不存在的类，启动时会显式报错，
         // 避免误装作 vanilla MC 让用户以为 mods 生效）
-        NSLog(@"[ModpackImport] %@ installer.jar download failed, falling back to placeholder JSON: %@", loader, installerURL);
+        NSLog(@"[ModpackImport] %@ installer.jar download failed (all %lu candidates), falling back to placeholder JSON: %@",
+              loader, (unsigned long)installerURLCandidates.count,
+              installerURLCandidates.lastObject);
         NSInteger javaMajor = [self javaMajorVersionForMC:minecraftVersion];
         NSDictionary *placeholderJSON = @{
             @"_comment_": [NSString stringWithFormat:localize(@"i18n_str_555", nil), loader, loaderVersion],
@@ -2272,7 +2289,7 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
         return NO;  // 让调用方感知失败并打印警告
     }
 
-    NSLog(@"[ModpackImport] %@ installer.jar download completed: %@", loader, tmpInstallerPath);
+    NSLog(@"[ModpackInstall] %@ installer.jar download completed: %@ (via %@)", loader, tmpInstallerPath, installerURL);
 
     // 调用直装器，写入 modpack 的 gameDirAbsolute（不注册 profile，由 createProfileForModpack 统一注册）
     NSError *installError = nil;
@@ -2474,24 +2491,46 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
     return YES;
 }
 
-/// 根据 loader 类型构造 installer.jar 下载 URL
+/// 根据 loader 类型构造 installer.jar 下载 URL 候选列表（Task175）
 /// Forge: https://maven.minecraftforge.net/net/minecraftforge/forge/<mc>-<loader>/forge-<mc>-<loader>-installer.jar
+///        旧版 Forge（MC ≤ 1.12.2）的晋升构建在 maven 上是 <mc>-<build>-<mc>
+///        后缀形（如 1.8.9-11.15.1.2318-1.8.9），无后缀路径 404 —— 补候选。
 /// NeoForge 1.20.1: https://maven.neoforged.net/releases/net/neoforged/forge/<loader>/forge-<loader>-installer.jar
 /// NeoForge 其他: https://maven.neoforged.net/releases/net/neoforged/neoforge/<loader>/neoforge-<loader>-installer.jar
 /// BMCLAPI 镜像优先（若用户选了 bmclapi 源）
-- (nullable NSString *)buildInstallerURLForLoader:(NSString *)loader
-                                    loaderVersion:(NSString *)loaderVersion
-                                   minecraftVersion:(NSString *)minecraftVersion {
+- (NSArray<NSString *> *)buildInstallerURLCandidatesForLoader:(NSString *)loader
+                                                 loaderVersion:(NSString *)loaderVersion
+                                              minecraftVersion:(NSString *)minecraftVersion {
     NSString *downloadSource = [PLPreferences currentDownloadSourceForType:@"forge"];
     BOOL useBMCLAPI = [downloadSource isEqualToString:@"bmclapi"];
 
     if ([loader isEqualToString:@"Forge"]) {
         // Forge versionString = "<mc>-<loaderVersion>"，例如 "1.20.1-47.3.0"
         NSString *versionString = [NSString stringWithFormat:@"%@-%@", minecraftVersion, loaderVersion];
-        if (useBMCLAPI) {
-            return [NSString stringWithFormat:@"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/%@/forge-%@-installer.jar", versionString, versionString];
+        NSMutableArray<NSString *> *candidates = [NSMutableArray array];
+        NSString *host = useBMCLAPI ? @"https://bmclapi2.bangbang93.com/maven" : @"https://maven.minecraftforge.net";
+        // Task175：旧版 Forge（1.x 且 minor ≤ 12）追加 "-<mcver>" 后缀形候选。
+        // 病历（f484eb7 装机日志）：1.8.9-11.15.1.2318 的 installer 在
+        // maven.minecraftforge.net 与 bmclapi 双双 404 ×8 次重试，占位 JSON
+        // 落盘，启动时 ClassNotFoundException: net.angelaura.installer.
+        // MissingLoader 崩溃。本地 curl 实锤：后缀形
+        // 1.8.9-11.15.1.2318-1.8.9/forge-1.8.9-11.15.1.2318-1.8.9-installer.jar
+        // = HTTP 200（无后缀 404、universal 也 404）。1.13+ 的 maven 布局
+        // 恒无后缀，不加候选（省一轮必 404 的等待）。
+        BOOL ame175_legacyForge = NO;
+        NSArray *ame175_parts = [minecraftVersion componentsSeparatedByString:@"."];
+        if (ame175_parts.count >= 2 && [ame175_parts[0] integerValue] == 1) {
+            NSInteger ame175_minor = [ame175_parts[1] integerValue];
+            ame175_legacyForge = (ame175_minor > 0 && ame175_minor <= 12);
         }
-        return [NSString stringWithFormat:@"https://maven.minecraftforge.net/net/minecraftforge/forge/%@/forge-%@-installer.jar", versionString, versionString];
+        [candidates addObject:[NSString stringWithFormat:@"%@/net/minecraftforge/forge/%@/forge-%@-installer.jar",
+                               host, versionString, versionString]];
+        if (ame175_legacyForge) {
+            NSString *suffixed = [NSString stringWithFormat:@"%@-%@", versionString, minecraftVersion];
+            [candidates addObject:[NSString stringWithFormat:@"%@/net/minecraftforge/forge/%@/forge-%@-installer.jar",
+                                   host, suffixed, suffixed]];
+        }
+        return candidates;
     }
 
     if ([loader isEqualToString:@"NeoForge"]) {
@@ -2499,18 +2538,16 @@ static NSString * const kImportedModpacksKey = @"ImportedModpacks";
         // loaderVersion 例如 "47.1.0"（1.20.1）或 "20.6.119-beta"（1.20.6+）
         BOOL isLegacyForgeArtifact = [minecraftVersion isEqualToString:@"1.20.1"];
         if (isLegacyForgeArtifact) {
-            if (useBMCLAPI) {
-                return [NSString stringWithFormat:@"https://bmclapi2.bangbang93.com/maven/net/neoforged/forge/%@/forge-%@-installer.jar", loaderVersion, loaderVersion];
-            }
-            return [NSString stringWithFormat:@"https://maven.neoforged.net/releases/net/neoforged/forge/%@/forge-%@-installer.jar", loaderVersion, loaderVersion];
+            NSString *host = useBMCLAPI ? @"https://bmclapi2.bangbang93.com/maven" : @"https://maven.neoforged.net/releases";
+            return @[[NSString stringWithFormat:@"%@/net/neoforged/forge/%@/forge-%@-installer.jar",
+                      host, loaderVersion, loaderVersion]];
         }
-        if (useBMCLAPI) {
-            return [NSString stringWithFormat:@"https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/%@/neoforge-%@-installer.jar", loaderVersion, loaderVersion];
-        }
-        return [NSString stringWithFormat:@"https://maven.neoforged.net/releases/net/neoforged/neoforge/%@/neoforge-%@-installer.jar", loaderVersion, loaderVersion];
+        NSString *host = useBMCLAPI ? @"https://bmclapi2.bangbang93.com/maven" : @"https://maven.neoforged.net/releases";
+        return @[[NSString stringWithFormat:@"%@/net/neoforged/neoforge/%@/neoforge-%@-installer.jar",
+                  host, loaderVersion, loaderVersion]];
     }
 
-    return nil;
+    return @[];
 }
 
 /// 根据 MC 版本推断所需 Java 主版本号

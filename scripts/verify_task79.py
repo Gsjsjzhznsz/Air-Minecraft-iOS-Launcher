@@ -84,7 +84,7 @@ check('A6 FPS 注释行恢复（Task79 回填）',
       '// FPS/内存监控相关（FPS 在 native pojavSwapBuffers 中计数，参照 FCL/ZL2）' in svc)
 
 # A7: updateSavedResolution 联动代码仍在（Task78 核心逻辑未因修复而丢失）
-linkage_ok = ('windowWidth = roundf((float)surfaceWidth / mgFsrScale);' in svc and
+linkage_ok = ('int ame153_renderW = roundf((float)surfaceWidth / mgFsrScale);' in svc and  # Task175 re-anchor: Task153 indirection
               'metalLayer.drawableSize = CGSizeMake(MAX(surfaceWidth, 1), MAX(surfaceHeight, 1));' in svc and
               'if (mgFsrScale > 0.0f) screenScale /= mgFsrScale;' in svc)
 check('A7 Task78 FSR 联动逻辑保持完整（窗口/drawable/输入三口径）', linkage_ok)

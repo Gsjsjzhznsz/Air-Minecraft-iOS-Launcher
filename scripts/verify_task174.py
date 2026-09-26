@@ -57,36 +57,39 @@ bm_m = rd("Natives/BackgroundManager.m")
 bsvc = rd("Natives/BackgroundSettingsViewController.m")
 
 # ============================================================
-# A. 画布接管（晕影根修：开关开启 = 壁纸层整层退出）
+# A. Task175 重锚：画布接管退役 → 壁纸共存
+# （用户对 Task174 构建的反馈"新拟态壁纸开启时壁纸被覆盖无法正常显示"；
+#   开启 = 壁纸照常铺设 + 卡片实底 + 柔和阴影档；接管门整体删除）
 # ============================================================
-check("A1 applyBackgroundToWindow 顶部开关门（cardsNeumorphEnabled → 原生底色 + return，壁纸容器不铺）",
-      "if (self.cardsNeumorphEnabled) {" in bm_m
-      and "window.backgroundColor = [UIColor systemBackgroundColor];" in bm_m
-      and bm_m.index("Task174：新拟态界面开关 = 全局画布接管") < bm_m.index("// Task111：检测并切换")
-      and "画布接管门" in bm_m)
-check("A2 applyBackgroundToSplitViewController 同款门（splitVC.view 原生底色 + return）",
-      bm_m.count("if (self.cardsNeumorphEnabled) {") >= 2
-      and "splitVC.view.backgroundColor = [UIColor systemBackgroundColor];" in bm_m
-      and bm_m.index("splitVC.view.backgroundColor = [UIColor systemBackgroundColor];")
-      < bm_m.index("if ([self hasBackground]) {", bm_m.index("- (void)applyBackgroundToSplitViewController")))
-check("A3 refreshUIEffect ON 分支：壁纸容器收起 + 双宿主底色原生 + 一次性取证日志",
+win_fn = bm_m[bm_m.index("- (void)applyBackgroundToWindow:"):bm_m.index("// Task111：检测并切换")]
+split_fn_start = bm_m.index("- (void)applyBackgroundToSplitViewController:")
+split_fn = bm_m[split_fn_start:bm_m.index("// Task111：同 applyBackgroundToWindow", split_fn_start)]
+check("A1 applyBackgroundToWindow 无新拟态早退门（画布接管退役：Task174→Task175 注释在位 + 旧门体删除）",
+      "Task174→Task175（画布接管退役，壁纸共存定稿）" in bm_m
+      and bm_m.index("Task174→Task175（画布接管退役，壁纸共存定稿）") < bm_m.index("// Task111：检测并切换")
+      and "if (self.cardsNeumorphEnabled)" not in win_fn
+      and "if (self.cardsNeumorphEnabled)" not in split_fn)
+check("A2 applyBackgroundToSplitViewController 同款退役（注释 + 无早退门）",
+      "Task174→Task175：与 applyBackgroundToWindow 同款退役" in bm_m
+      and bm_m.count("if (self.cardsNeumorphEnabled) {") >= 2)  # refreshUIEffect/卡片管线仍在
+check("A3 refreshUIEffect ON 分支：壁纸容器缺席时原位重建 + 双宿主底色原生 + 共存取证日志",
       "if (self.cardsNeumorphEnabled) {" in bm_m[bm_m.index("- (void)refreshUIEffect"):]
-      and "[self removeGlobalBackground];" in bm_m[bm_m.index("- (void)refreshUIEffect"):]
-      and "ame174CanvasLogOnce" in bm_m
-      and "[Task174] neumorph UI canvas active" in bm_m)
-check("A4 refreshUIEffect OFF 分支：被收起的壁纸容器原位重建（hasBackground && !container）",
+      and "if ([self hasBackground] && !self.globalBackgroundContainer) {" in bm_m[bm_m.index("- (void)refreshUIEffect"):]
+      and "ame175CoexistLogOnce" in bm_m
+      and "[Task175] neumorph UI wallpaper coexist" in bm_m
+      and bm_m.index("ame175CoexistLogOnce") > bm_m.index("- (void)refreshUIEffect"))
+check("A4 refreshUIEffect OFF 分支：原位重建 + blur 重挂（不变）",
       "if ([self hasBackground] && !self.globalBackgroundContainer) {" in bm_m
       and "[self applyBackgroundToSplitViewController:self.currentSplitVC];" in bm_m
       and "[self applyBackgroundToWindow:self.currentWindow];" in bm_m)
-check("A5 壁纸状态保留（gate 块仅赋底色+return，零清除/零重建调用——Bing 落盘照旧，关闭即回归）",
-      "clearBackground" not in bm_m[bm_m.index("if (self.cardsNeumorphEnabled) {"):
-                                    bm_m.index("// Task111：检测并切换")]
-      and "applyImageBackground" not in bm_m[bm_m.index("if (self.cardsNeumorphEnabled) {"):
-                                             bm_m.index("// Task111：检测并切换")])
-check("A5b 门内零副作用（两处门体均为 赋底色+return 两行，无 blur/透明化调用）",
-      all("addBlurEffectToContainer" not in seg and "makeSplitViewControllerTransparent" not in seg
-          for seg in [bm_m[bm_m.index("if (self.cardsNeumorphEnabled) {"):bm_m.index("// Task111：检测并切换")],
-                      bm_m[bm_m.rindex("if (self.cardsNeumorphEnabled) {", 0, bm_m.index("// Task111：同 applyBackgroundToWindow")):bm_m.index("// Task111：同 applyBackgroundToWindow")]]))
+check("A5 卡片管线挂柔和档（applyNeumorphCardEffectToView / applyEffectToCollectionViewCell 双点 ame_setNeumorphWallpaperSoft:[self hasBackground]）",
+      bm_m.count("ame_setNeumorphWallpaperSoft:[self hasBackground]") == 2)
+check("A5b 柔和档引擎参数（偏移/模糊缩约 1/3 + 不透明度 0.45/0.5 + 透传原语）",
+      "ame_wallpaperSoftProfile" in rd("Natives/UIKit+NativeSurface.m")
+      and "offset * 0.35" in rd("Natives/UIKit+NativeSurface.m")
+      and "blur * 0.37" in rd("Natives/UIKit+NativeSurface.m")
+      and "darkOpacity = 0.45" in rd("Natives/UIKit+NativeSurface.m")
+      and "ame_setNeumorphWallpaperSoft:(BOOL)soft" in rd("Natives/UIKit+NativeSurface.m"))
 
 # ============================================================
 # B. 百分比实时回显
@@ -107,8 +110,8 @@ check("B4 既有刷新链不破坏（落盘 + refreshUIEffect 仍在）",
 # ============================================================
 # C. 既有语义不回潮（Task173 重写与灰化反转原样保留）
 # ============================================================
-check("C1 卡片管线开关门仍在（applyNeumorphCardEffectToView / applyEffectToCollectionViewCell / applyCardEffectToCell）",
-      bm_m.count("self.cardsNeumorphEnabled") >= 6
+check("C1 卡片管线开关门仍在（applyNeumorphCardEffectToView / applyEffectToCollectionViewCell / applyCardEffectToCell；Task175 重锚：画布门退役后 6->4）",
+      bm_m.count("self.cardsNeumorphEnabled") >= 4
       and "- (void)applyNeumorphCardEffectToView:" in bm_m
       and "- (void)applyEffectToCollectionViewCell:" in bm_m
       and "- (void)applyCardEffectToCell:" in bm_m)
@@ -143,18 +146,19 @@ check("D2 新拟态双键六语言仍在位（interface.title + opacity.title）
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告插入 index 2（server/task169 pin 不动；本条@2 后双 task173 顺延 anns[3]/[4]，172/171/170/168 顺延 anns[5]/[6]/[7]/[8]）且 id 唯一",
+check("E1 公告（Task175 重锚：task175@2 插入，本条（task174）顺延 anns[3]，双 task173 顺延 anns[4]/[5]，172/171/170/168 顺延 anns[6]/[7]/[8]/[9]；server/task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[3]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[4]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[5]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[6]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[7]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[8]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t174 = anns[2]
+      and anns[2]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[3]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[4]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[5]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[6]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[7]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[8]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[9]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t174 = anns[3]
 check("E2 公告内容锚（晕影根因=壁纸垫底/画布接管/百分比实时回显 + EN 尾注）",
       "晕影" in t174["summary"] and "画布接管" in t174["summary"]
       and "壁纸" in t174["content"] and "实时回显" in t174["content"]

@@ -110,6 +110,15 @@ AME_ENVIRON_DECL BOOL virtualMouseEnabled, isControlModifiable;
 // windowWidth 口径）。
 AME_ENVIRON_DECL int ame_surfaceWidth, ame_surfaceHeight;
 
+// Task175（物品栏命中几何的单一事实源）：物理像素 / MC 窗口像素 的合成比
+// 例（= fsr / resolutionScale 的合成，含旋转/分辨率/FSR 档位全部因子）。
+// 由 updateSavedResolution 单点写入（窗口信念的唯一作者），消费者首选它、
+// 本地重算仅作 0 值时的回退——防 CallbackBridge_nativeSendScreenSize 等
+// Java 侧屏幕尺寸回报把 windowWidth/Height 全局改写后，命中矩形跟着走样
+// （用户实测"切换界面尺寸或更换分辨率后物品栏位置/大小偏移"的存活假设
+// 之一）。值域与 touchHotbar 的旧钳制一致 [0.25, 8]，异常时写 0 = 未就绪。
+AME_ENVIRON_DECL float ame_windowToPhysRatio;
+
 // Task 153（MobileGL 延迟缩窗 → Task 154 已退役，档案保留）：曾用于 FSR
 // 联动 + MobileGL 的"全尺寸启动 → 链确认全尺寸后缓冲后下发缩窗"流程；
 // 7c32bc3 装机日志实证 libMobileGL 的伪 EGL 使 eglQuerySurface 链恒 idle、

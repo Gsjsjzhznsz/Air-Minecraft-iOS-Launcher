@@ -73,6 +73,14 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 @interface AmeNeumorphShadowView : UIView
 /// 强制立即按宿主当前 bounds 重算度量/颜色（宿主 frame 变化后调用）
 - (void)ame_refreshForHostBounds;
+
+/// Task175：壁纸共存柔和档（新拟态界面开启且有壁纸时启用）。规格双阴影
+/// （20pt 偏移/60pt 模糊/不透明度 1.0）垫在原生底色上是经典新拟态，但
+/// 落在照片上必读作重晕影（Task173/174 两轮装机实测）；用户定稿改为
+/// 壁纸可见 + 卡片保持实底，阴影整体降档：偏移/模糊缩到约 1/3，不透明度
+/// 压到 0.45/0.5，在壁纸上读作轻微悬浮感而非晕影。默认 NO（原生底色上
+/// 维持 Task160 规格档不变）。
+@property (nonatomic, assign) BOOL ame_wallpaperSoftProfile;
 @end
 
 /// 原生卡片/面板表面（Task137 起替代 nm_convex / nm_flat 系列引擎调用）
@@ -117,6 +125,12 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 与实底版 ame_applyNeumorphSurface 的唯一差异是不写 backgroundColor。
 /// 调用点负责把卡面子视图（如 blur 层）的圆角同步到宿主新值。
 - (void)ame_attachNeumorphShadowOnly;
+
+/// Task175：壁纸共存柔和档开关（透传到关联的双阴影承载视图；未挂载时
+/// 无害空操作）。BackgroundManager 在新拟态界面开启且有壁纸时调用 YES——
+/// 卡片仍走规格实底表面（Task172/173 语义不变），仅阴影降档避免照片上
+/// 的重晕影；无壁纸/开关关闭时回 NO（规格档）。
+- (void)ame_setNeumorphWallpaperSoft:(BOOL)soft;
 
 /// Task172：卡片本体透明度（不含文字）——在 ame_applyNeumorphSurface 之后
 /// 调用。卡面背景色按 opacity 淡化（动态色安全：dynamic provider 内逐

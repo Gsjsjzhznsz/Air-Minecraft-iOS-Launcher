@@ -1216,6 +1216,46 @@ static void ame158_repairMissingLibraries(NSDictionary *launchTarget) {
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
+    // Task175：占位 mainClass 预检（用户实测"forge1.8.9 装整合包后启动 =
+    // ClassNotFoundException: net.angelaura.installer.MissingLoader 裸崩"）。
+    // ModpackImportService 在 loader 安装失败时写占位 JSON（mainClass 指向
+    // 不存在的类）——旧路径让 JVM 起来后在 loadClass 处炸出原始堆栈，
+    // 用户无从知道"是装包时加载器没装上"。此处提前拦下：弹窗复用
+    // i18n_str_555（"此整合包需要 %@ %@ 加载器，自动安装失败。请通过下载
+    // 界面手动安装。"——与导入期报错同文案），不进 JVM 直接返回。
+    if ([launchTarget isKindOfClass:NSDictionary.class] &&
+        [launchTarget[@"mainClass"] isEqualToString:@"net.angelaura.installer.MissingLoader"]) {
+        // 占位 JSON 的 _comment_ 是导入期就写好的本地化完整句（i18n_str_555
+        // 展开），比运行时重新拼更可靠；缺席时退回 555 现场展开。
+        NSString *ame175_message = [launchTarget[@"_comment_"] isKindOfClass:NSString.class]
+            ? launchTarget[@"_comment_"]
+            : [NSString stringWithFormat:localize(@"i18n_str_555", nil), @"Forge", @""];
+        NSLog(@"[JavaLauncher] Task175: refusing to launch placeholder version JSON (mainClass=net.angelaura.installer.MissingLoader) -- loader install had failed for this modpack");
+        dispatch_async(dispatch_get_main_queue(), ^{
+            // 标题留空（无现成"加载器安装失败"短标题键，正文自带完整语境；
+            // 零新增 l10n）
+            UIAlertController *ame175_alert = [UIAlertController
+                alertControllerWithTitle:nil
+                message:ame175_message
+                preferredStyle:UIAlertControllerStyleAlert];
+            [ame175_alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.ok", nil)
+                                                             style:UIAlertActionStyleDefault handler:nil]];
+            UIViewController *ame175_top = nil;
+            for (UIWindowScene *ame175_scene in UIApplication.sharedApplication.connectedScenes.allObjects) {
+                if (ame175_scene.activationState == UISceneActivationStateForegroundActive &&
+                    ame175_scene.windows.count > 0) {
+                    ame175_top = ame175_scene.windows.firstObject.rootViewController;
+                    while (ame175_top.presentedViewController != nil) {
+                        ame175_top = ame175_top.presentedViewController;
+                    }
+                    break;
+                }
+            }
+            [ame175_top presentViewController:ame175_alert animated:YES completion:nil];
+        });
+        return 1;
+    }
+
     // 防御检查：headless JVM（Forge/NeoForge 直装 processors 阶段）已在当前进程
     // 创建过 JVM。进程内 JVM 只能创建一次，再次 JLI_Launch 必然崩溃。
     // Task173：死路弹窗升级为一键出路——「重启并启动」写 internal.autolaunch_profile

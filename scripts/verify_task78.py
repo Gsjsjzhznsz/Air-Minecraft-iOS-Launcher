@@ -71,8 +71,8 @@ A = [
   "ame78_fsr_preset_scale"),
  (svc, "SurfaceViewController.m: linkage log",
   "Task83 FSR linkage: renderer=%@"),  # Task83 起 FSR 多渲染器化，日志前缀更新；联动语义不变
- (svc, "SurfaceViewController.m: render window = surface / fsr scale",
-  "windowWidth = roundf((float)surfaceWidth / mgFsrScale);"),
+ (svc, "SurfaceViewController.m: render window = surface / fsr scale (Task175 re-anchor: Task153 indirection, same expression)",
+  "int ame153_renderW = roundf((float)surfaceWidth / mgFsrScale);"),
  (svc, "SurfaceViewController.m: drawable writes use surface dims",
   "metalLayer.drawableSize = CGSizeMake(MAX(surfaceWidth, 1), MAX(surfaceHeight, 1));"),
  (svc, "SurfaceViewController.m: input scale divided by fsr scale",

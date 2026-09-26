@@ -186,12 +186,12 @@ check("D1 version.h Task 171 附录：七主题齐全",
                                  "PreferredGraphicsApi", "UIAsyncTextInput"]))
 anns = json.loads(rd("announcements.json"))["announcements"]
 # Task174 重锚：task174@2 + 十症状 task173@4 相继插入，task171 顺延 anns[4] -> anns[6]。
-check("D2 公告：task171 在 index 6（task174/双 task173/172 相继插入后）；置顶服务器推荐仍在 anns[0]；task169 仍在 anns[1]",
-      anns[6]["id"] == "task171-seven-fixes-2026-09-25"
+check("D2 公告（Task175 重锚）：task171 在 index 7（task175/174/双 task173/172 相继插入后）；置顶服务器推荐仍在 anns[0]；task169 仍在 anns[1]",
+      anns[7]["id"] == "task171-seven-fixes-2026-09-25"
       and anns[0].get("pin") and "mysv.dpdns.org" in anns[0]["title"]
       and anns[1]["id"] == "task169-four-fixes-2026-09-25")
 check("D3 task171 公告内容七条全列",
-      all(k in anns[6]["content"] for k in ["①", "②", "③", "④", "⑤", "⑥", "⑦"]))
+      all(k in anns[7]["content"] for k in ["①", "②", "③", "④", "⑤", "⑥", "⑦"]))
 wl = rd("worklog.md")
 check("D4 仓库 worklog 已记 Task 171",
       "Task ID: 171" in wl)

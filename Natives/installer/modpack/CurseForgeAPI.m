@@ -539,6 +539,13 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         @"id": [project[@"id"] description] ?: @"",
         @"title": [title isKindOfClass:NSString.class] ? title : @"",
         @"description": [description isKindOfClass:NSString.class] ? description : @"",
+        // Task175ï¼ä¸è½½ééä¼ ï¼ç¨æ·å®æµ"CF ä¸æ¾ç¤ºä¸è½½é"ï¼ãCF ååºå­æ®µæ¯
+        // downloadCountï¼NSNumberï¼ï¼UI å¡çè¯»çæ¯ downloads é®ï¼Modrinth ä¾§
+        // ååé®ï¼formatDownloadCount:ï¼ââæ§è½¬æ¢æè¯¥å­æ®µæ´ä¸ªä¸¢äºï¼ææ CF
+        // æ¡ç®ææ¾ "0 æ¬¡ä¸è½½"ãéåå®æµï¼mod.mcimirror.top è£æºæ¥å¿ + æ¬å°
+        // curl åè¯ï¼downloadCount ä¸ç´å¨ååºéï¼çº¯å±å­æ®µåæ­å±ã
+        @"downloads": [project[@"downloadCount"] isKindOfClass:NSNumber.class]
+            ? project[@"downloadCount"] : @0,
         @"imageUrl": [self imageURLForProject:project]
     }.mutableCopy;
 }

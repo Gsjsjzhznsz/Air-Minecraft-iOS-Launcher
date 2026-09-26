@@ -349,6 +349,14 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
     
     // 中间内容 - 默认显示新闻页
     LauncherNewsViewController *newsVC = [[LauncherNewsViewController alloc] init];
+    // Task175：初始主页实例注册进缓存（头像消失根修收尾）。
+    // 病历（f484eb7 装机日志实锤）：本方法创建的初始实例从未写入
+    // cachedHomeVC，用户首次切走再切回时 showHomePage 缓存未命中
+    // → 又 alloc 了全新实例（日志 "[HomeAvatar] Task173 home VC created"
+    // 出现在首次切换后 = 铁证），Task169/171/172 修过的全部时序病灶
+    // 在这个新实例上复发。卡片布局（LauncherCardLayoutViewController）
+    // 早已注册，此处补齐侧栏布局的差异。
+    self.cachedHomeVC = newsVC;
     [self setContentViewController:newsVC animated:NO];
     
     // 右侧面板 - 账户和启动

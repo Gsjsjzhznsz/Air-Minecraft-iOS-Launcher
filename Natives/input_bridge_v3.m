@@ -1439,10 +1439,34 @@ int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
     // 且 resolutionScale=100% 时比例恒 1.0，新几何 22*guiScale 比旧
     // 20*guiScale 只宽出精灵自带上边框（2*guiScale 像素），命中区更贴合
     // 视觉、行为无回退。比例异常（窗口未初始化/旋转间隙）回退 1.0 保持旧行为。
+    // Task175：比例优先取 ame_windowToPhysRatio（updateSavedResolution 单点
+    // 写入，environ.h 全局）——本地 physicalHeight/windowHeight 重算降级为
+    // 该全局为 0（未就绪）时的回退。动机：windowWidth/Height 还会被
+    // CallbackBridge_nativeSendScreenSize（Java 侧屏幕尺寸回报）改写，而
+    // ame_windowToPhysRatio 只随旋转/分辨率/FSR 档位变化（用户实测"切换
+    // 界面尺寸或更换分辨率后位置/大小偏移"的防复发加固）。
     float ame171_winToPhys = 1.0f;
-    if (windowHeight > 0 && physicalHeight > 0) {
+    int ame175_ratioSource = 0;  // 0=回退1.0 / 1=全局单点 / 2=本地重算
+    if (ame_windowToPhysRatio > 0.0f) {
+        ame171_winToPhys = ame_windowToPhysRatio;
+        ame175_ratioSource = 1;
+    } else if (windowHeight > 0 && physicalHeight > 0) {
         float ratio = (float)physicalHeight / (float)windowHeight;
-        if (ratio >= 0.25f && ratio <= 8.0f) ame171_winToPhys = ratio;
+        if (ratio >= 0.25f && ratio <= 8.0f) {
+            ame171_winToPhys = ratio;
+            ame175_ratioSource = 2;
+        }
+    }
+    // Task175：guiScale 节流保鲜——旧机制只在 grab 翻转沿重读 options.txt，
+    // 用户改完界面尺寸立即点物品栏时命中矩形仍按旧 scale 计算（偏移窗口）。
+    // 每次命中测试最多重读一次（2 秒节流，文件 ~1KB，触摸线程零负担）。
+    {
+        static double s_ame175_lastScaleRefresh = 0.0;
+        double ame175_now = (double)clock() / (double)CLOCKS_PER_SEC;
+        if (ame175_now - s_ame175_lastScaleRefresh > 2.0) {
+            s_ame175_lastScaleRefresh = ame175_now;
+            refreshGuiScaleNatively();
+        }
     }
     int barHeight = (int)((float)(22 * guiScale) * ame171_winToPhys + 0.5f);
     int barY = physicalHeight - barHeight;
@@ -1454,6 +1478,17 @@ int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
                   (int)physicalWidth, (int)physicalHeight, windowWidth, windowHeight,
                   (double)ame171_winToPhys, barHeight, barY,
                   (int)(physicalHeight - mcscale(20)));
+        }
+        // Task175 取证：一次性全量输入快照（phys/surface/win/fsr/resScale/
+        // guiScale/比例来源）。下轮"偏移"装机日志凭这一行直接钉死是哪个
+        // 变量走样——不再需要多轮猜测。
+        static bool s_task175Logged = false;
+        if (!s_task175Logged) {
+            s_task175Logged = true;
+            NSLog(@"[HotbarDiag] Task175 geometry snapshot: phys=%dx%d surface=%dx%d win=%dx%d resScale=%.2f guiScale=%d ratio=%.3f (source=%d: 1=savedResolution-global 2=local-recompute 0=fallback-1.0) barY=%d barH=%d",
+                  (int)physicalWidth, (int)physicalHeight, ame_surfaceWidth, ame_surfaceHeight,
+                  windowWidth, windowHeight, (double)resolutionScale, guiScale,
+                  (double)ame171_winToPhys, ame175_ratioSource, barY, barHeight);
         }
     }
     if (y < barY) {

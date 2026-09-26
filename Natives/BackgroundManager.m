@@ -268,17 +268,15 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // Remove existing
     [self removeGlobalBackground];
 
-    // Task174：新拟态界面开关 = 全局画布接管。开关开启时壁纸/毛玻璃容器整层
-    // 不再铺设（壁纸状态保留，仅视觉收起），宿主底色回归原生系统色——即用户
-    // 复现方法（"Bing 壁纸开着调 UI 效果再取消 Bing 壁纸"）的终态背景。规格
-    // 双阴影只有在与卡面同族的原生底上才读作"正常态"，垫在照片上必然读作
-    // 晕影（Task173 只重写了卡片层、壁纸仍垫底，装机实测"全都是晕影"）。
-    // Bing 自动刷新在开启期间的落盘照旧（setBingBackgroundImageAtPath 走到
-    // 这里即被本门拦下），开关关闭时由 refreshUIEffect 原位重建。
-    if (self.cardsNeumorphEnabled) {
-        window.backgroundColor = [UIColor systemBackgroundColor];
-        return;
-    }
+    // Task174→Task175（画布接管退役，壁纸共存定稿）：用户实测反馈
+    // "新拟态开启时壁纸被覆盖无法正常显示"——Task174 的画布级接管（壁纸
+    // 整层收起）矫枉过正。定稿语义：新拟态界面开启 = 卡片实底规格表面
+    // （Task173 语义不变）+ 壁纸照常铺设可见 + 双阴影自动切柔和档
+    // （AmeNeumorphShadowView.ame_wallpaperSoftProfile：偏移/模糊缩约
+    // 1/3、不透明度降档，照片上读作轻悬浮而非晕影）。无壁纸时维持原生
+    // 系统底色（Task137 语义）+ 规格档阴影。本方法不再有新拟态专属早退
+    // ——壁纸容器的铺设与开关状态无关，卡面/阴影的区分由卡片管线负责。
+    // Bing 自动刷新照旧可见（不再被拦截）。
 
     // Task111：检测并切换（用户实测反馈：Task89 的强制纯色底把启动器背景照片
     // 功能全部顶掉了）。用户设置了自定义背景（图片/视频）时，恢复 Task89 之前的
@@ -331,12 +329,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // Remove existing
     [self removeGlobalBackground];
 
-    // Task174：画布接管门，与 applyBackgroundToWindow 同款（见彼处注释）——
-    // 开关开启时壁纸容器不铺、底色回归原生系统色，开启期间 Bing 刷新落盘照旧。
-    if (self.cardsNeumorphEnabled) {
-        splitVC.view.backgroundColor = [UIColor systemBackgroundColor];
-        return;
-    }
+    // Task174→Task175：与 applyBackgroundToWindow 同款退役（画布接管门
+    // 删除，壁纸照常铺设；语义见彼处注释）。
 
     // Task111：同 applyBackgroundToWindow 的检测并切换——有自定义背景时恢复
     // Task89 之前的容器管线（最底层插入 + 图片/视频 + 子 VC 透明化），
@@ -1013,13 +1007,17 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 }
 
 - (void)refreshUIEffect {
-    // Task174：新拟态界面开关 = 全局画布接管（语义见 applyBackgroundToWindow
-    // 顶部注释）。开启：壁纸容器整层收起 + 宿主底色回归原生系统色（复现方法
-    // 终态）+ 一次性日志供装机取证；关闭：若壁纸容器在开启期间被收起则原位
-    // 重建（透明化由 applyBackgroundTo* 内部链路自带），再走既有 blur 重挂。
+    // Task174→Task175（画布接管退役 → 壁纸共存）：开启分支不再收起壁纸，
+    // 反向兜底——壁纸容器缺席时原位重建（与关闭分支同款链路），宿主底色
+    // 维持原生系统色作为容器之下的兜底；卡片管线在通知回调里重刷实底
+    // 表面 + 柔和阴影。关闭分支保持 Task174 语义不变（原位重建 + blur 重挂）。
     if (self.cardsNeumorphEnabled) {
-        if (self.globalBackgroundContainer) {
-            [self removeGlobalBackground];
+        if ([self hasBackground] && !self.globalBackgroundContainer) {
+            if (self.currentSplitVC) {
+                [self applyBackgroundToSplitViewController:self.currentSplitVC];
+            } else if (self.currentWindow) {
+                [self applyBackgroundToWindow:self.currentWindow];
+            }
         }
         if (self.currentWindow) {
             self.currentWindow.backgroundColor = [UIColor systemBackgroundColor];
@@ -1027,9 +1025,14 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         if (self.currentSplitVC) {
             self.currentSplitVC.view.backgroundColor = [UIColor systemBackgroundColor];
         }
-        static dispatch_once_t ame174CanvasLogOnce;
-        dispatch_once(&ame174CanvasLogOnce, ^{
-            NSLog(@"[Task174] neumorph UI canvas active -- wallpaper layer retracted, cards render the 'normal state' (spec surface + dual shadows on the native background)");
+        // 壁纸自身的压暗/模糊层照旧重挂（幂等：与关闭分支同款链路；新拟态
+        // 开启时设置页的三行壁纸效果选项被灰化冻结，容器维持冻结值即可）。
+        if (self.globalBackgroundContainer) {
+            [self addBlurEffectToContainer:self.globalBackgroundContainer];
+        }
+        static dispatch_once_t ame175CoexistLogOnce;
+        dispatch_once(&ame175CoexistLogOnce, ^{
+            NSLog(@"[Task175] neumorph UI wallpaper coexist: wallpaper visible, cards keep the spec surface, shadows soften (profile set by card pipeline)");
         });
     } else {
         if ([self hasBackground] && !self.globalBackgroundContainer) {
@@ -1183,6 +1186,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         cell.contentView.clipsToBounds = NO;
         cell.contentView.layer.masksToBounds = NO;
         [target ame_applyNeumorphSurface];
+        // Task175：壁纸共存柔和档（同 applyNeumorphCardEffectToView 分支）。
+        [target ame_setNeumorphWallpaperSoft:[self hasBackground]];
         // Task170 滑条（Task172 语义修订）：卡片本体透明度——卡面 + 双阴影
         // 承载层按比例淡化，文字/图标子视图不参与（引擎原语，非宿主 alpha）。
         [target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
@@ -1374,6 +1379,9 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     }
     if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;
     [view ame_applyNeumorphSurface];
+    // Task175：壁纸共存柔和档——有壁纸时阴影降档（见 ame_setNeumorphWallpaperSoft
+    // 引擎注释），无壁纸维持规格档。卡片实底表面语义不变（Task173）。
+    [view ame_setNeumorphWallpaperSoft:[self hasBackground]];
     // Task170 滑条（Task172 语义修订）：卡片本体透明度——卡面 + 双阴影
     // 承载层按比例淡化，文字/图标子视图不参与（引擎原语，非宿主 alpha）。
     [view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
