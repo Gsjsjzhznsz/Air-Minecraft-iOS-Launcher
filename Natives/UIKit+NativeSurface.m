@@ -183,10 +183,11 @@ static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait
         // 不透明渐变表面（CSS linear-gradient(145deg, start, end)）：
         // 145° 轴向单位向量 (sin145°, -cos145°) ≈ (0.5736, 0.8192)，
         // 折算 start = center - v/2 = (0.2132, 0.0904)，end = center + v/2 = (0.7868, 0.9096)
-        // CGColorRef 进 NSArray 字面量需 (id) 桥接（ARC；PLTaskProgress 先例）
+        // CGColorRef 进 NSArray 字面量需 __bridge 显式桥接（ARC 硬要求；数组
+        // 插入时自行 retain，解析出的 autoreleased UIColor 活过本语句，安全）
         self.ame177_surfaceLayer.colors = @[
-            (id)Ame177ResolvedCGColor(AmeNeumorphSurfaceGradientStartColor(), trait),
-            (id)Ame177ResolvedCGColor(AmeNeumorphSurfaceGradientEndColor(), trait),
+            (__bridge id)Ame177ResolvedCGColor(AmeNeumorphSurfaceGradientStartColor(), trait),
+            (__bridge id)Ame177ResolvedCGColor(AmeNeumorphSurfaceGradientEndColor(), trait),
         ];
         self.ame177_surfaceLayer.startPoint = CGPointMake(0.2132, 0.0904);
         self.ame177_surfaceLayer.endPoint   = CGPointMake(0.7868, 0.9096);
