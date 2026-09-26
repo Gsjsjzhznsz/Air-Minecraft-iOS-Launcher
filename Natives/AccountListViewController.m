@@ -1,6 +1,7 @@
 #import <AuthenticationServices/AuthenticationServices.h>
 #import <objc/runtime.h>   // Task 130b：按钮 row 关联对象
 #import "NMToast.h"
+#import "UIKit+NativeSurface.h" // Task180：ame_setNeumorphPinnedCornerRadius（引擎分类符号）
 
 #import "authenticator/BaseAuthenticator.h"
 #import "authenticator/ThirdPartyAuthenticator.h"

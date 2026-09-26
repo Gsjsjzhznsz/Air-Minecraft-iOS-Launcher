@@ -130,6 +130,7 @@ check('F', '实例页 blurView 换键', 'blurView.alpha = MAX(0.5, [BackgroundMa
 # ============ G. 账号/头像/安装页 ============
 ac = rd('AccountListViewController.m')
 check('G', '账号 cell 凸起管线', '[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:cardView];' in ac)
+check('G', '账号 cell 引擎头 import（CI 462 修：pinned 半径是引擎分类符号）', '#import "UIKit+NativeSurface.h"' in ac)
 check('G', '账号 cell 圆角钉 16', '[cardView ame_setNeumorphPinnedCornerRadius:16];' in ac)
 check('G', '账号 cell 裁剪放行', 'cell.contentView.layer.masksToBounds = NO;' in ac)
 check('G', '账号 cell 自绘阴影退场', 'shadowOpacity = 0.12' not in ac)
