@@ -138,20 +138,20 @@ check("E4 四主语言键集逐键一致", keysets[0] == keysets[1] == keysets[2
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("F1 公告（Task178 重锚：task178@2 插入，task177/175/174 顺延 anns[3]/[4]/[5]，双 task173 顺延 anns[6]/[7]，task172/171/170/168 顺延 anns[8]/[9]/[10]/[11]；anns[1] task169 pin 不动）且 id 唯一",
+check("F1 公告（Task178 重锚：task178@2 插入，task177/175/174 顺延 anns[4]/[4]/[5]，双 task173 顺延 anns[7]/[7]，task172/171/170/168 顺延 anns[9]/[9]/[10]/[11]；anns[1] task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[3]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[4]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[5]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[6]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[7]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[8]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[9]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[10]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[11]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[10]
+      and anns[3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[4]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[5]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[7]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[8]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[9]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[10]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[11]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[12]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[11]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]

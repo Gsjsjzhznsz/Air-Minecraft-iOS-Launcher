@@ -2500,6 +2500,16 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     [self presentViewController:alert animated:YES completion:nil];
 }
 
+/// Task179：versions 列表里是否已收录 “1.<minor>.” 开头的条目（旧次版本
+/// 最末 patch 去重用——清单 newest-first，每个 minor 的最新 patch 最先到）。
+- (BOOL)ame179_versionsContainMinor:(NSMutableArray<NSString *> *)versions minor:(NSInteger)minor {
+    NSString *ame179_prefix = [NSString stringWithFormat:@"1.%ld.", (long)minor];
+    for (NSString *v in versions) {
+        if ([v hasPrefix:ame179_prefix]) return YES;
+    }
+    return NO;
+}
+
 - (void)showGameVersionPicker {
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_188", nil)
                                                                    message:nil
@@ -2508,13 +2518,16 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     // 动态构建版本列表：优先使用已加载的 Mojang version_manifest 中的 release 版本，
     // 这样能自动跟随 MC 版本更新（不再使用硬编码列表）。
     // 同时把当前 profile 的 MC 版本置顶（如果有）方便快速选择。
-    // Task173（版本补全，用户实测“筛选的游戏版本到 1.21.1 和 1.16.5 就没有了”）：
-    //   1. 旧 hasPrefix:@"1." 把 26.x 新版本号全部滤掉；
-    //   2. 旧 32 条封顶把 1.16.4 及更早的经典 mod 版本（1.12.2/1.8.9 等）截掉；
-    //   3. 清单没加载时只剩 5 个硬编码兜底。
-    // 现在：接受一切纯数字开头的 release id（26.x 与 1.x 通吃），保留老版本
-    //（下到 1.8——mod 生态起点），封顶放宽到 64 条（actionSheet 可滚动）；
-    // 兜底列表换成全量常用集。
+    // Task173（版本补全）+ Task179（低版本扩容，用户实测“筛选版本能不能
+    // 再加多点低版本”）：
+    //   1. 接受一切纯数字开头的 release id（26.x 与 1.x 通吃）；
+    //   2. 下限从 1.8 放宽到 1.7（1.7.10 是经典 mod 时代，CF 上有数千个
+    //      1.7.10 mod/整合包资源）；
+    //   3. 全量列出 26.x 与 1.16+ 的每个 patch；1.15 及更早的旧次版本只保留
+    //      【每个 minor 的最末 patch】（1.15.2/1.14.4/1.13.2/1.12.2/1.11.2/
+    //      1.10.2/1.9.4/1.8.9/1.7.10——玩家实际筛选的经典版本），列表总量
+    //      可控（~80 条，actionSheet 可滚动）且不再把低版本截掉。
+    // 兜底列表同步扩展到 1.7.10。
     NSMutableArray<NSString *> *versions = [NSMutableArray arrayWithObject:localize(@"i18n_str_2032", nil)];
 
     // 当前 profile 的 MC 版本（若有）放第二位，便于快速选择
@@ -2531,23 +2544,31 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
             if (![type isEqualToString:@"release"]) continue;
             NSString *versionId = version[@"id"];
             if (![versionId isKindOfClass:[NSString class]] || versionId.length == 0) continue;
-            // Task173：数字开头的 release 全收（26.x / 1.x），非数字的
-            //（如旧 csv 命名或特殊 id）跳过；1.8 之前的版本 mod 支持极少，
-            // 以 “1.” 开头且次版本 < 8 的滤掉。
+            // Task179：数字开头的 release 全收（26.x / 1.x），非数字的跳过；
+            // 下限 1.7；1.15 及更早只收每个 minor 的最末 patch（首个遇到的
+            // ——清单 newest-first，同一 minor 的最新 patch 排最前）。
             unichar ame173_first = [versionId characterAtIndex:0];
             if (![ame173_digits characterIsMember:ame173_first]) continue;
-            if ([versionId hasPrefix:@"1."]) {
-                NSInteger ame173_minor = [[versionId substringFromIndex:2] integerValue];
-                if (ame173_minor < 8) continue;
-            }
-            // 跳过已经在列表中的（避免 profileMcVersion 重复）
             if ([versions containsObject:versionId]) continue;
+            if ([versionId hasPrefix:@"1."]) {
+                NSArray *ame179_parts = [versionId componentsSeparatedByString:@"."];
+                NSInteger ame179_minor = (ame179_parts.count > 1) ? [ame179_parts[1] integerValue] : 0;
+                if (ame179_minor < 7) continue;
+                if (ame179_minor <= 15) {
+                    // 旧次版本：只保留该 minor 的最末 patch（本 minor 已收过即跳过）
+                    NSString *ame179_minorKey = [NSString stringWithFormat:@"1.%ld", (long)ame179_minor];
+                    if ([versions containsObject:ame179_minorKey] ||
+                        [self ame179_versionsContainMinor:versions minor:ame179_minor]) continue;
+                    [versions addObject:versionId];
+                    continue;
+                }
+            }
             [versions addObject:versionId];
         }
     }
 
     // 若 versionList 还未加载或为空，使用基础 fallback（保证 picker 至少能弹出）。
-    // Task173：兜底列表从 5 个换成全量常用集（26.x + 1.21.x 全系 + … + 1.8.9）。
+    // Task179：兜底列表补 1.7.10，旧次版本按“最末 patch”收录。
     if (versions.count <= 2) {
         [versions addObjectsFromArray:@[
             @"26.3", @"26.2", @"26.1",
@@ -2557,22 +2578,20 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
             @"1.18.2", @"1.18.1", @"1.18",
             @"1.17.1", @"1.17",
             @"1.16.5", @"1.16.4", @"1.16.3", @"1.16.2", @"1.16.1", @"1.16",
-            @"1.15.2", @"1.15.1", @"1.15",
-            @"1.14.4", @"1.14.3", @"1.14.2", @"1.14.1", @"1.14",
-            @"1.13.2", @"1.13.1", @"1.13",
-            @"1.12.2", @"1.12.1", @"1.12",
-            @"1.11.2", @"1.11",
-            @"1.10.2", @"1.10",
-            @"1.9.4", @"1.9", @"1.8.9", @"1.8"
+            @"1.15.2",
+            @"1.14.4",
+            @"1.13.2",
+            @"1.12.2",
+            @"1.11.2",
+            @"1.10.2",
+            @"1.9.4",
+            @"1.8.9",
+            @"1.7.10"
         ]];
     }
 
-    // Task173：封顶从 32 放宽到 64（“全部” + profile + 62 个 release；
-    // 26.x 全系 + 1.x 下到 1.8 全覆盖，actionSheet 可滚动）。
-    if (versions.count > 64) {
-        NSArray *tail = [versions subarrayWithRange:NSMakeRange(0, 64)];
-        versions = [NSMutableArray arrayWithArray:tail];
-    }
+    // Task179：64 条封顶退役——列表构造本身就受控（新版本全量 + 旧次版本
+    // 最末 patch ≈ 80 条），全量展示，actionSheet 可滚动。
 
     for (NSString *version in versions) {
         [alert addAction:[UIAlertAction actionWithTitle:version
@@ -2641,10 +2660,21 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         self.currentGameVersion = profileMcVersion;
         changed = YES;
     }
-    // 加载器仅对模组 tab 自动应用（其他 tab 如光影/资源包不一定有加载器概念）
-    // 但 Modrinth 的 facets 中 categories 对所有 project_type 都生效，所以统一应用
-    if (profileLoader.length > 0 && ![self.currentModLoader isEqualToString:profileLoader]) {
+    // Task179：加载器只对模组/整合包 tab 自动应用。
+    // 旧注释"Modrinth 的 categories 对所有 project_type 都生效"是错的——
+    // 对 resourcepack 挂 categories:fabric 实测 35467 -> 15 个结果；CF 侧
+    // classId=12&modLoaderType=4 直接零结果。资源包/光影/数据包/世界没有
+    // 加载器概念，预选加载器只会污染侧边栏状态与后续请求（Task179 请求层
+    // 已统一拦截，这里同步把"错误的预选"也拿掉——侧边栏显示"全部"）。
+    BOOL ame179_loaderAwareTab = (self.tabSegment.selectedSegmentIndex == 1 ||
+                                  self.tabSegment.selectedSegmentIndex == 5);
+    if (ame179_loaderAwareTab &&
+        profileLoader.length > 0 && ![self.currentModLoader isEqualToString:profileLoader]) {
         self.currentModLoader = profileLoader;
+        changed = YES;
+    } else if (!ame179_loaderAwareTab && self.currentModLoader.length > 0) {
+        // 离开模组 tab 时清掉残留的加载器选择，避免跨 tab 污染
+        self.currentModLoader = nil;
         changed = YES;
     }
 

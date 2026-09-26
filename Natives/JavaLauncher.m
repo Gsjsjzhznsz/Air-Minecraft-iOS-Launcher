@@ -1275,7 +1275,9 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
     // Task67：MC 读取 options.txt 之前净化移动键位（含全量 dump 诊断）。
     // 必须在 JLI_Launch 之前——MC 的 Options.load 在 JVM 启动早期执行。
-    ame67_sanitizeOptionsKeybinds();
+    // Task179：调用点后移到 gameDir 解析之后（约 +320 行，Task179 注释块）——
+    // 旧位置只能读 POJAV_GAME_DIR 符号链接（基础实例），自定义实例的
+    // 键位净化一直在错误的文件上空转。
 
     DeviceGetJITFlags(YES);
     BOOL requiresTXMWorkaround = DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM);
@@ -1609,6 +1611,12 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // 空布局指针恢复/移除；mod 在 JVM 启动早期读取 config/touchcontroller/，
         // 此处调用当次生效。启动器不再向 mod 写入任何配置）
         ame140_remediateTouchControllerConfig(gameDir);
+
+        // Task179：键位净化移到这里（gameDir 已解析）——经环境变量把实际
+        // 实例目录递给净化器，自定义实例的 options.txt 终于能被修到。
+        // 仍在 JLI_Launch 前（MC 的 Options.load 在 JVM 启动早期执行）。
+        setenv("AME67_INSTANCE_GAME_DIR", gameDir.UTF8String, 1);
+        ame67_sanitizeOptionsKeybinds();
     } else {
         defaultJRETag = @"execute_jar";
         gameDir = @(getenv("POJAV_GAME_DIR"));

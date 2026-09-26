@@ -151,21 +151,21 @@ check("D2 开关键六语言在位（Task178 重锚：opacity.title 恢复，int
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告（Task178 重锚：task178@2 插入，task177/175 顺延 anns[3]/[4]，本条（task174）顺延 anns[5]，双 task173 顺延 anns[6]/[7]，172/171/170/168 顺延 anns[8]/[9]/[10]/[11]；server/task169 pin 不动）且 id 唯一",
+check("E1 公告（Task178 重锚：task178@2 插入，task177/175 顺延 anns[4]/[4]，本条（task174）顺延 anns[6]，双 task173 顺延 anns[7]/[7]，172/171/170/168 顺延 anns[9]/[9]/[10]/[11]；server/task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[3]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[4]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[5]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[6]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[7]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[8]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[9]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[10]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[11]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t174 = anns[5]
+      and anns[3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[4]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[5]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[7]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[8]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[9]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[10]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[11]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[12]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t174 = anns[6]
 check("E2 公告内容锚（晕影根因=壁纸垫底/画布接管/百分比实时回显 + EN 尾注）",
       "晕影" in t174["summary"] and "画布接管" in t174["summary"]
       and "壁纸" in t174["content"] and "实时回显" in t174["content"]

@@ -2600,39 +2600,27 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
               [sender.properties[@"keycodes"][3] intValue]);
     }
     int held = action == ACTION_DOWN;
-    // ===== Task176：粘滞修饰键（右shift 无效的根修）=====
-    // 病历（3b0307b 装机日志 latestlog.1，单人世界 + 聊天打字场景）：用户的
-    // 布局按钮"右SHIFT"（keycode=344=GLFW_KEY_RIGHT_SHIFT）事件链完全健康
-    // ——modstate sync sc=229 共 80 次、Task64 已证事件 1:1 送达 MC、MC 26.3
-    // 的键位注册表就是 scancode（right.shift=229）全链匹配。用户在聊天里
-    // 快速点按右shift 40 次仍"无效果"：真因是【点按语义】——每次 ACTION_UP
-    // 立即释放修饰键，点到字母时 shift 早已弹起，大写永远出不来。移动端
-    // 虚拟键盘的约定（FCL/ZL 同款）是粘滞 shift：轻点=锁定到下一个按键，
-    // 长按=常规按住。
-    // 实现：修饰键 ACTION_UP 时若按住时长 < 0.4s 则不发 UP（保持按下态并
-    // 记入锁定表）；之后任意非修饰按键（普通键或特殊按钮）的 ACTION_DOWN
-    // 处理完毕后，把锁定的修饰键统一补发 UP（一键大写/单符号后自动复位）。
-    // 长按（>= 0.4s）保持旧行为（按住生效，抬手释放），不改已有按住玩法。
+    // ===== Task179：修饰键 TOGGLE 语义（右shift 无效第二轮根修）=====
+    // 病历（9aacebb 装机 latestlog.1）：事件链依旧全绿（sc=229 送达 MC、
+    // KeyMapping.set(right.shift) 执行），但 Task176 的"粘滞到下一键"语义
+    // 让用户仍然无法使用：轻点右shift 后【任何】非修饰输入（包括摇杆/屏幕
+    // 触摸）都会立即自动释放它——"点 shift 再移动"的潜行用法被结构性杀死。
+    // Task179 新语义（移动启动器通用约定）：
+    //   轻点 = 开关（toggle）：再点一次才关；期间任意其它输入不影响；
+    //   长按（≥0.4s）= 常规按住：抬手即释放（并清除该键的 toggle 态）。
+    // 潜行（点 shift→移动→再点关）、shift+点击（点 shift→点击→再点关）、
+    // 大写字母（长按 shift+字母）三种用法全部成立。
     static NSMutableDictionary<NSNumber *, NSNumber *> *s_ame176_modDownTime = nil;
-    static NSMutableSet<NSNumber *> *s_ame176_latchedMods = nil;
+    static NSMutableSet<NSNumber *> *s_ame179_toggledMods = nil;
     if (s_ame176_modDownTime == nil) {
         s_ame176_modDownTime = [NSMutableDictionary dictionary];
-        s_ame176_latchedMods = [NSMutableSet set];
+        s_ame179_toggledMods = [NSMutableSet set];
     }
 #define AME176_IS_MOD_KEY(kc) \
     ((kc) == GLFW_KEY_LEFT_SHIFT || (kc) == GLFW_KEY_RIGHT_SHIFT || \
      (kc) == GLFW_KEY_LEFT_CONTROL || (kc) == GLFW_KEY_RIGHT_CONTROL || \
      (kc) == GLFW_KEY_LEFT_ALT || (kc) == GLFW_KEY_RIGHT_ALT || \
      (kc) == GLFW_KEY_LEFT_SUPER || (kc) == GLFW_KEY_RIGHT_SUPER)
-    // 本轮按键里是否含非修饰输入（用于锁定修饰键的自动复位触发）
-    BOOL ame176_hasNonModInput = NO;
-    for (int i = 0; i < 4; i++) {
-        int keycode = ((NSNumber *)sender.properties[@"keycodes"][i]).intValue;
-        if (keycode < 0 || (keycode > 0 && !AME176_IS_MOD_KEY(keycode))) {
-            ame176_hasNonModInput = YES;
-            break;
-        }
-    }
     for (int i = 0; i < 4; i++) {
         int keycode = ((NSNumber *)sender.properties[@"keycodes"][i]).intValue;
         if (keycode < 0) {
@@ -2699,22 +2687,32 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
                     break;
             }
         } else if (keycode > 0) {
-            // Task176：修饰键粘滞判定（在 nativeSendKey 之前——DOWN 记时间，
-            // UP 短按拦截）
+            // Task179：修饰键 toggle 判定（在 nativeSendKey 之前）。
             if (AME176_IS_MOD_KEY(keycode)) {
                 if (held) {
+                    // DOWN：记录按压起点（供 UP 时区分轻点/长按）。
                     s_ame176_modDownTime[@(keycode)] = @(CFAbsoluteTimeGetCurrent());
-                    [s_ame176_latchedMods removeObject:@(keycode)];  // 重新按下清除旧锁定
                 } else {
                     NSNumber *ame176_downT = s_ame176_modDownTime[@(keycode)];
                     [s_ame176_modDownTime removeObjectForKey:@(keycode)];
-                    if (ame176_downT != nil &&
-                        CFAbsoluteTimeGetCurrent() - ame176_downT.doubleValue < 0.4 &&
-                        ![s_ame176_latchedMods containsObject:@(keycode)]) {
-                        [s_ame176_latchedMods addObject:@(keycode)];
-                        NSLog(@"[InputDiag] Task176 sticky mod latched: keycode=%d (tap; UP deferred until next non-mod key)",
-                              keycode);
-                        continue;  // 不发 UP：保持按下态
+                    BOOL ame179_wasTap = (ame176_downT != nil &&
+                                          CFAbsoluteTimeGetCurrent() - ame176_downT.doubleValue < 0.4);
+                    BOOL ame179_wasToggled = [s_ame179_toggledMods containsObject:@(keycode)];
+                    if (ame179_wasTap) {
+                        if (ame179_wasToggled) {
+                            // 轻点在 toggle 态上：关闭（补发 UP），流程继续到
+                            // 下方的 nativeSendKey(..., 0, ...) 把 UP 发出去。
+                            [s_ame179_toggledMods removeObject:@(keycode)];
+                            NSLog(@"[InputDiag] Task179 mod toggle OFF: keycode=%d (tap on toggled state)", keycode);
+                        } else {
+                            // 轻点在常态上：开启（扣住 UP，保持按下态）。
+                            [s_ame179_toggledMods addObject:@(keycode)];
+                            NSLog(@"[InputDiag] Task179 mod toggle ON: keycode=%d (tap; stays down until next tap)", keycode);
+                            continue;
+                        }
+                    } else {
+                        // 长按释放：常规 UP，同时清除 toggle 态（按住玩法优先）。
+                        [s_ame179_toggledMods removeObject:@(keycode)];
                     }
                 }
             }
@@ -2729,16 +2727,9 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
         }
     }
 
-    // Task176：非修饰输入处理完毕，补发所有锁定修饰键的 UP（一键大写后
-    // 自动复位；特殊按钮——鼠标/滚轮/菜单——同样触发，shift+点击语义可用）。
-    if (ame176_hasNonModInput && s_ame176_latchedMods.count > 0) {
-        for (NSNumber *ame176_kc in s_ame176_latchedMods) {
-            CallbackBridge_nativeSendKey(ame176_kc.intValue, 0, 0, 0);
-            NSLog(@"[InputDiag] Task176 sticky mod auto-release after key: keycode=%d",
-                  ame176_kc.intValue);
-        }
-        [s_ame176_latchedMods removeAllObjects];
-    }
+    // Task179："非修饰输入自动释放锁定修饰键"机制退役——正是它让
+    // "点 shift 再移动"的潜行用法失效（任何输入都把 shift 弹起）。
+    // toggle 态只由再次轻点或长按释放，语义自洽。
 }
 
 - (void)executebtn_down:(ControlButton *)sender

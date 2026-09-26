@@ -181,9 +181,25 @@ void *proc_address(void *lib, const char *name) {
     void *emscripten_GetProcAddress(const char *name);
     return emscripten_GetProcAddress(name);
 #elif defined __APPLE__
-    // apple code seems to use RTLD_NEXT which is usually ((void*)-1)
-    // remove if it not needed
-    return dlsym((void*)(~(uintptr_t)0), name);
+    // Task179 (iOS port): the bare dlsym(RTLD_NEXT) below only works when the
+    // frameworks are positioned AFTER vgpu in the link order. On this launcher
+    // the host loads libEGL/libGLESv2 long before LWJGL dlopens libvgpu, so
+    // RTLD_NEXT from vgpu finds nothing and every egl_* / *OES lookup comes
+    // back NULL (device log 38a887d: "egl_eglBindAPI is NULL" x11, then the
+    // first NULL call = SIGSEGV pc=0). Resolve from the explicit framework
+    // handles captured by load_all() first (egl names from the EGL framework,
+    // gl names from the GLESv2 framework -- no collisions between the two
+    // families), then fall back to the legacy RTLD_NEXT, then RTLD_DEFAULT.
+    {
+        extern void *vgpu_gles_handle, *vgpu_egl_handle;
+        void *ame179_p = NULL;
+        if (vgpu_egl_handle != NULL) ame179_p = dlsym(vgpu_egl_handle, name);
+        if (ame179_p == NULL && vgpu_gles_handle != NULL) ame179_p = dlsym(vgpu_gles_handle, name);
+        if (ame179_p != NULL) return ame179_p;
+        ame179_p = dlsym((void*)(~(uintptr_t)0), name);   // RTLD_NEXT（旧行为）
+        if (ame179_p != NULL) return ame179_p;
+        return dlsym((void*)0, name);                     // RTLD_DEFAULT 兜底
+    }
 #elif !defined NO_LOADER
     return dlsym(lib, name);
 #else

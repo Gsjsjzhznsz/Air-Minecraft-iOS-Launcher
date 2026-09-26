@@ -153,8 +153,10 @@ check("E10 hardcoded index retired",
 print("== F. version picker completion + manifest chain ==")
 dl = rd("Natives/DownloadViewController.m")
 check("F1 numeric-release filter (26.x accepted)", "ame173_digits" in dl and "characterIsMember:ame173_first" in dl)
-check("F2 1.8 floor for 1.x line", "ame173_minor < 8" in dl)
-check("F3 cap raised to 64", "versions.count > 64" in dl and "versions.count > 32" not in dl)
+# Task179 重锚：下限放宽到 1.7（用户"再加多点低版本"），1.8 地板退役。
+check("F2 1.7 floor for 1.x line (Task179 重锚：自 1.8 放宽)", "ame179_minor < 7) continue" in dl)
+# Task179 重锚：64 封顶退役（低版本扩容后全量展示）。
+check("F3 cap retired (Task179 重锚：无 64/32 截断)", "versions.count > 64" not in dl and "versions.count > 32" not in dl)
 check("F4 full fallback list", '"1.12.2"' in dl and '"1.8.9"' in dl and '"26.3"' in dl)
 check("F5 manifest candidate chain", "candidateURLsForOriginalURL" in dl and "PLMirrorResourceTypeGameFile" in dl)
 check("F6 PLMirrorCenter import", '#import "PLMirrorCenter.h"' in dl)
@@ -211,7 +213,8 @@ print("== K. VGPU renderer integration ==")
 cm = rd("Natives/CMakeLists.txt")
 check("K1 CMake vgpu target", "add_library(vgpu SHARED" in cm)
 check("K2 two OBJECT libs (basename collision)", "add_library(vgpu_pack OBJECT" in cm and "add_library(vgpu_core OBJECT" in cm)
-check("K3 Android-parity defines", "NOX11 NO_GBM DEFAULT_ES=3 SHAREDLIB" in cm)
+# Task179 重锚：+NOEGL（1.8.9+vgpu 崩溃根修——临时 EGL 探测路径在 iOS 全灭）。
+check("K3 Android-parity defines (Task179 重锚：+NOEGL)", "NOX11 NO_GBM NOEGL DEFAULT_ES=3 SHAREDLIB" in cm)
 vgpu_exists = os.path.isdir(os.path.join(REPO, "Natives/external/vgpu/src"))
 check("K4 vendored source tree", vgpu_exists)
 if vgpu_exists:
@@ -251,13 +254,15 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("M1 version.h addendum", "Task 173" in vh and "desktop-GL completion layer" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
-check("M3 announcement at index 7 (Task178 重锚：task178@2 插入后 ten-fixes 自 anns[6] 顺延 anns[7]；toggle-173@6 / 174@5 / 175@4 / 177@3 随之顺延；task178 钉 anns[2])",
-      ann["announcements"][7]["id"] == "task173-ten-fixes-2026-09-26"
-      and ann["announcements"][6]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann["announcements"][5]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann["announcements"][4]["id"] == "task175-six-fixes-2026-09-26"
-      and ann["announcements"][3]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann["announcements"][2]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")
+# Task179 重锚：task179@2 插入，全体非钉位再顺延 +1；task178 自 anns[2] -> anns[3]。
+check("M3 announcement at index 7 (Task179 重锚：task179@2 插入后 ten-fixes anns[9]、toggle-173@7、174@6、175@5、177@4、178@3、179@2)",
+      ann["announcements"][8]["id"] == "task173-ten-fixes-2026-09-26"
+      and ann["announcements"][7]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann["announcements"][5]["id"] == "task175-six-fixes-2026-09-26"
+      and ann["announcements"][4]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann["announcements"][3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and ann["announcements"][2]["id"] == "task179-eight-fixes-2026-09-26")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")

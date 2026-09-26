@@ -81,24 +81,30 @@ check("B4 注入点在 Initialization_() 之后（dlsym 全部完成后）",
 
 print("== C. Sticky modifiers（右shift 根修）==")
 svc = rd("Natives/SurfaceViewController.m")
-check("C1 病历注释（事件链健康 + 点按语义真因 + FCL/ZL 约定）",
-      "Task176：粘滞修饰键（右shift 无效的根修）" in svc
-      and "轻点=锁定到下一个按键" in svc)
+# Task179 重锚（语义反转）：粘滞"锁定到下一键"被 TOGGLE 语义取代——任何输入
+# 自动释放 shift 杀死了"点 shift 再移动"的潜行玩法（装机实测依旧无效）。
+check("C1 病历注释（Task179 重锚：TOGGLE 语义 + 潜行/shift+点击/长按三用法）",
+      "Task179：修饰键 TOGGLE 语义（右shift 无效第二轮根修）" in svc
+      and "轻点 = 开关（toggle）：再点一次才关" in svc)
 check("C2 修饰键宏（8 键覆盖 shift/ctrl/alt/super 左右）",
       "AME176_IS_MOD_KEY" in svc
       and svc.count("GLFW_KEY_RIGHT_SHIFT") >= 1
       and "GLFW_KEY_LEFT_SUPER || (kc) == GLFW_KEY_RIGHT_SUPER" in svc.replace("\\\n     ", ""))
-check("C3 短按阈值 0.4s + DOWN 记时 + 重按清旧锁定",
+check("C3 短按阈值 0.4s + DOWN 记时（Task179 重锚：toggle 态判定共用）",
       "CFAbsoluteTimeGetCurrent() - ame176_downT.doubleValue < 0.4" in svc
       and "s_ame176_modDownTime[@(keycode)] = @(CFAbsoluteTimeGetCurrent());" in svc)
-check("C4 短按 UP 拦截（continue 不发 UP）+ 锁定日志锚",
-      "Task176 sticky mod latched: keycode=%d" in svc
-      and "continue;  // 不发 UP：保持按下态" in svc)
-check("C5 非修饰输入后统一补发 UP + 日志锚（特殊按钮也触发）",
-      "Task176 sticky mod auto-release after key: keycode=%d" in svc
-      and "ame176_hasNonModInput && s_ame176_latchedMods.count > 0" in svc)
-check("C6 长按语义不回退（>= 0.4s 走原 UP 路径）",
-      "长按（>= 0.4s）保持旧行为（按住生效，抬手释放）" in svc)
+# Task179 重锚（语义反转）：锁定日志换成 toggle ON/OFF 双锚；轻点在常态上扣住 UP。
+check("C4 轻点开启扣住 UP（toggle ON 日志锚，Task179 重锚）",
+      "Task179 mod toggle ON: keycode=%d" in svc
+      and "Task179 mod toggle OFF: keycode=%d" in svc)
+# Task179 重锚（语义反转）：非修饰输入自动释放退役——正是它杀死潜行玩法；
+# toggle 态只由再次轻点或长按释放。
+check("C5 自动释放机制退役（Task179 重锚：潜行可用，注释在位）",
+      "sticky mod auto-release after key" not in svc
+      and "\"非修饰输入自动释放锁定修饰键\"机制退役" in svc)
+check("C6 长按语义不回退（Task179 重锚：长按=常规按住 + 清除 toggle 态）",
+      "长按（≥0.4s）= 常规按住：抬手即释放（并清除该键的 toggle 态）" in svc
+      and "长按释放：常规 UP，同时清除 toggle 态" in svc)
 
 print("== D. JIT openURL 取证 ==")
 rp = rd("Natives/LauncherRightPanelViewController.m")

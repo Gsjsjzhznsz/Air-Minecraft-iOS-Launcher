@@ -651,6 +651,22 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         // relevance：不带 sortField（CF 默认）
     }
     NSString *loader = [filters[@"loader"] isKindOfClass:NSString.class] ? filters[@"loader"] : nil;
+    // Task179：无加载器概念的资源类型禁发 modLoaderType。
+    // 病历（用户实测“CF 资源文件页为空”）：autoApplyProfileFiltersIfNeeded
+    // 把当前 profile 的加载器（如 fabric）自动预选到资源包/光影/数据包/
+    // 世界 tab，而 CF 的 mods/search 对 classId=12/6552/6945/17 附带
+    // modLoaderType 时返回零结果（镜像实测：classId=12&modLoaderType=4 ->
+    // totalCount=0；同查询去掉 modLoaderType -> 1274）。整合包（4471）在
+    // CF 有加载器标签不受影响。版本（gameVersion）参数保留——对全部
+    // 类型有效。请求层统一拦截：手动在侧边栏选了加载器也不发。
+    NSString *ame179_projectType = [filters[@"projectType"] isKindOfClass:NSString.class] ? filters[@"projectType"] : nil;
+    BOOL ame179_loaderLessType = ([ame179_projectType isEqualToString:@"resourcepack"] ||
+                                  [ame179_projectType isEqualToString:@"shader"] ||
+                                  [ame179_projectType isEqualToString:@"datapack"] ||
+                                  [ame179_projectType isEqualToString:@"world"]);
+    if (ame179_loaderLessType) {
+        return;
+    }
     if (loader.length > 0) {
         NSDictionary<NSString *, NSNumber *> *ame173_loaderMap = @{
             @"forge": @1,
@@ -952,7 +968,20 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
                 if (completion) completion(nil, [CurseForgeAPI ame169_gatewayErrorFromJSON:json]);
                 return;
             }
-            if (completion) completion(@[], nil);
+            // Task179：无 data 数组且非网关错误（如 {"data":null}）不再静默回空列表——
+            // 用户实测“cf 资源文件页为空”的唙形之一（空页、无错误提示、日志只有
+            // 成功码）。退避重试一次；仍无 data 则浮出真错误（不再伪装成功的空结果）。
+            NSLog(@"[CurseForgeAPI] Task179 search response missing data array (attempt %lu, projectType=%@): %@",
+                  (unsigned long)(attempt + 1), projectType,
+                  [self printableStringFromData:data maxLen:256]);
+            if (attempt < 1) {
+                [self ame172_retrySearchRequest:request attempt:attempt projectType:projectType completion:completion reason:@"missing data array"];
+                return;
+            }
+            NSError *ame179_noData = [NSError errorWithDomain:@"CurseForgeAPI"
+                                                          code:4
+                                                      userInfo:@{NSLocalizedDescriptionKey: @"CurseForge API returned no data array"}];
+            if (completion) completion(nil, ame179_noData);
             return;
         }
 

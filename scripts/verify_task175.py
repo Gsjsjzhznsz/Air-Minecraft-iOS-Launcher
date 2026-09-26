@@ -242,13 +242,13 @@ anns = json.loads(rd("announcements.json"))["announcements"]
 check("G1 公告 task175@4（Task178 重锚：task178@2 插入；server/task169 pin 不动；177/174/双173/172/171/170/168 顺延 3-11）",
       anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[3]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[4]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[5]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[8]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[11]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t175 = anns[4]
+      and anns[3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[4]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[5]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[9]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[12]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t175 = anns[5]
 check("G2 公告内容六条全列 + EN 尾注 + 装机锚点",
       all(k in t175["content"] for k in
           ["ANGLE", "下载量", "头像", "物品栏", "Forge", "壁纸", "[Task175]"])

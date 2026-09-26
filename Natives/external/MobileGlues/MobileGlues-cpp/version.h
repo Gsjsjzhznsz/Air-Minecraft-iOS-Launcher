@@ -2168,3 +2168,59 @@
 // restored x6 (four main languages 1954 -> 1955). Device anchor: one-shot
 // "[Task178] neumorph decoupled: pinned spec cards + card-body opacity
 // slider, UI effect options stay interactive" log.
+
+// REVISION 17 addendum (Amethyst Task 179, no bump): eight-symptom device
+// feedback round (cc8ced8 logs). (1) ANGLE: the ost desktop-facade context
+// (eglBindAPI(EGL_OPENGL_API) + 3.3 Core attribs) never compiled a single
+// user shader -- Task175/176 verified the ES300 rewrite reaches ANGLE
+// byte-clean (head48 self-check + local harness) yet the error stayed the
+// empty-source "ERROR: 1:1: '' : syntax error" in BOTH dialects; the ost
+// fork's own internal emulated-library shaders are "#version 300 es"
+// compiled through a separate internal path. Fix: gl_init_context now
+// creates a REAL ES3 context for tinygl4angle (Task179 ame179_angleEs --
+// ES3_BIT config + ES API bind + CLIENT_VERSION=3) while tinygl4angle's
+// glGetString spoofs the desktop identity in facade-session-identical
+// forms (GL_VERSION "OpenGL ES 3.2.0 (ANGLE...)" -> "3.3.0 (ANGLE...)";
+// GLSL "OpenGL ES GLSL ES 3.20 (ANGLE...)" -> spoof then Task173 strip ->
+// "3.30 (ANGLE...)", chain unit-tested locally). MC's GL33 caps flow
+// through the spoofed strings exactly as in the working facade sessions;
+// the Task175/176 ES300 rewrite finally meets a compiler that accepts it.
+// (2) vgpu (legacy MC): GetHardwareExtensions' temp-EGL probe died at the
+// first NULL egl_* call (LOAD_EGL resolved everything to NULL -- on Apple
+// proc_address used bare dlsym(RTLD_NEXT), which finds nothing after a
+// late-dlopened vgpu because the host loaded the frameworks long before).
+// Fix: build with -DNOEGL (probe on the CURRENT game context; our
+// gl_bridge guarantees one before the first GL call), proc_address now
+// resolves from the explicit framework handles load_all() keeps open
+// (dlclose retired), Exts/vendor/renderer NULL-guarded. (3) CF empty
+// resource pages: loader-less project types (resourcepack/shader/datapack/
+// world) must never carry modLoaderType (CF returns zero results:
+// classId=12&modLoaderType=4 -> totalCount=0, without -> 1274) nor
+// Modrinth categories facets (35467 -> 15); request-layer interception in
+// ame173_applySortAndLoaderParams + ModrinthAPI, autoApply preselects the
+// profile loader only on mod/modpack tabs, and a missing "data" array is
+// retried once then surfaced as a real error instead of a silent empty
+// list. (4) Version filter extended down to 1.7.10; pre-1.16 minors
+// contribute only their last patch (1.15.2/1.14.4/.../1.8.9/1.7.10); the
+// 64-entry cap is retired. (5) Right shift: on-screen modifier buttons
+// move from latch-until-next-key to TOGGLE semantics (tap = on/off, hold
+// = momentary) -- the Task176 auto-release structurally killed
+// tap-shift-then-move sneaking. (6) Hotbar misalignment after GUI-scale
+// changes: readGuiScaleFromOptions read POJAV_GAME_DIR (the base-instance
+// symlink) instead of the ACTUAL instance gameDir (custom_gamedir/...,
+// == process CWD after Task97 CwdAlign) -- the refresh always saw raw=0;
+// CWD-first now, and ame67_sanitizeOptionsKeybinds receives the resolved
+// gameDir via AME67_INSTANCE_GAME_DIR (call moved after gameDir
+// resolution in launchJVM). (7) JIT wait from second-level menus:
+// ame169_waitForJITCondition excludes suspension gaps (>2s iteration
+// intervals) from the 120s budget -- being backgrounded by stikjit:// no
+// longer burns the timeout; background-task assertion validity logged.
+// (8) AvatarManager crash (user-reported chain): fetchAvatarFromURL
+// completion body and reloadProfileSection are now main-thread-guarded
+// (double safety on top of Task172's main-thread contract) -- no code
+// path can touch UICollectionView/Auto Layout off-main anymore. Device
+// anchors: "[TinyGL] Task179 desktop identity: GL_VERSION '...' -> '...'",
+// "VGPU: Task179 framework handles:", "[InputDiag] Task179 mod toggle
+// ON/OFF", "[JIT] Task179 ...: suspension gap of Ns excluded from
+// timeout budget", "[CurseForgeAPI] Task179 search response missing data
+// array".

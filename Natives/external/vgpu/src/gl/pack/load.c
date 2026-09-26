@@ -14,6 +14,13 @@ int loaded = 0;
 const char *LIB_GLES_NAME = "@rpath/libGLESv2.framework/libGLESv2";
 const char *LIB_EGL_NAME = "@rpath/libEGL.framework/libEGL";
 
+// Task179：显式框架句柄（供 loader.c proc_address 苹果分支使用）。
+// 病历（1.8.9+vgpu 装机 38a887d）：egl_* / OES 后缀函数经 dlsym(RTLD_NEXT)
+// 解析全部 NULL（宿主早已加载框架，晚加载的 vgpu 之后无镜像可找）。
+// load_all 捕获两个框架句柄存这里，proc_address 优先从它们解析。
+void *vgpu_gles_handle = NULL;
+void *vgpu_egl_handle = NULL;
+
 void load_all(void){
         
         printf("VGPU: Calling load_all()\n");
@@ -413,7 +420,16 @@ void load_all(void){
 /*PFNglTexStorage3DMultisample */    gles_glTexStorage3DMultisample = (PTR_glTexStorage3DMultisample)dlsym(libGL, "glTexStorage3DMultisample");
 
 
-        dlclose(libGL);
+        // Task179：dlclose 退役 + 句柄留存 + EGL 框架显式打开。
+        // (1) 旧 dlclose(libGL) 把本函数刚解析完的 gles_glXXX 指针的宿主
+        //     引用计数丢一个（vgpu 自身链接 -framework libGLESv2 使其
+        //     实际不卸载，但 proc_address 需要这个句柄——留着，一次泄漏）。
+        // (2) EGL 框架同步 dlopen：LOAD_EGL 家族（NOEGL 外的零星路径，
+        //     如 gl4es.c 的 vsync 探测）经 proc_address 也能解析。
+        vgpu_gles_handle = libGL;
+        vgpu_egl_handle = dlopen(LIB_EGL_NAME, flags);
+        printf("VGPU: Task179 framework handles: gles=%p egl=%p (kept open for proc_address)\n",
+               libGL, vgpu_egl_handle);
         
         Initialization_();
         

@@ -159,8 +159,10 @@ cf = read("Natives/installer/modpack/CurseForgeAPI.m")
 check("G1 5xx 判定助手（>= 500，4xx 不重试）",
       "ame172_isTransientServerStatus" in cf
       and "statusCode >= 500" in cf)
-check("G2 异步搜索两分支重试（空体 + JSON 解析失败）",
-      cf.count("ame172_retrySearchRequest:request") == 2)
+# Task179 重锚：无 data 数组分支新增第三处重试（Task179 no-data hardening），
+# 调用点 2 -> 3；原两处（空体 5xx + 5xx 非 JSON）保持原位。
+check("G2 异步搜索两分支重试（空体 + JSON 解析失败；Task179 重锚：+无 data 数组分支共 3 处）",
+      cf.count("ame172_retrySearchRequest:request") == 3)
 check("G3 重试上限 attempt < 2 + 2s 退避",
       "attempt < 2" in cf and "2.0 * NSEC_PER_SEC" in cf)
 check("G4 同步 getEndpoint failure 分支 5xx 包装 code 543（既有重试循环接管）",
@@ -176,9 +178,9 @@ check("H1 version.h REVISION 17 addendum (Task 172)",
 import os
 import json
 anns = json.load(open(f"{REPO}/announcements.json"))["announcements"]
-# Task175 重锚：task175@2 插入，task172 顺延 anns[5] -> anns[6]。
+# Task175 重锚：task175@2 插入，task172 顺延 anns[6] -> anns[7]。
 check("H2 announcements task172@8（Task178 重锚：task178/177/175/174/双 task173 后；server-pin/task169 钉 0/1）",
-      anns[8].get("id") == "task172-six-fixes-2026-09-25"
+      anns[9].get("id") == "task172-six-fixes-2026-09-25"
       and anns[0].get("id") == "server-recommend-2026-09-24"
       and "task169" in anns[1].get("id", ""))
 

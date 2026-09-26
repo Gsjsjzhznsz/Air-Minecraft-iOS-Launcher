@@ -1410,6 +1410,12 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                     NSLog(@"[HomeAvatar] Task172 branch: network fetch started (URL present, length=%lu)",
                           (unsigned long)avatarURL.length);
                     [[AvatarManager sharedManager] fetchAvatarFromURL:avatarURL completion:^(UIImage *img) {
+                        // Task179：completion 全体主线程化（用户反馈的崩溃链：
+                        // fetchAvatarFromURL completion → updateSkinDisplay →
+                        // reloadProfileSection → cellForItemAtIndexPath →
+                        // HomeProfileTileCell setupBaseViews → Auto Layout 崩溃。
+                        // 头像域名解析失败只是触发条件，根因是后台线程碰 UIKit）。
+                        dispatch_async(dispatch_get_main_queue(), ^{
                         if (img) {
                             [ame162_avatarCache() setObject:img forKey:avatarURL];
                         }
@@ -1422,6 +1428,7 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                         if (img) {
                             [self ame171_syncVisibleProfileAvatar];
                         }
+                        });  // Task179：dispatch_async(main) 收口
                     }];
                 }
             } else {
@@ -1476,6 +1483,18 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
 }
 
 - (void)reloadProfileSection {
+    // Task179：主线程守卫（别人反馈的异常崩溃：AvatarManager 头像下载
+    // completion 在后台线程回调时直达此处 → 后台线程创建 cell / 改 Auto
+    // Layout → NSInternalInconsistencyException "Modifications to the layout
+    // engine must not be performed from a background thread"）。AvatarManager
+    // 侧已保证主线程回调（Task172），这里再守一道——任何调用路径（未来的
+    // 新回调点）都不再可能把 UIKit 工作带进后台线程。
+    if (![NSThread isMainThread]) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self reloadProfileSection];
+        });
+        return;
+    }
     // 找到 Profile 类型的 section 并刷新
     for (NSInteger s = 0; s < self.displaySections.count; s++) {
         for (HomeTileConfig *tile in self.displaySections[s]) {

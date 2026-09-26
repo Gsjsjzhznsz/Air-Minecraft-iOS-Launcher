@@ -1727,6 +1727,22 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         ame166_metal_fsr_context_reset();
     }
 
+    // Task 179：ANGLE（tinygl4angle）改回真 ES3 上下文。
+    // 病历（9aacebb 装机 latestlog.old.txt，ANGLE 26.3 FO 会话）：桌面 facade
+    // 上下文（EGL_OPENGL_API + 3.3 Core attribs）里 glShaderSource/
+    // glCompileShader 从未成功过——Task175 ES 重写已验证送达 ANGLE 的源
+    // 确为合法 "#version 300 es"（head48 自证），错误仍是与修复前【逐字相同】
+    // 的 "ERROR: 1:1: '' : syntax error"（空源特征：编译器看到零字节源）；
+    // 本地 harness（scripts/task179_tinygl_harness.c）进一步证明 tinygl4angle
+    // 的 ES 直通分支逐字节上传。结论：ost 桌面 facade 的用户着色器编译路径
+    // 本身不通（其内部模拟库着色器是 "#version 300 es" 走独立内部路径编译）。
+    // 修法：给 tinygl4angle 建真 ES3 上下文（ES3_BIT + ES API + CV=3），桌面
+    // 身份由 tinygl4angle.c glGetString 伪装（GL_VERSION -> "3.3.0 (ANGLE...)"、
+    // GLSL -> "OpenGL GLSL 3.30 (ANGLE...)"，与 facade 会话逐字同形）；
+    // Task175/176 的 ES300 重写正好唱和真 ES3 上下文。
+    BOOL ame179_angleEs = renderer && strstr(renderer, "tinygl4angle") != NULL;
+    if (ame179_angleEs) desktopGL = NO;
+
     const EGLint gles_ctx_attribs[] = {
         EGL_CONTEXT_CLIENT_VERSION, 3,
         EGL_NONE
@@ -1741,6 +1757,9 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
         EGL_NONE
     };
+    if (ame179_angleEs) {
+        NSDebugLog(@"EGLBridge: Task179 ANGLE on real ES3 context (desktop identity spoofed in tinygl4angle glGetString; shader pipeline = Task175 ES300 rewrite)");
+    }
     // Task 140：attribs 选择器从 mobileGL 改为 desktopGL。
     // 病历（ab9670d Mithril 会话 latestlog.old.txt 实锤）：Mithril 是
     // desktopGL=YES / mobileGL=NO —— 旧选择器让它拿到 gles_ctx_attribs

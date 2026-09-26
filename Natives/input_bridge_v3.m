@@ -1223,11 +1223,23 @@ int mcscale(CGFloat input) {
 // 下一次切换即拿到新值。文件只在切换沿读取（状态不变不读），开销可忽略。
 // ============================================================================
 static int readGuiScaleFromOptions(void) {
-    const char *gameDir = getenv("POJAV_GAME_DIR");
-    if (gameDir == NULL) return 0;
+    // Task179：CWD 优先——实例的 options.txt 在【自定义 gameDir】里。
+    // 病历（9aacebb 装机 latestlog.1，mg FO 26.3 实例会话）：POJAV_GAME_DIR
+    // 是 main.m 时代指向 instances/<multidir> 符号链接的固定值，而 modrinth/
+    // 自定义实例的实际游戏目录是 instances/<multidir>/custom_gamedir/…
+    // （Task97 CwdAlign 把进程 CWD 对齐到它，MC 读写 options.txt 也用
+    // 相对路径落在那里）。旧实现读的永远是基础实例的文件：日志实锤
+    // "raw=0 auto=4"（实例里明明设了 guiScale）——用户改界面尺寸后
+    // 物品栏命中矩形永远按旧 scale 计算 = “调节尺寸后错位”的存活根因。
+    // MC 运行期间 CWD == 实际 gameDir，优先读 ./options.txt。
     char path[PATH_MAX];
-    if (snprintf(path, sizeof(path), "%s/options.txt", gameDir) >= (int)sizeof(path)) return 0;
-    FILE *f = fopen(path, "r");
+    FILE *f = fopen("options.txt", "r");
+    if (f == NULL) {
+        const char *gameDir = getenv("POJAV_GAME_DIR");
+        if (gameDir == NULL) return 0;
+        if (snprintf(path, sizeof(path), "%s/options.txt", gameDir) >= (int)sizeof(path)) return 0;
+        f = fopen(path, "r");
+    }
     if (f == NULL) return 0;
     int value = 0;
     char line[256];
@@ -1295,14 +1307,28 @@ static const struct { const char *opt; const char *defv; } ame67_canonicalKeys[]
 #define AME67_CANONICAL_COUNT (sizeof(ame67_canonicalKeys) / sizeof(ame67_canonicalKeys[0]))
 
 void ame67_sanitizeOptionsKeybinds(void) {
-    const char *gameDir = getenv("POJAV_GAME_DIR");
-    if (gameDir == NULL) {
-        NSLog(@"[Task67] keybind sanitize skipped: POJAV_GAME_DIR not set");
-        return;
-    }
+    // Task179：实例 gameDir 优先（AME67_INSTANCE_GAME_DIR，JavaLauncher 在
+    // gameDir 解析后 setenv 再调用本函数）→ CWD → POJAV_GAME_DIR 兜底。
+    // 病历：POJAV_GAME_DIR 指向 instances/<multidir> 符号链接，自定义实例
+    // 的 options.txt 实际在 custom_gamedir/… 下——旧实现净化错了文件，
+    // "keybind sanitize: 0 repairs" 看似正常实则空转。
     char path[PATH_MAX];
-    if (snprintf(path, sizeof(path), "%s/options.txt", gameDir) >= (int)sizeof(path)) return;
+    const char *ame67_dir = getenv("AME67_INSTANCE_GAME_DIR");
+    if (ame67_dir != NULL && ame67_dir[0] != '\0') {
+        if (snprintf(path, sizeof(path), "%s/options.txt", ame67_dir) >= (int)sizeof(path)) return;
+    } else {
+        snprintf(path, sizeof(path), "options.txt");
+    }
     FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        const char *gameDir = getenv("POJAV_GAME_DIR");
+        if (gameDir == NULL) {
+            NSLog(@"[Task67] keybind sanitize skipped: no options.txt (cwd or POJAV_GAME_DIR)");
+            return;
+        }
+        if (snprintf(path, sizeof(path), "%s/options.txt", gameDir) >= (int)sizeof(path)) return;
+        f = fopen(path, "rb");
+    }
     if (f == NULL) {
         NSLog(@"[Task67] options.txt absent (first run?) — MC will create defaults, nothing to sanitize");
         return;

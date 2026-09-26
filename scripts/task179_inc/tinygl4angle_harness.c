@@ -1,4 +1,4 @@
-#import <Foundation/Foundation.h>
+#include <Foundation/Foundation.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,11 +22,9 @@ extern void *eglGetProcAddress(const char *procname);
         gles_##func = dlsym(RTLD_DEFAULT, #func); \
     }
 
-#define AliasDecl(NAME, EXT) \
-    asm(".global _"# NAME "\n_" #NAME ": b _" #NAME #EXT);
+#define AliasDecl(NAME, EXT)
 
-#define AliasDeclPriv(NAME) \
-    asm(".global _gl"# NAME "\n_gl" #NAME ": b _GL_" #NAME);
+#define AliasDeclPriv(NAME)
 
 // Core OpenGL 2.0
 AliasDecl(glGetTexImage, ANGLE)
@@ -124,27 +122,8 @@ static void *ame173_gpa_multi(const char *name) {
 
 // ---- 取证：Task173 解析结果一次性日志（首次 glGetString 时，上下文已就位）----
 static void ame173_forensics(void) {
-    static dispatch_once_t onceTok;
-    dispatch_once(&onceTok, ^{
-        NSArray *ame173_names = @[
-            @"glQueryCounter", @"glDrawElementsBaseVertex", @"glDrawRangeElementsBaseVertex",
-            @"glDrawElementsInstancedBaseVertex", @"glMultiDrawElementsBaseVertex",
-            @"glMultiDrawArrays", @"glMultiDrawElements", @"glColorMaski", @"glEnablei",
-            @"glDisablei", @"glBlendFuncSeparatei", @"glBlendEquationSeparatei",
-            @"glFramebufferTexture", @"glTexBuffer", @"glTexBufferRange",
-            @"glVertexAttribDivisor", @"glCopyImageSubData", @"glTexImage1D",
-            @"glGetQueryObjectiv", @"glGetQueryObjecti64v"
-        ];
-        int ok = 0, miss = 0;
-        NSMutableArray *misses = [NSMutableArray array];
-        for (NSString *n in ame173_names) {
-            if (ame173_gpa_multi(n.UTF8String)) { ok++; }
-            else { miss++; [misses addObject:n]; }
-        }
-        NSLog(@"[TinyGL] Task173 desktop-GL completion layer: %d/%lu resolved via eglGetProcAddress%s",
-              ok, (unsigned long)ame173_names.count,
-              miss ? [NSString stringWithFormat:@", MISSING: %@", [misses componentsJoinedByString:@", "]] : @" (all present)");
-    });
+    (void)0; /* harness: forensics stubbed */
+
 }
 
 // ---- 桌面独有：类型适配（GLdouble → GLfloat / glGetFloatv 加宽）----
@@ -481,10 +460,8 @@ void glTexImage1D(GLenum target, GLint level, GLint internalformat, GLsizei widt
 
 // ---- 纯桌面语义无 ES 对应：安全 no-op + 一次性日志 ----
 static void ame173_log_once(const char *fn) {
-    static dispatch_once_t ame173_once_guard; // 简化：首个触发者带名记录
-    dispatch_once(&ame173_once_guard, ^{
-        NSLog(@"[TinyGL] Task173 desktop-only function with no ES equivalent no-op'd (first: %s)", fn);
-    });
+    (void)fn; /* harness: log stubbed */
+
 }
 
 void glLogicOp(GLenum opcode) {

@@ -313,8 +313,15 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
         [facetString appendFormat:@", [\"versions:%@\"]", mcVersion];
     }
     // 修复 #50: 必须把 loader（categories facet）传给 Modrinth API，否则筛选 neoforge/fabric 不生效
+    // Task179：无加载器概念的资源类型禁发 categories facet——resourcepack/
+    // shader/datapack/world 挂上 categories:fabric 后 Modrinth 只剩 15 个
+    // 结果（实测 35467 -> 15），资源包页等于清空。模组/整合包不受影响。
+    BOOL ame179_loaderLessType = ([projectType isEqualToString:@"resourcepack"] ||
+                                  [projectType isEqualToString:@"shader"] ||
+                                  [projectType isEqualToString:@"datapack"] ||
+                                  [projectType isEqualToString:@"world"]);
     NSString *loader = filters[@"loader"] ?: filters[@"categories"];
-    if (loader.length > 0) {
+    if (loader.length > 0 && !ame179_loaderLessType) {
         [facetString appendFormat:@", [\"categories:%@\"]", loader];
     }
     [facetString appendString:@"]"];

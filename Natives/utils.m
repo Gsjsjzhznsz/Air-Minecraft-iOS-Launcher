@@ -244,8 +244,24 @@ BOOL isTrollStoreInstall(void) {
 // JIT26 附加等待（JIT26IsLikelyDebuggerKeepAttached）同样复用。
 BOOL ame169_waitForJITCondition(BOOL (^condition)(void), NSTimeInterval timeout, NSString *label) {
     NSDate *start = [NSDate date];
+    NSDate *ame179_lastIter = [NSDate date];
     for (;;) {
         if (condition()) return YES;
+        // Task179：挂起间隙不计入超时预算。
+        // 病历（9aacebb 装机 latestlog.2，版本设置二级菜单启动）：stikjit://
+        // 把 App 切后台 → iOS 挂起本进程（后台断言宽限未兑现，心跳只打了
+        // 0s 一条就冻结）→ 用户在 StikJIT 里启用 JIT 后切回 → NSDate 墙钟
+        // 已走过 120s 预算 → 恢复后第一轮循环即 TIMED OUT = 用户实测的
+        // "二级菜单启动卡死、最后超时闪退"。修法：两次迭代间隔超过 2s 视为
+        // 挂起间隙（正常循环节拍 0.2s），把 start 前推该间隙——挂起多久都
+        // 不消耗等待预算；同时落一行间隙日志供装机日志核对。
+        NSTimeInterval ame179_gap = -[ame179_lastIter timeIntervalSinceNow];
+        if (ame179_gap > 2.0) {
+            NSLog(@"[JIT] Task179 %@: suspension gap of %.0fs excluded from timeout budget (app was backgrounded/suspended; wall-clock no longer burns the wait)",
+                  label ?: @"JIT", ame179_gap);
+            start = [start dateByAddingTimeInterval:ame179_gap];
+        }
+        ame179_lastIter = [NSDate date];
         NSTimeInterval waited = -[start timeIntervalSinceNow];
         if (waited >= timeout) {
             NSLog(@"[JIT] Task169 %@ wait TIMED OUT after %.0fs (traced=%d exn=%d)",

@@ -349,6 +349,11 @@ void GetHardwareExtensions(int notest)
     LOAD_GLES2_(glGetError);
     // Now get extensions
     const char* Exts = gles_glGetString(GL_EXTENSIONS);
+    // Task179 (iOS port hardening): ES3 deprecates GL_EXTENSIONS via
+    // glGetString (queryable only through glGetStringi) -- a driver may return
+    // NULL here, and every strstr() below would then crash. Fall back to an
+    // empty list (caps degrade gracefully; ANGLE still returns the list).
+    if (Exts == NULL) Exts = "";
     SHUT_LOGD("\n========\nGL_EXTENSIONS is :\n%s\n========\n", Exts);
     // Parse them!
     #define S(A, B, C) if(strstr(Exts, A)) { hardext.B = 1; SHUT_LOGD("Extension %s detected%s",A, C?" and used\n":"\n"); } 
@@ -514,6 +519,9 @@ void GetHardwareExtensions(int notest)
     // get GLES driver signatures...
     const char* vendor = gles_glGetString(GL_VENDOR);
     const char* renderer = gles_glGetString(GL_RENDERER);
+    // Task179 (iOS port hardening): NULL-guard the strstr probes.
+    if (!vendor) vendor = "";
+    if (!renderer) renderer = "";
     //SHUT_LOGD("Hardware vendor is %s\n", vendor);
     SHUT_LOGD("Hardware renderer is %s\n", renderer);
     if(strstr(vendor, "ARM"))

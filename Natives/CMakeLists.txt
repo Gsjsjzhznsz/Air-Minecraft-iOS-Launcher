@@ -292,7 +292,15 @@ add_library(vgpu_core OBJECT ${VGPU_CORE_SRC})
 foreach(ame173_vgpu_tgt vgpu_pack vgpu_core)
   target_include_directories(${ame173_vgpu_tgt} PRIVATE "${VGPU_DIR}/include")
   target_compile_definitions(${ame173_vgpu_tgt} PRIVATE
-    NOX11 NO_GBM DEFAULT_ES=3 SHAREDLIB
+    # Task179：+NOEGL——GetHardwareExtensions 的临时 EGL 探测上下文路径在
+    # iOS 上全灭（装机 38a887d 实锤：egl_eglGetDisplay/eglBindAPI 等 LOAD_EGL
+    # 全部 NULL——proc_address 苹果分支的 dlsym(RTLD_NEXT) 在晚加载的 vgpu
+    # 里找不到任何东西，宿主早已加载框架），首个 egl_eglGetDisplay(...) 调用
+    # = 调 NULL = SIGSEGV pc=0（1.8.9+vgpu 首个 GL 调用即崩）。
+    # NOEGL 语义 = "GL 调用来自宿主已绑定的当前上下文"（我们的 gl_bridge 正是
+    # 这么工作的：先建好上下文再让 vgpu 转译 GL 调用）——扩展探测改在【当前
+    # 游戏上下文】上做，零临时上下文、零 egl_* 依赖。
+    NOX11 NO_GBM NOEGL DEFAULT_ES=3 SHAREDLIB
   )
   target_link_libraries(${ame173_vgpu_tgt}
     "${GLOBAL_LDFLAGS}"

@@ -1738,6 +1738,13 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         // 宽限期到由系统挂起；恢复后循环按剩余预算继续（NSDate 计时包含
         // 挂起时长，超时语义不变）。
     }];
+    // Task179：断言有效性取证。latestlog.2 病历里心跳只打了 0s 一条就冻结
+    // ——断言是否真的被系统批准无从分辨（Invalid = 无后台宽限，挂起来得更
+    // 早）。无效断言 + Task179 的挂起间隙豁免双保险：即便立即挂起，恢复后
+    // 预算也不被墙钟烧穿。
+    NSLog(@"[JIT] [RightPanel] Task179 background task assertion: id=%lu valid=%d (remaining bg time %.0fs)",
+          (unsigned long)ame172_bgt, ame172_bgt != UIBackgroundTaskInvalid,
+          [UIApplication.sharedApplication backgroundTimeRemaining]);
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // Task169：有界等待（120s）+每 10s 心跳日志。旧裸循环在 stikjit://

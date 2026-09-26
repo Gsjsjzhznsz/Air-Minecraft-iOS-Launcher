@@ -185,20 +185,22 @@ check("D4 interface.title 键保留（开关行标题）",
 # ============================================================
 print("== E. 文档（公告/version.h/fallback） ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
-check("E1 公告 task178 插入 index 2（Task178 重锚：server/169 钉 0/1 不动）",
-      len(ann) == 20
+# Task179 重锚：task179@2 插入，全体顺延 +1，len 21。
+check("E1 公告 task178 插入（Task179 重锚：task179@2 后 task178 居 ann[3]；server/169 钉 0/1 不动）",
+      len(ann) == 21
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[2]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")
-check("E2 公告后续顺序整体 +1（Task178 重锚：177→3 / 175→4 / 174→5 / 173 新拟态→6 / 173 十连修→7）",
-      ann[3]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann[4]["id"] == "task175-six-fixes-2026-09-26"
-      and ann[5]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann[6]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann[7]["id"] == "task173-ten-fixes-2026-09-26")
-check("E3 公告内容锚（Task178 重锚：task177 内容锚随条目顺延至 ann[3]）",
-      "bigbear-ui" in ann[3]["content"] and "neu-white" in ann[3]["content"]
-      and "不要加任何的透明度" in ann[3]["summary"])
+      and ann[2]["id"] == "task179-eight-fixes-2026-09-26"
+      and ann[3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")
+check("E2 公告后续顺序整体 +1（Task179 重锚：177→4 / 175→5 / 174→6 / 173 新拟态→7 / 173 十连修→8）",
+      ann[4]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann[5]["id"] == "task175-six-fixes-2026-09-26"
+      and ann[6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann[7]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann[8]["id"] == "task173-ten-fixes-2026-09-26")
+check("E3 公告内容锚（Task179 重锚：task177 内容锚随条目顺延至 ann[4]）",
+      "bigbear-ui" in ann[4]["content"] and "neu-white" in ann[4]["content"]
+      and "不要加任何的透明度" in ann[4]["summary"])
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E4 version.h Task 177 附录（含设备日志锚）",
       "Amethyst Task 177" in vh and "[Task177] neumorph UI spec rewrite" in vh)
