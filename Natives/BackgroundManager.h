@@ -36,16 +36,22 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 @property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度
 
 // Task172（用户定稿，重写卡片管线）：新拟态界面开关。Task177 规格定稿：
-//   开启（默认）→ 卡片永远按 CSS 参考规格渲染：渐变表面 + 全不透明固定档
-//   双阴影，与是否有壁纸完全无关，也不读任何透明度/模糊偏好。
+//   开启（默认）→ 卡片永远按 CSS 参考规格渲染：渐变表面 + 固定档双阴影
+//   （卡体透明度可调 = cardsNeumorphOpacity，Task178 恢复），与是否有壁纸
+//   完全无关；UI 效果类型/模糊度/壁纸透明度（uiOpacity）一律不影响卡片。
 //   关闭 → 回归旧管线：有壁纸走毛玻璃/半透明（设置页其余 UI 效果选项
-//   恢复可操作），无壁纸走原生平铺。设置页"模糊程度"下方的开关行控制，
-//   开启时其余 UI 效果选项变灰，关闭反转。
+//   恢复可操作），无壁纸走原生平铺。设置页"模糊程度"下方的开关行控制；
+//   Task178 用户定稿：开关不管开还是关，都不会使其他选项变灰（灰化退役），
+//   且 UI 效果类型/模糊度在开启时也不影响新拟态——新拟态与旧管线两套
+//   渲染并行共存，各读各的偏好。
 @property (nonatomic, assign) BOOL cardsNeumorphEnabled; // defaults background_cards_neumorph_enabled，默认 YES
-// Task177：卡片透明度滑条（Task170/172 机制）整体退役——用户定稿"不要加
-// 任何的透明度"：卡片恒为 CSS 参考规格（渐变表面 + 全不透明固定档双阴影），
-// 不读任何透明度/模糊偏好；仅存开关控制开/关。背景卡片透明度遗留落盘键
-// 不再读取（无害闲置）。
+// Task178（Task170 机制恢复，用户定稿"只有那个透明度拉条可以改变新拟态
+// 的透明度，当然字体始终是不透明的"）：卡片本体透明度——只淡卡体（渐变
+// 表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），文字/图标恒
+// 不透明。与 UI 效果类型/模糊度/壁纸透明度（uiOpacity）完全无关，唯一
+// 入口 = 本偏好。defaults background_cards_neumorph_opacity 直读写，
+// 默认 1.0（= Task177 规格原样，用户已认可的定稿形态不缩水）。
+@property (nonatomic, assign) CGFloat cardsNeumorphOpacity;
 
 // Global background container
 @property (nonatomic, strong, readonly, nullable) UIView *globalBackgroundContainer;

@@ -2141,3 +2141,30 @@
 // settings slider row + ame_setNeumorphWallpaperSoft/soft profile are
 // deleted; cards no longer read uiOpacity/blurIntensity. Device anchor:
 // one-shot "[Task177] neumorph UI spec rewrite" log.
+
+// REVISION 17 addendum (Amethyst Task 178, no bump): neumorphism / UI-effect
+// settings decoupling per the user's final spec. (1) The neumorphic toggle
+// NEVER grays out the other options in either state -- the Task172/173
+// graying blocks (contentView.alpha 0.35 + userInteractionEnabled) are gone;
+// effect-type / uiOpacity / blur rows stay interactive at all times.
+// (2) With the toggle ON, UI effect type (blur/translucent) and blur level
+// only affect the wallpaper layer; cards are rendered by the Task177 spec
+// pipeline which reads none of them. (3) Card-body opacity slider RESTORED
+// (Task170 mechanism): BackgroundManager.cardsNeumorphOpacity
+// (defaults background_cards_neumorph_opacity, default 1.0 = Task177 look
+// untouched) -> engine ame_applyNeumorphCardOpacity adapted to the three-
+// layer engine: the whole AmeNeumorphShadowView (opaque gradient surface +
+// shadow pair) fades as ONE composite so the inner-spill occlusion survives
+// translucency (no haze returns at partial opacity); host fallback color
+// steps aside (clear); labels/icons are sibling subviews and stay fully
+// opaque. ame_applyNeumorphSurface re-pins shadowView.alpha = 1.0 so an
+// unpaired re-apply fails safe toward the approved opaque look. Settings:
+// "Neumorphism Opacity" row (tags 500/501/502, always visible, below the
+// toggle; no-wallpaper section0 = 2 rows) + Task174 live percentage label.
+// (4) News card corner pin: ame_setNeumorphPinnedCornerRadius (opt-in
+// associated flag read by ame_refreshForHostBounds) -- MinecraftNews cards
+// keep their explicit 12pt radius instead of the short-side proportional
+// ~27pt override ("太圆了"). l10n: background.cards.neumorph.opacity.title
+// restored x6 (four main languages 1954 -> 1955). Device anchor: one-shot
+// "[Task178] neumorph decoupled: pinned spec cards + card-body opacity
+// slider, UI effect options stay interactive" log.

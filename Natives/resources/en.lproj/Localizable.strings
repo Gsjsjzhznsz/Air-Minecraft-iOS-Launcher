@@ -2116,6 +2116,7 @@
 "bing.footer.hint" = "When enabled and no custom wallpaper is set, the Bing daily wallpaper is applied automatically and refreshed every day. Setting a custom wallpaper pauses it; clearing the background brings it back.";
 "background.effect.footer" = "Opacity controls how translucent the UI material is (lower = more wallpaper shows through). Blur Level controls the strength of the background Gaussian blur (lower = sharper background). Both only take effect when UI Effect is set to Blur or Translucent.";
 "background.cards.neumorph.interface.title" = "Neumorphic Interface";
+"background.cards.neumorph.opacity.title" = "Neumorphism Opacity";
 "bing.gallery.nav.title" = "Bing Gallery";
 "bing.setwallpaper.title" = "Set as Wallpaper";
 "bing.save.title" = "Save to Photos";

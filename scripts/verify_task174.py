@@ -72,19 +72,19 @@ check("A1 applyBackgroundToWindow 无新拟态早退门（画布接管退役：T
 check("A2 applyBackgroundToSplitViewController 同款退役（Task177 重锚：无早退门；开关门仅存 refreshUIEffect/卡片管线两处）",
       bm_m.count("if (self.cardsNeumorphEnabled) {") >= 2
       and "if (self.cardsNeumorphEnabled)" not in split_fn)
-check("A3 refreshUIEffect ON 分支：壁纸容器缺席时原位重建 + 双宿主底色原生 + 规格定稿取证日志（Task177 重锚：日志锚随注释演化为 Task177）",
+check("A3 refreshUIEffect ON 分支：壁纸容器缺席时原位重建 + 双宿主底色原生 + 解耦定稿取证日志（Task178 重锚：日志锚随注释演化为 Task178）",
       "if (self.cardsNeumorphEnabled) {" in bm_m[bm_m.index("- (void)refreshUIEffect"):]
       and "if ([self hasBackground] && !self.globalBackgroundContainer) {" in bm_m[bm_m.index("- (void)refreshUIEffect"):]
-      and "ame177CoexistLogOnce" in bm_m
-      and "[Task177] neumorph UI spec rewrite" in bm_m
-      and bm_m.index("ame177CoexistLogOnce") > bm_m.index("- (void)refreshUIEffect"))
+      and "ame178DecoupleLogOnce" in bm_m
+      and "[Task178] neumorph decoupled" in bm_m
+      and bm_m.index("ame178DecoupleLogOnce") > bm_m.index("- (void)refreshUIEffect"))
 check("A4 refreshUIEffect OFF 分支：原位重建 + blur 重挂（不变）",
       "if ([self hasBackground] && !self.globalBackgroundContainer) {" in bm_m
       and "[self applyBackgroundToSplitViewController:self.currentSplitVC];" in bm_m
       and "[self applyBackgroundToWindow:self.currentWindow];" in bm_m)
-check("A5 柔和档挂载点退役（Task177 重锚：管线双点调用随透明度定稿消失）",
+check("A5 卡片本体透明度挂载点恢复（Task178 重锚：柔和档仍退役，引擎原语两管线挂点回归）",
       bm_m.count("ame_setNeumorphWallpaperSoft") == 0
-      and bm_m.count("ame_applyNeumorphCardOpacity") == 0)
+      and bm_m.count("ame_applyNeumorphCardOpacity") == 2)
 check("A5b 柔和档引擎整体退役（Task177 重锚：属性/参数/透传原语全退，恒 1.0 不透明度 + 不透明渐变表面层在位）",
       "ame_wallpaperSoftProfile" not in rd("Natives/UIKit+NativeSurface.m")
       and "offset * 0.35" not in rd("Natives/UIKit+NativeSurface.m")
@@ -98,18 +98,18 @@ check("A5b 柔和档引擎整体退役（Task177 重锚：属性/参数/透传�
 # ============================================================
 blur_handler = bsvc[bsvc.index("- (void)blurIntensitySliderChanged"):]
 blur_handler = blur_handler[:blur_handler.index("\n}", 1) + 2]
-check("B1 滑条回调实时重写范式幸存（blur 行 viewWithTag:301；opacity 滑条整链退役）",
+check("B1 滑条回调实时回显恢复（Task178 重锚：opacity 行 viewWithTag:501 + 回调回归；blur 行 301 范式不变）",
       "viewWithTag:301" in blur_handler
-      and "viewWithTag:501" not in bsvc
-      and "cardsNeumorphOpacitySliderChanged" not in bsvc)
+      and "viewWithTag:501" in bsvc
+      and "cardsNeumorphOpacitySliderChanged" in bsvc)
 check("B2 blur 回调含百分比格式（%.0f%% × 100）",
       '@"%.0f%%", value * 100' in blur_handler)
 check("B3 blur 滑条取回范式（slider→superview→superview + 类型守卫）",
       "slider.superview.superview" in blur_handler
       and "[cell isKindOfClass:[UITableViewCell class]]" in blur_handler)
-check("B4 既有刷新链不破坏（refreshUIEffect 仍在；透明度落盘链退役）",
+check("B4 既有刷新链不破坏（Task178 重锚：refreshUIEffect 仍在；透明度落盘链恢复）",
       "refreshUIEffect" in blur_handler
-      and ".cardsNeumorphOpacity = slider.value;" not in bsvc)
+      and ".cardsNeumorphOpacity = slider.value;" in bsvc)
 
 # ============================================================
 # C. 既有语义不回潮（Task173 重写与灰化反转原样保留）
@@ -119,17 +119,18 @@ check("C1 卡片管线开关门仍在（applyNeumorphCardEffectToView / applyEff
       and "- (void)applyNeumorphCardEffectToView:" in bm_m
       and "- (void)applyEffectToCollectionViewCell:" in bm_m
       and "- (void)applyCardEffectToCell:" in bm_m)
-check("C2 灰化反转逻辑在位（Task177 重锚：旧选项 0.35 关交互两处；滑条启停表达式随行退役）",
-      bsvc.count("neumorphOn ? 0.35 : 1.0") == 2
+check("C2 灰化退役（Task178 重锚：开关不变灰任何选项——0.35/neumorphOn 全退，交互恒开）",
+      bsvc.count("neumorphOn ? 0.35 : 1.0") == 0
+      and "neumorphOn" not in bsvc
       and "slider.enabled = neumorphOn;" not in bsvc
       and "cell.contentView.alpha = neumorphOn ? 1.0 : 0.35;" not in bsvc)
 check("C3 开关回调链不回潮（落盘 + refreshUIEffect + reloadData）",
       "cardsNeumorphToggleChanged:" in bsvc
       and bsvc.index("- (void)cardsNeumorphToggleChanged:") < bsvc.index("refreshUIEffect", bsvc.index("- (void)cardsNeumorphToggleChanged:"))
       and "reloadData" in bsvc[bsvc.index("- (void)cardsNeumorphToggleChanged:"):bsvc.index("- (void)cardsNeumorphToggleChanged:") + 400])
-check("C4 卡片本体透明度原语退役（Task177 重锚：管线/引擎零残留，规格恒全不透明）",
-      bm_m.count("ame_applyNeumorphCardOpacity") == 0
-      and "ame_applyNeumorphCardOpacity" not in rd("Natives/UIKit+NativeSurface.m"))
+check("C4 卡片本体透明度原语恢复（Task178 重锚：管线双挂点 + 引擎原语在位）",
+      bm_m.count("ame_applyNeumorphCardOpacity") == 2
+      and "ame_applyNeumorphCardOpacity" in rd("Natives/UIKit+NativeSurface.m"))
 
 # ============================================================
 # D. l10n 零新增（本轮无新键，计数不动）
@@ -137,10 +138,10 @@ check("C4 卡片本体透明度原语退役（Task177 重锚：管线/引擎零�
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
 check("D1 四主语言键集一致且计数 = 1955（Task174 零新增；十症状并行会话并入后 1954->1955）",
-      all(len(k) == 1954 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
-check("D2 开关键六语言在位（Task177 重锚：opacity.title 随滑条退役，interface.title 保留）",
+      all(len(k) == 1955 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
+check("D2 开关键六语言在位（Task178 重锚：opacity.title 恢复，interface.title 保留）",
       "background.cards.neumorph.interface.title" in KEYSETS[0]
-      and "background.cards.neumorph.opacity.title" not in KEYSETS[0]
+      and "background.cards.neumorph.opacity.title" in KEYSETS[0]
       and all("background.cards.neumorph.interface.title" in
               rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
               for lg in ["ja", "km"]))
@@ -150,20 +151,21 @@ check("D2 开关键六语言在位（Task177 重锚：opacity.title 随滑条退
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告（Task177 重锚：task177@2 插入，task175 顺延 anns[3]，本条（task174）顺延 anns[4]，双 task173 顺延 anns[5]/[6]，172/171/170/168 顺延 anns[7]/[8]/[9]/[10]；server/task169 pin 不动）且 id 唯一",
+check("E1 公告（Task178 重锚：task178@2 插入，task177/175 顺延 anns[3]/[4]，本条（task174）顺延 anns[5]，双 task173 顺延 anns[6]/[7]，172/171/170/168 顺延 anns[8]/[9]/[10]/[11]；server/task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[3]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[4]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[5]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[6]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[7]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[8]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[9]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[10]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t174 = anns[4]
+      and anns[2]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[3]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[4]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[5]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[6]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[7]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[8]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[9]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[10]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[11]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t174 = anns[5]
 check("E2 公告内容锚（晕影根因=壁纸垫底/画布接管/百分比实时回显 + EN 尾注）",
       "晕影" in t174["summary"] and "画布接管" in t174["summary"]
       and "壁纸" in t174["content"] and "实时回显" in t174["content"]

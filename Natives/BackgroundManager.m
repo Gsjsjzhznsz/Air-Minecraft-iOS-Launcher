@@ -16,9 +16,10 @@ static NSString * const kBackgroundUIEffectKey = @"background_ui_effect";
 static NSString * const kBackgroundUIOpacityKey = @"background_ui_opacity";
 static NSString * const kBackgroundBlurIntensityKey = @"background_blur_intensity";
 // Task172：新拟态界面开关（默认 YES = 卡片永远按规格渲染，与壁纸无关；
-// NO = 旧管线毛玻璃/半透明/原生平铺）。Task177：透明度滑条机制整体退役，
-// background_cards_neumorph_opacity 键不再读取（遗留落盘值无害闲置）。
+// NO = 旧管线毛玻璃/半透明/原生平铺）。Task178：卡片本体透明度滑条恢复
+//（Task170 机制，仅淡卡体不含文字，与 UI 效果类型/模糊度彻底解耦）。
 static NSString * const kBackgroundCardsNeumorphEnabledKey = @"background_cards_neumorph_enabled";
+static NSString * const kBackgroundCardsNeumorphOpacityKey = @"background_cards_neumorph_opacity";
 // Task151：背景来源标记（"user" = 用户手动设置，"bing" = Bing 每日壁纸自动应用）
 static NSString * const kBackgroundSourceKey = @"background_source";
 static NSString * const kBackgroundsFolder = @"backgrounds";
@@ -232,6 +233,26 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)setCardsNeumorphEnabled:(BOOL)cardsNeumorphEnabled {
     [[NSUserDefaults standardUserDefaults] setBool:cardsNeumorphEnabled
                                             forKey:kBackgroundCardsNeumorphEnabledKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
+#pragma mark - Task178 卡片新拟态本体透明度（Task170 机制恢复）
+
+// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链，与开关
+// 同家法）——读侧永远拿到最新落盘值。语义见 BackgroundManager.h：只淡
+// 卡体（渐变表面 + 双阴影承载视图整体 alpha），文字/图标恒不透明；
+// UI 效果类型/模糊度/壁纸透明度均不影响新拟态，唯一入口 = 本偏好。
+- (CGFloat)cardsNeumorphOpacity {
+    // 未落盘时默认 1.0 = Task177 规格形态原样（用户已认可的定稿不缩水）
+    if ([[NSUserDefaults standardUserDefaults] objectForKey:kBackgroundCardsNeumorphOpacityKey] == nil) {
+        return 1.0;
+    }
+    return MAX(0.0, MIN(1.0, [[NSUserDefaults standardUserDefaults] doubleForKey:kBackgroundCardsNeumorphOpacityKey]));
+}
+
+- (void)setCardsNeumorphOpacity:(CGFloat)cardsNeumorphOpacity {
+    [[NSUserDefaults standardUserDefaults] setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))
+                                              forKey:kBackgroundCardsNeumorphOpacityKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
@@ -1005,14 +1026,14 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         if (self.currentSplitVC) {
             self.currentSplitVC.view.backgroundColor = [UIColor systemBackgroundColor];
         }
-        // 壁纸自身的压暗/模糊层照旧重挂（幂等：与关闭分支同款链路；新拟态
-        // 开启时设置页的三行壁纸效果选项被灰化冻结，容器维持冻结值即可）。
+        // 壁纸自身的压暗/模糊层照旧重挂（幂等：与关闭分支同款链路；Task178
+        // 灰化退役后三行壁纸效果选项恒可操作，改动只作用于壁纸层，不碰卡片）。
         if (self.globalBackgroundContainer) {
             [self addBlurEffectToContainer:self.globalBackgroundContainer];
         }
-        static dispatch_once_t ame177CoexistLogOnce;
-        dispatch_once(&ame177CoexistLogOnce, ^{
-            NSLog(@"[Task177] neumorph UI spec rewrite: opaque gradient surface + fixed-tier opaque dual shadows, zero transparency coupling");
+        static dispatch_once_t ame178DecoupleLogOnce;
+        dispatch_once(&ame178DecoupleLogOnce, ^{
+            NSLog(@"[Task178] neumorph decoupled: pinned spec cards + card-body opacity slider, UI effect options stay interactive");
         });
     } else {
         if ([self hasBackground] && !self.globalBackgroundContainer) {
@@ -1166,9 +1187,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         cell.contentView.clipsToBounds = NO;
         cell.contentView.layer.masksToBounds = NO;
         [target ame_applyNeumorphSurface];
-        // Task177：卡片恒为 CSS 参考规格（渐变表面 + 全不透明固定档双阴影），
-        // 不读壁纸状态、不读任何透明度/模糊偏好——Task175 柔和档与 Task170
-        // 本体透明度两链路随"不要加任何的透明度"定稿整体退役。
+        // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（渐变
+        // 表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），文字/
+        // 图标不参与；与壁纸状态/模糊度/透明度偏好完全无关，唯一入口 =
+        // cardsNeumorphOpacity 滑条。
+        [target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
         return;
     }
 
@@ -1358,6 +1381,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     }
     if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;
     [view ame_applyNeumorphSurface];
+    // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（承载视图
+    // 整体 alpha，引擎原语非宿主 alpha），文字/图标恒不透明；与壁纸状态/
+    // 模糊度/透明度偏好完全无关，唯一入口 = cardsNeumorphOpacity 滑条。
+    [view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

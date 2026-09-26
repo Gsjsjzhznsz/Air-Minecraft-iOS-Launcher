@@ -7,6 +7,10 @@
 //  Task177：按用户给过的 CSS 样式参考（bigbear-ui neu-white）定稿重写——
 //          渐变表面 + 固定档全不透明双阴影；透明承载层内侧染色（晕影根源）
 //          与壁纸柔和档/卡片透明度原语全部退役。
+//  Task178：恢复卡片本体透明度原语（用户定稿：只有"新拟态透明度"拉条
+//          可以改变新拟态的透明度，字体恒不透明；UI 效果类型/模糊度/
+//          壁纸透明度与新拟态彻底解耦）。Task177 三层引擎下整个卡体都在
+//          承载视图内，整体 alpha 淡化即卡体淡化，文字不参与。
 //
 
 #import "UIKit+NativeSurface.h"
@@ -83,6 +87,9 @@ void AmeNeumorphMetricsForSide(CGFloat side,
 #pragma mark - Task177 新拟态承载视图（投影对 + 不透明渐变表面）
 
 static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
+/// Task178：圆角钉住（opt-in）——宿主关联对象存 NSNumber，非空时
+/// ame_refreshForHostBounds 以钉住值为圆角（不再短边等比改写）。
+static void *kAmeNeumorphPinnedRadiusKey = &kAmeNeumorphPinnedRadiusKey;
 
 @interface AmeNeumorphShadowView ()
 /// 右下暗影投影层（clear，只画投影；边界内侧被表面层遮住）
@@ -155,6 +162,10 @@ static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait
         CGFloat side = MIN(host.bounds.size.width, host.bounds.size.height);
         CGFloat offset = 4.0, blur = 8.0;
         AmeNeumorphMetricsForSide(side, &radius, &offset, &blur);
+        // Task178：opt-in 圆角钉住优先（新闻卡等带显式圆角语义的卡片，
+        // 双列窄高布局下等比结果 ~27pt 远超卡片自定的 12pt——"太圆了"）
+        NSNumber *pinnedRadius = objc_getAssociatedObject(host, kAmeNeumorphPinnedRadiusKey);
+        if (pinnedRadius) radius = MAX(8.0, MIN(pinnedRadius.doubleValue, 50.0));
 
         self.ame177_darkLayer.frame = self.bounds;
         self.ame177_lightLayer.frame = self.bounds;
@@ -215,6 +226,9 @@ static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait
         objc_setAssociatedObject(self, kAmeNeumorphShadowViewKey, shadowView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     shadowView.frame = self.bounds; // 非自动布局场景立即对齐；autoresizing 兜后续
+    // Task178：重铺 = 回归规格全不透明（透明档由 ame_applyNeumorphCardOpacity
+    // 在管线尾部重新施加；未配对调用时向用户认可的 Task177 形态失效安全）
+    shadowView.alpha = 1.0;
     [shadowView setNeedsLayout];
 }
 
@@ -252,7 +266,44 @@ static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait
     if (shadowView) {
         [shadowView removeFromSuperview];
         objc_setAssociatedObject(self, kAmeNeumorphShadowViewKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(self, kAmeNeumorphPinnedRadiusKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC); // Task178：钉住随挂载一并清
     }
+}
+
+- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity {
+    // Task178：卡片本体透明度（不含文字）。设为独立引擎原语的原因（沿用
+    // Task172 定稿口径）：不能用宿主 view.alpha——alpha 沿层级连乘，
+    // 文字/图标子视图会一起被淡掉（用户定稿"字体始终是不透明的"）。
+    // Task177 三层引擎的适配：整个卡体（不透明渐变表面 + 双阴影投影层）
+    // 都在 AmeNeumorphShadowView 内，且不透明表面层盖住投影边界内侧——
+    // 承载视图整体 alpha 淡化保持这一合成结构不变（半透明态下投影内侧
+    // 剪影与表面同步衰减，晕影不随透明度回归），卡体对外呈统一的 o。
+    // 宿主兜底底色必须同步让位：不透明的 #e0e0e0 垫在承载视图下面，会把
+    // 半透明卡面从底下垫回不透明（透明度形同虚设）。
+    CGFloat o = MAX(0.0, MIN(1.0, opacity));
+    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
+    if (!shadowView) return; // 未挂承载视图（平贴表面/旧管线宿主）：无害空操作
+    if (shadowView.alpha != o) shadowView.alpha = o;
+    if (![self.backgroundColor isEqual:[UIColor clearColor]]) {
+        self.backgroundColor = [UIColor clearColor]; // 兜底让位（幂等）
+    }
+}
+
+- (void)ame_setNeumorphPinnedCornerRadius:(CGFloat)cornerRadius {
+    // Task178：圆角钉住（opt-in）。关联对象存 NSNumber（nil = 解除），
+    // 刷新链（layoutSubviews / trait 变化 / 宿主 bounds 变化）每帧读取，
+    // 生命周期与承载视图解耦。设置后立即重刷一次（bounds 不变时
+    // layoutSubviews 不会自发重跑）。
+    if (cornerRadius > 0.0) {
+        objc_setAssociatedObject(self, kAmeNeumorphPinnedRadiusKey,
+                                 @(MAX(8.0, MIN(cornerRadius, 50.0))),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else {
+        objc_setAssociatedObject(self, kAmeNeumorphPinnedRadiusKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    AmeNeumorphShadowView *shadowView = objc_getAssociatedObject(self, kAmeNeumorphShadowViewKey);
+    [shadowView ame_refreshForHostBounds]; // 未挂载时为无害空操作
 }
 
 @end

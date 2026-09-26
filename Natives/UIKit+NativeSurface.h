@@ -33,11 +33,15 @@
 //          投影内侧被表面遮住，只留外侧微晕——2~4pt 量级，不再是
 //          Task160 短边等比的 20/60pt 重晕影，也没有 Task175 柔和档的
 //          0.45/0.5 透明度。
-//    透明度隔离：新拟态表面/阴影不读任何透明度/模糊偏好（
-//          cardsNeumorphOpacity / uiOpacity / blurIntensity 全部无关），
-//          卡面恒全不透明。
+//    透明度隔离（Task177 定稿 / Task178 修订）：新拟态表面/阴影不读 UI
+//          效果的模糊度/壁纸透明度（uiOpacity / blurIntensity 无关）；
+//          卡体透明度唯一入口 = cardsNeumorphOpacity（Task178 恢复，
+//          默认 100% = 规格原样），经 ame_applyNeumorphCardOpacity
+//          施加在承载视图整体 alpha 上（文字不参与）。
 //
-//  Task160 沿用的稳定决策保留：圆角按元素短边等比 clamp[8,50]；
+//  Task160 沿用的稳定决策保留：圆角按元素短边等比 clamp[8,50]
+//  （Task178 修订：opt-in 圆角钉住 ame_setNeumorphPinnedCornerRadius，
+//  显式圆角语义的卡片如新闻卡 12pt 不被等比改写）；
 //  dynamic provider 深浅色自适应；宿主 masksToBounds = NO 放行外阴影。
 //
 
@@ -127,6 +131,25 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 关联对象（背景模式切换场景的残留清理——新拟态卡片切回毛玻璃/半透明
 /// 管线时旧投影会漏在 blur/半透明底外面穿帮）。未挂载时为无害空操作。
 - (void)ame_removeNeumorphShadow;
+
+/// Task178：卡片本体透明度（不含文字）——恢复 Task170/172/174 滑条语义，
+/// 适配 Task177 三层引擎（用户定稿"只有那个透明度拉条可以改变新拟态的
+/// 透明度，当然字体始终是不透明的"）。在 ame_applyNeumorphSurface 之后
+/// 调用：Task177 引擎下整个卡体（不透明渐变表面 + 双阴影投影层）都住在
+/// AmeNeumorphShadowView 内，整体 alpha 淡化 = 卡体同步淡化且不破坏
+/// "表面盖住投影内侧"的规格结构；文字/图标是宿主的其余子视图，不参与
+/// （恒全不透明）。宿主兜底底色同步让位（clear）——不透明的兜底色会把
+/// 半透明卡面从下面垫回不透明。100%（默认）= Task177 规格原样；0% =
+/// 卡体完全透明（文字仍可见）。未挂承载视图时无害空操作；重复调用幂等。
+- (void)ame_applyNeumorphCardOpacity:(CGFloat)opacity;
+
+/// Task178：新拟态圆角钉住（opt-in，默认不钉）——挂载后承载视图以本值
+/// 为准（clamp [8,50]），不再按宿主短边等比改写宿主圆角。背景：短边等比
+/// 是 Task160 全局定稿（大卡高圆角），但带显式圆角语义的卡片（如新闻卡
+/// 12pt）在双列窄高布局下会被等比改写成 ~27pt（"太圆了"）。钉住后投影
+/// shadowPath 与表面圆角同步用钉住值。传 0 = 解除钉住恢复等比。
+/// 需在 ame_applyNeumorphSurface 之前/之后调用均可（刷新链每帧读取）。
+- (void)ame_setNeumorphPinnedCornerRadius:(CGFloat)cornerRadius;
 
 @end
 

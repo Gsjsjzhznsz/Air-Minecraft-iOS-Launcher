@@ -155,9 +155,9 @@ a167 = [a for a in anns if a.get("id") == "task167-crashfix-migration-2026-09-25
 # 与 v6.0.0 发行文案改写插入——task167 现居 unpinned 组首位（数组第 4：
 # server(pin) / task169 / v6.0.0 / task167）。置顶断言改为"2026-09-25 同日
 # 组内、task166/task165/task164 之前"。
-check("E1 task167 公告置顶（Task177 重锚：task177/175/174 + 十症状 task173 相继 prepend 后居同日组第 13；双根因 + 装机验证清单）",
+check("E1 task167 公告置顶（Task178 重锚：task178/177/175/174 + 十症状 task173 相继 prepend 后居同日组第 14；双根因 + 装机验证清单）",
       len(a167) == 1
-      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(13, len(anns))))
+      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(14, len(anns))))
       and all(anns.index(a167[0]) < anns.index(x) for x in anns
               if x.get("id") in ("task166-vulkan-fsr-dsa-2026-09-25",
                                  "task165-blackscreen-rootcause-2026-09-25",

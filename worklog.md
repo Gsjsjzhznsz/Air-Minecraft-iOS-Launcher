@@ -634,3 +634,26 @@ Task: 新拟态按用户 CSS 参考定稿重写（bigbear-ui neu-white）——�
 - 提交待推送；装机锚点：设置→外观→"新拟态界面"开启（默认开）→ 全部卡片 = 浅色 145° 渐变白瓷面（#e6e6e6→#ffffff）+ 边缘 4pt 微阴影（深色模式同构），任何壁纸/开关状态下零晕影、零透明度；模糊程度/透明度滑条对卡片彻底失效（开启态置灰）
 - 引擎口径：卡片 large 档 4/8pt、小件 normal 档 2/4pt，颜色全不透明（浅 #d6d6d6+#ffffff、深 #1e1e1e+#3a3a3a）；圆角/尺寸/位置零变化；列表行/侧栏/右面板平贴家族不变
 - 透明度滑条已随"不要加任何的透明度"退役——若后续要"可调浓淡"，应做阴影档位（规格浓度系数）而非 alpha
+
+---
+Task ID: 178
+Agent: main (Super Z)
+Task: 新拟态与 UI 效果设置解耦定稿——开关永不变灰其他选项 + 卡片本体透明度滑条恢复（字体恒不透明）+ 新闻卡圆角钉住修复
+
+Work Log:
+- fetch 对齐 cc8ced8（remote Task 177 = 上轮 CSS 参考定稿重写，用户反馈"改得非常好"）；空号 178 无撞号
+- 需求定稿（用户原话锚点）：①新拟态开关不管咋样都不会使其他选项变灰 ②开启时 UI 效果类型（毛玻璃/半透明）和模糊度都不影响新拟态 ③只有那个透明度拉条可以改变新拟态的透明度，字体始终是不透明 ④追加：新闻界面的新闻卡片圆角太圆
+- 透明度选型：uiOpacity 默认 0.6 且被旧管线（nav bar/工具栏/半透明底）多处消费，复用会让用户已认可的 Task177 形态瞬间半透明 → 恢复 Task170 专用机制 cardsNeumorphOpacity（defaults background_cards_neumorph_opacity 直读写，默认 1.0 = 出厂形态不缩水）
+- 引擎适配（UIKit+NativeSurface）：ame_applyNeumorphCardOpacity 复活为三层引擎版——整个卡体（不透明渐变表面+双阴影投影对）都在 AmeNeumorphShadowView 内，承载视图整体 alpha 淡化保持"表面盖住投影内侧"合成结构（半透明态晕影不回归）；宿主兜底色 clear 让位（不透明 #e0e0e0 会把透明档垫回不透明）；ame_applyNeumorphSurface 重铺时 alpha 复位 1.0（未配对调用向 Task177 形态失效安全）；文字/图标为宿主兄弟子视图恒不透明
+- 圆角钉住（追加项）：ame_setNeumorphPinnedCornerRadius opt-in 关联对象（NSNumber，refreshForHostBounds 优先读取，clamp[8,50]，removeNeumorphShadow 随挂载清理）；MinecraftNews 卡 contentView 钉 12pt——双列 0.5 宽 × ~280 高自 sizing 布局下短边 ~185pt 被等比写成 ~27pt = "太圆了"根因（Task160 全局等比规则不动，仅 opt-in 豁免）
+- 设置页（BackgroundSettingsViewController）：灰化逻辑全退（neumorphOn ? 0.35 : 1.0 ×2 / userInteractionEnabled / slider.enabled 全删，neumorphOn 变量清除）；"新拟态透明度"滑条行恢复恒显恒可操作（开关行下方，tags 500/501/502，无壁纸 section0 = 2 行）；回调恢复（落盘 + Task174 百分比实时回显范式 + refreshUIEffect）；sections[0] 五项
+- BackgroundManager：属性/.h 语义注释/键常量/存取器恢复；两管线尾部挂点（surface 之后 cardOpacity）；refreshUIEffect 灰化注释退役 + 一次性日志锚演化 [Task178] neumorph decoupled（ame178DecoupleLogOnce）
+- l10n：background.cards.neumorph.opacity.title ×6 语言恢复（task178_l10n.py，四主语言唯一键 1954→1955，插于 interface.title 之后）；页脚 background.effect.footer 未动（描述的两个滑条仍准确）
+- 文档：announcements task178@2（server/task169 钉 0/1，历史条目顺延 +1，len 20）；version.h REVISION 17 append-only 附录（Task177 附录保留）
+- 重锚（task178_reanchor*.py 三阶段 + 手工补刀）：22 个计数锚 1954→1955（129-159/168/170/173b/174/175/177）；语义反转 168（A7b/B1/B2/B4/B5/B7）/170（A1-A3/B3/B5/B7/C1-C3/E1/E3）/173b（B3/B5/B9/C1/C3/C4/D2/D4/E1）/174（A5/B1/B4/C2/C4/D1/D2/E1/A3 日志锚）/175（F2 日志锚/F4/G1/G4）/177（A10/B1/B2/B7/B8/C1/C2/C5/C6/C7/D1/D2/E1-E3 + 文档头 Task178 重锚说明）/171（D2/D3）/172（H2）/173（M3）/165（G1 窗口 15→16）/167（E1 窗口 13→14）；151 H 扫描器期望值 1955
+- 级联对拍（35 校验器并行分块 sweep）：129 OK/141 36/150 OK/151 46/157 44/159 48/160 47/161 56/162 68/163 36/165 OK/166 OK/167 OK/168 OK/169 OK/170 OK/171 30/172 OK/173 123/173b 32/174 24/175 41/176 43/177 39 全绿；130 D4/131 H3/132 A1A2A15/133+138 静默崩溃（会话本地证据缺失）/134 READBACK/135 E/142 E1E2E4/143 G1/156 G = 具名豁免基线同态，零新增失败
+- verify_task178 新建（A 引擎 14 + B Manager 9 + C 设置页 10 + D l10n 5 + E 文档 5 + F 配平 2 + G 级联 1 = 46 项）；A-F 实测全 PASS，G 级联以分块并行对拍收口（177 级联递归深度超单次工具超时上限，家法分块先例）
+
+Stage Summary:
+- 装机锚点：①设置→外观：开关任何状态下五行全部可操作（永不变灰）②开关开启后拖"模糊程度"→ 只有壁纸变糊，卡片纹丝不动 ③"新拟态透明度"滑条（开关行下方）拖动 → 卡片本体实时淡化、百分比实时回显、文字始终清晰 ④默认 100% = 上轮认可的白瓷形态原样 ⑤新闻页卡片圆角恢复 12pt 自定值（不再过圆）
+- 语义定稿：新拟态与旧壁纸管线并行共存、各读各的偏好；卡体透明度唯一入口 = 专用滑条（uiOpacity/模糊度/效果类型与卡片零耦合）；列表行/侧栏/右面板 Flat 家族不吃透明度（Task160/170 语义维持）
