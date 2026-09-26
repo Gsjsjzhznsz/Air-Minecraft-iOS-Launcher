@@ -115,16 +115,35 @@ jobs:
           export BUILD_MOBILEGL="${BUILD_MOBILEGL:-0}"
 
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} 2>&1 | tee build_output.log
 
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1 2>&1 | tee -a build_output.log
 
           elif [ "${{ matrix.platform_name }}" == "tvos" ]; then
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1
+            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} TROLLSTORE_JIT_ENT=1 2>&1 | tee build_output.log
 
           else
-            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }}
+            gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} 2>&1 | tee build_output.log
           fi
+
+      - name: Surface build errors as annotations
+        # Task179 CI 诊断：编译器错误行以 GitHub annotation 浮出——job log 需要登录，
+        # annotations 匿名 API 可读。只在构建失败时运行，正常路径零开销。
+        if: failure()
+        run: |
+          LOG=build_output.log
+          if [ ! -f "$LOG" ]; then
+            echo "::error::build failed before producing build_output.log (configure/setup stage)"
+            exit 0
+          fi
+          grep -nE "error:|fatal error|Error [0-9]+|Undefined symbols|symbol.*not found|ld: " "$LOG" | grep -vE "warning:" | head -15 | while IFS= read -r line; do
+            msg=$(printf '%s' "$line" | cut -c1-250 | sed 's/\\/\\\\/g; s/"/\\"/g')
+            echo "::error::${msg}"
+          done
+          tail -10 "$LOG" | while IFS= read -r line; do
+            msg=$(printf '%s' "$line" | cut -c1-250 | sed 's/\\/\\\\/g; s/"/\\"/g')
+            echo "::error::[tail] ${msg}"
+          done
 
       - name: Upload MobileGL dylib (if built)
         # MobileGL 从源码编译，产物在 Natives/build/ 下。单独上传一份，
