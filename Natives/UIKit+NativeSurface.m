@@ -140,7 +140,7 @@ static void *kAmeNeumorphShadowViewKey = &kAmeNeumorphShadowViewKey;
 }
 
 /// 按 iOS 13+ 动态色在当前 trait 下解析 CGColor（pre-13 动态色函数本身回退静态浅色）
-static CGColorRef Ame176ResolvedCGColor(UIColor *color, UITraitCollection *trait) {
+static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait) {
     if (@available(iOS 13.0, *)) {
         return [[color resolvedColorWithTraitCollection:trait] CGColor];
     }
@@ -168,14 +168,14 @@ static CGColorRef Ame176ResolvedCGColor(UIColor *color, UITraitCollection *trait
 
         UITraitCollection *trait = self.traitCollection;
         // 暗影：右下（+offset, +offset）；不透明度恒 1.0（CSS 纯色阴影无 alpha）
-        self.ame177_darkLayer.shadowColor = Ame176ResolvedCGColor(AmeNeumorphShadowColor(), trait);
+        self.ame177_darkLayer.shadowColor = Ame177ResolvedCGColor(AmeNeumorphShadowColor(), trait);
         self.ame177_darkLayer.shadowOpacity = 1.0;
         self.ame177_darkLayer.shadowOffset = CGSizeMake(offset, offset);
         // CSS 模糊半径 ≈ CALayer.shadowRadius 的两倍（高斯 σ 映射）
         self.ame177_darkLayer.shadowRadius = blur / 2.0;
 
         // 高光：左上（-offset, -offset）
-        self.ame177_lightLayer.shadowColor = Ame176ResolvedCGColor(AmeNeumorphHighlightColor(), trait);
+        self.ame177_lightLayer.shadowColor = Ame177ResolvedCGColor(AmeNeumorphHighlightColor(), trait);
         self.ame177_lightLayer.shadowOpacity = 1.0;
         self.ame177_lightLayer.shadowOffset = CGSizeMake(-offset, -offset);
         self.ame177_lightLayer.shadowRadius = blur / 2.0;
@@ -183,9 +183,10 @@ static CGColorRef Ame176ResolvedCGColor(UIColor *color, UITraitCollection *trait
         // 不透明渐变表面（CSS linear-gradient(145deg, start, end)）：
         // 145° 轴向单位向量 (sin145°, -cos145°) ≈ (0.5736, 0.8192)，
         // 折算 start = center - v/2 = (0.2132, 0.0904)，end = center + v/2 = (0.7868, 0.9096)
+        // CGColorRef 进 NSArray 字面量需 (id) 桥接（ARC；PLTaskProgress 先例）
         self.ame177_surfaceLayer.colors = @[
-            Ame176ResolvedCGColor(AmeNeumorphSurfaceGradientStartColor(), trait),
-            Ame176ResolvedCGColor(AmeNeumorphSurfaceGradientEndColor(), trait),
+            (id)Ame177ResolvedCGColor(AmeNeumorphSurfaceGradientStartColor(), trait),
+            (id)Ame177ResolvedCGColor(AmeNeumorphSurfaceGradientEndColor(), trait),
         ];
         self.ame177_surfaceLayer.startPoint = CGPointMake(0.2132, 0.0904);
         self.ame177_surfaceLayer.endPoint   = CGPointMake(0.7868, 0.9096);
