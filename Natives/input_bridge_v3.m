@@ -1469,7 +1469,14 @@ int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
         }
     }
     int barHeight = (int)((float)(22 * guiScale) * ame171_winToPhys + 0.5f);
-    int barY = physicalHeight - barHeight;
+    // Task176：选中槽位高亮的视觉边距——MC 的选中框 sprite 是 24x24（比
+    // 182x22 的物品栏上下各多出 1 GUI 像素），选中箭头再向上伸 1 像素。
+    // 装机实测（latestlog.1）：y=1482 的点击被判 above-bar 拒收，而 barY=1490
+    // ——差 8 物理像素 = 正好高亮/箭头的视觉范围。把命中矩形向上扩
+    // 2*guiScale*ratio（≈14px）覆盖高亮与箭头，用户“点到物品栏顶部没反应”
+    // 的偏移感随之消失。X/底部不变。
+    int ame176_topMargin = (int)((float)(2 * guiScale) * ame171_winToPhys + 0.5f);
+    int barY = physicalHeight - barHeight - ame176_topMargin;
     {
         static bool s_task171Logged = false;
         if (!s_task171Logged && ame171_winToPhys != 1.0f) {
@@ -1482,13 +1489,23 @@ int callback_SurfaceViewController_touchHotbar(CGFloat x, CGFloat y) {
         // Task175 取证：一次性全量输入快照（phys/surface/win/fsr/resScale/
         // guiScale/比例来源）。下轮"偏移"装机日志凭这一行直接钉死是哪个
         // 变量走样——不再需要多轮猜测。
+        // Task176：改为【变化触发】——旧的一次性快照只覆盖会话首个命中，
+        // 用户中途改界面尺寸/分辨率后的新几何看不到（本轮正是这个盲区）。
+        // guiScale/比例/物理尺寸任一变化即重新落一行。
         static bool s_task175Logged = false;
-        if (!s_task175Logged) {
+        static int s_ame176_lastScale = -1;
+        static float s_ame176_lastRatio = -1.0f;
+        static int s_ame176_lastPhysH = -1;
+        if (!s_task175Logged || guiScale != s_ame176_lastScale ||
+            ame171_winToPhys != s_ame176_lastRatio || (int)physicalHeight != s_ame176_lastPhysH) {
             s_task175Logged = true;
-            NSLog(@"[HotbarDiag] Task175 geometry snapshot: phys=%dx%d surface=%dx%d win=%dx%d resScale=%.2f guiScale=%d ratio=%.3f (source=%d: 1=savedResolution-global 2=local-recompute 0=fallback-1.0) barY=%d barH=%d",
+            s_ame176_lastScale = guiScale;
+            s_ame176_lastRatio = ame171_winToPhys;
+            s_ame176_lastPhysH = (int)physicalHeight;
+            NSLog(@"[HotbarDiag] Task175 geometry snapshot: phys=%dx%d surface=%dx%d win=%dx%d resScale=%.2f guiScale=%d ratio=%.3f (source=%d: 1=savedResolution-global 2=local-recompute 0=fallback-1.0) barY=%d barH=%d topMargin=%d",
                   (int)physicalWidth, (int)physicalHeight, ame_surfaceWidth, ame_surfaceHeight,
                   windowWidth, windowHeight, (double)resolutionScale, guiScale,
-                  (double)ame171_winToPhys, ame175_ratioSource, barY, barHeight);
+                  (double)ame171_winToPhys, ame175_ratioSource, barY, barHeight, ame176_topMargin);
         }
     }
     if (y < barY) {

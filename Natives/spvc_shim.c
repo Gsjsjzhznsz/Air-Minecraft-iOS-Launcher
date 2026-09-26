@@ -176,6 +176,119 @@ static int ame175_is_desktop_glsl(const char *src) {
     return ver >= 130;
 }
 
+// ============================================================================
+// Task176：ES 重写自证 + 文本兑底。
+//
+// 病历（48a7055 装机日志 latestlog.txt，ANGLE 26.3 FO 会话）：Task175 的
+// 选项式重写日志已打出（"desktop GLSL -> GLSL ES 300"），但 ANGLE 仍报
+// 与修复前【逐字相同】的 "ERROR: 1:1: '' : syntax error" —— 错误一字不
+// 变意味着送达 ANGLE 的源仍是桌面 GLSL：impl 预构建二进制（0.65.0）与
+// vendored 源（0.68.0）版本不一致，旧版选项 API（create_compiler_options
+// + set_uint/set_bool + install）在 0.65 二进制里可能静默吞掉 es/version
+// 选项（源码层面 0.68 的 install 走完整 Options 拷贝无切片，但二进制无从
+// 验证）。Task175 只检查了 es_source != NULL，从未验证输出真的是 ES。
+//
+// 本轮双管齐下：
+//   (1) 自证：选项式编译后验证首行确为 "#version NNN es"，不是就丢弃；
+//   (2) 文本兑底：对桌面源做版本行替换（#version 330[ core] ->
+//       #version 300 es）+ 注入 ES 必需的 precision 声明（ES3 fragment
+//       无 float 默认精度，缺了直接编译错）。MC 26.x core 管线的着色器
+//       （blit/post/gui：显式 out 变量 + texture()/texelFetch +
+//       layout(location)，无 gl_FragData/固定管线）在 ES300 语义下合法。
+//       兑底字符串挂 ctx 注册表，context_destroy 时释放（不泄漏）。
+//   (3) 取证：前 4 次重写记录最终源的头 48 字节 + 路径（option/textual），
+//       下轮装机日志直接看到 ANGLE 实收什么。
+// ============================================================================
+
+/// ES 源自证：首行 "#version NNN es"（es 为独立 token）。
+static int ame176_is_es_source(const char *src) {
+    if (src == NULL) return 0;
+    if (strncmp(src, "#version ", 9) != 0) return 0;
+    long ver = strtol(&src[9], NULL, 10);
+    if (ver < 300) return 0;
+    const char *tail = &src[9];
+    while (*tail >= '0' && *tail <= '9') ++tail;
+    if (tail[0] != ' ') return 0;           // "#version 300\n"（无 profile）= 桌面
+    if (strncmp(tail + 1, "es", 2) != 0) return 0;
+    char after = tail[3];
+    return after == '\n' || after == ' ' || after == '\0';
+}
+
+// 兑底字符串注册表（按 ctx 挂靠，destroy 时释放）。
+#define AME176_FALLBACK_MAX 256
+typedef struct {
+    void *ctx;
+    char *str;
+} ame176_fallback_entry;
+static ame176_fallback_entry ame176_fallbacks[AME176_FALLBACK_MAX];
+static int ame176_fallback_count = 0;
+
+static void ame176_forget_fallbacks(void *ctx) {
+    for (int i = 0; i < ame176_fallback_count;) {
+        if (ame176_fallbacks[i].ctx == ctx) {
+            free(ame176_fallbacks[i].str);
+            ame176_fallbacks[i] = ame176_fallbacks[ame176_fallback_count - 1];
+            ame176_fallback_count--;
+        } else {
+            ++i;
+        }
+    }
+}
+
+static const char *ame176_register_fallback(void *ctx, char *str) {
+    if (str == NULL) return NULL;
+    if (ame176_fallback_count >= AME176_FALLBACK_MAX) {
+        // 表满：释放最老一条（极不可能——一个会话着色器数 < 256 时根本到不了这里；
+        // 到了说明 destroy 路径断了，丢最老的防泄漏）。
+        free(ame176_fallbacks[0].str);
+        for (int i = 1; i < ame176_fallback_count; ++i)
+            ame176_fallbacks[i - 1] = ame176_fallbacks[i];
+        --ame176_fallback_count;
+    }
+    ame176_fallbacks[ame176_fallback_count].ctx = ctx;
+    ame176_fallbacks[ame176_fallback_count].str = str;
+    ++ame176_fallback_count;
+    return str;
+}
+
+/// 文本兑底：桌面 GLSL -> ES300。返回 malloc 字符串（调用方注册到 ctx）。
+/// 版本行替换 + precision 注入；版本行缺失返回 NULL（防御，spirv-cross
+/// 输出恒有）。
+static char *ame176_textual_es_rewrite(const char *desktop) {
+    if (desktop == NULL) return NULL;
+    // 跳过可能的前导空白/注释（防御；spirv-cross 输出直接以 #version 开头）
+    const char *p = desktop;
+    while (*p == '\n' || *p == ' ' || *p == '\t' || *p == '\r') ++p;
+    if (strncmp(p, "#version ", 9) != 0) return NULL;
+    const char *eol = strchr(p, '\n');
+    if (eol == NULL) return NULL;
+    static const char *const kAme176Prec =
+        "#version 300 es\n"
+        "precision highp float;\n"
+        "precision highp int;\n"
+        "precision highp sampler2D;\n"
+        "precision highp sampler3D;\n"
+        "precision highp samplerCube;\n"
+        "precision highp sampler2DShadow;\n"
+        "precision highp samplerCubeShadow;\n"
+        "precision highp sampler2DArray;\n"
+        "precision highp isampler2D;\n"
+        "precision highp usampler2D;\n"
+        "precision highp isampler3D;\n"
+        "precision highp usampler3D;\n"
+        "precision highp image2D;\n"
+        "precision highp iimage2D;\n"
+        "precision highp uimage2D;\n";
+    size_t head_len = strlen(kAme176Prec);
+    size_t rest_len = strlen(eol + 1);
+    char *out = (char *)malloc(head_len + rest_len + 1);
+    if (out == NULL) return NULL;
+    memcpy(out, kAme176Prec, head_len);
+    memcpy(out + head_len, eol + 1, rest_len);
+    out[head_len + rest_len] = '\0';
+    return out;
+}
+
 /// 在同一 context 上重建 ES 编译器并编译；失败返回 NULL（调用方回落原源）。
 static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
                                             size_t word_count) {
@@ -415,18 +528,43 @@ int spvc_compiler_compile(void *compiler, const char **source) {
                 ame175_ctxe->words != NULL && ame175_ctxe->word_count > 0) {
                 const char *ame175_es = ame175_compile_es_source(
                     ame175_ce->ctx, ame175_ctxe->words, ame175_ctxe->word_count);
-                if (ame175_es != NULL) {
+                // Task176：自证——选项式输出必须真的是 "#version NNN es"。
+                // 0.65 预构建 impl 与 vendored 源版本不一致，选项可能被静默
+                // 吞掉（装机实锤：重写日志已打出但 ANGLE 错误与修前逐字相同）。
+                int ame176_viaOption = (ame175_es != NULL && ame176_is_es_source(ame175_es));
+                const char *ame176_final = NULL;
+                const char *ame176_path = NULL;
+                if (ame176_viaOption) {
+                    ame176_final = ame175_es;
+                    ame176_path = "option";
+                } else {
+                    // 文本兑底：桌面源版本行替换 + precision 注入。
+                    char *ame176_txt = ame176_textual_es_rewrite(*source);
+                    if (ame176_txt != NULL) {
+                        ame176_final = ame176_register_fallback(ame175_ce->ctx, ame176_txt);
+                        ame176_path = "textual";
+                    }
+                }
+                if (ame176_final != NULL) {
+                    static int s_ame176_headLogged = 0;
+                    if (s_ame176_headLogged < 4) {
+                        ++s_ame176_headLogged;
+                        fprintf(stderr,
+                                "[spvc-shim] Task176 ES rewrite via %s: head48='%.48s'\n",
+                                ame176_path, ame176_final);
+                    }
                     fprintf(stderr,
                             "[spvc-shim] Task175 ANGLE ES rewrite: desktop GLSL -> GLSL ES "
-                            "300 (comp=%p ctx=%p words=%zu, t=%.0fms)\n",
-                            compiler, ame175_ce->ctx, ame175_ctxe->word_count,
+                            "300 (comp=%p ctx=%p words=%zu path=%s, t=%.0fms)\n",
+                            compiler, ame175_ce->ctx, ame175_ctxe->word_count, ame176_path,
                             ame_spvc_shim_ms());
-                    *source = ame175_es;
+                    *source = ame176_final;
                 } else {
                     fprintf(stderr,
                             "[spvc-shim] Task175 ANGLE ES rewrite FAILED -- falling back to "
-                            "desktop source (comp=%p, t=%.0fms)\n",
-                            compiler, ame_spvc_shim_ms());
+                            "desktop source (comp=%p option_rc=%s, t=%.0fms)\n",
+                            compiler, (ame175_es != NULL) ? "non-es-output" : "null",
+                            ame_spvc_shim_ms());
                 }
             }
         }
@@ -457,6 +595,8 @@ void spvc_context_destroy(void *context) {
     ((void (*)(void *))real)(context);
     // Task175：context 亡，登记项与留存字一并清（防悬垂指针/泄漏）
     ame175_forget_context(context);
+    // Task176：兑底字符串同 ctx 一并释放
+    ame176_forget_fallbacks(context);
     pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] context_destroy %p done (t=%.0fms tid=%lx)\n",
             context, ame_spvc_shim_ms(), ame_spvc_shim_tid());

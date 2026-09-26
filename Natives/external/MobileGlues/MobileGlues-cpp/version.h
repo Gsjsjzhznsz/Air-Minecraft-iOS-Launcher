@@ -2076,3 +2076,48 @@
 // ~1/3, opacity 0.45/0.5) so photos read a light float instead of halos;
 // no-wallpaper keeps the spec profile. Device anchor (single line):
 // the one-shot "[Task175] neumorph UI wallpaper coexist" log.
+// REVISION 17 addendum (Task 176, no bump): second device-feedback round on
+// the Task175 build (log set 0356a74/3b0307b). (1) ANGLE: the option-based
+// ES rewrite fired (log line present) yet ANGLE reported the byte-identical
+// pre-fix error -- the shipped impl dylib is spirv-cross 0.65.0 while the
+// vendored source is 0.68.0, and the old options API may silently drop
+// es/version on the 0.65 binary. The rewrite is now self-verifying (output
+// must literally start "#version NNN es") with a textual fallback that swaps
+// the version line to "#version 300 es" and injects the precision block
+// (ES3 fragment has no default float precision), registered per-context and
+// freed at context_destroy; head48 forensics for the first 4 rewrites
+// ("[spvc-shim] Task176 ES rewrite via option|textual: head48=...").
+// (2) VGPU (legacy-Forge launch crash): gl4es_glGetError+0x80 SIGSEGV with
+// glstate == NULL -- the dylib constructor chain (initialize_gl4es ->
+// gl_init -> ActivateGLState) never ran before the first GL call ("VGPU:
+// Calling load_all()" appears only at that call, not at dlopen). load_all()
+// now calls initialize_gl4es() explicitly at its tail (idempotent, pointers
+// resolved + context current at that point; anchor: "VGPU: Task176
+// initialize_gl4es done"). (3) Right-shift "no effect": the whole event
+// chain was healthy (sc=229 x80, Task64 delivery, MC 26.3 key registry is
+// scancode-based = 229 matches right.shift) -- the real gap is tap
+// semantics: ACTION_UP released the modifier before the letter tap, so
+// capitals never happened. Sticky-modifier latch added: modifier taps
+// shorter than 0.4s defer the UP (latched); the next non-modifier button
+// press auto-releases latched modifiers after dispatch (FCL-style one-tap
+// shift; long-press keeps hold semantics). Anchors: "Task176 sticky mod
+// latched"/"auto-release after key". (4) JIT wait at the right panel: the
+// stikjit:// open now logs its result and shows an immediate guidance
+// dialog when no handler answers ("[JIT] [RightPanel] Task176 openURL
+// stikjit:// -> 0/1") instead of a blind 120s wait after which iOS had
+// already killed the backgrounded app. (5) Multiplayer-menu freeze
+// (log.2): no diagnostic survived the hard hang, so a main-thread watchdog
+// now probes every 5s (4s semaphore timeout) and logs "[FreezeWatch]
+// Task176: main thread unresponsive >= 8s" on two consecutive misses --
+// next repro pins whether the hang lives on the UIKit main thread.
+// (6) CF resource-pack tab empty: no classId=12 request ever appeared in
+// the logs, so the load path now logs entry (api/source/filters) and
+// result (count/error) via "[DLForensics] Task176 resourcepack". (7)
+// Hotbar: hitbox gains the selected-slot highlight margin (2*guiScale*ratio
+// upward; log.1 had y=1482 rejected against barY=1490) and the geometry
+// snapshot is now change-triggered (guiScale/ratio/physical size) instead
+// of once-per-process. Design note (user question): installing legacy
+// (<=1.12.2) Forge modpacks needs no JIT by design -- the old-format
+// installer runs natively in Objective-C (ForgeDirect: universal-jar
+// extraction + library downloads + version JSON write); only 1.17+
+// new-format installers execute processors in a headless JVM and need JIT.

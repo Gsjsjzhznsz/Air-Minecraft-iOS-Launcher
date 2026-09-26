@@ -1706,7 +1706,16 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 NSData *scriptData = [NSData dataWithContentsOfFile:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"UniversalJIT26.js"]];
                 scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
             }
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+            // Task176：openURL 结果取证 + 无处理器即时指引（不盲等 120s）。
+            NSURL *ame176_jitURL = [NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]];
+            [UIApplication.sharedApplication openURL:ame176_jitURL options:@{} completionHandler:^(BOOL ame176_ok) {
+                NSLog(@"[JIT] [RightPanel] Task176 openURL stikjit:// -> %d", ame176_ok);
+                if (!ame176_ok) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        showDialog(localize(@"Error", nil), @"stikjit:// 无响应（未安装 StikDebug？）。请在设置的 JIT 开启工具改用 SideStore/StosDebug/JITStreamer，或安装 StikDebug 后重试。");
+                    });
+                }
+            }];
         } else {
             // Assuming 16.7-17.3.1. SideStore still lacks this URL scheme at the time of writing, so it only jumps to SideStore.
             [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]] options:@{} completionHandler:nil];

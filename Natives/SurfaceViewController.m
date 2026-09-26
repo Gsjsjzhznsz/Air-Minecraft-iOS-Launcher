@@ -1120,6 +1120,50 @@ void ame139_fsr_heal_reset_input_scale(void) {
     // Load MetalHUD library
     dlopen("/usr/lib/libMTLHud.dylib", 0);
 
+    // Task176：主线程卡死看门狗（多人游戏打开卡死的取证）。
+    // 病历（3b0307b 装机日志 latestlog.2，FO 26.3 mg 会话）：主菜单按 ESC
+    // 后点"多人游戏"，全进程骤死（fps 心跳、触摸、渲染全部停摆，用户强
+    // 杀）。日志无任何异常帧，无法定位卡点。此看门狗每 5s 用信号量探测
+    // 主线程（4s 超时）：连续两轮无响应即落取证日志（NSLog 异步安全，
+    // 主线程恢复后补写），下轮装机日志直接钉死卡点是否在 UIKit 主线程。
+    // 只取证不干预——不杀进程、不改行为，零回归风险。
+    {
+        static dispatch_once_t ame176_once;
+        dispatch_once(&ame176_once, ^{
+            dispatch_source_t ame176_timer = dispatch_source_create(
+                DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
+                dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
+            dispatch_source_set_timer(
+                ame176_timer, DISPATCH_TIME_NOW, 5ull * NSEC_PER_SEC, 0);
+            __block volatile int ame176_hangStreak = 0;
+            dispatch_source_set_event_handler(ame176_timer, ^{
+                dispatch_semaphore_t ame176_sem = dispatch_semaphore_create(0);
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    dispatch_semaphore_signal(ame176_sem);
+                });
+                long ame176_rc = dispatch_semaphore_wait(ame176_sem, 4ull * NSEC_PER_SEC);
+                if (ame176_rc != 0) {
+                    ++ame176_hangStreak;
+                    if (ame176_hangStreak == 2) {
+                        NSLog(@"[FreezeWatch] Task176: main thread unresponsive >= 8s "
+                              @"(2 consecutive 4s probes failed) -- if the game froze "
+                              @"just now, this pins the hang to the UIKit main thread");
+                    } else if (ame176_hangStreak > 2 && (ame176_hangStreak % 6) == 0) {
+                        NSLog(@"[FreezeWatch] Task176: main thread still unresponsive (streak=%d)",
+                              ame176_hangStreak);
+                    }
+                } else {
+                    if (ame176_hangStreak >= 2) {
+                        NSLog(@"[FreezeWatch] Task176: main thread recovered after streak=%d",
+                              ame176_hangStreak);
+                    }
+                    ame176_hangStreak = 0;
+                }
+            });
+            dispatch_resume(ame176_timer);
+        });
+    }
+
     self.lightHaptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:(UIImpactFeedbackStyleLight)];
     self.mediumHaptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:(UIImpactFeedbackStyleMedium)];
     
@@ -2556,6 +2600,39 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
               [sender.properties[@"keycodes"][3] intValue]);
     }
     int held = action == ACTION_DOWN;
+    // ===== Task176：粘滞修饰键（右shift 无效的根修）=====
+    // 病历（3b0307b 装机日志 latestlog.1，单人世界 + 聊天打字场景）：用户的
+    // 布局按钮"右SHIFT"（keycode=344=GLFW_KEY_RIGHT_SHIFT）事件链完全健康
+    // ——modstate sync sc=229 共 80 次、Task64 已证事件 1:1 送达 MC、MC 26.3
+    // 的键位注册表就是 scancode（right.shift=229）全链匹配。用户在聊天里
+    // 快速点按右shift 40 次仍"无效果"：真因是【点按语义】——每次 ACTION_UP
+    // 立即释放修饰键，点到字母时 shift 早已弹起，大写永远出不来。移动端
+    // 虚拟键盘的约定（FCL/ZL 同款）是粘滞 shift：轻点=锁定到下一个按键，
+    // 长按=常规按住。
+    // 实现：修饰键 ACTION_UP 时若按住时长 < 0.4s 则不发 UP（保持按下态并
+    // 记入锁定表）；之后任意非修饰按键（普通键或特殊按钮）的 ACTION_DOWN
+    // 处理完毕后，把锁定的修饰键统一补发 UP（一键大写/单符号后自动复位）。
+    // 长按（>= 0.4s）保持旧行为（按住生效，抬手释放），不改已有按住玩法。
+    static NSMutableDictionary<NSNumber *, NSNumber *> *s_ame176_modDownTime = nil;
+    static NSMutableSet<NSNumber *> *s_ame176_latchedMods = nil;
+    if (s_ame176_modDownTime == nil) {
+        s_ame176_modDownTime = [NSMutableDictionary dictionary];
+        s_ame176_latchedMods = [NSMutableSet set];
+    }
+#define AME176_IS_MOD_KEY(kc) \
+    ((kc) == GLFW_KEY_LEFT_SHIFT || (kc) == GLFW_KEY_RIGHT_SHIFT || \
+     (kc) == GLFW_KEY_LEFT_CONTROL || (kc) == GLFW_KEY_RIGHT_CONTROL || \
+     (kc) == GLFW_KEY_LEFT_ALT || (kc) == GLFW_KEY_RIGHT_ALT || \
+     (kc) == GLFW_KEY_LEFT_SUPER || (kc) == GLFW_KEY_RIGHT_SUPER)
+    // 本轮按键里是否含非修饰输入（用于锁定修饰键的自动复位触发）
+    BOOL ame176_hasNonModInput = NO;
+    for (int i = 0; i < 4; i++) {
+        int keycode = ((NSNumber *)sender.properties[@"keycodes"][i]).intValue;
+        if (keycode < 0 || (keycode > 0 && !AME176_IS_MOD_KEY(keycode))) {
+            ame176_hasNonModInput = YES;
+            break;
+        }
+    }
     for (int i = 0; i < 4; i++) {
         int keycode = ((NSNumber *)sender.properties[@"keycodes"][i]).intValue;
         if (keycode < 0) {
@@ -2622,6 +2699,25 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
                     break;
             }
         } else if (keycode > 0) {
+            // Task176：修饰键粘滞判定（在 nativeSendKey 之前——DOWN 记时间，
+            // UP 短按拦截）
+            if (AME176_IS_MOD_KEY(keycode)) {
+                if (held) {
+                    s_ame176_modDownTime[@(keycode)] = @(CFAbsoluteTimeGetCurrent());
+                    [s_ame176_latchedMods removeObject:@(keycode)];  // 重新按下清除旧锁定
+                } else {
+                    NSNumber *ame176_downT = s_ame176_modDownTime[@(keycode)];
+                    [s_ame176_modDownTime removeObjectForKey:@(keycode)];
+                    if (ame176_downT != nil &&
+                        CFAbsoluteTimeGetCurrent() - ame176_downT.doubleValue < 0.4 &&
+                        ![s_ame176_latchedMods containsObject:@(keycode)]) {
+                        [s_ame176_latchedMods addObject:@(keycode)];
+                        NSLog(@"[InputDiag] Task176 sticky mod latched: keycode=%d (tap; UP deferred until next non-mod key)",
+                              keycode);
+                        continue;  // 不发 UP：保持按下态
+                    }
+                }
+            }
             CallbackBridge_nativeSendKey(keycode, 0, held, 0);
             // Task83：按钮键盘打字支持。custom 布局"键盘图标"抽屉里的
             // 字母/数字/符号按钮只发 key 事件，而 MC 1.13+ 聊天框只消费
@@ -2631,6 +2727,17 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
                 CallbackBridge_buttonKeySynthesizeText(keycode);
             }
         }
+    }
+
+    // Task176：非修饰输入处理完毕，补发所有锁定修饰键的 UP（一键大写后
+    // 自动复位；特殊按钮——鼠标/滚轮/菜单——同样触发，shift+点击语义可用）。
+    if (ame176_hasNonModInput && s_ame176_latchedMods.count > 0) {
+        for (NSNumber *ame176_kc in s_ame176_latchedMods) {
+            CallbackBridge_nativeSendKey(ame176_kc.intValue, 0, 0, 0);
+            NSLog(@"[InputDiag] Task176 sticky mod auto-release after key: keycode=%d",
+                  ame176_kc.intValue);
+        }
+        [s_ame176_latchedMods removeAllObjects];
     }
 }
 

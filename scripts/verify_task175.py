@@ -85,9 +85,13 @@ check("A4 登记：parse 留存字 + compiler 登记 + destroy/release 作废",
       and "ame175_forget_context" in shim
       and shim.count("ame175_forget_context(context);") == 2)
 check("A5 重写主体：同源校验 + 重 parse + ES 编译器 + 失败回落",
+      # Task176 重锚：重写主体升级为自证（is_es_source）+ 文本兑底（textual）
+      # + 路径标记（path=option|textual），最终替换指针改名为 ame176_final。
       "ame175_ctxe->last_parsed_ir == ame175_ce->parsed_ir" in shim
       and "ame175_compile_es_source(" in shim
-      and "*source = ame175_es;" in shim
+      and "*source = ame176_final;" in shim
+      and "ame176_is_es_source(ame175_es)" in shim
+      and "ame176_textual_es_rewrite(*source)" in shim
       and "falling back to " in shim)
 check("A6 双形选项 API（新版优先 + 旧版兜底）+ 枚举值钉 vendored 头",
       "spvc_context_create_compile_options" in shim

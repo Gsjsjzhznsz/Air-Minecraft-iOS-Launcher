@@ -15,29 +15,29 @@ const char *LIB_GLES_NAME = "@rpath/libGLESv2.framework/libGLESv2";
 const char *LIB_EGL_NAME = "@rpath/libEGL.framework/libEGL";
 
 void load_all(void){
-	
-	printf("VGPU: Calling load_all()\n");
-	loaded++;
-	if(loaded)
-	printf("VGPU: loaded succeed\n");
-	
-	void* libGL;
-	char* gles_ = getenv("LIBGL_GLES");
-	int flags = RTLD_LOCAL | RTLD_NOW;
-	
-	libGL = dlopen(LIB_GLES_NAME, flags);
-	/*if(libGL == NULL)
-		libGL = dlopen("libGLESv2.so", flags);
-	*/
-	if(libGL == NULL) {
-		printf("VGPU: load_all(): failed to dlopen \"%s\" \n", LIB_GLES_NAME);
-		loaded = 0;
-		return;
-	}
-	
-//	if(libGL == NULL)
-//		libGL = dlopen(gles_, flags);
-	
+        
+        printf("VGPU: Calling load_all()\n");
+        loaded++;
+        if(loaded)
+        printf("VGPU: loaded succeed\n");
+        
+        void* libGL;
+        char* gles_ = getenv("LIBGL_GLES");
+        int flags = RTLD_LOCAL | RTLD_NOW;
+        
+        libGL = dlopen(LIB_GLES_NAME, flags);
+        /*if(libGL == NULL)
+                libGL = dlopen("libGLESv2.so", flags);
+        */
+        if(libGL == NULL) {
+                printf("VGPU: load_all(): failed to dlopen \"%s\" \n", LIB_GLES_NAME);
+                loaded = 0;
+                return;
+        }
+        
+//      if(libGL == NULL)
+//              libGL = dlopen(gles_, flags);
+        
 // Find the addresses of all the GLES functions,
 // and assign them to the corresponding gles_glFunction,
 // so that the gles_glFunction can be called in pack.c.
@@ -413,11 +413,26 @@ void load_all(void){
 /*PFNglTexStorage3DMultisample */    gles_glTexStorage3DMultisample = (PTR_glTexStorage3DMultisample)dlsym(libGL, "glTexStorage3DMultisample");
 
 
-	dlclose(libGL);
-	
-	Initialization_();
-	
-	return;
-	
+        dlclose(libGL);
+        
+        Initialization_();
+        
+        // Task176 (iOS port): explicit gl4es state bootstrap. Device log proof
+        // (3b0307b build, Forge 1.8.9 + vgpu session): the dylib constructor's
+        // initialize_gl4es() -> gl_init() -> ActivateGLState() chain never ran
+        // before the first GL call -- "VGPU: Calling load_all()" appears only at
+        // the first Java-side glGetError (long after dlopen), and that call then
+        // SIGSEGV'd at gl4es_glGetError+0x80 dereferencing a NULL glstate
+        // (glstate is only assigned by ActivateGLState). initialize_gl4es() is
+        // idempotent (guarded by the inited counter), and by this point the
+        // gles_* pointers above are resolved and an EGL context is current
+        // (load_all only ever runs from a GL entry point), so the viewport probe
+        // inside ActivateGLState is safe here.
+        extern void initialize_gl4es(void);
+        initialize_gl4es();
+        printf("VGPU: Task176 initialize_gl4es done (glstate bootstrap)\n");
+        
+        return;
+        
 }
 
