@@ -39,10 +39,14 @@ def rd(path):
 
 # ---------------- A. ANGLE ----------------
 gl_bridge = rd("Natives/ctxbridges/gl_bridge.m")
-check("A1 gl_bridge ame179_angleEs special case present",
-      "BOOL ame179_angleEs = renderer && strstr(renderer, \"tinygl4angle\") != NULL;" in gl_bridge)
-check("A2 ame179_angleEs forces desktopGL=NO",
-      "if (ame179_angleEs) desktopGL = NO;" in gl_bridge)
+check("A1 gl_bridge ame179_angleEs special case present（CI 修复轮：UTF8String + strcmp 家法，不再 NSString 直传 strstr）",
+      'strcmp(ame179_rendererUtf8, RENDERER_NAME_MTL_ANGLE) == 0' in gl_bridge
+      and "strstr(renderer" not in gl_bridge)
+check("A2 ame179_angleEs forces desktopGL=NO（CI 修复轮：判定上移到函数开头，先于 attribs/eglBindAPI/ctx-attribs 三处消费点）",
+      "if (ame179_angleEs) {" in gl_bridge
+      and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("EGL_RENDERABLE_TYPE, desktopGL ?")
+      and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("handle.eglBindAPI(EGL_OPENGL_API)")
+      and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("desktopGL ? desktop_ctx_attribs : gles_ctx_attribs"))
 check("A3 ANGLE ES3 anchor log present",
       "Task179 ANGLE on real ES3 context" in gl_bridge)
 
