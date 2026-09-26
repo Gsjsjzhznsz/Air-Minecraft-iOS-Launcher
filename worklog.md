@@ -685,3 +685,9 @@ Work Log:
 Stage Summary:
 - 装机锚点：两滑条拖动实时跟随（BackgroundUIEffectChanged 广播链全员重刷）；背景 75% 装机即呈现大背景半透明；按钮 100% 形态不变；账号卡完整双阴影；安装方式页与版本卡同语言；复制 bug 写读双断
 - 待办：推送后盯 CI；26.1.2 libjvm 崩溃 / 静态库虚拟按钮 / README 6.0.0 收尾为继承遗留
+
+### Task 180 补记：CI 拉锯终局
+- Run 36260274532（主提交 4ff1dd5）failure：AccountListViewController.m:230 "no visible @interface for UIView declares the selector ame_setNeumorphPinnedCornerRadius:"——账号卡重写直调 Task178 圆角钉住原语（UIView 分类符号）但缺引擎头 import；经匿名 check-run annotations 通道实锤（并行 Task179 加装的 failure-gated capture 首次服役）
+- 修复 042b950（全仓引擎符号 import 扫描确认唯一缺口；verify_task180 G 组补 import 锚，113/113）；11ad745 docs 提交被 GitHub 自动取消（superseded）
+- Run 36261844785（042b950）= **success**，main 徽标 "Development build - passing"——Task 180 交付完成
+- 融合树对拍：verify_task180 113/113、179 61/61、177 A-F 38 项、178 A-F 45 项、160-176 全链绿；130/131/132/135 具名环境性豁免基线同态
