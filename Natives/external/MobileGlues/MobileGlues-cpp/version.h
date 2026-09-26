@@ -2224,3 +2224,47 @@
 // ON/OFF", "[JIT] Task179 ...: suspension gap of Ns excluded from
 // timeout budget", "[CurseForgeAPI] Task179 search response missing data
 // array".
+// REVISION 17 addendum (Amethyst Task 180, no bump): dual-slider opacity
+// system + account-list neumorph rewrite + account duplication double-guard
+// + avatar defense + installer page aligned to the version-card menu.
+// (1) Dual sliders per user spec "two bars control every surface 0-100%":
+// Background Opacity (background_bg_opacity, default 0.75) governs the
+// featureless large backgrounds -- sidebar/content/right-panel containers
+// (both root and card layouts via the new ame_applyPanelSurfaceWithRadius:
+// opacity: / Flat:opacity: engine primitives), page backgrounds (instance
+// editor, wallpaper gallery, download-center sheet), the download top tab
+// segments + search bar + source-switch track, settings rows, translucent
+// page bases, AND the neumorph card bodies (Task178's dedicated slider
+// retired into it; both pipeline hooks ame_applyNeumorphCardOpacity now
+// read backgroundOpacity). Button Opacity (background_btn_opacity, default
+// 1.0) governs launch/execute-jar/manage-version/download-center buttons,
+// the seven right-panel info cards (accent*0.15*coef), menu selected tint,
+// download-page functional buttons, NMToast card (engine hook), crash-view
+// restart/exit buttons -- background = base color x coefficient, 100% =
+// unchanged (fail-safe); icons and text always stay fully opaque (Flat
+// paths fade backgroundColor only, neumorph paths fade the shadow host
+// view). Legacy uiOpacity (0.6, floor 0.1) and cardsNeumorphOpacity
+// retired; four-main-language key count stays 1955.
+// (2) Account list rewritten on the raised pipeline
+// (applyNeumorphCardEffectToView + pinned 16pt radius + clip release chain
+// per layer, cell padding 6->10pt for shadow breathing): toggle ON = full
+// Task177 twin-shadow spec (the clipped-shadow artifact is gone), OFF =
+// legacy pipeline. Duplication double-guard: BaseAuthenticator.saveChanges
+// (the single choke point of every accountId rewrite) migrates the avatar
+// and removes the stale <oldAccountId>.json after a successful write (the
+// refresh chain renamed accounts without deleting the old file -- the
+// duplication root); reloadAccountList dedupes by accountId and skips
+// unreadable files. Avatar defense: avatarForAccount:usernameFallback:
+// (legacy username-named files and drifted IDs still hit), wired into both
+// the home profile card and the right panel; fetch-failure log anchors.
+// (3) Installer page aligned to the version-card menu: loader + option rows
+// on the raised pipeline (contentView as host), spec text colors, 40pt
+// icons, 64pt rows.
+// (4) Defaults per user note: Blur effect, background 75%, buttons 100%,
+// blur 0% (legacy 100% retired), card layout by default (explicit "vs"
+// choice kept), dark appearance default (only never-explicitly-chosen
+// devices migrate from auto/light, Task161 discipline). Device anchors:
+// "[Task180] account file migrated after accountId drift: X -> Y",
+// "[Task180] avatar hit via username fallback", "[Task180] avatar
+// migrated", "[Task180] dedup account entry by id", "[Task180] skipping
+// unreadable account file".

@@ -19,6 +19,7 @@
 
 #import "NMToast.h"
 #import "UIKit+NativeSurface.h"
+#import "BackgroundManager.h" // Task180：按钮透明度滑条
 // UIWindow.mainWindow 来自工程内 UIWindow(global) 分类（UIKit+hook.h）
 // Task137：文件已从 NeomorphKit/ 迁至 Natives/ 根，相对路径 ../ 已平化
 #import "UIKit+hook.h"
@@ -108,6 +109,10 @@ static __weak NMToast *s_nm125_current = nil;
     self.cardView = [[UIView alloc] initWithFrame:CGRectZero];
     self.cardView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.cardView ame_applyCardSurfaceWithRadius:kNMToastCornerRadius];
+    // Task180：通知小窗归「按钮透明度」管辖（用户口径"承载文字/功能/退出
+    // 的小按钮/窗口"）——新拟态卡体走引擎原语淡承载视图（正文/按钮文字
+    // 恒不透明）；100% = 规格原样。
+    [self.cardView ame_applyNeumorphCardOpacity:[BackgroundManager sharedManager].buttonOpacity];
 
     // ---- 正文 ----
     self.messageLabel = [[UILabel alloc] initWithFrame:CGRectZero];

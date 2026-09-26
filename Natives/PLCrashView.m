@@ -948,7 +948,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     // 参照 FCL：很多崩溃是临时加载失败（JIT/dylib/内存碎片），重启即可解决。
     _restartButton = [self createButtonWithTitle:localize(@"crash.restart_launcher", @"重启启动器")
                                             icon:@"arrow.clockwise"
-                                   backgroundColor:[UIColor colorWithRed:0.2 green:0.6 blue:0.95 alpha:1.0]
+                                   backgroundColor:[self ame180_buttonColor:[UIColor colorWithRed:0.2 green:0.6 blue:0.95 alpha:1.0]]
                                        textColor:[UIColor whiteColor]
                                           bold:YES
                                           action:@selector(restartLauncherAction)];
@@ -960,7 +960,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     // 不重启应用，与 FCL 的"退出"行为一致。
     _exitButton = [self createButtonWithTitle:localize(@"crash.return_launcher", @"退出启动器")
                                          icon:@"xmark.circle.fill"
-                                backgroundColor:[UIColor colorWithRed:0.85 green:0.2 blue:0.2 alpha:1.0]
+                                backgroundColor:[self ame180_buttonColor:[UIColor colorWithRed:0.85 green:0.2 blue:0.2 alpha:1.0]]
                                     textColor:[UIColor whiteColor]
                                        bold:YES
                                        action:@selector(exitLauncherAction)];
@@ -992,6 +992,20 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     [_fullLogButton setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
     [_fullLogButton addTarget:self action:@selector(showFullLog) forControlEvents:UIControlEventTouchUpInside];
     [container addArrangedSubview:_fullLogButton];
+}
+
+/// Task180：崩溃窗功能按钮（重启/退出启动器）底色接「按钮透明度」滑条
+/// ——底色 = 语义强调色 × buttonOpacity（白字/图标恒不透明；100% = 原形态）。
+/// 崩溃语境防御：BackgroundManager 单例惰性创建，取值失败回退 1.0。
+- (UIColor *)ame180_buttonColor:(UIColor *)base {
+    CGFloat o = 1.0;
+    @try {
+        o = [BackgroundManager sharedManager].buttonOpacity;
+    } @catch (NSException *e) {
+        o = 1.0;
+    }
+    if (o >= 1.0) return base;
+    return [base colorWithAlphaComponent:MAX(0.0, MIN(1.0, o))];
 }
 
 - (UIButton *)createButtonWithTitle:(NSString *)title icon:(NSString *)icon backgroundColor:(UIColor *)bgColor textColor:(UIColor *)textColor bold:(BOOL)bold action:(SEL)action {

@@ -1874,7 +1874,7 @@
 "i18n_str_1293" = "正在下载游戏文件（库 + 资源）";
 "i18n_str_1294" = "正在写入配置文件";
 "i18n_str_1295" = "导入完成";
-"i18n_str_1296" = "透明度";
+"i18n_str_1296" = "背景透明度";
 "i18n_str_1297" = "模糊程度";
 "i18n_str_1298" = "导出";
 "i18n_str_1299" = "%ld 秒";
@@ -2110,9 +2110,9 @@
 "bing.gallery.title" = "瀏覽壁紙庫";
 "bing.refresh.title" = "立即重新整理";
 "bing.footer.hint" = "開啟後，若未設定自訂壁紙，將自動套用 Bing 每日壁紙並每天更新；設定自訂壁紙會暫時停用，清除背景後自動恢復。";
-"background.effect.footer" = "上方「透明度」控制介面材質的不透明程度（數值越低，桌布透出越多）；下方「模糊程度」控制背景高斯模糊的強度（數值越低，背景越清晰）。僅在「UI效果」選擇毛玻璃或半透明時生效。";
+"background.effect.footer" = "「背景透明度」控制大背景（側欄/頁面背景/卡片/搜尋欄等）的不透明程度；「按鈕透明度」控制按鈕與視窗（啟動遊戲/資訊卡/通知小視窗等）的底色不透明程度。兩拉條均為 0~100%%，圖示和文字始終不透明。";
 "background.cards.neumorph.interface.title" = "新擬態介面";
-"background.cards.neumorph.opacity.title" = "新擬態透明度";
+"background.button.opacity.title" = "按鈕透明度";
 "bing.gallery.nav.title" = "Bing 壁紙庫";
 "bing.setwallpaper.title" = "設為壁紙";
 "bing.save.title" = "儲存到相簿";

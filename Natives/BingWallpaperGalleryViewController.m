@@ -77,7 +77,10 @@ static NSString * const kBingCellIdentifier = @"BingWallpaperCell";
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.collectionView.backgroundColor = [UIColor systemBackgroundColor];
+    // Task180：壁纸选择页背景接「背景透明度」滑条（用户点名"壁纸选择页
+    // 背景不受透明度影响的问题也改"；底色 alpha 化，缩略图/文字恒不透明）
+    self.collectionView.backgroundColor = [[UIColor systemBackgroundColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].backgroundOpacity];
     self.collectionView.alwaysBounceVertical = YES;
     [self.collectionView registerClass:[BingWallpaperCell class] forCellWithReuseIdentifier:kBingCellIdentifier];
 

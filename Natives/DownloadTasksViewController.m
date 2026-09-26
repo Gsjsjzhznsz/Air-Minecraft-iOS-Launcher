@@ -648,7 +648,11 @@ static const CGFloat kSectionInset = 16.0;
     // 适配自定义启动器背景：将当前视图控制器透明化，使全局背景壁纸能够透出
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 
-    self.view.backgroundColor = [UIColor systemBackgroundColor]; // Task136：主题化页面底色
+    // Task180：页面底色接「背景透明度」滑条（下载中心窗口 = 承载窗口类
+    // 大背景；旧 Task136 不透明 systemBackgroundColor 兜底退役，
+    // alpha 化后壁纸可透出，列表文字/图标恒不透明）
+    self.view.backgroundColor = [[UIColor systemBackgroundColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].backgroundOpacity];
     self.filterState = DownloadTaskStatePending;
     self.filterType = nil;
 

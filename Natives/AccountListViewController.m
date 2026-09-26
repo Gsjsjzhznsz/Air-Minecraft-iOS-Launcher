@@ -203,6 +203,19 @@
         subtitle = accountData[@"xboxGamertag"] ?: @"Microsoft";
     }
 
+    // Task180：重写 UI 兼顾新拟态开关（用户口径“账号选项阴影处被遮罩而
+    // 显示残缺的新拟态，请重写UI并兼顾新拟态开关”）——原 applyEffectToView
+    // 无壁纸档是平贴表面（masksToBounds=YES）且不读新拟态开关，自绘
+    // CALayer 阴影也被宿主裁剪杀掉（残缺根因）。换接凸起管线：开关开 =
+    // Task177 三层引擎完整双阴影（开关/背景透明度滑条全链生效），关 =
+    // 旧管线毛玻璃/半透明/平贴；裁剪逐层放行（投影越出 cell 边界的呼吸
+    // 空间，BackgroundManager applyEffectToCollectionViewCell 同款配方）。
+    // 自绘阴影退场（新拟态规格由引擎接管，边框保留）。
+    cell.clipsToBounds = NO;
+    cell.layer.masksToBounds = NO;
+    cell.contentView.clipsToBounds = NO;
+    cell.contentView.layer.masksToBounds = NO;
+
     // 卡片容器（圆角 + 半透明背景 + 毛玻璃）
     UIView *cardView = [[UIView alloc] init];
     cardView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -211,12 +224,11 @@
     cardView.layer.cornerCurve = kCACornerCurveContinuous;
     cardView.layer.borderWidth = 0.5;
     cardView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12].CGColor;
-    cardView.layer.shadowColor = [UIColor blackColor].CGColor;
-    cardView.layer.shadowOffset = CGSizeMake(0, 4);
-    cardView.layer.shadowOpacity = 0.12;
-    cardView.layer.shadowRadius = 10;
     [cell.contentView addSubview:cardView];
-    [[BackgroundManager sharedManager] applyEffectToView:cardView];
+    // Task178 圆角钉住：引擎默认按宿主短边等比改写圆角（本卡短边 ~80pt
+    // 时会被压到下限 8pt），钉 16pt 保住 Task137 定稿圆角
+    [cardView ame_setNeumorphPinnedCornerRadius:16];
+    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:cardView];
 
     // 左侧头像
     UIImageView *avatarView = [[UIImageView alloc] init];
@@ -320,10 +332,12 @@
 
     // 卡片内边距与子视图布局约束
     [NSLayoutConstraint activateConstraints:@[
-        [cardView.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:6],
+        // Task180：上下 6→10pt——新拟态双阴影外扩 ~8pt 需呼吸空间，
+    // 原 6pt 相邻卡阴影互叠/被邻卡压边
+    [cardView.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:10],
         [cardView.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
         [cardView.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
-        [cardView.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-6],
+        [cardView.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-10],
 
         [avatarView.leadingAnchor constraintEqualToAnchor:cardView.leadingAnchor constant:14],
         [avatarView.centerYAnchor constraintEqualToAnchor:cardView.centerYAnchor],
@@ -869,12 +883,29 @@ static NSMutableSet *ame128_validatedSet(void) {
     NSString *listPath = [NSString stringWithFormat:@"%s/accounts", getenv("POJAV_HOME")];
     NSFileManager *fm = [NSFileManager defaultManager];
     NSArray *files = [fm contentsOfDirectoryAtPath:listPath error:nil];
+    // Task180：复制 bug 双保险②——读侧兜底。①按 accountId（缺省退文件名）
+    // 去重：历史残留的重复 .json 只展示一份（写盘侧清理见 BaseAuthenticator
+    // saveChanges 的 Task180 钩子，存量随每次选择逐步消除）；②过滤解析失败
+    // 文件（parseJSONFromFile 失败时返回 @{@"NSErrorObject": ...}，旧代码照单
+    // 全收会渲染成空白行，同样被用户感知为“多出来的条目”）。
+    NSMutableSet *ame180_seenIds = [NSMutableSet set];
     for (NSString *file in files) {
         NSString *path = [listPath stringByAppendingPathComponent:file];
         BOOL isDir = NO;
         [fm fileExistsAtPath:path isDirectory:(&isDir)];
         if (!isDir && [file hasSuffix:@".json"]) {
-            [self.accountList addObject:parseJSONFromFile(path)];
+            NSDictionary *data = parseJSONFromFile(path);
+            if (data == nil || data[@"NSErrorObject"] != nil) {
+                NSLog(@"[Task180] skipping unreadable account file: %@", file);
+                continue;
+            }
+            NSString *ame180_key = data[@"accountId"] ?: [file stringByDeletingPathExtension];
+            if ([ame180_seenIds containsObject:ame180_key]) {
+                NSLog(@"[Task180] dedup account entry by id: %@", ame180_key);
+                continue;
+            }
+            [ame180_seenIds addObject:ame180_key];
+            [self.accountList addObject:data];
         }
     }
     [self.tableView reloadData];

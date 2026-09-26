@@ -662,3 +662,26 @@ Stage Summary:
 - push 9aacebb..efc6fbb；CI run 36235666096（Run 459 of Development build）= **completed success 首跑即绿**（无修复轮；ARC 桥接零踩坑——CAGradientLayer CGColor 教训已在 Task177 沉淀）
 - 时序旁证：用户两次日志上传提交（38a887d/9aacebb）触发的 Run 457/458 被 GitHub 自动取消（新提交顶替，非失败）；main 徽标此前显示 failing 即 cancelled 顶替的显示伪象
 - 终局对拍：verify_task178 A-F 全 PASS（46 项断言组）+ 35 级联校验器分块对拍零新增失败（22 直接全绿，其余 ⊆ 具名豁免基线）
+
+---
+Task ID: 180
+Agent: main (Super Z)
+Task: Air-Minecraft-iOS-Launcher 透明度体系重构（背景/按钮双滑条 0~100%）+ 账号列表新拟态重写 + 账号复制双保险 + 头像防御 + 安装方式页对齐版本卡 + 全局默认值定稿
+
+Work Log:
+- fetch 对齐 43784d6（并行 Task179 八连修已交付），空号 180 确认无撞号；勘察四向并行（头像/账号列表/安装页/透明度管线）+ AskUserQuestion 四点确认（合并两滑条 / 默认 100% 起步→备注改 75% / 账号 bug 修双保险 / 头像防御性修）
+- 引擎（UIKit+NativeSurface）：ame_applyNeumorphSurfaceFlatWithRadius:opacity: / ame_applyPanelSurfaceWithRadius:opacity: 新原语（backgroundColor alpha 化，文字/图标兄弟子视图恒不透明；旧签名转发 1.0 失效安全）
+- BackgroundManager：background_bg_opacity（默认 0.75）/ background_btn_opacity（默认 1.0）双键；uiOpacity（0.6/下限0.1）与 cardsNeumorphOpacity 属性/键/存取器全退役；20+ 管线消费点换读新键（makeViewControllerTransparent 语义翻转直读/applyEffectToCell 半透明档/导航/工具栏/applyEffectToView 半透明+Flat 档/挂点①②/searchBar/applyCardEffectToCell）
+- 大背景接线：Root 侧栏/右面板 Flat opacity、BingGallery、DownloadTasks、下载页 tabSegment/versionFilterSegment/胶囊轨道、下载页搜索栏补接管线、ProfileSettings heroCard
+- 按钮接线：RightPanel 三按钮（applyCustomAppearance ×btnO + reapply 重刷）/下载中心/7 信息卡（0.15×系数）、Menu 选中底×2+重刷、Download importModpack/侧栏筛选+重刷、NMToast 引擎挂点、PLCrashView ame180_buttonColor 防御辅助
+- 设置页：旧两滑条行退役；「背景透明度」行（复用 row1/tags 200-202/min 0.0）+「按钮透明度」行（tags 600-602/ButtonOpacityCell）恒显；无壁纸 section0 = 3 行；恢复默认 0.75/1.0/0.0
+- 默认值定稿：blur 默认 0.0；SceneDelegate ui_layout 未选→card（显式 vs 保持）、ui_theme 未显式选择 auto/light→dark（Task161 家法改靶）
+- 账号列表：cell 凸起管线+pinned 16+裁剪放行+间距 6→10；reloadAccountList 按 accountId 去重+过滤坏文件；BaseAuthenticator class extension ame180_savedAccountId + saveChanges 写盘成功后头像迁移+旧 .json 清理（refresh 链改 ID 不删旧文件=复制根因）；AvatarManager usernameFallback 查询+ame180_migrate 头像迁移原语；RightPanel/Home 换双参查询+fetch 失败日志
+- 安装方式页：loader/option 行凸起管线（contentView 宿主）+规格文字色+40pt 图标+64 行高+裁剪放行+引擎头 import
+- l10n：i18n_str_1296 改值"背景透明度"+新键 background.button.opacity.title ×6（neumorph.opacity 键退役）+footer 双滑条语义说明；四主语言计数 1955 保持；修复首版 footer 缺引号的 .strings 行语法破坏（129-135 级联暴露）
+- 校验：verify_task180 新建 112 项全绿；诚实重锚 160/161/162/163/164/167/168/170/171/172/173/173b/174/175/176/177/178（178 C10 断言值顺延、174 C4 计数 3=2调用+1注释）；130/131/132/135 具名环境性豁免基线同态；160-162 ROOT 可移植化（Task165 家法）
+- 文档：announcements task180@2（len 22，钉位 0/1 不动）；version.h REVISION 17 addendum (no bump)；本 worklog
+
+Stage Summary:
+- 装机锚点：两滑条拖动实时跟随（BackgroundUIEffectChanged 广播链全员重刷）；背景 75% 装机即呈现大背景半透明；按钮 100% 形态不变；账号卡完整双阴影；安装方式页与版本卡同语言；复制 bug 写读双断
+- 待办：推送后盯 CI；26.1.2 libjvm 崩溃 / 静态库虚拟按钮 / README 6.0.0 收尾为继承遗留

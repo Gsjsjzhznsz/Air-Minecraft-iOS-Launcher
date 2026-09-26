@@ -37,13 +37,14 @@ extern __weak UIWindow *mainWindow;
     self.window.backgroundColor = [UIColor systemBackgroundColor];
     mainWindow = self.window;
 
-    // 根据设置选择布局：默认 VS 三栏布局，可切换为卡片式便当盒布局
+    // 根据设置选择布局：Task180 用户定稿默认 = 卡片式便当盒布局；显式选择
+    // 过 "vs"（写盘）的设备保持三栏布局（未写盘 = 从未选择 → 走新默认 card）
     NSString *layout = getPrefObject(@"general.ui_layout");
     UIViewController *rootVC;
-    if ([layout isEqualToString:@"card"]) {
-        rootVC = [[LauncherCardLayoutViewController alloc] init];
-    } else {
+    if ([layout isEqualToString:@"vs"]) {
         rootVC = [[LauncherRootViewController alloc] init];
+    } else {
+        rootVC = [[LauncherCardLayoutViewController alloc] init];
     }
     self.window.rootViewController = rootVC;
 
@@ -60,10 +61,13 @@ extern __weak UIWindow *mainWindow;
         // auto。显式选过的设备永不覆盖（标记在设置页 pick 的 action 里置位）。
         if (!getPrefBool(@"general.ui_theme_explicit")) {
             NSString *ame161_legacy = getPrefObject(@"general.ui_theme");
-            if ([ame161_legacy isEqualToString:@"dark"] ||
+            if ([ame161_legacy isEqualToString:@"auto"] ||
                 [ame161_legacy isEqualToString:@"light"]) {
-                setPrefObject(@"general.ui_theme", @"auto");
-                NSLog(@"[SceneDelegate] Task161: ui_theme '%@' was a historical default (never explicitly chosen) -> migrated to 'auto' (follow system)", ame161_legacy);
+                // Task180：用户定稿默认初始值 = 深色模式——未显式选择过的设备
+                // （停在 auto（Task161 迁移值）/ light 历史默认上）迁移到 dark；
+                // 显式选择过的设备永不覆盖（Task161 家法不变）。
+                setPrefObject(@"general.ui_theme", @"dark");
+                NSLog(@"[SceneDelegate] Task180: ui_theme '%@' was never explicitly chosen -> migrated to 'dark' (user-specified default)", ame161_legacy);
             }
         }
         NSString *theme = getPrefObject(@"general.ui_theme");

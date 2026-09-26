@@ -113,12 +113,12 @@ check("A12 头文件 CSS 参考规格注释在位（bigbear-ui + neu-white + box
 # B. BackgroundManager
 # ============================================================
 print("== B. BackgroundManager（透明度解耦 + 管线规格统一） ==")
-check("B1 cardsNeumorphOpacity 属性/存取器恢复（Task178 重锚：.h 声明 + .m getter/setter + 管线读取）",
-      "CGFloat cardsNeumorphOpacity" in BM_H
-      and "- (CGFloat)cardsNeumorphOpacity" in BM_M
-      and "self.cardsNeumorphOpacity" in BM_M)
-check("B2 透明度落盘键恢复（Task178 重锚：kBackgroundCardsNeumorphOpacityKey 常量在位）",
-      "kBackgroundCardsNeumorphOpacityKey" in BM_M)
+check("B1 透明度属性（Task180 重锚：backgroundOpacity/buttonOpacity 双属性在位，cardsNeumorphOpacity 退役）",
+      "CGFloat backgroundOpacity" in BM_H
+      and "CGFloat buttonOpacity" in BM_H
+      and "self.backgroundOpacity" in BM_M)
+check("B2 透明度落盘键（Task180 重锚：background_bg_opacity/background_btn_opacity 双键在位）",
+      "kBackgroundBgOpacityKey" in BM_M and "kBackgroundBtnOpacityKey" in BM_M)
 check("B3 新拟态界面开关保留（getter/setter/键常量在位，默认 YES）",
       "kBackgroundCardsNeumorphEnabledKey" in BM_M
       and "- (BOOL)cardsNeumorphEnabled" in BM_M and "return YES;" in BM_M)
@@ -133,19 +133,19 @@ check("B6 refreshUIEffect 共存语义保留（ON 分支壁纸容器缺席重建
       and "systemBackgroundColor" in BM_M)
 check("B7 Task178 一次性日志锚（[Task178] neumorph decoupled）",
       "[Task178] neumorph decoupled" in BM_M)
-check("B8 头文件定稿注释（Task178 重锚：卡体透明度唯一入口 = 本偏好）",
-      "入口 = 本偏好" in BM_H)
+check("B8 头文件定稿注释（Task180 重锚：双滑条体系注释在位——背景透明度统管大背景+卡体）",
+      "统一透明度体系" in BM_H)
 
 # ============================================================
 # C. 设置页
 # ============================================================
 print("== C. 设置页（滑条退役 + 开关保留） ==")
-check("C1 透明度滑条行恢复（Task178 重锚：CellsNeumorphOpacityCell/滑条块/回调在位）",
-      "CardsNeumorphOpacityCell" in SET_M
-      and "cardsNeumorphOpacitySliderChanged" in SET_M)
-check("C2 滑条 tags 500/501/502 恢复（Task178 重锚：viewWithTag 绑定在位）",
-      "viewWithTag:500" in SET_M and "viewWithTag:501" in SET_M
-      and "viewWithTag:502" in SET_M)
+check("C1 按钮透明度滑条行（Task180 重锚：ButtonOpacityCell/滑条块/回调在位）",
+      "ButtonOpacityCell" in SET_M
+      and "buttonOpacitySliderChanged" in SET_M)
+check("C2 滑条 tags 600/601/602（Task180 重锚：viewWithTag 绑定在位）",
+      "viewWithTag:600" in SET_M and "viewWithTag:601" in SET_M
+      and "viewWithTag:602" in SET_M)
 check("C3 开关行保留（CardsNeumorphToggleCell + tag 410 + 回调 + sections[0][3]）",
       "CardsNeumorphToggleCell" in SET_M and "neumorphSwitch.tag = 410;" in SET_M
       and "@selector(cardsNeumorphToggleChanged:)" in SET_M
@@ -155,11 +155,11 @@ check("C4 开关行定位不变（hasBackground ? 3 : 0，恒显）",
 check("C5 灰化退役（Task178 重锚：开关不再变灰其他选项——0.35/neumorphOn 零残留）",
       SET_M.count("neumorphOn ? 0.35 : 1.0") == 0
       and "neumorphOn" not in SET_M)
-check("C6 sections[0] 五项（Task178 重锚：透明度标题条目恢复为末项）",
+check("C6 sections[0] 五项（Task180 重锚：按钮透明度标题条目为末项）",
       'localize(@"background.cards.neumorph.interface.title", nil)' in SET_M
-      and 'localize(@"background.cards.neumorph.opacity.title", nil)' in SET_M)
-check("C7 无壁纸行数 2（Task178 重锚：开关行 + 透明度滑条行恒显）",
-      re.search(r"hasBackground\]\) \{\s*\n\s*return 2;", SET_M) is not None
+      and 'localize(@"background.button.opacity.title", nil)' in SET_M)
+check("C7 无壁纸行数 3（Task180 重锚：开关行 + 背景/按钮透明度滑条恒显）",
+      re.search(r"hasBackground\]\) \{\s*\n\s*return 3;", SET_M) is not None
       and not re.search(r"hasBackground\]\) \{\s*\n\s*return 1;", SET_M))
 
 # ============================================================
@@ -170,8 +170,8 @@ KEYSET_LGS = ["en", "zh-Hans", "zh-CN", "zh-Hant"]
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in KEYSET_LGS]
 all_six = [rd(f"Natives/resources/{lg}.lproj/Localizable.strings") for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]]
-check("D1 opacity.title 键 ×6 语言全部恢复（Task178 重锚）",
-      all('"background.cards.neumorph.opacity.title"' in t for t in all_six))
+check("D1 button.opacity.title 键 ×6 语言全部在位（Task180 重锚）",
+      all('"background.button.opacity.title"' in t for t in all_six))
 check("D2 四主语言唯一键计数 1955（Task178 重锚：1954+1）",
       all(len(k) == 1955 for k in KEYSETS),
       detail=str([len(k) for k in KEYSETS]))

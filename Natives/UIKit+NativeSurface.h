@@ -117,6 +117,12 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// 不变，masksToBounds = YES 与侧栏容器创建态一致）。
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius;
 
+/// Task180：平贴面板表面 + 底色透明度（背景透明度滑条的 Flat 档载体）。
+/// 只改宿主自身 backgroundColor 的 alpha（文字/图标是兄弟子视图，恒全
+/// 不透明），不挂阴影承载层；1.0 = 与旧 Flat 完全一致（失效安全）。
+- (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius
+                                opacity:(CGFloat)opacity;
+
 /// Task177：纯新拟态表面（CSS 参考规格：渐变表面 + 全不透明双阴影承载
 /// 视图 + masksToBounds = NO；圆角按宿主短边等比自动写入）。供三方法外的
 /// 自创卡片直接使用。
@@ -126,6 +132,13 @@ FOUNDATION_EXPORT void AmeNeumorphMetricsForSide(CGFloat side,
 /// tableView 裁剪互叠（Task137 历史问题），此处只上规格表面色 + 圆角
 /// （尊重调用点传入值，clamp [8,50]），裁剪保持（Task152 直角露出修复不变）。
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius;
+
+/// Task180：平贴表面 + 底色透明度（背景透明度滑条在 cell/行/列表场景的
+/// 载体）：规格表面色 colorWithAlphaComponent:opacity + 圆角 + 裁剪保持，
+/// 其余同上——只淡宿主底色，子视图（文字/图标）不受影响；opacity 钉到
+/// [0,1]，1.0 与旧 Flat 完全一致。重铺幂等（滑条拖动时反复调用安全）。
+- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius
+                                       opacity:(CGFloat)opacity;
 
 /// Task163：移除 ame_applyNeumorphSurface 挂载的承载视图并清空
 /// 关联对象（背景模式切换场景的残留清理——新拟态卡片切回毛玻璃/半透明

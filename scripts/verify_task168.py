@@ -61,11 +61,11 @@ check("A7 cell 管线新门（Task173 重锚）：开关开启分支在最前（
       "if (![self hasBackground]) {" in bm_m
       and bm_m[bm_m.index("- (void)applyEffectToCollectionViewCell"):].index("if (self.cardsNeumorphEnabled) {")
       < bm_m[bm_m.index("- (void)applyEffectToCollectionViewCell"):].index("if (![self hasBackground]) {"))
-check("A7b 卡片本体透明度原语恢复（Task178 重锚：宿主 alpha 仍是历史，引擎原语两管线挂点回归）",
+check("A7b 卡片本体透明度原语（Task180 重锚：原语在位，两管线挂点读「背景透明度」——专用滑条退役并入）",
       "target.alpha = self.cardsNeumorphOpacity;" not in bm_m
       and "cardTarget.alpha = self.cardsNeumorphOpacity;" not in bm_m
-      and bm_m.count("[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") == 1
-      and bm_m.count("[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") == 1)
+      and bm_m.count("[target ame_applyNeumorphCardOpacity:self.backgroundOpacity];") == 1
+      and bm_m.count("[view ame_applyNeumorphCardOpacity:self.backgroundOpacity];") == 1)
 check("A8 动态收口退役（Task172）：attach 调用点全撤；Task177 重锚：引擎方法本体也退役",
       "[cardTarget ame_attachNeumorphShadowOnly];" not in bm_m
       and "subview.layer.cornerRadius = cardTarget.layer.cornerRadius;" not in bm_m
@@ -75,8 +75,8 @@ check("A9 宿主链放行裁剪维持（Task172 ON 分支保留：阴影越出�
       and "cell.contentView.layer.masksToBounds = NO;" in bm_m)
 check("A10 cell 管线实底尾部：ame_applyNeumorphSurface 仍在（规格表面+双阴影）",
       "[target ame_applyNeumorphSurface];" in bm_m)
-check("A11 边界维持：列表行 applyCardEffectToCell 仍 Flat 平贴（不受开关影响）",
-      "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm_m)
+check("A11 边界维持：列表行 applyCardEffectToCell 仍 Flat 平贴（Task180 重锚：Flat 接背景透明度）",
+      "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12\n                                                    opacity:self.backgroundOpacity];" in bm_m)
 check("A12 边界维持：侧栏/右面板仍走 applyEffectToView（Task163 平贴结论不被波及）",
       "applyEffectToView:self.sidebarContainer]" in rd("Natives/LauncherRootViewController.m")
       and "applyEffectToView:self.rightPanelContainer]" in rd("Natives/LauncherRootViewController.m"))
@@ -88,36 +88,38 @@ check("A13 联机页状态卡改走新拟态卡片管线（全部卡片统一）
 # ============================================================
 bsvc = rd("Natives/BackgroundSettingsViewController.m")
 
-check("B1 透明度属性恢复（Task178 重锚：cardsNeumorphOpacity .h 声明 + .m 存取器在位）",
-      'cardsNeumorphOpacity' in bm_h
-      and '- (CGFloat)cardsNeumorphOpacity' in bm_m)
-check("B2 落盘键恢复（Task178 重锚：kBackgroundCardsNeumorphOpacityKey 常量与 defaults 直读写回归）",
-      'kBackgroundCardsNeumorphOpacityKey' in bm_m
-      and 'setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))' in bm_m)
+check("B1 透明度属性（Task180 重锚：backgroundOpacity/buttonOpacity .h 声明；cardsNeumorphOpacity 属性退役）",
+      'CGFloat backgroundOpacity;' in bm_h
+      and 'CGFloat buttonOpacity;' in bm_h
+      and '- (void)setBackgroundOpacity:' in bm_m
+      and '- (void)setButtonOpacity:' in bm_m)
+check("B2 落盘键（Task180 重锚：background_bg_opacity/background_btn_opacity 双键）",
+      'kBackgroundBgOpacityKey = @"background_bg_opacity"' in bm_m
+      and 'kBackgroundBtnOpacityKey = @"background_btn_opacity"' in bm_m)
 check("B3 实底开关全链退役（Task170：代码零残留）",
       "cardsNeumorphSolid" not in bm_m and "cardsNeumorphSolid" not in bm_h
       and "cardsNeumorphSolid" not in bsvc
       and "background_cards_neumorph_solid" not in bm_m)
-check("B4 滑条行恢复（Task178 重锚：行/回调/tags 500~502 回归，开关行保留）",
-      '"CardsNeumorphOpacityCell"' in bsvc
-      and "slider.tag = 500;" in bsvc
-      and "cardsNeumorphOpacitySliderChanged" in bsvc
+check("B4 滑条行（Task180 重锚：按钮透明度行 tags 600~602，新拟态透明度行退役，开关行保留）",
+      '"ButtonOpacityCell"' in bsvc
+      and "slider.tag = 600;" in bsvc
+      and "buttonOpacitySliderChanged" in bsvc
       and '"CardsNeumorphToggleCell"' in bsvc)
-check("B5 滑条回调恢复（Task178 重锚）：落盘 + 实时回显 + 刷新链齐备，开关回调仍在",
-      "cardsNeumorphOpacity = slider.value;" in bsvc
+check("B5 滑条回调（Task180 重锚）：按钮透明度落盘 + 实时回显 + 刷新链齐备，开关回调仍在",
+      "buttonOpacity = slider.value;" in bsvc
       and "[[BackgroundManager sharedManager] refreshUIEffect];" in bsvc)
 check("B6 既有行不受影响（透明度/模糊滑块行仍在位）",
       "opacitySliderChanged:" in bsvc and "blurIntensitySliderChanged:" in bsvc
       and bsvc.count("- (void)blurIntensitySliderChanged:") == 1
       and bsvc.count("- (void)opacitySliderChanged:") == 1)
 
-l10n_key = "background.cards.neumorph.opacity.title"  # Task178：键随滑条恢复（Task177 曾退役，沿用 Task170 键名）
+l10n_key = "background.button.opacity.title"  # Task180 重锚：按钮透明度键（neumorph.opacity 键随专用滑条退役）
 l10n_vals = {}
 for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     s = rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
     m = re.search(r'^"' + re.escape(l10n_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     l10n_vals[lg] = m.group(1) if m else None
-check("B7 六语言键全部恢复（Task178 重锚）", all(v is not None for v in l10n_vals.values()), str(l10n_vals))
+check("B7 六语言键全部在位（Task180 重锚）", all(v is not None for v in l10n_vals.values()), str(l10n_vals))
 check("B8 四主语言键集一致且计数 = 1955（Task178 重锚：opacity.title 键恢复，净增 1）",
       all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1955
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))

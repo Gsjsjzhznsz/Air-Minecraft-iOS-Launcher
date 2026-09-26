@@ -73,15 +73,17 @@ check("B7 文件括号平衡",
 
 print("== C. 壁纸首启默认值（BackgroundManager.m）==")
 bm = rd("Natives/BackgroundManager.m")
-check("C1 三键 objectForKey == nil 判定（毛玻璃/60%/100%）",
+check("C1 键判定（Task180 重锚：效果/背景透明度/按钮透明度/模糊 四键 objectForKey == nil）",
       "[defaults objectForKey:kBackgroundUIEffectKey]" in bm
-      and "[defaults objectForKey:kBackgroundUIOpacityKey]" in bm
+      and "[defaults objectForKey:kBackgroundBgOpacityKey]" in bm
+      and "[defaults objectForKey:kBackgroundBtnOpacityKey]" in bm
       and "[defaults objectForKey:kBackgroundBlurIntensityKey]" in bm)
 check("C2 nil → BackgroundUIEffectBlur（默认毛玻璃）",
       "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm)
-check("C3 nil → 0.6 / 1.0（透明度 60% / 模糊 100%）",
-      "_uiOpacity = 0.6; // Task162/164：默认透明度 60%" in bm
-      and "_blurIntensity = 1.0; // Task162/164：默认模糊程度 100%" in bm)
+check("C3 nil → 0.75 / 1.0 / 0.0（Task180 重锚：背景 75% / 按钮 100% / 模糊 0%，用户备注定稿）",
+      "_backgroundOpacity = 0.75;" in bm
+      and "_buttonOpacity = 1.0;" in bm
+      and "_blurIntensity = 0.0;" in bm)
 check("C4 病历注释（范围检查的两个漏洞）",
       "枚举 0 = 半透明" in bm and "默认模糊 0%" in bm)
 check("C5 显式保存值尊重（半透明/0% 可选）——越界兜底仍保留",

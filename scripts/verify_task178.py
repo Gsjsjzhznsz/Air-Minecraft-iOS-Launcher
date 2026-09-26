@@ -126,28 +126,31 @@ check("A14 头文件规格注释演化（透明度隔离 Task178 修订 + 圆角
 # B. BackgroundManager
 # ============================================================
 print("== B. BackgroundManager（偏好 + 挂点 + 日志锚） ==")
-check("B1 .h 属性声明 + Task178 语义注释（唯一入口 = 本偏好）",
-      "@property (nonatomic, assign) CGFloat cardsNeumorphOpacity;" in BM_H
-      and "入口 = 本偏好" in BM_H)
-check("B2 落盘键常量恢复（background_cards_neumorph_opacity）",
-      'static NSString * const kBackgroundCardsNeumorphOpacityKey = @"background_cards_neumorph_opacity";' in BM_M)
-check("B3 存取器：defaults 直读写 + 判空默认 1.0 + clamp [0,1]",
-      "- (CGFloat)cardsNeumorphOpacity {" in BM_M
-      and "objectForKey:kBackgroundCardsNeumorphOpacityKey] == nil" in BM_M
-      and "return 1.0;" in BM_M
-      and "setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))" in BM_M)
+check("B1 .h 属性声明（Task180 重锚：backgroundOpacity/buttonOpacity 双属性在位，cardsNeumorphOpacity 属性退役）",
+      "@property (nonatomic, assign) CGFloat backgroundOpacity;" in BM_H
+      and "@property (nonatomic, assign) CGFloat buttonOpacity;" in BM_H
+      and "@property (nonatomic, assign) CGFloat cardsNeumorphOpacity;" not in BM_H)
+check("B2 落盘键常量（Task180 重锚：background_bg_opacity/background_btn_opacity 双键）",
+      'static NSString * const kBackgroundBgOpacityKey = @"background_bg_opacity";' in BM_M
+      and 'static NSString * const kBackgroundBtnOpacityKey = @"background_btn_opacity";' in BM_M)
+check("B3 存取器（Task180 重锚：双属性 setter + 判空默认 0.75/1.0 + clamp [0,1] 无下限）",
+      "- (void)setBackgroundOpacity:" in BM_M
+      and "- (void)setButtonOpacity:" in BM_M
+      and "NSNumber *ame164_opacity = [defaults objectForKey:kBackgroundBgOpacityKey]" in BM_M
+      and "NSNumber *ame180_btn = [defaults objectForKey:kBackgroundBtnOpacityKey]" in BM_M
+      and "_backgroundOpacity = 0.75;" in BM_M
+      and "_buttonOpacity = 1.0;" in BM_M)
 card_fn = BM_M[BM_M.index("- (void)applyNeumorphCardEffectToView"):BM_M.index("- (void)applyEffectToSearchBar")]
 cell_fn = BM_M[BM_M.index("- (void)applyEffectToCollectionViewCell"):BM_M.index("- (void)applyCardEffectToCell")]
-check("B4 两管线尾部挂点（surface 之后各一次 cardOpacity）",
-      card_fn.index("[view ame_applyNeumorphSurface];") < card_fn.index("[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];")
-      and cell_fn.index("[target ame_applyNeumorphSurface];") < cell_fn.index("[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];"))
+check("B4 两管线尾部挂点（Task180 重锚：surface 之后各一次 cardOpacity 读背景透明度）",
+      card_fn.index("[view ame_applyNeumorphSurface];") < card_fn.index("[view ame_applyNeumorphCardOpacity:self.backgroundOpacity];")
+      and cell_fn.index("[target ame_applyNeumorphSurface];") < cell_fn.index("[target ame_applyNeumorphCardOpacity:self.backgroundOpacity];"))
 check("B5 开关门语义不变（OFF 回归旧管线；ON 规格管线）",
       "if (!self.cardsNeumorphEnabled) {" in card_fn
       and "if (self.cardsNeumorphEnabled) {" in cell_fn)
-check("B6 列表行 Flat 边界维持（不接透明度，Task160/170 语义）",
-      "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in BM_M
-      and cell_fn.index("[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];") if False else
-      "applyCardEffectToCell" in BM_M)
+check("B6 列表行 Flat 边界维持（Task180 重锚：Flat 接背景透明度，方法仍在）",
+      "ame_applyNeumorphSurfaceFlatWithRadius:12\n                                                    opacity:self.backgroundOpacity];" in BM_M
+      and "applyCardEffectToCell" in BM_M)
 check("B7 一次性日志锚演化（[Task178] neumorph decoupled + ame178DecoupleLogOnce）",
       "[Task178] neumorph decoupled: pinned spec cards + card-body opacity slider, UI effect options stay interactive" in BM_M
       and "ame178DecoupleLogOnce" in BM_M
@@ -166,34 +169,35 @@ check("C1 灰化零残留（0.35 表达式 / userInteractionEnabled / slider.ena
       and "slider.enabled = neumorphOn;" not in SET_M
       and "cell.contentView.alpha = neumorphOn ? 1.0 : 0.35;" not in SET_M
       and "0.35" not in SET_M)
-check("C2 sections[0] 五项（UI效果/透明度/模糊程度/新拟态界面/新拟态透明度）",
-      SET_M.count('localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.interface.title", nil), localize(@"background.cards.neumorph.opacity.title", nil)') == 1)
-check("C3 无壁纸行数 2（开关行 + 滑条行恒显）",
-      re.search(r"hasBackground\]\) \{\s*\n\s*return 2;", SET_M) is not None)
+check("C2 sections[0] 五项（Task180 重锚：UI效果/背景透明度/模糊程度/新拟态界面/按钮透明度）",
+      SET_M.count('localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.interface.title", nil), localize(@"background.button.opacity.title", nil)') == 1)
+check("C3 无壁纸行数 3（Task180 重锚：开关行 + 背景透明度 + 按钮透明度恒显）",
+      re.search(r"hasBackground\]\) \{\s*\n\s*return 3;", SET_M) is not None)
 check("C4 开关行定位不变（hasBackground ? 3 : 0）",
       "indexPath.row == (hasBackground ? 3 : 0)" in SET_M
       and '"CardsNeumorphToggleCell"' in SET_M
       and "neumorphSwitch.tag = 410;" in SET_M)
-check("C5 滑条行恢复（hasBackground ? 4 : 1 + CardsNeumorphOpacityCell + tags 500/501/502）",
-      "indexPath.row == (hasBackground ? 4 : 1)" in SET_M
-      and '"CardsNeumorphOpacityCell"' in SET_M
-      and "slider.tag = 500;" in SET_M and "titleLabel.tag = 502;" in SET_M and "valueLabel.tag = 501;" in SET_M)
+check("C5 按钮透明度滑条行（Task180 重锚：hasBackground ? 4 : 2 + ButtonOpacityCell + tags 600/601/602）",
+      "indexPath.row == (hasBackground ? 4 : 2)" in SET_M
+      and '"ButtonOpacityCell"' in SET_M
+      and "slider.tag = 600;" in SET_M and "titleLabel.tag = 602;" in SET_M and "valueLabel.tag = 601;" in SET_M)
 check("C6 滑条行恒可操作（无 slider.enabled 灰化；0~1 全档）",
       "slider.minimumValue = 0.0f;" in SET_M and "slider.maximumValue = 1.0f;" in SET_M
       and "slider.enabled" not in SET_M)
-check("C7 回调恢复（落盘 + tag 501 实时回显 + refreshUIEffect）",
-      "- (void)cardsNeumorphOpacitySliderChanged:(UISlider *)slider {" in SET_M
-      and "[BackgroundManager sharedManager].cardsNeumorphOpacity = slider.value;" in SET_M
-      and "[cell.contentView viewWithTag:501]" in SET_M
+check("C7 回调（Task180 重锚：buttonOpacitySliderChanged 落盘 + tag 601 实时回显 + refreshUIEffect）",
+      "- (void)buttonOpacitySliderChanged:(UISlider *)slider {" in SET_M
+      and "[BackgroundManager sharedManager].buttonOpacity = slider.value;" in SET_M
+      and "[cell.contentView viewWithTag:601]" in SET_M
       and SET_M.count("[[BackgroundManager sharedManager] refreshUIEffect];") >= 3)
-check("C8 滑条值绑定（cellForRowAt 读 cardsNeumorphOpacity 回填滑条与百分比）",
-      "slider.value = manager.cardsNeumorphOpacity;" in SET_M
-      and 'manager.cardsNeumorphOpacity * 100' in SET_M)
+check("C8 滑条值绑定（Task180 重锚：cellForRowAt 读 buttonOpacity/backgroundOpacity 回填）",
+      "slider.value = manager.buttonOpacity;" in SET_M
+      and 'manager.buttonOpacity * 100' in SET_M
+      and "slider.value = manager.backgroundOpacity;" in SET_M)
 check("C9 既有行不破坏（透明度/模糊滑块 + UI效果选择 + Bing 区）",
       "opacitySliderChanged:" in SET_M and "blurIntensitySliderChanged:" in SET_M
       and "showUIEffectPicker" in SET_M and '"BingToggleCell"' in SET_M)
-check("C10 滑条行标题绑定含无壁纸档（sections[0][hasBackground ? 4 : 1]）",
-      "self.sections[0][hasBackground ? 4 : 1]" in SET_M)
+check("C10 滑条行标题绑定含无壁纸档（Task180 重锚：hasBackground ? 4 : 2]）",
+      "self.sections[0][hasBackground ? 4 : 2]" in SET_M)
 
 # ============================================================
 # D. l10n
@@ -203,8 +207,8 @@ KEYSET_LGS = ["en", "zh-Hans", "zh-CN", "zh-Hant"]
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in KEYSET_LGS]
 all_six = [rd(f"Natives/resources/{lg}.lproj/Localizable.strings") for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]]
-check("D1 opacity.title 键 ×6 语言全部恢复",
-      all('"background.cards.neumorph.opacity.title"' in t for t in all_six))
+check("D1 button.opacity.title 键 ×6 语言全部在位（Task180 重锚）",
+      all('"background.button.opacity.title"' in t for t in all_six))
 check("D2 四主语言唯一键计数 1955（1954+1）",
       all(len(k) == 1955 for k in KEYSETS),
       detail=str([len(k) for k in KEYSETS]))
@@ -212,9 +216,9 @@ check("D3 四主语言键集一致",
       KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 check("D4 interface.title 键保留（开关行标题）",
       all('"background.cards.neumorph.interface.title"' in t for t in all_six))
-check("D5 恢复键中文文案与 Task170 时代一致",
-      '"background.cards.neumorph.opacity.title" = "新拟态透明度";' in all_six[1]
-      and '"background.cards.neumorph.opacity.title" = "新拟态透明度";' in all_six[2])
+check("D5 新键中文文案（Task180 重锚：按钮透明度）",
+      '"background.button.opacity.title" = "按钮透明度";' in all_six[1]
+      and '"background.button.opacity.title" = "按钮透明度";' in all_six[2])
 
 # ============================================================
 # E. 文档

@@ -25,7 +25,7 @@
 import os
 import sys
 
-ROOT = os.environ.get('TASK162_REPO', '/home/z/my-project/Amethyst-iOS-MyRemastered')  # Task163: env-injected
+ROOT = os.environ.get('TASK162_REPO', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # Task180: portable default
 
 def rd(rel):
     return open(f"{ROOT}/{rel}", encoding="utf-8", errors="replace").read()
@@ -153,15 +153,15 @@ check("C4 头文件声明（Task162 注）",
       "- (BOOL)isBackgroundLiveAttached;" in bh)
 
 print("== D. 壁纸默认值（毛玻璃/60%/100%；Task164 重锚：nil 判定形态）==")
-check("D1 uiOpacity 默认 0.6（Task162 定稿，Task164 nil 判定重写后语义不变）",
-      "_uiOpacity = 0.6; // Task162/164：默认透明度 60%" in bm)
-check("D2 blurIntensity 默认 1.0（Task162 定稿，Task164 nil 判定重写后语义不变）",
-      "_blurIntensity = 1.0; // Task162/164：默认模糊程度 100%" in bm)
+check("D1 背景透明度默认 0.75（Task180 重锚：用户备注定稿；旧 uiOpacity 0.6 退役）",
+      "_backgroundOpacity = 0.75;" in bm)
+check("D2 blurIntensity 默认 0.0（Task180 重锚：用户备注“模糊 0”）",
+      "_blurIntensity = 0.0;" in bm)
 check("D3 效果默认毛玻璃保持不变（Task164：未保存键不再误读为枚举 0 半透明）",
       "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm
       and "[defaults objectForKey:kBackgroundUIEffectKey]" in bm)
-check("D4 存量已保存值不受影响（Task164 重锚：显式保存值走 else 分支 + 越界兜底）",
-      "if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {" in bm
+check("D4 存量已保存值不受影响（Task180 重锚：显式保存值走 else 分支 + 越界兜底；clamp 下限 0.0）",
+      "if (_backgroundOpacity < 0.0 || _backgroundOpacity > 1.0) {" in bm
       and "if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {" in bm
       and "_uiEffect < BackgroundUIEffectTranslucent || _uiEffect > BackgroundUIEffectBlur" in bm)
 
@@ -170,8 +170,9 @@ nw = rd("Natives/LauncherNewsViewController.m")
 check("E1 ame162_avatarCache 会话缓存（Task162 病历注 + NSCache countLimit 16）",
       "static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {" in nw
       and "cache.countLimit = 16;" in nw)
-check("E2 AvatarManager 本地自定义头像优先（与右面板同源）",
-      "[[AvatarManager sharedManager] avatarForAccount:auth.authData[@\"accountId\"]]" in nw)
+check("E2 AvatarManager 本地自定义头像优先（Task180 重锚：username 回退双参查询）",
+      "avatarForAccount:auth.authData[@\"accountId\"]" in nw
+      and "usernameFallback:auth.authData[@\"username\"]" in nw)
 check("E3 缓存命中同步上屏（不再裸网络重拉）",
       "UIImage *ame162_cached = [ame162_avatarCache() objectForKey:avatarURL];" in nw
       and "命中缓存：同步上屏" in nw)

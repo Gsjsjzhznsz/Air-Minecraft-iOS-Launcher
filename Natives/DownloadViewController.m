@@ -762,6 +762,12 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     self.tabSegment = [[UISegmentedControl alloc] initWithItems:@[localize(@"i18n_str_39", nil), localize(@"i18n_str_1283", nil), localize(@"i18n_str_1284", nil), localize(@"i18n_str_1285", nil), localize(@"i18n_str_1286", nil), localize(@"i18n_str_1287", nil), localize(@"i18n_str_119", nil)]];
     self.tabSegment.translatesAutoresizingMaskIntoConstraints = NO;
     self.tabSegment.selectedSegmentIndex = 0;
+    // Task180：顶部选择栏接「背景透明度」滑条（用户点名"游戏下载页面顶部
+    // 的顶部选择栏不受透明度影响的问题也改"）。安全做法（Task161 教训：
+    // 不碰系统控件私有子视图）：只改控件自身 backgroundColor alpha，
+    // 分段文字/图标（子视图）恒不透明。
+    self.tabSegment.backgroundColor = [[UIColor systemBackgroundColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].backgroundOpacity];
     // 调小字体，确保 7 个 tab 在 iPhone 竖屏也能完整显示
     NSDictionary *textAttrs = @{NSFontAttributeName: [UIFont systemFontOfSize:12 weight:UIFontWeightMedium]};
     [self.tabSegment setTitleTextAttributes:textAttrs forState:UIControlStateNormal];
@@ -780,6 +786,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     self.versionFilterSegment = [[UISegmentedControl alloc] initWithItems:@[localize(@"resman.mods.filter.all", nil), localize(@"i18n_str_2058", nil), localize(@"i18n_str_2059", nil), localize(@"i18n_str_154", nil)]];
     self.versionFilterSegment.translatesAutoresizingMaskIntoConstraints = NO;
     self.versionFilterSegment.selectedSegmentIndex = 0;
+    // Task180：同 tabSegment——底色 alpha 接「背景透明度」滑条
+    self.versionFilterSegment.backgroundColor = [[UIColor systemBackgroundColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].backgroundOpacity];
     [self.versionFilterSegment addTarget:self action:@selector(versionFilterChanged:) forControlEvents:UIControlEventValueChanged];
     [self.view addSubview:self.versionFilterSegment];
 
@@ -801,6 +810,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     self.searchBar.placeholder = localize(@"i18n_str_155", nil);
     self.searchBar.delegate = self;
     self.searchBar.searchBarStyle = UISearchBarStyleMinimal;
+    // Task180：搜索栏接入管线（用户点名"搜索栏不受透明度影响的问题也改"；
+    // 仓内唯一漏网主页搜索栏——ResourceListViewController.m:186 范式）
+    [[BackgroundManager sharedManager] applyEffectToSearchBar:self.searchBar];
     // 搜索框对所有 tab 都显示（版本 tab 用于按版本号前缀过滤）
     self.searchBar.hidden = NO;
     [self.view addSubview:self.searchBar];
@@ -823,7 +835,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     [self.importModpackButton setTitle:localize(@"i18n_str_156", nil) forState:UIControlStateNormal];
     // Task137：恢复 Task89 之前的原生主按钮（系统紫底白字）
     self.importModpackButton.tintColor = [UIColor whiteColor];
-    self.importModpackButton.backgroundColor = [UIColor systemPurpleColor];
+    // Task180：功能按钮底色接「按钮透明度」滑条（图标/文字恒不透明）
+    self.importModpackButton.backgroundColor = [[UIColor systemPurpleColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].buttonOpacity];
     self.importModpackButton.layer.cornerRadius = 10;
     self.importModpackButton.layer.masksToBounds = YES;
     [self.importModpackButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
@@ -1088,7 +1102,10 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     // 圆角胶囊背景轨道
     self.sourceSwitchTrack = [[UIView alloc] init];
     self.sourceSwitchTrack.translatesAutoresizingMaskIntoConstraints = NO;
-    self.sourceSwitchTrack.backgroundColor = [UIColor tertiarySystemFillColor];
+    // Task180：胶囊轨道底色接「背景透明度」滑条（自绘视图直接 alpha 化，
+    // 顶部选择栏容器类；轨道内按钮文字/图标恒不透明）
+    self.sourceSwitchTrack.backgroundColor = [[UIColor tertiarySystemFillColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].backgroundOpacity];
     self.sourceSwitchTrack.layer.cornerRadius = 16;
     self.sourceSwitchTrack.layer.masksToBounds = YES;
     [self.sourceSwitchContainer addSubview:self.sourceSwitchTrack];
@@ -1343,7 +1360,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     [self.sidebarResetButton setImage:[UIImage systemImageNamed:@"arrow.counterclockwise"] forState:UIControlStateNormal];
     self.sidebarResetButton.tintColor = [UIColor systemRedColor];
     // Task137：恢复 Task89 之前的原生样式（tertiarySystemFill 底，标题随 tint 呈红色）
-    self.sidebarResetButton.backgroundColor = [UIColor tertiarySystemFillColor];
+    // Task180：底色接「按钮透明度」滑条（承载功能的小按钮）
+    self.sidebarResetButton.backgroundColor = [[UIColor tertiarySystemFillColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].buttonOpacity];
     self.sidebarResetButton.layer.cornerRadius = 8;
     self.sidebarResetButton.layer.masksToBounds = YES;
     self.sidebarResetButton.imageEdgeInsets = UIEdgeInsetsMake(0, -2, 0, 2);
@@ -1380,7 +1399,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
     button.translatesAutoresizingMaskIntoConstraints = NO;
     // Task137：恢复 Task89 之前的原生选择按钮（tertiarySystemFill 底 + 8pt 圆角）
-    button.backgroundColor = [UIColor tertiarySystemFillColor];
+    // Task180：底色接「按钮透明度」滑条（承载功能的小按钮，标签/箭头恒不透明）
+    button.backgroundColor = [[UIColor tertiarySystemFillColor]
+        colorWithAlphaComponent:[BackgroundManager sharedManager].buttonOpacity];
     button.layer.cornerRadius = 8;
     button.layer.masksToBounds = YES;
     [button addTarget:self action:selector forControlEvents:UIControlEventTouchUpInside];
@@ -5817,6 +5838,16 @@ static NSString *PLSha1FromPrimaryFile(NSDictionary *primaryFile) {
         [self.resourcepackTableView reloadData];
         [self.datapackTableView reloadData];
         [self.worldTableView reloadData];
+        // Task180：顶部选择栏/搜索栏/胶囊轨道随「背景透明度」滑条实时重刷；
+        // 功能按钮底色随「按钮透明度」滑条实时重刷
+        CGFloat bgOpacity = [BackgroundManager sharedManager].backgroundOpacity;
+        CGFloat btnO = [BackgroundManager sharedManager].buttonOpacity;
+        self.tabSegment.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:bgOpacity];
+        self.versionFilterSegment.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:bgOpacity];
+        self.sourceSwitchTrack.backgroundColor = [[UIColor tertiarySystemFillColor] colorWithAlphaComponent:bgOpacity];
+        self.importModpackButton.backgroundColor = [[UIColor systemPurpleColor] colorWithAlphaComponent:btnO];
+        self.sidebarResetButton.backgroundColor = [[UIColor tertiarySystemFillColor] colorWithAlphaComponent:btnO];
+        [[BackgroundManager sharedManager] applyEffectToSearchBar:self.searchBar];
     });
 }
 

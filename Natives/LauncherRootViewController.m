@@ -694,8 +694,11 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
         [[BackgroundManager sharedManager] applyEffectToView:self.sidebarContainer];
         [[BackgroundManager sharedManager] applyEffectToView:self.rightPanelContainer];
     } else {
-        [self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];
-        [self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16];
+        // Task180：无壁纸 Flat 档接「背景透明度」滑条（左侧栏/右侧栏背景
+        // = 本身无功能的大背景类；底色 alpha 化，容器内菜单/按钮文字恒不透明）
+        CGFloat bgOpacity = [BackgroundManager sharedManager].backgroundOpacity;
+        [self.sidebarContainer ame_applyPanelSurfaceWithRadius:16 opacity:bgOpacity];
+        [self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16 opacity:bgOpacity];
     }
 }
 

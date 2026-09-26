@@ -1874,7 +1874,7 @@
 "i18n_str_1293" = "正在下载游戏文件（库 + 资源）";
 "i18n_str_1294" = "正在写入配置文件";
 "i18n_str_1295" = "导入完成";
-"i18n_str_1296" = "透明度";
+"i18n_str_1296" = "背景透明度";
 "i18n_str_1297" = "模糊程度";
 "i18n_str_1298" = "导出";
 "i18n_str_1299" = "%ld 秒";
@@ -2110,9 +2110,9 @@
 "bing.gallery.title" = "浏览壁纸库";
 "bing.refresh.title" = "立即刷新";
 "bing.footer.hint" = "开启后，若未设置自定义壁纸，将自动应用 Bing 每日壁纸并每天更新；设置自定义壁纸会暂时停用，清除背景后自动恢复。";
-"background.effect.footer" = "上方“透明度”控制界面材质的不透明程度（数值越低，壁纸透出越多）；下方“模糊程度”控制背景高斯模糊的强度（数值越低，背景越清晰）。仅在“UI效果”选择毛玻璃或半透明时生效。";
+"background.effect.footer" = "“背景透明度”控制大背景（侧栏/页面背景/卡片/搜索栏等）的不透明程度；“按钮透明度”控制按钮与窗口（启动游戏/信息卡/通知小窗等）的底色不透明程度。两拉条均为 0~100%%，图标和文字始终不透明。";
 "background.cards.neumorph.interface.title" = "新拟态界面";
-"background.cards.neumorph.opacity.title" = "新拟态透明度";
+"background.button.opacity.title" = "按钮透明度";
 "bing.gallery.nav.title" = "Bing 壁纸库";
 "bing.setwallpaper.title" = "设为壁纸";
 "bing.save.title" = "保存到相册";

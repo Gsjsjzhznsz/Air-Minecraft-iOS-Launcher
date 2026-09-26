@@ -1825,7 +1825,7 @@
 "i18n_str_1293" = "Downloading game files (libraries + assets)";
 "i18n_str_1294" = "Writing configuration file";
 "i18n_str_1295" = "Import complete";
-"i18n_str_1296" = "Opacity";
+"i18n_str_1296" = "背景の不透明度";
 "i18n_str_1297" = "Blur Level";
 "i18n_str_1298" = "Export";
 "i18n_str_1299" = "%ld sec";
@@ -1972,9 +1972,9 @@
 "bing.gallery.title" = "ギャラリーを見る";
 "bing.refresh.title" = "今すぐ更新";
 "bing.footer.hint" = "有効にすると、カスタム壁紙未設定の場合は Bing の毎日壁紙が自動で適用され、毎日更新されます。カスタム壁紙を設定すると一時停止し、背景を消去すると自動的に再開します。";
-"background.effect.footer" = "「不透明度」はUI素材の不透明度を制御します（低いほど壁紙が透けて見えます）。「ぼかしレベル」は背景のガウスぼかしの強さを制御します（低いほど背景が鮮明になります）。UI効果がぼかし/半透明に設定されている場合のみ有効です。";
+"background.effect.footer" = "「背景の不透明度」は大きな背景（サイドバー/ページ背景/カード/検索バーなど）の不透明度を、「ボタンの不透明度」はボタンや小ウィンドウ（起動ボタン/情報カード/トーストなど）の背景の不透明度を制御します（0〜100%%）。アイコンとテキストは常に完全不透明です。";
 "background.cards.neumorph.interface.title" = "ニューモーフ UI";
-"background.cards.neumorph.opacity.title" = "ニューモーフィズム透明度";
+"background.button.opacity.title" = "ボタンの不透明度";
 "bing.gallery.nav.title" = "Bing ギャラリー";
 "bing.setwallpaper.title" = "壁紙に設定";
 "bing.save.title" = "写真に保存";

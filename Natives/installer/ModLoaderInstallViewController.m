@@ -16,6 +16,7 @@
 #import "NeoForgeVersionFetcher.h"
 #import "LauncherPreferences.h"
 #import "BackgroundManager.h"
+#import "../UIKit+NativeSurface.h" // Task180：新拟态规格文字色/凸起管线符号
 #import "ModLoaderIconHelper.h"
 #import "ScreenUtils.h"
 #import <QuartzCore/QuartzCore.h>
@@ -59,7 +60,8 @@
     self.selectionStyle = UITableViewCellSelectionStyleDefault;
     self.accessoryType = UITableViewCellAccessoryNone;
 
-    CGFloat iconSize = [ScreenUtils dp:28];
+        // Task180：28→40pt 对齐上级版本卡图标规格
+        CGFloat iconSize = [ScreenUtils dp:40];
     CGFloat nameFont = [ScreenUtils sp:15];
     CGFloat stateFont = [ScreenUtils sp:12];
 
@@ -71,7 +73,8 @@
     _nameLabel = [[UILabel alloc] init];
     _nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _nameLabel.font = [UIFont systemFontOfSize:nameFont weight:UIFontWeightMedium];
-    _nameLabel.textColor = [UIColor labelColor];
+        // Task180：新拟态规格主文字色（对齐版本卡 AmeNeumorphPrimaryTextColor）
+        _nameLabel.textColor = AmeNeumorphPrimaryTextColor();
     _nameLabel.numberOfLines = 1;
     _nameLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentView addSubview:_nameLabel];
@@ -79,7 +82,8 @@
     _stateLabel = [[UILabel alloc] init];
     _stateLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _stateLabel.font = [UIFont systemFontOfSize:stateFont];
-    _stateLabel.textColor = [UIColor secondaryLabelColor];
+        // Task180：新拟态规格次要文字色
+        _stateLabel.textColor = AmeNeumorphSecondaryTextColor();
     _stateLabel.numberOfLines = 1;
     _stateLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentView addSubview:_stateLabel];
@@ -132,10 +136,11 @@
         self.accessoryType = UITableViewCellAccessoryNone;
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.contentView.userInteractionEnabled = NO;
-    } else {
-        self.nameLabel.textColor = [UIColor labelColor];
-        self.stateLabel.textColor = [UIColor secondaryLabelColor];
-        self.iconView.alpha = 1.0;
+        } else {
+            // Task180：恢复分支同步规格文字色
+            self.nameLabel.textColor = AmeNeumorphPrimaryTextColor();
+            self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+            self.iconView.alpha = 1.0;
         self.selectionStyle = UITableViewCellSelectionStyleDefault;
         self.contentView.userInteractionEnabled = YES;
     }
@@ -146,17 +151,19 @@
         self.stateLabel.hidden = NO;
         self.stateLabel.text = text;
         self.stateLabel.textColor = [UIColor systemGreenColor];
-    } else {
-        self.stateLabel.hidden = NO;
-        self.stateLabel.text = localize(@"i18n_str_1200", nil);
-        self.stateLabel.textColor = [UIColor secondaryLabelColor];
-    }
+        } else {
+            self.stateLabel.hidden = NO;
+            self.stateLabel.text = localize(@"i18n_str_1200", nil);
+            // Task180：规格次要文字色
+            self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+        }
 }
 
 - (void)clearStatusText {
     self.stateLabel.hidden = NO;
     self.stateLabel.text = localize(@"i18n_str_1201", nil);
-    self.stateLabel.textColor = [UIColor secondaryLabelColor];
+    // Task180：规格次要文字色
+    self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
 }
 
 - (void)configureWithRow:(ModLoaderRow *)row
@@ -223,14 +230,16 @@
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _titleLabel.font = [UIFont systemFontOfSize:titleFont weight:UIFontWeightMedium];
-    _titleLabel.textColor = [UIColor labelColor];
+        // Task180：新拟态规格主文字色
+        _titleLabel.textColor = AmeNeumorphPrimaryTextColor();
     _titleLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentView addSubview:_titleLabel];
 
     _descLabel = [[UILabel alloc] init];
     _descLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _descLabel.font = [UIFont systemFontOfSize:descFont];
-    _descLabel.textColor = [UIColor secondaryLabelColor];
+        // Task180：新拟态规格次要文字色
+        _descLabel.textColor = AmeNeumorphSecondaryTextColor();
     _descLabel.numberOfLines = 0;
     _descLabel.lineBreakMode = NSLineBreakByWordWrapping;
     _descLabel.adjustsFontForContentSizeCategory = NO;
@@ -939,8 +948,9 @@
     _tableView.backgroundView = nil;
     _tableView.dataSource = self;
     _tableView.delegate = self;
-    _tableView.rowHeight = 54;
-    _tableView.estimatedRowHeight = 54;
+    // Task180：54→64 对齐上级版本卡行高
+    _tableView.rowHeight = 64;
+    _tableView.estimatedRowHeight = 64;
     _tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     _tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
     // extendedLayoutIncludesOpaqueBars / edgesForExtendedLayout 是 UIViewController 的属性，
@@ -1300,8 +1310,19 @@
           selectedVersionDisplay:versionDisplay
                     incompatible:incompatible
                          reason:reason];
-        // Task136：与上级菜单卡片同语言的新拟态凸出样式
-        [[BackgroundManager sharedManager] applyCardEffectToCell:cell];
+            // Task180：重写对齐上级版本卡菜单（用户口径"选择安装方式页面的
+            // 选项始终为扁平UI，请重写UI并兼顾新拟态开关"）——原 applyCard-
+            // EffectToCell 走 Flat 平贴家族（无渐变无双阴影，即"始终扁平"根因），
+            // 换接凸起管线 applyNeumorphCardEffectToView（contentView 作宿主，
+            // 文字/图标是兄弟子视图恒不透明）：开关开 = Task177 三层引擎规格
+            // 渐变卡面 + 双阴影（与版本卡完全同语言，背景透明度滑条同步生效），
+            // 关 = 旧管线毛玻璃/半透明/平贴；圆角由引擎按宿主短边等比写入
+            //（与版本卡一致）。每次出列重铺幂等（复用安全）。
+            cell.clipsToBounds = NO;
+            cell.layer.masksToBounds = NO;
+            cell.contentView.clipsToBounds = NO;
+            cell.contentView.layer.masksToBounds = NO;
+            [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:cell.contentView];
         return cell;
     } else {
         // 附加选项 section（Task136：末节，Fabric API / OptiFine 共存开关）
@@ -1328,8 +1349,19 @@
         }
         [cell.switchControl removeTarget:nil action:NULL forControlEvents:UIControlEventAllEvents];
         [cell.switchControl addTarget:self action:@selector(switchChanged:) forControlEvents:UIControlEventValueChanged];
-        // Task136：与上级菜单卡片同语言的新拟态凸出样式
-        [[BackgroundManager sharedManager] applyCardEffectToCell:cell];
+            // Task180：重写对齐上级版本卡菜单（用户口径"选择安装方式页面的
+            // 选项始终为扁平UI，请重写UI并兼顾新拟态开关"）——原 applyCard-
+            // EffectToCell 走 Flat 平贴家族（无渐变无双阴影，即"始终扁平"根因），
+            // 换接凸起管线 applyNeumorphCardEffectToView（contentView 作宿主，
+            // 文字/图标是兄弟子视图恒不透明）：开关开 = Task177 三层引擎规格
+            // 渐变卡面 + 双阴影（与版本卡完全同语言，背景透明度滑条同步生效），
+            // 关 = 旧管线毛玻璃/半透明/平贴；圆角由引擎按宿主短边等比写入
+            //（与版本卡一致）。每次出列重铺幂等（复用安全）。
+            cell.clipsToBounds = NO;
+            cell.layer.masksToBounds = NO;
+            cell.contentView.clipsToBounds = NO;
+            cell.contentView.layer.masksToBounds = NO;
+            [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:cell.contentView];
         return cell;
     }
 }

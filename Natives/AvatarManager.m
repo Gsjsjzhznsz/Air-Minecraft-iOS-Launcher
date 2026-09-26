@@ -82,6 +82,35 @@
     return [UIImage imageWithContentsOfFile:path];
 }
 
+- (UIImage *)avatarForAccount:(NSString *)accountName
+             usernameFallback:(NSString *)username {
+    // Task180：accountId 优先，miss 且 username 非空时按 username 兑底
+    //（兼容历史按 username 存盘的头像文件；账号 ID 漂移后旧文件仍可命中）
+    UIImage *image = [self avatarForAccount:accountName];
+    if (!image && username.length > 0 && ![username isEqualToString:accountName]) {
+        image = [self avatarForAccount:username];
+        if (image) {
+            NSLog(@"[Task180] avatar hit via username fallback (%@ -> %@)", accountName, username);
+        }
+    }
+    return image;
+}
+
+- (void)ame180_migrateAvatarFromAccount:(NSString *)oldAccount
+                              toAccount:(NSString *)newAccount {
+    // Task180：账号 ID 漂移（refresh 链改写 accountId）时头像文件随迁；
+    // 仅当旧存在且新不存在时搬移（幂等防覆盖，与 loadSavedName 迁移家法一致）
+    if (oldAccount.length == 0 || newAccount.length == 0 || [oldAccount isEqualToString:newAccount]) return;
+    NSString *oldPath = [self avatarPathForAccount:oldAccount];
+    NSString *newPath = [self avatarPathForAccount:newAccount];
+    if ([self.fileManager fileExistsAtPath:oldPath] &&
+        ![self.fileManager fileExistsAtPath:newPath]) {
+        NSError *error = nil;
+        BOOL ok = [self.fileManager moveItemAtPath:oldPath toPath:newPath error:&error];
+        NSLog(@"[Task180] avatar migrated %@ -> %@ (%@)", oldAccount, newAccount, ok ? @"ok" : error.localizedDescription);
+    }
+}
+
 - (BOOL)hasCustomAvatarForAccount:(NSString *)accountName {
     if (accountName.length == 0) return NO;
     return [self.fileManager fileExistsAtPath:[self avatarPathForAccount:accountName]];

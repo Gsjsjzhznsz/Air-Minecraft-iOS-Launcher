@@ -195,7 +195,7 @@ check("I1 unified row spec table", "ame173_rowSpec" in bg)
 check("I2 centerY anchors", bg.count("centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor") >= 3)
 check("I3 constraint-built sliders", "translatesAutoresizingMaskIntoConstraints = NO" in bg)
 check("I4 no y=0 frames remain", "CGRectMake(150, 0," not in bg and "CGRectMake(165, 0," not in bg)
-check("I5 opacity floor preserved (0.1)", '(indexPath.row == 1) ? 0.1f : 0.0f' in bg)
+check("I5 opacity floor retired (Task180 重锚：用户定稿 0~100% 无下限，旧 0.1 floor 退役)", 'slider.minimumValue = 0.0f;' in bg)
 
 print("== J. Forge-JIT restart-and-launch ==")
 jl = rd("Natives/JavaLauncher.m")

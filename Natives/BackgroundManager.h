@@ -32,8 +32,30 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 
 // UI effect settings (for custom background)
 @property (nonatomic, assign) BackgroundUIEffect uiEffect;
-@property (nonatomic, assign) CGFloat uiOpacity;  // 0.0 ~ 1.0
-@property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度
+// Task180（用户定稿"UI效果的透明度选项改成背景透明度，再开一个按钮透明
+// 度；区分好所有界面的类别，用这两个拉条控制 0~100% 透明度"）：双滑条
+// 统一透明度体系——
+//   backgroundOpacity「背景透明度」：管辖全部"本身无功能的大背景"类——
+//     左侧栏/中心界面/右侧栏背景（Root 与卡片双布局）、实例页面等更多
+//     页面背景、壁纸选择页背景、游戏下载页顶部选择栏/搜索栏、设置页
+//     选项行、半透明档页面底色，以及新拟态卡体（卡片=背景类，Task178
+//     的"新拟态透明度"滑条退役并入本滑条）。只淡承载底色/卡体，图标
+//     和文字恒不透明（Flat=底色 alpha；新拟态=承载视图整体 alpha）。
+//     defaults background_bg_opacity 直读写，默认 0.75（用户备注
+//     "背景 75%"），0.0~1.0 无下限（用户定稿 0~100%）。
+//   buttonOpacity「按钮透明度」：管辖"承载文字/功能/退出的小按钮/窗口"
+//     类——启动游戏/执行Jar/选择版本/下载中心按钮、右侧栏权限信息/
+//     设备信息卡、菜单按钮、下载页功能按钮、NMToast 通知小窗、崩溃窗
+//     按钮。语义 = 按钮底色不透明度系数（base × buttonOpacity）：100%
+//     = 各按钮现形态原样（失效安全），0% = 底色全透明（图标/文字恒
+//     不透明）。defaults background_btn_opacity 直读写，默认 1.0
+//     （用户备注"按钮 100%"）。
+// 旧 uiOpacity（0.6 下限 0.1，管半透明档材质）与 cardsNeumorphOpacity
+// （Task178 专用新拟态滑条）双双退役：前者的消费点全部改读本属性，
+// 后者的挂点①②改读 backgroundOpacity——两滑条/两键时代结束。
+@property (nonatomic, assign) CGFloat backgroundOpacity; // defaults background_bg_opacity，默认 0.75，0.0~1.0
+@property (nonatomic, assign) CGFloat buttonOpacity;     // defaults background_btn_opacity，默认 1.0，0.0~1.0
+@property (nonatomic, assign) CGFloat blurIntensity; // 0.0 ~ 1.0, 背景模糊程度（Task180 默认改 0%，用户备注"模糊 0"）
 
 // Task172（用户定稿，重写卡片管线）：新拟态界面开关。Task177 规格定稿：
 //   开启（默认）→ 卡片永远按 CSS 参考规格渲染：渐变表面 + 固定档双阴影
@@ -45,13 +67,10 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 //   且 UI 效果类型/模糊度在开启时也不影响新拟态——新拟态与旧管线两套
 //   渲染并行共存，各读各的偏好。
 @property (nonatomic, assign) BOOL cardsNeumorphEnabled; // defaults background_cards_neumorph_enabled，默认 YES
-// Task178（Task170 机制恢复，用户定稿"只有那个透明度拉条可以改变新拟态
-// 的透明度，当然字体始终是不透明的"）：卡片本体透明度——只淡卡体（渐变
-// 表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），文字/图标恒
-// 不透明。与 UI 效果类型/模糊度/壁纸透明度（uiOpacity）完全无关，唯一
-// 入口 = 本偏好。defaults background_cards_neumorph_opacity 直读写，
-// 默认 1.0（= Task177 规格原样，用户已认可的定稿形态不缩水）。
-@property (nonatomic, assign) CGFloat cardsNeumorphOpacity;
+// Task180：cardsNeumorphOpacity 属性退役——新拟态卡体透明度并入
+// backgroundOpacity「背景透明度」（卡片=背景类，用户定稿"两个拉条控制
+// 所有界面"），引擎原语 ame_applyNeumorphCardOpacity 与两处管线挂点保持，
+// 只是喂入值换源。
 
 // Global background container
 @property (nonatomic, strong, readonly, nullable) UIView *globalBackgroundContainer;

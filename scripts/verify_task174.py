@@ -82,9 +82,9 @@ check("A4 refreshUIEffect OFF 分支：原位重建 + blur 重挂（不变）",
       "if ([self hasBackground] && !self.globalBackgroundContainer) {" in bm_m
       and "[self applyBackgroundToSplitViewController:self.currentSplitVC];" in bm_m
       and "[self applyBackgroundToWindow:self.currentWindow];" in bm_m)
-check("A5 卡片本体透明度挂载点恢复（Task178 重锚：柔和档仍退役，引擎原语两管线挂点回归）",
+check("A5 卡片本体透明度挂载点（Task180 重锚：柔和档仍退役，原语两管线挂点读背景透明度）",
       bm_m.count("ame_setNeumorphWallpaperSoft") == 0
-      and bm_m.count("ame_applyNeumorphCardOpacity") == 2)
+      and bm_m.count("ame_applyNeumorphCardOpacity:self.backgroundOpacity]") == 2)
 check("A5b 柔和档引擎整体退役（Task177 重锚：属性/参数/透传原语全退，恒 1.0 不透明度 + 不透明渐变表面层在位）",
       "ame_wallpaperSoftProfile" not in rd("Natives/UIKit+NativeSurface.m")
       and "offset * 0.35" not in rd("Natives/UIKit+NativeSurface.m")
@@ -98,18 +98,19 @@ check("A5b 柔和档引擎整体退役（Task177 重锚：属性/参数/透传�
 # ============================================================
 blur_handler = bsvc[bsvc.index("- (void)blurIntensitySliderChanged"):]
 blur_handler = blur_handler[:blur_handler.index("\n}", 1) + 2]
-check("B1 滑条回调实时回显恢复（Task178 重锚：opacity 行 viewWithTag:501 + 回调回归；blur 行 301 范式不变）",
+check("B1 滑条回调实时回显（Task180 重锚：opacity 行 301→背景透明度行 + 按钮行 601 回调；blur 行范式不变）",
       "viewWithTag:301" in blur_handler
-      and "viewWithTag:501" in bsvc
-      and "cardsNeumorphOpacitySliderChanged" in bsvc)
+      and "viewWithTag:601" in bsvc
+      and "buttonOpacitySliderChanged" in bsvc)
 check("B2 blur 回调含百分比格式（%.0f%% × 100）",
       '@"%.0f%%", value * 100' in blur_handler)
 check("B3 blur 滑条取回范式（slider→superview→superview + 类型守卫）",
       "slider.superview.superview" in blur_handler
       and "[cell isKindOfClass:[UITableViewCell class]]" in blur_handler)
-check("B4 既有刷新链不破坏（Task178 重锚：refreshUIEffect 仍在；透明度落盘链恢复）",
+check("B4 既有刷新链不破坏（Task180 重锚：refreshUIEffect 仍在；背景/按钮透明度落盘链在位）",
       "refreshUIEffect" in blur_handler
-      and ".cardsNeumorphOpacity = slider.value;" in bsvc)
+      and ".backgroundOpacity = value;" in bsvc
+      and ".buttonOpacity = slider.value;" in bsvc)
 
 # ============================================================
 # C. 既有语义不回潮（Task173 重写与灰化反转原样保留）
@@ -128,8 +129,9 @@ check("C3 开关回调链不回潮（落盘 + refreshUIEffect + reloadData）",
       "cardsNeumorphToggleChanged:" in bsvc
       and bsvc.index("- (void)cardsNeumorphToggleChanged:") < bsvc.index("refreshUIEffect", bsvc.index("- (void)cardsNeumorphToggleChanged:"))
       and "reloadData" in bsvc[bsvc.index("- (void)cardsNeumorphToggleChanged:"):bsvc.index("- (void)cardsNeumorphToggleChanged:") + 400])
-check("C4 卡片本体透明度原语恢复（Task178 重锚：管线双挂点 + 引擎原语在位）",
-      bm_m.count("ame_applyNeumorphCardOpacity") == 2
+check("C4 卡片本体透明度原语（Task180 重锚：管线双挂点读背景透明度 + 引擎原语在位；3 处 = 2 调用 + 1 退役注释）",
+      bm_m.count("ame_applyNeumorphCardOpacity") == 3
+      and bm_m.count("ame_applyNeumorphCardOpacity:self.backgroundOpacity]") == 2
       and "ame_applyNeumorphCardOpacity" in rd("Natives/UIKit+NativeSurface.m"))
 
 # ============================================================
@@ -139,9 +141,9 @@ KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/L
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
 check("D1 四主语言键集一致且计数 = 1955（Task174 零新增；十症状并行会话并入后 1954->1955）",
       all(len(k) == 1955 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
-check("D2 开关键六语言在位（Task178 重锚：opacity.title 恢复，interface.title 保留）",
+check("D2 开关键六语言在位（Task180 重锚：button.opacity 键替代 neumorph.opacity，interface.title 保留）",
       "background.cards.neumorph.interface.title" in KEYSETS[0]
-      and "background.cards.neumorph.opacity.title" in KEYSETS[0]
+      and "background.button.opacity.title" in KEYSETS[0]
       and all("background.cards.neumorph.interface.title" in
               rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
               for lg in ["ja", "km"]))

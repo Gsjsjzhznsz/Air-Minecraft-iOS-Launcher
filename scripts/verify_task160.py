@@ -20,7 +20,7 @@ import sys
 
 # Task161：ROOT 环境注入（沿用 TASK150_REPO 惯例）——原硬编码另一会话沙箱
 # 路径 /home/z/my-project/workspace/...，本仓库运行直接 FileNotFoundError。
-ROOT = os.environ.get('TASK160_REPO', '/home/z/my-project/Amethyst-iOS-MyRemastered')
+ROOT = os.environ.get('TASK160_REPO', os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # Task180: portable default
 PASS, FAIL = 0, 0
 
 
@@ -113,10 +113,10 @@ bm = read('Natives/BackgroundManager.m')
 check("B1  ui_theme 默认（Task161 重锚：用户指令“外观模式默认跟随系统”，推翻 Task160 的 light 缺省 → auto + 迁移）",
       '@"ui_theme": @"auto",' in plp
       and 'ui_theme_explicit' in plp)
-check("B2  uiOpacity 默认 0.6（Task162 重锚：用户定稿“毛玻璃，60% 的透明度，100% 的模糊”，推翻 Task160 的 0.1 缺省）",
-      "_uiOpacity = 0.6;" in bm and "_uiOpacity = 0.1;" not in bm and "_uiOpacity = 0.7;" not in bm)
-check("B3  blurIntensity 默认 1.0（Task162 重锚：100%）",
-      "_blurIntensity = 1.0;" in bm and "_blurIntensity = 0.75;" not in bm and "_blurIntensity = 0.7; //" not in bm)
+check("B2  背景透明度默认 0.75（Task180 重锚：用户备注定稿“背景 75%”；旧 uiOpacity 0.6/0.1/0.7 全退役）",
+      "_backgroundOpacity = 0.75;" in bm and "_uiOpacity = 0.1;" not in bm and "_uiOpacity = 0.7;" not in bm)
+check("B3  blurIntensity 默认 0.0（Task180 重锚：用户备注“模糊 0”，推翻 Task162 的 100%）",
+      "_blurIntensity = 0.0;" in bm and "_blurIntensity = 0.75;" not in bm and "_blurIntensity = 0.7; //" not in bm)
 check("B4  默认效果仍为毛玻璃（BackgroundUIEffectBlur）",
       "_uiEffect = BackgroundUIEffectBlur;" in bm)
 check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto；Task162 重锚：透明度/模糊注释改口径；Task164 重锚：nil 判定后病历注释承载首次语义）",
@@ -170,9 +170,10 @@ check("D4  双阴影承载视图（Task177 重锚：暗影右下 + 高光左上�
 check("D5  深浅色切换自动重刷（traitCollectionDidChange）",
       "traitCollectionDidChange:" in nsm
       and "AmeNeumorphDynamicColor" in nsm)
-check("D6  表面方法路由（Task163 重锚：Panel 退役阴影转 Flat——侧栏/右面板全屏大容器等比阴影溢出压到中央卡片，用户指令；Card/Raised 仍走新拟态）",
+check("D6  表面方法路由（Task180 重锚：Panel 转发 opacity 变体（默认 1.0 失效安全）；Card/Raised 仍走新拟态）",
       nsm.count("[self ame_applyNeumorphSurface];") == 2
-      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm)
+      and "[self ame_applyPanelSurfaceWithRadius:cornerRadius opacity:1.0];" in nsm
+      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius opacity:opacity];" in nsm)
 check("D7  cell 平贴版（无阴影层，防列表裁剪互叠）",
       "- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {" in nsm
       and "self.layer.masksToBounds = YES;" in nsm)

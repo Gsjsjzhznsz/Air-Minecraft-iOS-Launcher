@@ -19,6 +19,20 @@ NS_ASSUME_NONNULL_BEGIN
 /// 读取指定账户的自定义头像图片，不存在返回 nil。
 - (nullable UIImage *)avatarForAccount:(NSString *)accountName;
 
+/// Task180：accountId 优先 + username 回退查询（防御性修复"右侧栏头像未
+/// 显示"）——历史版本头像曾按 username 存盘；账号 ID 漂移（refresh 链改写
+/// accountId，见复制 bug）后自定义头像按旧 ID 存盘、新 ID 查不到。本方法
+/// 先按 accountId 查，miss 且 username 非空时按 username 兜底再查一次
+/// （兼容旧文件名）。两处均 miss 返回 nil。
+- (nullable UIImage *)avatarForAccount:(NSString *)accountName
+                       usernameFallback:(nullable NSString *)username;
+
+/// Task180：账号 ID 漂移时的头像迁移（复制 bug 双保险配套）——仅当旧 ID
+/// 头像存在且新 ID 头像不存在时搬移（幂等防覆盖）；任一侧条件不满足为
+/// 无害空操作。
+- (void)ame180_migrateAvatarFromAccount:(NSString *)oldAccount
+                              toAccount:(NSString *)newAccount;
+
 /// 是否已存在指定账户的自定义头像。
 - (BOOL)hasCustomAvatarForAccount:(NSString *)accountName;
 

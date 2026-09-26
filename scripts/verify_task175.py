@@ -227,10 +227,10 @@ check("F3 柔和档引擎整体退役（Task177 重锚：属性/透传原语/0.3
       and "lightOpacity = 0.50" not in engine_m
       and "ame_wallpaperSoftProfile != soft" not in engine_m
       and "ame177_surfaceLayer" in engine_m)
-check("F4 柔和档退役 + 卡体透明度挂点恢复（Task178 重锚：柔和档调用全退；cardOpacity 两管线挂点回归）",
+check("F4 柔和档退役 + 卡体透明度挂点（Task180 重锚：两挂点读背景透明度）",
       bm.count("ame_setNeumorphWallpaperSoft") == 0
-      and bm.count("[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") == 1
-      and bm.count("[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") == 1)
+      and bm.count("[view ame_applyNeumorphCardOpacity:self.backgroundOpacity];") == 1
+      and bm.count("[target ame_applyNeumorphCardOpacity:self.backgroundOpacity];") == 1)  # Task180
 check("F5 规格档不回退（Task177 重锚：恒 1.0 不透明度 = shadowOpacity = 1.0 ×2 层）",
       engine_m.count("shadowOpacity = 1.0") == 2)
 

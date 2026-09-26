@@ -88,16 +88,17 @@ nsm = read('Natives/UIKit+NativeSurface.m')
 nsh = read('Natives/UIKit+NativeSurface.h')
 root = read('Natives/LauncherRootViewController.m')
 
-check("A1  Panel 方法转 Flat 路由（表面+圆角，不挂阴影承载层）",
-      "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm
+check("A1  Panel 方法转 Flat 路由（Task180 重锚：转发 opacity 变体；NeumorphSurface 直调仅剩 Card/Raised 两处）",
+      "[self ame_applyPanelSurfaceWithRadius:cornerRadius opacity:1.0];" in nsm
+      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius opacity:opacity];" in nsm
       and nsm.count("[self ame_applyNeumorphSurface];") == 2,
-      "Panel 实现必须走 Flat；NeumorphSurface 直调仅剩 Card/Raised 两处")
+      "Panel 实现必须转发 opacity 变体；NeumorphSurface 直调仅剩 Card/Raised 两处")
 check("A2  Panel 注释留档（Task177 重锚：退役阴影语义延续到新注释——全屏大容器不挂阴影承载层）",
       "平贴面板退役阴影" in nsm
       and "ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius {" in nsm)
-check("A3  调用点保持 Panel 语义（LauncherRoot 无壁纸分支两行不变）",
-      "[self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];" in root
-      and "[self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16];" in root)
+check("A3  调用点保持 Panel 语义（Task180 重锚：LauncherRoot 无壁纸分支两行接背景透明度）",
+      "[self.sidebarContainer ame_applyPanelSurfaceWithRadius:16 opacity:bgOpacity];" in root
+      and "[self.rightPanelContainer ame_applyPanelSurfaceWithRadius:16 opacity:bgOpacity];" in root)
 check("A4  maskedCorners/创建态裁剪不被触碰（侧栏外侧两角圆角保留）",
       "kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner" in root
       and "kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner" in root
@@ -124,9 +125,9 @@ check("B2  CollectionViewCell 无壁纸分支挂双阴影（Flat -> NeumorphSurf
 check("B3  宿主链放行裁剪（无壁纸分支 cell.clipsToBounds=NO + contentView masks=NO）",
       "cell.clipsToBounds = NO;" in bm
       and "cell.contentView.layer.masksToBounds = NO;" in bm)
-check("B3b 表格卡片行的 Flat 形态裁剪不受影响（applyCardEffectToCell 保留自身 clips=YES）",
+check("B3b 表格卡片行的 Flat 形态裁剪不受影响（Task180 重锚：clips=YES 保留，Flat 接背景透明度）",
       "cell.clipsToBounds = YES;" in bm
-      and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
+      and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12\n                                                    opacity:self.backgroundOpacity];" in bm)
 check("B4  壁纸分支清残留阴影（applyEffectToView + CollectionViewCell 双入口）",
       bm.count("[view ame_removeNeumorphShadow];") >= 1
       and "[cell.contentView ame_removeNeumorphShadow];" in bm
@@ -143,8 +144,8 @@ check("B7  VersionCardCell 换调新管线",
 check("B8  HomeTileBaseCell 基类结构未动（磁贴圆角/容器创建保持）",
       "self.contentView.layer.cornerRadius = 16;" in read('Natives/LauncherNewsViewController.m')
       and "applyEffectToCollectionViewCell:self];" in read('Natives/LauncherNewsViewController.m'))
-check("B9  表格卡片行 applyCardEffectToCell 保持 Flat（用户未点名，不扩散）",
-      "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
+check("B9  表格卡片行 applyCardEffectToCell 保持 Flat（Task180 重锚：Flat 家族接背景透明度，调用点已迁安装页→凸起）",
+      "ame_applyNeumorphSurfaceFlatWithRadius:12\n                                                    opacity:self.backgroundOpacity];" in bm)
 check("B10 引擎凸起契约幸存（Task177 重锚：双阴影方向维持；透明承载层改投影对+不透明渐变表面三层结构）",
       "CGSizeMake(offset, offset)" in nsm
       and "CGSizeMake(-offset, -offset)" in nsm

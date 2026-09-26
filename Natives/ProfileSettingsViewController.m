@@ -2945,12 +2945,13 @@ static NSString * localizeProfileTitle(NSString *title) {
             UIVisualEffectView *blurView = [[UIVisualEffectView alloc] initWithEffect:blur];
             blurView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
             blurView.frame = tv.bounds;
-            // 按 uiEffect 调整透明度：毛玻璃模式保持默认 0.7 通透，半透明模式按 uiOpacity
+            // 按 uiEffect 调整透明度：毛玻璃模式保持默认 0.7 通透，半透明模式按「背景透明度」
             BackgroundUIEffect effect = [BackgroundManager sharedManager].uiEffect;
             if (effect == BackgroundUIEffectBlur) {
                 blurView.alpha = 0.85;
             } else {
-                blurView.alpha = MAX(0.5, [BackgroundManager sharedManager].uiOpacity);
+                // Task180：实例页背景受「背景透明度」滑条管辖（旧 uiOpacity 退役）
+                blurView.alpha = MAX(0.5, [BackgroundManager sharedManager].backgroundOpacity);
             }
             tv.backgroundView = blurView;
         } else {

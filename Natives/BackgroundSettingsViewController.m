@@ -152,7 +152,9 @@
     // 恢复/清除顺延为 3/4。
     // Sections: [UI效果设置], [选择背景类型], [Bing 壁纸(开关+画廊+刷新)], [图片背景, 视频背景], [恢复默认背景, 清除背景]
     self.sections = @[
-        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.interface.title", nil), localize(@"background.cards.neumorph.opacity.title", nil)],
+        // Task180：新拟态透明度键退役→按钮透明度键（背景透明度沿用老键
+        // i18n_str_1296 改值，不加计数）；四主语言键总数不变
+        @[localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil), localize(@"background.cards.neumorph.interface.title", nil), localize(@"background.button.opacity.title", nil)],
         @[localize(@"i18n_str_60", nil)],
         @[localize(@"bing.section.header", nil), localize(@"bing.toggle.title", nil), localize(@"bing.gallery.title", nil), localize(@"bing.refresh.title", nil)],
         @[localize(@"i18n_str_61", nil), localize(@"i18n_str_55", nil)],
@@ -171,11 +173,11 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    // 如果没有自定义背景，隐藏旧壁纸管线选项（行 0-2：UI效果/透明度/模糊程度）；
-    // Task172：新拟态界面开关行恒显。Task178：卡片本体透明度滑条行恢复恒显
-    //（Task170 机制，开关行 + 滑条行两行；无壁纸也有透明度可调）。
+    // 如果没有自定义背景，隐藏旧壁纸管线选项（行 0-2：UI效果/背景透明度/模糊程度）；
+    // Task172：新拟态界面开关行恒显。Task180：背景/按钮透明度两滑条恒显
+    //（无壁纸也有背景/按钮可调：开关 + 背景透明度 + 按钮透明度 = 三行）。
     if (section == 0 && ![[BackgroundManager sharedManager] hasBackground]) {
-        return 2;
+        return 3;
     }
     return [self.sections[section] count];
 }
@@ -232,7 +234,7 @@
             [self styleCell:cell hasBackground:hasBackground];
             return cell;
             
-        } else if (hasBackground && (indexPath.row == 1 || indexPath.row == 2)) {
+        } else if (indexPath.row == 1 || (hasBackground && indexPath.row == 2)) {
             // Task173（十连修会话）：透明度/模糊程度两行改用统一的 Auto Layout
             // 构建（用户反馈"壁纸设置默认配置调反了界面尺寸就会与点击位置
             // 错位"——旧实现三重错位源：①滑块/标签 y=0 h=30 顶对齐，可见拇指
@@ -263,8 +265,8 @@
 
                 UISlider *slider = [[UISlider alloc] init];
                 slider.translatesAutoresizingMaskIntoConstraints = NO;
-                // Task173：透明度行保持 0.1 下限（旧语义），模糊行 0.0 起步
-                slider.minimumValue = (indexPath.row == 1) ? 0.1f : 0.0f;
+                // Task180：背景/模糊两行均 0.0 起步（用户定稿 0~100%；旧背景行 0.1 下限退役）
+                slider.minimumValue = 0.0f;
                 slider.maximumValue = 1.0f;
                 slider.tag = [ame173_rowSpec[1] integerValue];
                 [slider addTarget:self action:NSSelectorFromString(ame173_rowSpec[4]) forControlEvents:UIControlEventValueChanged];
@@ -302,8 +304,10 @@
             UISlider *slider = [cell.contentView viewWithTag:[ame173_rowSpec[1] integerValue]];
             UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:[ame173_rowSpec[3] integerValue]];
             if (indexPath.row == 1) {
-                slider.value = manager.uiOpacity;
-                valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.uiOpacity * 100];
+                // Task180：行1 = 「背景透明度」滑条（旧 uiOpacity 改名扩权；
+                // 管辖大背景/新拟态卡体/半透明档，0~100%）
+                slider.value = manager.backgroundOpacity;
+                valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.backgroundOpacity * 100];
                 self.opacityValueLabel = valueLabel;
                 cell.imageView.image = [UIImage systemImageNamed:@"circle.lefthalf.filled"];
             } else {
@@ -341,38 +345,35 @@
             return cell;
         }
 
-        // Task178（Task170 机制恢复）：卡片本体透明度滑条行——恒显恒可操作
-        //（开关行下方；Task177 曾随"不要加任何的透明度"定稿退役，本轮用户
-        // 定稿恢复：只有它改变新拟态透明度，且字体恒不透明）。0%~100% 全档
-        //（0% = 卡体全透明，文字仍可见）。Task173 构建范式：统一 Auto Layout
-        //（图标后标题、滑块垂直居中占满剩余宽度、数值标签固定尾端——任意
-        // 行宽/旋转不错位）。
-        if (indexPath.row == (hasBackground ? 4 : 1)) {
-            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"CardsNeumorphOpacityCell"];
+        // Task180（两拉条体系统一）：按钮透明度滑条行——恒显恒可操作
+        //（新拟态透明度滑条退役，本行改管按钮/小窗类：底色 = 基础色 ×
+        // buttonOpacity，文字/图标恒不透明；0%~100% 全档）。
+        if (indexPath.row == (hasBackground ? 4 : 2)) {
+            UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ButtonOpacityCell"];
             if (!cell) {
-                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"CardsNeumorphOpacityCell"];
+                cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:@"ButtonOpacityCell"];
                 cell.selectionStyle = UITableViewCellSelectionStyleNone;
 
                 UILabel *titleLabel = [[UILabel alloc] init];
                 titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
                 titleLabel.font = [UIFont systemFontOfSize:15];
                 titleLabel.textColor = [UIColor labelColor];
-                titleLabel.tag = 502;
+                titleLabel.tag = 602;
                 [cell.contentView addSubview:titleLabel];
 
                 UISlider *slider = [[UISlider alloc] init];
                 slider.translatesAutoresizingMaskIntoConstraints = NO;
-                // Task170 语义：0%~100% 全开（0% = 卡体全透明，文字仍可见）
+                // Task180：0%~100% 全档（0% = 按钮底色全透明，文字/图标仍可见）
                 slider.minimumValue = 0.0f;
                 slider.maximumValue = 1.0f;
-                slider.tag = 500;
-                [slider addTarget:self action:@selector(cardsNeumorphOpacitySliderChanged:) forControlEvents:UIControlEventValueChanged];
+                slider.tag = 600;
+                [slider addTarget:self action:@selector(buttonOpacitySliderChanged:) forControlEvents:UIControlEventValueChanged];
                 [cell.contentView addSubview:slider];
 
                 UILabel *valueLabel = [[UILabel alloc] init];
                 valueLabel.translatesAutoresizingMaskIntoConstraints = NO;
                 valueLabel.textAlignment = NSTextAlignmentRight;
-                valueLabel.tag = 501;
+                valueLabel.tag = 601;
                 valueLabel.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
                 [cell.contentView addSubview:valueLabel];
 
@@ -392,18 +393,18 @@
 
             [self styleCell:cell hasBackground:hasBackground];
 
-            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:502];
-            titleLabel.text = self.sections[0][hasBackground ? 4 : 1]; // background.cards.neumorph.opacity.title
+            UILabel *titleLabel = (UILabel *)[cell.contentView viewWithTag:602];
+            titleLabel.text = self.sections[0][hasBackground ? 4 : 2]; // background.button.opacity.title
 
-            UISlider *slider = [cell.contentView viewWithTag:500];
-            slider.value = manager.cardsNeumorphOpacity;
+            UISlider *slider = [cell.contentView viewWithTag:600];
+            slider.value = manager.buttonOpacity;
 
-            UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:501];
-            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.cardsNeumorphOpacity * 100];
+            UILabel *valueLabel = (UILabel *)[cell.contentView viewWithTag:601];
+            valueLabel.text = [NSString stringWithFormat:@"%.0f%%", manager.buttonOpacity * 100];
             valueLabel.textColor = [UIColor labelColor]; // Task91
 
             cell.textLabel.text = nil;
-            cell.imageView.image = [UIImage systemImageNamed:@"square.on.square"];
+            cell.imageView.image = [UIImage systemImageNamed:@"record.circle"];
 
             return cell;
         }
@@ -506,7 +507,9 @@
 
 - (void)opacitySliderChanged:(UISlider *)slider {
     CGFloat value = slider.value;
-    [BackgroundManager sharedManager].uiOpacity = value;
+    // Task180：「背景透明度」滑条（旧 uiOpacity 改名扩权：大背景+新拟态卡体
+    // +半透明档统一管辖，0~100% 无下限）
+    [BackgroundManager sharedManager].backgroundOpacity = value;
     
     self.opacityValueLabel.text = [NSString stringWithFormat:@"%.0f%%", value * 100];
     
@@ -529,18 +532,18 @@
     [[BackgroundManager sharedManager] refreshUIEffect];
 }
 
-// Task178（Task170/172/174 机制恢复，用户定稿：只有"新拟态透明度"拉条
-// 可以改变新拟态的透明度，字体恒不透明）——落盘后走统一刷新链重建卡片
-//（引擎原语 ame_applyNeumorphCardOpacity：承载视图整体 alpha 淡化卡体，
-// 文字不动；每次重挂全量重设，无残留）。
-- (void)cardsNeumorphOpacitySliderChanged:(UISlider *)slider {
-    [BackgroundManager sharedManager].cardsNeumorphOpacity = slider.value;
+// Task180（两拉条体系统一，用户定稿"再开一个按钮透明度"）：按钮透明度
+// 滑条——管辖承载文字/功能/退出的小按钮/窗口（启动游戏/执行Jar/选择版本/
+// 下载中心/右侧栏信息卡/菜单按钮/下载页功能按钮/NMToast/崩溃窗按钮），
+// 底色 = 基础色 × buttonOpacity，文字/图标恒不透明。落盘后走统一刷新链
+//（BackgroundUIEffectChanged 广播，各按钮方在通知回调里重刷外观）。
+- (void)buttonOpacitySliderChanged:(UISlider *)slider {
+    [BackgroundManager sharedManager].buttonOpacity = slider.value;
 
-    // Task174：百分比实时回显。与 blurIntensitySliderChanged 同款取回范式：
-    // slider→contentView→cell，按 tag 501 找标签即时重写。
+    // Task174：百分比实时回显范式：slider→contentView→cell，按 tag 601 找标签即时重写。
     UITableViewCell *cell = (UITableViewCell *)slider.superview.superview;
     if ([cell isKindOfClass:[UITableViewCell class]]) {
-        UILabel *valueLabel = [cell.contentView viewWithTag:501];
+        UILabel *valueLabel = [cell.contentView viewWithTag:601];
         valueLabel.text = [NSString stringWithFormat:@"%.0f%%", slider.value * 100];
     }
 
@@ -772,7 +775,10 @@
         // 重置UI效果设置
         BackgroundManager *manager = [BackgroundManager sharedManager];
         manager.uiEffect = BackgroundUIEffectBlur;
-        manager.uiOpacity = 0.7;
+        // Task180：默认初始值定稿（用户备注：毛玻璃/背景 75%/按钮 100%/模糊 0）
+        manager.backgroundOpacity = 0.75;
+        manager.buttonOpacity = 1.0;
+        manager.blurIntensity = 0.0;
         
         [self updatePreview];
         [self.tableView reloadData];

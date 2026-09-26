@@ -233,9 +233,22 @@ static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait
 }
 
 - (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {
+    [self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius opacity:1.0];
+}
+
+- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius
+                                       opacity:(CGFloat)opacity {
     // Task160：cell/列表场景平贴版——只上规格表面色与圆角，无阴影层（避免
-    // 被相邻 cell/tableView 裁剪互叠），裁剪保持（Task152 直角露出修复不变）
-    self.backgroundColor = AmeNeumorphSurfaceColor();
+    // 被相邻 cell/tableView 裁剪互叠），裁剪保持（Task152 直角露出修复不变）。
+    // Task180：opacity = 背景透明度滑条（Flat 档载体）：只淡宿主底色
+    // （backgroundColor alpha），文字/图标子视图不参与；1.0 与旧形态完全
+    // 一致（未接滑条的调用点零行为变化，失效安全）。
+    CGFloat o = MAX(0.0, MIN(1.0, opacity));
+    UIColor *surface = AmeNeumorphSurfaceColor();
+    if (o < 1.0) {
+        surface = [surface colorWithAlphaComponent:o];
+    }
+    self.backgroundColor = surface;
     self.layer.cornerRadius = MAX(8.0, MIN(cornerRadius, 50.0));
     self.layer.masksToBounds = YES;
 }
@@ -252,9 +265,15 @@ static CGColorRef Ame177ResolvedCGColor(UIColor *color, UITraitCollection *trait
 }
 
 - (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius {
+    [self ame_applyPanelSurfaceWithRadius:cornerRadius opacity:1.0];
+}
+
+- (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius
+                                opacity:(CGFloat)opacity {
     // Task163：平贴面板退役阴影（侧栏/右面板等全屏高大容器不挂阴影承载层）。
     // Task177 后此家族仍为 Flat 表面（无渐变无阴影）——面板不在凸起规格内。
-    [self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];
+    // Task180：opacity = 背景透明度滑条（Flat 档载体），语义同 Flat opacity 版。
+    [self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius opacity:opacity];
 }
 
 - (void)ame_removeNeumorphShadow {

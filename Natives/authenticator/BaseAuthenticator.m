@@ -4,6 +4,19 @@
 #import "../LauncherPreferences.h"
 #import "../ios_uikit_bridge.h"
 #import "../utils.h"
+#import "../AvatarManager.h"
+
+// Task180：复制 bug 双保险①——记录当前实例上一次已成功落盘的 accountId。
+// refresh 链（选择账号必经）会改写 accountId（3P=profileId/微软=xuid），
+// 而 saveChanges 只写新文件不删旧文件 → 旧账号 .json 残留 → 列表重复
+//（用户实测"多次选择并报错后会复制"）。同仓库两处改 ID 流程（loadSaved-
+// Name 迁移 / ThirdParty switchToProfile）都配了对删除，唯独 refresh 链
+// 漏配——本属性使 saveChanges 能感知漂移并在写盘成功后统一迁移头像 +
+// 清理旧文件（write-side cleanup；读侧去重在 AccountListViewController
+// reloadAccountList，双保险②）。
+@interface BaseAuthenticator ()
+@property (nonatomic, copy, nullable) NSString *ame180_savedAccountId;
+@end
 
 @implementation BaseAuthenticator
 
@@ -115,6 +128,9 @@ static BaseAuthenticator *current = nil;
         }
     }
 
+    // Task180：记录本次加载已稳定的 accountId，供 saveChanges 感知后续漂移
+    auth.ame180_savedAccountId = authData[@"accountId"];
+
     return auth;
 }
 
@@ -160,6 +176,20 @@ static BaseAuthenticator *current = nil;
     } else {
         // 保存选中的账户（accountId），确保重启后能恢复登录状态
         setPrefObject(@"internal.selected_account", accountId);
+
+        // Task180：复制 bug 双保险①——写盘成功后统一迁移头像 + 清理旧文件。
+        // 仅当本实例上一次已保存的 accountId 与本次不同（= refresh 链改写了
+        // 身份）时触发；迁移防覆盖幂等（旧不存在/新已存在均为空操作），
+        // 旧文件删除在新文件已成功落盘之后执行（失败不清理，防数据丢失）。
+        NSString *ame180_old = self.ame180_savedAccountId;
+        if (ame180_old.length > 0 && ![ame180_old isEqualToString:accountId]) {
+            [[AvatarManager sharedManager] ame180_migrateAvatarFromAccount:ame180_old
+                                                                toAccount:accountId];
+            NSString *oldPath = [NSString stringWithFormat:@"%s/accounts/%@.json", getenv("POJAV_HOME"), ame180_old];
+            [[NSFileManager defaultManager] removeItemAtPath:oldPath error:nil];
+            NSLog(@"[Task180] account file migrated after accountId drift: %@ -> %@", ame180_old, accountId);
+        }
+        self.ame180_savedAccountId = accountId;
     }
     return error == nil;
 }

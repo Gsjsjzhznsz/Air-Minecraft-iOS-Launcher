@@ -13,13 +13,17 @@
 static NSString * const kBackgroundTypeKey = @"background_type";
 static NSString * const kBackgroundPathKey = @"background_path";
 static NSString * const kBackgroundUIEffectKey = @"background_ui_effect";
-static NSString * const kBackgroundUIOpacityKey = @"background_ui_opacity";
+// Task180：双滑条体系键（用户定稿"背景透明度+按钮透明度，两个拉条控制
+// 所有界面 0~100%"）。旧 background_ui_opacity（0.6/下限 0.1）与
+// background_cards_neumorph_opacity（Task178 专用滑条）退役停读。
+static NSString * const kBackgroundBgOpacityKey = @"background_bg_opacity";
+static NSString * const kBackgroundBtnOpacityKey = @"background_btn_opacity";
 static NSString * const kBackgroundBlurIntensityKey = @"background_blur_intensity";
 // Task172：新拟态界面开关（默认 YES = 卡片永远按规格渲染，与壁纸无关；
 // NO = 旧管线毛玻璃/半透明/原生平铺）。Task178：卡片本体透明度滑条恢复
 //（Task170 机制，仅淡卡体不含文字，与 UI 效果类型/模糊度彻底解耦）。
+// Task180：卡体透明度滑条退役并入背景透明度（卡片=背景类），仅存开关。
 static NSString * const kBackgroundCardsNeumorphEnabledKey = @"background_cards_neumorph_enabled";
-static NSString * const kBackgroundCardsNeumorphOpacityKey = @"background_cards_neumorph_opacity";
 // Task151：背景来源标记（"user" = 用户手动设置，"bing" = Bing 每日壁纸自动应用）
 static NSString * const kBackgroundSourceKey = @"background_source";
 static NSString * const kBackgroundsFolder = @"backgrounds";
@@ -173,23 +177,33 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         }
     }
 
-    NSNumber *ame164_opacity = [defaults objectForKey:kBackgroundUIOpacityKey];
+    NSNumber *ame164_opacity = [defaults objectForKey:kBackgroundBgOpacityKey];
     if (ame164_opacity == nil) {
-        _uiOpacity = 0.6; // Task162/164：默认透明度 60%
+        _backgroundOpacity = 0.75; // Task180：默认背景透明度 75%（用户备注定稿；旧 uiOpacity 0.6 键值不再沿用）
     } else {
-        _uiOpacity = [ame164_opacity doubleValue];
-        if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {
-            _uiOpacity = 0.6;
+        _backgroundOpacity = [ame164_opacity doubleValue];
+        if (_backgroundOpacity < 0.0 || _backgroundOpacity > 1.0) {
+            _backgroundOpacity = 0.75; // 越界兑底
+        }
+    }
+
+    NSNumber *ame180_btn = [defaults objectForKey:kBackgroundBtnOpacityKey];
+    if (ame180_btn == nil) {
+        _buttonOpacity = 1.0; // Task180：默认按钮透明度 100%（用户备注定稿）
+    } else {
+        _buttonOpacity = [ame180_btn doubleValue];
+        if (_buttonOpacity < 0.0 || _buttonOpacity > 1.0) {
+            _buttonOpacity = 1.0; // 越界兑底
         }
     }
 
     NSNumber *ame164_blur = [defaults objectForKey:kBackgroundBlurIntensityKey];
     if (ame164_blur == nil) {
-        _blurIntensity = 1.0; // Task162/164：默认模糊程度 100%
+        _blurIntensity = 0.0; // Task180：默认模糊程度改 0%（用户备注"模糊 0"定稿；旧默认 100% 退役）
     } else {
         _blurIntensity = [ame164_blur doubleValue];
         if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {
-            _blurIntensity = 1.0;
+            _blurIntensity = 0.0;
         }
     }
 }
@@ -197,7 +211,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)saveUISettings {
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     [defaults setInteger:self.uiEffect forKey:kBackgroundUIEffectKey];
-    [defaults setFloat:self.uiOpacity forKey:kBackgroundUIOpacityKey];
+    [defaults setFloat:self.backgroundOpacity forKey:kBackgroundBgOpacityKey];
+    [defaults setFloat:self.buttonOpacity forKey:kBackgroundBtnOpacityKey];
     [defaults setFloat:self.blurIntensity forKey:kBackgroundBlurIntensityKey];
     [defaults synchronize];
 }
@@ -207,8 +222,14 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     [self saveUISettings];
 }
 
-- (void)setUiOpacity:(CGFloat)uiOpacity {
-    _uiOpacity = MAX(0.1, MIN(1.0, uiOpacity));
+- (void)setBackgroundOpacity:(CGFloat)backgroundOpacity {
+    // Task180：0~100% 无下限（用户定稿；旧 uiOpacity 的 0.1 下限退役）
+    _backgroundOpacity = MAX(0.0, MIN(1.0, backgroundOpacity));
+    [self saveUISettings];
+}
+
+- (void)setButtonOpacity:(CGFloat)buttonOpacity {
+    _buttonOpacity = MAX(0.0, MIN(1.0, buttonOpacity));
     [self saveUISettings];
 }
 
@@ -236,25 +257,15 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-#pragma mark - Task178 卡片新拟态本体透明度（Task170 机制恢复）
+#pragma mark - Task180 双滑条体系（背景/按钮透明度）
 
-// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链，与开关
-// 同家法）——读侧永远拿到最新落盘值。语义见 BackgroundManager.h：只淡
-// 卡体（渐变表面 + 双阴影承载视图整体 alpha），文字/图标恒不透明；
-// UI 效果类型/模糊度/壁纸透明度均不影响新拟态，唯一入口 = 本偏好。
-- (CGFloat)cardsNeumorphOpacity {
-    // 未落盘时默认 1.0 = Task177 规格形态原样（用户已认可的定稿不缩水）
-    if ([[NSUserDefaults standardUserDefaults] objectForKey:kBackgroundCardsNeumorphOpacityKey] == nil) {
-        return 1.0;
-    }
-    return MAX(0.0, MIN(1.0, [[NSUserDefaults standardUserDefaults] doubleForKey:kBackgroundCardsNeumorphOpacityKey]));
-}
-
-- (void)setCardsNeumorphOpacity:(CGFloat)cardsNeumorphOpacity {
-    [[NSUserDefaults standardUserDefaults] setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))
-                                              forKey:kBackgroundCardsNeumorphOpacityKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
+// Task178 的 cardsNeumorphOpacity 存取器退役：新拟态卡体透明度并入
+// backgroundOpacity（卡片=背景类），两处管线挂点（applyEffectTo-
+// CollectionViewCell 尾部与 applyNeumorphCardEffectToView 尾部）原地换源。
+// 引擎原语 ame_applyNeumorphCardOpacity 与失效安全（重铺 alpha 复位
+// 1.0）保持不变——只淡卡体不含文字的机制原样保留。
+// 新拟态开关本体（上方）不受影响：UI 效果类型/模糊度仍不影响新拟态，
+// 唯一影响卡体透明度的入口 = 「背景透明度」滑条。
 
 #pragma mark - Global Background Application
 
@@ -650,12 +661,14 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         viewController.view.backgroundColor = [UIColor clearColor];
     } else {
         // 半透明效果 - semi-transparent background
-        // 修复：使用 systemBackgroundColor 替代硬编码黑色，自适应浅色/深色模式
+        // 修复：使用 systemBackgroundColor 替代硬编码黑色，自适应浅色/深色模式。
+        // Task180：页面底色不透明度 = 「背景透明度」滑条直读（旧语义
+        // 1.0-uiOpacity 退役；0.75 = 75% 不透明底，0~100% 无下限）。
         if (@available(iOS 13.0, *)) {
             UIColor *base = [UIColor systemBackgroundColor];
-            viewController.view.backgroundColor = [base colorWithAlphaComponent:1.0 - self.uiOpacity];
+            viewController.view.backgroundColor = [base colorWithAlphaComponent:self.backgroundOpacity];
         } else {
-            viewController.view.backgroundColor = [UIColor colorWithWhite:0 alpha:1.0 - self.uiOpacity];
+            viewController.view.backgroundColor = [UIColor colorWithWhite:0 alpha:self.backgroundOpacity];
         }
     }
 
@@ -793,12 +806,14 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 cell.backgroundView = blurView;
             }
         } else {
-            cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
         }
         cell.contentView.backgroundColor = [UIColor clearColor];
     } else {
         // 半透明效果 - simple semi-transparent background
-        // 修复：使用 secondarySystemBackgroundColor 替代硬编码 0.1 黑色
+        // 修复：使用 secondarySystemBackgroundColor 替代硬编码 0.1 黑色。
+        // Task180：底色不透明度 = 「背景透明度」滑条直读（实例页/设置页
+        // 等表格行全部受控，文字/图标是子视图恒不透明）。
         if (@available(iOS 13.0, *)) {
             // Task152：卡片化 cell（圆角 > 0）把半透明底作用到 contentView，
             // 避免直角 cell 底色在卡片圆角外露直角。
@@ -806,16 +821,16 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             if (contentRadius > 0) {
                 cell.backgroundColor = [UIColor clearColor];
                 cell.contentView.backgroundColor = [[UIColor secondarySystemBackgroundColor]
-                    colorWithAlphaComponent:self.uiOpacity];
+                    colorWithAlphaComponent:self.backgroundOpacity];
                 cell.contentView.layer.masksToBounds = YES;
                 cell.backgroundView = nil;
             } else {
-                cell.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
+                cell.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.backgroundOpacity];
                 cell.contentView.backgroundColor = [UIColor clearColor];
                 cell.backgroundView = nil;
             }
         } else {
-            cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            cell.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
             cell.contentView.backgroundColor = [UIColor clearColor];
             cell.backgroundView = nil;
         }
@@ -912,7 +927,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     } else {
         // 半透明效果
         if (@available(iOS 13.0, *)) {
-            UIColor *barColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
+            UIColor *barColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.backgroundOpacity];
             navigationBar.barTintColor = barColor;
             navigationBar.backgroundColor = barColor;
             // 半透明 Appearance 需要按当前 uiOpacity 构建（uiOpacity 可变，无法像 blur 一样全局单例）
@@ -931,8 +946,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             navigationBar.scrollEdgeAppearance = translucentAppearance;
             navigationBar.compactAppearance = translucentAppearance;
         } else {
-            navigationBar.barTintColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
-            navigationBar.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            navigationBar.barTintColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
+            navigationBar.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
         }
         navigationBar.shadowImage = emptyImage;
     }
@@ -983,7 +998,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     } else {
         // 半透明效果
         if (@available(iOS 13.0, *)) {
-            UIColor *barColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.uiOpacity];
+            UIColor *barColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.backgroundOpacity];
             toolbar.barTintColor = barColor;
             toolbar.backgroundColor = barColor;
             if (!translucentToolbarAppearance || ![translucentToolbarColor isEqual:barColor]) {
@@ -1000,8 +1015,8 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             toolbar.scrollEdgeAppearance = translucentToolbarAppearance;
             toolbar.compactAppearance = translucentToolbarAppearance;
         } else {
-            toolbar.barTintColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
-            toolbar.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+            toolbar.barTintColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
+            toolbar.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
         }
     }
 }
@@ -1109,14 +1124,15 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 }
             }
             if (@available(iOS 13.0, *)) {
-                CGFloat effectiveOpacity = self.uiOpacity;
+                // Task180：底色不透明度 = 「背景透明度」滑条直读
+                CGFloat effectiveOpacity = self.backgroundOpacity;
                 if (![self hasBackground]) {
                     effectiveOpacity = MIN(effectiveOpacity + 0.3, 1.0);
                 }
                 UIColor *base = [UIColor secondarySystemBackgroundColor];
                 view.backgroundColor = [base colorWithAlphaComponent:effectiveOpacity];
             } else {
-                view.backgroundColor = [UIColor colorWithWhite:0.08 alpha:self.uiOpacity];
+                view.backgroundColor = [UIColor colorWithWhite:0.08 alpha:self.backgroundOpacity];
             }
         }
         return;
@@ -1129,7 +1145,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // 不加圆角不强制裁剪（原生页面形态）。
     CGFloat radius = view.layer.cornerRadius;
     if (radius > 0) {
-        [view ame_applyNeumorphSurfaceFlatWithRadius:radius];
+        // Task180：Flat 档接「背景透明度」滑条（大背景承载层底色 alpha 化，
+        // 文字/图标子视图不受影响）
+        [view ame_applyNeumorphSurfaceFlatWithRadius:radius
+                                            opacity:self.backgroundOpacity];
     } else {
         view.backgroundColor = [UIColor systemBackgroundColor];
     }
@@ -1187,11 +1206,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         cell.contentView.clipsToBounds = NO;
         cell.contentView.layer.masksToBounds = NO;
         [target ame_applyNeumorphSurface];
-        // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（渐变
-        // 表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），文字/
-        // 图标不参与；与壁纸状态/模糊度/透明度偏好完全无关，唯一入口 =
-        // cardsNeumorphOpacity 滑条。
-        [target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
+        // Task178（Task170 机制恢复）→ Task180 换源：卡片本体透明度——只淡
+        // 卡体（渐变表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），
+        // 文字/图标不参与；与壁纸状态/模糊度/UI 效果类型完全无关，唯一
+        // 入口 = 「背景透明度」滑条（卡片=背景类，两拉条体系统一管栈）。
+        [target ame_applyNeumorphCardOpacity:self.backgroundOpacity];
         return;
     }
 
@@ -1315,9 +1334,9 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             }
             if (@available(iOS 13.0, *)) {
                 cardTarget.backgroundColor = [[UIColor secondarySystemBackgroundColor]
-                    colorWithAlphaComponent:self.uiOpacity];
+                    colorWithAlphaComponent:self.backgroundOpacity];
             } else {
-                cardTarget.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
+                cardTarget.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.backgroundOpacity];
             }
             cell.backgroundColor = [UIColor clearColor];
             cell.contentView.backgroundColor = [UIColor clearColor];
@@ -1346,7 +1365,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     cell.backgroundColor = [UIColor clearColor];
     cell.clipsToBounds = YES;
     cell.layer.masksToBounds = NO;
-    [cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];
+    // Task180：平贴行接「背景透明度」滑条（设置页选项/列表行类背景，
+    // 底色 alpha 化，行内文字/图标恒不透明）
+    [cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12
+                                                    opacity:self.backgroundOpacity];
 }
 
 - (void)applyNeumorphCardEffectToView:(UIView *)view {
@@ -1381,10 +1403,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     }
     if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;
     [view ame_applyNeumorphSurface];
-    // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（承载视图
-    // 整体 alpha，引擎原语非宿主 alpha），文字/图标恒不透明；与壁纸状态/
-    // 模糊度/透明度偏好完全无关，唯一入口 = cardsNeumorphOpacity 滑条。
-    [view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
+    // Task178（Task170 机制恢复）→ Task180 换源：卡片本体透明度——只淡
+    // 卡体（承载视图整体 alpha，引擎原语非宿主 alpha），文字/图标恒不透明；
+    // 与壁纸状态/模糊度/UI 效果类型完全无关，唯一入口 = 「背景透明度」
+    // 滑条（卡片=背景类，cardsNeumorphOpacity 退役）。
+    [view ame_applyNeumorphCardOpacity:self.backgroundOpacity];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {
@@ -1441,9 +1464,11 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         } else {
             // 半透明效果：输入框背景按 uiOpacity 调整
             if (@available(iOS 13.0, *)) {
-                textField.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:MAX(0.3, self.uiOpacity)];
+                // Task180：输入框底色不透明度 = 「背景透明度」滑条（无下限，
+                // 旧 MAX(0.3, uiOpacity) 退役；placeholder/文字是子视图恒清晰）
+                textField.backgroundColor = [[UIColor secondarySystemBackgroundColor] colorWithAlphaComponent:self.backgroundOpacity];
             } else {
-                textField.backgroundColor = [UIColor colorWithWhite:0.95 alpha:MAX(0.3, self.uiOpacity)];
+                textField.backgroundColor = [UIColor colorWithWhite:0.95 alpha:self.backgroundOpacity];
             }
         }
     }
