@@ -89,9 +89,14 @@
       "name": "安装与数据",
       "items": [
         {
-          "icon": "memorychip",
+          "icon": "memorychip.fill",
           "title": "如何正确分配内存？",
           "description": "通常可调整至设备总内存的%50，例如8GB设备可用3GB。具备扩展内存限制权限时，通常可调整至%65；具备扩展虚拟内存时，通常可调整至%75。\n\n其它性价比提示：\n• 视距 12 是甜点位，调大主要增加加载风暴时长和内存占用；\n• 渲染分辨率：优先用 FSR 档位降分辨率，而不是手动调分辨率滑条；\n• 卡顿时先分清是\"加载区块卡\"（换 Zink / 开 FSR / 降视距）还是\"整体帧率低\"（降视距/分辨率/光影），对症下药。"
+        },
+        {
+          "icon": "memorychip",
+          "title": "启动器所需的内存权限都有什么用？",
+          "description": "• 扩展内存限制：让iOS为启动器分配更多内存，通常可提高%15的内存限制。可使用\"id签\"(SideStore/NB助手等)或\"付费开发者证书\"(推荐BV1regH6RETM)。\n• 扩展虚拟内存：让iOS为启动器分配更多内存寻址空间，通常搭配前者可再提高%15的内存限制。只能使用\"付费开发者证书\"(推荐BV1regH6RETM)"
         },
         {
           "icon": "shippingbox",
@@ -106,7 +111,7 @@
         {
           "icon": "curlybraces",
           "title": "不同 MC 版本要用哪个 Java？",
-          "description": "启动器会按游戏版本自动选择正确的 Java 运行时，一般无需手动干预：\n\n• MC 26.x（年份制新版本）→ Java 25；\n• MC 1.20.5 – 1.21.x → Java 21；\n• MC 1.18 – 1.20.4 → Java 17；\n• MC 1.17 → Java 16；\n• MC 1.16.5 及更早 → Java 8。\n\n整合包 profile 里声明的 javaVersion 启动器会自动纠正（旧版整合包写错的值不再影响启动）。手动安装 Forge 时若提示 Java 版本不符，检查启动器的 Java 运行时设置是否被改过。"
+          "description": "启动器会按游戏版本自动选择正确的 Java 运行时，一般无需手动干预：\n\n• MC 26.x → Java 25；\n• MC 1.20.5 – 1.21.x → Java 21；\n• MC 1.17 – 1.20.4 → Java 17；\n• MC 1.16.5 及更早 → Java 8。\n\n整合包 profile 里声明的 javaVersion 启动器会自动纠正（旧版整合包写错的值不再影响启动）。手动安装 Forge 时若提示 Java 版本不符，检查启动器的 Java 运行时设置是否被改过。"
         },
         {
           "icon": "folder",
