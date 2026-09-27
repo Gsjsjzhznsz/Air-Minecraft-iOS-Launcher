@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 6.0.0
-[Pre-Init] Commit: 15fddc2 (main)
+[Pre-Init] Commit: c3f4623 (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -14,7 +14,7 @@
 * dynamic-codesigning: NO
 [Debugging] Debug log enabled: YES
 [Pre-init] Restored game directory preference (default)
-[SceneDelegate] Failed to update geometry: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
+[SceneDelegate] Task188: geometry request declined (expected in window mode; Info.plist UIRequiresFullScreen is the primary fix): 当前窗口模式不允许以编程方式更改界面方向。
 [HomeAvatar] Task172 branch: network fetch started (URL present, length=211)
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
 [PLPreferences] Getter could not find preference internal.autolaunch_profile
@@ -29,7 +29,84 @@
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260927)
 [HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Library/Caches/IconLoader, mirror enabled: YES
-[MCDL] remoteVersionList not loaded, but parent version JSON exists: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/versions/26.1.2/26.1.2.json
+[LauncherRootVC] Loaded 918 remote versions
+[DownloadVC] Task173 version manifest candidates: 2
+[DownloadVC] Task173 version manifest loaded from piston-meta.mojang.com (916 versions)
+[Task185] Forge XML source ended without match (official=0) — settled=0 fallbackFired=1
+[Task185] Forge fallback JSON: 21 entries for MC 26.1.2
+[Task185] Forge: BMCL per-version JSON won with 21 entries
+2026-09-28 07:32:06.127 AngelAuraAmethyst[6668:704297] invalid mode 'kCFRunLoopCommonModes' provided to CFRunLoopRunSpecific - break on _CFRunLoopError_RunCalledWithInvalidMode to debug. This message will only appear once per execution.
+[Forge Installer] Downloading https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/26.1.2-64.1.3/forge-26.1.2-64.1.3-installer.jar
+[ForgeDirect] DownloadViewController: starting direct install with unified progress UI
+[ForgeDirect] Starting installation: Forge-26.1.2-64.1.3
+[ForgeDirect] Progress: 0.00 - 开始安装
+[ForgeDirect] Reading install_profile.json
+[ForgeDirect] Progress: 0.05 - 正在读取 install_profile.json
+[ForgeDirect] Extracted entry 'install_profile.json' (21678 bytes)
+[ForgeDirect] Successfully read install_profile.json (21678 bytes)
+[ForgeDirect] Parsing install_profile.json
+[ForgeDirect] Progress: 0.10 - 正在解析 JSON 并检测格式
+[ForgeDirect] JSON parsing completed, error=none
+[ForgeDirect] Detecting installer format
+[ForgeDirect] Format detection: new=1, old=0
+[ForgeDirect] Game directory (user.dir): /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft
+[ForgeDirect] Main game directory (versions/libraries): /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft
+[ForgeDirect] Libraries directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/libraries
+[ForgeDirect] Progress: 0.15 - 正在准备版本目录
+[ForgeDirect] Using new format installer
+[ForgeDirect] installNewFormat started
+[ForgeDirect] Reading version.json
+[ForgeDirect] version.json entry: version.json
+[ForgeDirect] Extracted entry 'version.json' (17175 bytes)
+[ForgeDirect] Successfully read version.json (17175 bytes)
+[ForgeDirect] Parsing version.json
+[ForgeDirect] version.json parsed successfully
+[ForgeDirect] Version directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/versions/Forge-26.1.2-64.1.3
+[ForgeDirect] Extracting all maven entries from installer jar
+[ForgeDirect] Progress: 0.20 - 正在解压内嵌 maven 依赖
+[ForgeDirect] Extracted 2 maven entries
+[ForgeDirect] Downloading missing libraries from maven
+[ForgeDirect] Progress: 0.30 - 正在下载缺失的依赖库
+[ForgeDirect] Library download summary: downloaded=0, skipped=40, failed=0, total=40, criticalFailures=0
+[ForgeDirect] Downloading processor libraries
+[ForgeDirect] Progress: 0.50 - 正在下载安装工具链依赖
+[ForgeDirect] Library download summary: downloaded=0, skipped=16, failed=0, total=16, criticalFailures=0
+[ForgeDirect] Running processors for Minecraft 26.1.2
+[ForgeDirect] Progress: 0.55 - 正在执行安装处理器
+[ForgeProcExec] Progress: 0.55 - 正在解析安装配置
+[ForgeProcExec] Var PATCHED = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/libraries/net/minecraftforge/forge/26.1.2-64.1.3/forge-26.1.2-64.1.3-client.jar
+[ForgeProcExec] Var PATCHED_SHA = 2c0a98a0c35f5efac83aaaae96d95831235da51f
+[ForgeProcExec] Var MC_UNPACKED_SHA = 4e618f09a0c649dde3fdf829df443ce0b8831e65
+[ForgeProcExec] Extracted installer entry data/client.lzma -> /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/838D1A4D-1FBC-4635-8335-D1AA1966625A
+[ForgeProcExec] Var BINPATCH = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/.temp/forge_installer_cache/838D1A4D-1FBC-4635-8335-D1AA1966625A
+[ForgeProcExec] Var MC_UNPACKED = /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/libraries/net/minecraft/client/26.1.2/client-26.1.2.jar
+[ForgeProcExec] Progress: 0.57 - 正在准备原版客户端文件
+[ForgeProcExec] Progress: 0.57 - 正在检查原版客户端
+[ForgeProcExec] 原版客户端 already present and valid: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/versions/26.1.2/26.1.2.jar
+[ForgeProcExec] Progress: 0.66 - 原版客户端已就绪
+[ForgeProcExec] Progress: 0.66 - 正在准备映射文件
+[ForgeProcExec] Progress: 0.69 - 正在构建安装任务
+[ForgeProcExec] Skipping processor (outputs already satisfied): net.minecraftforge:binarypatcher:1.3.4
+[ForgeProcExec] All processor outputs already satisfied, skipping execution
+[ForgeProcExec] Progress: 0.85 - 安装产物已就绪
+[ForgeDirect] Task188: post-processor verification passed (40 runtime libraries present and valid)
+[ForgeDirect] Writing version JSON to: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/versions/Forge-26.1.2-64.1.3/Forge-26.1.2-64.1.3.json
+[ForgeDirect] Progress: 0.90 - 正在写入版本 JSON
+[ForgeDirect] Version JSON written successfully
+[ForgeDirect] Checking parent vanilla version: 26.1.2
+[ForgeDirect] Parent version JSON already exists: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/Library/Application Support/minecraft/versions/26.1.2/26.1.2.json
+[ForgeDirect] Parent vanilla version ensured: 26.1.2
+[ForgeDirect] installNewFormat completed
+[ForgeDirect] Registering version on main thread
+[ForgeDirect] Progress: 0.95 - 正在注册版本
+[ForgeDirect] registerVersion called: Forge-26.1.2-64.1.3
+[ForgeDirect] PLProfiles current: ok
+[ForgeDirect] Profile saved and selected (javaVersion=25, gameDir=.)
+[ForgeDirect] Version registered successfully
+[ForgeDirect] Installation completed successfully
+[ForgeDirect] Progress: 1.00 - 安装完成
+[Task173] safe heap ceiling: os_proc_available_memory=12210MB -> Xmx ceiling 11010MB (native reserve 1200MB)
+[MCDL] SHA1 passed for 26.1.2.json
 [MCDL] insertSafety: how to insert assetIndex?
 [MCDL] insertSafety: how to insert assets?
 [MCDL] Replacing JNA 5.17.0 with 5.13.0 for iOS compatibility (required by Forge-26.1.2-64.1.3)
@@ -89,7 +166,7 @@
 [MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows
 [MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-arm64
 [MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-x86
-[MCDL] Task187: verify stage entered (elapsed 1.7s since downloadVersion:)
+[MCDL] Task187: verify stage entered (elapsed 1.8s since downloadVersion:)
 [JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=0 trollStore=0 CS_DEBUGGED=0 ppid=1 traced=0 exn=0 JIT_FLAGS=0x7
 [JIT] [RightPanel] Task134 enabler=auto noScript=0
 sandbox_extension_issue_file failed for : 2 (No such file or directory)
@@ -100,6 +177,7 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [JIT] Task181 isJITEnabled app went to BACKGROUND while waiting (traced=0 exn=0)
 [IconLoader] App entered background: cancelled all ongoing downloads
 [JIT] Task181 isJITEnabled condition satisfied after 3.2s (traced=1 exn=1)
+[JIT] Task185 self-healing dispatch: refire on foreground (label=RightPanel main wait)
 [JIT] [RightPanel] Task183 wait-completed block entered on main (ok=1)
 [JIT] [RightPanel] Task183 invoking launch handler
 [TouchController] Task172 profile 'Forge-26.1.2-64.1.3' TouchController off -- global settings untouched
@@ -175,11 +253,9 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [Task67]   key_key.drop:key.keyboard.q
 [Task67]   key_key.inventory:key.keyboard.e
 [Task67]   key_key.chat:key.keyboard.t
-[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)[Task67]   key_key.playerlist:key.keyboard.tab
-
+[Task67]   key_key.playerlist:key.keyboard.tab
 [Task67]   key_key.pickItem:key.mouse.middle
 [Task67]   key_key.command:key.keyboard.slash
-[Task67]   key_key.friends:key.keyboard.o
 [Task67]   key_key.socialInteractions:key.keyboard.p
 [Task67]   key_key.toggleGui:key.keyboard.f1
 [Task67]   key_key.toggleSpectatorShaderEffects:key.keyboard.f4
@@ -227,17 +303,15 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [Task67]   key_key.debug.fpsCharts:key.keyboard.2
 [Task67]   key_key.debug.networkCharts:key.keyboard.3
 [Task67]   key_key.debug.lightmapTexture:key.keyboard.4
-[Task67]   key_key.debug.improvedTransparency:key.keyboard.x
 [Task67] ===== keybind sanitize: 0 repairs needed (all canonical / defaults) =====
 [JavaLauncher] Looking for Java 25 or later
 [JavaLauncher] JAVA_HOME has been set to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk
 [Task141] launch memory from auto ratio: 2966 MB
-[Task173] safe heap ceiling: os_proc_available_memory=12089MB -> Xmx ceiling 10889MB (native reserve 1200MB)
 [JavaLauncher] Max RAM allocation is set to 2966 MB
 [JavaLauncher] Task68 GC/safepoint pause logging enabled (-Xlog:gc,safepoint -> stdout)
 [JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks
 [Amethyst] Task112: OpenAL pinned to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks/libopenal.dylib
-[JavaLauncher] Published Metallum surface view: 0x14facd180 (scale=2)
+[JavaLauncher] Published Metallum surface view: 0x14d104fc0 (scale=2)
 [JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
 [JavaLauncher] Adding authlib-injector arguments for third party account
 [ThirdPartyAuthenticator] Added prefetched metadata parameter (length=1780)
@@ -245,6 +319,7 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [JavaLauncher] Added authlib-injector arg: -Dauthlibinjector.side=client
 [JavaLauncher] Added authlib-injector arg: -Dauthlibinjector.yggdrasil.prefetched=eyJtZXRhIjp7ImZlYXR1cmUuZW5hYmxlX21vamFuZ19hbnRpX2ZlYXR1cmVzIjp0cnVlLCJmZWF0dXJlLmVuYWJsZV9wcm9maWxlX2tleSI6dHJ1ZSwiZmVhdHVyZS5ub25fZW1haWxfbG9naW4iOnRydWUsImZlYXR1cmUub3BlbmlkX2NvbmZpZ3VyYXRpb25fdXJsIjoiaHR0cHM6Ly9vcGVuLmxpdHRsZXNraW4uY24vLndlbGwta25vd24vb3BlbmlkLWNvbmZpZ3VyYXRpb24iLCJpbXBsZW1lbnRhdGlvbk5hbWUiOiJZZ2dkcmFzaWwgQ29ubmVjdCIsImltcGxlbWVudGF0aW9uVmVyc2lvbiI6IjAuMC44IiwibGlua3MiOnsiYW5ub3VuY2VtZW50IjoiaHR0cHM6Ly9saXR0bGVza2luLmNuL2FwaS9hbm5vdW5jZW1lbnRzIiwiaG9tZXBhZ2UiOiJodHRwczovL2xpdHRsZXNraW4uY24iLCJyZWdpc3RlciI6Imh0dHBzOi8vbGl0dGxlc2tpbi5jbi9hdXRoL3JlZ2lzdGVyIn0sInNlcnZlck5hbWUiOiJMaXR0bGVTa2luIn0sInNpZ25hdHVyZVB1YmxpY2tleSI6Ii0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tXG5NSUlDSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQWc4QU1JSUNDZ0tDQWdFQXJHY05PT0ZJcUxKU3FvRTN1MGhqXG50T0VuT2NFVDN3ajlEcnNzMUJFNnNCcWdQbzBiTXVsT1VMaHFqa2MvdUgvd3lvc1luenczeGFhekp0ODdqVEhoXG5KOEJQTXhDZVFNb3lFZFJvUzNKbmoxRzBLZXpqNEEyYjYxUEpKTTFEcHZEQWNxUUJZc3JTZHBCSis1Mk1qb0dTXG52Sm9lUU81WFVsSlZRbTIxL0htSm5xc1BoemNBNkhnWTcxUkhZRTV4bmhwV0ppUHhMS1VQdG10NkNOWVVRUW9TXG5vMnYzNlhXZ01tTEJaaEFiTk9QeFlYKzFpb3hLYW1qaExPMjlVaHd0Z1k5VTZQV0VPNy9TQmZYenlSUFR6aFBWXG4ybkhxN0tKcWQ4SUlybHRzbHY2aS80RkVNODFpdlMvbW0rUE4zaFlsSVlLNno2WW1paTFuclFBcGxzSjY3T0dxXG5ZSHRXS092cGZUek9vbGx1Z3NSaWhrQUc0T0I2aE0wUHI0NWpqQzNUSWM3ZU83a09nSWNHVUdVUUd1dXVnREV6XG5KMU45RkZXbk4vSDZQOXVrRmVnNVNtR0M1K3dtVVBaWkN0TkJMcjhvOHNJNUg3UWhLN05nd0NhR0ZvWXVpQUdMXG5nejNrLzNZd0o0MEJid1FheVEyZ0lxZW56K1hPRklBbGFqdisvbnlmY0R2Wkg5dkdOS1A5bFZjSFhVVDVZUm5TXG5aU0hvNWx3dlZyWVVycUVBYmgvekR6OFFNRXlpdWpXdlVrUGhaczlmaDZmaW1VR3h0bThtRklQQ3RQSlZYamVZXG53RDNMdnQzYUlCMUpIZFVUSlIzZUVjNGVJYVRLTXdNUHlKUnpWbjV6S3NpdGFaejNubi9jT0Evd1pDOW9xeUVVXG5tYzloNlpNUlRSVUVFNFR0YUp5ZzlsTUNBd0VBQVE9PVxuLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tXG4iLCJza2luRG9tYWlucyI6WyJsaXR0bGVza2luLmNuIl19
 [JavaLauncher] JVM GC optimization: G1GC + MaxGCPauseMillis=50 + StringDeduplication (Java 17+)
+[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [SDLHook] Task133: libjli image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/libjli.dylib) -- rebinding its _dlopen slots
 [SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
 [SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
@@ -258,19 +333,19 @@ sandbox_extension_issue_file failed for : 2 (No such file or directory)
 [CwdAlign] Task97: process CWD aligned to game dir: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default
 [AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed (iOS has no AppKit; MC 26.3 MacosUtil menu walk no-ops, numberOfItems=0)
 [Init] Calling JLI_Launch
+[PLDisplayLinkTarget] displayLinkTick #2 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [SDLHook] Task133: libjvm image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib) -- rebinding its _dlopen slots
 [SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
 [SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
+[PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 OpenJDK 64-Bit Server VM warning: Option UseCompressedClassPointers was deprecated in version 25.0 and will likely be removed in a future release.
 OpenJDK 64-Bit Server VM warning: Compact object headers require compressed class pointers. Disabling compact object headers.
-[PLDisplayLinkTarget] displayLinkTick #2 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
-[JIT26] Requesting 64 MB for JIT mapping
-[JIT26] Got JIT mapping 0x128e18000 from debugger
-[JIT26] mapping at RW=0x163838000, RX=0x128e18000
-[2026-09-28T00:12:27.470+0800][0.253s] Using G1
-[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
-[PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
 [PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[JIT26] Requesting 64 MB for JIT mapping
+[JIT26] Got JIT mapping 0x152000000 from debugger
+[JIT26] mapping at RW=0x160c38000, RX=0x152000000
+[2026-09-28T07:32:23.792+0800][0.258s] Using G1
 WARNING: Unknown module: cpw.mods.bootstraplauncher specified to --add-exports
 WARNING: package sun.security.action not in java.base
 [authlib-injector] [INFO] Logging file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/authlib-injector.log
@@ -280,8 +355,8 @@ PatchJNAAgent: premain called
 Arc Capes DNS Injector
 Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
 Added DNS cache entry: s.optifine.net/23.95.137.176
-[2026-09-28T00:12:27.632+0800][0.415s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 10M->2M(128M) 1.407ms
-[2026-09-28T00:12:27.632+0800][0.415s] Safepoint "G1CollectForAllocation", Time since last: 150669042 ns, Reaching safepoint: 1458 ns, At safepoint: 1428792 ns, Leaving safepoint: 3000 ns, Total: 1433250 ns, Threads: 0 runnable, 12 total
+[2026-09-28T07:32:24.031+0800][0.497s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 10M->2M(128M) 1.554ms
+[2026-09-28T07:32:24.031+0800][0.497s] Safepoint "G1CollectForAllocation", Time since last: 212937084 ns, Reaching safepoint: 3166 ns, At safepoint: 1580584 ns, Leaving safepoint: 4875 ns, Total: 1588625 ns, Threads: 0 runnable, 12 total
 WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
 WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
 WARNING: Please consider reporting this to the maintainers of class com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
@@ -321,30 +396,42 @@ Launching Minecraft Forge-26.1.2-64.1.3
 [Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
 [Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
 Args init finished. Now starting game
-[2026-09-28T00:12:27.946+0800][0.729s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 84M->36M(128M) 2.609ms
-[2026-09-28T00:12:27.946+0800][0.729s] Safepoint "G1CollectForAllocation", Time since last: 311159416 ns, Reaching safepoint: 3125 ns, At safepoint: 2626000 ns, Leaving safepoint: 7334 ns, Total: 2636459 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.084+0800][0.867s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 80M->47M(128M) 4.146ms
-[2026-09-28T00:12:28.084+0800][0.867s] Safepoint "G1CollectForAllocation", Time since last: 134184833 ns, Reaching safepoint: 3583 ns, At safepoint: 4166834 ns, Leaving safepoint: 8291 ns, Total: 4178708 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.172+0800][0.955s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 95M->58M(128M) 4.086ms
-[2026-09-28T00:12:28.172+0800][0.955s] Safepoint "G1CollectForAllocation", Time since last: 83597750 ns, Reaching safepoint: 2584 ns, At safepoint: 4101125 ns, Leaving safepoint: 8458 ns, Total: 4112167 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.264+0800][1.047s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 102M->68M(128M) 3.249ms
-[2026-09-28T00:12:28.264+0800][1.047s] Safepoint "G1CollectForAllocation", Time since last: 88741083 ns, Reaching safepoint: 24500 ns, At safepoint: 3268459 ns, Leaving safepoint: 11833 ns, Total: 3304792 ns, Threads: 1 runnable, 17 total
-[2026-09-28T00:12:28.281+0800][1.065s] GC(5) Pause Young (Concurrent Start) (G1 Humongous Allocation) 73M->73M(128M) 1.876ms
-[2026-09-28T00:12:28.281+0800][1.065s] GC(6) Concurrent Mark Cycle
-[2026-09-28T00:12:28.281+0800][1.065s] Safepoint "G1TryInitiateConcMark", Time since last: 15695458 ns, Reaching safepoint: 4042 ns, At safepoint: 1913000 ns, Leaving safepoint: 7750 ns, Total: 1924792 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.287+0800][1.070s] GC(6) Pause Remark 86M->86M(138M) 0.856ms
-[2026-09-28T00:12:28.287+0800][1.070s] Safepoint "G1PauseRemark", Time since last: 4932708 ns, Reaching safepoint: 43584 ns, At safepoint: 867708 ns, Leaving safepoint: 4292 ns, Total: 915584 ns, Threads: 2 runnable, 17 total
-[2026-09-28T00:12:28.290+0800][1.073s] GC(6) Pause Cleanup 93M->93M(138M) 0.007ms
-[2026-09-28T00:12:28.290+0800][1.073s] Safepoint "G1PauseCleanup", Time since last: 2728750 ns, Reaching safepoint: 8166 ns, At safepoint: 16959 ns, Leaving safepoint: 1666 ns, Total: 26791 ns, Threads: 1 runnable, 17 total
-[2026-09-28T00:12:28.290+0800][1.073s] GC(6) Concurrent Mark Cycle 8.776ms
-[2026-09-28T00:12:28.296+0800][1.079s] GC(7) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 99M->87M(138M) 2.919ms
-[2026-09-28T00:12:28.296+0800][1.079s] Safepoint "G1CollectForAllocation", Time since last: 2886000 ns, Reaching safepoint: 3542 ns, At safepoint: 2939583 ns, Leaving safepoint: 7167 ns, Total: 2950292 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.332+0800][1.115s] GC(8) Pause Young (Mixed) (G1 Evacuation Pause) 135M->114M(336M) 4.365ms
-[2026-09-28T00:12:28.332+0800][1.115s] Safepoint "G1CollectForAllocation", Time since last: 31365458 ns, Reaching safepoint: 1875 ns, At safepoint: 4399542 ns, Leaving safepoint: 5458 ns, Total: 4406875 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.487+0800][1.270s] GC(9) Pause Young (Normal) (G1 Evacuation Pause) 206M->103M(336M) 3.500ms
-[2026-09-28T00:12:28.487+0800][1.270s] Safepoint "G1CollectForAllocation", Time since last: 151436875 ns, Reaching safepoint: 2167 ns, At safepoint: 3537542 ns, Leaving safepoint: 6708 ns, Total: 3546417 ns, Threads: 0 runnable, 17 total
-[2026-09-28T00:12:28.650+0800][1.433s] GC(10) Pause Young (Normal) (G1 Evacuation Pause) 231M->139M(336M) 4.785ms
-[2026-09-28T00:12:28.650+0800][1.433s] Safepoint "G1CollectForAllocation", Time since last: 158149500 ns, Reaching safepoint: 2042 ns, At safepoint: 4801416 ns, Leaving safepoint: 9042 ns, Total: 4812500 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.352+0800][0.817s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 84M->36M(128M) 2.265ms
+[2026-09-28T07:32:24.352+0800][0.817s] Safepoint "G1CollectForAllocation", Time since last: 317951833 ns, Reaching safepoint: 2000 ns, At safepoint: 2282917 ns, Leaving safepoint: 7833 ns, Total: 2292750 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.481+0800][0.947s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 80M->47M(128M) 3.407ms
+[2026-09-28T07:32:24.481+0800][0.947s] Safepoint "G1CollectForAllocation", Time since last: 126014875 ns, Reaching safepoint: 2542 ns, At safepoint: 3423708 ns, Leaving safepoint: 10375 ns, Total: 3436625 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.557+0800][1.023s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 95M->58M(128M) 3.400ms
+[2026-09-28T07:32:24.557+0800][1.023s] Safepoint "G1CollectForAllocation", Time since last: 72449625 ns, Reaching safepoint: 2750 ns, At safepoint: 3417083 ns, Leaving safepoint: 3792 ns, Total: 3423625 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.639+0800][1.105s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 100M->76M(128M) 3.939ms
+[2026-09-28T07:32:24.639+0800][1.105s] Safepoint "G1CollectForAllocation", Time since last: 78138958 ns, Reaching safepoint: 4000 ns, At safepoint: 3963292 ns, Leaving safepoint: 4208 ns, Total: 3971500 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.644+0800][1.109s] GC(5) Pause Young (Concurrent Start) (G1 Humongous Allocation) 77M->78M(128M) 1.297ms
+[2026-09-28T07:32:24.644+0800][1.109s] GC(6) Concurrent Mark Cycle
+[2026-09-28T07:32:24.644+0800][1.109s] Safepoint "G1TryInitiateConcMark", Time since last: 3372709 ns, Reaching safepoint: 23041 ns, At safepoint: 1310875 ns, Leaving safepoint: 9709 ns, Total: 1343625 ns, Threads: 1 runnable, 17 total
+[2026-09-28T07:32:24.653+0800][1.119s] GC(6) Pause Remark 104M->104M(144M) 1.037ms
+[2026-09-28T07:32:24.653+0800][1.119s] Safepoint "G1PauseRemark", Time since last: 8600291 ns, Reaching safepoint: 38292 ns, At safepoint: 1048417 ns, Leaving safepoint: 4333 ns, Total: 1091042 ns, Threads: 1 runnable, 17 total
+[2026-09-28T07:32:24.659+0800][1.125s] GC(7) Pause Young (Normal) (G1 Evacuation Pause) 106M->97M(232M) 3.259ms
+[2026-09-28T07:32:24.659+0800][1.125s] Safepoint "G1CollectForAllocation", Time since last: 2512083 ns, Reaching safepoint: 134917 ns, At safepoint: 3283000 ns, Leaving safepoint: 9208 ns, Total: 3427125 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.660+0800][1.126s] GC(6) Pause Cleanup 98M->98M(232M) 0.015ms
+[2026-09-28T07:32:24.660+0800][1.126s] Safepoint "G1PauseCleanup", Time since last: 537459 ns, Reaching safepoint: 20791 ns, At safepoint: 20834 ns, Leaving safepoint: 6208 ns, Total: 47833 ns, Threads: 4 runnable, 17 total
+[2026-09-28T07:32:24.660+0800][1.126s] GC(6) Concurrent Mark Cycle 16.473ms
+[2026-09-28T07:32:24.754+0800][1.220s] GC(8) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 193M->103M(232M) 4.922ms
+[2026-09-28T07:32:24.754+0800][1.220s] Safepoint "G1CollectForAllocation", Time since last: 89568250 ns, Reaching safepoint: 24292 ns, At safepoint: 4938541 ns, Leaving safepoint: 3959 ns, Total: 4966792 ns, Threads: 1 runnable, 17 total
+[2026-09-28T07:32:24.890+0800][1.356s] GC(9) Pause Young (Mixed) (G1 Evacuation Pause) 165M->104M(232M) 3.857ms
+[2026-09-28T07:32:24.890+0800][1.356s] Safepoint "G1CollectForAllocation", Time since last: 131604000 ns, Reaching safepoint: 22708 ns, At safepoint: 3894083 ns, Leaving safepoint: 9250 ns, Total: 3926041 ns, Threads: 1 runnable, 17 total
+[2026-09-28T07:32:24.985+0800][1.451s] GC(10) Pause Young (Concurrent Start) (G1 Humongous Allocation) 150M->109M(232M) 1.400ms
+[2026-09-28T07:32:24.985+0800][1.451s] Safepoint "G1TryInitiateConcMark", Time since last: 93635167 ns, Reaching safepoint: 1792 ns, At safepoint: 1417916 ns, Leaving safepoint: 5792 ns, Total: 1425500 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.985+0800][1.451s] GC(11) Concurrent Undo Cycle
+[2026-09-28T07:32:24.985+0800][1.451s] GC(11) Concurrent Undo Cycle 0.098ms
+[2026-09-28T07:32:24.997+0800][1.462s] GC(12) Pause Young (Concurrent Start) (G1 Humongous Allocation) 137M->123M(232M) 3.179ms
+[2026-09-28T07:32:24.997+0800][1.462s] Safepoint "G1TryInitiateConcMark", Time since last: 8435083 ns, Reaching safepoint: 2125 ns, At safepoint: 3213959 ns, Leaving safepoint: 4750 ns, Total: 3220834 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:24.997+0800][1.462s] GC(13) Concurrent Mark Cycle
+[2026-09-28T07:32:25.008+0800][1.474s] GC(13) Pause Remark 135M->127M(232M) 1.027ms
+[2026-09-28T07:32:25.008+0800][1.474s] Safepoint "G1PauseRemark", Time since last: 10259916 ns, Reaching safepoint: 10792 ns, At safepoint: 1039792 ns, Leaving safepoint: 2541 ns, Total: 1053125 ns, Threads: 1 runnable, 17 total
+[2026-09-28T07:32:25.012+0800][1.477s] GC(13) Pause Cleanup 127M->127M(232M) 0.015ms
+[2026-09-28T07:32:25.012+0800][1.477s] Safepoint "G1PauseCleanup", Time since last: 3552417 ns, Reaching safepoint: 3042 ns, At safepoint: 22291 ns, Leaving safepoint: 1417 ns, Total: 26750 ns, Threads: 0 runnable, 17 total
+[2026-09-28T07:32:25.012+0800][1.477s] GC(13) Concurrent Mark Cycle 14.996ms
+[2026-09-28T07:32:25.051+0800][1.517s] GC(14) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 197M->117M(232M) 4.005ms
+[2026-09-28T07:32:25.051+0800][1.517s] Safepoint "G1CollectForAllocation", Time since last: 35752500 ns, Reaching safepoint: 1542 ns, At safepoint: 4019875 ns, Leaving safepoint: 4333 ns, Total: 4025750 ns, Threads: 0 runnable, 16 total
 Ignoring duplicate module on SecureModuleFinder: com.google.gson: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/google/code/gson/gson/2.13.2/gson-2.13.2.jar!/]
 Ignoring duplicate module on SecureModuleFinder: jtracy: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-linux.jar!/]
 Ignoring duplicate module on SecureModuleFinder: jtracy: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-macos.jar!/]
@@ -363,7 +450,7 @@ Caused by: java.lang.reflect.InvocationTargetException
 	at net.minecraftforge.bootstrap.Bootstrap.start(Bootstrap.java:53)
 	at net.minecraftforge.bootstrap.ForgeBootstrap.main(ForgeBootstrap.java:19)
 	... 5 more
-Caused by: java.lang.module.ResolutionException: Modules launcher and lwjgl export package com.apple.ios.audio to module com.sun.jna.platform
+Caused by: java.lang.module.ResolutionException: Modules lwjgl and launcher export package android.util to module logging
 	at java.base/java.lang.module.Resolver.resolveFail(Unknown Source)
 	at java.base/java.lang.module.Resolver.failTwoSuppliers(Unknown Source)
 	at java.base/java.lang.module.Resolver.checkExportSuppliers(Unknown Source)
@@ -376,25 +463,23 @@ Caused by: java.lang.module.ResolutionException: Modules launcher and lwjgl expo
 [RenderDiag] exit(1) snapshot: swapOK=0 swapFail=0
 exit(1) called
 
-===== [Amethyst fatal trace] 2026-09-28 00:12:28.706 =====
+===== [Amethyst fatal trace] 2026-09-28 07:32:25.068 =====
 reason: exit(1) called
 thread: (unnamed)
-  #00 0x10863104c  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 69708
-  #01 0x108631908  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 71944
-  #02 0x1283a42a4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN2os5_exitEi + 9044644
-  #03 0x1283a4298  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN25permit_forbidden_function4exitEi + 9044632
-  #04 0x127fece38  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _Z18notify_vm_shutdownv + 5148216
-  #05 0x12867fcd4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN7VM_Exit4doitEv + 12041428
-  #06 0x12867ef74  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 12038004
-  #07 0x128687100  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 12071168
-  #08 0x128687854  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread13inner_executeEP12VM_Operation + 12073044
-  #09 0x128686dd8  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 12070360
-  #10 0x1285f83d4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN6Thread8call_runEv + 11486164
-  #11 0x12839cdcc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZL19thread_native_entryP6Thread + 9014732
+  #00 0x107b1504c  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 69708
+  #01 0x107b15908  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 71944
+  #02 0x12d8a02a4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN2os5_exitEi + 9044644
+  #03 0x12d8a0298  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN25permit_forbidden_function4exitEi + 9044632
+  #04 0x12d4e8e38  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _Z18notify_vm_shutdownv + 5148216
+  #05 0x12db7bcd4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN7VM_Exit4doitEv + 12041428
+  #06 0x12db7af74  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 12038004
+  #07 0x12db83100  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 12071168
+  #08 0x12db83854  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread13inner_executeEP12VM_Operation + 12073044
+  #09 0x12db82dd8  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 12070360
+  #10 0x12daf43d4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN6Thread8call_runEv + 11486164
+  #11 0x12d898dcc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZL19thread_native_entryP6Thread + 9014732
   #12 0x190752038  /usr/lib/system/libsystem_pthread.dylib  _pthread_start + 16440
   #13 0x19074e91c  /usr/lib/system/libsystem_pthread.dylib  thread_start + 2332
 
-[LauncherRootVC] Loaded 918 remote versions
-[PLCrashView] User tapped exit launcher, exiting process directly
-[RenderDiag] exit(0) snapshot: swapOK=0 swapFail=0
-exit(0) called
+[RenderDiag] fps=0 swapOK=0 swapFail=0 maxGap=0ms avgGap=0ms pres=0/0ms build=0/0ms mem=432MB layer=0x14daaa100 drawable=2360x1640 scale=2.00 bounds=1180x820 inWindow=1
+[IconLoader] App entered background: cancelled all ongoing downloads
