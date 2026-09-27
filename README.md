@@ -233,7 +233,7 @@ Additional thanks to [MCHeads](https://mc-heads.net) for Minecraft avatar servic
 
 ## Sponsor
 
-If you find this project valuable, consider supporting the original author through [Ko-Fi](https://ko-fi.com/herbrine8403), [Afdian](https://afdian.com/a/herbrine8403), or [WeChat Reward Code](donate.png).
+If you find this project valuable, consider supporting the original author through [Afdian](https://afdian.com/a/yiqiu4178), or [WeChat Reward Code](donate.png).
 
 ## Star History
 
