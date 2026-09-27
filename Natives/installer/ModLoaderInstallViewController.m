@@ -921,7 +921,10 @@ static NSString *ame185ShowAllRow(NSInteger hiddenCount) {
 /// 返回纯 Forge 版本号列表（"66.0.5" 形态，与 XML 路径的 sink 口径一致）；
 /// 任何失败（404/网络/解析）都按"该版本无数据"处理，回调空数组。
 - (void)ame185_fetchForgeFallbackJSON:(void (^)(NSArray *list))completion {
-    if (![completion isKindOfClass:NSBlock.class]) return;
+    // Task185 CI 修正：原写法 isKindOfClass:NSBlock.class——NSBlock 在 iOS SDK
+    // 不是公开声明的类（run 36317248542 实锤 "use of undeclared identifier
+    // 'NSBlock'"），仅 macOS 可用。nil 检查对本防御已足够。
+    if (!completion) return;
     NSString *encodedMC = [_gameVersion stringByReplacingOccurrencesOfString:@"-" withString:@"_"];
     if (encodedMC.length == 0) { completion(@[]); return; }
     NSString *urlString = [NSString stringWithFormat:@"https://bmclapi2.bangbang93.com/forge/minecraft/%@", encodedMC];
