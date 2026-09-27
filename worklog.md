@@ -796,3 +796,8 @@ Work Log:
 Stage Summary:
 - 装机锚点："[Task185] Forge: XML source won with N matches" 或 "BMCL per-version JSON won"（>26 生效）；Fabric/Quilt 列表默认 30 条 + 显示全部行；JIT 楔死场景 "[JIT] Task185 self-healing dispatch: refire on foreground"；"[JIT] ... Task185 openURL apple-magnifier:// -> 0"（巨魔助手死路钉死）；"[Task185] keychain token read failed ... OSStatus -25300"；"[Task185] repaired corrupted profilePicURL"；"[AvatarManager] Task185 avatar chain:" 各跳
 - 遗留：ANGLE 闪红后黑屏（呈现层已排除，嫌疑收敛内容层：desktop glUniformMatrix4fv transpose 等，待专项）、vgpu 白屏（待新构建日志）、26.1.2 空指针（他人反馈未到）、task134 fixture 漂移（环境性）
+
+### Task 185 补记：CI 首跑红 + 热修转绿
+- 首推 9e88f77（主轮 + 治愈轮）：CI run 36317248542 failure——ModLoaderInstallViewController.m:924 "use of undeclared identifier 'NSBlock'"（ame185_fetchForgeFallbackJSON 的防御写法 isKindOfClass:NSBlock.class；NSBlock 是 macOS 公开类、iOS SDK 未声明。本地验证器为纯静态检查无编译环节，故漏网）
+- 热修 8cb5e03：NSBlock 判定换 nil 检查（本防御足够）；全仓 NSBlock 代码用法清零（仅注释留档）；verify_task185 重跑 63/63 + 语法门全过
+- CI run 36317693650 completed success —— main 徽标恢复 passing；新令牌已更新进 remote（旧令牌确系 401 失效，用户重新配发）
