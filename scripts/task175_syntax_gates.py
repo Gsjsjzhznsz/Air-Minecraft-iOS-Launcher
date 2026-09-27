@@ -36,6 +36,12 @@ def balance(path):
         if state == "code":
             if c == '"':
                 state = "str"
+            elif c == "'":
+                # Task183（检查器治愈）：C 字符字面量。spvc_shim.c 的 Task183
+                # 清洗代码合法使用 '[' ']' '{' '}' '(' ')' 字面量做括号配对
+                # 扫描——旧状态机不识别字符字面量，把它们当真实括号计数，
+                # 对合法 C 代码误报不平衡。字符字面量里的括号不参与配平。
+                state = "char"
             elif c == "/" and i + 1 < n and src[i + 1] == "/":
                 state = "line"
                 i += 1
@@ -50,6 +56,11 @@ def balance(path):
             if c == "\\":
                 i += 1
             elif c == '"':
+                state = "code"
+        elif state == "char":
+            if c == "\\":
+                i += 1
+            elif c == "'":
                 state = "code"
         elif state == "line":
             if c == "\n":

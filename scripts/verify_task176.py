@@ -50,7 +50,9 @@ check("A3 文本兑底（版本行替换 + 15 条 precision 注入）",
       and shim.count("precision highp ") >= 15
       and '"#version 300 es\\n"' in shim)
 check("A4 兑底注册表按 ctx 挂靠 + destroy 释放 + 满表丢最老",
-      "AME176_FALLBACK_MAX 256" in shim
+      # Task183 重锚：256 -> 1024（本轮起选项式清洗副本也注册于此，大整合包
+      # 着色器数百起步，256 必满；满表丢最老语义不变）。
+      "AME176_FALLBACK_MAX 1024" in shim
       and "ame176_register_fallback(ame175_ce->ctx" in shim
       and "ame176_forget_fallbacks(context);" in shim)
 check("A5 主流程：option 自证失败转 textual，最终 *source = ame176_final",

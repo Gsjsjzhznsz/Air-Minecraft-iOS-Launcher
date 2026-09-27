@@ -2369,3 +2369,63 @@
 // Task182 glCreateShader(type=..) -> <id> (namespace joined)", "EGLBridge:
 // Task182 VGPU requesting ES 3.2 context", and -- absence expected --
 // "Task182 VGPU ES 3.2 context creation failed".
+//
+// REVISION 17 addendum (Task 183, no bump) -- 59d4b48 device-feedback
+// four-root-cause round (log set: latestlog.txt=ANGLE 26.3 FO black screen
+// with healthy swaps, latestlog.old.txt=1.8.9+vgpu white screen after ES3.2
+// fallback, latestlog.1=JIT second-menu hang; all three Commit: 59d4b48 with
+// Task182 anchors present = genuinely on the fixed build). (1) ANGLE black
+// screen ROOT fix -- the spvc-shim ES rewrite silently skipped 584/782 GLSL
+// compiles: MC's resource-reload storm holds up to 392 live spvc contexts at
+// once (batch create, deferred destroy) while the rewrite registry only had
+// 96 slots; once full, parse records were dropped and those compilers handed
+// MC raw DESKTOP GLSL 330, which the ES 3.0 context rejects at line 1
+// ("ERROR: 0:1: ...") -> ShaderManager "Failed to load required shader
+// programs" -> every pipeline missing -> 58fps of empty frames. Rewrite rate
+// by second (98%/11%/79%/2%) is fully anti-correlated with the live-context
+// watermark. Fix: registry 96 -> 1024 + oldest-eviction + rate-limited skip
+// logs on every silent branch (spvc_shim.c). Two ESSL-content families fixed
+// in the same shim, applied after the ES rewrite: (a) MC 26.x OIT fragment
+// shaders declare `layout(location=0) out vec4 coeff[N]` and index it with
+// loop variables (legal desktop GLSL, ILLEGAL ESSL 300 "array indexes for
+// fragment outputs must be constant integral expressions") -- accesses are
+// redirected to a plain global scratch array and constant-index copies are
+// inserted before main()'s closing brace; (b) clouds.vsh's `uniform
+// isamplerBuffer CloudFaces` comes back from spvc with `#extension
+// GL_EXT_texture_buffer : require` which ANGLE ES3 does not expose -- the
+// extension line is stripped, *samplerBuffer -> *sampler2D, and linear
+// texelFetch indices are folded to ivec2((i) & 255, (i) >> 8); tinygl4angle
+// gains the matching data-side bridge (glBindTexture GL_TEXTURE_BUFFER ->
+// GL_TEXTURE_2D retarget + glTexBuffer -> PBO-backed glTexImage2D at width
+// 256) plus a rate-limited desktop-source leak detector in glShaderSource.
+// (2) 1.8.9+vgpu white screen ROOT fix (second layer): the ES 3.2 context
+// request from Task182 was rejected by the bundled EGL (eglError=0x3004
+// BAD_ATTRIBUTE) and fell back to ES 3.0 -- where vgpu's GLSLHeader then
+// replaced #version 120 with the HARDCODED new_version ("#version 320 es")
+// even though its own testGLSL probe correctly reported only glsl300es --
+// FPE shaders rejected as "unsupported shader version", fixed pipeline zero
+// output = white screen. Fix: the replaced version now follows the probe
+// (320 -> 310 -> 300 es, vgpu src/gl/pack/shaderconv.c). (3) JIT second-menu
+// hang (1 of 3 sessions on the same build): the wait chain completed
+// normally but the main-queue continuation vanished without a single log;
+// the launch chain still had ONE completion dependency left --
+// UIKit_launchMinecraftSurfaceVC swapped the root VC inside
+// [UIView animateWithDuration:completion:], the same frozen-animation-clock
+// family Task182 removed from dismiss. Fix: synchronous root swap with a
+// fire-and-forget fade (ios_uikit_bridge.m, both directions), plus
+// wait-completed/handler-invoked anchor logs in RightPanel + NavCtrl.
+// (4) Right-Shift dead keybind: Task181's one-shot marker stopped future
+// washing but never repaired the washed state (device dump: marker present
+// AND sneak still at left.shift). Fix: one-time v2 restore -- when the v1
+// marker exists (the damage cohort) and sneak sits at the washed default
+// (left.shift / numeric 42), it is restored to right.shift / 54; fresh
+// installs (no v1) are untouched (input_bridge_v3.m). Device anchors:
+// ANGLE session free of "Couldn't compile .. shader for pipeline" spam and
+// free of "Task183 DESKTOP source reached GLES upload"; "[spvc-shim] Task183
+// ESSL sanitized" on OIT/clouds shaders; "Task183 texbuffer bridge: N bytes
+// -> 2D WxH"; "VGPU Task183: GLSLHeader version follows capability probe ->
+// #version 300 es" with the FPE storm compiling; "[JIT] [RightPanel] Task183
+// wait-completed block entered on main" followed by "[Task183] invoking
+// launch handler" and "[SurfaceSwap] Task183 launching SurfaceViewController";
+// "[Task183] keybind v2 RESTORE sneak: ... -> key.keyboard.right.shift"
+// (or 42 -> 54) exactly once, after which in-game rebinds survive.

@@ -88,7 +88,16 @@ static void *ame_spvc_shim_resolve(const char *sym);
 #define AME175_OPTION_GLSL_ES (9u | 0x2000000u)
 #define AME175_BACKEND_GLSL 1
 #define AME175_CAPTURE_TAKE_OWNERSHIP 1
-#define AME175_REGISTRY_MAX 96
+// Task183：96 -> 1024。病历（59d4b48 装机 latestlog.txt，ANGLE 26.3 FO
+// 会话）：MC 资源重载风暴期【并发持有最多 392 个活 spvc context】
+//（批量创建、延迟销毁），96 槽的注册表在 t=1-2s/3-4s 两个风暴窗口被打穿
+// ——新 context 的 parse 记录被静默丢弃，对应编译器的 ES 重写静默跳过，
+// 584/782 个着色器拿到【桌面 GLSL 330 原文】直达 ANGLE ES 3.0 上下文 =
+// "ERROR: 0:1" 行 1 解析错误全家桶 -> "Failed to load required shader
+// programs" 异常 -> 全管线缺失 -> 58fps 空帧黑屏。改写率逐秒实锤：
+// 0s:98% -> 1s:11% -> 2s:79% -> 3s:2%（与活 context 水位完全反相关）。
+// 1024 槽（静态 ~80KB）对 392 峰值留 2.6x 余量；仍配最旧驱逐兜底。
+#define AME175_REGISTRY_MAX 1024
 
 typedef struct {
     void *ctx;
@@ -96,6 +105,7 @@ typedef struct {
     size_t word_count;
     void *last_parsed_ir;
     int live;
+    unsigned seq;      // Task183：驱逐用序号（越大越新）
 } ame175_ctx_entry;
 
 typedef struct {
@@ -104,7 +114,17 @@ typedef struct {
     void *parsed_ir;
     int backend;
     int live;
+    unsigned seq;      // Task183：驱逐用序号（越新越大）
 } ame175_compiler_entry;
+
+static unsigned ame183_seq_counter = 0;
+
+// Task183：跳过/驱逐取证（限频：前 4 条全打，其后每 128 条一条）。
+static void ame183_skip_log(const char *why, int counter) {
+    if (counter <= 4 || (counter % 128) == 0) {
+        fprintf(stderr, "[spvc-shim] Task183 rewrite skipped (%s) #%d\n", why, counter);
+    }
+}
 
 static ame175_ctx_entry ame175_ctx_registry[AME175_REGISTRY_MAX];
 static ame175_compiler_entry ame175_compiler_registry[AME175_REGISTRY_MAX];
@@ -131,6 +151,7 @@ static void ame175_record_parse(void *ctx, const unsigned *spirv, size_t word_co
             }
             e->word_count = (e->words != NULL) ? word_count : 0;
             e->last_parsed_ir = parsed_ir;
+            e->seq = ++ame183_seq_counter;
             return;
         }
     }
@@ -146,8 +167,32 @@ static void ame175_record_parse(void *ctx, const unsigned *spirv, size_t word_co
             }
             e->word_count = (e->words != NULL) ? word_count : 0;
             e->last_parsed_ir = parsed_ir;
+            e->seq = ++ame183_seq_counter;
             return;
         }
+    }
+    // Task183：满表驱逐最旧（1024 槽下理论上到不了；到了说明 destroy 链
+    // 断了——被逐条目的字副本释放防泄漏，限频打点供装机日志定位）。
+    {
+        int oldest = 0;
+        for (int i = 1; i < AME175_REGISTRY_MAX; ++i) {
+            if (ame175_ctx_registry[i].seq < ame175_ctx_registry[oldest].seq) oldest = i;
+        }
+        static int s_ame183_evict = 0;
+        ++s_ame183_evict;
+        ame183_skip_log("ctx registry full -- evicting oldest", s_ame183_evict);
+        free(ame175_ctx_registry[oldest].words);
+        ame175_ctx_entry *e = &ame175_ctx_registry[oldest];
+        e->live = 1;
+        e->ctx = ctx;
+        e->words = NULL;
+        if (word_count > 0 && spirv != NULL) {
+            e->words = (unsigned *)malloc(word_count * sizeof(unsigned));
+            if (e->words != NULL) memcpy(e->words, spirv, word_count * sizeof(unsigned));
+        }
+        e->word_count = (e->words != NULL) ? word_count : 0;
+        e->last_parsed_ir = parsed_ir;
+        e->seq = ++ame183_seq_counter;
     }
 }
 
@@ -215,7 +260,9 @@ static int ame176_is_es_source(const char *src) {
 }
 
 // 兑底字符串注册表（按 ctx 挂靠，destroy 时释放）。
-#define AME176_FALLBACK_MAX 256
+// Task183：256 -> 1024（本轮起选项式清洗副本也注册于此——OIT/clouds
+// 系着色器数十起步，且文本兑底路径全量注册；256 槽在大整合包下必满）。
+#define AME176_FALLBACK_MAX 1024
 typedef struct {
     void *ctx;
     char *str;
@@ -287,6 +334,450 @@ static char *ame176_textual_es_rewrite(const char *desktop) {
     memcpy(out + head_len, eol + 1, rest_len);
     out[head_len + rest_len] = '\0';
     return out;
+}
+
+// ============================================================================
+// Task183：ES 输出清洗（选项式/文本式改写之后的第二道后处理）。
+// 病历（59d4b48 装机 latestlog.txt，ANGLE 26.3 FO 会话；Task182 命名空间
+// 修复让编译真实执行后暴露的下一层——两类 ESSL 300 非法构造）：
+//
+//   B 族（OIT 输出数组动态索引）："ERROR: 0:190: '[' : array indexes for
+//   fragment outputs must be constant integral expressions"——MC 26.x OIT
+//   系 fragment 声明 `layout(location = 0) out vec4 coeff[N];` 并用循环
+//   变量写 `coeff[attachmentIndex][i] = ...`（桌面 GLSL 330 合法、ESSL 300
+//   禁止 fragment 输出数组动态索引）。terrain/block/entity/item/particle/
+//   position_color/text 七族 fragment 全军覆没 = 管线缺失大户。修法（移植
+//   MobileGlues glsl_for_es.cpp fix_dynamic_output_indexing 同构逻辑）：
+//   声明用标记保护 -> 全部 `name[` 访问改走 `name_mgio[`（普通全局数组
+//   动态索引合法）-> 声明后补 `TYPE name_mgio[N];` 草稿声明 -> main 尾部
+//   插入常量索引复制（name[k] = name_mgio[k]）。
+//
+//   C 族（buffer 纹理扩展）：clouds.vsh 的 `uniform isamplerBuffer
+//   CloudFaces` + texelFetch 线性取数——spvc ES300 输出原样保留类型并加
+//   `#extension GL_EXT_texture_buffer : require`（第 2 行），ANGLE ES 3.0
+//   上下文无此扩展直接拒绝（clouds 管线在 required 名单里，缺失 = 整个
+//   ShaderManager reload 抛异常）。修法（模拟，与 tinygl4angle 侧
+//   glTexBuffer PBO 桥的 256 宽铺图对齐）：删扩展行 + samplerBuffer 族
+//   -> sampler2D 族（保 i/u 前缀）+ 仅对 buffer 派生的采样器把
+//   texelFetch(S, X) 线性索引折叠为 ivec2((X) & 255, (X) >> 8)。
+//
+// 入参为待清洗 ES 源；需清洗时返回 malloc 副本（调用方注册进 ctx 兜底
+// 表随 destroy 释放），无需清洗返回 NULL（调用方沿用原指针）。
+// ============================================================================
+
+static int ame183_is_ident(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '_';
+}
+
+/// 有界子串搜索（Darwin string.h 不声明 memmem，避免隐式声明告警）。
+static const char *ame183_memem(const char *hay, size_t hlen, const char *needle, size_t nlen) {
+    if (nlen == 0 || hay == NULL || hlen < nlen) return NULL;
+    for (size_t i = 0; i + nlen <= hlen; ++i) {
+        if (memcmp(hay + i, needle, nlen) == 0) return hay + i;
+    }
+    return NULL;
+}
+
+/// 词边界受限的全量替换：把 `from[`（from 为完整标识符且后随 '['）换成
+/// `to[`。返回新 malloc 缓冲；无命中返回 NULL。
+static char *ame183_replace_out_accesses(const char *src, const char *from, const char *to) {
+    size_t flen = strlen(from), tlen = strlen(to);
+    size_t hits = 0;
+    const char *p = src;
+    while ((p = strstr(p, from)) != NULL) {
+        if (p[flen] == '[' && (p == src || !ame183_is_ident(p[-1]))) ++hits;
+        p += flen;
+    }
+    if (hits == 0) return NULL;
+    char *out = (char *)malloc(strlen(src) + hits * (tlen - flen) + 1);
+    if (out == NULL) return NULL;
+    char *w = out;
+    const char *r = src;
+    while (*r) {
+        if (strncmp(r, from, flen) == 0 && r[flen] == '[' &&
+            (r == src || !ame183_is_ident(r[-1]))) {
+            memcpy(w, to, tlen);
+            w += tlen;
+            r += flen;
+        } else {
+            *w++ = *r++;
+        }
+    }
+    *w = '\0';
+    return out;
+}
+
+/// 在 [s, e) 里跳过空白。
+static const char *ame183_skipws(const char *s, const char *e) {
+    while (s < e && (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r')) ++s;
+    return s;
+}
+
+/// 读一个标识符到 buf（<=cap-1），返回结尾；失败返回 NULL。
+static const char *ame183_read_ident(const char *s, const char *e, char *buf, size_t cap) {
+    size_t n = 0;
+    while (s < e && ame183_is_ident(*s)) {
+        if (n + 1 < cap) buf[n++] = *s;
+        ++s;
+    }
+    if (n == 0) return NULL;
+    buf[n] = '\0';
+    return s;
+}
+
+typedef struct {
+    char name[64];
+    char decl[192];   // 原声明全文（含分号）
+    int n;            // 数组元素数
+} ame183_outarr_t;
+
+/// 解析一个 "out" 声明（调用点已确认 word=="out" 且前向布局可选）。
+/// 成功时填 name/decl/n，返回声明结束（';' 之后）在 src 里的偏移；
+/// 不是输出数组声明返回 -1。
+static long ame183_parse_out_array(const char *src, size_t len, size_t out_at, ame183_outarr_t *out) {
+    const char *e = src + len;
+    const char *p = src + out_at + 3;  // 跳过 "out"
+    char prec[16] = "", type[40], name[64];
+    p = ame183_skipws(p, e);
+    if (p >= e) return -1;
+    // 可选精度
+    if (strncmp(p, "highp", 5) == 0 || strncmp(p, "mediump", 7) == 0 || strncmp(p, "lowp", 4) == 0) {
+        const char *w = p;
+        while (w < e && ame183_is_ident(*w)) ++w;
+        size_t pl = (size_t)(w - p);
+        if (pl < sizeof(prec)) { memcpy(prec, p, pl); prec[pl] = '\0'; }
+        p = ame183_skipws(w, e);
+    }
+    p = ame183_read_ident(p, e, type, sizeof(type));
+    if (p == NULL) return -1;
+    p = ame183_skipws(p, e);
+    p = ame183_read_ident(p, e, name, sizeof(name));
+    if (p == NULL) return -1;
+    p = ame183_skipws(p, e);
+    if (p >= e || *p != '[') return -1;
+    ++p;
+    p = ame183_skipws(p, e);
+    if (p >= e || *p < '0' || *p > '9') return -1;
+    long n = 0;
+    while (p < e && *p >= '0' && *p <= '9') { n = n * 10 + (*p - '0'); ++p; }
+    p = ame183_skipws(p, e);
+    if (p >= e || *p != ']') return -1;
+    ++p;
+    p = ame183_skipws(p, e);
+    if (p >= e || *p != ';') return -1;
+    ++p;
+    if (n <= 0 || n > 64) return -1;
+    snprintf(out->name, sizeof(out->name), "%s", name);
+    snprintf(out->decl, sizeof(out->decl), "%.*s", (int)(p - (src + out_at)), src + out_at);
+    out->n = (int)n;
+    (void)prec;
+    return (long)(p - src);
+}
+
+/// B 族主逻辑：返回清洗后的 malloc 缓冲或 NULL。
+static char *ame183_fix_output_arrays(const char *src) {
+    ame183_outarr_t arrs[16];
+    int arr_count = 0;
+    // (a) 找全部输出数组声明。为支持"边找边标"的两遍处理，先收集。
+    typedef struct { size_t at; long end; } span_t;
+    span_t spans[16];
+    size_t i = 0;
+    while (i + 3 < strlen(src) && arr_count < 16) {
+        if (src[i] == 'o' && src[i+1] == 'u' && src[i+2] == 't' &&
+            !ame183_is_ident(src[i+3]) && (i == 0 || !ame183_is_ident(src[i-1]))) {
+            ame183_outarr_t a;
+            long end = ame183_parse_out_array(src, strlen(src), i, &a);
+            if (end > 0) {
+                arrs[arr_count] = a;
+                spans[arr_count].at = i;
+                spans[arr_count].end = end;
+                ++arr_count;
+                i = (size_t)end;
+                continue;
+            }
+        }
+        ++i;
+    }
+    if (arr_count == 0) return NULL;
+    // (b) 声明替换为标记（防止 (c) 改写声明自身）。
+    size_t cap = strlen(src) + arr_count * 256 + 64;
+    char *cur = (char *)malloc(cap);
+    if (cur == NULL) return NULL;
+    {
+        size_t w = 0, r = 0;
+        for (int k = 0; k < arr_count; ++k) {
+            size_t seg = spans[k].at - r;
+            memcpy(cur + w, src + r, seg);
+            w += seg;
+            w += (size_t)snprintf(cur + w, cap - w, "@@A183OUT%d@@", k);
+            r = (size_t)spans[k].end;
+        }
+        strcpy(cur + w, src + r);
+    }
+    // (c) 全部 name[ 访问改走 name_mgio[。
+    for (int k = 0; k < arr_count; ++k) {
+        char mgio[80];
+        snprintf(mgio, sizeof(mgio), "%s_mgio", arrs[k].name);
+        char *rep = ame183_replace_out_accesses(cur, arrs[k].name, mgio);
+        if (rep != NULL) {
+            free(cur);
+            cur = rep;
+            cap = strlen(cur) + 1;  // 真实容量（精确分配；后续步骤按需 realloc）
+        }
+    }
+    // (d) 标记还原：声明 + 草稿声明（普通全局数组，动态索引合法）。
+    for (int k = 0; k < arr_count; ++k) {
+        char marker[32], repl[384];
+        snprintf(marker, sizeof(marker), "@@A183OUT%d@@", k);
+        // decl 形如 "out mediump vec4 coeff[4];"；body = 去掉 "out" 后的
+        // "mediump vec4 coeff"（截到 '[' 前，含名字）——补 "_mgio" 即草稿名。
+        const char *d = arrs[k].decl;
+        const char *body = d + 4;  // 跳过 "out"
+        while (*body == ' ' || *body == '\t' || *body == '\n') ++body;
+        {
+            char typepart[160];
+            const char *br = strchr(body, '[');
+            size_t tl = br ? (size_t)(br - body) : strlen(body) - 1;
+            if (tl >= sizeof(typepart)) tl = sizeof(typepart) - 1;
+            memcpy(typepart, body, tl);
+            typepart[tl] = '\0';
+            snprintf(repl, sizeof(repl), "%s\n%s_mgio[%d];", d, typepart, arrs[k].n);
+        }
+        // 简单标记替换（标记唯一，直接 find/replace 一次）
+        char *m = strstr(cur, marker);
+        if (m != NULL) {
+            size_t ml = strlen(marker), rl = strlen(repl);
+            size_t tail = strlen(m + ml);
+            if (strlen(cur) - ml + rl + 1 > cap) {
+                cap = strlen(cur) - ml + rl + 64;
+                cur = (char *)realloc(cur, cap);
+                if (cur == NULL) return NULL;
+                m = strstr(cur, marker);
+            }
+            memmove(m + rl, m + ml, tail + 1);
+            memcpy(m, repl, rl);
+        }
+    }
+    // (e) main 尾部插入常量索引复制。
+    {
+        const char *mp = strstr(cur, "void main(");
+        if (mp == NULL) mp = strstr(cur, "void main (");
+        if (mp != NULL) {
+            const char *brace = strchr(mp, '{');
+            if (brace != NULL) {
+                int depth = 1;
+                const char *q = brace + 1;
+                while (*q && depth > 0) {
+                    if (*q == '{') ++depth;
+                    else if (*q == '}') --depth;
+                    ++q;
+                }
+                if (depth == 0) {
+                    size_t close_at = (size_t)(q - cur) - 1;
+                    char copies[1024];
+                    size_t cl = 0;
+                    int rn2 = snprintf(copies + cl, sizeof(copies) - cl,
+                        "\n    // mg: constant-index fragment-output copies (ESSL 300, Task183)\n");
+                    if (rn2 > 0) cl += (size_t)rn2;
+                    for (int k = 0; k < arr_count && cl + 96 < sizeof(copies); ++k) {
+                        for (int j = 0; j < arrs[k].n && cl + 96 < sizeof(copies); ++j) {
+                            rn2 = snprintf(copies + cl, sizeof(copies) - cl,
+                                "    %s[%d] = %s_mgio[%d];\n", arrs[k].name, j, arrs[k].name, j);
+                            if (rn2 <= 0) break;
+                            cl += (size_t)rn2;
+                            if (cl >= sizeof(copies)) { cl = sizeof(copies) - 1; break; }
+                        }
+                    }
+                    size_t need = strlen(cur) + cl + 1;
+                    if (need > cap) {
+                        cur = (char *)realloc(cur, need + 64);
+                        if (cur == NULL) return NULL;
+                        // realloc 后 close_at 仍有效（按偏移计算）
+                    }
+                    memmove(cur + close_at + cl, cur + close_at, strlen(cur + close_at) + 1);
+                    memcpy(cur + close_at, copies, cl);
+                }
+            }
+        }
+    }
+    return cur;
+}
+
+/// C 族：buffer 纹理模拟（shader 侧）。返回清洗后 malloc 缓冲或 NULL。
+static char *ame183_emulate_texture_buffers(const char *src) {
+    if (src == NULL || strstr(src, "samplerBuffer") == NULL) return NULL;
+    // (a) 收集 buffer 派生采样器名（uniform [prec] *samplerBuffer NAME[..];）。
+    //     token 级扫描：类型 token 以 "samplerBuffer" 结尾（isamplerBuffer/
+    //     usamplerBuffer 前缀自动兼容），随后读标识符名。
+    char names[8][64];
+    int name_count = 0;
+    const char *u = src;
+    while ((u = strstr(u, "uniform")) != NULL && name_count < 8) {
+        if (u == src || !ame183_is_ident(u[-1])) {
+            const char *p = u + 7;
+            while (*p && *p != ';' && *p != '\n') {
+                if (ame183_is_ident(*p)) {
+                    const char *tok = p;
+                    while (ame183_is_ident(*p)) ++p;
+                    size_t tl = (size_t)(p - tok);
+                    if (tl >= 13 && strncmp(tok + tl - 13, "samplerBuffer", 13) == 0) {
+                        const char *q = p;
+                        while (*q == ' ' || *q == '\t') ++q;
+                        char nm[64];
+                        if (ame183_read_ident(q, q + strlen(q), nm, sizeof(nm)) != NULL) {
+                            snprintf(names[name_count], sizeof(names[name_count]), "%s", nm);
+                            ++name_count;
+                        }
+                        break;
+                    }
+                } else {
+                    ++p;
+                }
+            }
+        }
+        u += 7;
+    }
+    // (b) 删 #extension GL_EXT_texture_buffer 行 + 类型替换 + texelFetch 重写。
+    //     逐行重建：命中扩展行跳过；行内做类型替换；texelFetch 用括号配对改写。
+    size_t cap = strlen(src) * 2 + 4096;
+    char *out = (char *)malloc(cap);
+    if (out == NULL) return NULL;
+    size_t w = 0;
+    const char *line = src;
+    int changed = 0;
+    while (line != NULL && *line != '\0') {
+        const char *eol = strchr(line, '\n');
+        size_t ll = eol ? (size_t)(eol - line) : strlen(line);
+        // 扩展行整行删除
+        if (ll > 10 && strncmp(line, "#extension", 10) == 0 &&
+            ame183_memem(line, ll, "GL_EXT_texture_buffer", 21) != NULL) {
+            changed = 1;
+        } else {
+            // 行内类型替换
+            for (size_t k = 0; k + 13 <= ll; ++k) {
+                if (strncmp(line + k, "samplerBuffer", 13) == 0) {
+                    memcpy((void *)(out + w), line, k);
+                    w += k;
+                    memcpy(out + w, "sampler2D", 9);
+                    w += 9;
+                    line += k + 13;
+                    ll -= k + 13;
+                    k = (size_t)-1;
+                    changed = 1;
+                    // 继续处理本行剩余
+                    continue;
+                }
+            }
+            memcpy(out + w, line, ll);
+            w += ll;
+        }
+        if (eol != NULL) { out[w++] = '\n'; line = eol + 1; }
+        else { line = NULL; }
+    }
+    out[w] = '\0';
+    if (!changed) { free(out); return NULL; }
+    // (c) texelFetch 重写（只动 buffer 派生采样器）。
+    for (int k = 0; k < name_count; ++k) {
+        size_t nl = strlen(names[k]);
+        const char *tf = out;
+        while ((tf = strstr(tf, "texelFetch")) != NULL) {
+            if (tf != out && ame183_is_ident(tf[-1])) { ++tf; continue; }
+            const char *par = tf + 10;
+            while (*par == ' ' || *par == '\t') ++par;
+            if (*par != '(') { ++tf; continue; }
+            // 第一参数须是 buffer 采样器名
+            const char *a1 = par + 1;
+            while (*a1 == ' ' || *a1 == '\t') ++a1;
+            if (strncmp(a1, names[k], nl) != 0 || ame183_is_ident(a1[nl])) { ++tf; continue; }
+            const char *comma = a1 + nl;
+            while (*comma == ' ' || *comma == '\t') ++comma;
+            if (*comma != ',') { ++tf; continue; }
+            // 括号配对
+            const char *close = NULL;
+            {
+                int depth2 = 0;
+                const char *q2 = par;
+                for (; *q2; ++q2) {
+                    if (*q2 == '(') ++depth2;
+                    else if (*q2 == ')') { --depth2; if (depth2 == 0) { close = q2; break; } }
+                }
+            }
+            if (close == NULL) break;
+            // 坐标表达式 = comma+1 .. 前一个顶层 ')' 之间（去掉外层包裹）
+            // 支持两种形态：texelFetch(S, X) / texelFetch(S, ivec2(X), 0)
+            const char *coordBegin = comma + 1;
+            const char *coordEnd = close;
+            const char *cursor = comma + 1;
+            int d2 = 0;
+            const char *lastTopComma = NULL;
+            for (const char *q2 = comma + 1; q2 < close; ++q2) {
+                if (*q2 == '(') ++d2;
+                else if (*q2 == ')') --d2;
+                else if (*q2 == ',' && d2 == 0) lastTopComma = q2;
+            }
+            int thirdArgZero = 0;
+            if (lastTopComma != NULL) {
+                // 3 参形态：第 2 参须是 ivec2(...)，第 3 参须是 0
+                const char *a3 = lastTopComma + 1;
+                while (*a3 == ' ' || *a3 == '\t') ++a3;
+                if (*a3 == '0' && (a3 + 1 == close)) thirdArgZero = 1;
+                coordEnd = lastTopComma;
+            }
+            (void)cursor;
+            // ivec2( 剥壳
+            const char *cb = coordBegin;
+            while (cb < coordEnd && (*cb == ' ' || *cb == '\t')) ++cb;
+            const char *ce = coordEnd;
+            while (ce > cb && (ce[-1] == ' ' || ce[-1] == '\t')) --ce;
+            if (ce - cb > 7 && strncmp(cb, "ivec2(", 6) == 0) {
+                // 校验闭合
+                int d3 = 0;
+                const char *q3;
+                for (q3 = cb; q3 < ce; ++q3) {
+                    if (*q3 == '(') ++d3;
+                    else if (*q3 == ')') { --d3; if (d3 == 0) break; }
+                }
+                if (d3 == 0 && q3 + 1 == ce) { cb += 6; ce -= 1; }
+            }
+            if (!thirdArgZero && lastTopComma != NULL) { ++tf; continue; }  // 不认识的形态
+            // 重建：texelFetch(NAME, ivec2((X) & 255, (X) >> 8), 0)
+            size_t coordLen = (size_t)(ce - cb);
+            size_t frag2 = 14 + nl + 32 + coordLen * 2 + 16;
+            char *repl2 = (char *)malloc(frag2);
+            if (repl2 == NULL) break;
+            int rn = snprintf(repl2, frag2, "texelFetch(%.*s, ivec2((%.*s) & 255, (%.*s) >> 8), 0)",
+                              (int)nl, names[k], (int)coordLen, cb, (int)coordLen, cb);
+            if (rn <= 0) { free(repl2); break; }
+            // Task183：先记偏移再换缓冲（tf/close 指向旧块，free 后即悬垂）。
+            size_t tfOff = (size_t)(tf - out);
+            size_t segLen = (size_t)(close + 1 - tf);
+            size_t newTotal = strlen(out) - segLen + (size_t)rn + 1;
+            char *buf2 = (char *)malloc(newTotal);
+            if (buf2 == NULL) { free(repl2); break; }
+            memcpy(buf2, out, tfOff);
+            memcpy(buf2 + tfOff, repl2, (size_t)rn);
+            memcpy(buf2 + tfOff + (size_t)rn, close + 1, strlen(close + 1) + 1);
+            free(repl2);
+            free(out);
+            out = buf2;
+            tf = out + tfOff + (size_t)rn;
+        }
+    }
+    return out;
+}
+
+/// Task183 总入口：B + C 清洗。返回 malloc 副本或 NULL（无需清洗）。
+static char *ame183_sanitize_essl(const char *essl) {
+    if (essl == NULL) return NULL;
+    char *c_fixed = ame183_emulate_texture_buffers(essl);
+    const char *base = (c_fixed != NULL) ? c_fixed : essl;
+    char *b_fixed = ame183_fix_output_arrays(base);
+    if (b_fixed != NULL) {
+        free(c_fixed);
+        return b_fixed;
+    }
+    return c_fixed;
 }
 
 /// 在同一 context 上重建 ES 编译器并编译；失败返回 NULL（调用方回落原源）。
@@ -513,6 +1004,14 @@ int spvc_compiler_compile(void *compiler, const char **source) {
                 break;
             }
         }
+        // Task183：静默跳过取证（59d4b48 病历：584/782 静默拿到桌面源，
+        // 零日志零线索——本轮起每个跳过分支都限频打点）。
+        static int s_ame183_noComp = 0;
+        static int s_ame183_noCtx = 0;
+        if (ame175_ce == NULL) {
+            ++s_ame183_noComp;
+            ame183_skip_log("compiler unregistered", s_ame183_noComp);
+        }
         if (ame175_ce != NULL && ame175_ce->backend == AME175_BACKEND_GLSL &&
             ame175_is_desktop_glsl(*source)) {
             ame175_ctx_entry *ame175_ctxe = NULL;
@@ -546,6 +1045,23 @@ int spvc_compiler_compile(void *compiler, const char **source) {
                     }
                 }
                 if (ame176_final != NULL) {
+                    // Task183：ES 输出清洗（B：OIT 输出数组动态索引；
+                    // C：texture buffer 模拟）。选项式输出是 ctx 内存的
+                    // const 指针，不可原地改——清洗副本注册进兜底表。
+                    static int s_ame183_saniLogged = 0;
+                    char *ame183_san = ame183_sanitize_essl(ame176_final);
+                    if (ame183_san != NULL) {
+                        const char *ame183_reg = ame176_register_fallback(ame175_ce->ctx, ame183_san);
+                        if (ame183_reg != NULL) {
+                            ame176_final = ame183_reg;
+                            if (s_ame183_saniLogged < 4) {
+                                ++s_ame183_saniLogged;
+                                fprintf(stderr,
+                                        "[spvc-shim] Task183 ESSL sanitized (output-array/texbuf, head48='%.48s')\n",
+                                        ame176_final);
+                            }
+                        }
+                    }
                     static int s_ame176_headLogged = 0;
                     if (s_ame176_headLogged < 4) {
                         ++s_ame176_headLogged;
@@ -566,6 +1082,10 @@ int spvc_compiler_compile(void *compiler, const char **source) {
                             compiler, (ame175_es != NULL) ? "non-es-output" : "null",
                             ame_spvc_shim_ms());
                 }
+            } else {
+                // Task183：ctx 缺失 / ir 失配 / 字丢失 —— 限频打点。
+                ++s_ame183_noCtx;
+                ame183_skip_log("ctx missing or ir mismatch", s_ame183_noCtx);
             }
         }
     }
@@ -635,13 +1155,22 @@ int spvc_context_create_compiler(void *context, int backend, void *parsed_ir,
             }
             if (!c->live && ame175_slot < 0) ame175_slot = i;
         }
-        if (ame175_slot >= 0) {
-            ame175_compiler_registry[ame175_slot].live = 1;
-            ame175_compiler_registry[ame175_slot].compiler = *compiler;
-            ame175_compiler_registry[ame175_slot].ctx = context;
-            ame175_compiler_registry[ame175_slot].parsed_ir = parsed_ir;
-            ame175_compiler_registry[ame175_slot].backend = backend;
+        if (ame175_slot < 0) {
+            // Task183：满表驱逐最旧（同 ctx 注册表间架；1024 槽下为断链兜底）。
+            ame175_slot = 0;
+            for (int i = 1; i < AME175_REGISTRY_MAX; ++i) {
+                if (ame175_compiler_registry[i].seq < ame175_compiler_registry[ame175_slot].seq) ame175_slot = i;
+            }
+            static int s_ame183_cevict = 0;
+            ++s_ame183_cevict;
+            ame183_skip_log("compiler registry full -- evicting oldest", s_ame183_cevict);
         }
+        ame175_compiler_registry[ame175_slot].live = 1;
+        ame175_compiler_registry[ame175_slot].compiler = *compiler;
+        ame175_compiler_registry[ame175_slot].ctx = context;
+        ame175_compiler_registry[ame175_slot].parsed_ir = parsed_ir;
+        ame175_compiler_registry[ame175_slot].backend = backend;
+        ame175_compiler_registry[ame175_slot].seq = ++ame183_seq_counter;
     }
     pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] create_compiler backend=%d -> %p rc=%d (t=%.0fms "

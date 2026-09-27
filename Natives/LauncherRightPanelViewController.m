@@ -1770,6 +1770,10 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         // 启动器界面，只能杀进程）。超时后撤弹窗并给出重试/取消。
         BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
         dispatch_async(dispatch_get_main_queue(), ^{
+            // Task183（断点钉死锚点）：59d4b48 装机 latestlog.1 病历——
+            // condition satisfied 之后主队列续接块静默丢失（连 TouchController
+            // 首日志都没出）。本行+后续每步锚点让下轮日志直接定位卡点。
+            NSLog(@"[JIT] [RightPanel] Task183 wait-completed block entered on main (ok=%d)", ok);
             if (ame172_bgt != UIBackgroundTaskInvalid) {
                 [UIApplication.sharedApplication endBackgroundTask:ame172_bgt];
                 ame172_bgt = UIBackgroundTaskInvalid;
@@ -1797,6 +1801,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                     NSLog(@"[JIT] [RightPanel] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
                     [self ame172_reattachJIT26ThenLaunch:handler];
                 } else {
+                    NSLog(@"[JIT] [RightPanel] Task183 invoking launch handler");
                     handler();
                 }
             } else {

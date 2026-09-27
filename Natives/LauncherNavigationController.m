@@ -785,6 +785,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         // RightPanel/DownloadVC 两处，群见 utils.m 病历）。
         BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
         dispatch_async(dispatch_get_main_queue(), ^{
+            // Task183（断点钉死锚点，同 RightPanel 病历 59d4b48 latestlog.1）。
+            NSLog(@"[JIT] [NavCtrl] Task183 wait-completed block entered on main (ok=%d)", ok);
             if (ame172_bgt != UIBackgroundTaskInvalid) {
                 [UIApplication.sharedApplication endBackgroundTask:ame172_bgt];
                 ame172_bgt = UIBackgroundTaskInvalid;
@@ -801,6 +803,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                     NSLog(@"[JIT] [NavCtrl] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
                     [self ame172_reattachJIT26ThenLaunch:handler];
                 } else {
+                    NSLog(@"[JIT] [NavCtrl] Task183 invoking launch handler");
                     handler();
                 }
             } else {

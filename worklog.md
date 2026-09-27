@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | Task 181 提交 488f25b（ab78f50 六症状轮：26.1.2 pc=0 根修 / 1.8.9 splash 禁用 / CF loaders 大小写 / 右 Shift 键位一次性化 / ANGLE+JIT 取证），CI run 36290432039 success 首跑绿；此前 afa23a6（Task180 轮 CI docs）+ 042b950（Task180）+ 43784d6（Task179）|
-| 最新 Task 号 | **181**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 181（六锚点见文末）+ Task 180（双滑条透明度）+ Task 179（八连修）+ Task 178/177（新拟态定稿）+ Task 175/176 + 更早轮次 |
+| 远端 HEAD | Task 182 提交 59d4b48（bc1941b 三根因：ANGLE 命名空间钉死 / vgpu ES3.2 请求 / JIT dismiss 同步化），CI 绿；本轮 Task 183 四根因待推（spvc 注册表 1024 + ESSL 清洗 / vgpu 版本随探测 / 换根同步化 / 键位 v2 恢复）；此前 488f25b（Task181 六症状）|
+| 最新 Task 号 | **183**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 183（四线锚点见文末）+ Task 182（三锚点）+ Task 181（六锚点）+ Task 180（双滑条透明度）+ Task 179（八连修）+ Task 178/177（新拟态定稿）+ 更早轮次 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135/149/158 路径依赖 + task140 G2/G3 日志轮换），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
@@ -716,3 +716,38 @@ Stage Summary:
 - 两项取证就位：⑤ANGLE 编译链（tinygl4angle 双向日志=断点分辨器）⑥JIT 等待（成功/翻转/快照三针）
 - 装机验证锚点：①26.1.2 不再 1.17s 崩（可进主菜单）②1.8.9 启动日志见 "Task181: legacy Forge splash disabled" 且不再 FBO status:0 崩③CF 详情页选 Fabric/Forge 筛选直接出文件（无需点全部）④启动日志见 "[Task181] keybind marker written"，之后游戏内改绑 right.shift 重启存活、右 Shift 按钮 toggle 生效⑤ANGLE 会话日志搜 "[tinygl4angle] Task181 glShaderSource/glCompileShader"——出现且 COMPILE_STATUS=0 → head48 当场钉死断源；不出现 → MC 调用解析在本 dylib 之外（下一轮修复目标）⑥JIT 日志搜 "[JIT] Task181"（wait begin / condition satisfied / returned to FOREGROUND）
 - 遗留：ANGLE 最后一环与 JIT 卡死断点待装机日志定案；MobileGL 会话 swapOK=10238 健康基线更新；latestlog 4.txt（他人 v5.0.0）JNA 签名崩溃属旧版残留（6.0.0 已含 Task107 修复，建议对方升级）
+
+---
+Task ID: 182（补记）
+Agent: main (Super Z)
+Task: bc1941b 构建六反馈三根因根修（071647c+a9e60ac 日志：ANGLE 编译 status=0 空 log / vgpu 白屏 / JIT 二级菜单 completion 悬空）——详见主 worklog 与 version.h REVISION 17 addendum；提交 59d4b48，CI 绿（本轮判读即基于该构建的装机日志）
+
+---
+Task ID: 183
+Agent: main (Super Z)
+Task: 59d4b48 构建装机四反馈（5b3dcab+e40da2e 三日志，全部 Commit: 59d4b48 + Task182 锚点在场=真在修复版上）：ANGLE 黑屏 / vgpu 白屏 / JIT 二级菜单依旧卡死（一级页面正常）/ 右 Shift 依旧无效 → 四根因定案 + 四线根修
+
+Work Log:
+- 三日志判读：latestlog.txt=ANGLE 26.3 FO 会话（swapOK=375 fps=58 呈现管线健康但黑屏）/ latestlog.old.txt=1.8.9+vgpu（ES 3.2 请求被拒 0x3004 回退 ES 3.0 后白屏）/ latestlog.1=JIT RightPanel 启动（condition satisfied 3.0s 后主队列续接块静默丢失=卡死；另两会话同代码成功）
+- ANGLE 黑屏根因定案（数据链）：783 次 compiler_compile vs 198 次 ES 改写成功 = 584 个静默拿到桌面 GLSL 330 → ANGLE ES3.0 "ERROR: 0:1" 行 1 拒绝 → ShaderManager "Failed to load required shader programs"（数百管线全列）→ 空管线 58fps 空帧 = 黑屏；改写率逐秒 98%/11%/79%/2% 与活 context 水位反相关；水位模拟实锤峰值 392 活 context vs 注册表 96 槽（Task175 时代的容量，MC 资源重载风暴批量创建延迟销毁）
+- ANGLE 第二层（改写成功者中的 ESSL 内容非法）：B 族=OIT fragment `layout(location=0) out vec4 coeff[N]` + 循环变量动态索引（ESSL300 禁止，terrain/entity/text 等七族 fragment 报 0:190/0:196）；C 族=clouds.vsh `uniform isamplerBuffer CloudFaces` → spvc ES300 输出 `#extension GL_EXT_texture_buffer : require`（第 2 行）ANGLE ES3 无此扩展
+- vgpu 白屏根因定案：Task182 ES 3.2 上下文请求被老 EGL 拒（0x3004 BAD_ATTRIBUTE）回退 ES 3.0；vgpu GLSLHeader 三分支能力探测（300es=1/310es=0/320es=0）正确但【替换恒用 new_version="#version 320 es"】→ FPE 全灭 "unsupported shader version" → 固定管线零输出 = 白屏（转换产物 dump 实证 in/out+texelFetch 全是 ES300 语法）
+- JIT 卡死根因定案：启动链最后一个 completion 依赖 = UIKit_launchMinecraftSurfaceVC 把换根 VC 包在 [UIView animateWithDuration:completion:] 里（后台态动画时钟冻结与 dismiss 同族）——Task182 修了 dismiss 族漏了这个
+- 右 Shift 根因定案：v1 标记在场（不再洗 ✓）但 sneak 仍处被洗态 left.shift——v1 只防未来洗不修历史损伤；1.8.9 侧数字格式 42 同态
+- 修复 A（spvc_shim.c）：注册表 96→1024 + seq 最旧驱逐 + 兑底表 256→1024 + 全部静默跳过分支限频打点；ES 改写后新增 ame183_sanitize_essl 清洗（B 族：声明标记保护→name[ 访问改 name_mgio[ 全局草稿→main 尾常量索引复制；C 族：删扩展行+*samplerBuffer→*sampler2D+texelFetch 线性折叠 ivec2((i)&255,(i)>>8)）
+- 修复 B（tinygl4angle.c）：glBindTexture(GL_TEXTURE_BUFFER→GL_TEXTURE_2D) 重定向 + glTexBuffer PBO 桥（绑 PBO 查尺寸→宽 256 铺 2D glTexImage2D 零拷贝，格式表 R8~R32UI/RGBA8）+ glShaderSource 桌面源泄漏限频探测（A 族回归锚点）
+- 修复 C（vgpu pack/shaderconv.c）：GLSLHeader 版本跟随能力探测（320→310→300 es 递降 + 探针日志）
+- 修复 D（ios_uikit_bridge.m 双向 + RightPanel/NavCtrl 锚点）：换根同步化（动画降级 fire-and-forget）+ "[JIT] Task183 wait-completed block entered on main"/"invoking launch handler" 断点钉死锚点
+- 修复 E（input_bridge_v3.m）：v2 一次性恢复——v1 标记存在（损伤 cohorts）&& v2 不存在 && sneak 处被洗默认（left.shift/42）→ 恢复 right.shift/54；新装直写 v2 不受影响；恢复走 repairs 写回管线（备份+原子写）
+- 功能单测 task183_sanitize_test.c（真实病灶形态 23 断言，ASAN+O2 双跑；本地复现抓出 3 个实现 bug 修复：replace 尾部空指针、isamplerBuffer 前缀漏检、texelFetch 重建偏移悬垂 + 1 个堆溢出（cap 虚高））
+- verify_task183 新建 50/50（A shim 十二 / B tinygl 七 / C vgpu 四 / D 换根六 / E JIT 锚五 / F 键位八 / G 语法门四 / H 差值配平四）
+- 级联：182:39 / 181:35 / 179:61 / 175:41 / 173:123 / 172:51 / 169:49 / 134 / 176:43 / 180:113 全绿；177/178 自身检查过+级联块沙箱超时（已知环境性）
+- 顺手治愈两处存量：task175_syntax_gates.py 状态机补字符字面量识别（'[' 等合法 C 字面量被误计为真实括号——spvc_shim 清洗代码被误报）+ task176 A4 重锚（256→1024 扩容）
+- version.h REVISION 17 addendum（Task 183，no bump）+ 本 worklog
+
+Stage Summary:
+- ANGLE 黑屏四层全闭环：命名空间（Task182）→ 注册表容量（本轮主根因 584/782 静默漏网）→ OIT 动态索引 → texture buffer 模拟；装机锚点："Task183 DESKTOP source reached GLES upload" 零出现 + 无 "Couldn't compile ... for pipeline" 刷屏 + "Task183 ESSL sanitized"/"texbuffer bridge" 在场
+- vgpu 白屏闭环：能力探测终于被采用（"GLSLHeader version follows capability probe -> #version 300 es"）；若 320 es 再现则 hardext 探测被环境误导需回报
+- JIT 换根 completion 依赖清除 + 三级锚点链（wait-completed → invoking handler → SurfaceSwap）；若再卡死日志可逐行定位
+- 右 Shift 损伤修复：v2 一次性恢复 right.shift（日志 "[Task183] keybind v2 RESTORE sneak"）——恢复后默认布局 ⬛️（左 Shift）潜行失效属预期（右 Shift 控件生效），用户可在游戏内改回且不再被洗
+- 遗留：26.1.2 空指针等另一人反馈；vgpu post 特效上游 bug 观察；JIT latestlog.1 主队列块丢失的深层机制（本修消除其最大嫌疑 + 锚点兜底）

@@ -108,6 +108,8 @@ void(*gles_glCopyTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint
 //void glGetBufferParameteriv(GLenum target, GLenum value, GLint * data);
 void(*gles_glGetTexLevelParameteriv)(GLenum target, GLint level, GLenum pname, GLint *params);
 void(*gles_glShaderSource)(GLuint shader, GLsizei count, const GLchar * const *string, const GLint *length);
+// Task183：glBindTexture 转发（buffer 纹理目标重定向用）
+void(*gles_glBindTexture)(GLenum target, GLuint texture);
 void(*gles_glTexImage2D)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *data);
 void(*gles_glTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *data);
 void(*gles_glTexParameterfv)(GLenum target, GLenum pname, const GLfloat *params);
@@ -462,9 +464,158 @@ void glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLin
     }
 }
 
+// ---- Task183：buffer 纹理 -> 2D 纹理 PBO 桥（与 spvc-shim 的 C 族着色器
+// 模拟配套）。病历（59d4b48 装机 latestlog.txt，ANGLE 26.3 FO 会话）：
+// clouds.vsh 用 `uniform isamplerBuffer CloudFaces` + texelFetch 线性取数；
+// spvc-shim 已把着色器侧换成 isampler2D + ivec2((idx) & 255, (idx) >> 8)
+// 折叠坐标，本侧必须把 MC 的 glTexBuffer 数据按【固定宽 256】铺成 2D 纹理
+// 才能对上。ANGLE ES 3.0 无 GL_TEXTURE_BUFFER 目标（glBindTexture 直接
+// GL_INVALID_ENUM、绑定不成立），因此：
+//   glBindTexture(GL_TEXTURE_BUFFER, t) -> 重定向为 GL_TEXTURE_2D 绑定；
+//   glTexBuffer(GL_TEXTURE_BUFFER, fmt, buf) -> 绑 buf 为 PBO 查尺寸，
+//   glTexImage2D(NULL) 零拷贝上传（宽 256，高 = ceil(元素数/256)）。
+// texelFetch 不走采样器过滤，无需 filter；mip 0 完整即 texture complete。
+#ifndef GL_TEXTURE_BUFFER
+#define GL_TEXTURE_BUFFER 0x8C2A
+#endif
+#ifndef GL_PIXEL_UNPACK_BUFFER
+#define GL_PIXEL_UNPACK_BUFFER 0x88EC
+#endif
+#ifndef GL_PIXEL_UNPACK_BUFFER_BINDING
+#define GL_PIXEL_UNPACK_BUFFER_BINDING 0x88EF
+#endif
+#ifndef GL_BUFFER_SIZE
+#define GL_BUFFER_SIZE 0x8764
+#endif
+#ifndef GL_R8I
+#define GL_R8I 0x8231
+#endif
+#ifndef GL_R8UI
+#define GL_R8UI 0x8232
+#endif
+#ifndef GL_R16I
+#define GL_R16I 0x8233
+#endif
+#ifndef GL_R16UI
+#define GL_R16UI 0x8234
+#endif
+#ifndef GL_R32I
+#define GL_R32I 0x8235
+#endif
+#ifndef GL_R32UI
+#define GL_R32UI 0x8236
+#endif
+#ifndef GL_R8
+#define GL_R8 0x8229
+#endif
+#ifndef GL_R16
+#define GL_R16 0x822A
+#endif
+#ifndef GL_R16F
+#define GL_R16F 0x822D
+#endif
+#ifndef GL_R32F
+#define GL_R32F 0x822E
+#endif
+#ifndef GL_RG
+#define GL_RG 0x8227
+#endif
+#ifndef GL_RED_INTEGER
+#define GL_RED_INTEGER 0x8D94
+#endif
+#ifndef GL_INT
+#define GL_INT 0x1404
+#endif
+
+typedef void (*ame183_fn_glBindTexture)(GLenum, GLuint);
+static ame183_fn_glBindTexture ame183_ptr_glBindTexture;
+void glBindTexture(GLenum target, GLuint texture) {
+    LOOKUP_FUNC(glBindTexture)
+    // Task183：buffer 纹理目标重定向（ANGLE ES3 无此目标，原样转发只会
+    // GL_INVALID_ENUM 且绑定不成立 -> 后续 glTexBuffer 桥拿不到纹理）。
+    if (target == GL_TEXTURE_BUFFER) target = GL_TEXTURE_2D;
+    gles_glBindTexture(target, texture);
+}
+
+/// Task183：内部状态查询/绑定助手（PBO 桥用，同样走钉死链）。
+typedef void (*ame183_fn_glBindBuffer)(GLenum, GLuint);
+static ame183_fn_glBindBuffer ame183_ptr_glBindBuffer;
+typedef void (*ame183_fn_glGetIntegerv)(GLenum, GLint *);
+static ame183_fn_glGetIntegerv ame183_ptr_glGetIntegerv;
+typedef void (*ame183_fn_glGetBufferParameteriv)(GLenum, GLenum, GLint *);
+static ame183_fn_glGetBufferParameteriv ame183_ptr_glGetBufferParameteriv;
+
+typedef struct { GLenum ifmt; GLenum fmt; GLenum type; int px; } ame183_tbfmt_t;
+static const ame183_tbfmt_t ame183_tbfmt_table[] = {
+    { 0x8229 /*R8*/,    0x1903 /*RED*/,   0x1401 /*UBYTE*/,  1 },
+    { 0x8231 /*R8I*/,   0x8D94 /*RED_INT*/, 0x1400 /*BYTE*/, 1 },
+    { 0x8232 /*R8UI*/,  0x8D94,           0x1401,            1 },
+    { 0x822A /*R16*/,   0x1903,           0x1403 /*USHORT*/, 2 },
+    { 0x8233 /*R16I*/,  0x8D94,           0x1402 /*SHORT*/,  2 },
+    { 0x8234 /*R16UI*/, 0x8D94,           0x1403,            2 },
+    { 0x822D /*R16F*/,  0x1903,           0x140B /*HALF*/,   2 },
+    { 0x822E /*R32F*/,  0x1903,           0x1406 /*FLOAT*/,  4 },
+    { 0x8235 /*R32I*/,  0x8D94,           0x1404 /*INT*/,    4 },
+    { 0x8236 /*R32UI*/, 0x8D94,           0x1405 /*UINT*/,   4 },
+    { 0x8058 /*RGBA8*/, 0x1908 /*RGBA*/,  0x1401,            4 },
+};
+
+/// Task183：buffer 数据按固定宽 256 铺 2D 纹理（PBO 零拷贝）。
+static void ame183_texbuffer_to_2d(GLenum internalformat, GLuint buffer) {
+    if (buffer == 0) return;
+    AME173_RESOLVE(ame183_ptr_glBindBuffer, "glBindBuffer");
+    AME173_RESOLVE(ame183_ptr_glGetIntegerv, "glGetIntegerv");
+    AME173_RESOLVE(ame183_ptr_glGetBufferParameteriv, "glGetBufferParameteriv");
+    if (!ame183_ptr_glBindBuffer || !ame183_ptr_glGetIntegerv ||
+        !ame183_ptr_glGetBufferParameteriv || !gles_glTexImage2D) {
+        return;
+    }
+    GLint prevPB = 0;
+    ame183_ptr_glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &prevPB);
+    GLint size = 0;
+    ame183_ptr_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer);
+    ame183_ptr_glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_SIZE, &size);
+    ame183_ptr_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, (GLuint)prevPB);
+    if (size <= 0) return;
+    const ame183_tbfmt_t *f = NULL;
+    for (size_t i = 0; i < sizeof(ame183_tbfmt_table) / sizeof(ame183_tbfmt_table[0]); ++i) {
+        if (ame183_tbfmt_table[i].ifmt == internalformat) { f = &ame183_tbfmt_table[i]; break; }
+    }
+    if (f == NULL) {
+        static int s_ame183_tbUnknown = 0;
+        if (s_ame183_tbUnknown < 2) {
+            ++s_ame183_tbUnknown;
+            printf("[tinygl4angle] Task183 texbuffer bridge: unknown internalformat 0x%X "
+                   "(size=%d) -- skipping upload\n", (unsigned)internalformat, size);
+        }
+        return;
+    }
+    int elements = size / f->px;
+    if (elements <= 0) return;
+    int width = 256;
+    int height = (elements + width - 1) / width;
+    // PBO 源 = 刚才解绑了 —— 重新绑上再传（TexImage 从 PBO 读）
+    ame183_ptr_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer);
+    gles_glTexImage2D(GL_TEXTURE_2D, 0, (GLint)internalformat, width, height, 0,
+                      f->fmt, f->type, NULL);
+    ame183_ptr_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, (GLuint)prevPB);
+    static int s_ame183_tbLogged = 0;
+    if (s_ame183_tbLogged < 4) {
+        ++s_ame183_tbLogged;
+        printf("[tinygl4angle] Task183 texbuffer bridge: %d bytes -> 2D %dx%d "
+               "(fmt 0x%X, px %d)\n", size, width, height, (unsigned)internalformat, f->px);
+    }
+}
+
 typedef void (*ame173_fn_glTexBuffer)(GLenum, GLenum, GLuint);
 static ame173_fn_glTexBuffer ame173_ptr_glTexBuffer;
 void glTexBuffer(GLenum target, GLenum internalformat, GLuint buffer) {
+    // Task183：ES3.0 无 texture buffer —— 先走 2D 桥；桥不认识再试原生
+    //（未来 ES3.1+ 上下文可用原生路径）。
+    if (target == GL_TEXTURE_BUFFER) {
+        ame183_texbuffer_to_2d(internalformat, buffer);
+        return;
+    }
     AME173_RESOLVE(ame173_ptr_glTexBuffer, "glTexBuffer");
     if (ame173_ptr_glTexBuffer) {
         ame173_ptr_glTexBuffer(target, internalformat, buffer);
@@ -567,6 +718,26 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar * const *string, 
     for (int i=0; i<count; i++) l+=(length && length[i] >= 0)?length[i]:strlen(string[i]);
     if (source) free(source);
     source = calloc(1, l+1);
+    // Task183（A 族回归监测锚点）：桌面 GLSL（>=130 且非 es）到达本函数 =
+    // spvc-shim 的 ES 重写漏网（59d4b48 病历：注册表 96 槽被 392 活 context
+    // 打穿，584/782 静默拿到桌面源 -> ANGLE "ERROR: 0:1" -> 黑屏）。限频
+    // 打点让下轮装机日志直接看到漏网量；spvc-shim 侧已配 Task183 跳过日志。
+    {
+        const char *ame183_h = (string != NULL && count > 0 && string[0] != NULL) ? string[0] : NULL;
+        if (ame183_h != NULL && strncmp(ame183_h, "#version ", 9) == 0) {
+            int ame183_isEs = (strncmp(&ame183_h[13], "es", 2) == 0);
+            long ame183_ver = strtol(&ame183_h[9], NULL, 10);
+            if (!ame183_isEs && ame183_ver >= 130) {
+                static int s_ame183_desktopLeak = 0;
+                ++s_ame183_desktopLeak;
+                if (s_ame183_desktopLeak <= 4 || (s_ame183_desktopLeak % 64) == 0) {
+                    printf("[tinygl4angle] Task183 DESKTOP source reached GLES upload "
+                           "(spvc rewrite missed) #%d head48='%.48s'\n",
+                           s_ame183_desktopLeak, ame183_h);
+                }
+            }
+        }
+    }
     if(length) {
         for (int i=0; i<count; i++) {
             if(length[i] >= 0)

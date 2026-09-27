@@ -208,15 +208,29 @@ void UIKit_launchMinecraftSurfaceVC(UIWindow* window, NSDictionary* metadata) {
     // Task172：版本级 TouchController 自动配置（必须在 SurfaceViewController
     // 读控件/触摸偏好之前落值——本函数是两条启动路径共用的换根入口）
     ame172_applyProfileTouchController();
+    // Task183（JIT 二级菜单卡死终章）：换根 VC 不再包在 UIView 动画的
+    // completion 里。病历（59d4b48 装机 latestlog.1，RightPanel 启动，
+    // Task182 同步化修复后）：JIT 等待链全程健康（wait begin -> openURL
+    // -> 后台化 -> condition satisfied 3.0s），但主队列续接块静默丢失、
+    // 游戏零启动日志 = 卡死；同构建的另两个会话（latestlog.txt/
+    // latestlog.old.txt）同一代码成功。Task182 已修 dismiss 族悬空，这里
+    // 是启动链上【最后一个 completion 依赖】：后台态下动画时钟冻结，
+    // [UIView animateWithDuration:completion:] 与 presentViewController 同族
+    // —— completion 可能永不回调，SurfaceViewController 永远建不出来。
+    // 修法：同步直接换根（换根本身不依赖动画），淡入淡出视觉降级为异步
+    // fire-and-forget（alpha 动画只影响观感，不再阻塞正确性）。
+    NSLog(@"[SurfaceSwap] Task183 launching SurfaceViewController (synchronous root swap; version=%@)",
+          metadata[@"version"]);
     dispatch_async(dispatch_get_main_queue(), ^{
-        tmpRootVC = window.rootViewController;
+        if (tmpRootVC == nil) {
+            tmpRootVC = window.rootViewController;
+        }
+        window.rootViewController = [[SurfaceViewController alloc] initWithMetadata:metadata];
+        [window makeKeyAndVisible];
+        // 视觉淡入 fire-and-forget（无 completion 依赖）
+        window.alpha = 0;
         [UIView animateWithDuration:0.2 animations:^{
-            window.alpha = 0;
-        } completion:^(BOOL b){
-            [window resignKeyWindow];
             window.alpha = 1;
-            window.rootViewController = [[SurfaceViewController alloc] initWithMetadata:metadata];
-            [window makeKeyAndVisible];
         }];
     });
 }
@@ -234,18 +248,19 @@ void UIKit_returnToSplitView() {
         }
 
         // Return from SurfaceViewController
+        // Task183：同 launchMinecraftSurfaceVC —— 同步换根，动画 fire-and-forget
+        //（后台态动画 completion 悬空风险，与 JIT 启动链同族病灶）。
+        NSLog(@"[SurfaceSwap] Task183 returning to split view (synchronous root swap)");
+        if (tmpRootVC) {
+            window.rootViewController = tmpRootVC;
+            tmpRootVC = nil;
+        } else {
+            window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];
+        }
+        [window makeKeyAndVisible];
+        window.alpha = 0;
         [UIView animateWithDuration:0.2 animations:^{
-            window.alpha = 0;
-        } completion:^(BOOL b){
-            [window resignKeyWindow];
             window.alpha = 1;
-            if (tmpRootVC) {
-                window.rootViewController = tmpRootVC;
-                tmpRootVC = nil;
-            } else {
-                window.rootViewController = [[LauncherSplitViewController alloc] initWithStyle:UISplitViewControllerStyleDoubleColumn];
-            }
-            [window makeKeyAndVisible];
         }];
     });
 }

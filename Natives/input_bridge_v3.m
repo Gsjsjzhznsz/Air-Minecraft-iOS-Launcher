@@ -1357,6 +1357,27 @@ void ame67_sanitizeOptionsKeybinds(void) {
             NSLog(@"[Task181] keybind marker present (%s) — user customizations preserved, no forced reset this launch", ame181_marker);
         }
     }
+    // Task183（右 Shift 键位损伤修复）：v1 标记存在 = 用户经历过 Task67
+    // 洗回时代（每次启动把 sneak 强制重置 left.shift，用户改绑的
+    // right.shift 被反复洗掉）。v1 修复只止住了未来洗涤，但【最后一次
+    // 洗涤造成的损伤还在档里】（59d4b48 装机实锤：latestlog.txt 显示
+    // marker present + sneak 仍处 left.shift 被洗态 = "shift 依旧用不了"）。
+    // v2 一次性反向修复：v1 存在 && v2 不存在 && sneak 处于被洗默认态时
+    // 恢复 right.shift（新旧两种键值格式都处理）；用户已自行改绑则尊重
+    // 现状。全新安装（无 v1）直接写 v2，不受影响。
+    char ame183_marker[PATH_MAX];
+    if (snprintf(ame183_marker, sizeof(ame183_marker), "%s.amethyst-keybinds-v2", path) >= (int)sizeof(ame183_marker)) {
+        ame183_marker[0] = '\0';
+    }
+    BOOL ame183_v2Needed = NO;
+    if (ame183_marker[0] != '\0') {
+        FILE *mf = fopen(ame183_marker, "rb");
+        if (mf != NULL) {
+            fclose(mf);
+        } else {
+            ame183_v2Needed = ame181_alreadySanitized;  // 仅损伤 cohorts
+        }
+    }
     // 读全文（options.txt 通常 < 64KB）
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
@@ -1410,6 +1431,24 @@ void ame67_sanitizeOptionsKeybinds(void) {
                         break;
                     }
                 }
+                // Task183：v2 一次性恢复——仅 sneak、仅被洗默认态。新格式
+                //（key.keyboard.*，MC 1.13+）与旧数字格式（LWJGL2，MC<=1.12）
+                // 分别对应 right.shift / 54。
+                if (ame183_v2Needed && [name isEqualToString:@"key_key.sneak"]) {
+                    NSString *ame183_target = nil;
+                    if ([value isEqualToString:@"key.keyboard.left.shift"]) {
+                        ame183_target = @"key.keyboard.right.shift";
+                    } else if ([value isEqualToString:@"42"]) {
+                        ame183_target = @"54";
+                    }
+                    if (ame183_target != nil) {
+                        NSLog(@"[Task183] keybind v2 RESTORE sneak: %@ -> %@ (repairing Task67-era wash damage; one-shot)",
+                              value, ame183_target);
+                        nsline = [NSString stringWithFormat:@"key_key.sneak:%@", ame183_target];
+                        repairs++;
+                        repaired = YES;
+                    }
+                }
                 if (!repaired && [value hasPrefix:@"key.keyboard.unknown"]) {
                     NSLog(@"[Task67] SUSPICIOUS (unknown-scancode binding, left as-is): %@", nsline);
                     suspicious++;
@@ -1460,6 +1499,25 @@ void ame67_sanitizeOptionsKeybinds(void) {
             NSLog(@"[Task181] keybind marker written (%s) — future launches preserve user customizations", ame181_marker);
         } else {
             NSLog(@"[Task181] WARN: marker write failed (%s) — forced reset will run once more next launch", ame181_marker);
+        }
+    }
+    // Task183：v2 标记落盘（无论本轮是否发生恢复——只要 v1 存在或本轮跑
+    // 过 v1 首次净化，就视为损伤 cohorts 已处理完毕；全新安装也直接落 v2
+    // 免得未来重装组合出误恢复窗口）。
+    if (ame183_marker[0] != '\0' && !ame183_v2Needed) {
+        // v2Needed==NO 且 v1 标记刚写或本就是新安装：写 v2
+        FILE *mf = fopen(ame183_marker, "wb");
+        if (mf != NULL) {
+            fputs("Amethyst keybind v2 right-shift restore evaluated (Task183). Delete this file to re-run.\n", mf);
+            fclose(mf);
+        }
+    } else if (ame183_marker[0] != '\0' && ame183_v2Needed) {
+        // v2Needed==YES：本轮已做恢复判定（恢复或尊重现状），落标记防重复
+        FILE *mf = fopen(ame183_marker, "wb");
+        if (mf != NULL) {
+            fputs("Amethyst keybind v2 right-shift restore evaluated (Task183). Delete this file to re-run.\n", mf);
+            fclose(mf);
+            NSLog(@"[Task183] keybind v2 marker written (%s)", ame183_marker);
         }
     }
 }
