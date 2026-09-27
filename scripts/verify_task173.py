@@ -255,14 +255,15 @@ check("M1 version.h addendum", "Task 173" in vh and "desktop-GL completion layer
 ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
 # Task179 重锚：task179@2 插入，全体非钉位再顺延 +1；task178 自 anns[2] -> anns[3]。
-check("M3 announcement at index 7 (Task179 重锚：task179@2 插入后 ten-fixes anns[9]、toggle-173@7、174@6、175@5、177@4、178@3、179@2)",
-      ann["announcements"][8]["id"] == "task173-ten-fixes-2026-09-26"
-      and ann["announcements"][7]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann["announcements"][6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann["announcements"][5]["id"] == "task175-six-fixes-2026-09-26"
-      and ann["announcements"][4]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann["announcements"][3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and ann["announcements"][2]["id"] == "task179-eight-fixes-2026-09-26")
+check("M3 announcement at index 8 (Task182 重锚：task180@2 插入后 ten-fixes anns[9]不动、toggle-173@8、174@7、175@6、177@5、178@4、179@3)",
+      ann["announcements"][9]["id"] == "task173-ten-fixes-2026-09-26"
+      and ann["announcements"][8]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][7]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann["announcements"][6]["id"] == "task175-six-fixes-2026-09-26"
+      and ann["announcements"][5]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann["announcements"][4]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and ann["announcements"][3]["id"] == "task179-eight-fixes-2026-09-26"
+      and ann["announcements"][2]["id"] == "task180-opacity-dual-slider-2026-09-26")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")

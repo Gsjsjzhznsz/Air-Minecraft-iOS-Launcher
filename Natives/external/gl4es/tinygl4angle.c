@@ -15,11 +15,65 @@
 extern void *eglGetProcAddress(const char *procname);
 #include "string_utils.h"
 
+// ============================================================================
+// Task182: gles_ 解析钉死（ANGLE 渲染器 pipeline/gui 崩溃根修——命名空间
+// 分裂）。病历（bc1941b 装机 latestlog.txt，ANGLE 26.3 FO 会话，Task181
+// 取证数据回收）：
+//   [tinygl4angle] Task181 glShaderSource #1: len0=435 head48='#version 300 es...'
+//   [tinygl4angle] Task181 glCompileShader #1: shader=1 COMPILE_STATUS=0 logHead=''
+//   → MC 的 ES300 源【确实送达】本 dylib（Task175 重写链全程正常），
+//     但编译后 status=0 且 infoLog 为空 = 典型 GL_INVALID_OPERATION
+//     （shader id 在编译器所在的库里不存在）。
+// 机制：本 dylib 的 gles_ 前缀函数此前用裸 dlsym(RTLD_NEXT) 解析——命中
+// 全局搜索序里本 dylib 之后的【下一个提供者】，真机上那是系统
+// /usr/lib/libGLESv2；而 MC 的 glCreateSymbol 走 dlsym(本 dylib handle)
+// 的导出闭包（自身 + 依赖的 ANGLE libGLESv2 framework，见 Task173 注释）
+// = app Frameworks 副本。两份 ANGLE = 两个 id 命名空间：
+//   - 上一轮（afa23a6，glCompileSymbol 未导出）：MC compile 直连 Frameworks
+//     副本（id=1 在那创建）而源码被本 dylib 上传到系统副本（无效丢弃）
+//     → Frameworks 副本编译【空源码】 → "ERROR: 1:1: '' : syntax error"；
+//   - 本轮（Task181 导出 glCompileShader 抢到符号）：编译也进了本 dylib
+//     → LOOKUP_FUNC 落系统副本 → 那里 id=1 无效 → status=0 + 空 log。
+// 两轮形态全部闭环，且 EGL 上下文（gl_bridge 从 ANGLE 框架解析）= Frameworks
+// 副本——一切 gles_ 调用都必须落在它上面才对得上 current context。
+// 修法（对齐 vgpu pack/load.c 的 Task173 先例 + ame173_gpa 同链）：
+//   eglGetProcAddress（当前 client API 的入口，与上下文同源）→
+//   显式 dlopen @rpath/libGLESv2.framework/libGLESv2（app 副本句柄）→
+//   RTLD_NEXT / RTLD_DEFAULT 兜底。
+// ============================================================================
+static void *ame182_gles2 = NULL;  // Frameworks 副本句柄（dlopen 幂等，竞态无害）
+static int ame182_pinLogs = 0;
+static void *ame182_resolve(const char *name) {
+    void *p = (void *)eglGetProcAddress(name);
+    if (p != NULL) {
+        if (ame182_pinLogs < 2) { ame182_pinLogs++; printf("[tinygl4angle] Task182 gles pin: %s via eglGetProcAddress (context-sourced)\n", name); }
+        return p;
+    }
+    if (ame182_gles2 == NULL) {
+        ame182_gles2 = dlopen("@rpath/libGLESv2.framework/libGLESv2", RTLD_LAZY | RTLD_LOCAL);
+        if (ame182_gles2 == NULL) {
+            ame182_gles2 = dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2", RTLD_LAZY | RTLD_LOCAL);
+        }
+    }
+    if (ame182_gles2 != NULL) {
+        p = dlsym(ame182_gles2, name);
+        if (p != NULL) {
+            if (ame182_pinLogs < 2) { ame182_pinLogs++; printf("[tinygl4angle] Task182 gles pin: %s via frameworks handle\n", name); }
+            return p;
+        }
+    }
+    p = dlsym(RTLD_NEXT, name);
+    if (p != NULL) {
+        if (ame182_pinLogs < 2) { ame182_pinLogs++; printf("[tinygl4angle] Task182 gles pin: %s via RTLD_NEXT (legacy)\n", name); }
+        return p;
+    }
+    p = dlsym(RTLD_DEFAULT, name);
+    return p;
+}
+
 #define LOOKUP_FUNC(func) \
     if (!gles_##func) { \
-        gles_##func = dlsym(RTLD_NEXT, #func); \
-    } if (!gles_##func) { \
-        gles_##func = dlsym(RTLD_DEFAULT, #func); \
+        gles_##func = ame182_resolve(#func); \
     }
 
 #define AliasDecl(NAME, EXT) \
@@ -640,14 +694,15 @@ void glCompileShader(GLuint shader) {
         static int s_ame181_compLog = 0;
         if (s_ame181_compLog < 32) {
             ++s_ame181_compLog;
-            if (gles_glGetShaderiv == NULL) { gles_glGetShaderiv = dlsym(RTLD_NEXT, "glGetShaderiv"); }
-            if (gles_glGetShaderiv == NULL) { gles_glGetShaderiv = dlsym(RTLD_DEFAULT, "glGetShaderiv"); }
+            // Task182：查询函数改走 ame182_resolve 钉死链（旧版裸
+            // RTLD_NEXT 落到系统副本 → status/log 读错对象，与编译器
+            // 不同库，status=0+空 log 的另一半成因）。
+            if (gles_glGetShaderiv == NULL) { gles_glGetShaderiv = ame182_resolve("glGetShaderiv"); }
             GLint ame181_status = 0;
             if (gles_glGetShaderiv != NULL) {
                 gles_glGetShaderiv(shader, 35713 /* GL_COMPILE_STATUS */, &ame181_status);
                 if (ame181_status == 0) {
-                    if (gles_glGetShaderInfoLog == NULL) { gles_glGetShaderInfoLog = dlsym(RTLD_NEXT, "glGetShaderInfoLog"); }
-                    if (gles_glGetShaderInfoLog == NULL) { gles_glGetShaderInfoLog = dlsym(RTLD_DEFAULT, "glGetShaderInfoLog"); }
+                    if (gles_glGetShaderInfoLog == NULL) { gles_glGetShaderInfoLog = ame182_resolve("glGetShaderInfoLog"); }
                     char ame181_log[160];
                     GLsizei ame181_logLen = 0;
                     ame181_log[0] = '\0';
@@ -663,6 +718,38 @@ void glCompileShader(GLuint shader) {
                 }
             }
         }
+    }
+}
+
+// Task182：补导出 shader 对象生命周期入口（纯转发，与 glCompileShader 同款
+// LOOKUP_FUNC 钉死链）。理由：MC 的符号解析走 dlsym(本 dylib handle) 的
+// 导出闭包（自身 + 依赖树）——glCreateShader 不在本 dylib 导出面时，它沿
+// 依赖树落到的库与本 dylib gles_ 解析链命中的库【不保证同一份】（真机
+// 实测即分裂：create 在 Frameworks 副本、upload/compile 在系统副本，
+// 两轮装机的 "ERROR: 1:1" 空源码与 "status=0 空 log" 两种形态全由此出）。
+// 现在把 create/delete 也拉进本 dylib 的同一解析链：MC 全部 shader 族
+// 调用（create→source→compile→query→delete）汇聚到同一份 ANGLE，
+// 命名空间彻底闭合。转发本身零语义变化（同一函数，多一层中转）。
+GLuint(*gles_glCreateShader)(GLenum type);
+void(*gles_glDeleteShader)(GLuint shader);
+GLuint glCreateShader(GLenum type) {
+    LOOKUP_FUNC(glCreateShader)
+    if (gles_glCreateShader) {
+        GLuint ame182_id = gles_glCreateShader(type);
+        static int s_ame182_createLogs = 0;
+        if (s_ame182_createLogs < 4) {
+            s_ame182_createLogs++;
+            printf("[tinygl4angle] Task182 glCreateShader(type=%u) -> %u (namespace joined: create/source/compile/query now share one ANGLE)\n",
+                   (unsigned)type, (unsigned)ame182_id);
+        }
+        return ame182_id;
+    }
+    return 0;
+}
+void glDeleteShader(GLuint shader) {
+    LOOKUP_FUNC(glDeleteShader)
+    if (gles_glDeleteShader) {
+        gles_glDeleteShader(shader);
     }
 }
 

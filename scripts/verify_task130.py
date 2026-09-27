@@ -105,9 +105,9 @@ check("D2 CompileRCASShader 失败返回 0（EASU 不受影响）",
       "GLuint CompileRCASShader()" in f1 and "staying EASU-only" in f1)
 check("D3 InitFSRResources：EASU 之后编 RCAS + ready 日志",
       "g_rcasProgram = CompileRCASShader();" in f1 and "Task130 RCAS ready" in f1)
-check("D4 ApplyFSR directToSurface rcasOn 分支（EASU→targetFBO→RCAS→surface）",
+check("D4 ApplyFSR directToSurface rcasOn 分支（Task182 重锚：Task165 加了 s_ame165_rcasBailout 第三条件，行尾由 ; 变 &&）",
       "const bool rcasOn = FSR1_Context::g_rcasProgram != 0 &&" in f1
-      and "global_settings.fsr1_rcas_sharpness >= 0.0f;" in f1
+      and "global_settings.fsr1_rcas_sharpness >= 0.0f &&" in f1
       and "Task130 RCAS engaged" in f1)
 check("D5 ctx 状态表携带 rcasProgram（跨上下文）",
       "d.rcasProgram = FSR1_Context::g_rcasProgram;" in f1

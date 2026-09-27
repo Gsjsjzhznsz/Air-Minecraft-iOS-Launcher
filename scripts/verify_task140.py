@@ -24,7 +24,8 @@ def read(p):
 print("== A. Mithril context attribs (gl_bridge.m) ==")
 gb = read('Natives/ctxbridges/gl_bridge.m')
 check("A1 attribs select by desktopGL (not mobileGL)",
-      "desktopGL ? desktop_ctx_attribs : gles_ctx_attribs" in gb)
+      # Task182 重锚：选择器尾部 gles_ctx_attribs -> ame182_esAttribs（vgpu 3.2 分流，语义不变）
+      "desktopGL ? desktop_ctx_attribs : ame182_esAttribs" in gb)
 check("A2 Task140 case-file comment present",
       "Task 140：attribs 选择器从 mobileGL 改为 desktopGL" in gb)
 check("A3 readback forensics after MakeCurrent",

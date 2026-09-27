@@ -2313,3 +2313,59 @@
 // glShaderSource #", "[tinygl4angle] Task181 glCompileShader #",
 // "[JIT] Task181 ... wait begin / condition satisfied / app returned to
 // FOREGROUND".
+
+// REVISION 17 addendum (Task 182, no bump): three-root-cause round from the
+// bc1941b device logs (071647c + a9e60ac uploads). (1) ANGLE pipeline/gui
+// namespace split ROOT fix: Task181's instrumentation came back decisive --
+// glShaderSource #1 received the legitimate 435-byte "#version 300 es" source
+// (Task175 rewrite chain fully working) yet glCompileShader #1 returned
+// COMPILE_STATUS=0 with an EMPTY infoLog = the GL_INVALID_OPERATION
+// signature of a shader id that does not exist in the compiler's library.
+// Mechanism: tinygl4angle's LOOKUP_FUNC resolved gles_ functions via bare
+// dlsym(RTLD_NEXT), which on device lands on the SYSTEM /usr/lib/libGLESv2,
+// while MC's glCreateShader resolved through dlsym(tinygl_handle)'s export
+// closure (self + dependent ANGLE libGLESv2 framework) = the app Frameworks
+// copy -- two ANGLE instances, two id namespaces: last round (afa23a6,
+// glCompileShader not yet exported) MC compiled on the Frameworks copy where
+// the source had never arrived ("ERROR: 1:1: '' : syntax error" = empty
+// source); this round Task181's export pulled compilation into the system
+// copy where id=1 was invalid (status=0 + empty log). Both rounds' failure
+// shapes fully explained. Fix: LOOKUP_FUNC now resolves through
+// ame182_resolve (eglGetProcAddress first -- same source as the EGL context,
+// then an explicit @rpath/libGLESv2.framework handle, RTLD_NEXT/DEFAULT as
+// legacy fallback), and glCreateShader/glDeleteShader are newly exported as
+// pure forwarders on the same chain so create/source/compile/query all
+// converge on ONE ANGLE (tinygl4angle.c). (2) 1.8.9+vgpu white screen ROOT
+// fix: with Task181's splash disable working (crash gone), the next layer
+// surfaced -- vgpu's second-pass shader_conv_ rewrite emits "#version 320 es"
+// (device dump: NewConvertShader first line, in/out-ified, texelFetch_
+// helpers) which needs an ES 3.2 context, but the bridge only ever created
+// ES 3.0 (CLIENT_VERSION=3) -- ANGLE rejects 320 es sources as "unsupported
+// shader version", every FPE shader dies, the fixed pipeline (1.8.9's main
+// render path) outputs nothing = white screen. Fix: gl_init_context's vgpu
+// branch now requests EGL 3.2 (MAJOR 3 + MINOR 2; ES3_BIT config covers the
+// whole 3.x family), falling back to CLIENT_VERSION=3 with a loud log if
+// 3.2 creation fails (= pre-fix behavior). Known leftover: vgpu's
+// ConvertShader misplaces injected declarations for MC-native #version 120
+// shaders (declarations land inside ftransform()'s body, #version drifts to
+// line 3) -- vanilla post-processing effects stay broken (WARN-level, not
+// white-screen); upstream vgpu converter quality, left as-is deliberately.
+// (3) JIT second-menu hang ROOT fix: Task181's three probes confirmed
+// condition-satisfied fires (2.9s, traced=1 exn=1) with NO follow-up logs
+// and NO returned-to-FOREGROUND -- the wait succeeded while the app sat in
+// the background (background task assertion keeping the loop alive), and
+// the success path launched the game from inside
+// dismissViewControllerAnimated:completion:, which UIKit never calls when the
+// alert's presentation animation was interrupted by the stikjit://
+// backgrounding -- the handler is lost = the user's frozen second menu. The
+// success case (latestlog.2) had the user return to the foreground first,
+// so the same completion fired normally. Fix: all eight completion-wrapped
+// branches (RightPanel main-wait + reattach, NavigationController main-wait
+// + reattach) now dismiss with completion:nil and run the continuation
+// (Task172 liveness recheck + handler, or the timeout retry alert)
+// synchronously (LauncherRightPanelViewController.m,
+// LauncherNavigationController.m). Device anchors: "[tinygl4angle] Task182
+// gles pin: <fn> via eglGetProcAddress/frameworks handle", "[tinygl4angle]
+// Task182 glCreateShader(type=..) -> <id> (namespace joined)", "EGLBridge:
+// Task182 VGPU requesting ES 3.2 context", and -- absence expected --
+// "Task182 VGPU ES 3.2 context creation failed".

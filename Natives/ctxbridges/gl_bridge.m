@@ -1764,6 +1764,30 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         EGL_CONTEXT_CLIENT_VERSION, 3,
         EGL_NONE
     };
+    // Task182：vgpu 的 ES 3.2 上下文。病历（bc1941b 装机 latestlog.old.txt，
+    // 1.8.9+vgpu，Task181 splash 禁用后崩溃消失、暴露白屏）：vgpu 的强化
+    // 转换层（shader_conv_ 第二层）把 FPE 与全部着色器统一改写为
+    // "#version 320 es"（真机 dump 实证：NewConvertShader 首行即 320 es，
+    // 含 in/out 化 + texelFetch_ 辅助函数族）——需要 ES 3.2 上下文；而
+    // 旧路径 CLIENT_VERSION=3 只给 ES 3.0，ANGLE 对 320 es 源报
+    // "unsupported shader version"（sobel.vsh 报错形态）→ FPE 全灭 →
+    // 固定管线（1.8.9 主渲染路径）零输出 = 白屏。修法：vgpu 分支请求
+    // ES 3.2（EGL_OPENGL_ES3_BIT config 覆盖 3.x 全系，无需改 config）；
+    // 创建失败（老 ANGLE 无 3.2）回退 CLIENT_VERSION=3 = 行为等于现状。
+    const BOOL ame182_vgpu = (renderer != nil &&
+                              [renderer isEqualToString:@ RENDERER_NAME_VGPU]);
+    const EGLint vgpu_ctx_attribs[] = {
+        EGL_CONTEXT_MAJOR_VERSION, 3,
+        EGL_CONTEXT_MINOR_VERSION, 2,
+        EGL_NONE
+    };
+    const EGLint vgpu_fallback_attribs[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 3,
+        EGL_NONE
+    };
+    if (ame182_vgpu && !desktopGL) {
+        NSDebugLog(@"EGLBridge: Task182 VGPU requesting ES 3.2 context (vgpu shaderconv outputs #version 320 es; ES3.0 rejected it as unsupported shader version -- the 1.8.9 white screen)");
+    }
     // MobileGL 走真正的 desktop GL：要求 3.3 Core Profile。
     // Mithril 同样导出 desktop GL 3.3 Core，但其 EGLConfig 已同时声明
     // EGL_OPENGL_BIT | EGL_OPENGL_ES3_BIT，沿用 ES 版的 CLIENT_VERSION=3 即可
@@ -1789,8 +1813,19 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
     // 唯一可疑点即此）。MobileGL 两变体（mobileGL=YES）本就是 desktopGL=YES
     // （isDesktopGLRenderer 覆盖家族三键），行为零变化；gl4es/MobileGlues/LTW
     // desktopGL=NO 维持 ES attribs 零变化。
+    const EGLint *ame182_esAttribs = gles_ctx_attribs;
+    if (ame182_vgpu && !desktopGL) {
+        ame182_esAttribs = vgpu_ctx_attribs;
+    }
     bundle->context = handle.eglCreateContext(g_EglDisplay, bundle->config, share ? share->context : EGL_NO_CONTEXT,
-        desktopGL ? desktop_ctx_attribs : gles_ctx_attribs);
+        desktopGL ? desktop_ctx_attribs : ame182_esAttribs);
+    if (!bundle->context && ame182_vgpu && !desktopGL) {
+        // Task182：3.2 请求失败 → 回退旧 CLIENT_VERSION=3（行为=修复前），
+        // 白屏回到"上游 vgpu 转换层版本假设"的已知状态，响亮留痕。
+        NSDebugLog(@"EGLBridge: Task182 VGPU ES 3.2 context creation failed (eglError=0x%x) -- falling back to CLIENT_VERSION=3 (pre-Task182 behavior)", (unsigned int)(uintptr_t)handle.eglGetError());
+        bundle->context = handle.eglCreateContext(g_EglDisplay, bundle->config, share ? share->context : EGL_NO_CONTEXT,
+            vgpu_fallback_attribs);
+    }
     if (!bundle->context) {
         NSDebugLog(@"EGLBridge: Error eglCreateContext finished with error: 0x%x", handle.eglGetError());
         free(bundle);

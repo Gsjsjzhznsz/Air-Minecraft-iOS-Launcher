@@ -1775,25 +1775,35 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 ame172_bgt = UIBackgroundTaskInvalid;
             }
             if (ok) {
-                [alert dismissViewControllerAnimated:YES completion:^{
-                    // Task172：等待成功 ≠ 能安全启动。StikJIT 在我们被挂起
-                    // 期间附加又死亡时，CS_DEBUGGED 已置而 JIT26 调试器无人
-                    // 服务 brk #0x69 —— 旧代码直接跑 handler 即用户实测的
-                    // "二级菜单启动卡 JIT 等待 120s 后闪退"。与入口
-                    // CS_DEBUGGED 分支同款存活性复查：需要重挂就重挂。
-                    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
-                        !JIT26IsLikelyDebuggerKeepAttached() &&
-                        !getPrefBool(@"debug.jit26_script_disable")) {
-                        NSLog(@"[JIT] [RightPanel] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
-                        [self ame172_reattachJIT26ThenLaunch:handler];
-                    } else {
-                        handler();
-                    }
-                }];
+                // Task182：成功路径不再依赖 dismiss 的 completion。病历
+                //（bc1941b 装机 latestlog.1）：stikjit:// 把 App 切后台、UIKit
+                // 暂停动画，present 动画未完成的 alert 上调 dismiss 是 no-op，
+                // completion 【永不回调】——Task181 三针实锤 condition
+                // satisfied 之后零后续日志、且全程无 returned-to-FOREGROUND
+                //（用户始终没切回前台也能成局：后台断言让等待循环活着），
+                // handler 就此丢失 = 用户实测的"二级菜单启动卡死"。对照组
+                // latestlog.2：用户先切回前台（alert 完成呈现）再满足，同一
+                // 份 completion 正常触发、游戏正常启动。修法：completion:nil
+                // + 同步直接执行后续链（dismiss 本身对未完成呈现是安全的）。
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                // Task172：等待成功 ≠ 能安全启动。StikJIT 在我们被挂起
+                // 期间附加又死亡时，CS_DEBUGGED 已置而 JIT26 调试器无人
+                // 服务 brk #0x69 —— 旧代码直接跑 handler 即用户实测的
+                // "二级菜单启动卡 JIT 等待 120s 后闪退"。与入口
+                // CS_DEBUGGED 分支同款存活性复查：需要重挂就重挂。
+                if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+                    !JIT26IsLikelyDebuggerKeepAttached() &&
+                    !getPrefBool(@"debug.jit26_script_disable")) {
+                    NSLog(@"[JIT] [RightPanel] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
+                    [self ame172_reattachJIT26ThenLaunch:handler];
+                } else {
+                    handler();
+                }
             } else {
-                [alert dismissViewControllerAnimated:YES completion:^{
-                    [self ame169_showJITTimeoutAlertWithRetry:handler];
-                }];
+                // Task182：同上——超时路径的 retry 弹窗也不再包进 dismiss
+                // completion（后台态同样悬空），直接呈现。
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
         });
     });
@@ -1881,11 +1891,13 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 ame172_bgt = UIBackgroundTaskInvalid;
             }
             if (ok) {
-                [alert dismissViewControllerAnimated:YES completion:handler];
+                // Task182：同主等待路径——后台态 dismiss completion 悬空风险，
+                // completion:nil + 直接执行（reattach 场景 App 同样常在后台）。
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                if (handler) handler();
             } else {
-                [alert dismissViewControllerAnimated:YES completion:^{
-                    [self ame169_showJITTimeoutAlertWithRetry:handler];
-                }];
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
         });
     });

@@ -46,7 +46,9 @@ check("A2 ame179_angleEs forces desktopGL=NO（CI 修复轮：判定上移到函
       "if (ame179_angleEs) {" in gl_bridge
       and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("EGL_RENDERABLE_TYPE, desktopGL ?")
       and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("handle.eglBindAPI(EGL_OPENGL_API)")
-      and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("desktopGL ? desktop_ctx_attribs : gles_ctx_attribs"))
+      # Task182 重锚：ctx attribs 选择器尾部 gles_ctx_attribs → ame182_esAttribs
+      #（vgpu 3.2 分流，语义不变：选择点仍在判定点之后）
+      and gl_bridge.find("if (ame179_angleEs) {") < gl_bridge.find("desktopGL ? desktop_ctx_attribs : ame182_esAttribs"))
 check("A3 ANGLE ES3 anchor log present",
       "Task179 ANGLE on real ES3 context" in gl_bridge)
 
@@ -321,7 +323,8 @@ check("K2 gl_bridge ARC 修复在位（NSString 不再直传 strstr）",
 check("K3 ES3 判定先于三处消费点（attribs/eglBindAPI/ctx-attribs）",
       glb.find("if (ame179_angleEs) {") < glb.find("EGL_RENDERABLE_TYPE, desktopGL ?")
       and glb.find("if (ame179_angleEs) {") < glb.find("handle.eglBindAPI(EGL_OPENGL_API)")
-      and glb.find("if (ame179_angleEs) {") < glb.find("desktopGL ? desktop_ctx_attribs : gles_ctx_attribs"))
+      # Task182 重锚：同 A2（选择器尾部改名 ame182_esAttribs）
+      and glb.find("if (ame179_angleEs) {") < glb.find("desktopGL ? desktop_ctx_attribs : ame182_esAttribs"))
 
 print()
 print(f"RESULT: {PASS} passed, {FAIL} failed")

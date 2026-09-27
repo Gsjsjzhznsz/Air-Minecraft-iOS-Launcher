@@ -790,21 +790,23 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                 ame172_bgt = UIBackgroundTaskInvalid;
             }
             if (ok) {
-                [alert dismissViewControllerAnimated:YES completion:^{
-                    // Task172：存活性复查（同 RightPanel）：CS_DEBUGGED 已置但
-                    // 调试器已死时直接启动 = brk #0x69 闪退，先重挂。
-                    if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
-                        !JIT26IsLikelyDebuggerKeepAttached()) {
-                        NSLog(@"[JIT] [NavCtrl] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
-                        [self ame172_reattachJIT26ThenLaunch:handler];
-                    } else {
-                        handler();
-                    }
-                }];
+                // Task182：后台态 dismiss completion 悬空风险（同 RightPanel
+                // 主等待路径，病历 bc1941b latestlog.1）——completion:nil +
+                // 直接执行后续链。
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                // Task172：存活性复查（同 RightPanel）：CS_DEBUGGED 已置但
+                // 调试器已死时直接启动 = brk #0x69 闪退，先重挂。
+                if (DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
+                    !JIT26IsLikelyDebuggerKeepAttached()) {
+                    NSLog(@"[JIT] [NavCtrl] Task172 wait satisfied but JIT26 debugger is gone — re-attaching before launch");
+                    [self ame172_reattachJIT26ThenLaunch:handler];
+                } else {
+                    handler();
+                }
             } else {
-                [alert dismissViewControllerAnimated:YES completion:^{
-                    [self ame169_showJITTimeoutAlertWithRetry:handler];
-                }];
+                // Task182：同上，超时弹窗不包进 dismiss completion。
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
         });
     });
@@ -866,11 +868,12 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                 ame172_bgt = UIBackgroundTaskInvalid;
             }
             if (ok) {
-                [alert dismissViewControllerAnimated:YES completion:handler];
+                // Task182：同主等待路径——completion:nil + 直接执行。
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                if (handler) handler();
             } else {
-                [alert dismissViewControllerAnimated:YES completion:^{
-                    [self ame169_showJITTimeoutAlertWithRetry:handler];
-                }];
+                [alert dismissViewControllerAnimated:YES completion:nil];
+                [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
         });
     });
