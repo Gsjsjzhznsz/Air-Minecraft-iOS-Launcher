@@ -822,3 +822,18 @@ Stage Summary:
 - ANGLE 黑屏：矩阵 transpose 嫌疑加固（修复合一）；装机二分——若 "[tinygl4angle] Task186 ... transpose=TRUE" 出现且黑屏治愈 = 嫌疑坐实；若日志无此行且黑屏仍在 = 嫌疑排除，下轮转向 depth/blend 状态与 "Invalid pname" 取证
 - 分辨率调节：游戏内菜单与生效链同源（profile 层）；装机锚点 "[Task186] in-game resolution: profile '...' resolution -> N%"
 - 遗留：ANGLE "Invalid pname" swap 期高频未取证；0x884F/0x8642 desktop-only glEnable 噪音未静默；task175 存量 3 漂移（环境性）；vgpu post 特效上游 bug（sobel/entity_outline WARN，非阻塞）
+
+---
+Task ID: 186 (续)
+Agent: main (Super Z)
+Task: e947f2f 新日志分诊（8cb5e03 = Task185 修复版首次装机反馈，latestlog.txt=ANGLE 9561 行 / latestlog.old.txt=vgpu 4470 行，变基推送 01cddae 后判读）
+
+Work Log:
+- vgpu 白屏根因【二次实锤，逐字吻合】：GLSLHeader 版本跟随在场（"-> #version 300 es (300es=1 310es=0 320es=0)"）+ ES 3.2 请求仍被 0x3004 拒回退 ES 3.0（=300es 会话，修复 B 目标场景）+ FPE 编译错误 "0:1 'out' : storage qualifier supported in GLSL ES 3.00 and above only"（Fragment）/ "0:1 'sampler2DShadow' : Illegal use of reserved word"（Vertex）+ "Program link failed: Vertex shader is not compiled"——错误行号 0:1/0:2 直接证明 out 声明与 shadow precision 行被插到 #version 之前（插入点归零病灶）；下游 "1282: Invalid operation" Pre render 刷屏 = FPE 链接失败的渲染调用无效（修复 B 治愈后应随之消失）；会话结局 = 用户主动 actionForceClose（exit(0) 快照 swapOK=1150，非崩溃）
+- ANGLE 黑屏形态与 c689d41 完全一致（fps=57 swapOK=181、遮罩按 first-swap 移除、Task183 sanitize 锚点在场、无 Couldn't compile 刷屏、无 Task186 transpose 锚点——8cb5e03 不含本轮代码，预期）：transpose 嫌疑保持，等 01cddae 装机二分裁决；"Invalid pname" 仅 6 次且集中在首帧 present 附近（非持续，非黑屏主因，降级为低优先线索）
+- Task185 修复活体确认（8cb5e03 真机）："[Task185] Forge: XML source won with 5 matches (official=1)"（竞速防陈旧生效，官方源 5 匹配获胜）；"[JIT] Task185 self-healing dispatch: refire on foreground (label=RightPanel main wait)"（两会话均有——后台楔死被前台激活自愈真实发生，会话继续跑完）；"[JIT] [RightPanel] Task176 openURL stikjit:// -> 1"（回执正常）
+- keychain/avatar/Fabric 精选锚点不在场（本轮为用户自机日志，无对应场景，留待触发）
+
+Stage Summary:
+- Task186 三线修复与新日志对齐良好：vgpu 根因二次实锤（等 01cddae 装机验证 "VGPU Task186: cut-in anchor"）；ANGLE transpose 二分已就绪（锚点在/不在 + 黑屏治/不治）；分辨率锚点待触发
+- Task185 装机反馈正面：Forge 竞速 + JIT 自愈两锚点活体在场
