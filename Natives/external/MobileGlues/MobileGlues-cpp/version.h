@@ -2623,3 +2623,105 @@
 // default -> repo-relative, env override kept; now 48/48); task175 F4/G1/G2
 // remain 3 pre-existing drifts (stash-tested identical on HEAD, Task180-era
 // opacity-revert announcement anchors, untouched by this round).
+
+// ============================================================================
+// Task 187 addendum (b5038d0 triple-log round: 8cca75a ANGLE latestlog.txt +
+// vgpu latestlog.old.txt + mg latestlog.1 as the working control; 8cb5e03
+// latestlog (1).txt install session; no bump).
+//
+// (1) vgpu 1.8.9 white screen ROOT CAUSE (third and final layer): the Task186
+// cut-in anchor fix fired on device ("VGPU Task186: cut-in anchor follows
+// actual #version line -> offset 16/362/83") yet FPE compile errors persisted
+// (43 occurrences) in the NEW shape "0:1/0:2 'in' storage qualifier..." +
+// "0:3 version directive must occur before anything else" + "ftransform:
+// built-in functions cannot be redefined". Byte-exact dump decode: the gl4es
+// legacy converter's OWN wrapper inserts (ftransform emulation, attribute/
+// varying/uniform declarations) landed BEFORE the #version line -- because
+// GetLine(Tmp, N) returns the TOP of the buffer when fewer than N newlines
+// exist, and MC 1.8.9's GLSL 120 sources are single-line with no trailing
+// newline, while the vgpu GLESFullHeader is only 2 lines ("#version 120\n\n")
+// unlike upstream gl4es's multi-line header (version + precision lines) whose
+// extra newlines made GetLine(3) always land inside the header. Every wrapper
+// insert then anchored at buffer top, splicing declarations before #version;
+// GLSL mandates #version as the first statement, the shader misparsed as ES
+// 1.00, and the entire FPE family died = white screen. Fix: the header gains
+// a third newline (3-line header keeps every wrapper anchor behind #version
+// and in the global declaration zone for single-line sources; multi-line
+// sources keep upstream behavior, now anchored before the first content line
+// which is strictly safer) + string_utils.c GetLine hardening (newline
+// exhaustion returns buffer END instead of TOP, never before #version).
+// Anchors: "VGPU Task187: short GLSL source (N newlines total)".
+//
+// (2) ANGLE 26.3 black screen: the transpose suspect is EXCLUDED (RenderPearl
+// uploads matrices exclusively through UBOs -- the 26.3 client decompile of
+// GlDevice/GlProgram shows zero glUniformMatrix* calls; the Task186 bridge
+// anchor never fired in the 8cca75a session). The remaining content-layer
+// hypothesis space is now instrumented instead of guessed: probe frames
+// (#1-5 + every 200) snapshot clearColor / colorMask / scissor box+enable /
+// depth / blend / stencil via ES3-legal read-only queries -- "clearColor red
+// but screen black" pins presentation dropping content; "colorMask all
+// false" or "scissor tiny" finds the culprit state; "all normal + clearColor
+// black" pins genuinely-black MC content (spvc rewrite semantics next).
+// Also: RenderPearl's unconditional desktop-only glEnable(0x884F
+// GL_TEXTURE_CUBE_MAP_SEAMLESS / 0x8642 GL_PROGRAM_POINT_SIZE) -- proven
+// unconditional by the 26.3 GlDevice decompile -- are now accepted as local
+// no-ops in tinygl4angle (they were rejected by ES with HIGH debug errors
+// logged by MC every session; the working mg control session swallows them
+// with zero debug messages).
+//
+// (3) In-game resolution touch misalignment root cause: Task186's menu fix
+// called updateSavedResolution LIVE, which rewrites surface/drawableSize/
+// contentsScale and the windowWidth/Height globals -- but MC's window belief
+// (told to launchJVM once) is immutable in-process: the EGL surface shrinks
+// under a full-size MC and sendTouchPoint's Task175 formula scales touches by
+// the new resolutionScale while MC normalizes by the old window = systematic
+// 1/ratio offset. Fix: the menu now only persists the preference (both keys)
+// and toasts "applies next launch"; the next launchJVM cycle rebuilds
+// surface/window/input in the same consistent session. Anchor: "[Task187]
+// in-game resolution saved N% -- geometry applies next launch".
+//
+// (4) "Selected 26.1.2+neoforge but downloaded vanilla 26.3": the loader
+// install path's conservative dead-end alert ("install that vanilla in the
+// Downloads page first", OK-only) dumped users back into the version list
+// sorted by date with 26.3 on top -- the 8cb5e03 session log shows a pure
+// 26.3 vanilla download chain with zero NeoForge branch lines. Fix: one-tap
+// "Install & Continue" -- ensureVanillaInstalled runs with the user's OWN
+// selected version dict (correctness by data flow, not manual navigation),
+// then the loader install continues automatically; failure surfaces a real
+// error. Anchors: "[DownloadVC] Task187: vanilla ... missing ... offering
+// one-tap auto-install" / "one-tap install accepted".
+//
+// (5) Keychain-lost dialog upgraded to one-tap repair: "Remove & Sign In
+// Again" deletes the account (json + keychain residue, same semantics as the
+// account-list swipe delete) and opens the account manager login page; the
+// launch chain's pendingLaunchAfterLogin auto-continues after sign-in.
+//
+// (6) TrollStore "stuck at verifying integrity": the verify stage is
+// bookkeeping-only by design (SHA1 is enforced per-file at download time)
+// yet a device report shows the UI wedged on it; the stage now logs its
+// entry with elapsed time and a 30s watchdog force-completes it if any
+// upstream path leaves it Running. Anchors: "[MCDL] Task187: verify stage
+// entered (elapsed ...)" / "verify stage watchdog fired".
+//
+// (7) Force landscape: Info.plist's iPhone orientation list dropped Portrait
+// (the programmatic request is rejected Code=101 in window mode; a
+// landscape-only supported list makes the system present landscape directly;
+// iPad was already landscape-only).
+//
+// (8) iPhone notch/punch-hole: both home layouts (card default + vs
+// three-column) add an iPhone-only horizontal safe-area inset to the sidebar
+// leading and right-panel trailing margins (helper ame187_iphoneNotchInset;
+// iPad returns 0 = zero regression; rotation 180 swaps sides via trait
+// change recompute; vertical margins keep the symmetric outerMargin design;
+// the game surface stays full-bleed = true full-screen gaming).
+//
+// Verification: verify_task187 61/61 (A vgpu 7 + B ANGLE 9 + C resolution 6
+// + D one-tap 7 + E keychain 7 + F watchdog 4 + G landscape 2 + H notch 7 +
+// I bracket gates 12) + task187_vgpu_syntax.sh (GetLine semantics unit test
+// + string_utils gcc syntax + header/anchor assertions); re-anchored for the
+// intentional semantic flips: verify_task186 C10 (live-apply retired ->
+// next-launch semantics, +C10b) + D3 healed self-contained stub headers
+// (52/52), verify_task185 F3 (dialog upgraded to action, 63/63), verify_task159
+// E1 (l10n baseline 1955 -> 1959, 48/48); cascade 184:39 183:50 +
+// task175_syntax_gates ALL PASS.
+// ============================================================================

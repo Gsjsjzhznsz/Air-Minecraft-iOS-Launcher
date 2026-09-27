@@ -461,7 +461,7 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
     if(hardext.glsl310es) {
     versionHeader = 2;
     if(hardext.glsl320es) {
-    	versionHeader = 3;
+        versionHeader = 3;
     }
     }
     }*/
@@ -472,13 +472,28 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
     //sprintf(GLESFullHeader, GLESHeader[versionHeader], "");
     // pack/shaderconv.h shaderconv.c: old_version new_version
     sprintf(GLESFullHeader, old_version, "");
-    sprintf(GLESFullHeader+strlen(old_version), "\n\n");
+    // Task187（vgpu 白屏根修·三行头）：上游这里只有 "\n\n"（两行头），
+    // 而后续所有包装插入的锚点是 GetLine(Tmp, 3)（第 4 行起点）。MC 1.8.9
+    // 的着色器源码是【单行内容且无尾换行】——两行头 + 单行内容 = 整个缓冲
+    // 只有 2 个换行，GetLine 第 3 次循环 strstr 落空返回缓冲【顶部】→
+    // ftransform 模拟 + attribute/varying/uniform 声明全部插到 #version
+    // 行【之前】（8cca75a latestlog.old.txt 实锤：转换产物开头两行 varying、
+    // #version 120 排第三）→ GLSL 要求 #version 必须是首语句 → 按 ES 1.00
+    // 编译 → "in : storage qualifier supported in GLSL ES 3.00 and above
+    // only" + "ftransform : built-in functions cannot be redefined" → FPE
+    // 全灭 = 1.8.9 白屏。上游 gl4es 不踩此坑是因为它的 GLESFullHeader 是
+    // 多行（版本 + precision 行），GetLine(3) 永远落在头内。修法：头补足
+    // 第三个换行——单行源码下所有插入锚点稳定落在版本行之后、内容行之前
+    // （全局声明区，先声明后使用），多行源码行为不变（插入点仍在内容首行
+    // 前，比上游"内容首行后"更安全）。配套：string_utils.c GetLine 换行
+    // 耗尽时返回缓冲末尾而非顶部（双保险）。
+    sprintf(GLESFullHeader+strlen(old_version), "\n\n\n");
     
     
     int tmpsize = strlen(pBuffer)*2+strlen(GLESFullHeader)+100;
     char* Tmp = (char*)calloc(1, tmpsize);
     strcpy(Tmp, pBuffer);
-    
+
     // and now change the version header, and add default precision
     char* newptr;
     newptr=strstr(Tmp, "#version");
@@ -491,6 +506,20 @@ char* ConvertShader(const char* pEntry, int isVertex, shaderconv_need_t *need)
     Tmp = InplaceInsert(Tmp, GLESFullHeader, Tmp, &tmpsize);
     }
     int headline = 3;
+    // Task187：短源码取证锚点——三行头之后 0~1 个换行 = 单行着色器
+    //（MC 1.8.9 全部 GLSL 120 源码形态，vgpu 白屏病灶形态）。装机日志
+    // 出现本行 = 修复路径已覆盖该着色器；若仍见 "declarations before
+    // #version" 编译错误则另有插入点遗漏（回 string_utils.c GetLine 兜底）。
+    {
+        static int s_ame187_shortLogged = 0;
+        char *ame187_p = Tmp;
+        int ame187_nl = 0;
+        while((ame187_p = strstr(ame187_p, "\n"))) { ++ame187_p; ++ame187_nl; }
+        if(ame187_nl <= 3 && s_ame187_shortLogged < 4) {
+            ++s_ame187_shortLogged;
+            printf("VGPU Task187: short GLSL source (%d newlines total) -- 3-line header anchors wrapper inserts behind #version\n", ame187_nl);
+        }
+    }
     // check if gl_FragDepth is used
     int fragdepth = (strstr(pBuffer, "gl_FragDepth"))?1:0;
     const char* GLESUseFragDepth = "//#extension GL_EXT_frag_depth : enable\n";

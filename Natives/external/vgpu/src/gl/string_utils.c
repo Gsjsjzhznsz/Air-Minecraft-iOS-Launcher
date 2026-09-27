@@ -49,7 +49,16 @@ char* GetLine(char* pBuffer, int num)
 {
     char *p = pBuffer;
     while(num-- && (p=strstr(p, "\n"))) p+=strlen("\n");
-    return (p)?p:pBuffer;
+    // Task187（vgpu 白屏根修·GetLine 兜底）：换行数不足 num 时 p==NULL，
+    // 旧版返回 pBuffer（缓冲【顶部】）——调用方（shaderconv.c 的包装插入
+    // 锚点）会把 ftransform/attribute/varying/uniform 声明插到 #version
+    // 行之前（GLSL 规定 #version 必须是首语句 → 整个着色器按 ES 1.00
+    // 误解析 → FPE 全灭 = 1.8.9 白屏，8cca75a latestlog.old.txt 实锤）。
+    // 兜底语义改为返回缓冲【末尾】：宁可声明落在文件尾（局部编译错误、
+    // 不至于整体误解析），绝不插到 #version 之前。与 shaderconv.c 的
+    // 三行头修复（Task187 主修）互为双保险。
+    if(!p) return pBuffer + strlen(pBuffer);
+    return p;
 }
 
 int CountLine(const char* pBuffer)

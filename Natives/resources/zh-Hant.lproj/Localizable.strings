@@ -14,6 +14,7 @@
 "game.menu.toggle_keyboard" = "遊戲內鍵盤開關";
 "game.menu.resolution" = "解析度調整";
 "game.menu.resolution.message" = "選擇遊戲解析度縮放比例";
+"game.menu.resolution.next_launch" = "解析度已儲存，重啟遊戲後生效";
 
 "game.note.airplay" = "我的世界正在AirPlay鏡像顯示器中顯示";
 
@@ -2123,3 +2124,6 @@
 "bing.download.hint" = "壁紙下載中…";
 "bing.refresh.done" = "同步完成";
 "bing.refresh.failed" = "同步失敗，請檢查網路";
+"i18n_str_2069" = "安裝 %@ 前需要先安裝原版 %@。可以自動安裝該原版並繼續，是否繼續？";
+"i18n_str_2070" = "安裝並繼續";
+"i18n_str_2071" = "刪除帳號並重新登入";

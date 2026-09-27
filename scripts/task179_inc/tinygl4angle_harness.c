@@ -303,6 +303,33 @@ void glQueryCounter(GLuint id, GLenum target) {
     if (ame173_ptr_glQueryCounter) ame173_ptr_glQueryCounter(id, target);
 }
 
+// ---- Task187：desktop-only glEnable 无害化（ANGLE 噪音静默）----
+// 病历（8cca75a latestlog.txt，ANGLE 会话）：MC 26.3 RenderPearl 的 GlDevice
+// 构造【无条件】调用 glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS=0x884F) 与
+// glEnable(GL_PROGRAM_POINT_SIZE=0x8642)（26.3 client 反编译 GlDevice.java
+// 第 147-148 行实证）。ES 3.0 上下文上 ANGLE 拒绝这两个 cap 并通过
+// KHR_debug 回调打 "Enum 0x884F is currently not supported." HIGH 级错误
+// （MC 全量记录 = 日志噪音 + 每 cap 一条假错误）。同会话的 MobileGlues
+// 前端吞掉了这两个调用（0 条 debug message）= 上游同样视其为桌面门面噪音。
+// 处理：两个 cap 本地 no-op + 一次性锚点日志，其余 cap 原样转发（零回归）。
+// 功能影响：无——ES 3.0 上无缝立方图与程序点尺寸本来就不存在，MC 的
+// fallback 路径已经跑了 8 轮日志（渲染循环 58fps 无任何相关副作用）。
+typedef void (*ame187_fn_glEnable)(GLenum);
+static ame187_fn_glEnable ame187_ptr_glEnable;
+void glEnable(GLenum cap) {
+    if (cap == 0x884Fu /* GL_TEXTURE_CUBE_MAP_SEAMLESS (desktop-only) */ ||
+        cap == 0x8642u /* GL_PROGRAM_POINT_SIZE (desktop-only) */) {
+        static int s_ame187_logged = 0;
+        if (s_ame187_logged < 2) {
+            ++s_ame187_logged;
+            NSLog(@"[tinygl4angle] Task187: accepted desktop-only glEnable(0x%04X) as no-op (RenderPearl unconditional init; ES rejects with HIGH debug error)", (unsigned)cap);
+        }
+        return;
+    }
+    AME173_RESOLVE(ame187_ptr_glEnable, "glEnable");
+    if (ame187_ptr_glEnable) ame187_ptr_glEnable(cap);
+}
+
 typedef void (*ame173_fn_glGetQueryObjectiv)(GLuint, GLenum, GLint *);
 static ame173_fn_glGetQueryObjectiv ame173_ptr_glGetQueryObjectiv;
 void glGetQueryObjectiv(GLuint id, GLenum pname, GLint *params) {

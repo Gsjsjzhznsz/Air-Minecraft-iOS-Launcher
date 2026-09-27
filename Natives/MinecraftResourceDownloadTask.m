@@ -38,6 +38,8 @@ static const NSUInteger kMCStageIndexVerify = 5;
 // ===== 阶段上报（redesign-download-ui Phase 3 Task 3.1）=====
 // 仅 downloadVersion:（原版安装链路）启用阶段上报；整合包下载走 ModpackImportService 自行上报
 @property (nonatomic, assign) BOOL stageReportingEnabled;
+// Task187：downloadVersion: 入口时间零点（验证完整性阶段耗时锚点用）
+@property (nonatomic, assign) CFTimeInterval ame187_taskStartTs;
 // 库文件/资源文件双维度计数（按下载目标路径分类；versions/ 下的 version JSON 不计入）
 @property (nonatomic, assign) NSInteger libTotalFileCount;
 @property (nonatomic, assign) NSInteger libCompletedFileCount;
@@ -588,6 +590,9 @@ static const NSUInteger kMCStageIndexVerify = 5;
 }
 
 - (void)downloadVersion:(NSDictionary *)version {
+    // Task187：验证阶段耗时锚点的时间零点（CFAbsoluteTime，CoreFoundation 恒可用）
+    self.ame187_taskStartTs = CFAbsoluteTimeGetCurrent();
+
     self.currentVersionId = version[@"id"];
     [self prepareForDownload];
 
@@ -891,11 +896,39 @@ static const NSUInteger kMCStageIndexVerify = 5;
         }
     }
     // 验证完整性：SHA1 校验已随每个文件完成，快速推进
+    // Task187（巨魔装机“卡在验证完整性”取证 + 看门狗）：本阶段设计上
+    // 瞬时完成（SHA1 已内嵌在每个文件的下载完成回调里），但用户报告
+    // 启动时界面长时间停在“验证完整性”。两道防线：
+    //   1) 入场锚点（含自 downloadVersion: 起的耗时）——装机日志可定位实际卡点；
+    //   2) 30s 看门狗：阶段仍 Running 则强制完成（逐文件 SHA1 已保证完整性，
+    //      本阶段只是展示层收尾，强推不会引入假阳性）。
+    {
+        CFTimeInterval ame187_elapsed = 0.0;
+        if (self.ame187_taskStartTs > 0.0) {
+            ame187_elapsed = CFAbsoluteTimeGetCurrent() - self.ame187_taskStartTs;
+        }
+        NSLog(@"[MCDL] Task187: verify stage entered (elapsed %.1fs since downloadVersion:)", (double)ame187_elapsed);
+    }
     [manager updateTaskWithId:taskId stageAtIndex:kMCStageIndexVerify status:PLTaskStageStatusRunning];
     [manager updateTaskWithId:taskId stageAtIndex:kMCStageIndexVerify progress:1 message:nil];
     [manager updateTaskWithId:taskId stageAtIndex:kMCStageIndexVerify status:PLTaskStageStatusCompleted];
     [manager updateTaskWithId:taskId currentStageIndex:kMCStageIndexVerify];
     self.stageReportingEnabled = NO;
+    // Task187 看门狗：30s 后若“验证完整性”仍 Running（任何上游路径把它留在
+    // Running 而没走到上面的完成链，含下载中心详情页的陈旧展示），强制收尾 + 留痕。
+    {
+        NSString *ame187_taskId = [taskId copy];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            DownloadTaskItem *ame187_item = [[DownloadTaskManager sharedManager] taskWithId:ame187_taskId];
+            if (ame187_item != nil &&
+                ame187_item.stages.count > kMCStageIndexVerify &&
+                ame187_item.stages[kMCStageIndexVerify].status == PLTaskStageStatusRunning) {
+                NSLog(@"[MCDL] Task187: verify stage watchdog fired (Running >30s -- force-completed; per-file SHA1 already guarantees integrity)");
+                [[DownloadTaskManager sharedManager] updateTaskWithId:ame187_taskId stageAtIndex:kMCStageIndexVerify status:PLTaskStageStatusCompleted];
+            }
+        });
+    }
 }
 
 - (void)cancel {

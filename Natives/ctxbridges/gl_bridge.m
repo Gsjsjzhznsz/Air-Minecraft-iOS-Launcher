@@ -211,6 +211,9 @@ typedef void (*ame_es_genfb_t)(int, unsigned int *);
 typedef void (*ame_es_delfb_t)(int, const unsigned int *);
 typedef void (*ame_es_fbtex2d_t)(unsigned int, unsigned int, unsigned int, unsigned int, int);
 typedef unsigned int (*ame_es_checkfb_t)(unsigned int);
+// Task187：黑屏二分取证包——glGetFloatv/glGetBooleanv（clearColor/colorMask）
+typedef void (*ame_es_getfloat_t)(unsigned int, float *);
+typedef void (*ame_es_getbool_t)(unsigned int, unsigned char *);
 
 typedef struct {
     ame_es_getint_t    getIntegerv;
@@ -219,6 +222,8 @@ typedef struct {
     ame_es_isenabled_t isEnabled;
     ame_es_enable_t    enable;
     ame_es_blitfb_t    blitFramebuffer;
+    ame_es_getfloat_t  getFloatv;      // Task187 状态快照
+    ame_es_getbool_t   getBooleanv;    // Task187 状态快照
     EGLBoolean (*querySurface)(EGLDisplay, EGLSurface, EGLint, EGLint *);
     ame_es_bindtex_t   bindTexture;        // Task 49 几何自愈
     ame_es_texparami_t texParameteri;      // Task 49 几何自愈
@@ -265,6 +270,9 @@ static ame_es_t ame_es(void) {
     }
     s_es.getIntegerv     = (ame_es_getint_t)dlsym(h, "glGetIntegerv");
     s_es.bindFramebuffer = (ame_es_bindfb_t)dlsym(h, "glBindFramebuffer");
+    // Task187：状态快照双查询（缺符号时快照自动降级跳过，不影响探针主体）
+    s_es.getFloatv       = (ame_es_getfloat_t)dlsym(h, "glGetFloatv");
+    s_es.getBooleanv     = (ame_es_getbool_t)dlsym(h, "glGetBooleanv");
     // Task 75：glReadPixels 解析已移除（回读探针退役，Swap 路径零回读）。
     s_es.getError        = (ame_es_geterr_t)dlsym(h, "glGetError");
     s_es.isEnabled       = (ame_es_isenabled_t)dlsym(h, "glIsEnabled");
@@ -689,9 +697,15 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
         void *ame146_giv = dlsym(ame145_rendererHandle, "glGetIntegerv");
         void *ame146_bfb = dlsym(ame145_rendererHandle, "glBindFramebuffer");
         void *ame146_qs  = dlsym(ame145_rendererHandle, "eglQuerySurface");
+        // Task187：状态快照跟随渲染器 dispatch（mg 前端与 raw ANGLE 的
+        // 状态机不同，读数必须来自渲染器自己的表）
+        void *ame146_gfv = dlsym(ame145_rendererHandle, "glGetFloatv");
+        void *ame146_gbv = dlsym(ame145_rendererHandle, "glGetBooleanv");
         if (ame146_giv) es.getIntegerv    = (ame_es_getint_t)ame146_giv;
         if (ame146_bfb) es.bindFramebuffer = (ame_es_bindfb_t)ame146_bfb;
         if (ame146_qs)  es.querySurface   = (EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint *))ame146_qs;
+        if (ame146_gfv) es.getFloatv      = (ame_es_getfloat_t)ame146_gfv;
+        if (ame146_gbv) es.getBooleanv    = (ame_es_getbool_t)ame146_gbv;
         static int ame146_dspLogs = 0;
         if (ame146_dspLogs < 2) {
             ame146_dspLogs++;
@@ -725,6 +739,36 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     es.getIntegerv(0x8CA9 /*GL_DRAW_FRAMEBUFFER_BINDING*/, &drawFb);
     es.getIntegerv(0x8CAA /*GL_READ_FRAMEBUFFER_BINDING*/, &readFb);
     es.getIntegerv(0x0BA2 /*GL_VIEWPORT*/, viewport);
+
+    // Task187：黑屏二分取证包（ANGLE 黑屏内容层专项）。transpose 嫌疑已被
+    // 排除（RenderPearl 纯 UBO 上传矩阵，tinygl4angle Task186 转置桥在
+    // 8cca75a 会话零触发；26.3 client 反编译 GlProgram.java 证实无
+    // glUniformMatrix* 调用）。本快照在探针帧（#1-5 + 每 200）以只读查询
+    // 采集输出链关键状态，把"内容层黑"的剩余假设空间一刀切开：
+    //   clearColor 红/灰但屏幕黑 → 呈现丢弃（层/表面内容劫持方向）；
+    //   colorMask 全 false → 找到元凶（一切绘制被掩蔽，只剩 clear 也不可见）；
+    //   scissor 小盒/开启 → 找到元凶（MC 状态缓存与真实 GL 脱钩方向）；
+    //   全部正常 + clearColor 黑 → MC 真画了黑内容（着色器语义/spvc 改写方向）。
+    // 全部 pname 均为 ES 3.0 合法查询（不产生 GL 错误、不污染 MC 调试输出），
+    // 只读、零回读（Task75 SIGBUS 教训），探针帧以外零开销。
+    if (es.getFloatv != NULL && es.getBooleanv != NULL && es.isEnabled != NULL) {
+        float clearColor[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+        unsigned char colorMask[4] = {0, 0, 0, 0};
+        int scissorBox[4] = {0, 0, 0, 0};
+        es.getFloatv(0x0C22 /*GL_COLOR_CLEAR_VALUE*/, clearColor);
+        es.getBooleanv(0x0C23 /*GL_COLOR_WRITEMASK*/, colorMask);
+        es.getIntegerv(0x0C10 /*GL_SCISSOR_BOX*/, scissorBox);
+        unsigned char scissorOn = es.isEnabled(0x0C11 /*GL_SCISSOR_TEST*/);
+        unsigned char depthOn = es.isEnabled(0x0B71 /*GL_DEPTH_TEST*/);
+        unsigned char blendOn = es.isEnabled(0x0BE2 /*GL_BLEND*/);
+        unsigned char stencilOn = es.isEnabled(0x0B90 /*GL_STENCIL_TEST*/);
+        NSLog(@"[RenderDiag] Task187 state: clearColor=(%.2f,%.2f,%.2f,%.2f) colorMask=(%d%d%d%d) scissor=[%d,%d %dx%d on=%d] depth=%d blend=%d stencil=%d drawFb=%d readFb=%d viewport=[%d,%d %dx%d]",
+              clearColor[0], clearColor[1], clearColor[2], clearColor[3],
+              colorMask[0], colorMask[1], colorMask[2], colorMask[3],
+              scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3], (int)scissorOn,
+              (int)depthOn, (int)blendOn, (int)stencilOn,
+              drawFb, readFb, viewport[0], viewport[1], viewport[2], viewport[3]);
+    }
     // Task 76：退役 while(es.getError() != 0) 清错循环——它会把底层 ANGLE
     // 错误队列清空，吞掉 MobileGlues 待转译的错误。getIntegerv 本身不产生
     // GL 错误，残留错误不影响本探针读数的正确性。

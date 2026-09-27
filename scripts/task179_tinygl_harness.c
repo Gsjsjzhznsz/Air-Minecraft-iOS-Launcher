@@ -53,7 +53,7 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices
 void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei pc) { (void)mode; (void)count; (void)type; (void)indices; (void)pc; }
 void glDrawArrays(GLenum mode, GLint first, GLsizei count) { (void)mode; (void)first; (void)count; }
 void glColorMask(GLboolean r, GLboolean g, GLboolean b, GLboolean a) { (void)r;(void)g;(void)b;(void)a; }
-void glEnable(GLenum cap) { (void)cap; }
+// Task187: 本地 glEnable 桩退役——镜像 harness 自带 Task187 包装（desktop-only no-op + 转发），语义等价
 void glDisable(GLenum cap) { (void)cap; }
 void glBlendFuncSeparate(GLenum a, GLenum b, GLenum c, GLenum d) { (void)a;(void)b;(void)c;(void)d; }
 void glBlendEquationSeparate(GLenum a, GLenum b) { (void)a;(void)b; }

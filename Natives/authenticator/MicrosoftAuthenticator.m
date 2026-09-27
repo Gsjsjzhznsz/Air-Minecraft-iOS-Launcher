@@ -244,11 +244,15 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
         // /TrollStore 重签）、换机迁移、恢复备份都会丢该条目；而账号 .json
         // 在容器里还在（列表有账号）→ token 已失但账号在列 = 必须重登才能
         // 恢复正版皮肤/多人。
+        // Task187：文案指引升级为一键修复弹窗——「删除账号并重新登录」就地
+        // 删账号（.json + keychain 残留）并拉起登录页，免去四步手动导航
+        //（用户反馈"账号凭据已丢失…请删除该账号后重新登录"仍是一堵墙）。
         static BOOL ame185_shown = NO;
         if (!ame185_shown) {
             ame185_shown = YES;
-            showDialog(localize(@"Error", nil),
-                @"账号凭据已丢失（更换安装方式/恢复备份后常见），请删除该账号后重新登录，以恢复正版皮肤与联机功能。\nAccount tokens are missing from the keychain (common after reinstall/backup restore). Please remove this account and sign in again.");
+            ame187_showAccountRepairDialog(self.authData[@"username"],
+                                           self.authData[@"accountId"],
+                                           self.authData[@"xuid"]);
         } else {
             NSLog(@"[Task185] keychain token still missing (dialog suppressed this session)");
         }

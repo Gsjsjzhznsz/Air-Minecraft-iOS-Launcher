@@ -75,6 +75,10 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
 @property(nonatomic, strong) NSLayoutConstraint *rightPanelWidthConstraint;
 // 存储外边距约束，traitCollection 变化时动态更新
 @property(nonatomic, strong) NSArray<NSLayoutConstraint *> *outerMarginConstraints;
+// Task187（iPhone 刘海适配）：水平边距约束单独持有（leading/trailing 需叠加
+// 刘海避让量，top/bottom 维持对称 outerMargin）
+@property(nonatomic, strong) NSLayoutConstraint *ame187_sidebarLeadingConstraint;
+@property(nonatomic, strong) NSLayoutConstraint *ame187_rightTrailingConstraint;
 // 关键修复（UI 累积异常）：同 LauncherRootViewController，持有当前内容 VC 的约束
 // 并先 deactivate 再激活，避免 tmpRootVC 保留场景下缓存复用子 VC 的约束叠加。
 @property(nonatomic, strong) NSArray<NSLayoutConstraint *> *currentContentConstraints;
@@ -184,6 +188,13 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // Task187（iPhone 刘海适配）：viewDidLoad 时刻 safeAreaInsets 仍是 0，
+    // 真实内缩在首次布局后才到位；在此补一次水平边距重算（iPad 恒 0 零开销）
+    if (self.ame187_sidebarLeadingConstraint != nil) {
+        CGFloat outerMargin = LauncherCardLayoutOuterMargin(self.traitCollection);
+        self.ame187_sidebarLeadingConstraint.constant = outerMargin + ame187_iphoneNotchInset(self.view, YES);
+        self.ame187_rightTrailingConstraint.constant = -(outerMargin + ame187_iphoneNotchInset(self.view, NO));
+    }
     [[BackgroundManager sharedManager] resumeVideo];
 }
 
@@ -237,10 +248,19 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
     }
     // 更新外边距约束（iPhone/iPad 切换时 outerMargin 不同）
     CGFloat outerMargin = LauncherCardLayoutOuterMargin(self.traitCollection);
+    // Task187：水平约束单独重算（含刘海避让；旋转 180° 后左右互换）
+    if (self.ame187_sidebarLeadingConstraint != nil) {
+        self.ame187_sidebarLeadingConstraint.constant = outerMargin + ame187_iphoneNotchInset(self.view, YES);
+    }
+    if (self.ame187_rightTrailingConstraint != nil) {
+        self.ame187_rightTrailingConstraint.constant = -(outerMargin + ame187_iphoneNotchInset(self.view, NO));
+    }
+    // top/bottom 维持对称 outerMargin；水平约束已在上方单独重算，跳过
     for (NSLayoutConstraint *c in self.outerMarginConstraints) {
-        // 第一、四、七个约束是 leading/trailing（正外边距），其余是 top/bottom
-        // leading 用正 outerMargin，trailing 用负 outerMargin，top 用正，bottom 用负
-        // 简化处理：根据原 constant 符号决定正负
+        if (c == self.ame187_sidebarLeadingConstraint || c == self.ame187_rightTrailingConstraint) {
+            continue;
+        }
+        // 根据 original constant 符号决定正负（top 正、bottom 负）
         if (c.constant >= 0) {
             c.constant = outerMargin;
         } else {
@@ -325,14 +345,23 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
     // 而顶部边距 = 0 + outerMargin = 8pt，底部比顶部宽 3.6 倍。
     // 改为 view.topAnchor/view.bottomAnchor 后，上下边距均 = outerMargin，保持一致。
     // 卡片背景会延伸到 home indicator 下方，视觉上无影响（卡片有不透明/毛玻璃背景）。
-    NSLayoutConstraint *sidebarLeading = [self.sidebarCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:outerMargin];
+    // Task187（iPhone 刘海/挖孔适配）：水平边距叠加安全避让（仅 iPhone 生效，
+    // iPad 恒 0 零回归）——否则横屏下侧栏/右面板直接被刘海压住。
+    // 上下边维持对称 outerMargin（既有"下面过宽"修复语义不变，home indicator
+    // 由不透明卡片背景自然覆盖）。
+    CGFloat ame187_leadInset = ame187_iphoneNotchInset(self.view, YES);
+    CGFloat ame187_trailInset = ame187_iphoneNotchInset(self.view, NO);
+    NSLayoutConstraint *sidebarLeading = [self.sidebarCard.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:outerMargin + ame187_leadInset];
     NSLayoutConstraint *sidebarTop = [self.sidebarCard.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:outerMargin];
     NSLayoutConstraint *sidebarBottom = [self.sidebarCard.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-outerMargin];
-    NSLayoutConstraint *rightTrailing = [self.rightPanelCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-outerMargin];
+    NSLayoutConstraint *rightTrailing = [self.rightPanelCard.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-(outerMargin + ame187_trailInset)];
     NSLayoutConstraint *rightTop = [self.rightPanelCard.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:outerMargin];
     NSLayoutConstraint *rightBottom = [self.rightPanelCard.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-outerMargin];
     NSLayoutConstraint *contentTop = [self.contentCard.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:outerMargin];
     NSLayoutConstraint *contentBottom = [self.contentCard.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor constant:-outerMargin];
+
+    self.ame187_sidebarLeadingConstraint = sidebarLeading;
+    self.ame187_rightTrailingConstraint = rightTrailing;
 
     self.outerMarginConstraints = @[sidebarLeading, sidebarTop, sidebarBottom,
                                     rightTrailing, rightTop, rightBottom,

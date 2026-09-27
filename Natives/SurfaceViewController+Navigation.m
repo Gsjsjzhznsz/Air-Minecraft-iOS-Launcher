@@ -9,6 +9,7 @@
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 #import "ScreenUtils.h"
+#import "NMToast.h"
 // ZeroTier/Terracotta 联机暂时移除（排查启动崩溃）
 // #import "MultiplayerViewController.h"
 // #import "MultiplayerManager.h"
@@ -361,7 +362,22 @@ static const void *kMenuDimViewKey = &kMenuDimViewKey;
             // video.resolution（Task159 注释明确的保留设计），保持旧全局写入
             // 不回归其行为。
             setPrefFloat(@"video.resolution", value.floatValue);
-            [self updateSavedResolution];
+            // Task187（分辨率触摸错位根修）：不再【立即】调用 updateSavedResolution。
+            // 病历（8cca75a 用户反馈"分辨率调节触摸输入不正常"）：updateSavedResolution
+            // 是全量几何重算——运行中调用会同步改写 surface/drawableSize/contentsScale
+            // 与 windowWidth/Height 全局，但 MC 的窗口信念（launchJVM 启动时告知的
+            // 窗口尺寸）在本进程内【不可变】：
+            //   1) EGL 表面被缩到新尺寸而 MC 仍按旧尺寸渲染（拉伸/裁切）；
+            //   2) sendTouchPoint 的 Task175 公式按新 resolutionScale 换算触点，
+            //      MC 仍按旧窗口信念归一化 → 触点整体偏移 1/旧比例（实测病灶）。
+            // 修法：菜单只写偏好（键值已即时落盘），下一次 launchJVM 周期
+            // updateSavedResolution 自然以新值建表面/窗口/输入三口径一致的
+            // 会话。当前会话保持既有几何不动（触摸与渲染完全自洽）。
+            if (value.intValue != currentValue) {
+                [NMToast showMessage:localize(@"game.menu.resolution.next_launch", nil)];
+            }
+            NSLog(@"[Task187] in-game resolution saved %ld%% -- geometry applies next launch (in-session resize would desync MC window belief + touch mapping)",
+                  (long)value.intValue);
         }]];
     }
     [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil) style:UIAlertActionStyleCancel handler:nil]];

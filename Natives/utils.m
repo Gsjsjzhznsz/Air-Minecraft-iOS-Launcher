@@ -961,3 +961,22 @@ int ame141_currentLaunchAllocMem(void) {
     }
     return mem;
 }
+
+// ============================================================================
+// Task 187（iPhone 刘海/挖孔适配）：见 utils.h 声明处注释。
+// iPad（主力机型）恒返回 0，布局零回归；iPhone 横屏返回对应侧的安全区
+// 水平内缩（刘海/挖孔/灵动岛侧 47~59pt，另一侧通常 0）。旋转 180° 后
+// 左右互换，调用方在 traitCollectionDidChange / viewSafeAreaInsetsDidChange
+// 里重取即可。
+// ============================================================================
+double ame187_iphoneNotchInset(UIView *view, BOOL isLeading) {
+    if (view == nil) return 0.0;
+    if (view.traitCollection.userInterfaceIdiom != UIUserInterfaceIdiomPhone) return 0.0;
+    UIEdgeInsets insets = view.safeAreaInsets;
+    // 横屏下左右内缩即设备物理左右（启动器锁定横屏，Info.plist Task187）；
+    // 竖屏兜底沿用 top（用户理论上不会见到：方向已锁横屏）。
+    if (view.bounds.size.width < view.bounds.size.height) {
+        return isLeading ? (double)insets.top : (double)insets.bottom;
+    }
+    return isLeading ? (double)insets.left : (double)insets.right;
+}

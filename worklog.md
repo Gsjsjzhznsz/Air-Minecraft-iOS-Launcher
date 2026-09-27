@@ -837,3 +837,28 @@ Work Log:
 Stage Summary:
 - Task186 三线修复与新日志对齐良好：vgpu 根因二次实锤（等 01cddae 装机验证 "VGPU Task186: cut-in anchor"）；ANGLE transpose 二分已就绪（锚点在/不在 + 黑屏治/不治）；分辨率锚点待触发
 - Task185 装机反馈正面：Forge 竞速 + JIT 自愈两锚点活体在场
+
+---
+Task ID: 187
+Agent: main (Super Z)
+Task: b5038d0 三日志分诊 + 用户八项反馈根修轮：vgpu 白屏（第三层根因闭环）/ ANGLE 黑屏（transpose 排除 + 取证包）/ 分辨率触摸错位 / 26.1.2+neoforge 装成 26.3 原版 / keychain 一键修复 / 巨魔卡"验证完整性" / 强制横屏 / iPhone 刘海适配
+
+Work Log:
+- 日志分诊：latestlog.txt（8cca75a=Task186 构建，ANGLE，fabric 26.3，fps=58 swapOK=411 用户强关）/ latestlog.old.txt（8cca75a，vgpu，1.8.9 系）/ latestlog.1（8cca75a，mg 渲染器=可用对照组）/ latestlog (1).txt + (6).txt（8cb5e03=Task185 构建，安装/下载会话）
+- vgpu 根因（第三层，字节级实锤）：Task186 修复 B 锚点在场（offset 16/362/83）但 FPE 错误仍 43 处且形态升级（"0:3 version directive must occur before anything else" + ftransform 重定义 + 'in' storage qualifier）→ 逐字节解码 ConvertShader 产物：两行 varying 声明排在 #version 之前 → gl4es 老转换器的包装插入（ftransform/attribute/varying/uniform）锚点 GetLine(Tmp,3) 在"换行数 < 3"时返回缓冲【顶部】——MC 1.8.9 单行源码（无尾换行）+ vgpu 两行头（"\n\n"）恰触发；上游 gl4es 不踩坑因其头多行（版本+precision）。插桩推演与设备 dump 逐行吻合（顶点着色器 15 行完整复现插入序列）。修复：三行头（"\n\n\n"）+ GetLine 兜底（耗尽返缓冲尾，绝不返顶部）+ 短源码锚点
+- ANGLE 判读：Task186 transpose 锚点【零触发】→ 下载真实 26.3 client.jar（41MB，piston-data）CFR 反编译 RenderPearl：GlProgram 纯 UBO 上传矩阵（全无 glUniformMatrix*）= transpose 理论彻底排除；GlDevice 构造【无条件】glEnable(0x884F/0x8642)（desktop-only，ES 拒绝并 HIGH 级 debug message 刷屏；mg 对照组 0 条=前端吞掉）；mg 对照组（同构建同设备正常渲染）锁定差异面=spvc Task175 ES 改写 + tinygl4angle + 3.3 伪装，能力面（扩展列表 mg 为空/ANGLE 仅 2 项）与 Metal 层配置完全一致 → 黑内容根因未定，落取证包：探针帧快照 clearColor/colorMask/scissor/depth/blend/stencil（全 ES3 合法只读查询）四分法切开假设空间；desktop-only 两 cap 本地 no-op 静默
+- 分辨率触摸错位根因：Task186 菜单修复把 updateSavedResolution 改为【运行中】调用——全量几何重算改写 surface/drawable/contentsScale/windowWidth，但 MC 窗口信念（launchJVM 一次性告知）进程内不可变 → 表面缩水 + sendTouchPoint 按新 resolutionScale 换算而 MC 按旧窗口归一化 = 触点偏移 1/旧比例。修复：菜单只写偏好 + toast"重启游戏后生效"，下次 launchJVM 周期三口径（表面/窗口/输入）一致重建
+- 26.1.2+neoforge 装成 26.3：8cb5e03 安装会话日志实锤只有 26.3.json 原版下载链（neoforge 分支零日志）→ Task173 保守策略的死路警告（"知道了"，无跳转无上下文）把用户抛回按时间排序的版本列表（26.3 恒顶）误触顶卡。修复：一键"安装并继续"——ensureVanillaInstalled 用用户所选同一 version 字典装原版后自动接续加载器安装（runLoaderInstall 抽出共用），失败才落错误提示
+- keychain 弹窗升级：Task185 文案指引（"请删除该账号后重新登录"）仍是四步手动导航墙 → ame187_showAccountRepairDialog 一键修复（删 .json + 清 keychain 残留 + 拉起登录页；pendingLaunchAfterLogin 链登录后自动接续启动）
+- 巨魔"卡在验证完整性"：定位 taskStage.title.verifyIntegrity="验证完整性"（PLTaskStagesVanilla 第 6 阶段），代码上瞬时完成（SHA1 逐文件内嵌）但无日志无法定位卡点 → 入场锚点（含自 downloadVersion 起耗时）+ 30s 看门狗强推（展示层收尾，强推无假阳性风险）
+- 强制横屏：Info.plist iPhone 段移除 Portrait（8cb5e03 日志实证 requestGeometryUpdate 被 Code=101 拒绝于窗口模式；支持列表仅横屏 = 系统直接横屏呈现，iPad 段本就 only）
+- iPhone 刘海适配：两套主界面（卡片默认 + vs 三栏）侧栏 leading / 右面板 trailing 叠加 ame187_iphoneNotchInset（仅 iPhone 生效，iPad 恒 0 零回归；旋转 180° trait 重算；viewWillAppear 补算 insets 迟到；上下边维持对称 outerMargin 语义；游戏表面全出血不动=真全面屏）
+- 验证：verify_task187 61/61；task187_vgpu_syntax.sh（GetLine 语义单测 + gcc 语法门）全过；有意语义翻转诚实重锚：186-C10（实时生效退役→next-launch 语义 +C10b）+186-D3 环境治愈（stub 头自建，52/52）、185-F3（弹窗升级，63/63）、159-E1（l10n 基线 1955→1959，48/48）；级联 184:39、183:50、task175_syntax_gates ALL PASS；version.h 括号差值 0/0
+
+Stage Summary:
+- 装机锚点：vgpu 1.8.9 "VGPU Task187: short GLSL source" + FPE 编译错误消失 = 白屏闭环（三层修复链：183 版本行 → 186 插入点 → 187 头行数+GetLine）；ANGLE "[RenderDiag] Task187 state: clearColor=..." 四分法裁决黑内容根因（红clear+黑屏=呈现丢弃 / mask全false 或 小scissor=状态元凶 / 全正常+黑clear=着色器语义下一轮）；"[tinygl4angle] Task187: accepted desktop-only glEnable"=噪音静默生效
+- 分辨率：游戏内菜单改值 → toast"重启生效" + "[Task187] in-game resolution saved"；下次启动触点/渲染自洽（Task175 公式在新会话窗口信念下正确）
+- 下载：选 26.1.2+neoforge 原版未装 → 一键"安装并继续"（26.1.2 原版 + neoforge 连装，不再有 26.3 误装路径）
+- keychain：弹窗"删除账号并重新登录"一键修复；巨魔启动"验证完整性"最长 30s 自动收尾 + 耗时锚点
+- iPhone：锁定横屏（无 Portrait）；刘海侧自动避让（iPad 零回归）
+- 遗留：ANGLE 黑屏根因待 01cddae 后续构建的 Task187 状态快照裁决；vgpu post 特效上游 bug（sobel WARN，非阻塞）；launch.stage.* 孤儿键与 i18n_str_195/196 文案与新流程的收尾清理（低优先）

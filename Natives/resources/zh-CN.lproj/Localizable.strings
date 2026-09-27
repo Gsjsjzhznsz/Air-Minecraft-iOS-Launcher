@@ -14,6 +14,7 @@
 "game.menu.toggle_keyboard" = "游戏内键盘开关";
 "game.menu.resolution" = "分辨率调整";
 "game.menu.resolution.message" = "选择游戏分辨率缩放比例";
+"game.menu.resolution.next_launch" = "分辨率已保存，重启游戏后生效";
 
 "game.note.airplay" = "Minecraft 正在通过隔空播放（AirPlay）到其他设备显示";
 
@@ -2123,3 +2124,6 @@
 "bing.download.hint" = "壁纸下载中…";
 "bing.refresh.done" = "同步完成";
 "bing.refresh.failed" = "同步失败，请检查网络";
+"i18n_str_2069" = "安装 %@ 前需要先安装原版 %@。可以自动安装该原版并继续，是否继续？";
+"i18n_str_2070" = "安装并继续";
+"i18n_str_2071" = "删除账号并重新登录";

@@ -14,6 +14,7 @@
 "game.menu.toggle_keyboard" = "Toggle Keyboard";
 "game.menu.resolution" = "Resolution";
 "game.menu.resolution.message" = "Select game resolution scale";
+"game.menu.resolution.next_launch" = "Saved. Restart the game to apply.";
 
 "game.note.airplay" = "Minecraft is being displayed in AirPlay mirrored display";
 
@@ -2127,3 +2128,6 @@
 "bing.download.hint" = "Downloading wallpaper…";
 "bing.refresh.done" = "Sync complete";
 "bing.refresh.failed" = "Sync failed, check your network";
+"i18n_str_2069" = "Installing %@ requires vanilla %@ first. Install it automatically and continue?";
+"i18n_str_2070" = "Install & Continue";
+"i18n_str_2071" = "Remove & Sign In Again";

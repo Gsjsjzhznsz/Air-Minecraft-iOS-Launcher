@@ -51,6 +51,78 @@ void showDialog(NSString* title, NSString* message) {
     });
 }
 
+// Task187（keychain 凭据丢失一键修复）：Task185 把死循环弹窗改成了去重 +
+// 文案指引（"请删除该账号后重新登录"），但用户仍需手动完成
+// 账号列表 → 滑动删除 → 添加账号 → 登录 四步导航。本弹窗提供一步出路：
+// 「删除账号并重新登录」→ 就地删除账号 .json 与 keychain 残留 → 拉起账号
+// 管理页（登录入口）。launchGame 的 pendingLaunchAfterLogin 链在登录成功
+// 后自动接续启动（RightPanel 已有的机制，此处零新增状态）。
+void ame187_showAccountRepairDialog(NSString *username, NSString *accountId, NSString *xuid) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIAlertController *alert = [UIAlertController
+            alertControllerWithTitle:localize(@"Error", nil)
+                             message:[NSString stringWithFormat:
+                @"账号凭据已丢失（更换安装方式/恢复备份后常见）。\n\n点击「删除账号并重新登录」将移除「%@」并直接打开登录页面，登录后即可恢复正版皮肤与联机功能。\nAccount tokens are missing from the keychain. Tap Repair to remove \"%@\" and sign in again.",
+                username ?: @"?", username ?: @"?"]
+                      preferredStyle:UIAlertControllerStyleAlert];
+        UIWindow *previousKeyWindow = UIWindow.mainWindow;
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_2071", nil)
+                                                  style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction *action) {
+            // 与 AccountListViewController 滑动删除同一套语义：
+            // accounts/{accountId}.json + keychain 条目 + selected_account 修正
+            NSString *aid = accountId.length > 0 ? accountId : (username ?: @"");
+            if (aid.length > 0) {
+                NSString *path = [NSString stringWithFormat:@"%s/accounts/%@.json", getenv("POJAV_HOME"), aid];
+                [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+                NSLog(@"[Task187] account repair: removed %@ (keychain residue cleared next login)", path);
+            }
+            if (xuid.length > 0) {
+                Class msAuth = NSClassFromString(@"MicrosoftAuthenticator");
+                SEL clearSel = NSSelectorFromString(@"clearTokenDataOfProfile:");
+                if (msAuth && [msAuth respondsToSelector:clearSel]) {
+                    ((void (*)(id, SEL, id))objc_msgSend)(msAuth, clearSel, xuid);
+                }
+            }
+            // 若删除的正是当前选中账户，清空选中态（与列表删除一致）
+            if ([getPrefObject(@"internal.selected_account") isEqualToString:aid]) {
+                setPrefObject(@"internal.selected_account", @"");
+                [BaseAuthenticator setCurrent:nil];
+            }
+            // 关闭承载 window 并还原 key window
+            UIWindow *w = objc_getAssociatedObject(alert, @selector(alertWindow));
+            if (w) {
+                w.hidden = YES;
+                if (previousKeyWindow && previousKeyWindow != w) {
+                    [previousKeyWindow makeKeyAndVisible];
+                }
+            }
+            // 拉起账号管理页（登录入口）；启动链的 pendingLaunchAfterLogin
+            // 在登录成功后自动接续（如本次修复发生在启动流程中）
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"ShowAccountManager" object:nil];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
+                                                  style:UIAlertActionStyleCancel
+                                                handler:^(UIAlertAction *action) {
+            UIWindow *w = objc_getAssociatedObject(alert, @selector(alertWindow));
+            if (w) {
+                w.hidden = YES;
+                if (previousKeyWindow && previousKeyWindow != w) {
+                    [previousKeyWindow makeKeyAndVisible];
+                }
+            }
+        }]];
+
+        UIWindow *alertWindow = [[UIWindow alloc] initWithWindowScene:UIWindow.mainWindow.windowScene];
+        alertWindow.frame = UIScreen.mainScreen.bounds;
+        alertWindow.rootViewController = [UIViewController new];
+        alertWindow.windowLevel = 1000;
+        [alertWindow makeKeyAndVisible];
+        objc_setAssociatedObject(alert, @selector(alertWindow), alertWindow, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [alertWindow.rootViewController presentViewController:alert animated:YES completion:nil];
+    });
+}
+
 // Task173：gJvmUsedInProcess 的出路弹窗（“Forge 安装后启动游戏弹 java
 // runtime 问题，重启刷新 jit 状态就好”根修的 UI 侧）。
 // 机制：进程内 JVM 只能创建一次——Forge/NeoForge 安装器（headless JVM）跑

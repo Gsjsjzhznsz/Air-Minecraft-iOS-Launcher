@@ -417,6 +417,20 @@ int ame141_currentLaunchAllocMem(void);
 // ============================================================================
 int ame173_safeHeapCeilingMB(void);
 
+// ============================================================================
+// Task 187（iPhone 刘海/挖孔适配）：启动器为 iPad 设计的卡片布局用
+// view 边缘 + 固定 outerMargin 定位；iPhone 横屏下左侧（或右侧，随设备
+// 朝向）的刘海/挖孔 + 灵动岛会直接压住侧栏卡片内容。本助手返回
+// 【仅 iPhone】的额外水平避让量（取 safeAreaInsets 对应边，iPad 恒 0
+// ——iPad 主力机型零布局回归）。调用方把它加进 leading/trailing 边距：
+//   constant = outerMargin + ame187_iphoneNotchInset(view, isLeading)
+// 垂直边（状态栏已隐藏、home indicator 由不透明卡片背景自然覆盖）
+// 维持既有对称 outerMargin 设计（Task "下面过宽" 修复的语义不变）。
+// 游戏表面（SurfaceViewController surfaceView）不经此路径——真全面屏
+// 全出血渲染不受影响。
+// ============================================================================
+double ame187_iphoneNotchInset(UIView *view, BOOL isLeading);
+
 #ifdef __cplusplus
 }
 #endif

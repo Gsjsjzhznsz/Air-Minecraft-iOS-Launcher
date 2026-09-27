@@ -192,8 +192,8 @@ def keyset(lang):
     s = read(f"Natives/resources/{lang}.lproj/Localizable.strings")
     return set(re.findall(r'^"([^"]+)"\s*=', s, re.M))
 sets = [keyset(l) for l in LANGS]
-check("E1  四语言键集一致且为 1952（= Task157 基线 1948 + 净增 4）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1955,
+check("E1  四语言键集一致且为 1959（= Task157 基线 1948 + 历轮净增；Task187 +4：next_launch/2069/2070/2071）",
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1959,
       f"counts={[len(s) for s in sets]}")
 NEW_KEYS = ["preference.manage_runtime.default.126", "preference.manage_runtime.footer.java25",
             "preference.profile.title.resolution_scale", "memory.adjust_title", "memory.adjust_message"]

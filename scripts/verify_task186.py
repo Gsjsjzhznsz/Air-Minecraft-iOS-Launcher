@@ -100,7 +100,11 @@ check("[Task186] in-game resolution: profile" in nav, "C8: 调节锚点日志")
 aam = nav[nav.find("- (void)actionAdjustResolution"):nav.find("- (void)actionOpenNavigationMenu")]
 check("getPrefFloat(@\"video.resolution\")" not in aam,
       "C9: 菜单显示值不再读全局键（✓ 标记与生效值同源）")
-check("[self updateSavedResolution];" in aam, "C10: 调节后实时生效调用保留")
+check("[Task187] in-game resolution saved" in nav,
+      "C10: Task187 语义——仅存偏好，几何下次启动再生效（运行中改几何会与\n"
+      "      MC 固定的窗口信念脱钩 → 触摸错位，Task186 的实时生效调用已退役）")
+check("[self updateSavedResolution];" not in aam,
+      "C10b: 运行中直调 updateSavedResolution 已移除（触摸错位根修）")
 
 # ------------------------------------------------- D. 行为单测（C 编译执行）
 import tempfile, os
@@ -118,6 +122,19 @@ def run_c_test(src_name, binary_name):
 check(run_c_test("task186_matrix_test.c", "task186_matrix_test_v"), "D1: 转置数学单测 11 例（ASAN）")
 check(run_c_test("task186_cutin_test.c", "task186_cutin_test_v"), "D2: 插入点单测 8 例（ASAN）")
 # ANGLE 新区块独立编译级检查（九符号 + 纯 C 语法，-Wall -Wextra 零警告）
+# Task187 治愈：stub 头目录原为原会话手工产物（/tmp/task186_syntax 不随仓库
+# 存活 → 每次新环境 D3 必败，stash 对拍定案环境性漂移）。验证器自建自足。
+import os as _os
+_stub_dir = "/tmp/task186_syntax/GL"
+_os.makedirs(_stub_dir, exist_ok=True)
+if not _os.path.exists(_stub_dir + "/gl.h"):
+    open(_stub_dir + "/gl.h", "w").write(
+        "#pragma once\n#include <stdint.h>\n"
+        "typedef int GLint; typedef int GLsizei; typedef unsigned int GLuint;\n"
+        "typedef unsigned int GLenum; typedef unsigned char GLboolean;\n"
+        "typedef float GLfloat; typedef double GLdouble;\n"
+        "#define GL_FALSE 0\n#define GL_TRUE 1\nvoid glEnable(GLenum cap);\n")
+    open(_stub_dir + "/glext.h", "w").write("#pragma once\n")
 harness = ROOT / "scripts" / "task186_angle_syntax_harness.c"
 r = subprocess.run(["gcc", "-O2", "-Wall", "-Wextra", "-Wno-unused-parameter",
                     "-I/tmp/task186_syntax", "-o", "/tmp/task186_angle_syntax_v", str(harness)],

@@ -204,7 +204,11 @@
         <false/>
         <key>UISupportedInterfaceOrientations</key>
         <array>
-                <string>UIInterfaceOrientationPortrait</string>
+                <!-- Task187（强制横屏）：移除 UIInterfaceOrientationPortrait——启动器为横屏设计，
+                     iPhone 上竖屏打开后界面错位且 requestGeometryUpdate 在窗口模式下被系统
+                     拒绝（Code=101 "当前窗口模式不允许以编程方式更改界面方向"，8cb5e03 日志）。
+                     支持列表只留横屏后系统直接以横屏呈现，无需编程请求。iPad 段本就横屏 only，
+                     SceneDelegate 的几何请求保留为纵深防御。 -->
                 <string>UIInterfaceOrientationLandscapeLeft</string>
                 <string>UIInterfaceOrientationLandscapeRight</string>
         </array>

@@ -69,6 +69,9 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 @property(nonatomic, strong) NSLayoutConstraint *contentTrailingConstraint;
 @property(nonatomic, strong) NSLayoutConstraint *sidebarWidthConstraint;
 @property(nonatomic, strong) NSLayoutConstraint *rightPanelWidthConstraint;
+// Task187（iPhone 刘海适配）：左右边距约束单独持有（叠加避让量）
+@property(nonatomic, strong) NSLayoutConstraint *ame187_sidebarLeadingConstraint;
+@property(nonatomic, strong) NSLayoutConstraint *ame187_rightTrailingConstraint;
 // 关键修复（UI 累积异常）：setContentViewController: 之前每次切换都激活 4 个新约束
 // （leading/trailing/top/bottom 到 contentContainer），但旧 VC 的约束未显式 deactivate。
 // 在 tmpRootVC 保留场景下，缓存复用的子 VC 反复激活约束，layout 解算时 leading/trailing
@@ -186,6 +189,11 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // Task187（iPhone 刘海适配）：viewDidLoad 时刻 insets 尚为 0，首布局后补算
+    if (self.ame187_sidebarLeadingConstraint != nil) {
+        self.ame187_sidebarLeadingConstraint.constant = ame187_iphoneNotchInset(self.view, YES);
+        self.ame187_rightTrailingConstraint.constant = -ame187_iphoneNotchInset(self.view, NO);
+    }
     [[BackgroundManager sharedManager] resumeVideo];
     [self ame125_autoUpdateCheckOnce];
 }
@@ -235,6 +243,11 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
     }
     if (self.rightPanelWidthConstraint.constant != rightPanelWidth) {
         self.rightPanelWidthConstraint.constant = rightPanelWidth;
+    }
+    // Task187（iPhone 刘海适配）：旋转 180° 后左右安全区互换，重算避让量
+    if (self.ame187_sidebarLeadingConstraint != nil) {
+        self.ame187_sidebarLeadingConstraint.constant = ame187_iphoneNotchInset(self.view, YES);
+        self.ame187_rightTrailingConstraint.constant = -ame187_iphoneNotchInset(self.view, NO);
     }
     // 通知子 VC 重新布局
     for (UIViewController *child in self.childViewControllers) {
@@ -311,15 +324,22 @@ static CGFloat LauncherRootLayoutRightPanelWidth(UITraitCollection *trait) {
     self.sidebarWidthConstraint = [self.sidebarContainer.widthAnchor constraintEqualToConstant:LauncherRootLayoutSidebarWidth(self.traitCollection)];
     self.rightPanelWidthConstraint = [self.rightPanelContainer.widthAnchor constraintEqualToConstant:LauncherRootLayoutRightPanelWidth(self.traitCollection)];
 
+    // Task187（iPhone 刘海/挖孔适配）：左右边距叠加安全避让（仅 iPhone 生效，
+    // iPad 恒 0 零回归）——旧约束直接贴 view 边缘，iPhone 横屏下侧栏被刘海压住。
+    CGFloat ame187_leadInset = ame187_iphoneNotchInset(self.view, YES);
+    CGFloat ame187_trailInset = ame187_iphoneNotchInset(self.view, NO);
+    self.ame187_sidebarLeadingConstraint = [self.sidebarContainer.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:ame187_leadInset];
+    self.ame187_rightTrailingConstraint = [self.rightPanelContainer.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-ame187_trailInset];
+
     [NSLayoutConstraint activateConstraints:@[
         // 左侧边栏
-        [self.sidebarContainer.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        self.ame187_sidebarLeadingConstraint,
         [self.sidebarContainer.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [self.sidebarContainer.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         self.sidebarWidthConstraint,
 
         // 右侧面板
-        [self.rightPanelContainer.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        self.ame187_rightTrailingConstraint,
         [self.rightPanelContainer.topAnchor constraintEqualToAnchor:self.view.topAnchor],
         [self.rightPanelContainer.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
         self.rightPanelWidthConstraint,

@@ -2991,13 +2991,17 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         return;
     }
 
-    // 用户决策（参考 ZL2 的保守策略）：安装模组加载器前检测对应原版是否已安装，
-    // 未安装时不再自动代装原版，而是提醒用户先手动安装原版。
-    // 原因：原版自动预装 + 加载器安装的复合流程中，若原版安装失败/被中断，
-    // 加载器版本虽写入但继承的原版缺失，实例管理会出现"找不到刚安装的版本"等问题；
-    // 提醒方式让用户明确先完成原版安装，流程更可控。
-    // 注：加载器版本 JSON 均含 "inheritsFrom" 字段，启动时 Java 端会读取
-    // versions/{inheritsFrom}/{inheritsFrom}.json 合并，原版缺失会导致启动崩溃。
+    // Task187（"选了 26.1.2+neoforge 却下了 26.3 原版"根修）：Task173 的
+    // 保守策略（原版未装 → 弹"知道了"死路警告，让用户自己去下载页装原版）
+    // 实测把用户引向了错误版本——警告没有任何跳转/上下文，用户回到版本
+    // 列表（按时间排序、26.3 恒在顶）后误触顶卡 = 下了 26.3 原版
+    //（8cb5e03 latestlog (1).txt 实锤：会话里只有 26.3.json 下载链，
+    // neoforge 分支零日志）。修法：原版未装时提供【一键安装并继续】——
+    // ensureVanillaInstalled 用【用户所选的同一 version 字典】装原版
+    //（版本正确性由数据流保证，不再依赖用户手动导航），装完自动接续
+    // 加载器安装；失败才落到带错误信息的警告。保守策略的初衷（复合流程
+    // 中断会产生残缺实例）由 ensure 的失败分支 + 错误提示承接，不再以
+    // 死路警告的形式把版本选择权丢回给用户。
     if (![self isVanillaVersionInstalled:versionId]) {
         NSDictionary *loaderDisplayNames = @{
             @"fabric": @"Fabric",
@@ -3007,19 +3011,53 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
             @"optifine": @"OptiFine"
         };
         NSString *loaderDisplayName = loaderDisplayNames[loaderType] ?: loaderType;
+        NSLog(@"[DownloadVC] Task187: vanilla %@ missing for %@ install -- offering one-tap auto-install (was dead-end alert)", versionId, loaderDisplayName);
         UIAlertController *alert = [UIAlertController
             alertControllerWithTitle:localize(@"i18n_str_195", nil)
                              message:[NSString stringWithFormat:
-                                      localize(@"i18n_str_196", nil),
+                                      localize(@"i18n_str_2069", nil),
                                       loaderDisplayName, versionId]
                       preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_197", nil)
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_2070", nil)
                                                   style:UIAlertActionStyleDefault
+                                                handler:^(UIAlertAction *action) {
+            NSLog(@"[DownloadVC] Task187: one-tap install accepted -- installing vanilla %@ then %@", versionId, loaderDisplayName);
+            __weak typeof(self) weakSelf = self;
+            [self ensureVanillaInstalled:version completion:^(BOOL success) {
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (!strongSelf) return;
+                if (success) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [strongSelf runLoaderInstall:loaderType
+                                            versionId:versionId
+                                     installFabricAPI:installFabricAPI
+                                      installOptiFine:installOptiFine
+                                         loaderVersion:loaderVersion];
+                    });
+                } else {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        [strongSelf showError:[NSString stringWithFormat:localize(@"i18n_str_194", nil), versionId]];
+                    });
+                }
+            }];
+        }]];
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
+                                                  style:UIAlertActionStyleCancel
                                                 handler:nil]];
         [self presentViewController:alert animated:YES completion:nil];
         return;
     }
 
+    [self runLoaderInstall:loaderType versionId:versionId installFabricAPI:installFabricAPI installOptiFine:installOptiFine loaderVersion:loaderVersion];
+}
+
+/// Task187：加载器安装分发（从 proceedWithVersion 抽出，供直装与
+/// 一键装完原版后的接续两条路径共用）。
+- (void)runLoaderInstall:(NSString *)loaderType
+              versionId:(NSString *)versionId
+       installFabricAPI:(BOOL)installFabricAPI
+        installOptiFine:(BOOL)installOptiFine
+           loaderVersion:(NSString *)loaderVersion {
     dispatch_async(dispatch_get_main_queue(), ^{
         if ([loaderType isEqualToString:@"fabric"]) {
             [self installFabric:versionId loaderVersion:loaderVersion installAPI:installFabricAPI];

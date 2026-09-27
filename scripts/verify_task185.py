@@ -142,8 +142,9 @@ check('self.authData[@"username"] = response[@"name"];\n        self.authData[@"
       "F1: 先落 username 再拼头像 URL（顺序修复）")
 check("ame185_shown" in msa,
       "F2: 会话内弹窗去重")
-check("Account tokens are missing from the keychain" in msa,
-      "F3: 可行动的双语文案")
+check("ame187_showAccountRepairDialog(self.authData[@\"username\"]," in msa,
+      "F3: 可行动的双语文案（Task187 升级为一键修复弹窗：删账号 + 拉起登录页，"
+      "旧纯文案已由 ios_uikit_bridge.m 的弹窗体承接）")
 check("OSStatus %d" in msa,
       "F4: keychain 状态码取证")
 check('containsString:@"(null)"]' in msa,
