@@ -1333,6 +1333,30 @@ void ame67_sanitizeOptionsKeybinds(void) {
         NSLog(@"[Task67] options.txt absent (first run?) — MC will create defaults, nothing to sanitize");
         return;
     }
+    // Task181（右 Shift 键位被反复洗掉根修）：旧实现每次启动都把 7 个移动
+    // 键位强制重置为默认值——病历（afa23a6 装机，用户实测"shift依旧使用不了
+    // 而另一个控件却正常"）：用户把潜行键改绑到 key.keyboard.right.shift
+    // （移动端常见），每次启动净化器发现它 ≠ 默认 left.shift 就 REPAIR
+    // 洗回——游戏内按右 Shift 事件链全绿但 MC 的 sneak 绑定已不在右 Shift
+    // 上，表现为"右 Shift 无效"；左 Shift 按钮（或绑在默认键位的控件）正常。
+    // 修法：强制重置只做【一次】（历史坏档已被洗干净，坏档成因=输入损坏
+    // 时代的绑定捕获，Task66 之后不会再产生）。标记文件与 options.txt 同
+    // 目录；存在则只保留 dump 取证、不再改写任何键位。删标记可重新强制
+    // 一次（分诊逃生口）。
+    char ame181_marker[PATH_MAX];
+    if (snprintf(ame181_marker, sizeof(ame181_marker), "%s.amethyst-keybinds-v1", path) >= (int)sizeof(ame181_marker)) {
+        // 路径超长：保守起见继续走旧逻辑（强制净化，宁洗勿坏）
+        ame181_marker[0] = '\0';
+    }
+    BOOL ame181_alreadySanitized = NO;
+    if (ame181_marker[0] != '\0') {
+        FILE *mf = fopen(ame181_marker, "rb");
+        if (mf != NULL) {
+            fclose(mf);
+            ame181_alreadySanitized = YES;
+            NSLog(@"[Task181] keybind marker present (%s) — user customizations preserved, no forced reset this launch", ame181_marker);
+        }
+    }
     // 读全文（options.txt 通常 < 64KB）
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
@@ -1372,7 +1396,10 @@ void ame67_sanitizeOptionsKeybinds(void) {
                 BOOL repaired = NO;
                 for (size_t i = 0; i < AME67_CANONICAL_COUNT; i++) {
                     if ([name isEqualToString:@(ame67_canonicalKeys[i].opt)]) {
-                        if (![value isEqualToString:@(ame67_canonicalKeys[i].defv)]) {
+                        // Task181：一次性化——标记存在后不再强制重置（用户
+                        // 自定义键位存活；仅无标记的首轮执行历史坏档清洗）。
+                        if (!ame181_alreadySanitized &&
+                            ![value isEqualToString:@(ame67_canonicalKeys[i].defv)]) {
                             NSLog(@"[Task67] REPAIR %@: %@ -> %@ (canonical default; was broken-era remap?)",
                                   name, value, @(ame67_canonicalKeys[i].defv));
                             nsline = [NSString stringWithFormat:@"%@:%@",
@@ -1421,6 +1448,19 @@ void ame67_sanitizeOptionsKeybinds(void) {
         }
     } else {
         NSLog(@"[Task67] ===== keybind sanitize: 0 repairs needed (all canonical / defaults) =====");
+    }
+    // Task181：本轮净化跑完（无论是否发生修复）落一次性标记——下轮起用户
+    // 键位自定义不再被强制重置。标记创建失败只影响下次多做一次强制（安全
+    // 方向失败），不阻断启动。
+    if (ame181_marker[0] != '\0' && !ame181_alreadySanitized) {
+        FILE *mf = fopen(ame181_marker, "wb");
+        if (mf != NULL) {
+            fputs("Amethyst one-shot keybind canonicalization done (Task181). Delete this file to re-run.\n", mf);
+            fclose(mf);
+            NSLog(@"[Task181] keybind marker written (%s) — future launches preserve user customizations", ame181_marker);
+        } else {
+            NSLog(@"[Task181] WARN: marker write failed (%s) — forced reset will run once more next launch", ame181_marker);
+        }
     }
 }
 
@@ -1625,8 +1665,18 @@ void CallbackBridge_nativeSetInputReady(BOOL inputReady) {
         if (GLFW_invoke_FramebufferSize) {
             GLFW_invoke_FramebufferSize((void*) showingWindow, windowWidth, windowHeight);
         }
+        // Task181（26.1.2 NeoForge 早期显示窗口 pc=0 崩溃根修）：
+        // 病历（hs_err_pid1381，elapsed 1.17s）：NeoForge 26.1.2.100 的
+        // earlydisplay DisplayWindow.initWindow 只注册 WindowSize 回调
+        // （不注册 FramebufferSize），本分支旧代码判空的是
+        // GLFW_invoke_WindowSize、调用的却是 GLFW_invoke_FramebufferSize——
+        // WindowSize 非空而 FramebufferSize 为 NULL 时 BLR 0 → pc=0x0、
+        // SIGSEGV si_code=SEGV_ACCERR si_addr=0（执行空指针的特征签名），
+        // 崩溃帧符号化错位到 CallbackBridge_nativeSetInputReady+0xd8。
+        // 26.3 走 SDL3 路径不经过此函数，只有 ≤26.2 的 GLFW 线（及
+        // NeoForge earlydisplay）暴露本 bug。
         if (GLFW_invoke_WindowSize) {
-            GLFW_invoke_FramebufferSize((void*) showingWindow, windowWidth, windowHeight);
+            GLFW_invoke_WindowSize((void*) showingWindow, windowWidth, windowHeight);
         }
     }
 }

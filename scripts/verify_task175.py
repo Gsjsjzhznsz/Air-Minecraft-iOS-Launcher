@@ -239,16 +239,18 @@ check("F5 规格档不回退（Task177 重锚：恒 1.0 不透明度 = shadowOpa
 # ============================================================
 print("== G. 文档 ==")
 anns = json.loads(rd("announcements.json"))["announcements"]
-check("G1 公告 task175@4（Task178 重锚：task178@2 插入；server/task169 pin 不动；177/174/双173/172/171/170/168 顺延 3-11）",
+check("G1 公告 task175@6（Task181 重锚：task180@2/task179@3 插入；server/task169 pin 不动；177@5；175@6；174@7；172@10；168@13）",
       anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[3]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[4]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[5]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[6]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[9]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[12]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t175 = anns[5]
+      and anns[2]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and anns[3]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[4]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[5]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[6]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[7]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[10]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[13]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t175 = anns[6]
 check("G2 公告内容六条全列 + EN 尾注 + 装机锚点",
       all(k in t175["content"] for k in
           ["ANGLE", "下载量", "头像", "物品栏", "Forge", "壁纸", "[Task175]"])

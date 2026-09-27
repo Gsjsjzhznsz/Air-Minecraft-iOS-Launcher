@@ -2268,3 +2268,48 @@
 // "[Task180] avatar hit via username fallback", "[Task180] avatar
 // migrated", "[Task180] dedup account entry by id", "[Task180] skipping
 // unreadable account file".
+
+// REVISION 17 addendum (Task 181, no bump): device-feedback six-symptom
+// round on the ab78f50 log set (build afa23a6 / Task 180 IPA). (1) The
+// 26.1.2 NeoForge pc=0 crash (hs_err_pid1381, elapsed 1.17s): the early
+// display window only registers a WindowSize callback, and
+// CallbackBridge_nativeSetInputReady's second branch guarded
+// GLFW_invoke_WindowSize but CALLED GLFW_invoke_FramebufferSize -- a NULL
+// descriptor BLR, signature pc=0x0 / SEGV_ACCERR / si_addr=0; fixed to
+// call the guarded pointer (input_bridge_v3.m). (2) CF detail-page loader
+// filter wiped every file: parseCurseForgeDictionary stored loader names
+// verbatim ("Fabric") while the predicate compares against
+// lowercaseString ("fabric") -- exact containsObject never matched on the
+// CF source (Modrinth is natively lowercase, hence unaffected); loaders
+// now stored lowercased and LiteLoader prefix added (ModVersion.m). (3)
+// Right-Shift dead keybind: the Task67 options.txt canonicalizer force
+// reset the seven movement keys on EVERY launch, washing the user's
+// key.keyboard.right.shift sneak binding back to left.shift each time;
+// the forced reset is now one-shot (marker options.txt.amethyst-keybinds-v1
+// beside the sanitized file; delete to re-run) while the dump forensics
+// stay (input_bridge_v3.m). (4) Legacy Forge (1.x) SplashProgress
+// disabled: its background GL thread races the main thread on the shared
+// single context (1.8.9+vgpu session: "Texture creation: Invalid enum" on
+// the splash thread, then glCheckFramebufferStatus returned 0 on the main
+// thread); ame181_disableLegacyForgeSplash writes config/splash.properties
+// enabled=false before JLI_Launch for 1.x Forge ids only (JavaLauncher.m).
+// (5) ANGLE pipeline/gui "ERROR: 1:1: '' : syntax error" forensics: the
+// 26.3 client jar was decompiled -- GlStateManager.glShaderSource uploads
+// a single NUL-terminated UTF-8 segment with length=NULL via
+// GL33C.nglShaderSource, and the spvc exit already self-verifies ES300;
+// tinygl4angle now logs glShaderSource head48/count/len0 (first 8) and a
+// pure-forwarding glCompileShader export logs COMPILE_STATUS + infoLog
+// head (first 32) -- if the crash reproduces WITHOUT these lines, MC's
+// shader calls resolve outside this dylib (Apple system libGLESv2 / raw
+// ANGLE), which is the missing link (tinygl4angle.c). (6) JIT wait
+// hang forensics: the success path of ame169_waitForJITCondition was
+// fully silent; now logs a wait-begin snapshot (foreground/traced/exn/
+// csdbg), a condition-satisfied line with net wait time, and foreground/
+// background transitions while waiting; backgroundTimeRemaining's DBL_MAX
+// foreground value prints as "fg(n/a)" instead of a 300-digit number
+// (utils.m, LauncherRightPanelViewController.m). Device anchors:
+// "[Task181] keybind marker present", "[Task181] keybind marker written",
+// "Task181: legacy Forge splash disabled", "[tinygl4angle] Task181
+// glShaderSource #", "[tinygl4angle] Task181 glCompileShader #",
+// "[JIT] Task181 ... wait begin / condition satisfied / app returned to
+// FOREGROUND".

@@ -245,8 +245,34 @@ BOOL isTrollStoreInstall(void) {
 BOOL ame169_waitForJITCondition(BOOL (^condition)(void), NSTimeInterval timeout, NSString *label) {
     NSDate *start = [NSDate date];
     NSDate *ame179_lastIter = [NSDate date];
+    // Task181（JIT 二级菜单卡死取证）：成功路径此前完全静默（return YES 不打
+    // 任何日志）——病历（afa23a6 装机 latestlog.1）日志止于 "still waiting
+    // after 0s"+openURL+entered background，用户回前台后是"等待成功进入
+    // 启动"还是"循环冻死"无从分辨。补三针：①首查快照（等待开始时各检测
+    // 分量的瞬时值）；②成功一行（含净等待时长）；③循环内进程前台态翻转
+    // （UIApplicationState 变化）打点。下一轮装机日志直接钉死断点在哪。
+    BOOL ame181_foreground = (UIApplication.sharedApplication.applicationState == UIApplicationStateActive);
+    int ame181_csFlags = 0;
+    csops(getpid(), 0, &ame181_csFlags, sizeof(ame181_csFlags));
+    NSLog(@"[JIT] Task181 %@ wait begin: startForeground=%d traced=%d exn=%d csdbg=%d",
+          label ?: @"JIT", ame181_foreground, JIT26DebuggerAttachedViaPtrace(),
+          JIT26DebuggerViaExceptionPorts(), (ame181_csFlags & CS_DEBUGGED) != 0);
     for (;;) {
-        if (condition()) return YES;
+        if (condition()) {
+            NSTimeInterval ame181_waited = -[start timeIntervalSinceNow];
+            NSLog(@"[JIT] Task181 %@ condition satisfied after %.1fs (traced=%d exn=%d)",
+                  label ?: @"JIT", ame181_waited, JIT26DebuggerAttachedViaPtrace(),
+                  JIT26DebuggerViaExceptionPorts());
+            return YES;
+        }
+        // Task181：前台态翻转打点（后台回前台是恢复等待的关键事件，此前零观测）。
+        BOOL ame181_nowForeground = (UIApplication.sharedApplication.applicationState == UIApplicationStateActive);
+        if (ame181_nowForeground != ame181_foreground) {
+            NSLog(@"[JIT] Task181 %@ app %s while waiting (traced=%d exn=%d)",
+                  label ?: @"JIT", ame181_nowForeground ? "returned to FOREGROUND" : "went to BACKGROUND",
+                  JIT26DebuggerAttachedViaPtrace(), JIT26DebuggerViaExceptionPorts());
+            ame181_foreground = ame181_nowForeground;
+        }
         // Task179：挂起间隙不计入超时预算。
         // 病历（9aacebb 装机 latestlog.2，版本设置二级菜单启动）：stikjit://
         // 把 App 切后台 → iOS 挂起本进程（后台断言宽限未兑现，心跳只打了

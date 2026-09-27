@@ -64,8 +64,21 @@
     NSMutableArray *loaders = [NSMutableArray array];
     NSMutableArray *gameVerArr = [NSMutableArray array];
     for (NSString *v in gameVersions) {
-        if ([v hasPrefix:@"Fabric"] || [v hasPrefix:@"Forge"] || [v hasPrefix:@"NeoForge"] || [v hasPrefix:@"Quilt"]) {
-            [loaders addObject:v];
+        // Task181（CF 资源详细页加载器筛选过滤光根修）：
+        // 病历（afa23a6 装机，用户实测"需要在资源详细页点加载器中的全部
+        // 才能显示资源"）：CF 的 gameVersions 里加载器标签是首字母大写
+        // 原文（"Fabric"/"Forge"/...），旧代码原样存储；而
+        // ModVersionViewController 的筛选比较用
+        // [loaders containsObject:selectedLoader.lowercaseString]（"fabric"）
+        // ——containsObject 精确比较，"Fabric" != "fabric" → CF 源下选中
+        // 任何加载器都会过滤掉【全部】文件，只有"全部"chip 能显示。
+        // Modrinth 的 loaders 字段本就是小写，所以 Modrinth 源正常。
+        // 修法：统一小写存储（显示层 processFilters 会 capitalizedString，
+        // preferred 置顶比较也是 lowercaseString，两处同时恢复）；
+        // 顺手补 LiteLoader 前缀（老 CF 文件带此标签，否则会漏进版本 chips）。
+        if ([v hasPrefix:@"Fabric"] || [v hasPrefix:@"Forge"] || [v hasPrefix:@"NeoForge"] ||
+            [v hasPrefix:@"Quilt"] || [v hasPrefix:@"LiteLoader"]) {
+            [loaders addObject:[v lowercaseString]];
         } else if ([v containsString:@"."]) {
             if (gameVer == nil) {
                 gameVer = v;

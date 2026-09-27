@@ -691,3 +691,28 @@ Stage Summary:
 - 修复 042b950（全仓引擎符号 import 扫描确认唯一缺口；verify_task180 G 组补 import 锚，113/113）；11ad745 docs 提交被 GitHub 自动取消（superseded）
 - Run 36261844785（042b950）= **success**，main 徽标 "Development build - passing"——Task 180 交付完成
 - 融合树对拍：verify_task180 113/113、179 61/61、177 A-F 38 项、178 A-F 45 项、160-176 全链绿；130/131/132/135 具名环境性豁免基线同态
+
+---
+Task ID: 181
+Agent: main (Super Z)
+Task: 用户六症状装机反馈（ab78f50 日志组，构建 afa23a6 / Task 180 IPA）：崩溃定位指引（hs_err 判读）/ ANGLE 依旧崩溃 / 旧版本依旧崩溃（1.8.9+vgpu 与 NeoForge 26.1.2 双形态）/ CF 加载源需在资源详细页点加载器"全部"才显示 / JIT 二级菜单启动卡死 / 右 Shift 无效另一控件正常
+
+Work Log:
+- 日志组判读（三批上传 fb6e8f6/25e0b1b/ab78f50 + hs_err_pid1381 + fatal_trace 2 + latestlog 4）：latestlog.txt=1.8.9+Forge 11.15.1.2318+vgpu 崩溃会话 / latestlog.old.txt=ANGLE 26.3 FO 包 pipeline 崩溃 / latestlog.1=JIT 卡死会话 / latestlog.2=MobileGL 正常游玩会话（exit(0) 非崩溃）/ latestlog 4.txt=他人设备 v5.0.0 JNA 签名崩溃（Task107 已修的旧版残留）
+- 26.1.2 NeoForge pc=0 崩溃定案（hs_err_pid1381 判读按用户指引：Problematic frame + siginfo）：pc=0x0 + SEGV_ACCERR@0 = BLR NULL 空指针执行；栈 pojavPumpEvents+0x8c → CallbackBridge_nativeSetInputReady+0xd8；earlydisplay 只注册 WindowSize 回调而旧代码【判空 WindowSize、调用 FramebufferSize】= 复制粘贴错位实锤 → 修（input_bridge_v3.m）
+- ANGLE 1:1 空源码之谜法证：下载 piston 26.3 client.jar（41MB）CFR 反编译 GlPipelineRecompiler/GlStateManager/GlShaderModule——MC 上传形态 = 单 NUL 终止 UTF-8 段 + length=NULL（nglShaderSource）；spvc 出口 ES300 自证已过（Task176 head48）+ 本地 harness（task179）ES 直通可编译 → 中间断点无法本地定案 → 决策：装机取证（tinygl4angle glShaderSource head48/count/len0 限 8 次 + 纯转发 glCompileShader 导出查 COMPILE_STATUS/infoLog 限 32 次）；取证日志兼作二分分辨器——崩溃复现而日志不出现 = MC 的 shader 调用解析在本 dylib 之外（Apple 系统 libGLESv2 / 直连 ANGLE）
+- 1.8.9+vgpu 崩溃链判读：splash 线程（Thread-7）"Texture creation: Invalid enum"（SplashProgress.checkGLError）+ eglCreateWindowSurface 0x3003 + 主线程 LoadingScreenRenderer glCheckFramebufferStatus=unknown status:0 → SplashProgress 后台线程与主线程共享单上下文互踩（vgpu gl4es 初始化本身已全绿=Task179 NOEGL 修复生效）→ 修：≤1.12.2 Forge 启动前写 config/splash.properties enabled=false（ame181_disableLegacyForgeSplash，NeoForge/非 forge/非 1.x 排除，存在则备份后就地翻转）
+- CF 加载源根修：ModVersion.parseCurseForgeDictionary 的 loaders 存 CF 原文大写（"Fabric"），ModVersionViewController 筛选用 lowercaseString（"fabric"）精确 containsObject → CF 源下任何加载器选中都过滤光全部文件（Modrinth loaders 原生小写所以正常）→ loaders 统一小写 + 补 LiteLoader 前缀
+- 右 Shift 根修：Task67 键位净化器每次启动把 7 个移动键强制重置默认（sneak→left.shift）——用户改绑 right.shift 每轮被洗回 = "右 Shift 无效另一控件正常"实锤 → 一次性化（标记文件 options.txt.amethyst-keybinds-v1 同目录；存在则只 dump 取证不改写；本轮跑完写标记；删标记可重跑）
+- JIT 卡死取证（现场证据缺失：latestlog.1 止于 still waiting 0s + openURL→1 + entered background，回前台后零日志零心跳零超时）：utils.m 等待循环补三针（wait begin 快照 startForeground/traced/exn/csdbg；condition satisfied 成功行含净等待时长；前台/后台翻转打点）+ RightPanel backgroundTimeRemaining 的 DBL_MAX（前台无任务契约值，上轮日志 300 位数字的真相）归一为 fg(n/a)；isJITEnabled 检测面复核（CS_DEBUGGED 语义正确，StikJIT 兼容）
+- 语法门 task181_syntax_gate.py（4+2 文件括号配平 + 正负锚点）；tinygl4angle.c 误删 nlevel/isProxyTexture 函数体的编辑事故当场恢复（E5/E6 锚点钉死）
+- verify_task181 新建 35/35（A 2612 四 / B CF 四 / C 键位六 / D splash 六 / E ANGLE 六 / F JIT 六 / G version.h 三）
+- 级联：179 61/61、180 113/113、172 51/51（H2 重锚治愈）、175 G1/G2 重锚治愈（G1 断言的 task168 id 拼写勘误 neumorph-faq）、169 全绿、176/177/178 零 FAIL（级联块沙箱超时=已知环境性）、171 7 fails 基线同态（stash 对拍）——**零新增失败**
+- 顺手治愈：Task180 公告顺延未重锚的 task175 G1/G2 + task172 H2（task180@2/task179@3 插入，175 4→6、172 8→10）
+- 版本历史法证附带确认：远程已推进至 Task 180（本地曾停在 Task110 时代，fetch 对齐 ab78f50；交接摘要中 Task167/168 后的 111-180 全部落地）；task179 harness 系 verify 自动同步行为确认（还原 4 个副产物文件保持提交面最小）
+
+Stage Summary:
+- 四项实锤根修落地：①26.1.2 NeoForge 早期窗口崩溃（GLFW 回调指针错位）②1.8.9 老 Forge SplashProgress 线程 GL 互踩 ③CF 资源详细页加载器筛选大小写过滤光 ④右 Shift 键位被净化器反复洗回
+- 两项取证就位：⑤ANGLE 编译链（tinygl4angle 双向日志=断点分辨器）⑥JIT 等待（成功/翻转/快照三针）
+- 装机验证锚点：①26.1.2 不再 1.17s 崩（可进主菜单）②1.8.9 启动日志见 "Task181: legacy Forge splash disabled" 且不再 FBO status:0 崩③CF 详情页选 Fabric/Forge 筛选直接出文件（无需点全部）④启动日志见 "[Task181] keybind marker written"，之后游戏内改绑 right.shift 重启存活、右 Shift 按钮 toggle 生效⑤ANGLE 会话日志搜 "[tinygl4angle] Task181 glShaderSource/glCompileShader"——出现且 COMPILE_STATUS=0 → head48 当场钉死断源；不出现 → MC 调用解析在本 dylib 之外（下一轮修复目标）⑥JIT 日志搜 "[JIT] Task181"（wait begin / condition satisfied / returned to FOREGROUND）
+- 遗留：ANGLE 最后一环与 JIT 卡死断点待装机日志定案；MobileGL 会话 swapOK=10238 健康基线更新；latestlog 4.txt（他人 v5.0.0）JNA 签名崩溃属旧版残留（6.0.0 已含 Task107 修复，建议对方升级）

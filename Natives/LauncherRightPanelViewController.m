@@ -1756,9 +1756,13 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // ——断言是否真的被系统批准无从分辨（Invalid = 无后台宽限，挂起来得更
     // 早）。无效断言 + Task179 的挂起间隙豁免双保险：即便立即挂起，恢复后
     // 预算也不被墙钟烧穿。
-    NSLog(@"[JIT] [RightPanel] Task179 background task assertion: id=%lu valid=%d (remaining bg time %.0fs)",
+    // Task181（取证可读性修正）：backgroundTimeRemaining 在前台无后台任务时
+    // 返回 DBL_MAX（≈1.8e308）——上一轮装机日志里那串 300 位数字是它的本来
+    // 面目，不是溢出 bug（UIKit 契约）。打印时归一为 "fg(n/a)" 免再吓人。
+    double ame181_bgTime = [UIApplication.sharedApplication backgroundTimeRemaining];
+    NSLog(@"[JIT] [RightPanel] Task179 background task assertion: id=%lu valid=%d (remaining bg time %@)",
           (unsigned long)ame172_bgt, ame172_bgt != UIBackgroundTaskInvalid,
-          [UIApplication.sharedApplication backgroundTimeRemaining]);
+          (ame181_bgTime > 1e300) ? @"fg(n/a)" : [NSString stringWithFormat:@"%.0fs", ame181_bgTime]);
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // Task169：有界等待（120s）+每 10s 心跳日志。旧裸循环在 stikjit://

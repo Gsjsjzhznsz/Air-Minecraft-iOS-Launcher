@@ -505,6 +505,32 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar * const *string, 
     char *source = NULL;
     char *converted;
 
+    // Task181（ANGLE pipeline/gui "ERROR: 1:1: '' : syntax error" 取证）：
+    // 反编译 26.3 client.jar 定案 MC 的上传形态 = GlStateManager.glShaderSource
+    // （UTF-8 编码 + NUL 终止单段 + length=NULL → nglShaderSource）；spvc 出口
+    // 已自证产出合法 "#version 300 es"（head48 日志），本地 harness（task179）
+    // 也验证过 ES 直通可编译——中间必有一环没走通。本日志限 8 次，双重目的：
+    // (a) 若日志出现 → tinygl4angle 的 glShaderSource 被 MC 命中，且能看到
+    //     ANGLE 实收的源码头部（是否为 ES300/是否为空当场钉死）；
+    // (b) 若崩溃复现而日志【不】出现 → MC 的 glShaderSource 解析到了本
+    //     dylib 之外（Apple 系统 libGLESv2 或直连 ANGLE）——那才是断点。
+    {
+        static int s_ame181_srcLog = 0;
+        if (s_ame181_srcLog < 8) {
+            ++s_ame181_srcLog;
+            size_t ame181_len0 = 0;
+            if (string != NULL && count > 0 && string[0] != NULL) {
+                ame181_len0 = (length != NULL && length[0] >= 0)
+                    ? (size_t)length[0]
+                    : strlen(string[0]);
+            }
+            const char *ame181_head = (string != NULL && count > 0 && string[0] != NULL) ? string[0] : "";
+            printf("[tinygl4angle] Task181 glShaderSource #%d: shader=%u count=%d len0=%zu length=%s head48='%.48s'\n",
+                   s_ame181_srcLog, shader, count, ame181_len0,
+                   (length == NULL) ? "NULL" : "array", ame181_head);
+        }
+    }
+
     // get the size of the shader sources and than concatenate in a single string
     int l = 0;
     for (int i=0; i<count; i++) l+=(length && length[i] >= 0)?length[i]:strlen(string[i]);
@@ -594,6 +620,50 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar * const *string, 
 
     free(source);
     free(converted);
+}
+
+// Task181（ANGLE 编译链取证，与上面 glShaderSource 取证同轮）：
+// 本 dylib 之前不导出 glCompileShader/glCreateShader（直接走 ANGLE 原生）。
+// 新增【纯转发】导出：行为不变（转发到 LOOKUP_FUNC 解析出的同一 ANGLE
+// 函数），但让"MC 的编译调用是否/以何参数命中本 dylib"变得可观测——
+// 每次编译后查一次 COMPILE_STATUS（35713），失败时打 infoLog 头 64 字节。
+// 若装机日志里这些行【不】出现而崩溃复现 → MC 的编译链解析在本 dylib 之外。
+void(*gles_glCompileShader)(GLuint shader);
+void(*gles_glGetShaderiv)(GLuint shader, GLenum pname, GLint *params);
+void(*gles_glGetShaderInfoLog)(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+void glCompileShader(GLuint shader) {
+    LOOKUP_FUNC(glCompileShader)
+    if (gles_glCompileShader) {
+        gles_glCompileShader(shader);
+    }
+    {
+        static int s_ame181_compLog = 0;
+        if (s_ame181_compLog < 32) {
+            ++s_ame181_compLog;
+            if (gles_glGetShaderiv == NULL) { gles_glGetShaderiv = dlsym(RTLD_NEXT, "glGetShaderiv"); }
+            if (gles_glGetShaderiv == NULL) { gles_glGetShaderiv = dlsym(RTLD_DEFAULT, "glGetShaderiv"); }
+            GLint ame181_status = 0;
+            if (gles_glGetShaderiv != NULL) {
+                gles_glGetShaderiv(shader, 35713 /* GL_COMPILE_STATUS */, &ame181_status);
+                if (ame181_status == 0) {
+                    if (gles_glGetShaderInfoLog == NULL) { gles_glGetShaderInfoLog = dlsym(RTLD_NEXT, "glGetShaderInfoLog"); }
+                    if (gles_glGetShaderInfoLog == NULL) { gles_glGetShaderInfoLog = dlsym(RTLD_DEFAULT, "glGetShaderInfoLog"); }
+                    char ame181_log[160];
+                    GLsizei ame181_logLen = 0;
+                    ame181_log[0] = '\0';
+                    if (gles_glGetShaderInfoLog != NULL) {
+                        gles_glGetShaderInfoLog(shader, sizeof(ame181_log) - 1, &ame181_logLen, ame181_log);
+                        ame181_log[ame181_logLen > 0 && ame181_logLen < (GLsizei)sizeof(ame181_log) - 1 ? ame181_logLen : (GLsizei)sizeof(ame181_log) - 1] = '\0';
+                    }
+                    printf("[tinygl4angle] Task181 glCompileShader #%d: shader=%u COMPILE_STATUS=0 logHead='%s'\n",
+                           s_ame181_compLog, shader, ame181_log);
+                } else {
+                    printf("[tinygl4angle] Task181 glCompileShader #%d: shader=%u COMPILE_STATUS=1 (ok)\n",
+                           s_ame181_compLog, shader);
+                }
+            }
+        }
+    }
 }
 
 int isProxyTexture(GLenum target) {

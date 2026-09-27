@@ -1213,6 +1213,72 @@ static void ame158_repairMissingLibraries(NSDictionary *launchTarget) {
     }
 }
 
+// Task181：老 Forge（1.x 谱系）SplashProgress 禁用（1.8.9+vgpu 会话崩溃根修）。
+// 病历（afa23a6 装机 latestlog.txt，Forge 11.15.1.2318 + libvgpu）：
+//   1. Forge 1.7.x–1.12.2 的 SplashProgress 在独立线程（Thread-7）里抢 GL
+//      上下文做闪屏纹理——日志实锤 "Texture creation: Invalid enum"
+//      （SplashProgress.checkGLError）+ eglCreateWindowSurface 0x3003；
+//   2. 随后主线程 LoadingScreenRenderer 构造 Framebuffer 时
+//      glCheckFramebufferStatus 返回 unknown status:0 → 崩溃（splash 线程
+//      与主线程的 GL 状态在共享 ctx 上互相踩踏）。
+// 移动端单上下文环境无法承载 SplashProgress 的多线程 GL 模型，Pojav 系
+// 对老 Forge 的标准处理就是禁用 splash。规则：文件不存在 → 写
+// enabled=false 最小配置；存在且 enabled=true → 备份后就地改 false；
+// 已是 false → 不动。仅 Forge 1.x 谱系生效（vanilla/fabric/neoforge 不写；
+// 1.13+ Forge 已移除 SplashProgress，写了也无害，但一并限 1.x 保持最小面）。
+static void ame181_disableLegacyForgeSplash(NSString *gameDir, NSString *versionId) {
+    if (![gameDir isKindOfClass:[NSString class]] || gameDir.length == 0) return;
+    if (![versionId isKindOfClass:[NSString class]] || versionId.length == 0) return;
+    NSString *ame181_lower = versionId.lowercaseString;
+    if ([ame181_lower rangeOfString:@"neoforge"].location != NSNotFound) return;  // NeoForge 26.x earlydisplay 另案（Task181 已修 GLFW 指针错位）
+    if ([ame181_lower rangeOfString:@"forge"].location == NSNotFound) return;
+    if (ame98_mcMajorFromVersionId(versionId) != 1) return;  // 仅 1.x 谱系
+
+    NSString *ame181_cfgDir = [gameDir stringByAppendingPathComponent:@"config"];
+    NSString *ame181_path = [ame181_cfgDir stringByAppendingPathComponent:@"splash.properties"];
+    NSFileManager *ame181_fm = [NSFileManager defaultManager];
+    if (![ame181_fm fileExistsAtPath:ame181_path]) {
+        [ame181_fm createDirectoryAtPath:ame181_cfgDir
+              withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *ame181_body = @"# Written by Amethyst (Task181): SplashProgress disabled -- its background-thread GL breaks single-context mobile renderers.\nenabled=false\n";
+        if ([ame181_body writeToFile:ame181_path atomically:YES encoding:NSUTF8StringEncoding error:nil]) {
+            NSLog(@"[JavaLauncher] Task181: legacy Forge splash disabled (wrote %@, versionId=%@)", ame181_path.lastPathComponent, versionId);
+        }
+        return;
+    }
+    // 已有文件：只改 enabled 行（备份 .amethyst-bak）。
+    NSString *ame181_old = [NSString stringWithContentsOfFile:ame181_path encoding:NSUTF8StringEncoding error:nil];
+    if (![ame181_old isKindOfClass:[NSString class]]) return;
+    if ([ame181_old rangeOfString:@"enabled=false"].location != NSNotFound) return;  // 已禁用
+    NSArray<NSString *> *ame181_lines = [ame181_old componentsSeparatedByString:@"\n"];
+    NSMutableArray<NSString *> *ame181_out = [NSMutableArray arrayWithCapacity:ame181_lines.count];
+    BOOL ame181_flipped = NO;
+    for (NSString *ame181_line in ame181_lines) {
+        if (!ame181_flipped && [ame181_line hasPrefix:@"enabled"]) {
+            [ame181_out addObject:@"enabled=false"];
+            ame181_flipped = YES;
+        } else {
+            [ame181_out addObject:ame181_line];
+        }
+    }
+    if (!ame181_flipped) {
+        // 文件里没有 enabled 行（异常档案）：追加一行。
+        [ame181_out addObject:@"enabled=false"];
+        ame181_flipped = YES;
+    }
+    NSString *ame181_bak = [ame181_path stringByAppendingString:@".amethyst-bak"];
+    [ame181_fm removeItemAtPath:ame181_bak error:nil];
+    if ([ame181_fm copyItemAtPath:ame181_path toPath:ame181_bak error:nil]) {
+        NSString *ame181_new = [ame181_out componentsJoinedByString:@"\n"];
+        if ([ame181_new writeToFile:ame181_path atomically:YES encoding:NSUTF8StringEncoding error:nil]) {
+            NSLog(@"[JavaLauncher] Task181: legacy Forge splash disabled (flipped enabled->false in existing %@, backup kept, versionId=%@)",
+                  ame181_path.lastPathComponent, versionId);
+        }
+    } else {
+        NSLog(@"[JavaLauncher] Task181: WARN backup failed, leaving splash.properties untouched (%@)", ame181_path.lastPathComponent);
+    }
+}
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -1617,6 +1683,12 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // 仍在 JLI_Launch 前（MC 的 Options.load 在 JVM 启动早期执行）。
         setenv("AME67_INSTANCE_GAME_DIR", gameDir.UTF8String, 1);
         ame67_sanitizeOptionsKeybinds();
+
+        // Task181：老 Forge（1.x）SplashProgress 线程禁用——splash 线程与主线程
+        // 在共享 GL 上下文上互相踩踏是 1.8.9 会话 FBO status:0 崩溃的根因
+        // （详见函数头病历）。仍在 JLI_Launch 前，Forge 早期配置读取之前。
+        ame181_disableLegacyForgeSplash(gameDir,
+            [launchTarget isKindOfClass:NSDictionary.class] ? launchTarget[@"id"] : nil);
     } else {
         defaultJRETag = @"execute_jar";
         gameDir = @(getenv("POJAV_GAME_DIR"));
