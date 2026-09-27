@@ -215,4 +215,73 @@
     [task resume];
 }
 
+/// Task185：带账号上下文的头像获取链（三层回退，病历见 AvatarManager.h）。
+/// 实现说明：每层都走 fetchAvatarFromURL（自带磁盘缓存 + 10s 超时 + 主线程
+/// 回调契约），失败逐层下探；全部失败回调 nil（调用方显示占位头像）。
+- (void)ame185_fetchAvatarForAuthData:(NSDictionary *)authData
+                           completion:(void (^)(UIImage * _Nullable))completion {
+    if (![authData isKindOfClass:NSDictionary.class]) {
+        dispatch_async(dispatch_get_main_queue(), ^{ if (completion) completion(nil); });
+        return;
+    }
+    // 第①层：保存的 profilePicURL（跳过 "(null)"/"(nil)" 脏数据形态——
+    // 首登顺序 bug 的历史产物，refreshTokenWithCallback 侧另有内存态修复）
+    NSString *ame185_primary = authData[@"profilePicURL"];
+    if ([ame185_primary isKindOfClass:NSString.class] &&
+        ([ame185_primary containsString:@"(null)"] || [ame185_primary containsString:@"(nil)"])) {
+        ame185_primary = nil;
+    }
+    // 第②层：crafatar 按正版 UUID 渲染皮肤头（正版账号真皮肤，带 overlay 外层）
+    NSString *ame185_uuid = authData[@"profileId"];
+    BOOL ame185_hasUuid = [ame185_uuid isKindOfClass:NSString.class] && ame185_uuid.length == 36 &&
+        ![ame185_uuid isEqualToString:@"00000000-0000-0000-0000-000000000000"];
+    // 第③层：minotar 按 username
+    NSString *ame185_user = authData[@"username"];
+
+    void (^ame185_done)(UIImage *) = ^(UIImage *img) {
+        if (completion) completion(img);
+    };
+    void (^ame185_tryMinotar)(void) = ^{
+        if (![ame185_user isKindOfClass:NSString.class] || ame185_user.length == 0 ||
+            [ame185_user hasPrefix:@"Demo."]) {
+            NSLog(@"[AvatarManager] Task185 avatar chain exhausted (no usable username)");
+            dispatch_async(dispatch_get_main_queue(), ^{ ame185_done(nil); });
+            return;
+        }
+        NSString *ame185_url = [NSString stringWithFormat:@"https://minotar.net/helm/%@/120.png", ame185_user];
+        [self fetchAvatarFromURL:ame185_url completion:^(UIImage *img) {
+            if (!img) NSLog(@"[AvatarManager] Task185 avatar chain: minotar also failed (user=%@)", ame185_user);
+            ame185_done(img);
+        }];
+    };
+    void (^ame185_tryCrafatar)(void) = ^{
+        if (!ame185_hasUuid) {
+            ame185_tryMinotar();
+            return;
+        }
+        NSString *ame185_url = [NSString stringWithFormat:@"https://crafatar.com/renders/head/%@?overlay&size=120", ame185_uuid];
+        [self fetchAvatarFromURL:ame185_url completion:^(UIImage *img) {
+            if (!img) {
+                NSLog(@"[AvatarManager] Task185 avatar chain: crafatar failed, falling to minotar");
+                ame185_tryMinotar();
+            } else {
+                ame185_done(img);
+            }
+        }];
+    };
+    if ([ame185_primary isKindOfClass:NSString.class] && ame185_primary.length > 0) {
+        NSString *ame185_fixed = [ame185_primary stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
+        [self fetchAvatarFromURL:ame185_fixed completion:^(UIImage *img) {
+            if (!img) {
+                NSLog(@"[AvatarManager] Task185 avatar chain: primary failed (%@), falling to crafatar", ame185_primary.lastPathComponent);
+                ame185_tryCrafatar();
+            } else {
+                ame185_done(img);
+            }
+        }];
+    } else {
+        ame185_tryCrafatar();
+    }
+}
+
 @end

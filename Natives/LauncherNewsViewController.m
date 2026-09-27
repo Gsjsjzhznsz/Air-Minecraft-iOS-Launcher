@@ -1402,7 +1402,12 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
             NSLog(@"[HomeAvatar] Task172 branch: AvatarManager local hit (%ldx%ld)",
                   (long)ame162_local.size.width, (long)ame162_local.size.height);
         } else {
+            // Task185：脏 URL（首登顺序 bug 的历史产物）不作缓存键也不作首跳
             NSString *avatarURL = auth.authData[@"profilePicURL"];
+            if ([avatarURL isKindOfClass:NSString.class] &&
+                ([avatarURL containsString:@"(null)"] || [avatarURL containsString:@"(nil)"])) {
+                avatarURL = nil;
+            }
             if (avatarURL) {
                 avatarURL = [avatarURL stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
                 UIImage *ame162_cached = [ame162_avatarCache() objectForKey:avatarURL];
@@ -1414,7 +1419,7 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                 } else {
                     NSLog(@"[HomeAvatar] Task172 branch: network fetch started (URL present, length=%lu)",
                           (unsigned long)avatarURL.length);
-                    [[AvatarManager sharedManager] fetchAvatarFromURL:avatarURL completion:^(UIImage *img) {
+                    [[AvatarManager sharedManager] ame185_fetchAvatarForAuthData:auth.authData completion:^(UIImage *img) {
                         // Task179：completion 全体主线程化（用户反馈的崩溃链：
                         // fetchAvatarFromURL completion → updateSkinDisplay →
                         // reloadProfileSection → cellForItemAtIndexPath →
@@ -1437,10 +1442,20 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
                     }];
                 }
             } else {
-                // Task172 取证：authData 在但没有 profilePicURL——旧代码静默
-                // 保持 nil（显示占位头像），用户感知"头像消失"无从定位。
-                NSLog(@"[HomeAvatar] Task172 branch: auth present but profilePicURL is MISSING (keys: %@)",
+                // Task185：无可用主 URL（缺失或脏数据）也走回退链
+                //（crafatar UUID / minotar username），不再静默保持 nil。
+                NSLog(@"[HomeAvatar] Task185 branch: no clean profilePicURL, trying avatar fallback chain (keys: %@)",
                       [auth.authData.allKeys componentsJoinedByString:@","]);
+                [[AvatarManager sharedManager] ame185_fetchAvatarForAuthData:auth.authData completion:^(UIImage *img) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        self.currentAvatar = img;
+                        NSLog(@"[HomeAvatar] Task185 fallback chain completion: img=%@", img ? @"yes" : @"nil");
+                        [self reloadProfileSection];
+                        if (img) {
+                            [self ame171_syncVisibleProfileAvatar];
+                        }
+                    });
+                }];
             }
         }
     } else {

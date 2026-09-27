@@ -694,6 +694,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
     // 注意：不要在此清空 localVersionList/remoteVersionList
     // 该方法既被 JAR 执行调用，也被正常启动游戏调用；清空会导致用户返回后版本列表为空、
     // buttonInstall 短暂不可用。版本列表的生命周期应由 reloadProfileList 统一管理。
+    // Task185：收起任何活跃键盘（卡死会话独有环境 = 二级菜单文本框 + 拼音
+    // 键盘；启动前强制 resign，病历见 RightPanel 同名方法 + utils.h）。
+    [[UIApplication sharedApplication] sendAction:@selector(resignFirstResponder) to:nil from:nil forEvent:nil];
+
     // Task91：entitlement 标记 AND 磁盘标记双确认——entitlements.sideload.xml
     // 模板给普通侧载包也预写了 jb.pmap_cs.custom_trust 字符串，单看签名会把
     // 非 TrollStore 环境误导入 apple-magnifier:// 死路（JIT 无法自动开启）
@@ -740,7 +744,16 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         return;
     } else if (hasTrollStoreJIT) {
         NSURL *jitURL = [NSURL URLWithString:[NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", NSBundle.mainBundle.bundleIdentifier]];
-        [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:nil];
+        // Task185：回执检查（他人装机反馈“巨魔 JIT 启动游戏没有任何反应”——
+        // completionHandler:nil 时 URL 无人处理完全静默，只能盲等 120s）。
+        [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:^(BOOL ame185_ok) {
+            NSLog(@"[JIT] [NavCtrl] Task185 openURL apple-magnifier:// -> %d", ame185_ok);
+            if (!ame185_ok) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    showDialog(localize(@"Error", nil), @"apple-magnifier:// 无响应（TrollStore JIT 助手未接管，常见于 TrollStore 版本过旧）。请更新 TrollStore，或在设置的 JIT 开启工具改用 stikjit / SideStore / StosDebug 后重试。\napple-magnifier:// not handled. Update TrollStore or switch the JIT enabler in Settings.");
+                });
+            }
+        }];
         // Do not return, wait for TrollStore to enable JIT and jump back
     } else if (getPrefBool(@"debug.debug_skip_wait_jit")) {
         NSLog(@"Debug option skipped waiting for JIT. Java might not work.");
@@ -760,7 +773,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         }];
     } else {
         // Assuming 16.7-17.3.1. SideStore still lacks this URL scheme at the time of writing, so it only jumps to SideStore.
-        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]] options:@{} completionHandler:nil];
+        [self ame185_openJITEnablerURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]]
+            toolLabel:@"sidestore://sidejit-enable"];
     }
 
     UIAlertController* alert = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
@@ -784,7 +798,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         // Task169：有界等待（120s）+每 10s 心跳日志，超时走重试弹窗（同
         // RightPanel/DownloadVC 两处，群见 utils.m 病历）。
         BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
-        dispatch_async(dispatch_get_main_queue(), ^{
+        // Task185：自愈式派发（11e4b63 latestlog.2 病历：condition satisfied
+        // 后旧 dispatch_async(main) 续接块在后台被楔死的主队列上永不执行——
+        // 见 utils.h ame185_dispatchToMainSelfHealing）。
+        ame185_dispatchToMainSelfHealing(^{
             // Task183（断点钉死锚点，同 RightPanel 病历 59d4b48 latestlog.1）。
             NSLog(@"[JIT] [NavCtrl] Task183 wait-completed block entered on main (ok=%d)", ok);
             if (ame172_bgt != UIBackgroundTaskInvalid) {
@@ -811,8 +828,25 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                 [alert dismissViewControllerAnimated:YES completion:nil];
                 [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
-        });
+        }, @"NavCtrl main wait");
     });
+}
+
+/// Task185：JIT 开启工具 URL 统一拉起（回执取证 + 失败即时指引，同
+/// RightPanel.ame185_openJITEnablerURL）。
+- (void)ame185_openJITEnablerURL:(NSURL *)url toolLabel:(NSString *)tool {
+    if (!url) {
+        NSLog(@"[JIT] [NavCtrl] Task185 openURL skipped: nil URL (tool=%@)", tool);
+        return;
+    }
+    [UIApplication.sharedApplication openURL:url options:@{} completionHandler:^(BOOL ok) {
+        NSLog(@"[JIT] [NavCtrl] Task185 openURL %@ -> %d", tool, ok);
+        if (!ok) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                showDialog(localize(@"Error", nil), [NSString stringWithFormat:@"%@ 未接管启动请求（未安装或版本过旧？）。请在设置的 JIT 开启工具中换用其它工具后重试。\n%@ did not handle the request. Switch the JIT enabler in Settings and retry.", tool, tool]);
+            });
+        }
+    }];
 }
 
 /// Task172：JIT26 调试器重挂统一助手（stikjit:// + 有界等待 + 前台等待 +
@@ -834,7 +868,10 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         if (scriptData) {
             scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
         }
-        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:^(BOOL ame185_ok) {
+            // Task185：回执取证（重挂场景已有等待弹窗 + 超时重试兑底，失败只记日志）
+            NSLog(@"[JIT] [NavCtrl] Task185 re-attach stikjit:// -> %d", ame185_ok);
+        }];
         NSLog(@"[JIT] [NavCtrl] Task172 stikjit:// re-attach fired (script=%lu bytes)",
               (unsigned long)scriptData.length);
     };
@@ -865,7 +902,8 @@ static void *ProgressObserverContext = &ProgressObserverContext;
         // -- that flag is already set and would race the first brk.
         // Task169：有界等待（120s）+心跳日志，超时走重试弹窗。
         BOOL ok = ame169_waitForJITCondition(^{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"JIT26 debugger attach");
-        dispatch_async(dispatch_get_main_queue(), ^{
+        // Task185：自愈式派发（同主等待路径，病历见 utils.h）。
+        ame185_dispatchToMainSelfHealing(^{
             if (ame172_bgt != UIBackgroundTaskInvalid) {
                 [UIApplication.sharedApplication endBackgroundTask:ame172_bgt];
                 ame172_bgt = UIBackgroundTaskInvalid;
@@ -878,7 +916,7 @@ static void *ProgressObserverContext = &ProgressObserverContext;
                 [alert dismissViewControllerAnimated:YES completion:nil];
                 [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
-        });
+        }, @"NavCtrl reattach wait");
     });
 }
 

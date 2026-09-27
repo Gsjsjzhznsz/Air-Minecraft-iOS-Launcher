@@ -234,6 +234,147 @@ BOOL isTrollStoreInstall(void) {
     return access(tsPath.UTF8String, F_OK) == 0;
 }
 
+// ============================================================================
+// Task185：加载器版本候选集（去 "-suffix"、去最后一个点分量），供
+// ame185_loaderVersionMatchesGameVersion 内部使用。
+// ============================================================================
+static NSArray<NSString *> *ame185_loaderCandidates(NSString *loaderVersion) {
+    if (loaderVersion.length == 0) return @[];
+    NSString *clean = loaderVersion;
+    NSRange hyphen = [loaderVersion rangeOfString:@"-"];
+    if (hyphen.location != NSNotFound) {
+        clean = [loaderVersion substringToIndex:hyphen.location];
+    }
+    if (clean.length == 0) return @[];
+    NSMutableArray<NSString *> *candidates = [NSMutableArray arrayWithObject:clean];
+    NSRange lastDot = [clean rangeOfString:@"." options:NSBackwardsSearch];
+    if (lastDot.location != NSNotFound && lastDot.location > 0) {
+        [candidates addObject:[clean substringToIndex:lastDot.location]];
+    }
+    return candidates;
+}
+
+// Task185：游戏版本候选集（原文、去 "1." 前缀、二分量补 ".0"）。
+static NSArray<NSString *> *ame185_gameCandidates_PLACEHOLDER(NSString *gameVersion) {
+    if (gameVersion.length == 0) return @[];
+    NSMutableArray<NSString *> *candidates = [NSMutableArray arrayWithObject:gameVersion];
+    NSCharacterSet *nonNum = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+    if ([gameVersion hasPrefix:@"1."] && gameVersion.length > 2) {
+        NSString *stripped = [gameVersion substringFromIndex:2];
+        NSArray *parts = [stripped componentsSeparatedByString:@"."];
+        BOOL numeric = parts.count >= 1;
+        for (NSString *p in parts) {
+            if (p.length == 0 || [p rangeOfCharacterFromSet:nonNum].location != NSNotFound) { numeric = NO; break; }
+        }
+        if (numeric) {
+            [candidates addObject:stripped];
+            if (parts.count == 1) {
+                [candidates addObject:[NSString stringWithFormat:@"%@.0", stripped]];
+            }
+        }
+    }
+    // 纯数字二分量（如 26.3、21.0）补一个 ".0" 变体（对应 NeoForge 三分量首段）
+    {
+        NSArray *parts = [gameVersion componentsSeparatedByString:@"."];
+        BOOL numeric = parts.count == 2;
+        for (NSString *p in parts) {
+            if (p.length == 0 || [p rangeOfCharacterFromSet:nonNum].location != NSNotFound) { numeric = NO; break; }
+        }
+        if (numeric) {
+            [candidates addObject:[NSString stringWithFormat:@"%@.0", gameVersion]];
+        }
+    }
+    return candidates;
+}
+
+// Task185：等价匹配主入口（机制与覆盖范围见 utils.h 大注释）。
+BOOL ame185_loaderVersionMatchesGameVersion(NSString *loaderVersion, NSString *gameVersion) {
+    if (loaderVersion.length == 0 || gameVersion.length == 0) return NO;
+    NSArray *gameCandidates = ame185_gameCandidates_PLACEHOLDER(gameVersion);
+    if (gameCandidates.count == 0) return NO;
+
+    // 特殊形态一：NeoForge legacy 1.20.1 专用坐标（47.x.y / 含 1.20.1 子串）
+    if ([loaderVersion hasPrefix:@"47."] || [loaderVersion containsString:@"1.20.1"]) {
+        return [gameCandidates containsObject:@"1.20.1"] || [gameCandidates containsObject:@"20.1"];
+    }
+    // 特殊形态二：NeoForge 愚人节快照专用（0.25w14craftmine.3）
+    if ([loaderVersion hasPrefix:@"0."]) {
+        for (NSString *cand in ame185_loaderCandidates([loaderVersion substringFromIndex:2])) {
+            if ([gameCandidates containsObject:cand]) return YES;
+        }
+        return NO;
+    }
+
+    // 通用形态 A：复合版本 "<mc>-<forge>"（Forge 全系 + NeoForge legacy）。
+    // 注意失配时【不短路】，落穿到形态 B——NeoForge 预发布版本带 "-beta"
+    // 后缀（如 "26.3.0.5-beta"），连字符前缀 "26.3.0.5" 不是完整 MC 版本，
+    // 需要形态 B 的去后缀 + 去尾分量候选集（→"26.3.0"）才能命中 game
+    // "26.3"（其候选集含 "26.3.0"）。单测 Task185-matcher-18 抓出的缺陷。
+    NSRange hyphen = [loaderVersion rangeOfString:@"-"];
+    if (hyphen.location != NSNotFound && hyphen.location > 0) {
+        NSString *mcPortion = [loaderVersion substringToIndex:hyphen.location];
+        if ([gameCandidates containsObject:mcPortion]) return YES;
+    }
+
+    // 通用形态 B：NeoForge 新旧格式（21.1.5 / 26.3.7 / 26.1.2.71 / 26.3.0.5-beta）
+    for (NSString *cand in ame185_loaderCandidates(loaderVersion)) {
+        if ([gameCandidates containsObject:cand]) return YES;
+    }
+    return NO;
+}
+
+// ============================================================================
+// Task185：JIT 等待成功后的自愈式主队列派发（机制与病历见 utils.h 注释）。
+// ============================================================================
+void ame185_dispatchToMainSelfHealing(dispatch_block_t block, NSString *label) {
+    if (!block) return;
+    // delivered 只在主队列（attempt 内）读写；看门狗线程只做轮询读取。
+    // arm64 上对齐单字节读写天然原子，volatile 保证编译器不缓存轮询值。
+    __block volatile BOOL delivered = NO;
+    __block id ame185_obs = nil;
+    void (^ame185_cleanup)(void) = ^{
+        if (ame185_obs) {
+            [[NSNotificationCenter defaultCenter] removeObserver:ame185_obs];
+            ame185_obs = nil;
+        }
+    };
+    dispatch_block_t attempt = ^{
+        if (delivered) return;
+        delivered = YES;
+        ame185_cleanup();
+        block();
+    };
+    // 防线①：常规派发（快路径，与旧 dispatch_async(main) 完全等价）。
+    dispatch_async(dispatch_get_main_queue(), attempt);
+    // 防线②：前台激活瞬间重派。后台被楔死的主线程会在 UIKit 激活流程中
+    // 被解锁（动画/键盘相关 XPC 恢复），此刻重派一次即送达。
+    ame185_obs = [[NSNotificationCenter defaultCenter]
+        addObserverForName:UIApplicationDidBecomeActiveNotification
+                    object:nil queue:[NSOperationQueue mainQueue]
+                 usingBlock:^(NSNotification *ame185_note) {
+        if (delivered) { ame185_cleanup(); return; }
+        NSLog(@"[JIT] Task185 self-healing dispatch: refire on foreground (label=%@)", label);
+        dispatch_async(dispatch_get_main_queue(), attempt);
+    }];
+    // 防线③：看门狗（后台队列，窗口 120s 与 JIT 等待对齐）。仅在前台重派：
+    // 后台态主线程挂起属正常（防线②负责那个场景），前台而未达才是"派发被吞"。
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_DEFAULT, 0), ^{
+        for (int ame185_i = 0; ame185_i < 60; ame185_i++) {
+            if (delivered) { ame185_cleanup(); return; }
+            usleep(2 * 1000 * 1000);
+            if (delivered) { ame185_cleanup(); return; }
+            if ([UIApplication sharedApplication].applicationState == UIApplicationStateActive) {
+                NSLog(@"[JIT] Task185 self-healing dispatch: watchdog redispatch #%d (label=%@)", ame185_i + 1, label);
+                dispatch_async(dispatch_get_main_queue(), attempt);
+            }
+        }
+        if (!delivered) {
+            NSLog(@"[JIT] Task185 self-healing dispatch: NOT delivered after 120s -- main queue wedged (label=%@)", label);
+        }
+        ame185_cleanup();
+    });
+}
+
 // Task169：JIT 等待轮询的有界版本。病历（装机 485b18c，zink 冷启动首次
 // 启动）：三处 invokeAfterJITEnabled 的等待循环都是裸
 // while (!isJITEnabled(false)) usleep(200ms)——无超时、无日志、无出路。

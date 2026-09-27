@@ -2489,3 +2489,77 @@
 // worklog. Device anchors: neumorph cards back to fully opaque porcelain;
 // installer page renders the exact version-card look with NO white frame
 // behind cards, with the neumorph toggle still honored.
+
+// REVISION 17 addendum (Amethyst Task 185, no bump): five-line round driven by
+// the 11e4b63 device feedback (user's four logs all Commit 11e4b63 = the
+// Task183 build, plus one other-person's log Commit 59d4b48). (1) Loader list
+// "not found for MC > 26", root layer 1 -- Minecraft version numbers lost the
+// "1." prefix from 26.x on (26.3, 26.1.2) while three extractor/filter sites
+// still assumed it: NeoForge 26.3.x parsed to MC "1.26.3", Forge compound
+// "26.3-66.0.5" judged "Unknown" by the ^1\. regex, so the gameVersion filter
+// skipped EVERY entry. Fix: shared bidirectional-candidates matcher
+// ame185_loaderVersionMatchesGameVersion (utils.h/utils.m; loader side strips
+// "-suffix" then drops the last dot component, game side carries original /
+// de-"1." / ".0"-completed forms, plus the NeoForge legacy 47.x=1.20.1 and
+// 0.<snapshot> fool's-day shapes; form A now falls through to form B so
+// pre-release "26.3.0.5-beta" matches game 26.3 -- caught by the new
+// task185_matcher_test). Consumers: NeoForgeVersionFetcher.filterVersions,
+// ModLoaderInstallViewController's XML filter, both gameVersion filters in
+// ForgeInstallViewController's addVersionToList; the NeoForge extractor now
+// drops the trailing build component and only prefixes "1." for major <= 25
+// (26.3.7 -> 26.3, 26.1.2.71 -> 26.1.2, 21.1.5 -> 1.21.1). Root layer 2 --
+// the ModLoader Forge race: the BMCL racing mirror served 2022-era stale
+// maven-metadata (newest entry 1.18-38.0.17, ONE version element vs hundreds
+// on official) and first-to-arrive-wins let it discard the official result,
+// so 26.x matched zero entries. Fix: a payload may only settle the race if it
+// PARSES to >0 gameVersion matches; unusable sources hand the chance to the
+// other; on the first unusable XML the BMCL per-version JSON endpoint
+// (/forge/minecraft/<mc>, verified to carry 26.3 data) races as a third lane;
+// all three empty -> honest "no versions" (that MC truly has no Forge).
+// (2) Fabric/Quilt list UX: fabric-meta returns ALL ~253 loaders for ANY game
+// version (loader is version-agnostic; verified 26.3 and 1.20.1 return the
+// identical list, newest first) -- the picker now shows the newest 30 with a
+// "__AME185_SHOW_ALL__" sentinel row (packed via the \x1f display convention)
+// that expands the cached full list on tap without a refetch. (3) JIT
+// second-menu hang, the surviving shape ON the Task183 build: latestlog.2
+// logged "condition satisfied after 3.8s" (background, traced=1 exn=1) and
+// then NOTHING -- the main-queue continuation never ran, while three sibling
+// sessions drained the same queue in background fine; the hang sessions'
+// unique environment = ProfileSettings second-level menu alive + pinyin
+// keyboard activity. GCD drops no block: the main thread was wedged in
+// background. Fix: keyboard dismissal at both invokeAfterJITEnabled entries
+// (sendAction:resignFirstResponder) removes the suspect at the source, and
+// ame185_dispatchToMainSelfHealing (utils.m) delivers the wait-success
+// continuation through three lines of defense -- normal dispatch, re-fire on
+// UIApplicationDidBecomeActive (a background-wedged main thread gets unlocked
+// by UIKit's activation flow), and a 120s background watchdog that re-dispatches
+// when the app is foreground-but-undelivered, with a pinned NOT-delivered
+// anchor otherwise; both wait chains in RightPanel + NavCtrl (main and
+// JIT26-reattach) now use it. (4) TrollStore JIT "no reaction at all"
+// (other person's report): every JIT-enabler openURL outside Task176's
+// stikjit branch used completionHandler:nil -- an unhandled
+// apple-magnifier:// (stale TrollStore) was completely silent. Fix:
+// ame185_openJITEnablerURL:toolLabel: (RightPanel + NavCtrl) logs the receipt
+// and shows actionable guidance on failure; the TrollStore auto-branch gets
+// the same treatment. (5) Microsoft account "Failed to load account tokens
+// from keychain" x5 + no skin (other person's iPad, 59d4b48): three stacked
+// causes -- (a) the keychain item is
+// kSecAttrAccessibleWhenUnlockedThisDeviceOnly, lost on re-sign (sideload ->
+// TrollStore switch), device migration or backup restore while the account
+// .json survives in the container: the refresh chain now dedupes the dialog
+// per session, explains the cause and tells the user to remove + re-login,
+// and tokenDataOfProfile logs the SecItemCopyMatching OSStatus (-25300 vs
+// -25308 distinguish lost vs locked); (b) checkMCProfile built profilePicURL
+// from username BEFORE username was set, saving a literal "head/(null)" URL
+// on first login (log-proven: "RightPanel avatar fetch failed (url=...head/
+// (null))") -- username now lands first, and refreshToken repairs the stored
+// "(null)" URL in memory; (c) the single avatar mirror api.rms.net.cn was
+// DNS-dead in that log -- AvatarManager.ame185_fetchAvatarForAuthData adds a
+// three-layer chain (profilePicURL -> crafatar by profileId -> minotar by
+// username), consumed by RightPanel + HomeAvatar. Device anchors:
+// "[Task185] Forge: XML source won with N matches" or "BMCL per-version JSON
+// won"; "[JIT] Task185 self-healing dispatch: refire on foreground" only in
+// the wedged-main scenario; "[JIT] [RightPanel|NavCtrl] Task185 openURL
+// apple-magnifier:// -> 0" pinpoints a dead TrollStore helper; "[Task185]
+// keychain token read failed .. OSStatus -25300"; "[Task185] repaired
+// corrupted profilePicURL"; "[AvatarManager] Task185 avatar chain:" hops.

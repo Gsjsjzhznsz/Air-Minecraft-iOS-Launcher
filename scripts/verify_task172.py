@@ -124,7 +124,7 @@ check("E3 updateSkinDisplay 四分支取证日志",
       all(k in news for k in ["branch: AvatarManager local hit",
                               "branch: session cache hit",
                               "branch: network fetch started",
-                              "auth present but profilePicURL is MISSING"]))
+                              "no clean profilePicURL, trying avatar fallback chain"]))  # Task185 重锚：MISSING 分支升级为回退链分支（意图不变：无主 URL 时有取证）
 check("E4 直刷 helper 取证（可见卡计数 + 图片尺寸 + nil 分支）",
       "Task172 direct-sync:" in news and "sync skipped: currentAvatar is nil" in news)
 check("E5 viewDidAppear 延迟补刷（0.35s）",

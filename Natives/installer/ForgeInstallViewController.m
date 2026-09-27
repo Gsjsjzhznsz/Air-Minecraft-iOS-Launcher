@@ -752,7 +752,10 @@ NSString * const ForgeInstallerFlowErrorDomain = @"ForgeInstallerFlowErrorDomain
         if ([self isSnapshotVersion:mcPortion]) {
             return mcPortion;
         }
-        NSRegularExpression *mcRegex = [NSRegularExpression regularExpressionWithPattern:@"^1\\.[0-9]+(\\.[0-9]+)?$" options:0 error:nil];
+        // Task185：正则扩展——旧 "^1\\." 只认旧纪元，26.x 起复合版本首段
+        // 无 "1." 前缀（"26.3-66.0.5" → "26.3"），原被误判 "Unknown"。
+        // 数字点分形态全接受（复合版本的首段按定义就是 MC 版本号）。
+        NSRegularExpression *mcRegex = [NSRegularExpression regularExpressionWithPattern:@"^\\d+(\\.\\d+)*$" options:0 error:nil];
         NSRange fullRange = NSMakeRange(0, mcPortion.length);
         if ([mcRegex firstMatchInString:mcPortion options:0 range:fullRange]) {
             return mcPortion;
@@ -805,20 +808,25 @@ NSString * const ForgeInstallerFlowErrorDomain = @"ForgeInstallerFlowErrorDomain
 
         if (majorIsNum && minorIsNum) {
             NSInteger majorVal = [major integerValue];
-            if (majorVal >= 21) {
-                // 21.x - 25.x: NeoForge loader 版本号 == MC 版本号（21.x → MC 1.21.x）
-                // NeoForge 版本格式: major.minor.patch[.build]
-                //   - major 对应 MC 的 minor（21 → MC 1.21）
-                //   - minor 对应 MC 的 patch（21.1 → MC 1.21.1）
-                //   - patch 是 NeoForge 自己的 build 号（与 MC 版本无关）
-                // 因此 MC 版本 = 1.<major>.<minor>，而非 1.<major>.<patch>。
-                // 修复前错误取 components[2]（patch），导致 21.1.5 被解析为 MC 1.21.5
-                // 而非正确的 1.21.1，版本被错误分组。
-                return [NSString stringWithFormat:@"1.%@.%@", major, minor];
-            } else {
-                // Old format: 20.2.88 -> 1.20.2
-                return [NSString stringWithFormat:@"1.%@.%@", major, minor];
+            // Task185：26.x 新纪元修正。NeoForge 版本 = <MC 版本> + <build>，
+            // MC 版本号本身从 26 起去掉 "1." 前缀：
+            //   21.1.5      → MC 1.21.1（旧纪元，前缀 "1."）
+            //   20.2.88     → MC 1.20.2（同上）
+            //   26.3.7      → MC 26.3（新纪元，无前缀）
+            //   26.1.2.71   → MC 26.1.2（新纪元，四分量）
+            //   26.3.0.5    → MC 26.3.0（新纪元，四分量）
+            // 统一规则：去掉最后一个点分量（build 号），余下即 MC 版本；
+            // major ≤ 25 补 "1." 前缀，major ≥ 26 直接用。旧代码固定取
+            // 前两段拼 "1.%@.%@"，26.x 全部解析成 "1.26.3" = 找不到的根源。
+            if (components.count >= 3) {
+                NSArray *mcParts = [components subarrayWithRange:NSMakeRange(0, components.count - 1)];
+                NSString *mcVersion = [mcParts componentsJoinedByString:@"."];
+                return (majorVal >= 26) ? mcVersion
+                                        : [NSString stringWithFormat:@"1.%@", mcVersion];
             }
+            // 两分量形态（罕见）：直接用前两段
+            return (majorVal >= 26) ? [NSString stringWithFormat:@"%@.%@", major, minor]
+                                    : [NSString stringWithFormat:@"1.%@.%@", major, minor];
         }
     }
 
@@ -925,7 +933,10 @@ NSString * const ForgeInstallerFlowErrorDomain = @"ForgeInstallerFlowErrorDomain
     }
     
     NSString *mcVersion = self.versionList[section];
-    if ([mcVersion hasPrefix:@"1."]) {
+    // Task185：26.x 新纪元分区头也带 Minecraft 前缀（旧代码只认 "1." 开头）
+    BOOL ame185_numericHead = mcVersion.length > 0 &&
+        [[NSCharacterSet decimalDigitCharacterSet] characterIsMember:[mcVersion characterAtIndex:0]];
+    if ([mcVersion hasPrefix:@"1."] || ame185_numericHead) {
         headerView.titleLabel.text = [NSString stringWithFormat:@"Minecraft %@", mcVersion];
     } else {
         headerView.titleLabel.text = mcVersion;
@@ -1313,7 +1324,13 @@ NSString * const ForgeInstallerFlowErrorDomain = @"ForgeInstallerFlowErrorDomain
         
         // 当 gameVersion 已设置时（例如由 DownloadViewController 传入），仅加载对应 MC 版本的加载器版本
         // 避免一次性把所有 MC 版本的 Forge/NeoForge 全部加载出来
-        if (self.gameVersion.length > 0 && ![minecraftVersion isEqualToString:self.gameVersion]) {
+        // Task185：过滤器换共享等价匹配器（病历见 utils.h
+        // ame185_loaderVersionMatchesGameVersion）。旧逻辑比对提取器输出，
+        // 而 26.x 新纪元提取器会把 26.3.x 解析成 "1.26.3"、把 26.1.2.71
+        // 按首两段解析成 "1.26.1"——与 gameVersion "26.3"/"26.1.2" 永不
+        // 相等 → 全部条目被跳过 = "大于 26 的版本 NeoForge 找不到"。匹配器
+        // 直接在原始版本串上做双向候选集等价判定，新旧纪元 + legacy 全兼容。
+        if (self.gameVersion.length > 0 && !ame185_loaderVersionMatchesGameVersion(version, self.gameVersion)) {
             NSLog(@"[ForgeInstall] Skipping NeoForge version (gameVersion filter): %@ (MC %@ != %@)", version, minecraftVersion, self.gameVersion);
             [self.dataLock unlock];
             return;
@@ -1367,7 +1384,9 @@ NSString * const ForgeInstallerFlowErrorDomain = @"ForgeInstallerFlowErrorDomain
         
         // 当 gameVersion 已设置时（例如由 DownloadViewController 传入），仅加载对应 MC 版本的加载器版本
         // 避免一次性把所有 MC 版本的 Forge 全部加载出来
-        if (self.gameVersion.length > 0 && ![minecraftVersion isEqualToString:self.gameVersion]) {
+        // Task185：同 NeoForge 分支——过滤器换共享等价匹配器（复合版本
+        // "26.3-66.0.5" / "1.20.1-47.2.0" 全兼容，含跨纪元等价形态）。
+        if (self.gameVersion.length > 0 && !ame185_loaderVersionMatchesGameVersion(version, self.gameVersion)) {
             NSLog(@"[ForgeInstall] Skipping Forge version (gameVersion filter): %@ (MC %@ != %@)", version, minecraftVersion, self.gameVersion);
             [self.dataLock unlock];
             return;

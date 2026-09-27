@@ -502,16 +502,47 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
 @property (nonatomic, strong) NSMutableArray *forgeVersionList;
 @property (nonatomic, strong) NSMutableString *currentVersionValue;
 @property (nonatomic, assign) BOOL isParsingForge;
+// Task185：Fabric/Quilt 列表精选——显示全部开关态（默认只展前 30 个）
+@property (nonatomic, assign) BOOL fabricQuiltShowAll;
+// Task185：Fabric/Quilt 网络全量结果缓存（“显示全部”展开免二次请求）
+@property (nonatomic, strong) NSArray *fabricQuiltFullList;
+// Task185：Forge 竞速重写的解析基础设施——sink = 当前 XML 的输出缓冲
+//（竞速下每个 payload 解析到独立 sink，验证过才允许收尾），completion =
+// 该 payload 的验证回调。
+@property (nonatomic, strong) NSMutableArray *forgeParseSink;
+@property (nonatomic, copy) void (^forgeParseCompletion)(NSArray *parsed);
+// Task185：BMCL 按版本 JSON 兜底任务（两个 XML 源都拿不到匹配时第三路）
+@property (nonatomic, strong) NSURLSessionDataTask *forgeFallbackTask;
 // 网络任务
 @property (nonatomic, strong) NSURLSessionDataTask *currentTask;
 @property (nonatomic, strong) NSURLSessionDataTask *bmclTask;
 @end
+
+/// Task185：Fabric/Quilt 列表尾部“显示全部”哨兵行（didSelectRow 特判展开）
+static NSString *ame185ShowAllSentinel(void) {
+    return @"__AME185_SHOW_ALL__";
+}
+
+/// Task185：哨兵行打包格式——复用 ModLoaderVersionCell 的 \x1f 显示约定
+/// （type\x1fpatch\x1ffilename\x1fdisplay，cell 取 parts[3] 展示）。
+/// 哨兵前缀保证 didSelectRow 能识别，显示文案按语言切换。
+static NSString *ame185ShowAllRow(NSInteger hiddenCount) {
+    NSString *lang = getPrefObject(@"general.app_language");
+    if (![lang isKindOfClass:NSString.class] || lang.length == 0 || [lang isEqualToString:@"system"]) {
+        lang = NSLocale.preferredLanguages.firstObject ?: @"en";
+    }
+    NSString *display = [lang hasPrefix:@"zh"]
+        ? [NSString stringWithFormat:@"显示全部（还有 %ld 个更早的版本）", (long)hiddenCount]
+        : [NSString stringWithFormat:@"Show all (%ld older versions)", (long)hiddenCount];
+    return [NSString stringWithFormat:@"%@\x1f\x1f\x1f%@", ame185ShowAllSentinel(), display];
+}
 
 @implementation ModLoaderVersionPickerViewController
 
 - (void)dealloc {
     if (_currentTask) { [_currentTask cancel]; _currentTask = nil; }
     if (_bmclTask) { [_bmclTask cancel]; _bmclTask = nil; }
+    if (_forgeFallbackTask) { [_forgeFallbackTask cancel]; _forgeFallbackTask = nil; }   // Task185
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
@@ -626,6 +657,8 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
 
 - (void)startLoading {
     _versions = nil;
+    _fabricQuiltShowAll = NO;   // Task185：每次重新加载重置精选开关
+    _fabricQuiltFullList = nil; // Task185：全量缓存随加载周期重置
     [_tableView reloadData];
     _emptyLabel.hidden = YES;
     _errorLabel.hidden = YES;
@@ -680,36 +713,180 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
                     [list addObject:loaderVersion];
                 }
             }
-            [strongSelf finishLoadingWithVersions:list error:nil];
+            // Task185：列表精选（用户反馈“一点开是所有版本放在一起”）。
+            // fabric-meta 对【任意】游戏版本都返回全部 ~253 个 loader（实测
+            // 26.3 与 1.20.1 返回完全同序列表、最新在前）——loader 本就跨
+            // 游戏版本通用，API 没有也不能按版本筛。默认只展示最新 30 个
+            //（覆盖整合包常见需求），尾部追加“显示全部”开关行；点开后从
+            // 缓存展开全量（免二次请求）。N 选 30 而非 stable 过滤的原因：
+            // fabric meta 全列表仅 1 个 stable=true，单独过滤只剩 1 条。
+            strongSelf->_fabricQuiltFullList = [list copy];
+            if (list.count > 30 && !strongSelf->_fabricQuiltShowAll) {
+                NSArray *head = [list subarrayWithRange:NSMakeRange(0, 30)];
+                NSMutableArray *capped = [NSMutableArray arrayWithArray:head];
+                [capped addObject:ame185ShowAllRow((NSInteger)list.count - 30)];
+                [strongSelf finishLoadingWithVersions:capped error:nil];
+            } else {
+                [strongSelf finishLoadingWithVersions:list error:nil];
+            }
         });
     }];
     [_currentTask resume];
 }
 
-#pragma mark Forge (并发竞速，参照原 loadForgeVersionsReal)
+#pragma mark Forge (并发竞速 + 结果验证，Task185 重写)
 
 - (void)loadForgeVersions {
-    // 参照 FCL/HMCL：并发竞速同时发起官方源和 BMCL API 请求，谁先成功用谁
+    // Task185：竞速结果验证重写。病历（11e4b63 装机反馈，国内网络）：
+    // BMCL 竞速源实际返回 2022 年的陈旧 maven-metadata（最新条目
+    // 1.18-38.0.17，仅 1 条 version；官方源几百条）——旧"谁先到谁赢"
+    // 让陈旧镜像把官方结果挤掉，26.x 等新版本匹配数为 0 = "Forge 找不到"。
+    // 新规则：
+    //   1. payload 解析后【匹配当前 gameVersion 的条目 > 0】才有资格收尾；
+    //   2. 陈旧/不匹配的源标记终态，把机会留给另一源；
+    //   3. 首个 XML 源证明无匹配时，立即拉 BMCL 按版本 JSON 接口
+    //      （/forge/minecraft/<mc>，实测有 26.3 数据）作第三路兜底，
+    //      与另一个 XML 源继续竞速；
+    //   4. 三路全部无匹配 → 空列表（该版本确实没有 Forge 是合法状态，
+    //      显示"暂无版本"而非报错；全部网络错误则展示错误）。
     NSString *bmclURL = @"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/maven-metadata.xml";
     NSString *officialURL = @"https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml";
 
     _forgeVersionList = [NSMutableArray array];
+    _forgeParseSink = nil;
+    _forgeParseCompletion = nil;
     _isParsingForge = YES;
 
     __weak typeof(self) weakSelf = self;
-    __block BOOL settled = NO;
+    __block BOOL settled = NO;        // 已有可用结果完成收尾
+    __block BOOL bmclEnded = NO;      // BMCL XML 到达终态（usable/无匹配/错）
+    __block BOOL officialEnded = NO;  // 官方 XML 到达终态
+    __block BOOL fallbackFired = NO;  // 兜底 JSON 已在途
+    __block BOOL fallbackEnded = NO;  // 兜底 JSON 到达终态
+    __block NSError *lastError = nil; // 三路全败时的错误展示（可为 nil）
 
     NSString *userAgent = @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15";
 
-    void (^processData)(NSData *) = ^(NSData *data) {
+    // 收尾：排序 + finish（主线程）
+    void (^finishWith)(NSArray *) = ^(NSArray *list) {
+        NSArray *sorted = [list sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+            return [b compare:a options:NSNumericSearch];
+        }];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            if (!strongSelf) return;
+            [strongSelf finishLoadingWithVersions:sorted error:nil];
+        });
+    };
+
+    // 三路全部终态且无人收尾 → 空收尾（有错展示错，无错展示"暂无版本"）
+    void (^checkAllEnded)(void) = ^{
+        BOOL shouldFinish = NO;
+        @synchronized(weakSelf) {
+            if (!settled && bmclEnded && officialEnded && (!fallbackFired || fallbackEnded)) {
+                settled = YES;
+                shouldFinish = YES;
+            }
+        }
+        if (shouldFinish) {
+            NSLog(@"[Task185] Forge: all sources ended without a match (bmcl=%d official=%d fallback=%d)",
+                  bmclEnded, officialEnded, fallbackEnded);
+            NSError *err = nil;
+            @synchronized(weakSelf) { err = lastError; }
+            dispatch_async(dispatch_get_main_queue(), ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (!strongSelf) return;
+                [strongSelf finishLoadingWithVersions:@[] error:err];
+            });
+        }
+    };
+
+    // 单源到达终态（无匹配/失败）：按需发兜底 + 查全局终态
+    void (^sourceEnded)(BOOL) = ^(BOOL isOfficial) {
+        BOOL fireFallback = NO;
         @synchronized(weakSelf) {
             if (settled) return;
-            settled = YES;
+            if (isOfficial) officialEnded = YES; else bmclEnded = YES;
+            if (!fallbackFired) {
+                fallbackFired = YES;
+                fireFallback = YES;
+            }
         }
-        if (!data || data.length == 0) return;
-        NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
-        parser.delegate = weakSelf;
-        [parser parse];
+        NSLog(@"[Task185] Forge XML source ended without match (official=%d) — settled=%d fallbackFired=%d",
+              isOfficial, settled, fallbackFired);
+        if (fireFallback) {
+            // 首个 XML 源证明无匹配：立即拉 BMCL 按版本 JSON（数据实测是新的），
+            // 与另一个 XML 源继续竞速——国内用户官方源可能 20s 超时，不必干等。
+            [weakSelf ame185_fetchForgeFallbackJSON:^(NSArray *list) {
+                BOOL useIt = NO;
+                @synchronized(weakSelf) {
+                    if (!settled && list.count > 0) {
+                        settled = YES;
+                        useIt = YES;
+                    } else {
+                        fallbackEnded = YES;
+                    }
+                }
+                if (useIt) {
+                    NSLog(@"[Task185] Forge: BMCL per-version JSON won with %lu entries", (unsigned long)list.count);
+                    finishWith(list);
+                } else {
+                    checkAllEnded();
+                }
+            }];
+        }
+        checkAllEnded();
+    };
+
+    // 解析 + 验证一个 payload（解析在回调线程同步执行，收尾统一切主线程）。
+    // Task185 竞态防护：旧"谁先到谁赢"里 settled 短路保证同一时刻只有一个
+    // 解析器在跑；新逻辑两路 XML 都要解析验证，而委托状态（_currentVersion-
+    // Value / _forgeParseSink / _forgeParseCompletion）是 VC 级共享——两个
+    // NSXMLParser 在不同回调线程并发解析会互相踩文本缓冲。整个"装 sink →
+    // 解析 → completion"临界区用 @synchronized(self) 串行化（objc 锁可重入，
+    // didEndElement 内无需再加）。
+    void (^processData)(NSData *, BOOL) = ^(NSData *data, BOOL isOfficial) {
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        @synchronized(weakSelf) { if (settled) return; }
+        if (!data || data.length == 0) { sourceEnded(isOfficial); return; }
+        @synchronized(strongSelf) {
+            NSMutableArray *sink = [NSMutableArray array];
+            __block BOOL ame185_completed = NO;   // completion 是否被 metadata 闭合消费
+            strongSelf->_forgeParseSink = sink;
+            strongSelf->_forgeParseCompletion = ^(NSArray *parsed) {
+                ame185_completed = YES;
+                BOOL useIt = NO;
+                @synchronized(weakSelf) {
+                    if (!settled && parsed.count > 0) {
+                        settled = YES;
+                        useIt = YES;
+                    }
+                }
+                if (useIt) {
+                    NSLog(@"[Task185] Forge: XML source won with %lu matches (official=%d)",
+                          (unsigned long)parsed.count, isOfficial);
+                    finishWith(parsed);
+                } else {
+                    sourceEnded(isOfficial);
+                }
+            };
+            NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
+            parser.delegate = strongSelf;
+            [parser parse];
+            // 解析同步完成后（didEndElement:metadata 已触发 completion 并清空
+            // sink/completion），此处补一道防御性清理，防异常路径残留。
+            strongSelf->_forgeParseSink = nil;
+            strongSelf->_forgeParseCompletion = nil;
+            // Task185 防挂死：XML 截断/坏格式时 metadata 闭合标签永不到达，
+            // completion 不被消费 = 该源永不终态 → checkAllEnded 永不触发
+            //（旧代码同样暴露此形态，5s 宽限只盖网络错误）。此处补终态。
+            if (!ame185_completed) {
+                NSLog(@"[Task185] Forge XML parse incomplete, marking source ended (official=%d, parserError=%@)",
+                      isOfficial, parser.parserError.localizedDescription ?: @"nil");
+                sourceEnded(isOfficial);
+            }
+        }
     };
 
     NSMutableURLRequest *bmclRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:bmclURL]];
@@ -717,10 +894,11 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     [bmclRequest setValue:userAgent forHTTPHeaderField:@"User-Agent"];
     _bmclTask = [[NSURLSession sharedSession] dataTaskWithRequest:bmclRequest completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error || !data) {
-            @synchronized(weakSelf) { if (settled) return; }
+            @synchronized(weakSelf) { if (settled) return; lastError = error ?: lastError; }
+            sourceEnded(NO);
             return;
         }
-        processData(data);
+        processData(data, NO);
     }];
 
     NSMutableURLRequest *officialRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:officialURL]];
@@ -728,26 +906,57 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     [officialRequest setValue:userAgent forHTTPHeaderField:@"User-Agent"];
     _currentTask = [[NSURLSession sharedSession] dataTaskWithRequest:officialRequest completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error || !data) {
-            @synchronized(weakSelf) { if (settled) return; }
-            // 给 BMCLAPI 5s 宽限期
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                @synchronized(weakSelf) {
-                    if (settled) return;
-                    settled = YES;
-                }
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    __strong typeof(weakSelf) strongSelf = weakSelf;
-                    if (!strongSelf) return;
-                    [strongSelf finishLoadingWithVersions:@[] error:error];
-                });
-            });
+            @synchronized(weakSelf) { if (settled) return; lastError = error ?: lastError; }
+            sourceEnded(YES);
             return;
         }
-        processData(data);
+        processData(data, YES);
     }];
 
     [_bmclTask resume];
     [_currentTask resume];
+}
+
+/// Task185：BMCL 按版本 Forge JSON 兜底（/forge/minecraft/<mc>）。
+/// 返回纯 Forge 版本号列表（"66.0.5" 形态，与 XML 路径的 sink 口径一致）；
+/// 任何失败（404/网络/解析）都按"该版本无数据"处理，回调空数组。
+- (void)ame185_fetchForgeFallbackJSON:(void (^)(NSArray *list))completion {
+    if (![completion isKindOfClass:NSBlock.class]) return;
+    NSString *encodedMC = [_gameVersion stringByReplacingOccurrencesOfString:@"-" withString:@"_"];
+    if (encodedMC.length == 0) { completion(@[]); return; }
+    NSString *urlString = [NSString stringWithFormat:@"https://bmclapi2.bangbang93.com/forge/minecraft/%@", encodedMC];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:urlString]];
+    req.timeoutInterval = 15.0;
+    [req setValue:@"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15" forHTTPHeaderField:@"User-Agent"];
+    __weak typeof(self) weakSelf = self;
+    _forgeFallbackTask = [[NSURLSession sharedSession] dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        NSMutableArray *out = [NSMutableArray array];
+        if (data && !error) {
+            NSArray *tokens = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            if ([tokens isKindOfClass:NSArray.class]) {
+                for (NSDictionary *token in tokens) {
+                    if (![token isKindOfClass:NSDictionary.class]) continue;
+                    NSString *ver = token[@"version"];
+                    id branchRaw = token[@"branch"];
+                    NSString *branch = [branchRaw isKindOfClass:NSString.class] ? branchRaw : nil;
+                    if (![ver isKindOfClass:NSString.class] || ver.length == 0) continue;
+                    // 与 XML 路径口径一致：纯 Forge 版本号（可选 -branch 后缀）
+                    [out addObject:(branch.length > 0)
+                        ? [NSString stringWithFormat:@"%@-%@", ver, branch]
+                        : ver];
+                }
+            }
+        } else {
+            NSLog(@"[Task185] Forge fallback JSON failed: %@", error.localizedDescription ?: @"no data");
+        }
+        NSLog(@"[Task185] Forge fallback JSON: %lu entries for MC %@", (unsigned long)out.count, encodedMC);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf;
+            (void)strongSelf;   // completion 与 UI 解耦，仅在主线程回调
+            completion([out copy]);
+        });
+    }];
+    [_forgeFallbackTask resume];
 }
 
 #pragma mark NeoForge
@@ -852,36 +1061,44 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     if (!_isParsingForge) return;
     if ([elementName isEqualToString:@"version"]) {
         NSString *raw = [_currentVersionValue stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-        if (raw.length > 0 && [_forgeVersionList indexOfObject:raw] == NSNotFound) {
-            // Forge 版本格式：<mcver>-<forgever>，例如 "1.20.1-47.2.0"
-            // 按 FCL/HMCL 做法：只保留与当前 gameVersion 匹配的版本
-            NSString *prefix = [NSString stringWithFormat:@"%@-", _gameVersion];
-            if ([raw hasPrefix:prefix]) {
-                NSString *forgeVer = [raw substringFromIndex:prefix.length];
-                if (forgeVer.length > 0 && ![_forgeVersionList containsObject:forgeVer]) {
-                    [_forgeVersionList addObject:forgeVer];
-                }
-            } else if ([raw hasPrefix:_gameVersion] && [raw isEqualToString:_gameVersion]) {
-                // 极少数情况：版本号就是 gameVersion 本身
-                if (![_forgeVersionList containsObject:raw]) {
-                    [_forgeVersionList addObject:raw];
+        if (raw.length > 0) {
+            // Forge 版本格式：<mcver>-<forgever>，例如 "1.20.1-47.2.0" / "26.3-66.0.5"
+            // Task185：过滤逻辑换共享等价匹配器（26.x 新纪元 + legacy 全兼容，
+            // 见 utils.h ame185_loaderVersionMatchesGameVersion 病历）。旧
+            // "<gameVersion>-" 前缀对 "26.3-66.0.5" 形态其实能命中，但
+            // 对跨纪元等价形态（gameVersion "1.21" vs 复合首段等）覆盖不全。
+            // 解析结果写入 Task185 竞速 sink（无 sink 时回退旧列表，双保险）。
+            NSMutableArray *sink = _forgeParseSink ?: _forgeVersionList;
+            if (ame185_loaderVersionMatchesGameVersion(raw, _gameVersion)) {
+                NSRange hyphen = [raw rangeOfString:@"-"];
+                NSString *forgeVer = (hyphen.location != NSNotFound && hyphen.location > 0)
+                    ? [raw substringFromIndex:hyphen.location + 1]
+                    : raw;
+                if (forgeVer.length > 0 && ![sink containsObject:forgeVer]) {
+                    [sink addObject:forgeVer];
                 }
             }
         }
         _currentVersionValue = nil;
     } else if ([elementName isEqualToString:@"metadata"]) {
         _isParsingForge = NO;
-        // 解析完成
-        NSArray *sorted = [_forgeVersionList sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
-            // 简单降序排序，让最新版本在前
-            return [b compare:a options:NSNumericSearch];
-        }];
-        // NSXMLParser 在后台线程（NSURLSession completionHandler）同步执行，
-        // finishLoadingWithVersions: 内部调用 reloadData / stopAnimating 等 UI 操作，
-        // 必须切回主线程，否则触发 AutoLayout 后台线程修改崩溃。
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [self finishLoadingWithVersions:sorted error:nil];
-        });
+        // Task185：解析完成——结果交给竞速验证回调（sink 里只有匹配当前
+        // gameVersion 的条目，count>0 才有资格收尾）；无回调时（理论不可达，
+        // 兼容田路径）保留旧排序收尾行为。
+        NSArray *parsed = [(_forgeParseSink ?: _forgeVersionList) copy];
+        void (^completion)(NSArray *) = _forgeParseCompletion;
+        _forgeParseCompletion = nil;
+        _forgeParseSink = nil;
+        if (completion) {
+            completion(parsed);
+        } else {
+            NSArray *sorted = [parsed sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+                return [b compare:a options:NSNumericSearch];
+            }];
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self finishLoadingWithVersions:sorted error:nil];
+            });
+        }
     }
 }
 
@@ -909,6 +1126,22 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     NSString *raw = _versions[indexPath.row];
+
+    // Task185：Fabric/Quilt“显示全部”哨兵行——从缓存展开全量（免二次网络
+    // 请求），滚回展开点附近。
+    if ([raw isKindOfClass:NSString.class] && [raw hasPrefix:ame185ShowAllSentinel()]) {
+        _fabricQuiltShowAll = YES;
+        if (_fabricQuiltFullList.count > 0) {
+            _versions = [_fabricQuiltFullList copy];
+            [_tableView reloadData];
+            NSIndexPath *path = [NSIndexPath indexPathForRow:MIN(30, (NSInteger)_versions.count - 1) inSection:0];
+            [_tableView scrollToRowAtIndexPath:path atScrollPosition:UITableViewScrollPositionTop animated:NO];
+        } else {
+            // 缓存意外丢失（理论上不可达）：重新拉取（并保留展开态）
+            [self startLoading];
+        }
+        return;
+    }
 
     // 立即更新选中状态视觉反馈
     _selectedVersion = raw;

@@ -154,7 +154,7 @@ check('G', '头像迁移原语（180 保留）', 'ame180_migrateAvatarFromAccoun
 check('G', 'RightPanel username 回退调用（183 补挂点保留）', 'usernameFallback:currentAuth.authData[@"username"]' in rp)
 nw = rd('LauncherNewsViewController.m')
 check('G', '主页 username 回退调用（183 补挂点保留）', 'usernameFallback:auth.authData[@"username"]' in nw)
-check('G', 'RightPanel fetch 失败日志锚（180 保留）', '[Task180] RightPanel avatar fetch failed' in rp)
+check('G', 'RightPanel fetch 失败日志锚（180 保留）', ('[Task180] RightPanel avatar fetch failed' in rp) or ('[Task180] RightPanel avatar chain exhausted' in rp))  # Task185 重锚：单 URL 拉取升级为三层回退链
 ml = rd('installer/ModLoaderInstallViewController.m')
 check('G', '安装页凸起管线 ×3（183 重锚：内层 cardContainer init 挂载）', ml.count('[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];') == 3)
 check('G', '安装页 contentView 直挂退役（183 重锚）', 'applyNeumorphCardEffectToView:cell.contentView];' not in ml)

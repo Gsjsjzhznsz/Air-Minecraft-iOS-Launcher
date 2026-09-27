@@ -187,8 +187,12 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
             [uuid substringWithRange:NSMakeRange(16, 4)],
             [uuid substringWithRange:NSMakeRange(20, 12)]
         ];
-        self.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://api.rms.net.cn/head/%@", self.authData[@"username"]];
+        // Task185：先落 username 再拼头像 URL——旧顺序在首登时 username 尚为
+        // nil，profilePicURL 被存成字面 "head/(null)"；之后刷新链若在
+        // checkMCProfile 之前断掉（如 keychain 丢失），坏 URL 永久留在
+        // .json 里 = “正版账号没有皮肤”的直接根源之一。
         self.authData[@"username"] = response[@"name"];
+        self.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://api.rms.net.cn/head/%@", self.authData[@"username"]];
         // 微软账户用 xuid 作为 accountId（全局唯一且稳定），使同名账户可共存
         self.authData[@"accountId"] = self.authData[@"xuid"];
         callback(nil, [self saveChanges]);
@@ -220,9 +224,34 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
 }
 
 - (void)refreshTokenWithCallback:(Callback)callback {
-    // Move tokens to keychain if we haven't
+    // Task185：修复历史脏数据——首登顺序 bug 存下的 "head/(null)" 头像 URL
+    //（他人装机日志实锤：[Task180] RightPanel avatar fetch failed
+    // (url=…head/(null))，同一会话弹 5 次 keychain 报错）。内存态修复即可
+    // 让本会话头像恢复正常；下次登录成功后 .json 自然重写为正确值。
+    {
+        NSString *ame185_pic = self.authData[@"profilePicURL"];
+        NSString *ame185_user = self.authData[@"username"];
+        if ([ame185_pic isKindOfClass:NSString.class] && [ame185_pic containsString:@"(null)"]
+            && [ame185_user isKindOfClass:NSString.class] && ame185_user.length > 0) {
+            self.authData[@"profilePicURL"] = [NSString stringWithFormat:@"https://api.rms.net.cn/head/%@", ame185_user];
+            NSLog(@"[Task185] repaired corrupted profilePicURL (was head/(null), username=%@)", ame185_user);
+        }
+    }
     if (!self.tokenData) {
-        showDialog(localize(@"Error", nil), @"Failed to load account tokens from keychain");
+        // Task185：会话内去重 + 可行动文案。旧版每次刷新链都弹一次（他人
+        // 装机日志一场会话弹 5 次）；根因：keychain 条目带
+        // kSecAttrAccessibleWhenUnlockedThisDeviceOnly——更换安装方式（换侧载
+        // /TrollStore 重签）、换机迁移、恢复备份都会丢该条目；而账号 .json
+        // 在容器里还在（列表有账号）→ token 已失但账号在列 = 必须重登才能
+        // 恢复正版皮肤/多人。
+        static BOOL ame185_shown = NO;
+        if (!ame185_shown) {
+            ame185_shown = YES;
+            showDialog(localize(@"Error", nil),
+                @"账号凭据已丢失（更换安装方式/恢复备份后常见），请删除该账号后重新登录，以恢复正版皮肤与联机功能。\nAccount tokens are missing from the keychain (common after reinstall/backup restore). Please remove this account and sign in again.");
+        } else {
+            NSLog(@"[Task185] keychain token still missing (dialog suppressed this session)");
+        }
         callback(nil, YES);
         return;
     }
@@ -266,10 +295,18 @@ typedef void(^XSTSCallback)(NSString *xsts, NSString *uhs);
     CFTypeRef result = nil;
     OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)dict, &result);
     if (status == errSecSuccess) {
-        return [NSKeyedUnarchiver unarchivedObjectOfClass:NSDictionary.class fromData:(__bridge NSData *)result error:nil];
-    } else {
-        return nil;
+        NSDictionary *ame185_tokens = [NSKeyedUnarchiver unarchivedObjectOfClass:NSDictionary.class fromData:(__bridge NSData *)result error:nil];
+        if (!ame185_tokens) {
+            // Task185：取证锚点——条目在但解档失败（数据损坏）
+            NSLog(@"[Task185] keychain token read: SecItem OK but unarchive failed for profile %@", profile);
+        }
+        return ame185_tokens;
     }
+    // Task185：状态码取证（errSecItemNotFound=-25300 常见于重签/换机/恢复
+    // 备份后 ThisDeviceOnly 条目丢失；-25308=设备锁定期读取被拒）。旧版
+    // 无差别返回 nil，丢失原因无从分辨。
+    NSLog(@"[Task185] keychain token read failed for profile %@: OSStatus %d", profile, (int)status);
+    return nil;
 }
 
 + (void)clearTokenDataOfProfile:(NSString *)profile {

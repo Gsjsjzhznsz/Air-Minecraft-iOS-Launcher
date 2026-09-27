@@ -47,6 +47,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)fetchAvatarFromURL:(NSString *)urlString
                 completion:(void (^)(UIImage * _Nullable image))completion;
 
+/// Task185：带账号上下文的头像获取链（他人装机反馈“正版账号…没有皮肤”）。
+/// 三层回退：①authData 的 profilePicURL（跳过 "(null)" 脏数据形态）；
+/// ②crafatar 按 profileId（UUID）渲染正版皮肤头（正版账号真皮肤）；
+/// ③minotar 按 username。旧代码只拉单一镜像（api.rms.net.cn），该域名
+/// DNS 失效时（本轮装机日志实测）所有正版账号头像全灭；回退链保证
+/// 只要任一公开头像源可达就能出图。completion 恰好回调一次（主线程）。
+- (void)ame185_fetchAvatarForAuthData:(NSDictionary *)authData
+                           completion:(void (^)(UIImage * _Nullable image))completion;
+
 @end
 
 NS_ASSUME_NONNULL_END

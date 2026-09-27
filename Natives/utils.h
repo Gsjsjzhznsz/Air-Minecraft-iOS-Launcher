@@ -189,8 +189,40 @@ BOOL isTrollStoreInstall(void);
 // while (!isJITEnabled) 死循环——stikjit:// 偶发没开成 JIT 时旧循环
 // 永不退出（装机实测"启动卡在启动器界面"，只能杀进程）。
 BOOL ame169_waitForJITCondition(BOOL (^condition)(void), NSTimeInterval timeout, NSString *label);
+// Task185：JIT 等待成功后的自愈式主队列派发。病历（11e4b63 装机 latestlog.2）：
+// condition satisfied（后台态 3.8s，traced=1 exn=1）之后 dispatch_async(main)
+// 的续接块【从未执行】——Task183 锚点 "wait-completed block entered" 缺失，
+// 会话就此卡死。同一构建的三个成功会话（版本列表页启动）同代码主队列照常
+// 排空（锚点全部在后台态打出）；卡死会话的独有环境 = 版本设置二级菜单
+// （ProfileSettings 在导航栈里）+ 拼音键盘活动（开场即有 keyplane 日志）。
+// GCD 不丢弃块，唯一解释：主线程在后台被楔死（键盘/输入服务会话是头号
+// 嫌疑）。三道防线：①常规派发（快路径与旧代码完全等价）；②前台激活监听
+// 重派（后台楔死的主线程在 UIKit 激活流程中被解锁——didBecomeActive 后
+// 重派一次必然送达）；③后台队列看门狗（每 2s 复查；App 在前台而未达 =
+// 派发被吞形态，立即重派；120s 全程未达 → 钉死锚点日志）。delivered 的
+// 检查与置位只在主队列串行发生（attempt 内），多重派发不会导致块双跑。
+void ame185_dispatchToMainSelfHealing(dispatch_block_t block, NSString *label);
 // used for large memory regions
 void* JIT26PrepareRegion(void *addr, size_t len);
+
+// ============================================================================
+// Task185：加载器版本 ↔ 游戏版本等价匹配（Forge/NeoForge >26 找不到根修）。
+// 病历（11e4b63 装机反馈）：Minecraft 26.x 起版本号去掉 "1." 前缀（26.3、
+// 26.1.2），而三处提取器仍把 NeoForge 26.3.x 解析成 MC "1.26.3"、把 Forge
+// 复合版本 "26.3-66.0.5" 的 MC 段判为 "Unknown"（^1\. 正则不匹配新格式）
+// → gameVersion 过滤器把全部条目跳过 = 列表全空。
+// 本匹配器不做单向提取，而是双向候选集等价判定：
+//   loaderVersion 侧候选 = {去 "-suffix" 后全文, 再去最后一个点分量}
+//     （覆盖 "26.3-66.0.5"→26.3、"21.1.5"→21.1、"26.1.2.71"→26.1.2、
+//       "26.3.0.5-beta"→26.3.0）
+//   gameVersion 侧候选 = {原文, 去 "1." 前缀, 二分量补 ".0"}
+//     （覆盖 "1.21"→21/21.0、"1.20.1"→20.1、"26.3"→26.3/26.3.0）
+// 另保留两族特殊形态：NeoForge legacy "47.x"/含 "1.20.1"（1.20.1 专用坐标）、
+// "0.<snapshot>.x"（愚人节快照专用）。
+// 消费方：NeoForgeVersionFetcher.filterVersions、
+// ForgeInstallViewController 双过滤器、ModLoaderInstallViewController。
+// ============================================================================
+BOOL ame185_loaderVersionMatchesGameVersion(NSString *loaderVersion, NSString *gameVersion);
 // same as JIT26PrepareRegion, but used for smaller memory regions
 // and retain content instead of filling 0x69
 void JIT26PrepareRegionForPatching(void *addr, size_t len);

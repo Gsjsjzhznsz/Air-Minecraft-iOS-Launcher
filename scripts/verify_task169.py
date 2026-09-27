@@ -150,10 +150,12 @@ check("D4 失败日志", "Task169 avatar fetch failed" in am)
 check("D5 主线程单次回调契约（缓存命中也 dispatch main）",
       am.count("dispatch_async(dispatch_get_main_queue(), ^{") >= 2)
 check("D6 主页 VC 头像路径换用助手（updateSkinDisplay 内不再裸下载；注释提及不算）",
-      "fetchAvatarFromURL:avatarURL" in news_skin
+      ("fetchAvatarFromURL:avatarURL" in news_skin
+       or "ame185_fetchAvatarForAuthData:auth.authData" in news_skin)  # Task185 重锚：头像链升级
       and "NSData dataWithContentsOfURL" not in news_skin)
 check("D7 右面板换用助手（updateAccountInfo 内不再裸下载；注释提及不算）",
-      "fetchAvatarFromURL:avatarURL" in rp_acct
+      ("fetchAvatarFromURL:avatarURL" in rp_acct
+       or "ame185_fetchAvatarForAuthData:currentAuth.authData" in rp_acct)  # Task185 重锚：头像链升级
       and "NSData dataWithContentsOfURL" not in rp_acct)
 # Task171 诚实重锚：内联循环已提炼为 ame171_syncVisibleProfileAvatar（缓存
 # 命中/viewDidAppear 分支同样直刷），此处改锚 helper 本体与三处调用。

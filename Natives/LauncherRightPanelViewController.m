@@ -1605,6 +1605,14 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
 }
 
 - (void)invokeAfterJITEnabled:(void(^)(void))handler {
+    // Task185：收起任何活跃键盘。两轮“版本设置页启动 = 卡死”会话的共同
+    // 环境 = 二级菜单文本框 + 拼音键盘（latestlog.2 开场即有 keyplane
+    // 日志），而三个成功会话（版本列表页启动）无键盘活动——后台化时
+    // 键盘/输入服务会话是主线程楔死的头号嫌疑（GCD 不丢块，condition
+    // satisfied 后主队列续接块却永不执行）。启动前强制 resign，从源头
+    // 移除该变量；后续防线见 ame185_dispatchToMainSelfHealing。
+    [[UIApplication sharedApplication] sendAction:@selector(resignFirstResponder) to:nil from:nil forEvent:nil];
+
     // Task91：entitlement AND 磁盘标记双确认（同 LauncherNavigationController，
     // 防止普通侧载包里的预写标记把流程导入 apple-magnifier:// 死路）
     BOOL hasTrollStoreJIT = getEntitlementValue(@"jb.pmap_cs.custom_trust") && isTrollStoreInstall();
@@ -1651,7 +1659,18 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         return;
     } else if (hasTrollStoreJIT) {
         NSURL *jitURL = [NSURL URLWithString:[NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", NSBundle.mainBundle.bundleIdentifier]];
-        [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:nil];
+        // Task185：TrollStore 分支回执检查（他人装机反馈“巨魔 JIT 启动游戏
+        // 没有任何反应”）。旧代码 completionHandler:nil——apple-magnifier://
+        // 无人处理时（TrollStore 版本过旧/助手异常）完全静默，只能盲等
+        // 120s 超时。现在失败即时弹指引（Task176 stikjit:// 同款）。
+        [UIApplication.sharedApplication openURL:jitURL options:@{} completionHandler:^(BOOL ame185_ok) {
+            NSLog(@"[JIT] [RightPanel] Task185 openURL apple-magnifier:// -> %d", ame185_ok);
+            if (!ame185_ok) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    showDialog(localize(@"Error", nil), @"apple-magnifier:// 无响应（TrollStore JIT 助手未接管，常见于 TrollStore 版本过旧）。请更新 TrollStore，或在设置的 JIT 开启工具改用 stikjit / SideStore / StosDebug 后重试。\napple-magnifier:// not handled. Update TrollStore or switch the JIT enabler in Settings.");
+                });
+            }
+        }];
     } else if (getPrefBool(@"debug.debug_skip_wait_jit")) {
         NSLog(@"Debug option skipped waiting for JIT. Java might not work.");
         handler();
@@ -1675,14 +1694,14 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         if ([ame134_enabler isEqualToString:@"manual"]) {
             // 手动：不跳任何工具，等用户自己附加调试器（显示等待弹窗）
         } else if ([ame134_enabler isEqualToString:@"trollstore"]) {
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+            [self ame185_openJITEnablerURL:[NSURL URLWithString:
                 [NSString stringWithFormat:@"apple-magnifier://enable-jit?bundle-id=%@", ame134_bundleId]]
-                options:@{} completionHandler:nil];
+                toolLabel:@"apple-magnifier://"];
         } else if ([ame134_enabler isEqualToString:@"sidestore"]) {
             // SideStore 官方 scheme（LiveContainer 同款）
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+            [self ame185_openJITEnablerURL:[NSURL URLWithString:
                 [NSString stringWithFormat:@"sidestore://enable-jit?bundle-id=%@", ame134_bundleId]]
-                options:@{} completionHandler:nil];
+                toolLabel:@"sidestore://"];
         } else if ([ame134_enabler isEqualToString:@"stosdebug"]) {
             NSString *ame134_appName = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleDisplayName"] ?: @"Amethyst";
             NSMutableString *ame134_url = [NSMutableString stringWithFormat:
@@ -1694,14 +1713,13 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                     [ame134_url appendFormat:@"&script=%@", [ame134_script base64EncodedStringWithOptions:0]];
                 }
             }
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:ame134_url]
-                options:@{} completionHandler:nil];
+            [self ame185_openJITEnablerURL:[NSURL URLWithString:ame134_url] toolLabel:@"stosdebug://"];
         } else if ([ame134_enabler isEqualToString:@"jitstreamer"]) {
             // JitStreamer-EB：默认 WireGuard 本地地址（LiveContainer 同款
             // 默认值 http://[fd00::]:9172），浏览器打开 launch_app 接口
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:
+            [self ame185_openJITEnablerURL:[NSURL URLWithString:
                 [NSString stringWithFormat:@"http://[fd00::]:9172/launch_app/%@", ame134_bundleId]]
-                options:@{} completionHandler:nil];
+                toolLabel:@"jitstreamer"];
         } else if (@available(iOS 17.4, *)) {
             // auto / stikjit 共用 stikjit://（显式选择时无视系统版本）
             NSString *scriptDataString = @"";
@@ -1723,7 +1741,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
             }];
         } else {
             // Assuming 16.7-17.3.1. SideStore still lacks this URL scheme at the time of writing, so it only jumps to SideStore.
-            [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]] options:@{} completionHandler:nil];
+            [self ame185_openJITEnablerURL:[NSURL URLWithString:[NSString stringWithFormat:@"sidestore://sidejit-enable?pid=%d", getpid()]]
+                toolLabel:@"sidestore://sidejit-enable"];
         }
     }
     
@@ -1760,7 +1779,12 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         // 偶发没开成 JIT 时永不退出（装机 485b18c：冷启动首次启动卡在
         // 启动器界面，只能杀进程）。超时后撤弹窗并给出重试/取消。
         BOOL ok = ame169_waitForJITCondition(^{ return isJITEnabled(false); }, 120.0, @"isJITEnabled");
-        dispatch_async(dispatch_get_main_queue(), ^{
+        // Task185：自愈式派发（11e4b63 装机 latestlog.2 病历：condition
+        // satisfied 后旧 dispatch_async(main) 续接块在后台被楔死的主队列上
+        // 永不执行，Task183 锚点缺失即卡死——见 utils.h
+        // ame185_dispatchToMainSelfHealing 病历注释）。捕获的 alert/bgt
+        // 随块存活到送达，endBackgroundTask/dismiss 在迟到送达时仍正确执行。
+        ame185_dispatchToMainSelfHealing(^{
             // Task183（断点钉死锚点）：59d4b48 装机 latestlog.1 病历——
             // condition satisfied 之后主队列续接块静默丢失（连 TouchController
             // 首日志都没出）。本行+后续每步锚点让下轮日志直接定位卡点。
@@ -1801,8 +1825,27 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 [alert dismissViewControllerAnimated:YES completion:nil];
                 [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
-        });
+        }, @"RightPanel main wait");
     });
+}
+
+/// Task185：JIT 开启工具 URL 统一拉起（回执取证 + 失败即时指引，Task176
+/// stikjit:// 同款）。旧代码五个分支全部 completionHandler:nil——URL 无人
+/// 处理时完全静默（他人装机反馈“巨魔 JIT 启动游戏没有任何反应”的形态
+/// 之一），只能盲等 120s 超时。
+- (void)ame185_openJITEnablerURL:(NSURL *)url toolLabel:(NSString *)tool {
+    if (!url) {
+        NSLog(@"[JIT] [RightPanel] Task185 openURL skipped: nil URL (tool=%@)", tool);
+        return;
+    }
+    [UIApplication.sharedApplication openURL:url options:@{} completionHandler:^(BOOL ok) {
+        NSLog(@"[JIT] [RightPanel] Task185 openURL %@ -> %d", tool, ok);
+        if (!ok) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                showDialog(localize(@"Error", nil), [NSString stringWithFormat:@"%@ 未接管启动请求（未安装或版本过旧？）。请在设置的 JIT 开启工具中换用其它工具后重试。\n%@ did not handle the request. Switch the JIT enabler in Settings and retry.", tool, tool]);
+            });
+        }
+    }];
 }
 
 /// Task169：JIT 等待超时后的出路弹窗（重试 = 重新走一轮 invokeAfterJITEnabled，
@@ -1850,7 +1893,10 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         if (scriptData) {
             scriptDataString = [@"&script-data=" stringByAppendingString:[scriptData base64EncodedStringWithOptions:0]];
         }
-        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:nil];
+        [UIApplication.sharedApplication openURL:[NSURL URLWithString:[NSString stringWithFormat:@"stikjit://enable-jit?bundle-id=%@&pid=%d%@", NSBundle.mainBundle.bundleIdentifier, getpid(), scriptDataString]] options:@{} completionHandler:^(BOOL ame185_ok) {
+            // Task185：回执取证（重挂场景已有等待弹窗 + 超时重试兑底，失败只记日志）
+            NSLog(@"[JIT] [RightPanel] Task185 re-attach stikjit:// -> %d", ame185_ok);
+        }];
         NSLog(@"[JIT] [RightPanel] Task172 stikjit:// re-attach fired (script=%lu bytes)",
               (unsigned long)scriptData.length);
     };
@@ -1881,7 +1927,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         // -- that flag is already set and would race the first brk.
         // Task169：有界等待（120s）+心跳日志，超时走重试弹窗。
         BOOL ok = ame169_waitForJITCondition(^{ return JIT26IsLikelyDebuggerKeepAttached(); }, 120.0, @"JIT26 debugger attach");
-        dispatch_async(dispatch_get_main_queue(), ^{
+        // Task185：自愈式派发（同主等待路径，病历见 utils.h）。
+        ame185_dispatchToMainSelfHealing(^{
             if (ame172_bgt != UIBackgroundTaskInvalid) {
                 [UIApplication.sharedApplication endBackgroundTask:ame172_bgt];
                 ame172_bgt = UIBackgroundTaskInvalid;
@@ -1895,7 +1942,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                 [alert dismissViewControllerAnimated:YES completion:nil];
                 [self ame169_showJITTimeoutAlertWithRetry:handler];
             }
-        });
+        }, @"RightPanel reattach wait");
     });
 }
 
@@ -1933,19 +1980,17 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         if (localAvatar) {
             self.avatarImageView.image = localAvatar;
         } else {
-            NSString *avatarURL = currentAuth.authData[@"profilePicURL"];
-            if (avatarURL) {
-                avatarURL = [avatarURL stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
-                [[AvatarManager sharedManager] fetchAvatarFromURL:avatarURL completion:^(UIImage *image) {
-                    if (!image) {
-                        NSLog(@"[Task180] RightPanel avatar fetch failed (url=%@)", avatarURL);
-                    }
-                    self.avatarImageView.image = image ?: [UIImage systemImageNamed:@"person.circle.fill"];
-                }];
-            } else {
-                NSLog(@"[Task180] RightPanel avatar: no local avatar and no profilePicURL (keys: %@)",
-                      [currentAuth.authData.allKeys componentsJoinedByString:@","]);
-            }
+            // Task185：换带账号上下文的头像获取链（profilePicURL → crafatar
+            // UUID → minotar username 三层回退）。病历：他人装机日志实锤
+            // 单一镜像 api.rms.net.cn DNS 失效时正版账号头像全灭，且首登
+            // 顺序 bug 存下的 "head/(null)" 脏 URL 会永远拉失败。
+            [[AvatarManager sharedManager] ame185_fetchAvatarForAuthData:currentAuth.authData completion:^(UIImage *image) {
+                if (!image) {
+                    NSLog(@"[Task180] RightPanel avatar chain exhausted (accountId=%@)",
+                          currentAuth.authData[@"accountId"]);
+                }
+                self.avatarImageView.image = image ?: [UIImage systemImageNamed:@"person.circle.fill"];
+            }];
         }
     } else {
         self.usernameLabel.text = localize(@"i18n_str_357", nil);

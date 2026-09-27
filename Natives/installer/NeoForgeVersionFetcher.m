@@ -1,5 +1,6 @@
 #import "NeoForgeVersionFetcher.h"
 #import "PLMirrorCenter.h"
+#import "utils.h"
 
 @implementation NeoForgeVersionFetcher
 
@@ -168,12 +169,16 @@
 }
 
 + (NSArray *)filterVersions:(NSArray *)versions gameVersion:(NSString *)gameVersion {
+    // Task185：改用 ame185_loaderVersionMatchesGameVersion 等价匹配。
+    // 病历（11e4b63 装机反馈）：MC 26.x 起版本号无 "1." 前缀（26.3、26.1.2），
+    // 旧提取器把 NeoForge 26.3.x 解析成 MC "1.26.3" → 与 gameVersion "26.3"
+    // 永不相等 → 列表全空 = "大于 26 的版本 NeoForge 找不到"。
+    // 新匹配器双向候选集等价判定，覆盖新旧两个纪元 + legacy/快照特殊形态。
     NSMutableArray *filtered = [NSMutableArray array];
     for (id obj in versions) {
         if (![obj isKindOfClass:[NSString class]]) continue;
         NSString *version = obj;
-        NSString *mcVersion = [self extractMinecraftVersionFromNeoForgeVersion:version];
-        if ([mcVersion isEqualToString:gameVersion]) {
+        if (ame185_loaderVersionMatchesGameVersion(version, gameVersion)) {
             [filtered addObject:version];
         }
     }
