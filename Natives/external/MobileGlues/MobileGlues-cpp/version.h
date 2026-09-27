@@ -2725,3 +2725,82 @@
 // E1 (l10n baseline 1955 -> 1959, 48/48); cascade 184:39 183:50 +
 // task175_syntax_gates ALL PASS.
 // ============================================================================
+
+// ============================================================================
+// Task 188 addendum (15fddc2 six-log round: ANGLE latestlog.old.txt + vgpu
+// latestlog.txt + Forge latestlog.2 + NeoForge latestlog.old.1/.1 + other
+// user's 8cb5e03 45k-line log). Six-item fix round:
+//
+// (1) vgpu white screen, FOURTH layer (wrapper self-poisoning): Task187's
+// 3-line header + GetLine END-return fixed the #version-first violation
+// (cut-in anchors now land behind #version, "VGPU Task187: short GLSL
+// source (3 newlines total)" firing), but the NewConvertShader wrapper
+// library prepended to EVERY converted shader (even 436-byte FPE vertex
+// shaders) calls native textureGather -- legal only in GLSL ES 3.10+, and
+// the capability probe reports 300es=1 310es=0 320es=0. So every shader,
+// FPE included, died at 0:25 'textureGather: no matching overloaded
+// function found' -> white screen. Fix: texelFetch-based emulation of
+// textureGather_/textureGather_Offset_ (base texel floor(P*size-0.5),
+// quad order (x,y)(x+1,y)(x+1,y+1)(x,y+1), clamped; comp overload via
+// dynamic vec4 subscript, ES 3.00-legal) in pack/shaderconv.c. Anchor:
+// zero 'no matching overloaded function found' for textureGather.
+//
+// (2) Forge 26.1.2 launch crash: java.lang.module.ResolutionException
+// "Modules launcher and lwjgl export package com.apple.ios.audio to module
+// com.sun.jna.platform" -- JavaApp/Makefile mirrored the launcher's
+// com/apple/ios/audio classes + JavaSound services file into lwjgl_lib_*
+// (c71dcfa SDL-hook provider mirror era). lwjgl overlay has ZERO references
+// to the package; launcher.jar is always on the classpath, so the mirror
+// is pure history. Fix: mirror removed -- the package now lives in exactly
+// one artifact (launcher.jar) and Forge's modular bootstrap resolves.
+//
+// (3) NeoForge "missing files": two stacked causes. (a) A stray regular
+// file at libraries/net/neoforged/neoforge/26.1.2.109 (name-collides with
+// the directory APFS must create) made BOTH the installer-jar extraction
+// and the universal download fail -- while the install overall still
+// reported "Installation completed successfully". (b) The minecraft-client-
+// patched jar is a PROCESSOR OUTPUT (never published to maven; the client
+// classifier 404s on purpose on both BMCLAPI and maven.minecraftforge.net)
+-- so pre-processor download failures are undecidable. Fix: utils
+// ame188_ensureDirectoryHealed (full ancestor-chain stray-file self-heal)
+// wired into both installers' every mkdir site + Step E post-processor
+// artifact verification (runtime library list: existence + jar PK magic;
+// any miss = explicit install failure with a named list, never silent
+// success). Anchors: "[Task188] stray file ... removed" / "Task188:
+// post-processor verification FAILED/passed".
+//
+// (4) Forced landscape, round two: Task187's portrait-drop was ignored on
+// iPadOS 27 because the app runs in WINDOW MODE (new iPadOS windowing /
+// LiveContainer host), where the system owns geometry and ignores both the
+// orientation lists and every code-level override (AppDelegate
+// supportedInterfaceOrientationsFor:, scene-level callback, root-VC
+// overrides -- all present, all ineffective). Fix: UIRequiresFullScreen=true
+// opts out of window mode; the scene geometry request stays as defense in
+// depth with its window-mode failure downgraded to a one-time notice.
+//
+// (5) ANGLE black screen forensics round 2 (adjudication of Task187's kit):
+// state snapshots came back ALL-NORMAL + clearColor (0,0,0,0) + 58fps +
+// zero shader compile errors -- "genuinely-black content" OR "presentation
+// drops content", still undecidable from state alone. Shipped the decisive
+// kit: (a) 1x1 center glReadPixels on probe frames (<=3/session, default-FB
+// bound only, 4-byte RGBA read avoids the Task75 full-screen CopyBGRA8ToRGBA8
+// SIGBUS path) -- nonzero rgb = content present & presentation dropping,
+// black = genuinely-black content (spvc rewrite next); (b) GL_ALPHA_BITS/
+// DEPTH_BITS + CAMetalLayer pixelFormat/opaque/framebufferOnly logging --
+// alpha-bearing default FB + MC's alpha=0 clear + non-opaque composite is
+// the premultiplied-black hypothesis; (c) phase-tagged error read after the
+// state queries to name the probe query that triggers the per-probe
+// 'Invalid pname' (1280) ANGLE debug message (mg sessions: zero).
+//
+// (6) FCL-style control repository (user feature request): in-app browser
+// for community control layouts (CustomControlsViewController long-press
+// menu -> 控件仓库), fetching controls/index.json from the launcher repo
+// (raw.githubusercontent primary + jsDelivr CDN fallback), validating
+// layoutDictionary-schema JSON, saving to controlmap/<id>.json for the
+// existing Load menu lifecycle. Seed: controls/ with classic / minimal-fps
+// / large-buttons. Anchors: "[ControlRepo] Task188: index loaded/downloading
+// layout/saved".
+//
+// Verification: verify_task188 (this round) + gcc syntax gate on
+// pack/shaderconv.c post-emulation.
+// ============================================================================

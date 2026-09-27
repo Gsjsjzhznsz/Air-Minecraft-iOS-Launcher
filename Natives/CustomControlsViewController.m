@@ -1,4 +1,5 @@
 #import "CustomControlsViewController.h"
+#import "ControlRepoViewController.h"
 #import "DBNumberedSlider.h"
 #import "FileListViewController.h"
 #import "LauncherPreferences.h"
@@ -241,7 +242,9 @@
         UIMenuItem *actionAddButton = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.add_button", nil) action:@selector(actionMenuAddButton)];
         UIMenuItem *actionAddDrawer = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.add_drawer", nil) action:@selector(actionMenuAddDrawer)];
         UIMenuItem *actionAddJoystick = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.add_joystick", nil) action:@selector(actionMenuAddJoystick)];
-        [menuController setMenuItems:@[actionExit, actionSave, actionLoad, actionRestoreDefault, actionSafeArea, actionAddButton, actionAddDrawer, actionAddJoystick]];
+        // Task188：FCL 式控件仓库入口（下载社区布局到 controlmap 后用“加载”应用）
+        UIMenuItem *actionRepo = [[UIMenuItem alloc] initWithTitle:localize(@"custom_controls.control_menu.repo", nil) action:@selector(actionMenuRepo)];
+        [menuController setMenuItems:@[actionExit, actionSave, actionLoad, actionRestoreDefault, actionSafeArea, actionAddButton, actionAddDrawer, actionAddJoystick, actionRepo]];
 
         CGPoint point = [sender locationInView:sender.view];
         self.selectedPoint = CGRectMake(point.x, point.y, 1.0, 1.0);
@@ -367,6 +370,16 @@
         [self loadControlFile:name];
         self.setDefaultCtrl(name);
     }];
+}
+
+// Task188（FCL 式控件仓库）：打开仓库浏览页（推入导航栈，页表呈现）。
+// 下载的布局落入 controlmap/<id>.json，随后经既有“加载”菜单应用——
+// 与本地布局同一套生命周期（编辑/保存/设为默认），仓库只做分发。
+- (void)actionMenuRepo {
+    ControlRepoViewController *repo = [[ControlRepoViewController alloc] init];
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:repo];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    [self presentViewController:nav animated:YES completion:nil];
 }
 
 - (void)actionMenuSafeArea {

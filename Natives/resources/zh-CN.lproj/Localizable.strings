@@ -2127,3 +2127,16 @@
 "i18n_str_2069" = "安装 %@ 前需要先安装原版 %@。可以自动安装该原版并继续，是否继续？";
 "i18n_str_2070" = "安装并继续";
 "i18n_str_2071" = "删除账号并重新登录";
+
+/* Task188: FCL-style control repository */
+"custom_controls.control_menu.repo" = "控件仓库";
+"custom_controls.repo.title" = "控件仓库";
+"custom_controls.repo.empty" = "仓库还没有布局";
+"custom_controls.repo.fetch.failed" = "无法获取仓库列表";
+"custom_controls.repo.retry_hint" = "下拉或点击此处重试（需要网络）";
+"custom_controls.repo.author" = "作者 %@";
+"custom_controls.repo.installed" = "已安装 v%@";
+"custom_controls.repo.update_available" = "可更新到 v%@";
+"custom_controls.repo.download.failed" = "布局下载失败";
+"custom_controls.repo.download.invalid" = "布局文件无效（不是有效的控件布局）";
+"custom_controls.repo.download.done" = "已下载“%@”，可在“加载”菜单中选择";

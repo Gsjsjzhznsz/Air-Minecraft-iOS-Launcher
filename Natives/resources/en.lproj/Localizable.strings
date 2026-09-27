@@ -2131,3 +2131,16 @@
 "i18n_str_2069" = "Installing %@ requires vanilla %@ first. Install it automatically and continue?";
 "i18n_str_2070" = "Install & Continue";
 "i18n_str_2071" = "Remove & Sign In Again";
+
+/* Task188: FCL-style control repository */
+"custom_controls.control_menu.repo" = "Control repo";
+"custom_controls.repo.title" = "Control Repository";
+"custom_controls.repo.empty" = "No layouts in the repository yet";
+"custom_controls.repo.fetch.failed" = "Failed to load the repository";
+"custom_controls.repo.retry_hint" = "Pull down or tap to retry (network required)";
+"custom_controls.repo.author" = "By %@";
+"custom_controls.repo.installed" = "Installed v%@";
+"custom_controls.repo.update_available" = "Update to v%@";
+"custom_controls.repo.download.failed" = "Layout download failed";
+"custom_controls.repo.download.invalid" = "Invalid layout file (not a control layout)";
+"custom_controls.repo.download.done" = "Downloaded "%@" — pick it in the Load menu";

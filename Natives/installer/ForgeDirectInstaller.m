@@ -733,6 +733,66 @@ NSString *const ForgeDirectInstallerErrorDomain = @"ForgeDirectInstallerErrorDom
         return NO;
     }
 
+    // Step E (Task188)：后置产物验证 —— 与 NeoForgeDirectInstaller 同款。
+    // 病历（15fddc2 latestlog.old.2）：forge:client classifier 在 BMCLAPI 与
+    // 官方源均 404（新版安装器格式的预打补丁 client jar 本就是 processor
+    // 本地产物，从不发布到 maven）→ 下载阶段误报 critical failure，而产物
+    // 实际由随后的处理器生成。此验证在处理器跑完后才定案：运行期清单
+    // （versionJson.libraries，OS rules 过滤）逐项存在性 + .jar 头 PK 魔数，
+    // 任一缺失 ⇒ 显式失败并列出缺件清单。
+    {
+        NSMutableArray<NSString *> *missingArtifacts = [NSMutableArray array];
+        NSArray *ame188_runtimeLibs = versionJson[@"libraries"];
+        if ([ame188_runtimeLibs isKindOfClass:[NSArray class]]) {
+            for (NSDictionary *ame188_lib in ame188_runtimeLibs) {
+                if (![ame188_lib isKindOfClass:[NSDictionary class]]) continue;
+                NSString *ame188_name = [ame188_lib[@"name"] isKindOfClass:[NSString class]] ? ame188_lib[@"name"] : nil;
+                id ame188_rules = ame188_lib[@"rules"];
+                if ([ame188_rules isKindOfClass:[NSArray class]] && [(NSArray *)ame188_rules count] > 0) {
+                    if (![MinecraftResourceUtils evaluateRules:(NSArray *)ame188_rules]) continue;
+                }
+                NSString *ame188_rel = nil;
+                NSDictionary *ame188_dl = ame188_lib[@"downloads"];
+                if ([ame188_dl isKindOfClass:[NSDictionary class]] &&
+                    [ame188_dl[@"artifact"] isKindOfClass:[NSDictionary class]] &&
+                    [ame188_dl[@"artifact"][@"path"] isKindOfClass:[NSString class]]) {
+                    ame188_rel = ame188_dl[@"artifact"][@"path"];
+                }
+                if (ame188_rel.length == 0) ame188_rel = [self mavenPathToRelativePath:ame188_name ?: @""];
+                if (ame188_rel.length == 0) continue;
+                NSString *ame188_dest = [librariesDir stringByAppendingPathComponent:ame188_rel];
+                BOOL ame188_isDir = NO;
+                if (![NSFileManager.defaultManager fileExistsAtPath:ame188_dest isDirectory:&ame188_isDir] || ame188_isDir) {
+                    [missingArtifacts addObject:[NSString stringWithFormat:@"%@ (missing)", ame188_name ?: ame188_rel]];
+                    continue;
+                }
+                if ([ame188_dest.pathExtension.lowercaseString isEqualToString:@"jar"]) {
+                    NSFileHandle *ame188_fh = [NSFileHandle fileHandleForReadingAtPath:ame188_dest];
+                    NSData *ame188_head = ame188_fh ? [ame188_fh readDataOfLength:4] : nil;
+                    [ame188_fh closeFile];
+                    const unsigned char *ame188_p = (const unsigned char *)ame188_head.bytes;
+                    BOOL ame188_zipMagic = (ame188_head.length == 4 && ame188_p[0] == 0x50 && ame188_p[1] == 0x4B);
+                    if (!ame188_zipMagic) {
+                        [missingArtifacts addObject:[NSString stringWithFormat:@"%@ (corrupt, not a jar)", ame188_name ?: ame188_rel]];
+                    }
+                }
+            }
+        }
+        if (missingArtifacts.count > 0) {
+            NSLog(@"[ForgeDirect] Task188: post-processor verification FAILED -- %lu artifact(s) invalid: %@",
+                  (unsigned long)missingArtifacts.count, missingArtifacts);
+            if (error) {
+                *error = [NSError errorWithDomain:ForgeDirectInstallerErrorDomain
+                                             code:ForgeDirectInstallerErrorWriteFailed
+                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:
+                    @"安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@", missingArtifacts]}];
+            }
+            return NO;
+        }
+        NSLog(@"[ForgeDirect] Task188: post-processor verification passed (%lu runtime libraries present and valid)",
+              (unsigned long)ame188_runtimeLibs.count);
+    }
+
     // Write version JSON
     NSLog(@"[ForgeDirect] Writing version JSON to: %@", versionJsonPath);
     reportProgress(0.9, localize(@"i18n_str_1263", nil));
@@ -1096,29 +1156,18 @@ NSString *const ForgeDirectInstallerErrorDomain = @"ForgeDirectInstallerErrorDom
 
 // 安全创建目录：若路径上存在同名普通文件（之前安装失败残留），先删除再创建。
 // APFS 不允许同名文件和目录共存，直接 createDirectoryAtPath 会失败。
+// Task188：升级为委托 utils 的 ame188_ensureDirectoryHealed —— 旧实现只查
+// 最终一层，深层目录首次创建时【中间层】的杂散文件同样会令创建失败
+//（NeoForge 病历的同类形态，withIntermediateDirectories 遇祖先链上任一
+// 文件冲突即失败）。幂等：已存在目录直接返回 YES。
 + (BOOL)ensureDirectoryExists:(NSString *)path error:(NSError **)error {
-    NSFileManager *fm = NSFileManager.defaultManager;
-    BOOL isDir = NO;
-    if ([fm fileExistsAtPath:path isDirectory:&isDir]) {
-        if (isDir) return YES; // 目录已存在
-        // 存在同名普通文件，删除它
-        NSError *removeError = nil;
-        if (![fm removeItemAtPath:path error:&removeError]) {
-            if (error) {
-                *error = [NSError errorWithDomain:ForgeDirectInstallerErrorDomain
-                                             code:ForgeDirectInstallerErrorWriteFailed
-                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"i18n_str_1128", nil), path, removeError.localizedDescription]}];
-            }
-            return NO;
-        }
+    if (ame188_ensureDirectoryHealed(path)) return YES;
+    if (error) {
+        *error = [NSError errorWithDomain:ForgeDirectInstallerErrorDomain
+                                     code:ForgeDirectInstallerErrorWriteFailed
+                                 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"i18n_str_1128", nil), path, @"healed-create failed"]}];
     }
-    NSError *createError = nil;
-    [fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&createError];
-    if (createError) {
-        if (error) *error = createError;
-        return NO;
-    }
-    return YES;
+    return NO;
 }
 
 // 同步下载文件到指定路径（带 60 秒超时）

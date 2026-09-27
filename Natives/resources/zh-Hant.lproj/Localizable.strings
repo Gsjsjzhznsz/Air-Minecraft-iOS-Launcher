@@ -2127,3 +2127,16 @@
 "i18n_str_2069" = "安裝 %@ 前需要先安裝原版 %@。可以自動安裝該原版並繼續，是否繼續？";
 "i18n_str_2070" = "安裝並繼續";
 "i18n_str_2071" = "刪除帳號並重新登入";
+
+/* Task188: FCL-style control repository */
+"custom_controls.control_menu.repo" = "控制倉庫";
+"custom_controls.repo.title" = "控制倉庫";
+"custom_controls.repo.empty" = "倉庫還沒有佈局";
+"custom_controls.repo.fetch.failed" = "無法取得倉庫列表";
+"custom_controls.repo.retry_hint" = "下拉或點擊此處重試（需要網路）";
+"custom_controls.repo.author" = "作者 %@";
+"custom_controls.repo.installed" = "已安裝 v%@";
+"custom_controls.repo.update_available" = "可更新到 v%@";
+"custom_controls.repo.download.failed" = "佈局下載失敗";
+"custom_controls.repo.download.invalid" = "佈局檔案無效（不是有效的控制佈局）";
+"custom_controls.repo.download.done" = "已下載「%@」，可在「載入」選單中選擇";

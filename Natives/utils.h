@@ -431,6 +431,17 @@ int ame173_safeHeapCeilingMB(void);
 // ============================================================================
 double ame187_iphoneNotchInset(UIView *view, BOOL isLeading);
 
+// ============================================================================
+// Task 188（安装器目录杂散文件自愈）：递归建目录，路径上任意一级"目录位
+// 置被同名普通文件占用"（历史安装失败残留）时自动移除后重建。
+// 病历：NeoForge 26.1.2.109 安装时 libraries/net/neoforged/neoforge/
+// 26.1.2.109 处的杂散文件令 universal jar 解压/下载双败而安装仍报成功
+// → 启动报 "The NeoForge jar is missing"。返回 YES 当且仅当路径最终为
+// 可用目录。供 NeoForgeDirectInstaller / ForgeDirectInstaller 全部
+// 建目录点替换调用（含下载与解压落盘路径）。
+// ============================================================================
+BOOL ame188_ensureDirectoryHealed(NSString *path);
+
 #ifdef __cplusplus
 }
 #endif

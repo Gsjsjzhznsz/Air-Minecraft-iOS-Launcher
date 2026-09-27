@@ -504,6 +504,7 @@ add_executable(AngelAuraAmethyst
   AppDelegate.m
   CustomControlsViewController.m
   CustomControlsViewController+UndoManager.m
+  ControlRepoViewController.m
   FileListViewController.m
   GameSurfaceView.m
   JavaGUIViewController.m

@@ -294,20 +294,68 @@ static char _shadow2D[]=
 " ivec2 Size = textureSize(tex, int(lod));\n"
 " return vec2(float(Size.x), float(Size.y));\n"
 "}"
-"vec4 textureGather_(sampler2D tex, vec2 P){\n"                         // textureGather
-" return textureGather(tex, P);\n"
+/* Task188（vgpu 白屏第四层·textureGather 仿真）：原生 textureGather 需要
+ * GLSL ES 3.10+，而本设备上下文能力探测实测只有 300 es（Task183 探针：
+ * 300es=1 310es=0 320es=0）。该包装块被无条件前置到【所有】经
+ * NewConvertShader 转换的着色器（连最简单的 FPE 顶点着色器也在内，
+ * 15fddc2 latestlog.txt 实锤：436 字节的 FPE 顶点着色器同样死在 0:25
+ * 'textureGather : no matching overloaded function found'）→ 包装块自身
+ * 携带的非法调用毒死了整条管线 = 白屏。修法：texelFetch 四点采样仿真
+ * （ES 3.00 合法），语义对齐 GLSL 4.0 规范——返回双线性过滤在 P 处会
+ * 采样到的 2x2 texel 四元组各自的第 comp（默认 0 = .r）分量，采样基点
+ * floor(P*size-0.5)，四角顺序 (x,y)(x+1,y)(x+1,y+1)(x,y+1)，越界钳制
+ * （texelFetch 越界未定义，desktop textureGather 语义为钳制）。
+ * comp 重载一并启用：vec4 动态下标取分量在 ES 3.00 合法。 */
+"vec4 textureGather_(sampler2D tex, vec2 P){\n"
+" ivec2 sz = textureSize(tex, 0);\n"
+" ivec2 tc = ivec2(floor(P * vec2(sz) - 0.5));\n"
+" ivec2 c0 = clamp(tc, ivec2(0), sz-ivec2(1));\n"
+" ivec2 c1 = clamp(tc+ivec2(1,0), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c2 = clamp(tc+ivec2(1,1), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c3 = clamp(tc+ivec2(0,1), ivec2(0), sz-ivec2(1));\n"
+" return vec4(texelFetch(tex, c0, 0).r,\n"
+"             texelFetch(tex, c1, 0).r,\n"
+"             texelFetch(tex, c2, 0).r,\n"
+"             texelFetch(tex, c3, 0).r);\n"
 "}"
-/*"vec4 textureGather_(sampler2D tex, vec2 P, float comp){\n"
-" return textureGather(tex, P, int(comp));\n"
-"}"*/
+"vec4 textureGather_(sampler2D tex, vec2 P, float comp){\n"
+" ivec2 sz = textureSize(tex, 0);\n"
+" ivec2 tc = ivec2(floor(P * vec2(sz) - 0.5));\n"
+" ivec2 c0 = clamp(tc, ivec2(0), sz-ivec2(1));\n"
+" ivec2 c1 = clamp(tc+ivec2(1,0), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c2 = clamp(tc+ivec2(1,1), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c3 = clamp(tc+ivec2(0,1), ivec2(0), sz-ivec2(1));\n"
+" int k = int(comp);\n"
+" return vec4(texelFetch(tex, c0, 0)[k],\n"
+"             texelFetch(tex, c1, 0)[k],\n"
+"             texelFetch(tex, c2, 0)[k],\n"
+"             texelFetch(tex, c3, 0)[k]);\n"
+"}"
 "vec4 textureGather_Offset_(sampler2D tex, vec2 P, vec2 offset){\n"
-" ivec2 Size = textureSize(tex, 0);\n"
-" return textureGather(tex, P+offset/vec2(float(Size.x), float(Size.y)));\n"
+" ivec2 sz = textureSize(tex, 0);\n"
+" ivec2 tc = ivec2(floor(P * vec2(sz) - 0.5)) + ivec2(offset);\n"
+" ivec2 c0 = clamp(tc, ivec2(0), sz-ivec2(1));\n"
+" ivec2 c1 = clamp(tc+ivec2(1,0), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c2 = clamp(tc+ivec2(1,1), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c3 = clamp(tc+ivec2(0,1), ivec2(0), sz-ivec2(1));\n"
+" return vec4(texelFetch(tex, c0, 0).r,\n"
+"             texelFetch(tex, c1, 0).r,\n"
+"             texelFetch(tex, c2, 0).r,\n"
+"             texelFetch(tex, c3, 0).r);\n"
 "}"
-/*"vec4 textureGather_Offset_(sampler2D tex, vec2 P, vec2 offset, float comp){\n"
-" ivec2 Size = textureSize(tex, 0);\n"
-" return textureGather(tex, P+offset/vec2(float(Size.x), float(Size.y)), int(comp));\n"
-"}"*/
+"vec4 textureGather_Offset_(sampler2D tex, vec2 P, vec2 offset, float comp){\n"
+" ivec2 sz = textureSize(tex, 0);\n"
+" ivec2 tc = ivec2(floor(P * vec2(sz) - 0.5)) + ivec2(offset);\n"
+" ivec2 c0 = clamp(tc, ivec2(0), sz-ivec2(1));\n"
+" ivec2 c1 = clamp(tc+ivec2(1,0), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c2 = clamp(tc+ivec2(1,1), ivec2(0), sz-ivec2(1));\n"
+" ivec2 c3 = clamp(tc+ivec2(0,1), ivec2(0), sz-ivec2(1));\n"
+" int k = int(comp);\n"
+" return vec4(texelFetch(tex, c0, 0)[k],\n"
+"             texelFetch(tex, c1, 0)[k],\n"
+"             texelFetch(tex, c2, 0)[k],\n"
+"             texelFetch(tex, c3, 0)[k]);\n"
+"}"
 /*"vec3 shadow2DLod(sampler2DShadow shadow, vec3 coord, int level){\n"
 " return vec3(textureLod(shadow, coord, float(level)), 0.0, 0.0);\n"
 "}"*/

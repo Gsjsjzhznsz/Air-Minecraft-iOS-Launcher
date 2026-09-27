@@ -201,7 +201,16 @@
         <key>UIStatusBarHidden</key>
         <true/>
         <key>UIRequiresFullScreen</key>
-        <false/>
+        <true/>
+        <!-- Task188（强制横屏·第二轮）：Task187 移除了 Portrait 后 15fddc2 装机
+             仍然竖屏（iPadOS 27 窗口模式下 Code=101 “当前窗口模式不允许以编程
+             方式更改界面方向”）。根因：iPadOS 26+ 的窗口系统里，可自由调节
+             尺寸的 app 窗口由系统持有几何、完全无视 UISupportedInterfaceOrientations
+             与代码级覆盖（AppDelegate supportedInterfaceOrientationsFor:、
+             SceneDelegate scene:supportedInterfaceOrientationsForWindowScene:、
+             根 VC 覆盖全部已就位且无效）。声明 UIRequiresFullScreen=true 退出
+             窗口模式 → 系统回归传统全屏呈现，方向列表立即生效（游戏启动器
+             本就全屏体验，无多任务/分屏诉求）。 -->
         <key>UISupportedInterfaceOrientations</key>
         <array>
                 <!-- Task187（强制横屏）：移除 UIInterfaceOrientationPortrait——启动器为横屏设计，

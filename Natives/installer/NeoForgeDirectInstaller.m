@@ -133,10 +133,9 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
         reportProgress(0.15, localize(@"i18n_str_1268", nil));
 
         // 提前创建 libraries 目录，避免后续下载/解压失败
-        [[NSFileManager defaultManager] createDirectoryAtPath:librariesDir
-                                  withIntermediateDirectories:YES
-                                                   attributes:nil
-                                                        error:nil];
+        // Task188：带杂散文件自愈（历史失败残留的"目录位同名文件"会令
+        // 后续所有子路径写入静默失败）。
+        ame188_ensureDirectoryHealed(librariesDir);
 
         BOOL success = [self installNewFormat:installProfile
                                installerPath:installerPath
@@ -264,10 +263,8 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
     NSString *versionDir = [[self gameDirectory] stringByAppendingPathComponent:[NSString stringWithFormat:@"versions/%@", versionId]];
     NSString *versionJsonPath = [versionDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.json", versionId]];
     NSLog(@"[NeoForgeDirect] Version directory: %@", versionDir);
-    [[NSFileManager defaultManager] createDirectoryAtPath:versionDir
-                              withIntermediateDirectories:YES
-                                               attributes:nil
-                                                    error:nil];
+    // Task188：杂散文件自愈建目录（同前）。
+    ame188_ensureDirectoryHealed(versionDir);
 
     // Step A: 解压 installer.jar 内 maven/ 下的所有依赖到 libraries 目录
     NSLog(@"[NeoForgeDirect] Extracting all maven entries from installer jar");
@@ -318,6 +315,69 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
                                                       error:error]) {
         NSLog(@"[NeoForgeDirect] Processor execution failed");
         return NO;
+    }
+
+    // Step E (Task188)：后置产物验证 —— processor 输出（minecraft-client-patched 等）
+    // 由 headless JVM 本地生成，此前的下载失败（如 client classifier 官方源本就
+    // 404）只有在处理器跑完后才能定案。病历（15fddc2 latestlog.old.1）：
+    // universal 解压/下载双败 + 启动侧 "The NeoForge jar is missing" /
+    // "An error occurred scanning file jar(.../minecraft-client-patched-...jar)"，
+    // 而安装整体仍报 "Installation completed successfully" —— 静默缺件安装。
+    // 验证规则（仅运行期清单 versionJson.libraries，跳过 OS rules 不适用项）：
+    //   1) 工件必须存在；
+    //   2) .jar 工件头 4 字节必须是 PK\x03\x04（拦截空文件/HTML 错误页/半包）。
+    // 任一缺失 ⇒ 本次安装显式失败并列出缺件清单，绝不静默成功。
+    {
+        NSMutableArray<NSString *> *missingArtifacts = [NSMutableArray array];
+        NSArray *ame188_runtimeLibs = versionJson[@"libraries"];
+        if ([ame188_runtimeLibs isKindOfClass:[NSArray class]]) {
+            for (NSDictionary *ame188_lib in ame188_runtimeLibs) {
+                if (![ame188_lib isKindOfClass:[NSDictionary class]]) continue;
+                NSString *ame188_name = [ame188_lib[@"name"] isKindOfClass:[NSString class]] ? ame188_lib[@"name"] : nil;
+                id ame188_rules = ame188_lib[@"rules"];
+                if ([ame188_rules isKindOfClass:[NSArray class]] && [(NSArray *)ame188_rules count] > 0) {
+                    if (![MinecraftResourceUtils evaluateRules:(NSArray *)ame188_rules]) continue;
+                }
+                NSString *ame188_rel = nil;
+                NSDictionary *ame188_dl = ame188_lib[@"downloads"];
+                if ([ame188_dl isKindOfClass:[NSDictionary class]] &&
+                    [ame188_dl[@"artifact"] isKindOfClass:[NSDictionary class]] &&
+                    [ame188_dl[@"artifact"][@"path"] isKindOfClass:[NSString class]]) {
+                    ame188_rel = ame188_dl[@"artifact"][@"path"];
+                }
+                if (ame188_rel.length == 0) ame188_rel = [self mavenPathToRelativePath:ame188_name ?: @""];
+                if (ame188_rel.length == 0) continue;
+                NSString *ame188_dest = [librariesDir stringByAppendingPathComponent:ame188_rel];
+                BOOL ame188_isDir = NO;
+                if (![NSFileManager.defaultManager fileExistsAtPath:ame188_dest isDirectory:&ame188_isDir] || ame188_isDir) {
+                    [missingArtifacts addObject:[NSString stringWithFormat:@"%@ (missing)", ame188_name ?: ame188_rel]];
+                    continue;
+                }
+                if ([ame188_dest.pathExtension.lowercaseString isEqualToString:@"jar"]) {
+                    NSFileHandle *ame188_fh = [NSFileHandle fileHandleForReadingAtPath:ame188_dest];
+                    NSData *ame188_head = ame188_fh ? [ame188_fh readDataOfLength:4] : nil;
+                    [ame188_fh closeFile];
+                    const unsigned char *ame188_p = (const unsigned char *)ame188_head.bytes;
+                    BOOL ame188_zipMagic = (ame188_head.length == 4 && ame188_p[0] == 0x50 && ame188_p[1] == 0x4B);
+                    if (!ame188_zipMagic) {
+                        [missingArtifacts addObject:[NSString stringWithFormat:@"%@ (corrupt, not a jar)", ame188_name ?: ame188_rel]];
+                    }
+                }
+            }
+        }
+        if (missingArtifacts.count > 0) {
+            NSLog(@"[NeoForgeDirect] Task188: post-processor verification FAILED -- %lu artifact(s) invalid: %@",
+                  (unsigned long)missingArtifacts.count, missingArtifacts);
+            if (error) {
+                *error = [NSError errorWithDomain:NeoForgeDirectInstallerErrorDomain
+                                             code:NeoForgeDirectInstallerErrorWriteFailed
+                                         userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:
+                    @"安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@", missingArtifacts]}];
+            }
+            return NO;
+        }
+        NSLog(@"[NeoForgeDirect] Task188: post-processor verification passed (%lu runtime libraries present and valid)",
+              (unsigned long)ame188_runtimeLibs.count);
     }
 
     // Write version JSON
@@ -528,14 +588,13 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
     }
 
     // 5. 创建父版本目录并写入 JSON
-    NSError *dirError = nil;
-    [NSFileManager.defaultManager createDirectoryAtPath:parentVersionDir
-                            withIntermediateDirectories:YES
-                                             attributes:nil
-                                                  error:&dirError];
-    if (dirError) {
-        NSLog(@"[NeoForgeDirect] Failed to create parent version dir: %@", dirError.localizedDescription);
-        if (error) *error = dirError;
+    // Task188：杂散文件自愈建目录（同前）。
+    if (!ame188_ensureDirectoryHealed(parentVersionDir)) {
+        if (error) {
+            *error = [NSError errorWithDomain:NeoForgeDirectInstallerErrorDomain
+                                         code:NeoForgeDirectInstallerErrorWriteFailed
+                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create directory %@", parentVersionDir]}];
+        }
         return NO;
     }
 
@@ -694,8 +753,10 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
         }
 
         // 创建目标目录
+        // Task188：杂散文件自愈（病历：universal jar 因目录位同名杂散文件
+        // 在此写失败，且旧实现 error:nil 静默吞错）。
         NSString *destDir = [destPath stringByDeletingLastPathComponent];
-        [fm createDirectoryAtPath:destDir withIntermediateDirectories:YES attributes:nil error:nil];
+        ame188_ensureDirectoryHealed(destDir);
 
         // 写入文件
         NSError *writeError = nil;
@@ -944,16 +1005,13 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
     }
 
     NSString *destDir = [destPath stringByDeletingLastPathComponent];
-    NSError *dirError = nil;
-    [NSFileManager.defaultManager createDirectoryAtPath:destDir
-                            withIntermediateDirectories:YES
-                                             attributes:nil
-                                                  error:&dirError];
-    if (dirError) {
+    // Task188：杂散文件自愈建目录（病历主现场：universal jar 下载因
+    // "目录位已存在同名文件"在此失败，安装却继续走完报成功）。
+    if (!ame188_ensureDirectoryHealed(destDir)) {
         if (error) {
             *error = [NSError errorWithDomain:NeoForgeDirectInstallerErrorDomain
                                          code:NeoForgeDirectInstallerErrorWriteFailed
-                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create directory %@: %@", destDir, dirError.localizedDescription]}];
+                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create directory %@", destDir]}];
         }
         return NO;
     }
@@ -1102,17 +1160,13 @@ NSString *const NeoForgeDirectInstallerErrorDomain = @"NeoForgeDirectInstallerEr
     }
 
     NSString *destDir = [destPath stringByDeletingLastPathComponent];
-    NSError *dirError = nil;
-    [[NSFileManager defaultManager] createDirectoryAtPath:destDir
-                              withIntermediateDirectories:YES
-                                               attributes:nil
-                                                    error:&dirError];
-    if (dirError) {
-        NSLog(@"[NeoForgeDirect] Failed to create directory '%@': %@", destDir, dirError.localizedDescription);
+    // Task188：杂散文件自愈建目录（病历：universal jar 下载因
+    // "已存在同名文件"在此失败，而安装整体仍报成功）。
+    if (!ame188_ensureDirectoryHealed(destDir)) {
         if (error) {
             *error = [NSError errorWithDomain:NeoForgeDirectInstallerErrorDomain
                                          code:NeoForgeDirectInstallerErrorWriteFailed
-                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create directory %@: %@", destDir, dirError.localizedDescription]}];
+                                     userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:@"Failed to create directory %@", destDir]}];
         }
         return NO;
     }

@@ -980,3 +980,57 @@ double ame187_iphoneNotchInset(UIView *view, BOOL isLeading) {
     }
     return isLeading ? (double)insets.left : (double)insets.right;
 }
+
+// ============================================================================
+// Task 188（安装器目录杂散文件自愈）：递归建目录，路径上任意一级"目录位
+// 置被同名普通文件占用"（历史安装失败残留 / APFS 不允许文件目录同名共存）
+// 时自动移除该杂散文件后重试创建。
+// 病历（15fddc2 latestlog.old.1，NeoForge 26.1.2.109 安装）：
+//   libraries/net/neoforged/neoforge/26.1.2.109 处存在杂散普通文件
+//   → universal jar 的解压（extractAllMavenEntries failed to write）与
+//     下载（Failed to create directory ... 已存在同名文件）双双失败，
+//   → 但安装流程继续走完并报 "Installation completed successfully"
+//   → 启动时 FML 报 "The NeoForge jar is missing"（用户反馈"缺失文件"）。
+// ForgeDirectInstaller 的 ensureDirectoryExists: 只查最终一层；本助手
+// 沿完整祖先链逐级清理（深层目录首次创建时中间层也可能是杂散文件）。
+// ============================================================================
+BOOL ame188_ensureDirectoryHealed(NSString *path) {
+    if (path.length == 0) return NO;
+    NSFileManager *fm = NSFileManager.defaultManager;
+    BOOL isDir = NO;
+    if ([fm fileExistsAtPath:path isDirectory:&isDir]) {
+        if (isDir) return YES;   // 已是目录，幂等成功
+        // 最终路径本身是普通文件 = 挡路杂散文件（调用方要的是目录）
+        NSError *rmErr = nil;
+        if (![fm removeItemAtPath:path error:&rmErr]) {
+            NSLog(@"[Task188] cannot remove stray file at target %@: %@", path, rmErr.localizedDescription);
+            return NO;
+        }
+        NSLog(@"[Task188] stray file at target removed: %@", path);
+    }
+    // 尝试直接创建（快路径：无阻塞时零额外 stat）
+    NSError *createErr = nil;
+    if ([fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:&createErr]) {
+        return YES;
+    }
+    // 慢路径：逐级检查祖先链，清理"目录位上的普通文件"后重试
+    NSLog(@"[Task188] directory create failed (%@), scanning ancestors for stray files...", createErr.localizedDescription);
+    NSArray *comps = path.pathComponents;
+    NSString *cur = @"";
+    for (NSString *c in comps) {
+        if ([c isEqualToString:@"/"]) { cur = @"/"; continue; }
+        // stringByAppendingPathComponent 对根目录后拼接会正确去重斜杠
+        cur = [cur stringByAppendingPathComponent:c];
+        BOOL cd = NO;
+        BOOL ex = [fm fileExistsAtPath:cur isDirectory:&cd];
+        if (ex && !cd) {
+            NSError *rmErr = nil;
+            if ([fm removeItemAtPath:cur error:&rmErr]) {
+                NSLog(@"[Task188] stray file blocking ancestor removed: %@", cur);
+            } else {
+                NSLog(@"[Task188] failed removing ancestor stray %@: %@", cur, rmErr.localizedDescription);
+            }
+        }
+    }
+    return [fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:NULL];
+}

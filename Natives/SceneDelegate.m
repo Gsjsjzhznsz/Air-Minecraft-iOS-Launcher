@@ -21,11 +21,19 @@ extern __weak UIWindow *mainWindow;
     UIWindowScene *windowScene = (UIWindowScene *)scene;
     
     // 强制横屏 (iOS 16+)
+    // Task188：窗口模式（iPadOS 26+ 多窗口/LiveContainer 宿主）下系统持有
+    // 几何、本请求预期被拒（Code=101）——Info.plist 的 UIRequiresFullScreen=true
+    // 才是主修复；此请求仅在全屏模式下作纵深防御，失败为预期态降级为单次
+    // 提示（不再每次启动刷一条 Failed 日志）。
     if (@available(iOS 16.0, *)) {
         UIWindowSceneGeometryPreferencesIOS *geometryPreferences = [[UIWindowSceneGeometryPreferencesIOS alloc] init];
         geometryPreferences.interfaceOrientations = UIInterfaceOrientationMaskLandscape;
         [windowScene requestGeometryUpdateWithPreferences:geometryPreferences errorHandler:^(NSError *error) {
-            NSLog(@"[SceneDelegate] Failed to update geometry: %@", error);
+            static BOOL s_task188_logged = NO;
+            if (!s_task188_logged) {
+                s_task188_logged = YES;
+                NSLog(@"[SceneDelegate] Task188: geometry request declined (expected in window mode; Info.plist UIRequiresFullScreen is the primary fix): %@", error.localizedDescription);
+            }
         }];
     }
     

@@ -214,6 +214,8 @@ typedef unsigned int (*ame_es_checkfb_t)(unsigned int);
 // Task187：黑屏二分取证包——glGetFloatv/glGetBooleanv（clearColor/colorMask）
 typedef void (*ame_es_getfloat_t)(unsigned int, float *);
 typedef void (*ame_es_getbool_t)(unsigned int, unsigned char *);
+// Task188：1x1 中心像素回读（决定性二分：内容层 vs 呈现层）
+typedef void (*ame_es_readpx_t)(int, int, int, int, unsigned int, unsigned int, void *);
 
 typedef struct {
     ame_es_getint_t    getIntegerv;
@@ -224,6 +226,7 @@ typedef struct {
     ame_es_blitfb_t    blitFramebuffer;
     ame_es_getfloat_t  getFloatv;      // Task187 状态快照
     ame_es_getbool_t   getBooleanv;    // Task187 状态快照
+    ame_es_readpx_t    readPixels;     // Task188 中心像素回读
     EGLBoolean (*querySurface)(EGLDisplay, EGLSurface, EGLint, EGLint *);
     ame_es_bindtex_t   bindTexture;        // Task 49 几何自愈
     ame_es_texparami_t texParameteri;      // Task 49 几何自愈
@@ -701,11 +704,14 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
         // 状态机不同，读数必须来自渲染器自己的表）
         void *ame146_gfv = dlsym(ame145_rendererHandle, "glGetFloatv");
         void *ame146_gbv = dlsym(ame145_rendererHandle, "glGetBooleanv");
+        // Task188：1x1 回读同走渲染器 dispatch
+        void *ame188_rpx = dlsym(ame145_rendererHandle, "glReadPixels");
         if (ame146_giv) es.getIntegerv    = (ame_es_getint_t)ame146_giv;
         if (ame146_bfb) es.bindFramebuffer = (ame_es_bindfb_t)ame146_bfb;
         if (ame146_qs)  es.querySurface   = (EGLBoolean (*)(EGLDisplay, EGLSurface, EGLint, EGLint *))ame146_qs;
         if (ame146_gfv) es.getFloatv      = (ame_es_getfloat_t)ame146_gfv;
         if (ame146_gbv) es.getBooleanv    = (ame_es_getbool_t)ame146_gbv;
+        if (ame188_rpx) es.readPixels     = (ame_es_readpx_t)ame188_rpx;
         static int ame146_dspLogs = 0;
         if (ame146_dspLogs < 2) {
             ame146_dspLogs++;
@@ -768,6 +774,52 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
               scissorBox[0], scissorBox[1], scissorBox[2], scissorBox[3], (int)scissorOn,
               (int)depthOn, (int)blendOn, (int)stencilOn,
               drawFb, readFb, viewport[0], viewport[1], viewport[2], viewport[3]);
+
+        // ============================================================
+        // Task188：黑屏取证升级（15fddc2 判读结果：全状态正常 + clearColor
+        // 黑 + 58fps 全速 = "MC 真画了黑内容" 或 "呈现丢弃" 未分）。三件套：
+        // (1) 相位标记——上轮 8 探针 8 条 Invalid pname(1280) 与探针严格 1:1
+        //     （mg 会话零出现），但 state 块全部 pname 均 ES3 合法；本轮在
+        //     查询前后分组清错，下一轮日志直接点名非法查询所属相位。
+        // (2) 默认帧缓冲格式——GL_ALPHA_BITS（alpha 通道在场则预乘合成
+        //     黑屏假说升级：MC 清屏 alpha=0 + 可透层 = 全透黑）。
+        // (3) 1x1 中心像素回读（≤3 次/会话，仅默认 FB 绑定时）——决定性
+        //     二分：像素非黑 ⇒ 内容已进 drawable、呈现链丢弃（层合成方向）；
+        //     像素黑 ⇒ 内容真黑（spvc 语义方向，下一轮直接查改写）。
+        //     Task75 SIGBUS 教训：全屏 BGRA 回读死于 CopyBGRA8ToRGBA8 NEON
+        //     拷贝；此处 4 字节 RGBA 读走独立小分配路径，并预清错误队列。
+        // ============================================================
+        {
+            // (1) 相位标记：state 块读完后若错误队列非空，点名相位
+            unsigned int ame188_err = es.getError();
+            if (ame188_err != 0) {
+                NSLog(@"[RenderDiag] Task188 phase-tag: GL error 0x%x pending AFTER Task187 state queries (bad pname is among drawFb/readFb/viewport/clear/mask/scissor/enable queries)", ame188_err);
+            }
+            // (2) 默认 FB 通道位宽
+            int ame188_alphaBits = -1, ame188_depthBits = -1;
+            if (es.getIntegerv != NULL) {
+                es.getIntegerv(0x0D55 /*GL_ALPHA_BITS*/, &ame188_alphaBits);
+                es.getIntegerv(0x0D56 /*GL_DEPTH_BITS*/, &ame188_depthBits);
+            }
+            // (3) 1x1 中心回读
+            static int s_task188_reads = 0;
+            unsigned char ame188_px[4] = {0, 0, 0, 0};
+            BOOL ame188_readOK = NO;
+            if (drawFb == 0 && viewport[2] > 0 && viewport[3] > 0 &&
+                es.readPixels != NULL && s_task188_reads < 3) {
+                s_task188_reads++;
+                while (es.getError()) {}  // 预清（上一查询组的残留不污染回读判读）
+                es.readPixels(viewport[0] + viewport[2] / 2, viewport[1] + viewport[3] / 2,
+                              1, 1, 0x1908 /*GL_RGBA*/, 0x1401 /*GL_UNSIGNED_BYTE*/, ame188_px);
+                unsigned int ame188_rbErr = es.getError();
+                ame188_readOK = (ame188_rbErr == 0);
+                NSLog(@"[RenderDiag] Task188 readback #%d center=(%d,%d) rgba=(%d,%d,%d,%d) glErr=0x%x -- nonzero rgb => content present, presentation drops it; black => genuinely-black content",
+                      s_task188_reads, viewport[0] + viewport[2] / 2, viewport[1] + viewport[3] / 2,
+                      ame188_px[0], ame188_px[1], ame188_px[2], ame188_px[3], ame188_rbErr);
+            }
+            NSLog(@"[RenderDiag] Task188 fb: alphaBits=%d depthBits=%d readbackDone=%d (alphaBits=8 => premultiplied-black composite hypothesis live)",
+                  ame188_alphaBits, ame188_depthBits, (int)ame188_readOK);
+        }
     }
     // Task 76：退役 while(es.getError() != 0) 清错循环——它会把底层 ANGLE
     // 错误队列清空，吞掉 MobileGlues 待转译的错误。getIntegerv 本身不产生
@@ -1772,6 +1824,16 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
               (void *)bundle->surface, (__bridge void *)layer,
               layer.bounds.size.width, layer.bounds.size.height,
               (double)layer.contentsScale, drawable.width, drawable.height, (int)inWindow);
+        // Task188：呈现链格式取证——CAMetalLayer 像素格式（含 alpha 的
+        // BGRA8Unorm + MC 清屏 alpha=0 + 可透合成 = 全透黑假说的关键数据）、
+        // opaque、framebufferOnly。与 Task188 探针的 GL_ALPHA_BITS 互证：
+        // 层侧与 GL 侧任一含 alpha 都令该假说升级为待裁决主嫌。
+        if (isMetal) {
+            CAMetalLayer *ame188_ml = (CAMetalLayer *)layer;
+            NSLog(@"[RenderDiag] Task188 layer: pixelFormat=%u opaque=%d framebufferOnly=%d maxDrawables=%ld (BGRA8Unorm=80 alpha-bearing; opaque=0 => alpha composited)",
+                  (unsigned int)ame188_ml.pixelFormat, (int)ame188_ml.opaque,
+                  (int)ame188_ml.framebufferOnly, (long)ame188_ml.maximumDrawableCount);
+        }
         // Task 36 取证：surface 在 EGL 侧的真实尺寸（MC RenderPearl 的表面配置
         // 报 1180x820，若此处 eglQuerySurface 报 2360x1640 则存在 2x 不匹配，
         // 下一轮设备日志可据此判断合成/缩放行为）。

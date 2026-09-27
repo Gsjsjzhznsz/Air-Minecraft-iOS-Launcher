@@ -862,3 +862,23 @@ Stage Summary:
 - keychain：弹窗"删除账号并重新登录"一键修复；巨魔启动"验证完整性"最长 30s 自动收尾 + 耗时锚点
 - iPhone：锁定横屏（无 Portrait）；刘海侧自动避让（iPad 零回归）
 - 遗留：ANGLE 黑屏根因待 01cddae 后续构建的 Task187 状态快照裁决；vgpu post 特效上游 bug（sobel WARN，非阻塞）；launch.stage.* 孤儿键与 i18n_str_195/196 文案与新流程的收尾清理（低优先）
+
+---
+Task ID: 188
+Agent: main (Super Z)
+Task: 15fddc2 六日志分诊 + 六项修复轮（vgpu 白屏第四层闭环 / ANGLE 取证升级 / Forge 拆分包 / NeoForge 杂散文件 + 产物验证 / UIRequiresFullScreen 横屏 / FCL 式控件仓库）
+
+Work Log:
+- 六日志归位：latestlog.old.txt=ANGLE 会话（15fddc2）、latestlog.txt=vgpu、latestlog.2=Forge 26.1.2 启动崩、latestlog.old.2=Forge 安装、latestlog.old.1+.1=NeoForge 装+启、latestlog (2).txt=他人旧构建 8cb5e03（26.3 误装报告，Task187 一键流已覆盖，需新包）
+- vgpu 白屏第四层（包装块自毒）：Task187 头行修复后 #version 违规消失，新形态 0:25 'textureGather: no matching overloaded function found'——NewConvertShader 的兼容函数包装块（texelFetch_/textureGather_/…）无条件前置到所有转换后 shader（含 436 字节 FPE 顶点着色器），而包装块自调原生 textureGather（ES 3.10+ 才有）；能力探测实测 300es=1 310es=0 320es=0 → 全管线编译死 → 白屏。修复：pack/shaderconv.c textureGather_/Offset_ 改 texelFetch 四点仿真（基点 floor(P*size-0.5)、四角 (x,y)(x+1,y)(x+1,y+1)(x,y+1)、clamp 钳制、comp 重载动态下标启用——全部 ES 3.00 合法）
+- Forge 26.1.2 崩溃：ResolutionException "Modules launcher and lwjgl export package com.apple.ios.audio"——Makefile 把 launcher 的音频类 + JavaSound services 镜像进 lwjgl_lib（c71dcfa SDL-hook 时代遗留）；lwjgl overlay 零引用、launcher.jar 恒在 classpath → 镜像撤除，包唯一化于 launcher.jar
+- NeoForge 缺文件（双因叠加）：(a) libraries/net/neoforged/neoforge/26.1.2.109 处杂散同名普通文件 → universal 解压+下载双败而安装仍报成功；(b) minecraft-client-patched 是 processor 本地产物（client classifier 双源 404 属预期）。修复：utils ame188_ensureDirectoryHealed（祖先链杂散文件自愈）接入两安装器全部建目录点 + Step E 后置产物验证（运行期清单存在性 + jar PK 魔数，缺件显式失败绝不静默成功）；Forge ensureDirectoryExists 升级同款委托
+- 强制横屏第二轮：Task187 移除 Portrait 无效——iPadOS 27 窗口模式下系统持有几何，无视方向列表与全部代码级覆盖（AppDelegate/SceneDelegate/根 VC 全在位全无效，Code=101 实证）；UIRequiresFullScreen=true 退出窗口模式 → 方向列表生效；SceneDelegate 请求保留为纵深防御（失败降级单次提示）
+- ANGLE 取证升级（Task187 快照判读：全状态正常 + clearColor(0,0,0,0) + 58fps + 零编译错误 = "真黑内容"与"呈现丢弃"未分）：1x1 中心像素回读（≤3 次/会话，独立 4 字节小分配避开 Task75 全屏 SIGBUS 路径）+ GL_ALPHA_BITS/GL_DEPTH_BITS + CAMetalLayer pixelFormat/opaque/framebufferOnly 一次性日志（BGRA8+alpha=0 clear+可透合成=预乘黑假说的三数据点）+ 相位标记点名每探针一条的 Invalid pname 归属
+- FCL 式控件仓库：ControlRepoViewController（索引/列表/下载/校验/落盘 controlmap/<id>.json，raw.githubusercontent 主源 + jsDelivr 回退，mControlDataList 数组门 + 防连点锁 + 已装版本角标）；编辑器长按菜单"控件仓库"入口；CMake 收录；i18n ×11 键四语言（基线 1959→1970）；仓库种子 controls/（classic/minimal-fps/large-buttons + index.json，生成脚本 scripts/task188_seed_controls.py）
+- 验证：verify_task188 53/53（括号门抓出 ControlRepoViewController 两处 `}];` 应为 `});` 的真实笔误）；级联 187:61、vgpu 语法门全过、186:52、185:63、184:39、183:50、159:48（E1 重锚 1959→1970）、task175_syntax_gates ALL PASS；version.h REVISION 附录
+
+Stage Summary:
+- 装机锚点：vgpu（textureGather 编译错误归零 = 白屏闭环链第四环）；ANGLE（"Task188 readback #N center rgba=..." 非黑=呈现丢弃 / 黑=spvc 语义；"Task188 fb: alphaBits=..."；"Task188 layer: pixelFormat=..."；"Task188 phase-tag"）；Forge/NeoForge（"Task188: stray file ... removed" + "Task188: post-processor verification passed/FAILED"）；横屏（启动即横屏，无 Portrait 窗口）；控件仓库（"[ControlRepo] Task188: index loaded/downloading/saved"）
+- Forge/NeoForge 用户路径：重装即自愈（杂散文件清除 + 缺件显式报错 + processor 重跑补件）
+- 遗留：ANGLE 黑屏待 readback/alphaBits 数据裁决方向（呈现 vs spvc 语义）；他人 26.3 误装需新包验证一键流；LiveContainer 宿主下 UIRequiresFullScreen 传递性待装机确认
