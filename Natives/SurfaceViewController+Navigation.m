@@ -331,13 +331,35 @@ static const void *kMenuDimViewKey = &kMenuDimViewKey;
                                                             preferredStyle:UIAlertControllerStyleActionSheet];
 
     NSArray *options = @[@25, @50, @75, @100, @125, @150];
-    NSInteger currentValue = (NSInteger)getPrefFloat(@"video.resolution");
+    // Task186（分辨率调节失效根修）：Task159 实例化后生效链（updateSavedResolution）
+    // 读 profile 键 resolution（[PLProfiles resolveKeyForCurrentProfile:]，
+    // profile 固化显式值后全局 video.resolution 即被无视——版本设置页首次保存
+    // 即固化），而本菜单旧代码读写全局键 → 游戏内调节永远无效、✓ 标记与实际
+    // 生效值脱节。修法：读写全部对齐 profile 层（与生效链同源）。
+    NSInteger currentValue = [PLProfiles resolveKeyForCurrentProfile:@"resolution"].integerValue;
+    if (currentValue <= 0) currentValue = 100;
     for (NSNumber *value in options) {
         NSString *title = [NSString stringWithFormat:@"%ld%%", (long)value.intValue];
         if (value.intValue == currentValue) {
             title = [NSString stringWithFormat:@"✓ %@", title];
         }
         [alert addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault handler:^(UIAlertAction *action) {
+            // Task186：写当前实例的 resolution 键（setServerIp 同款 mutableCopy
+            // 写回模式，updateSavedResolution 立即可见——PLProfiles.current 同一
+            // 内存对象，无需重建）；
+            NSString *ame186_profileName = PLProfiles.current.selectedProfileName;
+            if (ame186_profileName.length > 0) {
+                NSMutableDictionary *ame186_profile = [PLProfiles.current.profiles[ame186_profileName] mutableCopy];
+                if (!ame186_profile) ame186_profile = [NSMutableDictionary dictionary];
+                ame186_profile[@"resolution"] = [NSString stringWithFormat:@"%ld", (long)value.intValue];
+                PLProfiles.current.profiles[ame186_profileName] = ame186_profile;
+                [PLProfiles.current save];
+                NSLog(@"[Task186] in-game resolution: profile '%@' resolution -> %ld%% (was %ld%%)",
+                      ame186_profileName, (long)value.intValue, (long)currentValue);
+            }
+            // 兼容镜像：JavaGUI（executeJar 窗口，无实例上下文）4 处仍读全局
+            // video.resolution（Task159 注释明确的保留设计），保持旧全局写入
+            // 不回归其行为。
             setPrefFloat(@"video.resolution", value.floatValue);
             [self updateSavedResolution];
         }]];

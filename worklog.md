@@ -801,3 +801,24 @@ Stage Summary:
 - 首推 9e88f77（主轮 + 治愈轮）：CI run 36317248542 failure——ModLoaderInstallViewController.m:924 "use of undeclared identifier 'NSBlock'"（ame185_fetchForgeFallbackJSON 的防御写法 isKindOfClass:NSBlock.class；NSBlock 是 macOS 公开类、iOS SDK 未声明。本地验证器为纯静态检查无编译环节，故漏网）
 - 热修 8cb5e03：NSBlock 判定换 nil 检查（本防御足够）；全仓 NSBlock 代码用法清零（仅注释留档）；verify_task185 重跑 63/63 + 语法门全过
 - CI run 36317693650 completed success —— main 徽标恢复 passing；新令牌已更新进 remote（旧令牌确系 401 失效，用户重新配发）
+
+---
+Task ID: 186
+Agent: main (Super Z)
+Task: 11e4b63 遗留三线根修：ANGLE 黑屏（内容层 transpose 嫌疑加固）+ vgpu 白屏（Task183 半修复回归闭环）+ 游戏内分辨率调节失效（Task159 实例化键分叉）
+
+Work Log:
+- vgpu 白屏重新判读（c689d41 latestlog.old.txt）：Task183 版本跟随修复【生效】（"VGPU Task183: GLSLHeader version follows capability probe -> #version 300 es (300es=1 310es=0 320es=0)" 在场，转换产物首行 #version 300 es）——上一轮"输出仍 #version 120"为误读；真根因 = shader_conv_ 的插入点定位恒 strstr(new_version="#version 320 es") → 300es 会话必落空 → cut_in_offset=0 → "out mediump vec4 FragColor;" 与 _shadow2D 的 "precision mediump sampler2DShadow;"、gl_FragData layout-out 行全部被 cut_in 插到 #version 行【之前】→ 版本指令失效（GLSL 规定首语句）→ 按 ES 1.00 编译 → "ERROR: 0:1: 'out' : storage qualifier supported in GLSL ES 3.00 and above only" + "0:2 'sampler2DShadow' : Illegal use of reserved word" → FPE 全灭 = 白屏（日志实锤双形态错误与 GLSLHeader 日志同场）
+- ANGLE 黑屏判读（c689d41 latestlog.txt）：呈现层全绿（fps=60 swapOK=372、遮罩按 first-swap 移除、Task183 后无 "Couldn't compile ... for pipeline" 刷屏、sanitize 锚点在场）但屏幕纯黑 = MC 画了黑内容；desktop GL 3.3 glUniformMatrix*fv 允许 transpose=TRUE（行主序），ESSL 强制 FALSE：违反 = GL_INVALID_VALUE 且调用整体丢弃 → 矩阵 uniform 全灭 → 顶点退化为零向量 → 几何全剔除 → 只剩 clearColor，与症状逐点吻合；本 dylib 从未导出矩阵族 → 调用直落 ANGLE 原生（ES 语义无人在场转置）。附带盘点：0x884F=GL_TEXTURE_CUBE_MAP_SEAMLESS / 0x8642=GL_PROGRAM_POINT_SIZE 两个 desktop-only glEnable 被 ES 拒（debug message 噪音，无害，未处理）；"Invalid pname" swap 期高频（待后续取证）
+- 分辨率调节根因：游戏内菜单 actionAdjustResolution 读写【全局】video.resolution，但生效链 updateSavedResolution:1562 读【profile】resolution（Task159 实例化：resolveKeyForCurrentProfile，版本设置页首次保存即固化 profile 键 → 全局键被无视）→ 游戏内调节永远无效 + ✓ 标记与实际值脱节；Task184 的 ProfileSettings 改动仅为背景透明度（parent-checkout），与本症无关
+- 修复 A（tinygl4angle.c）：glUniformMatrix{2,3,4}{,x}fv 九函数族转置桥——FALSE 纯转发零回归；TRUE 本地转置（行主序→列主序 out[col*rows+row]=in[row*cols+col]）后以 FALSE 转发；单矩阵 ≤16 float 栈缓冲（热路径零 malloc），批量堆分配；首次 TRUE 限频锚点日志（取证修复合一：无此行且黑屏仍在 = 嫌疑排除转向 depth/blend 态）
+- 修复 B（pack/shaderconv.c）：cut_in_offset 定位 else 分支跟随实际 "#version" 行（strstr + 跳过行尾），无版本行才回落 0；320es 精确命中路径原样保留；锚点 "VGPU Task186: cut-in anchor follows actual #version line -> offset N"（限频 4）
+- 修复 C（SurfaceViewController+Navigation.m）：菜单读 [PLProfiles resolveKeyForCurrentProfile:@"resolution"]（与生效链同源，0 兜底 100）；写当前 profile 的 resolution 键（setServerIp 同款 mutableCopy 写回 + save，PLProfiles.current 同一内存对象即时可见）；setPrefFloat 全局键兼容镜像保留（JavaGUI 4 处读取方零回归）；锚点 "[Task186] in-game resolution: profile '%@' resolution -> N%%"
+- 验证：task186_matrix_test 11 例（2x3/3x2/2x4/4x2/3x4/4x3 全布局 + 批量 count=2 + 方阵 2/3/4，ASAN+O2 全过）；task186_cutin_test 8 例（300es/310es 跟随 =16、320es 旧精确路径不变、无版本行回落 0、插入后 #version 仍为首语句不变量）；task186_angle_syntax_harness 九符号独立编译（-Wall -Wextra 零警告，Linux stub 头法）；verify_task186 51/51；级联 183:50 / 182:39 / 181:35 / 179:61 / 176 / 185:63 / 184:39 / 160:47 全绿；task159 验证器治愈（默认路径硬编码并行会话检出 → 仓库相对，环境变量覆盖保留，48/48）；task175 F4/G1/G2 = 3 个存量漂移（stash 对拍 HEAD 一致，Task180-era 公告锚点，未触碰）；version.h 括号差值与 HEAD 逐位一致（task131 37/37）
+- task179 harness 镜像自动同步产线改动（+ tinygl4angle_harness.c 镜像更新）= 级联机制正常工作，随本轮一并提交
+
+Stage Summary:
+- vgpu 白屏根修闭环：Task183 只改了版本行没改插入锚点，本轮补齐后半；装机预期 FPE 编译错误消失 + "VGPU Task186: cut-in anchor" 在场
+- ANGLE 黑屏：矩阵 transpose 嫌疑加固（修复合一）；装机二分——若 "[tinygl4angle] Task186 ... transpose=TRUE" 出现且黑屏治愈 = 嫌疑坐实；若日志无此行且黑屏仍在 = 嫌疑排除，下轮转向 depth/blend 状态与 "Invalid pname" 取证
+- 分辨率调节：游戏内菜单与生效链同源（profile 层）；装机锚点 "[Task186] in-game resolution: profile '...' resolution -> N%"
+- 遗留：ANGLE "Invalid pname" swap 期高频未取证；0x884F/0x8642 desktop-only glEnable 噪音未静默；task175 存量 3 漂移（环境性）；vgpu post 特效上游 bug（sobel/entity_outline WARN，非阻塞）

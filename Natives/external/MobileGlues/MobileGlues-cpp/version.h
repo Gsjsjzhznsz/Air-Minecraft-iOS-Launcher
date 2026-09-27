@@ -2563,3 +2563,63 @@
 // apple-magnifier:// -> 0" pinpoints a dead TrollStore helper; "[Task185]
 // keychain token read failed .. OSStatus -25300"; "[Task185] repaired
 // corrupted profilePicURL"; "[AvatarManager] Task185 avatar chain:" hops.
+
+// REVISION 17 addendum (Task 186, no bump): three-line root-cause round on the
+// 11e4b63 seven-feedback leftovers. (1) ANGLE black screen, content-layer prime
+// suspect hardened: the 26.3 FO session on 11e4b63 (c689d41 latestlog.txt) is
+// presentation-healthy (fps=60 swapOK=372, overlay removed on first swap,
+// audio/input alive, Task183 shader chain clean -- no "Couldn't compile ...
+// for pipeline" spam) yet the screen is pure black = MC drew black content.
+// Desktop GL 3.3 glUniformMatrix*fv accepts transpose=GL_TRUE (row-major
+// input) while ESSL mandates GL_FALSE -- a violation is GL_INVALID_VALUE and
+// the call is DROPPED WHOLESALE: every matrix uniform dies, vertices collapse
+// to zero vectors, geometry is culled away and only the clear color remains,
+// matching the symptom point for point. tinygl4angle.c never exported the
+// matrix family, so those calls fell straight through to ANGLE's ES semantics
+// with nobody transposing. Fix: all nine glUniformMatrix{2,3,4}{,x}fv wrappers
+// -- transpose=FALSE passes through untouched (zero regression), TRUE is
+// locally transposed (row-major -> column-major) and forwarded as FALSE
+// (single matrices <= 16 floats use a stack buffer, no malloc on the hot
+// path); a rate-limited anchor logs the first TRUE occurrences so the
+// installation log either confirms the hit ("[tinygl4angle] Task186 ...
+// transpose=TRUE -> locally transposed") or excludes this suspect outright.
+// (2) vgpu 1.8.9 white screen -- the Task183 half-fix regression closed: the
+// GLSLHeader capability-following rewrite works ("VGPU Task183: GLSLHeader
+// version follows capability probe -> #version 300 es" present on device),
+// but shader_conv_'s cut-in anchor still located the version line via
+// strstr(new_version)="#version 320 es" -- on an ES 3.0 session that misses,
+// cut_in_offset collapses to 0, and every cut_in() insert ("out mediump vec4
+// FragColor;", the _shadow2D "precision mediump sampler2DShadow;" block, the
+// gl_FragData layout-out lines) lands BEFORE the #version line. GLSL requires
+// #version to be the first statement, so the directive is voided, the shader
+// compiles as ES 1.00, and "'out' : storage qualifier supported in GLSL ES
+// 3.00 and above only" + "'sampler2DShadow' : Illegal use of reserved word"
+// kill the whole FPE family = white screen (11e4b63 c689d41 latestlog.old.txt
+// shows exactly these errors at 0:1/0:2 with the 300es header logged
+// alongside). Fix: when the exact new_version miss happens, the anchor now
+// follows the actual "#version" line (skips past its newline); only sources
+// with no version line at all fall back to offset 0. The 320es exact-match
+// path is preserved verbatim. Anchor: "VGPU Task186: cut-in anchor follows
+// actual #version line -> offset N". (3) In-game resolution menu dead after
+// Task159's per-instance migration: actionAdjustResolution read and wrote the
+// GLOBAL video.resolution key while the effective chain
+// (SurfaceViewController.updateSavedResolution) resolves the PROFILE
+// "resolution" key through [PLProfiles resolveKeyForCurrentProfile:] -- once
+// any version-settings save materialized the profile key (first save pins
+// it), the in-game menu could never take effect and its checkmark drifted
+// from the live value. Fix: the menu now reads the same profile-side resolve
+// (0 -> 100 fallback) and writes the current profile's "resolution" key
+// (setServerIp-style mutableCopy write-back + save, immediately visible to
+// updateSavedResolution on the same in-memory PLProfiles), while the legacy
+// global-key write is mirrored for the JavaGUI consumers that still read it.
+// Anchor: "[Task186] in-game resolution: profile '<name>' resolution -> N%".
+// Verification: matrix transpose math unit test (11 cases incl. 2x3/3x2/2x4/
+// 4x2/3x4/4x3 layouts and batch count, ASAN) + cut-in offset unit test (8
+// cases: 300es/310es follow, 320es legacy exact path, no-version fallback,
+// post-insert first-statement invariant) + a standalone compile harness for
+// the new matrix block (9 symbols, -Wall -Wextra clean); verify_task186
+// 51/51; cascade 183:50 182:39 181:35 179:61 176 185:63 184:39 160:47 all
+// green; task159 verifier healed (parallel-session checkout path hardcoded as
+// default -> repo-relative, env override kept; now 48/48); task175 F4/G1/G2
+// remain 3 pre-existing drifts (stash-tested identical on HEAD, Task180-era
+// opacity-revert announcement anchors, untouched by this round).

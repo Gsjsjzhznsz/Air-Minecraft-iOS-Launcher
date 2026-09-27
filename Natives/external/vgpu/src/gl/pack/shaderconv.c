@@ -101,7 +101,32 @@ void shader_conv_(char **glshader_source, char **glshader_converted){//         
                 if(ptr_offset){
                         cut_in_offset = ptr_offset + strlen(new_version) + 2 - *glshader_converted;//                           Printf(" cut_in_offset = %d ", cut_in_offset);
                 }else{
-                        cut_in_offset = 0;
+                        // Task186（vgpu 白屏根修·插入点跟随实际版本行）：Task183 把
+                        // GLSLHeader 的版本行从恒 new_version（"#version 320 es"）改为跟随
+                        // 能力探测后，本定位仍恒找 new_version —— ES 3.0 会话（探测结论
+                        // 300es=1/320es=0）必落空 → cut_in_offset=0 → 后续所有 cut_in
+                        //（"out mediump vec4 FragColor;"、_shadow2D 的 "precision mediump
+                        // sampler2DShadow;"、gl_FragData 的 layout-out 行）被插到 #version
+                        // 行【之前】→ GLSL 规定 #version 必须是首语句 → 版本指令失效 →
+                        // 着色器按 ES 1.00 编译 → "ERROR: 0:1: 'out' : storage qualifier
+                        // supported in GLSL ES 3.00 and above only" + "'sampler2DShadow' :
+                        // Illegal use of reserved word" → FPE 全灭 = 1.8.9 白屏（11e4b63
+                        // 装机 c689d41 latestlog.old.txt 实锤：GLSLHeader 日志 "-> #version
+                        // 300 es" 在场而编译错误如上）。修法：插入点跟随实际 #version 行
+                        //（跳到该行行尾之后），字符串无版本行才回落 0。
+                        char * ptr_version = strstr(*glshader_converted, "#version");
+                        if(ptr_version != NULL){
+                                while(*ptr_version != '\0' && *ptr_version != '\n'){ ptr_version++; }
+                                if(*ptr_version == '\n'){ ptr_version++; }
+                                cut_in_offset = (int)(ptr_version - *glshader_converted);
+                                static int s_ame186_anchorLogged = 0;
+                                if(s_ame186_anchorLogged < 4){
+                                        ++s_ame186_anchorLogged;
+                                        Printf("VGPU Task186: cut-in anchor follows actual #version line -> offset %d\n", cut_in_offset);
+                                }
+                        }else{
+                                cut_in_offset = 0;
+                        }
                 }
         }
         char * ptr_cut_in = *glshader_converted + cut_in_offset;

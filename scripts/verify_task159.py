@@ -27,7 +27,7 @@ import os
 import re
 import sys
 
-REPO = os.environ.get("TASK159_REPO", "/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher")
+REPO = os.environ.get("TASK159_REPO", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PASS = 0
 FAIL = 0
 FAILED = []

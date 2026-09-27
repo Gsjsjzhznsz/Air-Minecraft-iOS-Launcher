@@ -924,6 +924,73 @@ void glDeleteShader(GLuint shader) {
     }
 }
 
+// ============================================================================
+// Task186: glUniformMatrix*fv transpose 转置桥（ANGLE 黑屏·内容层头号嫌疑
+// 根修 + 取证锚点）。病历（11e4b63 装机 c689d41 latestlog.txt，ANGLE 26.3
+// FO 会话）：呈现层全绿（fps=60 swapOK=372、遮罩按 first-swap 移除、音频/
+// 输入/主菜单音效俱全、Task183 后无 "Couldn't compile ... for pipeline"
+// 刷屏）但屏幕全黑 = MC 画了黑内容。desktop GL 3.3 的 glUniformMatrix*fv
+// 允许 transpose=GL_TRUE（行主序输入），ESSL（300/320）强制 transpose=
+// GL_FALSE：违反 = GL_INVALID_VALUE 且【调用被整体丢弃】——一旦 MC 某条
+// 路径传 TRUE，矩阵 uniform 全灭 → 所有顶点退化为零向量 → 几何全剔除 →
+// 只剩 clearColor = 游戏跑着但全黑，与本轮症状逐点吻合。本 dylib 此前
+// 不导出矩阵族：MC 的调用沿依赖树直落 ANGLE 原生（ES 语义，无人在场
+// 转置）。修法：九函数全族包装——transpose=FALSE 纯转发（零回归）；
+// TRUE 时本地转置（行主序→列主序）后以 FALSE 转发（单矩阵 ≤16 float
+// 走栈缓冲，热路径零 malloc）；首次 TRUE 打锚点日志（取证修复合一：
+// 若装机日志无此行且黑屏仍在，本嫌疑即排除，排查转向 depth/blend 态）。
+// GL 语义：glUniformMatrix{cols}x{rows}fv，FALSE=列主序 out[col*rows+row]，
+// TRUE=行主序 in[row*cols+col]；转置即 out[col*rows+row]=in[row*cols+col]。
+// ============================================================================
+static int ame186_transposeLogged = 0;
+#define AME186_MATRIX_FN(FN, COLS, ROWS) \
+void (*gles_##FN)(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value); \
+void FN(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) { \
+    LOOKUP_FUNC(FN) \
+    if (!gles_##FN) return; \
+    if (transpose == GL_FALSE || value == NULL || count <= 0) { \
+        gles_##FN(location, count, transpose, value); \
+        return; \
+    } \
+    const GLsizei ame186_n = (COLS) * (ROWS); \
+    GLfloat ame186_stack[16]; \
+    GLfloat *ame186_buf = ame186_stack; \
+    int ame186_heap = 0; \
+    if ((size_t)count * (size_t)ame186_n > 16) { \
+        ame186_buf = (GLfloat *)malloc(((size_t)count * (size_t)ame186_n) * sizeof(GLfloat)); \
+        if (ame186_buf == NULL) { \
+            gles_##FN(location, count, transpose, value); \
+            return; \
+        } \
+        ame186_heap = 1; \
+    } \
+    for (GLsizei ame186_m = 0; ame186_m < count; ++ame186_m) { \
+        const GLfloat *ame186_src = value + (size_t)ame186_m * (size_t)ame186_n; \
+        GLfloat *ame186_dst = ame186_buf + (size_t)ame186_m * (size_t)ame186_n; \
+        for (int ame186_c = 0; ame186_c < (COLS); ++ame186_c) { \
+            for (int ame186_r = 0; ame186_r < (ROWS); ++ame186_r) { \
+                ame186_dst[ame186_c * (ROWS) + ame186_r] = ame186_src[ame186_r * (COLS) + ame186_c]; \
+            } \
+        } \
+    } \
+    if (ame186_transposeLogged < 4) { \
+        ++ame186_transposeLogged; \
+        printf("[tinygl4angle] Task186 %s transpose=TRUE -> locally transposed %dx%d x%ld matrix/matrices (ES requires column-major; dropped call was the black-content suspect)\n", \
+               #FN, (COLS), (ROWS), (long)count); \
+    } \
+    gles_##FN(location, count, GL_FALSE, ame186_buf); \
+    if (ame186_heap) free(ame186_buf); \
+}
+AME186_MATRIX_FN(glUniformMatrix2fv, 2, 2)
+AME186_MATRIX_FN(glUniformMatrix3fv, 3, 3)
+AME186_MATRIX_FN(glUniformMatrix4fv, 4, 4)
+AME186_MATRIX_FN(glUniformMatrix2x3fv, 2, 3)
+AME186_MATRIX_FN(glUniformMatrix3x2fv, 3, 2)
+AME186_MATRIX_FN(glUniformMatrix2x4fv, 2, 4)
+AME186_MATRIX_FN(glUniformMatrix4x2fv, 4, 2)
+AME186_MATRIX_FN(glUniformMatrix3x4fv, 3, 4)
+AME186_MATRIX_FN(glUniformMatrix4x3fv, 4, 3)
+
 int isProxyTexture(GLenum target) {
     switch (target) {
         case GL_PROXY_TEXTURE_1D:
