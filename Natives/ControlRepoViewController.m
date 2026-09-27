@@ -136,7 +136,7 @@ static NSString *const kTask188FileFallbackFmt =
         if (error) { completion(nil, error); return; }
         if ([resp isKindOfClass:[NSHTTPURLResponse class]] && [(NSHTTPURLResponse *)resp statusCode] >= 400) {
             completion(nil, [NSError errorWithDomain:@"ControlRepo" code:[(NSHTTPURLResponse *)resp statusCode]
-                                          userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"HTTP %ld", (long)[(NSHTTPURLResponse *)resp statusCode]}]]);
+                                          userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"HTTP %ld", (long)[(NSHTTPURLResponse *)resp statusCode]]}]);
             return;
         }
         completion(data, nil);

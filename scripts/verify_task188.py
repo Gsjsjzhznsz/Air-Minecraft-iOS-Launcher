@@ -123,13 +123,21 @@ allv = all(json.load(open('controls/' + l['file'])).get('mControlDataList') is n
 check("F10 种子布局全部为合法 layoutDictionary", allv)
 check("F11 种子生成脚本入库", os.path.exists('/home/z/my-project/scripts/task188_seed_controls.py'))
 
-# ---------- G. 括号门 ----------
+# ---------- G. 括号门（栈式：计数平衡但类型错位也能抓——Task188 CI 三连败教训） ----------
 def balanced(path):
     s = open(path, encoding='utf-8').read()
     s = re.sub(r'@"(?:[^"\\]|\\.)*"', '""', s)
     s = re.sub(r'//[^\n]*', '', s)
     s = re.sub(r'/\*.*?\*/', '', s, flags=re.S)
-    return s.count('{') == s.count('}') and s.count('(') == s.count(')') and s.count('[') == s.count(']')
+    stack = []
+    for ch in s:
+        if ch in '([{':
+            stack.append(ch)
+        elif ch in ')]}':
+            if not stack or stack[-1] != {')':'(', ']':'[', '}':'{'}[ch]:
+                return False
+            stack.pop()
+    return not stack
 for f in ['Natives/ctxbridges/gl_bridge.m', 'Natives/utils.m', 'Natives/SceneDelegate.m',
           'Natives/installer/NeoForgeDirectInstaller.m', 'Natives/installer/ForgeDirectInstaller.m',
           'Natives/ControlRepoViewController.m', 'Natives/CustomControlsViewController.m']:
