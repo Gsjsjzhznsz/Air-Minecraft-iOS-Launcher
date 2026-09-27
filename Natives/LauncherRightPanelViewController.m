@@ -253,9 +253,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
 /// 确保全局背景能够正常透出。
 - (void)reapplyBackgroundEffect {
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
-    // Task180：「按钮透明度」滑条拖动实时重刷三枚功能按钮/信息卡底色
-    // （applyCustomAppearance 内 accent × buttonOpacity 幂等重设）
-    [self applyCustomAppearance];
+    // Task183：Task180 按钮透明度实时重刷退役（双滑条体系整体撤销，回归
+    // Task179 形态：底色恒定，不接任何透明度滑条）
 }
 
 - (void)dealloc {
@@ -350,9 +349,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // Task137：黑底深字直修（用户实测反馈）——旧实现硬编码 0.2 白（深灰）底
     // 配 labelColor 字（浅色模式下黑字），深浅模式都可能不可读。改用原生卡片
     // 表面（secondarySystemGroupedBackground），深浅色对比度由系统语义色保证。
-    // Task180：底色接「按钮透明度」滑条（承载功能的小按钮/窗口类）
-    self.downloadCenterButton.backgroundColor = [[UIColor secondarySystemGroupedBackgroundColor]
-        colorWithAlphaComponent:[BackgroundManager sharedManager].buttonOpacity];
+    // Task183：Task180 按钮透明度接线撤销，回归恒定语义色底
+    self.downloadCenterButton.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
     self.downloadCenterButton.layer.cornerRadius = 10;
     self.downloadCenterButton.layer.masksToBounds = YES;
     // 左侧下载图标
@@ -995,11 +993,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
                       valueLabel:(UILabel * __strong *)outValueLabel {
     UIView *card = [[UIView alloc] init];
     card.translatesAutoresizingMaskIntoConstraints = NO;
-    // Task180：右侧栏权限信息/设备信息卡（用户点名归「按钮透明度」管辖——
-    // "承载文字/功能/退出的小按钮/窗口，例如右侧栏权限信息显示"）；
-    // 底色 = accent × 0.15（原设计淡底）× buttonOpacity（滑条系数），
-    // 图标/文字子视图恒不透明；100% 滑条 = 原形态不变（失效安全）。
-    card.backgroundColor = [accent colorWithAlphaComponent:0.15 * [BackgroundManager sharedManager].buttonOpacity];
+    // Task183：Task180 按钮透明度接线撤销，信息卡回归原设计 accent × 0.15 淡底
+    card.backgroundColor = [accent colorWithAlphaComponent:0.15];
     card.layer.cornerRadius = 12;
     card.layer.masksToBounds = YES;
     [card.heightAnchor constraintEqualToConstant:46].active = YES;
@@ -1100,14 +1095,10 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // 主题强调色：刷新启动按钮背景，使用户自选的主题色立即生效。
     // Task96：执行Jar/选择版本与「登录并启动」同款配色（accentColor 底 +
     // 白字），三枚按钮统一在此刷新。
-    // Task180：三枚按钮底色接「按钮透明度」滑条（用户点名"启动游戏"类
-    // 承载功能的小按钮；底色 = accent × buttonOpacity，白字/图标恒不透明；
-    // 100% = 原形态）。本方法在 BackgroundUIEffectChanged 通知链
-    // （reapplyBackgroundEffect）重刷，滑条拖动实时跟随。
-    CGFloat btnO = [BackgroundManager sharedManager].buttonOpacity;
-    self.launchButton.backgroundColor = [accentColor() colorWithAlphaComponent:btnO];
-    self.executeJarBtn.backgroundColor = [accentColor() colorWithAlphaComponent:btnO];
-    self.manageVersionBtn.backgroundColor = [accentColor() colorWithAlphaComponent:btnO];
+    // Task183：Task180 按钮透明度接线撤销，三枚按钮回归恒定 accentColor 底
+    self.launchButton.backgroundColor = accentColor();
+    self.executeJarBtn.backgroundColor = accentColor();
+    self.manageVersionBtn.backgroundColor = accentColor();
 
     NSString *hex = getPrefObject(@"general.text_color");
     UIColor *customColor = [self colorFromHexString:hex];

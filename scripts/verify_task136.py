@@ -222,8 +222,10 @@ check("G1  每个加载器独立 section（insetGrouped 独立圆角卡）",
 check("G2  卡片间距 10pt（无标题 section 头高 10 + footer 0.01）",
       "if (section < (NSInteger)_loaders.count) return 10;" in ml
       and "return 0.01;" in ml)
-check("G3  两类 cell 均走 applyCardEffectToCell（Task137：原生卡片行）",
-      ml.count("[[BackgroundManager sharedManager] applyCardEffectToCell:cell];") == 2)
+check("G3  两类 cell 视觉自洽（Task184 重锚：VersionCardCell 同构——cardContainer init 挂凸起管线 ×3，逐帧 effect 调用退役）",
+      ml.count("[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];") == 3
+      and "applyCardEffectToCell:cell];" not in ml
+      and "applyNeumorphCardEffectToView:cell.contentView];" not in ml)
 check("G4  nameBar 与上级菜单同语言（Task137 重锚：原生圆角 10 + 原生表面枢纽）",
       "_nameBar.layer.cornerRadius = 10;" in ml)
 check("G5  didSelect 按新 section 语义取行（_loaders[indexPath.section] + 越界守卫）",

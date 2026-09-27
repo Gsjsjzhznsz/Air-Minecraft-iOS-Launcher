@@ -2429,3 +2429,63 @@
 // launch handler" and "[SurfaceSwap] Task183 launching SurfaceViewController";
 // "[Task183] keybind v2 RESTORE sneak: ... -> key.keyboard.right.shift"
 // (or 42 -> 54) exactly once, after which in-game rebinds survive.
+
+// ===== REVISION 17 addendum (Amethyst Task 184, no bump) =====
+//
+// Task 184 -- user verdict: "先撤销180task的UI效果调整，先修好这两样" (revert
+// Task 180's UI-effect adjustments, then actually fix the two things). The
+// Task 180 dual-slider opacity system (Background/Button) is RETIRED
+// wholesale: the engine opacity-variant primitives
+// (ame_applyPanelSurfaceWithRadius:opacity: /
+// ame_applyNeumorphSurfaceFlatWithRadius:opacity:) are deleted back to the
+// single-signature forms, BackgroundManager returns to the
+// uiOpacity (0.6, floor 0.1) + cardsNeumorphOpacity (neumorph card-body
+// opacity, default 1.0 = opaque porcelain, Task 178 semantics) key pair
+// (background_bg_opacity / background_btn_opacity keys retired), the
+// settings page returns to the "Opacity + Neumorphism Opacity" slider rows
+// (tags 500/501/502), and the 20+ wiring points (Root sidebar/right-panel,
+// Bing gallery, download center/page segments and search bar, RightPanel
+// buttons/info cards, Menu selected tint, NMToast, PLCrashView,
+// ProfileSettings) return to constant backgrounds. The washed-out
+// "white frame with an edge line" pseudo-neumorphism (Task 180's 75%
+// background default bleeding through the porcelain cards) is gone.
+// NOTE: blurIntensity default returns to 100% (Task 180's 0% default was
+// part of the reverted set) -- users can re-adjust in settings.
+//
+// The installer page ("选择安装方式" -- loader list + Fabric API/OptiFine
+// coexistence switch rows + version picker subpage) is REWRITTEN to be
+// structurally identical to VersionCardCell (the version-number selection
+// list the user approved): outer cell fully transparent INCLUDING the
+// iOS-managed inset-grouped system cell background and gray selection
+// highlight replaced by empty clear views (AME184ClearTableViewCellChrome,
+// applied in init AND prepareForReuse -- the REAL root cause of the user's
+// "nailed-down white frame with an edge line" that survived three previous
+// rewrites: the raised pipeline was attached to the contentView while the
+// system white backgroundView stayed behind it); visuals are carried by an
+// inner cardContainer (cornerRadius 12 continuous, 4pt vertical insets)
+// with applyNeumorphCardEffectToView attached ONCE in init (honors the
+// neumorph toggle: ON = Task 177 gradient porcelain + twin shadows, OFF =
+// legacy frosted/flat pipeline); icon container 40x40 rounded-10 brand-tint
+// (ModLoaderIconHelper brand color 0.15, same spec as
+// createIconBadgeForLoader); name 16 semibold / state 12 spec text colors;
+// right chevron 14pt; row height 64 = version-card height.
+//
+// KEPT from Task 180 (functional fixes, not UI effects): account duplication
+// double-guard (saveChanges write-through stale .json cleanup + read-side
+// dedup), avatar defense (avatarForAccount:usernameFallback: at BOTH the
+// right panel and the home/news profile card -- the news-side call site was
+// restored after the wholesale revert), the account-list raised rewrite
+// (pinned 16pt radius + clip release), and the card-layout/dark-mode
+// defaults.
+//
+// Verification: verify_task184.py new (39 checks, A installer rewrite /
+// B opacity retirement incl. repo-wide residual scan / C avatar dual sites /
+// D keepers / E engine-symbol import discipline). Honest re-anchors:
+// verify_task180 flipped to the post-revert truth (120 checks), 160 (47/47),
+// 162 (68/68), 163 (36/36), 164 (ALL GREEN), 168 (43/43), 170 (34/34),
+// 171 (30/30), 173b (32/32), 174 (24/24), 173 (123/123), 177 (A-F green),
+// 179 J1 (task179 index 3->4), announcement full-shift family healed for
+// the task184@2 insertion (len 23). Docs: announcements task184@2,
+// worklog. Device anchors: neumorph cards back to fully opaque porcelain;
+// installer page renders the exact version-card look with NO white frame
+// behind cards, with the neumorph toggle still honored.

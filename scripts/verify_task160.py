@@ -113,10 +113,10 @@ bm = read('Natives/BackgroundManager.m')
 check("B1  ui_theme 默认（Task161 重锚：用户指令“外观模式默认跟随系统”，推翻 Task160 的 light 缺省 → auto + 迁移）",
       '@"ui_theme": @"auto",' in plp
       and 'ui_theme_explicit' in plp)
-check("B2  背景透明度默认 0.75（Task180 重锚：用户备注定稿“背景 75%”；旧 uiOpacity 0.6/0.1/0.7 全退役）",
-      "_backgroundOpacity = 0.75;" in bm and "_uiOpacity = 0.1;" not in bm and "_uiOpacity = 0.7;" not in bm)
-check("B3  blurIntensity 默认 0.0（Task180 重锚：用户备注“模糊 0”，推翻 Task162 的 100%）",
-      "_blurIntensity = 0.0;" in bm and "_blurIntensity = 0.75;" not in bm and "_blurIntensity = 0.7; //" not in bm)
+check("B2  默认透明度 0.6（Task184 重锚：180 双滑条撤销，回归 Task162/164 的 uiOpacity 0.6/下限 0.1 形态）",
+      "_uiOpacity = 0.6;" in bm and "_backgroundOpacity" not in bm and "_buttonOpacity" not in bm)
+check("B3  blurIntensity 默认 1.0（Task184 重锚：180 的模糊 0 默认随透明度体系一并撤销，回归 Task162 的 100%）",
+      "_blurIntensity = 1.0;" in bm and "_blurIntensity = 0.0;" not in bm)
 check("B4  默认效果仍为毛玻璃（BackgroundUIEffectBlur）",
       "_uiEffect = BackgroundUIEffectBlur;" in bm)
 check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto；Task162 重锚：透明度/模糊注释改口径；Task164 重锚：nil 判定后病历注释承载首次语义）",
@@ -170,10 +170,10 @@ check("D4  双阴影承载视图（Task177 重锚：暗影右下 + 高光左上�
 check("D5  深浅色切换自动重刷（traitCollectionDidChange）",
       "traitCollectionDidChange:" in nsm
       and "AmeNeumorphDynamicColor" in nsm)
-check("D6  表面方法路由（Task180 重锚：Panel 转发 opacity 变体（默认 1.0 失效安全）；Card/Raised 仍走新拟态）",
+check("D6  表面方法路由（Task184 重锚：Panel 单签名转发 Flat；Card/Raised 仍走新拟态）",
       nsm.count("[self ame_applyNeumorphSurface];") == 2
-      and "[self ame_applyPanelSurfaceWithRadius:cornerRadius opacity:1.0];" in nsm
-      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius opacity:opacity];" in nsm)
+      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm
+      and "[self ame_applyPanelSurfaceWithRadius:cornerRadius opacity:" not in nsm)
 check("D7  cell 平贴版（无阴影层，防列表裁剪互叠）",
       "- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {" in nsm
       and "self.layer.masksToBounds = YES;" in nsm)

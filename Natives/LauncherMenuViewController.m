@@ -165,9 +165,7 @@
     // Task137：新拟态退役——初始选中项直接应用原生 accent 半透明高亮
     // （选中态在 updateButtonColors 维护）
     if (index == self.selectedIndex) {
-        // Task180：菜单按钮选中底接「按钮透明度」滑条（承载功能的小按钮；
-        // accent × 0.15（原淡底）× buttonOpacity，图标恒不透明）
-        btn.backgroundColor = [accent colorWithAlphaComponent:0.15 * [BackgroundManager sharedManager].buttonOpacity];
+        btn.backgroundColor = [accent colorWithAlphaComponent:0.15];
     }
 
     return btn;
@@ -323,8 +321,7 @@
                 // Task101：按钮无标题（纯图标），仅剩图标着色，原 setTitleColor 分支退场
                 // Task137：新拟态退役——选中项回归原生 accent 半透明高亮
                 // （Task89 之前的样式）；幂等重刷（重复调用安全）
-                // Task180：选中底接「按钮透明度」滑条（系数乘算，幂等重刷）
-                btn.backgroundColor = [accent colorWithAlphaComponent:0.15 * [BackgroundManager sharedManager].buttonOpacity];
+                btn.backgroundColor = [accent colorWithAlphaComponent:0.15];
                 // Task111：z 序保险——把图标子视图提回最前（幂等保留）
                 UIView *iconView = btn.imageView;
                 if (iconView && iconView.superview == btn) {
@@ -349,8 +346,6 @@
 /// 确保全局背景能够正常透出。
 - (void)reapplyBackgroundEffect {
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
-    // Task180：「按钮透明度」滑条拖动实时重刷菜单按钮选中底
-    [self updateButtonColors];
 }
 
 - (void)dealloc {

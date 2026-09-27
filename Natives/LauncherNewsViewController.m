@@ -1391,8 +1391,9 @@ static NSCache<NSString *, UIImage *> *ame162_avatarCache(void) {
         // Caches 磁盘缓存 + 失败日志）——旧裸 dataWithContentsOfURL 默认
         // 60s 挂起且失败静默，装机实测"头像要点一下才能显示"；另加可见
         // Profile 卡直刷兜底（reloadSections 在个别布局时序下不触发重绘）。
-        // Task180：查询加 username 回退（与右面板同步——历史 username 文件名
-        // / 账号 ID 漂移后的旧文件仍可命中）
+        // Task180→Task183 保留：查询加 username 回退（与右面板同步——历史
+        // username 文件名 / 账号 ID 漂移后的旧文件仍可命中；头像防御非
+        // 透明度体系成员，不随本轮回退）
         UIImage *ame162_local = [[AvatarManager sharedManager]
             avatarForAccount:auth.authData[@"accountId"]
             usernameFallback:auth.authData[@"username"]];

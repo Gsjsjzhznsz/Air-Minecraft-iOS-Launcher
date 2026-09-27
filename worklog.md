@@ -751,3 +751,22 @@ Stage Summary:
 - JIT 换根 completion 依赖清除 + 三级锚点链（wait-completed → invoking handler → SurfaceSwap）；若再卡死日志可逐行定位
 - 右 Shift 损伤修复：v2 一次性恢复 right.shift（日志 "[Task183] keybind v2 RESTORE sneak"）——恢复后默认布局 ⬛️（左 Shift）潜行失效属预期（右 Shift 控件生效），用户可在游戏内改回且不再被洗
 - 遗留：26.1.2 空指针等另一人反馈；vgpu post 特效上游 bug 观察；JIT latestlog.1 主队列块丢失的深层机制（本修消除其最大嫌疑 + 锚点兜底）
+
+Task ID: 184
+Agent: main (Super Z)
+Task: Air-Minecraft-iOS-Launcher 用户裁决轮——撤销 Task180 的 UI 效果调整（双滑条透明度体系整体退役）+ 安装方式页面按版本号选择界面真正重写（钉死的底层白框根修）
+
+Work Log:
+- 家法：fetch 对齐 e40da2e（远端已推进至 Task 182，空号 183 确认无撞号）；用户两图（白框假新拟态 + 安装方式页）网关未落盘，以文字口径+代码勘察定案
+- 白框根因双闭合：①账号列表/右栏 = Task180 把新拟态瓷面降到 backgroundOpacity 0.75，半透明白瓷叠深底 = "白色外框里一条边"；②安装方式页 = InsetGrouped 系统 cell 白色 backgroundView 从未被清，凸起管线挂 contentView 时白底垫在卡外 = "钉死的底层白框"，此前三轮重写无效的真根源
+- 撤销（UI 效果调整）：引擎 opacity 变体两原语删除（checkout 父版本 UIKit+NativeSurface.h/.m）；BackgroundManager.h/.m 回归 uiOpacity(0.6/下限0.1)+cardsNeumorphOpacity(默认1.0) 单键时代；设置页回归 透明度+新拟态透明度 双滑条行（Task178 形态 tags 500/501/502）；Bing/DownloadTasks/Download/Menu/News/Root/NMToast/PLCrashView/ProfileSettings 九文件 checkout 父版本；l10n ×6 checkout 父版本（1296 回归"透明度"、button.opacity 键退役、cards.neumorph.opacity 键回归、计数 1955 保持）
+- 外科手术（保留修复）：RightPanel 四处按钮透明度接线手工回退（accentColor() ×3/下载中心语义色/信息卡 0.15/reapply 重刷撤），头像 username 回退+失败日志原样保留；News 头像挂点补回（整体回退误伤，usernameFallback 双挂点复原）
+- 保留（180 功能修复）：账号复制双保险、头像防御、账号列表凸起重写（钉16+裁剪放行）、SceneDelegate card/dark 默认；blur 默认随撤销回归 1.0（公告注明可调回）
+- 重写（安装方式页）：ModLoaderRowCell/ModLoaderSwitchCell/ModLoaderVersionCell 三 cell 与 VersionCardCell 完全同构——AME183ClearTableViewCellChrome 杀系统白底/选中高亮（init+prepareForReuse 双点重放）+ 内层 cardContainer(圆角12 continuous/上下4pt) init 挂凸起管线一次 + 图标 40x40 圆角10 品牌色0.15淡底 + 名称16 semibold/状态12 规格文字色 + chevron 14pt；主表行高 64、子页 50+去分隔线；cellForRow 逐帧重铺/applyEffectToCell 全退役
+- verify_task184 新建 39/39 绿（A 安装页重写/B 撤销+全仓残留扫描/C 头像双挂点/D 保留项/E 引擎符号 import 纪律）
+- 诚实重锚：verify_task180 翻转为回退态 120/120；160 47/47、162 68/68、163 36/36、164 全绿、168 43/43、170 34/34、171 30/30、173b 32/32、174 24/24、173 123/123；公告 task184@2 插入（len 23）全家族顺延重锚（177 E1-E3、178 E1-E3、173 M3、179 J1）；179/178/182 全量级联后台并行确认中（G/J 级联沙箱慢=已知环境性）
+- 文档：公告 task184@2 + version.h REVISION 17 addendum + 双 worklog
+
+Stage Summary:
+- 装机锚点：①设置页回归"透明度+新拟态透明度"双滑条，新拟态卡体恢复 100% 不透明瓷面（白框假新拟态消失）②安装方式页与版本号选择界面同构：版本卡样式卡片、无白色底层、新拟态开关仍然有效③模糊默认回归 100%（可手动调回）④账号复制/头像修复保持不变
+- 教训：整体 checkout 父版本回退必须先 diff 圈出混入的功能修复（本轮 News 头像挂点被误伤后补回）；str.replace 补丁脚本必须核对替换计数（178 的 C10/D1/D5 静默失配由重跑日志暴露）

@@ -113,12 +113,14 @@ check("A12 头文件 CSS 参考规格注释在位（bigbear-ui + neu-white + box
 # B. BackgroundManager
 # ============================================================
 print("== B. BackgroundManager（透明度解耦 + 管线规格统一） ==")
-check("B1 透明度属性（Task180 重锚：backgroundOpacity/buttonOpacity 双属性在位，cardsNeumorphOpacity 退役）",
-      "CGFloat backgroundOpacity" in BM_H
-      and "CGFloat buttonOpacity" in BM_H
-      and "self.backgroundOpacity" in BM_M)
-check("B2 透明度落盘键（Task180 重锚：background_bg_opacity/background_btn_opacity 双键在位）",
-      "kBackgroundBgOpacityKey" in BM_M and "kBackgroundBtnOpacityKey" in BM_M)
+check("B1 透明度属性（Task184 重锚：uiOpacity/cardsNeumorphOpacity 回归，180 双属性退役）",
+      "CGFloat uiOpacity" in BM_H
+      and "CGFloat cardsNeumorphOpacity" in BM_H
+      and "self.cardsNeumorphOpacity" in BM_M
+      and "CGFloat backgroundOpacity" not in BM_H
+      and "CGFloat buttonOpacity" not in BM_H)
+check("B2 透明度落盘键（Task184 重锚：background_ui_opacity/background_cards_neumorph_opacity 旧双键回归）",
+      "kBackgroundUIOpacityKey" in BM_M and "kBackgroundCardsNeumorphOpacityKey" in BM_M)
 check("B3 新拟态界面开关保留（getter/setter/键常量在位，默认 YES）",
       "kBackgroundCardsNeumorphEnabledKey" in BM_M
       and "- (BOOL)cardsNeumorphEnabled" in BM_M and "return YES;" in BM_M)
@@ -133,19 +135,22 @@ check("B6 refreshUIEffect 共存语义保留（ON 分支壁纸容器缺席重建
       and "systemBackgroundColor" in BM_M)
 check("B7 Task178 一次性日志锚（[Task178] neumorph decoupled）",
       "[Task178] neumorph decoupled" in BM_M)
-check("B8 头文件定稿注释（Task180 重锚：双滑条体系注释在位——背景透明度统管大背景+卡体）",
-      "统一透明度体系" in BM_H)
+check("B8 头文件注释（Task184 重锚：180 双滑条注释退役，Task178 专用透明度语义回归）",
+      "统一透明度体系" not in BM_H
+      and "cardsNeumorphOpacity" in BM_H)
 
 # ============================================================
 # C. 设置页
 # ============================================================
 print("== C. 设置页（滑条退役 + 开关保留） ==")
-check("C1 按钮透明度滑条行（Task180 重锚：ButtonOpacityCell/滑条块/回调在位）",
-      "ButtonOpacityCell" in SET_M
-      and "buttonOpacitySliderChanged" in SET_M)
-check("C2 滑条 tags 600/601/602（Task180 重锚：viewWithTag 绑定在位）",
-      "viewWithTag:600" in SET_M and "viewWithTag:601" in SET_M
-      and "viewWithTag:602" in SET_M)
+check("C1 新拟态透明度滑条行（Task184 重锚：CardsNeumorphOpacityCell/滑条块/回调回归）",
+      "CardsNeumorphOpacityCell" in SET_M
+      and "cardsNeumorphOpacitySliderChanged" in SET_M
+      and "ButtonOpacityCell" not in SET_M
+      and "buttonOpacitySliderChanged" not in SET_M)
+check("C2 滑条 tags 500/501/502（Task184 重锚：viewWithTag 绑定回归）",
+      "viewWithTag:500]" in SET_M and "viewWithTag:501]" in SET_M
+      and "viewWithTag:502]" in SET_M)
 check("C3 开关行保留（CardsNeumorphToggleCell + tag 410 + 回调 + sections[0][3]）",
       "CardsNeumorphToggleCell" in SET_M and "neumorphSwitch.tag = 410;" in SET_M
       and "@selector(cardsNeumorphToggleChanged:)" in SET_M
@@ -155,11 +160,12 @@ check("C4 开关行定位不变（hasBackground ? 3 : 0，恒显）",
 check("C5 灰化退役（Task178 重锚：开关不再变灰其他选项——0.35/neumorphOn 零残留）",
       SET_M.count("neumorphOn ? 0.35 : 1.0") == 0
       and "neumorphOn" not in SET_M)
-check("C6 sections[0] 五项（Task180 重锚：按钮透明度标题条目为末项）",
+check("C6 sections[0] 五项（Task184 重锚：新拟态透明度标题条目回归末项）",
       'localize(@"background.cards.neumorph.interface.title", nil)' in SET_M
-      and 'localize(@"background.button.opacity.title", nil)' in SET_M)
-check("C7 无壁纸行数 3（Task180 重锚：开关行 + 背景/按钮透明度滑条恒显）",
-      re.search(r"hasBackground\]\) \{\s*\n\s*return 3;", SET_M) is not None
+      and 'localize(@"background.cards.neumorph.opacity.title", nil)' in SET_M
+      and 'localize(@"background.button.opacity.title", nil)' not in SET_M)
+check("C7 无壁纸行数 2（Task184 重锚：开关行 + 新拟态透明度滑条恒显，Task178 形态）",
+      re.search(r"hasBackground\]\) \{\s*\n\s*return 2;", SET_M) is not None
       and not re.search(r"hasBackground\]\) \{\s*\n\s*return 1;", SET_M))
 
 # ============================================================
@@ -170,8 +176,9 @@ KEYSET_LGS = ["en", "zh-Hans", "zh-CN", "zh-Hant"]
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in KEYSET_LGS]
 all_six = [rd(f"Natives/resources/{lg}.lproj/Localizable.strings") for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]]
-check("D1 button.opacity.title 键 ×6 语言全部在位（Task180 重锚）",
-      all('"background.button.opacity.title"' in t for t in all_six))
+check("D1 neumorph.opacity.title 键 ×6 语言全部在位（Task184 重锚：回归键；button.opacity 退役）",
+      all('"background.cards.neumorph.opacity.title"' in t for t in all_six)
+      and all('"background.button.opacity.title"' not in t for t in all_six))
 check("D2 四主语言唯一键计数 1955（Task178 重锚：1954+1）",
       all(len(k) == 1955 for k in KEYSETS),
       detail=str([len(k) for k in KEYSETS]))
@@ -186,22 +193,23 @@ check("D4 interface.title 键保留（开关行标题）",
 print("== E. 文档（公告/version.h/fallback） ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 # Task179 重锚：task179@2 插入，全体顺延 +1，len 21。
-check("E1 公告 task178 插入（Task179 重锚：task179@2 后 task178 居 ann[3]；server/169 钉 0/1 不动）",
-      len(ann) == 22  # Task180：+1
+check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[3]；server/169 钉 0/1 不动）",
+      len(ann) == 23  # Task184：+1
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[3]["id"] == "task179-eight-fixes-2026-09-26"  # Task180 顺延
-      and ann[2]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and ann[4]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task180 顺延
-check("E2 公告后续顺序整体 +1（Task180 重锚：全体 +1——178→5 / 177→6 / 175→7 / 174→8 / 双173→9,10）",
-      ann[5]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann[6]["id"] == "task175-six-fixes-2026-09-26"
-      and ann[7]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann[8]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann[9]["id"] == "task173-ten-fixes-2026-09-26")
-check("E3 公告内容锚（Task179 重锚：task177 内容锚随条目顺延（Task180 重锚））",
-      "bigbear-ui" in ann[5]["content"] and "neu-white" in ann[5]["content"]
-      and "不要加任何的透明度" in ann[5]["summary"])
+      and ann[2]["id"] == "task183-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
+      and ann[3]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
+      and ann[4]["id"] == "task179-eight-fixes-2026-09-26"  # Task184 顺延
+      and ann[5]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
+check("E2 公告后续顺序整体 +1（Task184 重锚：177→6 / 175→7 / 174→8 / 双173→9,10）",
+      ann[6]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann[7]["id"] == "task175-six-fixes-2026-09-26"
+      and ann[8]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann[9]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann[10]["id"] == "task173-ten-fixes-2026-09-26")
+check("E3 公告内容锚（Task184 重锚：task177 内容锚随条目顺延）",
+      "bigbear-ui" in ann[6]["content"] and "neu-white" in ann[6]["content"]
+      and "不要加任何的透明度" in ann[6]["summary"])
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E4 version.h Task 177 附录（含设备日志锚）",
       "Amethyst Task 177" in vh and "[Task177] neumorph UI spec rewrite" in vh)

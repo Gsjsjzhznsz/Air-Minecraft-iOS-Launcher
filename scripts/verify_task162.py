@@ -153,16 +153,16 @@ check("C4 头文件声明（Task162 注）",
       "- (BOOL)isBackgroundLiveAttached;" in bh)
 
 print("== D. 壁纸默认值（毛玻璃/60%/100%；Task164 重锚：nil 判定形态）==")
-check("D1 背景透明度默认 0.75（Task180 重锚：用户备注定稿；旧 uiOpacity 0.6 退役）",
-      "_backgroundOpacity = 0.75;" in bm)
-check("D2 blurIntensity 默认 0.0（Task180 重锚：用户备注“模糊 0”）",
-      "_blurIntensity = 0.0;" in bm)
+check("D1 默认透明度 0.6（Task184 重锚：180 双滑条撤销，回归 Task162/164 的 uiOpacity 0.6）",
+      "_uiOpacity = 0.6;" in bm and "_backgroundOpacity" not in bm)
+check("D2 blurIntensity 默认 1.0（Task184 重锚：180 的模糊 0 默认随体系撤销，回归 Task162 的 100%）",
+      "_blurIntensity = 1.0;" in bm)
 check("D3 效果默认毛玻璃保持不变（Task164：未保存键不再误读为枚举 0 半透明）",
       "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm
       and "[defaults objectForKey:kBackgroundUIEffectKey]" in bm)
-check("D4 存量已保存值不受影响（Task180 重锚：显式保存值走 else 分支 + 越界兜底；clamp 下限 0.0）",
-      "if (_backgroundOpacity < 0.0 || _backgroundOpacity > 1.0) {" in bm
-      and "if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {" in bm
+check("D4 存量已保存值不受影响（Task184 重锚：显式保存值走 else 分支 + 越界兜底；uiOpacity 下限 0.1 回归）",
+      "if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {" in bm
+      and "_uiOpacity = MAX(0.1, MIN(1.0, uiOpacity));" in bm
       and "_uiEffect < BackgroundUIEffectTranslucent || _uiEffect > BackgroundUIEffectBlur" in bm)
 
 print("== E. 主页头像缓存 ==")
