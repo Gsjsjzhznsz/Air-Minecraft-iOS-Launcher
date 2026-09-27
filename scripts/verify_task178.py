@@ -230,7 +230,7 @@ check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann
       len(ann) == 23  # Task184：+1
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[2]["id"] == "task183-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
+      and ann[2]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
       and ann[3]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
       and ann[4]["id"] == "task179-eight-fixes-2026-09-26"
       and ann[5]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延

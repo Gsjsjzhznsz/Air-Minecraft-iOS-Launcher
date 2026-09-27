@@ -18,8 +18,10 @@
 import os
 import sys
 
+# Task185 治愈：默认路径曾是并行会话的检出目录（workspace/...），跨会话必崩；
+# 改为本仓库相对路径（环境变量覆盖能力保留）。
 ROOT = os.environ.get('TASK163_REPO',
-                      '/home/z/my-project/workspace/Air-Minecraft-iOS-Launcher')
+                      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PASS, FAIL = 0, 0
 
 

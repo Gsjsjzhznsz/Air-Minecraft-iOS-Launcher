@@ -776,3 +776,23 @@ Stage Summary:
 - 变基后治愈：公告 task184@2 插入的置顶区窗口再顺延（165 G1 18→19 / 166+167 窗口 16→17 / 168 D1 anns[13]→[14]）；131 G1 的 version.h 括号平衡（冲突标记残片清除）；verify_task180 G 组 AME184 串重锚
 - 合并树终态对拍：verify_task184 39/39 + 对方 verify_task183 50/50 双绿互兼容；180 120/120、168 43/43、165 34/34、166 64/64、167 31/31、131 37/37、136 63/63、137 47/47（G3/G4 提交后自愈）、173 123/123、179 61/61
 - CI：run（1b9526e）completed success **首跑即绿**，main 徽标 passing
+
+---
+Task ID: 185
+Agent: main (Super Z)
+Task: 11e4b63 装机七反馈五线根修（与并行 Task184 UI 轮撞号，家法让位改号 185 后变基融合）：Forge/NeoForge >26 找不到 / Fabric·Quilt 列表全量混排 / JIT 版本设置页卡死（Task183 修复版上仍存的残留形态）/ 巨魔 JIT 静默无反应 / 他人反馈 keychain 报错无皮肤
+
+Work Log:
+- 日志分诊：用户四日志（c689d41+62e7c52）全部 Commit 11e4b63 = Task183 修复版真机；latestlog.2 = JIT 卡死会话（condition satisfied 后台 3.8s 后主队列续接块永不执行，Task183 锚点缺失；三个成功会话同代码后台照常排空；卡死会话独有环境 = ProfileSettings 二级菜单 + 拼音键盘 keyplane 日志）；他人 iPad9 日志（424e02a，59d4b48）= keychain×5 + head/(null) 坏 URL + api.rms.net.cn DNS 失效三层叠加
+- 修复 1（>26 找不到）：共享匹配器 ame185_loaderVersionMatchesGameVersion（utils 双向候选集等价判定；形态 A 失配落穿形态 B——单测抓出 "26.3.0.5-beta"→26.3 缺陷）落地三处消费方（NeoForgeVersionFetcher / ModLoader XML 过滤 / ForgeInstallVC 双分支）；NeoForge 提取器去尾分量 + major≥26 免 "1." 前缀；ModLoader Forge 竞速重写——payload 匹配数>0 才可 settle，首个无匹配 XML 立即拉 BMCL 按版本 JSON（实测有 26.3 数据）第三路竞速，@synchronized 串行双解析器 + XML 截断防挂死；BMCL 陈旧镜像（2022 元数据）再也无法挤掉官方结果
+- 修复 2（Fabric/Quilt 混排）：fabric-meta 对任意版本返回全部 ~253 loader（loader 版本无关，API 不能筛）→ 精选最新 30 + __AME185_SHOW_ALL__ 哨兵行（复用 \x1f 显示约定，双语）点开从缓存展开全量免二次请求
+- 修复 3（JIT 卡死）：双入口键盘收起（sendAction:resignFirstResponder 移除头号嫌疑变量）+ ame185_dispatchToMainSelfHealing 自愈式主队列派发（常规派发 / didBecomeActive 重派 / 120s 看门狗三防线；主线程后台楔死时激活流程解锁即送达）；四个等待块（RightPanel+NavCtrl 主等待与 JIT26 重挂）全换；捕获的 alert/bg 断言随块存活到送达
+- 修复 4（巨魔 JIT 静默）：ame185_openJITEnablerURL:toolLabel: 统一拉起（回执日志 + 失败即时双语指引），覆盖 apple-magnifier/sidestore/stosdebug/jitstreamer/sidejit-enable 五工具 + TrollStore 自动分支；重挂 stikjit 补回执取证
+- 修复 5（keychain/无皮肤）：弹窗会话去重 + 重登指引 + tokenDataOfProfile 记 OSStatus（-25300 丢 / -25308 锁）；checkMCProfile 先落 username 再拼头像 URL（首登 "head/(null)" 字面量根修）+ 坏 URL 内存态修复；AvatarManager.ame185_fetchAvatarForAuthData 三层头像链（profilePicURL→crafatar UUID→minotar username）双调用方切换
+- 撞号处理：远程并行会话已占 Task184（UI 回退 + 安装页重写，1b9526e/ce60fdd）→ 我方全链改号 185（ame185 符号/Task 185 注释/verify_task185/task185_matcher_test/提交信息），变基融合三冲突（verify_task180 取对方翻转态 + 融合头像链 OR 锚；version.h 双附录并留；ModLoader 自动合并后审计：对方 cell 重写保留 \x1f 打包显示 = 哨兵行兼容）
+- 级联治愈（并行会话 task184@2 公告插入 + 改号 183→184 的漏网锚）：170-F1/F2、171-D2/D3/E2、172-H2、173b-E1/E2、174-E1/E2（全体 anns 索引 +1 顺延）、177-E1/178-E1（改号漏改断言串 task183-→task184-）、163（默认 ROOT 硬编码并行会话检出路径 → 仓库相对）
+- 验证：task185_matcher_test 23 用例全过（真实病灶形态含陈旧镜像负例 + beta 落穿回归）；verify_task185 63/63；合并树双绿对拍 verify_task184 39/39；级联 91:74/169:49/172:51/176/179:61/180:120/181:35/182:39/183:50/136:63/160:47/162:68/163/164/165:34/166:64/167:31/168:43/170:34/171:30/173:123/173b:32/174:24/177/178 + task175 语法门全过；task134 fixture 文件名漂移为 HEAD 既有环境性（stash 对拍定案）
+
+Stage Summary:
+- 装机锚点："[Task185] Forge: XML source won with N matches" 或 "BMCL per-version JSON won"（>26 生效）；Fabric/Quilt 列表默认 30 条 + 显示全部行；JIT 楔死场景 "[JIT] Task185 self-healing dispatch: refire on foreground"；"[JIT] ... Task185 openURL apple-magnifier:// -> 0"（巨魔助手死路钉死）；"[Task185] keychain token read failed ... OSStatus -25300"；"[Task185] repaired corrupted profilePicURL"；"[AvatarManager] Task185 avatar chain:" 各跳
+- 遗留：ANGLE 闪红后黑屏（呈现层已排除，嫌疑收敛内容层：desktop glUniformMatrix4fv transpose 等，待专项）、vgpu 白屏（待新构建日志）、26.1.2 空指针（他人反馈未到）、task134 fixture 漂移（环境性）
