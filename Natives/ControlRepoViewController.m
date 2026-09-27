@@ -2,6 +2,7 @@
 #import "NMToast.h"
 #import "utils.h"
 #import "LauncherPreferences.h"
+#include <stdlib.h>  // getenv（POJAV_HOME；显式包含，不依赖伞头传递）
 
 // 仓库远端：主源 raw.githubusercontent.com，回退 jsDelivr CDN（国内可达性）。
 // 索引结构见仓库 controls/index.json：

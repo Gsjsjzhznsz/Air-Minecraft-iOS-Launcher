@@ -2761,7 +2761,7 @@
 // reported "Installation completed successfully". (b) The minecraft-client-
 // patched jar is a PROCESSOR OUTPUT (never published to maven; the client
 // classifier 404s on purpose on both BMCLAPI and maven.minecraftforge.net)
--- so pre-processor download failures are undecidable. Fix: utils
+// -- so pre-processor download failures are undecidable. Fix: utils
 // ame188_ensureDirectoryHealed (full ancestor-chain stray-file self-heal)
 // wired into both installers' every mkdir site + Step E post-processor
 // artifact verification (runtime library list: existence + jar PK magic;
