@@ -229,7 +229,7 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 ## 捐赠
 
-如果您觉得这个项目对您有价值，欢迎通过 [Ko-Fi](https://ko-fi.com/herbrine8403)、[爱发电](https://afdian.com/a/herbrine8403) 或[微信赞赏码](donate.png) 进行捐赠支持。
+如果您觉得这个项目对您有价值，欢迎通过 [爱发电](https://afdian.com/a/yiqiu4178) 或[微信赞赏码](donate.png) 进行捐赠支持。
 
 ## Star History
 
