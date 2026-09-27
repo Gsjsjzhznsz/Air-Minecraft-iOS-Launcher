@@ -78,11 +78,13 @@ void ame187_showAccountRepairDialog(NSString *username, NSString *accountId, NSS
                 NSLog(@"[Task187] account repair: removed %@ (keychain residue cleared next login)", path);
             }
             if (xuid.length > 0) {
-                Class msAuth = NSClassFromString(@"MicrosoftAuthenticator");
-                SEL clearSel = NSSelectorFromString(@"clearTokenDataOfProfile:");
-                if (msAuth && [msAuth respondsToSelector:clearSel]) {
-                    ((void (*)(id, SEL, id))objc_msgSend)(msAuth, clearSel, xuid);
-                }
+                // Task187 修复：BaseAuthenticator.h（本文件第 1 行已导入）直接声明了
+                // MicrosoftAuthenticator 类与 +clearTokenDataOfProfile: 类方法，
+                // 与 AccountListViewController 滑动删除（同文件 619 行）同一调用形式。
+                // 直调替代此前的 objc_msgSend 动态派发——后者漏 <objc/message.h>
+                // 声明，曾致 CI af86509 构建失败（84:45 implicit function decl）。
+                [MicrosoftAuthenticator clearTokenDataOfProfile:xuid];
+                NSLog(@"[Task187] account repair: keychain entry cleared for xuid %@", xuid);
             }
             // 若删除的正是当前选中账户，清空选中态（与列表删除一致）
             if ([getPrefObject(@"internal.selected_account") isEqualToString:aid]) {
