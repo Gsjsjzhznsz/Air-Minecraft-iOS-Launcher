@@ -13,9 +13,9 @@ AngelAuraAmethyst（Amethyst-iOS 重制版，fork **Gsjsjzhznsz/Air-Minecraft-iO
 ### 当前状态（收尾时更新）
 | 项 | 值 |
 |---|---|
-| 远端 HEAD | 本会话 Task 165 提交（ES/4.0 黑屏真根因：egl.cpp xglGetProcAddress + FSR1 探针/熔断，CI 盯绿中）；此前 23ae87c（Task164）+ 447a677（Task163）+ df96d13（Task162）|
-| 最新 Task 号 | **165**（多会话并行开发，开新任务前先 fetch 避让编号） |
-| 待用户装机验证 | Task 165（黑屏根修）+ Task 164（壁纸默认/RCAS 对齐）+ Task 163（三案）+ Task 162（八案）+ Task 161（六案）+ Task 160 + 159 + 158 + 157 + 156 |
+| 远端 HEAD | Task 181 提交 488f25b（ab78f50 六症状轮：26.1.2 pc=0 根修 / 1.8.9 splash 禁用 / CF loaders 大小写 / 右 Shift 键位一次性化 / ANGLE+JIT 取证），CI run 36290432039 success 首跑绿；此前 afa23a6（Task180 轮 CI docs）+ 042b950（Task180）+ 43784d6（Task179）|
+| 最新 Task 号 | **181**（多会话并行开发，开新任务前先 fetch 避让编号） |
+| 待用户装机验证 | Task 181（六锚点见文末）+ Task 180（双滑条透明度）+ Task 179（八连修）+ Task 178/177（新拟态定稿）+ Task 175/176 + 更早轮次 |
 | 已知历史遗留 | v6.0.0-release-notes.md 是工作区工件不在 git（发布时从 announcements.json 重导出）；部分 verify 级联失败为沙箱环境性（会话本地脚本被清 + task132/135/149/158 路径依赖 + task140 G2/G3 日志轮换），与基线对拍判读 |
 
 ### 双会话并行协作规则（重要）
