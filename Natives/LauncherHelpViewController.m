@@ -80,7 +80,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"使用问题";
+    self.title = localize(@"ame193.misc.5", @"使用问题");
 
     // 与其他内容页一致：透出全局背景（图片/视频/毛玻璃）
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];

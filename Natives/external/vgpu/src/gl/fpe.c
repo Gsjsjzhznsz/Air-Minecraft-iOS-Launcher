@@ -795,7 +795,13 @@ void fpe_glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *i
     realize_glenv(mode==GL_POINTS, 0, count, type, indices, &scratch);
     LOAD_GLES2_(glDrawElements);
     int use_vbo = 0;
-    if(glstate->vao->elements && glstate->vao->elements->real_buffer && indices>=glstate->vao->elements->data && indices<=(glstate->vao->elements->data+glstate->vao->elements->size)) {
+    // Task193：indices==NULL 只可能来自 ame191_drawElementsViaEBO（scratch
+    // EBO 已绑定，NULL = 偏移 0）。旧的影子重绑判定在 elements->data==NULL
+    // （应用只 glBufferSubData 从未 glBufferData 的形态）时 0>=0 && 0<=size
+    // 恒真，会把 EBO 从 scratch 悄悄换回应用自己的（可能无数据的）元素缓冲
+    // → 每次绘制 GL_INVALID_OPERATION 0x0502。NULL 永远不可能是指向影子
+    // 数据内部的合法指针，直接排除。
+    if(indices && glstate->vao->elements && glstate->vao->elements->real_buffer && indices>=glstate->vao->elements->data && indices<=(glstate->vao->elements->data+glstate->vao->elements->size)) {
         use_vbo = 1;
         gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->vao->elements->real_buffer);
         indices = (GLvoid*)((uintptr_t)indices - (uintptr_t)(glstate->vao->elements->data));

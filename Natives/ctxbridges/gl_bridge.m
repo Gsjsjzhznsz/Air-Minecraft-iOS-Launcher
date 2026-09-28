@@ -1834,12 +1834,47 @@ gl_render_window_t* gl_init_context(gl_render_window_t *share) {
         ((CAMetalLayer *)layer).drawableSize.width < 1.0) {
         NSLog(@"[GLGeo] Task124 WARN: MobileGL CAMetalLayer drawableSize still zero before surface creation (Task60 align invariant broken?)");
     }
-    bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
-        (__bridge EGLNativeWindowType)swapLayerForEGL, attribsForEGL);
-    if (!bundle->surface) {
-        NSDebugLog(@"EGLBridge: eglCreateWindowSurface finished with error: 0x%x", handle.eglGetError());
-        free(bundle);
-        return NULL;
+    // Task193：同 layer 表面复用（Forge 26.1.2 双窗口形态根修）。
+    // 病历（727a291 latestlog.1，Forge-26.1.2-64.1.3 + MobileGlues 会话）：
+    // MC 26.x RenderPearl 建主窗口前先建 hidden test window —— SDL3 路径
+    // （26.3）上该窗口被 SDL hook 复用主窗口（refs 计数，无第二次 EGL 表面
+    // 创建）；但 GLFW shim 路径（26.1.2 Forge，lwjgl-glfw natives 被 MDCL
+    // 跳过、走启动器自带 shim）会再次 pojavCreateContext → 第二次
+    // eglCreateWindowSurface 打在同一个 CAMetalLayer 上 → ANGLE 以
+    // EGL_BAD_ALLOC 0x3003 拒绝（层已绑定表面，Task48 时代已实证此行为）→
+    // "Failed to create window with OpenGL context" → "No supported graphics
+    // backend was found" → 进程退出。
+    // 修法：层→表面单例。对同一 layer 的后续创建请求直接复用首个表面
+    //（语义与 SDL 复用路径对齐：单游戏视图单 layer，多窗口共享同一表面
+    // 是正确模型；hidden test window 只做能力查询，共享无副作用）。
+    {
+        static CFTypeRef s_ame193_layerCF = NULL;
+        static EGLSurface s_ame193_layerSurface = EGL_NO_SURFACE;
+        CFTypeRef ame193_reqCF = (CFTypeRef)CFBridgingRetain(swapLayerForEGL);
+        BOOL ame193_reused = NO;
+        if (s_ame193_layerSurface != EGL_NO_SURFACE && s_ame193_layerCF != NULL &&
+            ame193_reqCF != NULL && CFEqual(s_ame193_layerCF, ame193_reqCF)) {
+            bundle->surface = s_ame193_layerSurface;
+            ame193_reused = YES;
+            NSLog(@"[GLGeo] Task193: eglCreateWindowSurface REUSED surface=%p for layer=%p "
+                  @"(second window on same layer -- Forge 26.x hidden-test-window shape; "
+                  @"BAD_ALLOC 0x3003 avoided)",
+                  (void *)bundle->surface, (const void *)s_ame193_layerCF);
+        }
+        if (ame193_reqCF != NULL) CFRelease(ame193_reqCF);
+        if (!ame193_reused) {
+            bundle->surface = handle.eglCreateWindowSurface(g_EglDisplay, bundle->config,
+                (__bridge EGLNativeWindowType)swapLayerForEGL, attribsForEGL);
+            if (!bundle->surface) {
+                NSDebugLog(@"EGLBridge: eglCreateWindowSurface finished with error: 0x%x", handle.eglGetError());
+                free(bundle);
+                return NULL;
+            }
+            // 记录首个 (layer, surface) 对，供后续同层请求复用
+            if (s_ame193_layerCF != NULL) CFRelease(s_ame193_layerCF);
+            s_ame193_layerCF = (CFTypeRef)CFBridgingRetain(swapLayerForEGL);
+            s_ame193_layerSurface = bundle->surface;
+        }
     }
     // 黑屏取证（Task 32）：surface 创建成功时，把呈现目标的完整状态记入日志——
     // layer 指针/bounds/contentsScale/drawableSize/是否已在窗口层级。

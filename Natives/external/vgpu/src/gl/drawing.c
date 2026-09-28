@@ -119,13 +119,64 @@ void ame189_afterDraw(const char *site, GLenum mode, GLsizei count, GLenum idxTy
 // 装机锚点：site=direct-elements-ebo 且 GL error 0x0502 归零；
 //   MC "@ Pre render 1282" 计数归零；1.8.9 方块纹理恢复正常。
 // ============================================================================
+// Task193：ES3 真驱动查询用 GL_ELEMENT_ARRAY_BUFFER_BINDING=0x8894（本仓
+// src/gl/gles.h 里的 0x8895 是桌面 GL 的值，对 ANGLE ES3 上下文是
+// GL_INVALID_ENUM）。glstate.h 未定义该常量，这里补 ES3 值。
+#ifndef AME193_EAB_BINDING
+#define AME193_EAB_BINDING 0x8894
+#endif
+
 static void ame191_drawElementsViaEBO(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices) {
     LOAD_GLES2_(glBindBuffer);
-    LOAD_GLES2_(glBufferSubData);
+    LOAD_GLES2_(glBufferData);
+    LOAD_GLES2_(glGetIntegerv);
     GLsizei bytes = count * ((type == GL_UNSIGNED_INT) ? (GLsizei)sizeof(GLuint) : (GLsizei)sizeof(GLushort));
-    gl4es_scratch_indices(bytes);   // 分配（如需扩容）+ 绑定 scratch EBO
-    gles_glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, bytes, indices);
-    fpe_glDrawElements(mode, count, type, NULL);   // fpe 链完整；NULL 偏移在 EBO 绑定下 = 从 scratch 读取
+    // Task193：四步归因。Task192 装机裁决（727a291 latestlog.old.txt，1.8.9
+    // vgpu 会话）：scratch EBO 已确认真驱动 id=1（分配锚点命中），但
+    // direct-elements-ebo 仍 119/120 失败 0x0502，首个错误紧随第二组 FPE
+    // 程序编译之后 —— 错误源必须钉到具体调用才能继续。本探针把
+    // 【进入残留 / 绑定 / 数据上传 / 绘制】四步的错误分别读出（首调用
+    // 基线 + 前 8 个错误调用，之后零开销），装机日志一锤定音：
+    //   preErr!=0   → 错误是队列积压（历史上所有 post-draw 归因全是误报）
+    //   bindErr!=0  → scratch 名字在当前上下文无效（跨上下文失效）
+    //   dataErr!=0  → 上传本身被拒
+    //   drawErr!=0  → 绘制被拒（EBO 内容不足 / 属性状态 / 程序状态）
+    // 同时上传改为单次 glBufferData（分配+上传一体，listdraw.c:742 成功
+    // 路径同构），彻底消除 scratch_indices_size 与驱动侧实际大小失配的
+    // 整个 bug 族。
+    static unsigned s_ame193_calls = 0, s_ame193_logged = 0;
+    unsigned ame193_no = ++s_ame193_calls;
+    int ame193_wantlog = (ame193_no == 1 || s_ame193_logged < 8);
+    GLenum ame193_ePre = 0, ame193_eBind = 0, ame193_eData = 0, ame193_eDraw = 0;
+    GLint ame193_eabBefore = -1;
+    if (ame193_wantlog) {
+        gles_glGetIntegerv(AME193_EAB_BINDING, &ame193_eabBefore);
+        ame193_ePre = gles_glGetError();   // 进入时的队列残留
+    }
+    gl4es_scratch_indices(bytes);   // Task193：仅确保名字存在 + 绑定（上传已单次化）
+    if (ame193_wantlog) ame193_eBind = gles_glGetError();
+    gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, bytes, indices, GL_DYNAMIC_DRAW);
+    if (ame193_wantlog) ame193_eData = gles_glGetError();
+    fpe_glDrawElements(mode, count, type, NULL);   // fpe 链完整；Task193 起影子重绑对 NULL 已免疫（fpe.c）
+    if (ame193_wantlog) {
+        ame193_eDraw = gles_glGetError();
+        int ame193_hasErr = (ame193_ePre || ame193_eBind || ame193_eData || ame193_eDraw);
+        if (ame193_hasErr) s_ame193_logged++;
+        if (ame193_hasErr || ame193_no == 1) {
+            GLint ame193_eabNow = -1;
+            gles_glGetIntegerv(AME193_EAB_BINDING, &ame193_eabNow);
+            SHUT_LOGD("VGPU Task193 step-attrs #%u: mode=0x%04X count=%d type=0x%04X bytes=%d "
+                      "preErr=0x%04X bindErr=0x%04X dataErr=0x%04X drawErr=0x%04X "
+                      "eabBefore=%d eabNow=%d scratch=%u vaoElems(real=%u size=%d data=%p)%s\n",
+                      ame193_no, (unsigned)mode, (int)count, (unsigned)type, (int)bytes,
+                      (unsigned)ame193_ePre, (unsigned)ame193_eBind, (unsigned)ame193_eData, (unsigned)ame193_eDraw,
+                      (int)ame193_eabBefore, (int)ame193_eabNow, (unsigned)glstate->scratch_indices,
+                      (glstate->vao->elements) ? (unsigned)glstate->vao->elements->real_buffer : 0u,
+                      (glstate->vao->elements) ? (int)glstate->vao->elements->size : -1,
+                      (glstate->vao->elements) ? (void *)glstate->vao->elements->data : NULL,
+                      (ame193_no == 1 && !ame193_hasErr) ? " (baseline: first call clean)" : "");
+        }
+    }
     gl4es_use_scratch_indices(0);   // 恢复 EBO=0，不留跨调用状态
 }
 

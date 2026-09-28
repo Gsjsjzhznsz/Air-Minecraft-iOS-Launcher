@@ -111,5 +111,139 @@ for v in ("scripts/verify_task173.py", "scripts/verify_task190.py"):
     except SyntaxError as e:
         check("G", f"{os.path.basename(v)} compile-ok", False, str(e))
 
+
+# ============ H. vgpu Task193（fpe NULL 守卫 + 四步归因 + 单次上传）============
+print("== H. vgpu Task193（fpe NULL 守卫 + 四步归因 + 单次上传）==")
+def rd(p):
+    return io.open(p, encoding="utf-8", errors="replace").read()
+fpe = rd("Natives/external/vgpu/src/gl/fpe.c")
+drawing = rd("Natives/external/vgpu/src/gl/drawing.c")
+gl4es_c = rd("Natives/external/vgpu/src/gl/gl4es.c")
+check("H", "fpe_glDrawElements 影子重绑对 NULL 免疫（indices && 前置）",
+      "if(indices && glstate->vao->elements" in fpe)
+check("H", "ame191 四步归因插桩（preErr/bindErr/dataErr/drawErr）",
+      all(s in drawing for s in ["ame193_ePre", "ame193_eBind", "ame193_eData", "ame193_eDraw"]))
+check("H", "单次 glBufferData 上传（listdraw 同构）",
+      "gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, bytes, indices, GL_DYNAMIC_DRAW);" in drawing)
+check("H", "旧 SubData 两段式退役",
+      "gles_glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, bytes, indices);" not in drawing)
+check("H", "EAB 绑定查询用 ES3 值 0x8894（AME193_EAB_BINDING）",
+      "#define AME193_EAB_BINDING 0x8894" in drawing)
+check("H", "gl4es_scratch_indices 退役为绑定+名字（size 跟踪移除）",
+      "Task193：本函数退役为" in gl4es_c and "scratch_indices_size < alloc" not in gl4es_c)
+check("H", "首调用基线 + 前 8 错误调用日志（装机锚点）",
+      "VGPU Task193 step-attrs" in drawing and "baseline: first call clean" in drawing)
+
+# ============ I. gl4es 构造器临时上下文引导 ============
+print("== I. gl4es 构造器临时上下文引导 ==")
+egl = rd("Natives/egl_bridge.m")
+check("I", "Task193 引导块存在 + 一次性守卫",
+      "Task193：gl4es 构造器崩溃根修" in egl and "s_ame193_gl4esDone" in egl)
+check("I", "临时 pbuffer + ES3 上下文（与游戏上下文同版本）",
+      "EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE" in egl and "ame193_createPbuffer" in egl)
+check("I", "构造器在有上下文环境运行（显式 dlopen libgl4es_114）",
+      'dlopen("@rpath/libgl4es_114.dylib", RTLD_NOW | RTLD_GLOBAL)' in egl)
+check("I", "临时资源释放（makeCurrent NO + destroy ctx/surface）",
+      "ame193_makeCurrent(ame193_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)" in egl)
+check("I", "失败安全锚点（bootstrap FAILED 日志）",
+      "gl4es constructor bootstrap FAILED" in egl)
+
+# ============ J. gl_bridge 同 layer 表面复用 ============
+print("== J. gl_bridge 同 layer 表面复用 ==")
+glb = rd("Natives/ctxbridges/gl_bridge.m")
+check("J", "Task193 复用块 + 层→表面单例",
+      "Task193：同 layer 表面复用" in glb and "s_ame193_layerSurface" in glb)
+check("J", "复用命中日志（装机锚点）", "eglCreateWindowSurface REUSED" in glb)
+check("J", "首个 (layer, surface) 记录",
+      "s_ame193_layerCF = (CFTypeRef)CFBridgingRetain(swapLayerForEGL);" in glb)
+check("J", "CFBridgingRetain 平衡（reqCF 释放）",
+      "if (ame193_reqCF != NULL) CFRelease(ame193_reqCF);" in glb)
+
+# ============ K. convertV1Layout addObject:nil 根修 ============
+print("== K. convertV1Layout addObject:nil 根修 ==")
+ccu = rd("Natives/customcontrols/CustomControlsUtils.m")
+check("K", "keycode addObject nil 防护（integerValue 兜底）",
+      '[keycodes addObject:@([btnDict[@"keycode"] integerValue])];' in ccu)
+check("K", "病历注释（符号化调用链）",
+      "_convertV1Layout+0x410" in ccu and "FileListViewController" in ccu)
+check("K", "其余三处 addObject 为常量（无 nil 面）",
+      ccu.count("[keycodes addObject:@(GLFW_KEY_") == 3)
+
+# ============ L. ANGLE DSA 通告 + Map/VAO 族 + dlsym 取证 ============
+print("== L. ANGLE DSA 通告 + Map/VAO 族 + dlsym 取证 ==")
+tg = rd("Natives/external/gl4es/tinygl4angle.c")
+check("L", "GL_ARB_direct_state_access 通告", '"GL_ARB_direct_state_access"' in tg)
+check("L", "glGetStringi 导出 + 扩展缓存",
+      "ame193_buildExtCache" in tg and "const GLubyte *glGetStringi(GLenum name, GLuint index)" in tg)
+check("L", "glGetIntegerv 拦截（NUM_EXTENSIONS +1）",
+      "void glGetIntegerv(GLenum pname, GLint *params)" in tg and "GL_NUM_EXTENSIONS" in tg)
+check("L", "glGetString(GL_EXTENSIONS) 追加（旧式路径）", "ame193_appendExtString(result)" in tg)
+check("L", "Map/Storage 族（7 函数）",
+      all(s in tg for s in ["glMapNamedBufferRange", "glUnmapNamedBuffer",
+                            "glGetNamedBufferSubData", "glNamedBufferStorage",
+                            "glFlushMappedNamedBufferRange", "glClearNamedBufferSubData"]))
+check("L", "VAO-DSA 族（8 函数）",
+      all(s in tg for s in ["glCreateVertexArrays", "glVertexArrayElementBuffer",
+                            "glVertexArrayVertexBuffer", "glVertexArrayAttribFormat",
+                            "glVertexArrayAttribBinding", "glEnableVertexArrayAttrib",
+                            "glDisableVertexArrayAttrib", "glVertexArrayBindingDivisor"]))
+check("L", "dlsym GL NULL 取证（hooked_dlsym）",
+      "GL symbol resolution FAILED" in rd("Natives/main_hook.m"))
+check("L", "LWJGL natives dlsym 重绑（触发面 + 镜像扫描）",
+      'strstr(path, "lwjgl") != NULL' in rd("Natives/main_hook.m") and
+      "isLwjglNative" in rd("Natives/sdl3_hook.m"))
+r = subprocess.run(["bash", "scripts/task193_tinygl_syntax.sh"], capture_output=True, text=True, timeout=180)
+check("L", "tinygl4angle 真源码语法门（task193_tinygl_syntax.sh）",
+      r.returncode == 0 and "SYNTAX OK" in r.stdout, r.stdout[-200:] + r.stderr[-200:])
+
+# ============ M. i18n UI 清扫（180 键 ×4 主语言）============
+print("== M. i18n UI 清扫（180 键 ×4 主语言）==")
+import re as _re
+for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
+    n = len(set(_re.findall(r'^"([^"]+)"\s*=',
+                            rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), _re.M)))
+    check("M", f"{lang} 唯一键 2408", n == 2408, f"got {n}")
+for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
+    t = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
+    check("M", f"{lang} ame193 键 180 个", len(_re.findall(r'^"ame193\.', t, _re.M)) == 180)
+mp = rd("Natives/MultiplayerViewController.m")
+check("M", "MP 硬编码中文清零（localize 包装后）", mp.count('localize(@"ame193.') >= 100)
+check("M", "混合语 JIT 串迁移",
+      'localize(@"ame193.misc.jit_not_handled"' in rd("Natives/LauncherRightPanelViewController.m"))
+check("M", "既有键复用（新建版本→i18n_str_2027 修英文模式比较失配）",
+      'isEqualToString:localize(@"i18n_str_2027"' in rd("Natives/VersionManagerViewController.m"))
+r = subprocess.run([sys.executable, "scripts/task191_validate_strings.py"],
+                   capture_output=True, text=True, timeout=300)
+check("M", "全部 lproj 表解析 OK（task191 tokenizer）",
+      r.returncode == 0 and "FAIL" not in r.stdout and "OK" in r.stdout)
+
+# ============ N. MobileGlues 2.0.18 ============
+print("== N. MobileGlues 2.0.18 ==")
+vh2 = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
+md = rd("Natives/external/MobileGlues/MobileGlues-cpp/gl/multidraw.cpp")
+check("N", "REVISION 18", "#define REVISION 18" in vh2)
+check("N", "上游 0f1e10b multidraw grow-only 移植",
+      "if (staged.size() < static_cast<size_t>(primcount))" in md and
+      "Upstream 0f1e10b (2.0.18 sync)" in md)
+check("N", "FSR1 兼容审计注记（478d479 已在树 + config 键对齐）",
+      "FSR1 compatibility audit" in vh2 and "fsr1Setting" in vh2)
+settings = rd("Natives/external/MobileGlues/MobileGlues-cpp/config/settings.cpp")
+jl = rd("Natives/JavaLauncher.m")
+check("N", "FSR1 config 键两端对齐（fsr1Setting/fsr1RcasSharpness）",
+      'config_get_int((char*)"fsr1Setting")' in settings and
+      'config[@"fsr1Setting"]' in jl and
+      'config_get_double((char*)"fsr1RcasSharpness"' in settings and
+      'config[@"fsr1RcasSharpness"]' in jl)
+check("N", "RCAS 负值 off 语义（两端）", "negative (not NaN) = explicit off" in settings)
+
+# ============ O. 级联 spot check ============
+print("== O. 级联 ==")
+for v in ["verify_task188", "verify_task189", "verify_task190", "verify_task191", "verify_task192"]:
+    r = subprocess.run([sys.executable, f"scripts/{v}.py"], capture_output=True, text=True, timeout=600)
+    low = r.stdout.lower()
+    ok = ("0 fail" in low or "0 failed" in low or "all pass" in low or "all green" in low)
+    check("O", f"级联 {v}", ok, r.stdout[-160:])
+
+
 print(f"\n===== verify_task193: {len(PASS)} PASS / {len(FAIL)} FAIL =====")
 sys.exit(1 if FAIL else 0)

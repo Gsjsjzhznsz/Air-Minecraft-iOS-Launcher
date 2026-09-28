@@ -1198,19 +1198,21 @@ void gl4es_use_scratch_vertex(int use) {
 }
 
 void gl4es_scratch_indices(int alloc) {
-    LOAD_GLES(glBufferData);
+    // Task193：本函数退役为【确保名字存在 + 绑定】。数据上传由调用方以
+    // 单次 glBufferData(GL_ELEMENT_ARRAY_BUFFER, bytes, data, GL_DYNAMIC_DRAW)
+    // 完成（listdraw.c:742 索引 VBO 成功路径同构）。旧的"按需扩容 + 调用方
+    // SubData"两段式存在 scratch_indices_size 与驱动侧实际 buffer 大小失配
+    // 的整个 bug 族（glBufferData 失败时 size 仍被记大 → 后续 SubData 静默
+    // 拒绝 → 绘制读旧数据/越界 0x0502），单次化后该状态不复存在。
+    // alloc 参数保留签名兼容，语义已由调用方的 bytes 承担。
+    (void)alloc;
     LOAD_GLES(glBindBuffer);
     LOAD_GLES(glGenBuffers);
     if(!glstate->scratch_indices) {
-        // Task192：同上——真驱动 id（详见 gl4es_scratch_vertex 注释）。
         gles_glGenBuffers(1, &glstate->scratch_indices);
         SHUT_LOGD("VGPU Task192: scratch EBO allocated (real driver id=%u)\n", glstate->scratch_indices);
     }
     gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->scratch_indices);
-    if(glstate->scratch_indices_size < alloc) {
-        gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, alloc, NULL, GL_DYNAMIC_DRAW);
-        glstate->scratch_indices_size = alloc;
-    }
 }
 
 void gl4es_use_scratch_indices(int use) {

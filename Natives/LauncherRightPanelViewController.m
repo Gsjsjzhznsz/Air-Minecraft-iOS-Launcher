@@ -1842,7 +1842,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         NSLog(@"[JIT] [RightPanel] Task185 openURL %@ -> %d", tool, ok);
         if (!ok) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                showDialog(localize(@"Error", nil), [NSString stringWithFormat:@"%@ 未接管启动请求（未安装或版本过旧？）。请在设置的 JIT 开启工具中换用其它工具后重试。\n%@ did not handle the request. Switch the JIT enabler in Settings and retry.", tool, tool]);
+                showDialog(localize(@"Error", nil), [NSString stringWithFormat:localize(@"ame193.misc.jit_not_handled", @"%@ 未接管启动请求（未安装或版本过旧？）。请在设置的 JIT 开启工具中换用其它工具后重试。"), tool]);
             });
         }
     }];

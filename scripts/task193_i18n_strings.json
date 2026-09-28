@@ -1,0 +1,1722 @@
+{
+ "关闭": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:304"
+  ]
+ },
+ "联机核心不可用": {
+  "count": 6,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:359",
+   "Natives/MultiplayerViewController.m:408",
+   "Natives/MultiplayerViewController.m:442",
+   "Natives/MultiplayerViewController.m:618",
+   "Natives/MultiplayerViewController.m:901",
+   "Natives/MultiplayerViewController.m:1309"
+  ]
+ },
+ "ZeroTier 联机核心未加载，无法启用联机。请使用包含真实 zt.framework 的构建版本。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:360"
+  ]
+ },
+ "启动失败": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:378"
+  ]
+ },
+ "ZeroTier 节点启动失败，请重试。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:379"
+  ]
+ },
+ "ZeroTier 联机核心未加载，无法设置 Network ID。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:409"
+  ]
+ },
+ "设置 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:415"
+  ]
+ },
+ "在 central.zerotier.com 创建网络后填入 16 位 Network ID，开房时自动使用": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:416"
+  ]
+ },
+ "16 位十六进制 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:421"
+  ]
+ },
+ "取消": {
+  "count": 7,
+  "files": [
+   "Natives/ModpackExportViewController.m",
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:428",
+   "Natives/MultiplayerViewController.m:800",
+   "Natives/MultiplayerViewController.m:816",
+   "Natives/MultiplayerViewController.m:1095",
+   "Natives/MultiplayerViewController.m:1326",
+   "Natives/MultiplayerViewController.m:1611",
+   "Natives/ModpackExportViewController.m:508"
+  ]
+ },
+ "使用快速模式（无需注册）": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:434"
+  ]
+ },
+ "ZeroTier 联机核心未加载，无法使用快速模式。": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:443",
+   "Natives/MultiplayerViewController.m:619"
+  ]
+ },
+ "生成失败": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:450",
+   "Natives/MultiplayerViewController.m:626"
+  ]
+ },
+ "无法生成快速模式 Network ID，请改用标准模式": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:451",
+   "Natives/MultiplayerViewController.m:627"
+  ]
+ },
+ "已启用快速模式": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:460",
+   "Natives/MultiplayerViewController.m:636"
+  ]
+ },
+ "已自动生成 Network ID，无需注册账号即可联机。注意：快速模式稳定性不如标准模式，IP 可能变化。": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:462",
+   "Natives/MultiplayerViewController.m:638"
+  ]
+ },
+ "保存": {
+  "count": 2,
+  "files": [
+   "Natives/AI/AISystemPromptEditorViewController.m",
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:466",
+   "Natives/AI/AISystemPromptEditorViewController.m:34"
+  ]
+ },
+ "格式不正确": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:484"
+  ]
+ },
+ "Network ID 应为 16 位十六进制字符串": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:485"
+  ]
+ },
+ "标准模式": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:514",
+   "Natives/MultiplayerViewController.m:524"
+  ]
+ },
+ "稳定": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:515"
+  ]
+ },
+ "在 central.zerotier.com 注册账号并创建组织，获得固定的 Network ID。IP 稳定、支持授权管理、每人独立网络。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:516"
+  ]
+ },
+ "快速模式": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:519",
+   "Natives/MultiplayerViewController.m:555"
+  ]
+ },
+ "不稳定": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:520"
+  ]
+ },
+ "使用 Ad-hoc 网络自动生成 Network ID，无需注册账号。但只有 IPv6 地址、公开网络安全性弱、IP 可能变化。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:521"
+  ]
+ },
+ "注册 ZeroTier 账号": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:527"
+  ]
+ },
+ "访问 central.zerotier.com（新版 Central），注册并登录账号（免费，支持 Google/GitHub/Microsoft 登录）": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:528"
+  ]
+ },
+ "创建组织": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:531"
+  ]
+ },
+ "登录后输入组织名称，点击「Create Organization」。免费套餐自带一个 Network Group 和一个 Network": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:532"
+  ]
+ },
+ "获取 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:535"
+  ]
+ },
+ "在左侧边栏展开「Networks」，点击默认网络（如 my-first-network），复制顶部的 16 位 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:536"
+  ]
+ },
+ "设置网络访问控制": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:539"
+  ]
+ },
+ "Private（推荐）：需手动授权成员更安全；Public：任何人可直接加入": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:540"
+  ]
+ },
+ "填入启动器": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:543"
+  ]
+ },
+ "回到本页面，点击「预设 Network ID」行，粘贴并保存": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:544"
+  ]
+ },
+ "授权房客设备": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:547"
+  ]
+ },
+ "房客加入后在「Member Devices」标签点击三点菜单→「Authorize」授权（Private 模式需要，Public 模式跳过）": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:548"
+  ]
+ },
+ "开始联机": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:551",
+   "Natives/MultiplayerViewController.m:566"
+  ]
+ },
+ "启动游戏后在悬浮球中打开联机界面，选择「当房主」即可开房": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:552",
+   "Natives/MultiplayerViewController.m:567"
+  ]
+ },
+ "点击「预设 Network ID」": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:558"
+  ]
+ },
+ "在本页面点击「预设 Network ID」行": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:559"
+  ]
+ },
+ "选择快速模式": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:562"
+  ]
+ },
+ "点击「使用快速模式（无需注册）」按钮，系统自动生成 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:563"
+  ]
+ },
+ "ZeroTier 提供两种联机模式，根据需求选择：": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:570"
+  ]
+ },
+ "注意：房主和房客使用相同的 Network ID 才能联机。标准模式需在后台授权成员（Private）或设为 Public。快速模式所有人共享同一公开网络。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:590"
+  ]
+ },
+ "ZeroTier 联机教程": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:592"
+  ]
+ },
+ "打开 central.zerotier.com（标准模式）": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:599"
+  ]
+ },
+ "使用快速模式": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:610"
+  ]
+ },
+ "我知道了": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:643"
+  ]
+ },
+ "连接失败": {
+  "count": 5,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:717",
+   "Natives/MultiplayerViewController.m:759",
+   "Natives/MultiplayerViewController.m:1052",
+   "Natives/MultiplayerViewController.m:1417",
+   "Natives/MultiplayerViewController.m:1471"
+  ]
+ },
+ "无法连接到房间，请检查 Network ID 是否正确以及网络是否畅通。": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:718",
+   "Natives/MultiplayerViewController.m:760"
+  ]
+ },
+ "未命名房间": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:735",
+   "Natives/MultiplayerViewController.m:2029"
+  ]
+ },
+ "断开连接": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:746"
+  ]
+ },
+ "连接房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:747"
+  ]
+ },
+ "分享房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:767"
+  ]
+ },
+ "删除房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:787"
+  ]
+ },
+ "确认删除": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:794"
+  ]
+ },
+ "确定要删除房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:796"
+  ]
+ },
+ "此操作无法撤销。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:798"
+  ]
+ },
+ "删除": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:801"
+  ]
+ },
+ "提示": {
+  "count": 3,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:840",
+   "Natives/MultiplayerViewController.m:852",
+   "Natives/MultiplayerViewController.m:863"
+  ]
+ },
+ "请输入服务器 IP 地址": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:841"
+  ]
+ },
+ "IP 地址格式不正确，请检查输入": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:853"
+  ]
+ },
+ "未找到当前 profile，请先选择一个游戏配置": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:864"
+  ]
+ },
+ "已添加服务器": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:870",
+   "Natives/MultiplayerViewController.m:872"
+  ]
+ },
+ "ZeroTier 联机核心未加载，无法作为房主开房。请使用包含真实 zt.framework 的构建版本。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:902"
+  ]
+ },
+ "未设置 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:910"
+  ]
+ },
+ "房主需要先设置预设 ZeroTier Network ID。请在启动器联机界面中设置后再来。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:911"
+  ]
+ },
+ "好": {
+  "count": 3,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:913",
+   "Natives/MultiplayerViewController.m:1287",
+   "Natives/MultiplayerViewController.m:1563"
+  ]
+ },
+ "Network ID 格式不正确": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:920"
+  ]
+ },
+ "请在启动器联机界面设置正确的 16 位十六进制 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:921"
+  ]
+ },
+ "我的联机房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:983"
+  ]
+ },
+ "正在开启联机": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1012"
+  ]
+ },
+ "正在连接到 ZeroTier 网络，请稍候...": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1013"
+  ]
+ },
+ "无法连接到 ZeroTier 网络，请检查 Network ID 是否正确以及网络是否畅通。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1053"
+  ]
+ },
+ "已连接到联机网络，请在 MC 中开放局域网后输入端口号": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1077"
+  ]
+ },
+ "请在 MC 中创建世界并点击「对局域网开放」": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1078"
+  ]
+ },
+ "开放局域网后，MC 会在聊天框显示端口号，请将其输入下方": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1079"
+  ]
+ },
+ "本机 IP": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1080"
+  ]
+ },
+ "联机已开启": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1083"
+  ]
+ },
+ "端口号（如 54321）": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1088"
+  ]
+ },
+ "生成分享代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1100"
+  ]
+ },
+ "端口为空": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1111"
+  ]
+ },
+ "请输入 LAN 端口号": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1112"
+  ]
+ },
+ "端口无效": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1119"
+  ]
+ },
+ "端口号必须在 1-65535 之间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1120"
+  ]
+ },
+ "生成分享代码失败": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1200"
+  ]
+ },
+ "无法获取本机 ZeroTier IP，请检查网络连接后重试": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1201"
+  ]
+ },
+ "房主 IP 已变化": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1234"
+  ]
+ },
+ "你的 ZeroTier IP 已变化，之前分享的旧代码已失效。请将新的分享代码重新发给房客。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1235"
+  ]
+ },
+ "分享代码已生成！将以下代码发给房客：": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1250"
+  ]
+ },
+ "房客输入此代码即可加入你的联机网络": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1252"
+  ]
+ },
+ "服务器地址": {
+  "count": 4,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1253",
+   "Natives/MultiplayerViewController.m:1485",
+   "Natives/MultiplayerViewController.m:2045",
+   "Natives/MultiplayerViewController.m:2316"
+  ]
+ },
+ "可点击下方按钮复制或分享代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1254"
+  ]
+ },
+ "分享代码已生成": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1256"
+  ]
+ },
+ "复制代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1261"
+  ]
+ },
+ "分享...": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1270"
+  ]
+ },
+ "ZeroTier 联机核心未加载，无法作为房客加入。请使用包含真实 zt.framework 的构建版本。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1310"
+  ]
+ },
+ "输入分享代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1314"
+  ]
+ },
+ "请输入房主提供的分享代码": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1315",
+   "Natives/MultiplayerViewController.m:1343"
+  ]
+ },
+ "在此粘贴分享代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1319"
+  ]
+ },
+ "加入": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1331"
+  ]
+ },
+ "输入为空": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1342"
+  ]
+ },
+ "代码无效": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1350",
+   "Natives/MultiplayerViewController.m:1357"
+  ]
+ },
+ "无法解析分享代码，请确认代码完整无误": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1351"
+  ]
+ },
+ "分享代码中的 Network ID 无效": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1358"
+  ]
+ },
+ "分享代码无效": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1365"
+  ]
+ },
+ "分享代码缺少房主 IP，请确认代码完整无误": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1366"
+  ]
+ },
+ "正在加入联机": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1400"
+  ]
+ },
+ "正在连接到房主的 ZeroTier 网络，请稍候...": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1401"
+  ]
+ },
+ "无法连接到房主的网络，请检查分享代码是否正确以及网络是否畅通。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1418"
+  ]
+ },
+ "未知": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1443"
+  ]
+ },
+ "端口转发器启动失败，无法连接到房主。请尝试断开重连。": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1472"
+  ]
+ },
+ "已连接到房主的联机网络": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1482"
+  ]
+ },
+ "请在 MC 多人游戏界面点击「添加服务器」，粘贴以下地址即可加入": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1483"
+  ]
+ },
+ "服务器地址已自动复制到剪贴板，直接粘贴即可": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1484"
+  ]
+ },
+ "地址已自动保存到当前配置，下次启动游戏会自动连接": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1487"
+  ]
+ },
+ "已加入联机": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1489"
+  ]
+ },
+ "未连接": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1691",
+   "Natives/MultiplayerViewController.m:2277"
+  ]
+ },
+ "连接中": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1693",
+   "Natives/MultiplayerViewController.m:1726"
+  ]
+ },
+ "已连接": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1695",
+   "Natives/MultiplayerViewController.m:2277"
+  ]
+ },
+ "错误": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1697"
+  ]
+ },
+ "断开": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1722"
+  ]
+ },
+ "连接": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1730"
+  ]
+ },
+ "选择角色": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1802"
+  ]
+ },
+ "联机状态": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1804"
+  ]
+ },
+ "联机设置": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1811"
+  ]
+ },
+ "我的房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1813"
+  ]
+ },
+ "直连": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1815"
+  ]
+ },
+ "房主需在 MC 中开放局域网，房客输入分享代码即可加入": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1826"
+  ]
+ },
+ "显示当前联机网络的状态信息": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1828"
+  ]
+ },
+ "启用联机后可设置 Network ID，房主开房时自动使用": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1835"
+  ]
+ },
+ "输入服务器 IP 和端口，写入当前 profile，启动游戏后自动加入": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1837"
+  ]
+ },
+ "启用联机": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1878"
+  ]
+ },
+ "节点已上线": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1895"
+  ]
+ },
+ "节点启动中...": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1897",
+   "Natives/MultiplayerViewController.m:1902"
+  ]
+ },
+ "节点未启动": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1904"
+  ]
+ },
+ "预设 Network ID": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1924"
+  ]
+ },
+ "未设置": {
+  "count": 2,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1937",
+   "Natives/MultiplayerViewController.m:2297"
+  ]
+ },
+ "ZeroTier 网络创建教程": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1972"
+  ]
+ },
+ "不知道怎么创建网络？点这里": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:1983"
+  ]
+ },
+ "暂无房间（房间仅在本次会话中保留）": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2006"
+  ]
+ },
+ "服务器 IP": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2088"
+  ]
+ },
+ "加入游戏": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2178"
+  ]
+ },
+ "当房主": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2217"
+  ]
+ },
+ "创建联机房间，开放局域网后生成分享代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2219"
+  ]
+ },
+ "当房客": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2233"
+  ]
+ },
+ "输入分享代码，加入房主的联机网络": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2235"
+  ]
+ },
+ "房主模式": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2285"
+  ]
+ },
+ "房客模式": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2287"
+  ]
+ },
+ "未开始": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2289"
+  ]
+ },
+ "本地 IP": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2303"
+  ]
+ },
+ "分享代码": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2309"
+  ]
+ },
+ "暂无房间": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2373"
+  ]
+ },
+ "请先在 Section 0 设置 Network ID，然后在游戏内模式中选择当房主或房客": {
+  "count": 1,
+  "files": [
+   "Natives/MultiplayerViewController.m"
+  ],
+  "lines": [
+   "Natives/MultiplayerViewController.m:2374"
+  ]
+ },
+ "删除该实例并重新导入整合包（建议换个下载源重试）%@": {
+  "count": 1,
+  "files": [
+   "Natives/PLCrashView.m"
+  ],
+  "lines": [
+   "Natives/PLCrashView.m:581"
+  ]
+ },
+ "——重点确认：%@": {
+  "count": 1,
+  "files": [
+   "Natives/PLCrashView.m"
+  ],
+  "lines": [
+   "Natives/PLCrashView.m:581"
+  ]
+ },
+ "FTB 组件": {
+  "count": 1,
+  "files": [
+   "Natives/PLCrashView.m"
+  ],
+  "lines": [
+   "Natives/PLCrashView.m:704"
+  ]
+ },
+ "缺失的类（对应 mod 未安装或版本不符）：\\n": {
+  "count": 1,
+  "files": [
+   "Natives/PLCrashView.m"
+  ],
+  "lines": [
+   "Natives/PLCrashView.m:717"
+  ]
+ },
+ "\\n推断缺失组件：%@": {
+  "count": 1,
+  "files": [
+   "Natives/PLCrashView.m"
+  ],
+  "lines": [
+   "Natives/PLCrashView.m:723"
+  ]
+ },
+ "\\n\\n依赖检查被覆盖：%@": {
+  "count": 1,
+  "files": [
+   "Natives/PLCrashView.m"
+  ],
+  "lines": [
+   "Natives/PLCrashView.m:726"
+  ]
+ },
+ "（正在调用工具…）": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AIMessageCell.m"
+  ],
+  "lines": [
+   "Natives/AI/AIMessageCell.m:192"
+  ]
+ },
+ "工具": {
+  "count": 2,
+  "files": [
+   "Natives/AI/AIMessageCell.m"
+  ],
+  "lines": [
+   "Natives/AI/AIMessageCell.m:195",
+   "Natives/AI/AIMessageCell.m:205"
+  ]
+ },
+ "\\n\\n⚙️ 工具：%@": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AIMessageCell.m"
+  ],
+  "lines": [
+   "Natives/AI/AIMessageCell.m:196"
+  ]
+ },
+ "✅ %@ 执行成功": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AIMessageCell.m"
+  ],
+  "lines": [
+   "Natives/AI/AIMessageCell.m:208"
+  ]
+ },
+ "❌ %@ 执行失败": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AIMessageCell.m"
+  ],
+  "lines": [
+   "Natives/AI/AIMessageCell.m:208"
+  ]
+ },
+ "⚙️ 工具：%@": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AIMessageCell.m"
+  ],
+  "lines": [
+   "Natives/AI/AIMessageCell.m:210"
+  ]
+ },
+ "给 Air 发送消息…": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AIInputBarView.m"
+  ],
+  "lines": [
+   "Natives/AI/AIInputBarView.m:67"
+  ]
+ },
+ "系统提示词": {
+  "count": 2,
+  "files": [
+   "Natives/AI/AISystemPromptEditorViewController.m",
+   "Natives/LauncherPreferencesViewController.m"
+  ],
+  "lines": [
+   "Natives/AI/AISystemPromptEditorViewController.m:22",
+   "Natives/LauncherPreferencesViewController.m:1470"
+  ]
+ },
+ "恢复默认": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AISystemPromptEditorViewController.m"
+  ],
+  "lines": [
+   "Natives/AI/AISystemPromptEditorViewController.m:28"
+  ]
+ },
+ "这会注入到每次对话的最前面，用于约定 Air 助手的行为方式。": {
+  "count": 1,
+  "files": [
+   "Natives/AI/AISystemPromptEditorViewController.m"
+  ],
+  "lines": [
+   "Natives/AI/AISystemPromptEditorViewController.m:65"
+  ]
+ },
+ "全部": {
+  "count": 12,
+  "files": [
+   "Natives/AssetVersionViewController.m",
+   "Natives/DownloadViewController.m",
+   "Natives/ModVersionViewController.m",
+   "Natives/ShaderVersionViewController.m"
+  ],
+  "lines": [
+   "Natives/ShaderVersionViewController.m:681",
+   "Natives/ShaderVersionViewController.m:682",
+   "Natives/ShaderVersionViewController.m:729",
+   "Natives/ShaderVersionViewController.m:731",
+   "Natives/ModVersionViewController.m:677",
+   "Natives/ModVersionViewController.m:678",
+   "Natives/ModVersionViewController.m:724",
+   "Natives/ModVersionViewController.m:726",
+   "Natives/AssetVersionViewController.m:564",
+   "Natives/AssetVersionViewController.m:565",
+   "Natives/AssetVersionViewController.m:593",
+   "Natives/DownloadViewController.m:1328"
+  ]
+ },
+ "全部版本": {
+  "count": 2,
+  "files": [
+   "Natives/DownloadViewController.m"
+  ],
+  "lines": [
+   "Natives/DownloadViewController.m:1314",
+   "Natives/DownloadViewController.m:2651"
+  ]
+ },
+ "正式版": {
+  "count": 1,
+  "files": [
+   "Natives/VersionCardCell.m"
+  ],
+  "lines": [
+   "Natives/VersionCardCell.m:223"
+  ]
+ },
+ "测试版": {
+  "count": 1,
+  "files": [
+   "Natives/VersionCardCell.m"
+  ],
+  "lines": [
+   "Natives/VersionCardCell.m:227"
+  ]
+ },
+ "新建版本": {
+  "count": 1,
+  "files": [
+   "Natives/VersionManagerViewController.m"
+  ],
+  "lines": [
+   "Natives/VersionManagerViewController.m:842"
+  ]
+ },
+ "使用问题": {
+  "count": 1,
+  "files": [
+   "Natives/LauncherHelpViewController.m"
+  ],
+  "lines": [
+   "Natives/LauncherHelpViewController.m:83"
+  ]
+ },
+ "简体中文": {
+  "count": 1,
+  "files": [
+   "Natives/LauncherPreferencesViewController.m"
+  ],
+  "lines": [
+   "Natives/LauncherPreferencesViewController.m:547"
+  ]
+ },
+ "提供商配置": {
+  "count": 1,
+  "files": [
+   "Natives/LauncherPreferencesViewController.m"
+  ],
+  "lines": [
+   "Natives/LauncherPreferencesViewController.m:1426"
+  ]
+ },
+ "会话列表": {
+  "count": 1,
+  "files": [
+   "Natives/LauncherPreferencesViewController.m"
+  ],
+  "lines": [
+   "Natives/LauncherPreferencesViewController.m:1437"
+  ]
+ },
+ "Markdown 渲染": {
+  "count": 1,
+  "files": [
+   "Natives/LauncherPreferencesViewController.m"
+  ],
+  "lines": [
+   "Natives/LauncherPreferencesViewController.m:1465"
+  ]
+ },
+ "iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\\n\\n": {
+  "count": 1,
+  "files": [
+   "Natives/LauncherPreferencesViewController.m"
+  ],
+  "lines": [
+   "Natives/LauncherPreferencesViewController.m:1916"
+  ]
+ },
+ "安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@": {
+  "count": 2,
+  "files": [
+   "Natives/installer/ForgeDirectInstaller.m",
+   "Natives/installer/NeoForgeDirectInstaller.m"
+  ],
+  "lines": [
+   "Natives/installer/NeoForgeDirectInstaller.m:375",
+   "Natives/installer/ForgeDirectInstaller.m:788"
+  ]
+ },
+ "显示全部（还有 %ld 个更早的版本）": {
+  "count": 1,
+  "files": [
+   "Natives/installer/ModLoaderInstallViewController.m"
+  ],
+  "lines": [
+   "Natives/installer/ModLoaderInstallViewController.m:535"
+  ]
+ }
+}

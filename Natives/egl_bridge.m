@@ -214,6 +214,113 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         NSLog(@"[egl_bridge] Task192: preloading ANGLE frameworks RTLD_GLOBAL for gl4es EGL resolution");
         dlopen("@executable_path/Frameworks/libEGL.framework/libEGL", RTLD_NOW | RTLD_GLOBAL);
         dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2", RTLD_NOW | RTLD_GLOBAL);
+        // Task193：gl4es 构造器崩溃根修（strstr(NULL) SIGSEGV）。
+        // 病历（727a291 latestlog.2，gl4es 渲染器会话）：dylib 构造器
+        // initialize_gl4es → GetHardwareExtensions 把 glGetString 的返回值
+        // 直接交给 strstr —— 构造器运行时【无当前上下文】，ANGLE 的
+        // glGetString 返回 NULL，_platform_strstr(NULL) → SIGSEGV（PC 在
+        // libsystem_platform，栈：GetHardwareExtensions → initialize_gl4es）。
+        // Task192 的 RTLD_DEFAULT 补丁让 proc_address 解析到真函数，但也
+        // 正因此把"无上下文调 NULL 返回值"这条死路打通了。
+        // 修法（ame_mgBootstrap 同款模式）：在统一 dlopen 拉起 libgl4es_114
+        // 之前，本线程先建一次性 pbuffer + ES3 上下文并 make current，然后
+        // 显式 dlopen 渲染器 dylib —— 构造器在【有当前上下文】的环境里跑，
+        // glGetString 返回真串，能力检测真实生效（顺带修好之前因 NULL 检测
+        // 而恒走 GLES 2.0 后端的降级）。之后立即释放临时资源；下方的统一
+        // dlopen 对已加载镜像只返回句柄，构造器不会二次执行。
+        // 上下文版本对齐：gl4es 会话的游戏上下文是 CLIENT_VERSION=3
+        // （gl_bridge.m Task179/182 路径），临时上下文同为 ES3，构造器缓存
+        // 的能力检测结果与游戏会话一致。
+        {
+            static BOOL s_ame193_gl4esDone = NO;
+            if (!s_ame193_gl4esDone) {
+                s_ame193_gl4esDone = YES;
+                // EGL_OPENGL_ES3_BIT 兜底（个别 vendored EGL 头缺失该宏；
+                // gl_bridge.m 已实证可用，这里防御性补齐）
+#ifndef EGL_OPENGL_ES3_BIT
+#define EGL_OPENGL_ES3_BIT 0x0040
+#endif
+                void *ame193_eglLib = dlopen("@executable_path/Frameworks/libEGL.framework/libEGL", RTLD_NOW | RTLD_LOCAL);
+                void *ame193_glesLib = dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2", RTLD_NOW | RTLD_LOCAL);
+                if (ame193_eglLib && ame193_glesLib) {
+                    EGLDisplay (*ame193_getDisplay)(EGLNativeDisplayType) =
+                        dlsym(ame193_eglLib, "eglGetDisplay");
+                    EGLBoolean (*ame193_initialize)(EGLDisplay, EGLint*, EGLint*) =
+                        dlsym(ame193_eglLib, "eglInitialize");
+                    EGLBoolean (*ame193_chooseConfig)(EGLDisplay, const EGLint*, EGLConfig*, EGLint, EGLint*) =
+                        dlsym(ame193_eglLib, "eglChooseConfig");
+                    EGLSurface (*ame193_createPbuffer)(EGLDisplay, EGLConfig, const EGLint*) =
+                        dlsym(ame193_eglLib, "eglCreatePbufferSurface");
+                    EGLContext (*ame193_createContext)(EGLDisplay, EGLConfig, EGLContext, const EGLint*) =
+                        dlsym(ame193_eglLib, "eglCreateContext");
+                    EGLBoolean (*ame193_makeCurrent)(EGLDisplay, EGLSurface, EGLSurface, EGLContext) =
+                        dlsym(ame193_eglLib, "eglMakeCurrent");
+                    EGLBoolean (*ame193_destroyContext)(EGLDisplay, EGLContext) =
+                        dlsym(ame193_eglLib, "eglDestroyContext");
+                    EGLBoolean (*ame193_destroySurface)(EGLDisplay, EGLSurface) =
+                        dlsym(ame193_eglLib, "eglDestroySurface");
+                    EGLint (*ame193_getError)(void) = dlsym(ame193_eglLib, "eglGetError");
+                    if (ame193_getDisplay && ame193_initialize && ame193_chooseConfig &&
+                        ame193_createPbuffer && ame193_createContext && ame193_makeCurrent &&
+                        ame193_destroyContext && ame193_destroySurface) {
+                        EGLDisplay ame193_dpy = ame193_getDisplay(EGL_DEFAULT_DISPLAY);
+                        EGLBoolean ame193_inited = (ame193_dpy != EGL_NO_DISPLAY)
+                            ? ame193_initialize(ame193_dpy, NULL, NULL) : EGL_FALSE;
+                        const EGLint ame193_cfgAttrs[] = {
+                            EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+                            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+                            EGL_NONE
+                        };
+                        EGLConfig ame193_cfg = NULL;
+                        EGLint ame193_nCfg = 0;
+                        const EGLint ame193_pbAttrs[] = { EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE };
+                        const EGLint ame193_ctxAttrs[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
+                        EGLSurface ame193_pb = EGL_NO_SURFACE;
+                        EGLContext ame193_ctx = EGL_NO_CONTEXT;
+                        BOOL ame193_ok = NO;
+                        if (ame193_inited &&
+                            ame193_chooseConfig(ame193_dpy, ame193_cfgAttrs, &ame193_cfg, 1, &ame193_nCfg) &&
+                            ame193_nCfg > 0 && ame193_cfg != NULL) {
+                            ame193_pb = ame193_createPbuffer(ame193_dpy, ame193_cfg, ame193_pbAttrs);
+                            if (ame193_pb != EGL_NO_SURFACE) {
+                                ame193_ctx = ame193_createContext(ame193_dpy, ame193_cfg, EGL_NO_CONTEXT, ame193_ctxAttrs);
+                                if (ame193_ctx != EGL_NO_CONTEXT &&
+                                    ame193_makeCurrent(ame193_dpy, ame193_pb, ame193_pb, ame193_ctx)) {
+                                    ame193_ok = YES;
+                                }
+                            }
+                        }
+                        if (ame193_ok) {
+                            // 构造器在此刻运行（首次加载），能力查询命中真上下文
+                            void *ame193_gl4es = dlopen("@rpath/libgl4es_114.dylib", RTLD_NOW | RTLD_GLOBAL);
+                            NSLog(@"[egl_bridge] Task193: gl4es constructor bootstrap complete "
+                                  @"(libgl4es_114=%p, throwaway ES3 ctx was current during init)",
+                                  ame193_gl4es);
+                        } else {
+                            // 失败安全：不提前 dlopen，走旧路径（统一 dlopen 处构造器
+                            // 仍会 strstr(NULL) 崩溃——但日志留下明确死因锚点）
+                            NSLog(@"[egl_bridge] Task193: gl4es constructor bootstrap FAILED "
+                                  @"(dpy=%p inited=%d nCfg=%d pb=%p ctx=%p eglErr=0x%x) -- "
+                                  @"constructor will run context-less (crash risk: GetHardwareExtensions strstr(NULL))",
+                                  (void *)ame193_dpy, (int)ame193_inited, (int)ame193_nCfg,
+                                  (void *)ame193_pb, (void *)ame193_ctx,
+                                  ame193_getError ? (unsigned)ame193_getError() : 0u);
+                        }
+                        // 无论成败，恢复线程无上下文状态并回收临时资源
+                        if (ame193_pb != EGL_NO_SURFACE || ame193_ctx != EGL_NO_CONTEXT) {
+                            ame193_makeCurrent(ame193_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+                            if (ame193_ctx != EGL_NO_CONTEXT) ame193_destroyContext(ame193_dpy, ame193_ctx);
+                            if (ame193_pb != EGL_NO_SURFACE) ame193_destroySurface(ame193_dpy, ame193_pb);
+                        }
+                    } else {
+                        NSLog(@"[egl_bridge] Task193: EGL symbol resolution incomplete -- gl4es constructor bootstrap skipped");
+                    }
+                } else {
+                    NSLog(@"[egl_bridge] Task193: ANGLE frameworks unavailable for temp-context bootstrap (egl=%p gles=%p)",
+                          ame193_eglLib, ame193_glesLib);
+                }
+            }
+        }
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
         renderer = @ RENDERER_NAME_MOBILEGLUES;

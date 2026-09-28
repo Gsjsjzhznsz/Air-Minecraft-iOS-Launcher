@@ -532,7 +532,7 @@ static NSString *ame185ShowAllRow(NSInteger hiddenCount) {
         lang = NSLocale.preferredLanguages.firstObject ?: @"en";
     }
     NSString *display = [lang hasPrefix:@"zh"]
-        ? [NSString stringWithFormat:@"显示全部（还有 %ld 个更早的版本）", (long)hiddenCount]
+        ? [NSString stringWithFormat:localize(@"ame193.misc.12", @"显示全部（还有 %ld 个更早的版本）"), (long)hiddenCount]
         : [NSString stringWithFormat:@"Show all (%ld older versions)", (long)hiddenCount];
     return [NSString stringWithFormat:@"%@\x1f\x1f\x1f%@", ame185ShowAllSentinel(), display];
 }

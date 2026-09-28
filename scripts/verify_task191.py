@@ -49,10 +49,10 @@ print("== B. vgpu direct-elements EBO ==")
 drawing = read("Natives/external/vgpu/src/gl/drawing.c")
 check("B1 ame191_drawElementsViaEBO 函数在位",
       "static void ame191_drawElementsViaEBO" in drawing)
-check("B2 上传序列：scratch_indices -> BufferSubData -> fpe(NULL) -> 解绑",
+check("B2 上传序列：scratch_indices -> 单次 glBufferData -> fpe(NULL) -> 解绑（Task193 重锚：上传单次化）",
       all(s in drawing for s in [
           "gl4es_scratch_indices(bytes);",
-          "gles_glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, bytes, indices);",
+          "gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, bytes, indices, GL_DYNAMIC_DRAW);",
           "fpe_glDrawElements(mode, count, type, NULL);",
           "gl4es_use_scratch_indices(0);"]))
 check("B3 探针站点名 direct-elements-ebo（装机锚点）",

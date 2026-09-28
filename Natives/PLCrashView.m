@@ -578,7 +578,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
             [result addObject:@{@"icon": @"wifi", @"text": localize(@"crash.suggestion.missinglib_network", @"检查网络连接，确保下载源可访问")}];
             break;
         case CrashTypeMissingMods:
-            [result addObject:@{@"icon": @"arrow.clockwise.circle", @"text": [NSString stringWithFormat:@"删除该实例并重新导入整合包（建议换个下载源重试）%@", self.ame95_missingModNames.count > 0 ? [NSString stringWithFormat:@"——重点确认：%@", [self.ame95_missingModNames componentsJoinedByString:@"、"]] : @""]}];
+            [result addObject:@{@"icon": @"arrow.clockwise.circle", @"text": [NSString stringWithFormat:localize(@"ame193.crash.1", @"删除该实例并重新导入整合包（建议换个下载源重试）%@"), self.ame95_missingModNames.count > 0 ? [NSString stringWithFormat:@"——重点确认：%@", [self.ame95_missingModNames componentsJoinedByString:@"、"]] : @""]}];
             [result addObject:@{@"icon": @"square.and.pencil", @"text": localize(@"crash.suggestion.missingmods_manual", @"或在 Mod 管理器中手动补齐缺失的 mod（版本需与整合包要求一致）")}];
             if (self.ame95_overriddenEvidence.length > 0) {
                 [result addObject:@{@"icon": @"eye.slash", @"text": localize(@"crash.suggestion.missingmods_override", @"日志显示依赖检查被覆盖（Dependencies overridden），它会让缺失 mod 逃避报错直到运行时崩溃；修复后可删掉 config/fabric-loader.json 里的 dependencyOverrides 条目")}];
@@ -701,7 +701,7 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
         else if ([cls hasPrefix:@"dev.ftb.mods.ftblibrary"]) name = @"FTB Library";
         else if ([cls hasPrefix:@"dev.ftb.mods.ftbteams"]) name = @"FTB Teams";
         else if ([cls hasPrefix:@"dev.ftb.mods.ftbbackups"]) name = @"FTB Backups";
-        else if ([cls hasPrefix:@"dev.ftb.mods."]) name = @"FTB 组件";
+        else if ([cls hasPrefix:@"dev.ftb.mods."]) name = localize(@"ame193.crash.3", @"FTB 组件");
         else if ([cls hasPrefix:@"net.blay09.mods.balm"]) name = @"Balm";
         else if ([cls hasPrefix:@"terrablender."]) name = @"TerraBlender";
         if (name && ![modNames containsObject:name]) {
@@ -714,16 +714,16 @@ static NSString *const kGitHubIssuesURL = @"https://github.com/herbrine8403/Amet
     self.ame95_overriddenEvidence = overriddenLine;
     NSMutableString *detail = [NSMutableString string];
     if (missingClasses.count > 0) {
-        [detail appendString:@"缺失的类（对应 mod 未安装或版本不符）：\n"];
+        [detail appendString:localize(@"ame193.crash.4", @"缺失的类（对应 mod 未安装或版本不符）：\n")];
         for (NSString *cls in missingClasses) {
             [detail appendFormat:@"  • %@\n", cls];
         }
     }
     if (modNames.count > 0) {
-        [detail appendFormat:@"\n推断缺失组件：%@", [modNames componentsJoinedByString:@"、"]];
+        [detail appendFormat:localize(@"ame193.crash.5", @"\n推断缺失组件：%@"), [modNames componentsJoinedByString:@"、"]];
     }
     if (overriddenLine.length > 0) {
-        [detail appendFormat:@"\n\n依赖检查被覆盖：%@", overriddenLine];
+        [detail appendFormat:localize(@"ame193.crash.6", @"\n\n依赖检查被覆盖：%@"), overriddenLine];
     }
     self.crashDetail = detail.length > 0 ? [detail copy] : nil;
     return YES;

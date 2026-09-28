@@ -2294,6 +2294,12 @@ void amethyst_task133_ensure_jvm_chain(void) {
         // 从未命中，这是 26.1.2 拦截链断开的第二个断点
         bool isJna = (base && strstr(base, "libjnidispatch")) ||
                      (installBase && strstr(installBase, "libjnidispatch"));
+        // Task193：LWJGL natives（liblwjgl.jni / liblwjgl.dylib，可能从 jar
+        // 解包成临时文件名）——重绑其 _dlsym 槽到 hooked_dlsym，使
+        // hooked_dlsym 的 GL NULL 解析取证（[dlsym] Task193: GL symbol
+        // resolution FAILED: ...）能覆盖 LWJGL 的 GL$1 函数解析链。
+        bool isLwjglNative = (base && strstr(base, "lwjgl")) ||
+                             (installBase && strstr(installBase, "lwjgl"));
         intptr_t slide = _dyld_get_image_vmaddr_slide(i);
         if (isJli || isJvm) {
             NSLog(@"[SDLHook] Task133: %@ image detected (%s) -- rebinding its "
@@ -2321,6 +2327,13 @@ void amethyst_task133_ensure_jvm_chain(void) {
                 amethyst_task134_jna_retry_arm(hdr, slide);
             }
             amethyst_task134_watchdog_maybe_start();
+        } else if (isLwjglNative) {
+            // Task193：LWJGL natives 的 _dlsym 槽重绑（GL NULL 解析取证，
+            // 见 hooked_dlsym 的 [dlsym] Task193 日志与 main_hook.m 触发面注释）
+            NSLog(@"[SDLHook] Task193: LWJGL native image detected (%s / "
+                  @"install %s) -- rebinding its _dlsym slots (GL NULL-resolution forensics)",
+                  path ?: "(null)", install ?: "(null)");
+            amethyst_task132_rebind_jna_dlsym_ex(hdr, slide, (void *)hooked_dlsym);
         }
     }
     t133_cursor = _dyld_image_count();

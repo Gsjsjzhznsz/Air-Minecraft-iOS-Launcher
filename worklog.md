@@ -957,3 +957,16 @@ Work Log:
 
 Stage Summary:
 - 装机锚点：重装后桌面图标 = 草方块立方体（iPhone/iPad 一致，浅色/深色/着色外观同图）；上游品牌资产零触碰可一键回滚（blob 哈希全档归档于 verify_task193）
+
+---
+Task ID: 193 (合并附记)
+Agent: main (Super Z)
+Task: 与图标会话的 Task 193 撞号合并
+
+Work Log:
+- 推送时发现并行图标会话已推 d8e557e（Task 193 图标替换 + 同名 verify_task193.py 36 检查 + MobileGlues version.h 的"REVISION 18 addendum (no bump)"附录）
+- rebase 解决唯一文件冲突 verify_task193.py：合并为 A-G（图标）+ H-O（六修一轮）共 86 检查的单文件；version.h 双方附录共存（REVISION 18 = 本轮 MobileGlues 同步的真实 bump，图标附录为 no-bump 备注）；worklog 双条目共存
+- rebase 后复验：verify_task193 86/86、task173 123/123、task129 47/47 全绿
+
+Stage Summary:
+- 两个 Task 193（图标 + 六修）在单提交序列上共存，CI 待推

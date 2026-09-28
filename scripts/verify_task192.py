@@ -80,9 +80,9 @@ for f in clean_files:
 # ============================== B. vgpu ==============================
 print("== B. vgpu scratch EBO ==")
 gl4es_c = read("Natives/external/vgpu/src/gl/gl4es.c")
-check("B1 gl4es_scratch_indices 用真驱动 id",
+check("B1 gl4es_scratch_indices 用真驱动 id（Task193 重锚：函数退役为绑定+名字保障，上传单次化）",
       "gles_glGenBuffers(1, &glstate->scratch_indices);" in gl4es_c and
-      "Task192：同上——真驱动 id" in gl4es_c)
+      "Task193：本函数退役为" in gl4es_c)
 check("B2 gl4es_scratch_vertex 用真驱动 id",
       "gles_glGenBuffers(1, &glstate->scratch_vertex);" in gl4es_c and
       "Task192：虚拟 id 根修" in gl4es_c)
@@ -134,9 +134,9 @@ w0 = _s.unpack("<I", orig[0x136DEC:0x136DEC+4])[0]
 check("C7 仓库原件保持 pristine (0x92800000)", w0 == 0x92800000, hex(w0))
 
 egl = read("Natives/egl_bridge.m")
-check("C8 egl_bridge gl4es 分支 RTLD_GLOBAL 预载",
+check("C8 egl_bridge gl4es 分支 RTLD_GLOBAL 预载（Task193 重锚：+1 = 临时上下文引导的显式 dlopen）",
       "Task192: preloading ANGLE frameworks RTLD_GLOBAL" in egl and
-      egl.count('RTLD_NOW | RTLD_GLOBAL') == 2)
+      egl.count('RTLD_NOW | RTLD_GLOBAL') == 3)
 
 # ============================== D. 控件仓库崩溃 ==============================
 print("== D. CCMenu picker guards ==")

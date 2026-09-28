@@ -505,7 +505,7 @@
                                                                                   error:&error];
 
         dispatch_async(dispatch_get_main_queue(), ^{
-            BOOL wasCancelled = [[error.userInfo objectForKey:NSLocalizedDescriptionKey] containsString:@"取消"];
+            BOOL wasCancelled = [[error.userInfo objectForKey:NSLocalizedDescriptionKey] containsString:localize(@"Cancel", @"取消")];
             [self hideProgressCard];
             if (success) {
                 [self showExportSuccessWithPath:destPath];

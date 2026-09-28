@@ -785,7 +785,7 @@ NSString *const ForgeDirectInstallerErrorDomain = @"ForgeDirectInstallerErrorDom
                 *error = [NSError errorWithDomain:ForgeDirectInstallerErrorDomain
                                              code:ForgeDirectInstallerErrorWriteFailed
                                          userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:
-                    @"安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@", missingArtifacts]}];
+                    localize(@"ame193.misc.11", @"安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@"), missingArtifacts]}];
             }
             return NO;
         }

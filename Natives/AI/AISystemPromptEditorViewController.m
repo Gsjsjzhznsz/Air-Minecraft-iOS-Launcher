@@ -19,19 +19,19 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"系统提示词";
+    self.title = localize(@"ame193.ai.9", @"系统提示词");
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
     self.view.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.04];
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 
     // 恢复默认
-    UIBarButtonItem *resetItem = [[UIBarButtonItem alloc] initWithTitle:@"恢复默认"
+    UIBarButtonItem *resetItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"ame193.ai.10", @"恢复默认")
                                                                   style:UIBarButtonItemStylePlain
                                                                  target:self
                                                                  action:@selector(resetAction)];
     self.navigationItem.leftBarButtonItem = resetItem;
     // 保存
-    UIBarButtonItem *saveItem = [[UIBarButtonItem alloc] initWithTitle:@"保存"
+    UIBarButtonItem *saveItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"ame193.ai.1", @"保存")
                                                                  style:UIBarButtonItemStyleDone
                                                                 target:self
                                                                 action:@selector(saveAction)];
@@ -62,7 +62,7 @@
     // 提示文案
     UILabel *hintLabel = [[UILabel alloc] init];
     hintLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    hintLabel.text = @"这会注入到每次对话的最前面，用于约定 Air 助手的行为方式。";
+    hintLabel.text = localize(@"ame193.ai.11", @"这会注入到每次对话的最前面，用于约定 Air 助手的行为方式。");
     hintLabel.font = [UIFont systemFontOfSize:12];
     hintLabel.textColor = [UIColor secondaryLabelColor];
     hintLabel.numberOfLines = 0;

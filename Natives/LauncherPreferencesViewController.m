@@ -544,7 +544,7 @@
               ],
               @"pickList": @[
                   localize(@"i18n_str_382", nil),
-                  @"简体中文",
+                  localize(@"ame193.misc.6", @"简体中文"),
                   @"English"
               ],
               @"action": ^(NSString *value){
@@ -1423,7 +1423,7 @@
             // AI 助手 settings（Air AI Agent Phase 2）
             @{@"icon": @"sparkles"},
             @{@"key": @"provider_config",
-              @"title": @"提供商配置",
+              @"title": localize(@"ame193.misc.7", @"提供商配置"),
               @"icon": @"globe.asia.australia.fill",
               @"type": self.typeButton,
               @"action": ^void(){
@@ -1434,7 +1434,7 @@
               }
             },
             @{@"key": @"session_list",
-              @"title": @"会话列表",
+              @"title": localize(@"ame193.misc.8", @"会话列表"),
               @"icon": @"rectangle.stack.badge.person.crop",
               @"type": self.typeButton,
               @"action": ^void(){
@@ -1462,12 +1462,12 @@
               ]
             },
             @{@"key": @"markdown_enabled",
-              @"title": @"Markdown 渲染",
+              @"title": localize(@"ame193.misc.9", @"Markdown 渲染"),
               @"icon": @"textformat",
               @"type": self.typeSwitch
             },
             @{@"key": @"system_prompt",
-              @"title": @"系统提示词",
+              @"title": localize(@"ame193.ai.9", @"系统提示词"),
               @"icon": @"text.book.closed.fill",
               @"type": self.typeButton,
               @"action": ^void(){
@@ -1913,7 +1913,7 @@
     UIAlertController *alert = [UIAlertController
         alertControllerWithTitle:localize(@"mem_help.title", @"关于内存限制")
                          message:localize(@"mem_help.message",
-                             @"iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\n\n"
+                             localize(@"ame193.misc.10", @"iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\n\n")
                               "解决方法：\n"
                               "使用 GetMoreRam (LiveContainer 插件) 解除内存限制。\n"
                               "GetMoreRam 仓库：github.com/hugeBlack/GetMoreRam\n\n"

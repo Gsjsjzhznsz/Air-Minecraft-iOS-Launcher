@@ -423,11 +423,15 @@ void* hooked_dlopen(const char* path, int mode) {
     // 槽改绑（JVM 后续 System.load 全部进入本 hook），jna*.tmp 按
     // install name 检出并触发 Task132 重绑定。触发面：libjli/libjvm/
     // jna/.tmp/java 路径；漏网的由 hooked_dlsym 入口的同款扫描兜底。
+    // Task193 追加：lwjgl 路径（LWJGL 从 jar 解包的 liblwjgl.jni 等
+    // natives，文件名/路径含 "lwjgl"）——扫描会给它重绑 _dlsym 槽，
+    // 使 hooked_dlsym 能看到 LWJGL 的 GL 函数解析（NULL 结果取证）。
     BOOL needsT133Scan = path != NULL && (strstr(path, "libjli") != NULL ||
                                           strstr(path, "libjvm") != NULL ||
                                           strstr(path, "jna") != NULL ||
                                           strstr(path, ".tmp") != NULL ||
-                                          strstr(path, "java") != NULL);
+                                          strstr(path, "java") != NULL ||
+                                          strstr(path, "lwjgl") != NULL);
     // Task 132/133 同样需要拿到真实句柄做后处理，与 zink 重绑同款非尾返路径
     BOOL needsPostLoadFixup = needsZinkRebind || needsJnaDlsymRebind || needsT133Scan;
 
@@ -1837,7 +1841,25 @@ void* hooked_dlsym(void* handle, const char* name) {
             return (void*)amethyst_vkGetDeviceProcAddr;
         }
     }
-    return orig_dlsym(handle, name);
+    // Task193：GL 符号解析失败取证（ANGLE 黑屏裁决轮）。
+    // 病历（727a291 latestlog.txt，fabric 26.3 + tinygl4angle 会话）：
+    // "DSA support not detected" 后紧跟 LWJGL "No context is current or
+    // a function that is not available" —— MC 调到了 NULL 函数指针，但
+    // 日志不打印符号名，黑屏根因无法进一步定位。LWJGL GL$1 的 macOS
+    // 分支只做 OSMesaGetProcAddress（恒 0）+ dlsym(lib, name)（GLBackend
+    // 镜像链实证）——把 LWJGL natives 的 _dlsym 槽重绑到本 hook 后，
+    // 这里能给每个 gl* 前缀的 NULL 解析记名（前 30 个）。下一轮装机
+    // 日志直接点名缺失函数，DSA/黑屏裁决一步到位。
+    void *ame193_res = orig_dlsym(handle, name);
+    if (ame193_res == NULL && name != NULL && name[0] == 'g' && name[1] == 'l') {
+        static int s_ame193_glNulls = 0;
+        if (s_ame193_glNulls < 30) {
+            s_ame193_glNulls++;
+            NSLog(@"[dlsym] Task193: GL symbol resolution FAILED: %s (handle=%p) -- LWJGL/MC will see a NULL function pointer",
+                  name, handle);
+        }
+    }
+    return ame193_res;
 }
 
 int hooked_open(const char *path, int oflag, ...) {

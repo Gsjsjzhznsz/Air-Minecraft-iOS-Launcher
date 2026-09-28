@@ -136,7 +136,15 @@ void convertV1Layout(NSMutableDictionary* dict) {
         [btnDict removeObjectForKey:@"isRound"];
 
         // keycode -> keycodes[0]
-        [keycodes addObject:btnDict[@"keycode"]];
+        // Task193：仓库下载的 v1 布局可能缺省 "keycode" 字段（727a291 装机
+        // latestlog.old 符号化实锤：_convertV1Layout+0x410 ←
+        // _convertLayoutIfNecessary ← _loadControlObject ←
+        // -[ControlLayout loadControlFile:] ← actionMenuLoad block ←
+        // FileListViewController tableView:didSelectRowAtIndexPath:]，
+        // [keycodes addObject:nil] → "insertObject:atIndex: object cannot
+        // be nil" 崩溃）。缺省/非数值一律按 KEY_UNKNOWN(0) 兜底，布局照常
+        // 加载（按钮无绑定键也比整个启动器崩溃好）。
+        [keycodes addObject:@([btnDict[@"keycode"] integerValue])];
         [btnDict removeObjectForKey:@"keycode"];
 
         // alt -> keycodes[i++]

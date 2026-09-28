@@ -518,7 +518,24 @@
 // reports transport health) ("[OSMBridge] Task100" anchors). FAQ content
 // refreshed in place (macMenuStub/fsrCorner, count stays 32). Launcher-side
 // only, REVISION stays 17.
-#define REVISION 17
+#define REVISION 18
+// REVISION 18: upstream 2.0.0-release sync + FSR1 compatibility audit.
+// (1) Ported upstream 0f1e10b ([Fix] multidraw: grow-only resize for the
+//     indirect command staging vector) -- prepare_indirect_buffer's staged
+//     vector no longer shrinks after a small draw only to memset the tail on
+//     the next large one; matches the grow-only policy of every other staging
+//     vector in the hot path (drawing.cpp / rebased / zeros).
+// (2) FSR1 audit vs the launcher integration (the user-facing concern of this
+//     bump): the upstream 478d479 state-guard/perf rework is already in this
+//     tree (GLStateGuard bits + link-time uniform caching + the
+//     deleted-framebuffer republish on RecreateFSRFBO), the Amethyst fork
+//     additions on top (Task 76 TeardownFSR1, Task 78 viewport-latched render
+//     size, Task 80 uTargetSize, Task 130 RCAS pass) are intact, and the
+//     config linkage is verified aligned: JavaLauncher writes
+//     fsr1Setting (int, FSR1_Quality_Preset, bounds-checked here) and
+//     fsr1RcasSharpness (double, clamped to [0,1]) into MG/config.json, which
+//     config/settings.cpp reads under the same names and semantics. The
+//     Android-adaptation mods on the fork side do not touch the FSR1 surface.
 #define PATCH 0
 
 #define VERSION_TYPE VERSION_RELEASE

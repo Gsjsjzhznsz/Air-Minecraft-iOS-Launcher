@@ -220,11 +220,11 @@
     UIColor *typeColor = [UIColor systemGreenColor];
     NSString *typeText = localize(@"i18n_str_2058", nil);
 
-    if ([type isEqualToString:@"正式版"] || [type isEqualToString:@"release"]) {
+    if ([type isEqualToString:localize(@"ame193.misc.3", @"正式版")] || [type isEqualToString:@"release"]) {
         iconName = @"cube.fill";
         typeColor = [UIColor systemGreenColor];
         typeText = localize(@"i18n_str_2058", nil);
-    } else if ([type isEqualToString:@"测试版"] || [type isEqualToString:@"snapshot"]) {
+    } else if ([type isEqualToString:localize(@"ame193.misc.4", @"测试版")] || [type isEqualToString:@"snapshot"]) {
         iconName = @"hammer.fill";
         typeColor = [UIColor systemOrangeColor];
         typeText = localize(@"i18n_str_2059", nil);

@@ -189,11 +189,11 @@ static const CGFloat kMsgCornerRadius = 12.0;
 /// 工具调用消息用于气泡显示的内容：AI 的话 + 工具调用提示（共存）
 + (NSString *)displayContentForMessage:(AiMessage *)message {
     if (message.isToolCall) {
-        NSString *base = message.content.length > 0 ? message.content : @"（正在调用工具…）";
+        NSString *base = message.content.length > 0 ? message.content : localize(@"ame193.ai.2", @"（正在调用工具…）");
         // 关键修复（工具名显示 call_00_...）：toolName 缺失时显示通用"工具"，
         // 绝不用 toolCallID（形如 call_xxx 的一串 id）顶替真实工具名
-        NSString *name = message.toolName.length > 0 ? message.toolName : @"工具";
-        return [base stringByAppendingFormat:@"\n\n⚙️ 工具：%@", name];
+        NSString *name = message.toolName.length > 0 ? message.toolName : localize(@"ame193.ai.3", @"工具");
+        return [base stringByAppendingFormat:localize(@"ame193.ai.4", @"\n\n⚙️ 工具：%@"), name];
     }
     return message.content ?: @"";
 }
@@ -202,12 +202,12 @@ static const CGFloat kMsgCornerRadius = 12.0;
     if (!message) return @"";
     // 关键修复（工具名显示 call_00_...）：toolName 缺失时显示通用"工具"，
     // 不用 toolCallID（call_xxx）顶替真实工具名
-    NSString *name = message.toolName.length > 0 ? message.toolName : @"工具";
+    NSString *name = message.toolName.length > 0 ? message.toolName : localize(@"ame193.ai.3", @"工具");
     if (message.isToolResult) {
         // 只显示执行成功/失败状态，不展示冗长的工具返回正文（避免占满屏幕）
-        return message.toolSucceeded ? [NSString stringWithFormat:@"✅ %@ 执行成功", name] : [NSString stringWithFormat:@"❌ %@ 执行失败", name];
+        return message.toolSucceeded ? [NSString stringWithFormat:localize(@"ame193.ai.5", @"✅ %@ 执行成功"), name] : [NSString stringWithFormat:@"❌ %@ 执行失败", name];
     }
-    return [NSString stringWithFormat:@"⚙️ 工具：%@", name];
+    return [NSString stringWithFormat:localize(@"ame193.ai.7", @"⚙️ 工具：%@"), name];
 }
 
 #pragma mark - 高度估算

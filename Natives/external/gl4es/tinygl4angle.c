@@ -279,10 +279,17 @@ static const char *ame179_spoofDesktopGlsl(const char *s) {
     return s;
 }
 
+static const GLubyte *ame193_appendExtString(const GLubyte *real);   // Task193 前置声明（定义在 ame193 DSA 块）
+
 const GLubyte * glGetString(GLenum name) {
     AME173_RESOLVE(ame173_real_glGetString, "glGetString");
     const GLubyte *result = ame173_real_glGetString ? ame173_real_glGetString(name) : NULL;
     ame173_forensics();
+    // Task193：旧式扩展枚举路径与索引式（glGetStringi）同口径——追加
+    // GL_ARB_direct_state_access（DSA 通告，见 ame193 块注释）。
+    if (name == GL_EXTENSIONS && result) {
+        return ame193_appendExtString(result);
+    }
     if (name == GL_VERSION && result) {
         const char *ame179_s = ame179_spoofDesktopVersion((const char *)result);
         if (ame179_s != (const char *)result) {
@@ -891,6 +898,404 @@ void glGetNamedBufferParameteriv(GLuint buffer, GLenum pname, GLint *params) {
     ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
     ame192_ptr_glGetBufferParameteriv(GL_COPY_WRITE_BUFFER, pname, params);
     ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+}
+
+// ============================================================================
+// Task193：DSA 能力通告 + 索引式扩展枚举 + Map/VAO 命名族。
+//
+// 病历（727a291 latestlog.txt，fabric 26.3 + tinygl4angle 会话）：
+//   [Render thread/INFO]: DSA support not detected.
+//   Thread[#3,Render thread]: No context is current or a function that is
+//   not available in the current context was called...
+//   Using graphics device extensions: GL_KHR_debug, GL_EXT_texture_filter_anisotropic
+// MC 26.3 RenderPearl 以 LWJGL caps 判 DSA（GL_ARB_direct_state_access 或
+// OpenGL 4.5+），而 caps 由扩展表构建——tinygl4angle 从不导出 glGetStringi
+// 也不拦 GL_NUM_EXTENSIONS，索引式枚举拿到的东西支离破碎（设备扩展只剩
+// 2 条）。Task192 实现的 6 个 buffer-DSA 函数从未被调用（无 "Task192
+// dsa:" 日志）—— MC 在探测阶段就判了 not detected，非 DSA 回退路径上
+// 又踩了 NULL 函数（黑屏，swap 58fps 但 readback rgba(0,0,0,0)）。
+//
+// 修法（三层）：
+//   (1) 扩展表补全：glGetStringi + glGetIntegerv(GL_NUM_EXTENSIONS) 拦截
+//       （真实列表 + 追加 GL_ARB_direct_state_access —— Task192 已实现
+//       buffer-DSA 六函数 + 本轮 Map/VAO 族补齐）；glGetString(GL_EXTENSIONS)
+//       同步追加（旧式枚举路径一致）。
+//   (2) buffer-DSA Map/Storage 族：glMapNamedBuffer(Range)/glUnmapNamedBuffer/
+//       glGetNamedBufferSubData/glNamedBufferStorage/glFlushMappedNamedBufferRange/
+//       glClearNamedBufferSubData（GL_COPY_WRITE_BUFFER 换绑法，与 Task192 同构）。
+//   (3) VAO-DSA 族：glCreateVertexArrays/glVertexArrayElementBuffer/
+//       glVertexArrayVertexBuffer/glVertexArrayAttribFormat/
+//       glVertexArrayAttribBinding/glEnableVertexArrayAttrib/
+//       glDisableVertexArrayAttrib/glVertexArrayBindingDivisor（ELEMENT/
+//       ARRAY/VERTEX_ARRAY 绑定保存恢复法）。MC 若走 VAO-DSA 也不再踩 NULL。
+// 遗留观测：hooked_dlsym 的 [dlsym] Task193 GL NULL 日志将点名残余缺项。
+// ============================================================================
+#ifndef GL_NUM_EXTENSIONS
+#define GL_NUM_EXTENSIONS 0x821D
+#endif
+#ifndef GL_MAP_READ_BIT
+#define GL_MAP_READ_BIT 0x0001
+#define GL_MAP_WRITE_BIT 0x0002
+#define GL_MAP_INVALIDATE_RANGE_BIT 0x0004
+#define GL_MAP_INVALIDATE_BUFFER_BIT 0x0008
+#define GL_MAP_FLUSH_EXPLICIT_BIT 0x0010
+#define GL_MAP_UNSYNCHRONIZED_BIT 0x0020
+#endif
+#ifndef GL_READ_ONLY
+#define GL_READ_ONLY 0x88B8
+#define GL_WRITE_ONLY 0x88B9
+#define GL_READ_WRITE 0x88BA
+#endif
+#ifndef GL_VERTEX_ARRAY_BINDING
+#define GL_VERTEX_ARRAY_BINDING 0x85B5
+#endif
+#ifndef GL_ARRAY_BUFFER_BINDING
+#define GL_ARRAY_BUFFER_BINDING 0x8B8C
+#endif
+#ifndef GL_VERTEX_ATTRIB_ARRAY_ENABLED
+#define GL_VERTEX_ATTRIB_ARRAY_ENABLED 0x8622
+#endif
+#ifndef GL_VERTEX_ATTRIB_ARRAY_POINTER
+#define GL_VERTEX_ATTRIB_ARRAY_POINTER 0x8645
+#endif
+#ifndef GL_VERTEX_ATTRIB_ARRAY_DIVISOR
+#define GL_VERTEX_ATTRIB_ARRAY_DIVISOR 0x88FE
+#endif
+
+static const char *const ame193_extraExts[] = {
+    "GL_ARB_direct_state_access",
+};
+#define AME193_EXTRA_EXT_COUNT (sizeof(ame193_extraExts) / sizeof(ame193_extraExts[0]))
+static char **ame193_extCache = NULL;   // 真实 + 追加 的完整扩展串列表
+static GLuint ame193_extCount = 0;
+
+static void ame193_buildExtCache(void) {
+    if (ame193_extCache != NULL) return;
+    typedef void (*ame193_fn_getIntegerv)(GLenum, GLint *);
+    typedef const GLubyte *(*ame193_fn_getStringi)(GLenum, GLuint);
+    static ame193_fn_getStringi ame193_real_getStringi = NULL;
+    ame193_fn_getIntegerv ame193_getInt = NULL;
+    if (ame192_ptr_glGetIntegerv != NULL) {
+        ame193_getInt = ame192_ptr_glGetIntegerv;
+    } else {
+        ame192_resolve_buffer_helpers();
+        ame193_getInt = ame192_ptr_glGetIntegerv;
+    }
+    AME173_RESOLVE(ame193_real_getStringi, "glGetStringi");
+    if (ame193_getInt == NULL || ame193_real_getStringi == NULL) {
+        NSLog(@"[tinygl4angle] Task193: ext cache build skipped (getIntegerv=%p getStringi=%p)",
+              (void *)ame193_getInt, (void *)ame193_real_getStringi);
+        return;
+    }
+    GLint n = 0;
+    ame193_getInt(GL_NUM_EXTENSIONS, &n);
+    if (n <= 0) {
+        NSLog(@"[tinygl4angle] Task193: GL_NUM_EXTENSIONS=%d (driver reports none) -- indexed enumeration unavailable", (int)n);
+        return;
+    }
+    char **cache = (char **)calloc((size_t)n + AME193_EXTRA_EXT_COUNT, sizeof(char *));
+    GLuint filled = 0;
+    for (GLint i = 0; i < n; i++) {
+        const GLubyte *s = ame193_real_getStringi(GL_EXTENSIONS, (GLuint)i);
+        if (s == NULL) continue;
+        cache[filled++] = strdup((const char *)s);
+    }
+    for (size_t k = 0; k < AME193_EXTRA_EXT_COUNT; k++) {
+        cache[filled++] = strdup(ame193_extraExts[k]);
+    }
+    ame193_extCache = cache;
+    ame193_extCount = filled;
+    NSLog(@"[tinygl4angle] Task193: extension cache built: %d real + %zu appended (GL_ARB_direct_state_access advertised; MC DSA probe should now SUCCEED)",
+          (int)n, AME193_EXTRA_EXT_COUNT);
+}
+
+const GLubyte *glGetStringi(GLenum name, GLuint index) {
+    if (name == GL_EXTENSIONS) {
+        ame193_buildExtCache();
+        if (ame193_extCache != NULL) {
+            if (index < ame193_extCount) return (const GLubyte *)ame193_extCache[index];
+            return NULL;   // 越界：GL 语义 = NULL
+        }
+    }
+    typedef const GLubyte *(*ame193_fn_getStringi)(GLenum, GLuint);
+    static ame193_fn_getStringi ame193_real_getStringi = NULL;
+    AME173_RESOLVE(ame193_real_getStringi, "glGetStringi");
+    return ame193_real_getStringi ? ame193_real_getStringi(name, index) : NULL;
+}
+
+// glGetIntegerv 拦截：只为 GL_NUM_EXTENSIONS +1（其余原样转发）。
+// 注意：tinygl4angle 此前不导出该符号（LWJGL 经依赖闭包直接拿 ANGLE 的），
+// 现在由本 dylib 导出接管，全部 pname 语义不变。
+typedef void (*ame193_fn_glGetIntegerv)(GLenum, GLint *);
+static ame193_fn_glGetIntegerv ame193_ptr_glGetIntegerv;
+void glGetIntegerv(GLenum pname, GLint *params) {
+    if (pname == GL_NUM_EXTENSIONS && params != NULL) {
+        ame193_buildExtCache();
+        if (ame193_extCache != NULL) {
+            *params = (GLint)ame193_extCount;
+            return;
+        }
+    }
+    AME173_RESOLVE(ame193_ptr_glGetIntegerv, "glGetIntegerv");
+    if (ame193_ptr_glGetIntegerv) ame193_ptr_glGetIntegerv(pname, params);
+}
+
+// glGetString(GL_EXTENSIONS) 追加（旧式枚举路径与索引式同口径）。
+static char *ame193_extStringCache = NULL;
+static const GLubyte *ame193_appendExtString(const GLubyte *real) {
+    if (real == NULL) return NULL;
+    if (ame193_extStringCache != NULL) return (const GLubyte *)ame193_extStringCache;
+    size_t len = strlen((const char *)real);
+    size_t extra = 0;
+    for (size_t k = 0; k < AME193_EXTRA_EXT_COUNT; k++) extra += strlen(ame193_extraExts[k]) + 1;
+    ame193_extStringCache = (char *)malloc(len + extra + 2);
+    memcpy(ame193_extStringCache, real, len);
+    char *w = ame193_extStringCache + len;
+    for (size_t k = 0; k < AME193_EXTRA_EXT_COUNT; k++) {
+        *w++ = ' ';
+        size_t l = strlen(ame193_extraExts[k]);
+        memcpy(w, ame193_extraExts[k], l);
+        w += l;
+    }
+    *w = '\0';
+    NSLog(@"[tinygl4angle] Task193: GL_EXTENSIONS legacy string appended GL_ARB_direct_state_access (len %zu -> %zu)",
+          len, (size_t)(w - ame193_extStringCache));
+    return (const GLubyte *)ame193_extStringCache;
+}
+
+// ---- buffer-DSA Map/Storage 族 ----
+typedef void *(*ame193_fn_glMapBufferRange)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
+static ame193_fn_glMapBufferRange ame193_ptr_glMapBufferRange;
+typedef GLboolean (*ame193_fn_glUnmapBuffer)(GLenum);
+static ame193_fn_glUnmapBuffer ame193_ptr_glUnmapBuffer;
+typedef void (*ame193_fn_glFlushMappedBufferRange)(GLenum, GLintptr, GLsizeiptr);
+static ame193_fn_glFlushMappedBufferRange ame193_ptr_glFlushMappedBufferRange;
+
+static GLbitfield ame193_translateMapAccess(GLenum access) {
+    // DSA glMapNamedBuffer 的 access（READ_ONLY/WRITE_ONLY/READ_WRITE）
+    // → ES3 glMapBufferRange 的 bit 组合
+    if (access == 0x88B8 /* GL_READ_ONLY */) return GL_MAP_READ_BIT;
+    if (access == 0x88B9 /* GL_WRITE_ONLY */) return GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT;
+    return GL_MAP_READ_BIT | GL_MAP_WRITE_BIT;
+}
+
+void *glMapNamedBuffer(GLuint buffer, GLenum access) {
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame193_ptr_glMapBufferRange, "glMapBufferRange");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame193_ptr_glMapBufferRange) return NULL;
+    GLint prev = 0, size = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    // 查 buffer 大小（DSA 语义：size 省略 = 整个 buffer）
+    typedef void (*ame193_fn_getBufParam)(GLenum, GLenum, GLint *);
+    static ame193_fn_getBufParam ame193_ptr_getBufParam = NULL;
+    AME173_RESOLVE(ame193_ptr_getBufParam, "glGetBufferParameteriv");
+    if (ame193_ptr_getBufParam) ame193_ptr_getBufParam(GL_COPY_WRITE_BUFFER, 0x8764 /* GL_BUFFER_SIZE */, &size);
+    void *p = ame193_ptr_glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, (GLsizeiptr)size, ame193_translateMapAccess(access));
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+    return p;
+}
+
+void *glMapNamedBufferRange(GLuint buffer, GLintptr offset, GLsizeiptr length, GLbitfield access) {
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame193_ptr_glMapBufferRange, "glMapBufferRange");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame193_ptr_glMapBufferRange) return NULL;
+    // PERSISTENT/COHERENT（桌面 4.4 buffer-storage 语义）在 ES3 上不可模拟，
+    // 剥掉并以普通映射兜底（MC 非 buffer-storage 回退路径不会带这些位）。
+    GLbitfield es3Access = access & 0x3F;
+    if (access & ~0x3F) {
+        static int s_ame193_persistWarn = 0;
+        if (s_ame193_persistWarn < 4) {
+            s_ame193_persistWarn++;
+            NSLog(@"[tinygl4angle] Task193: glMapNamedBufferRange persistent/coherent bits stripped (0x%X -> 0x%X; ES3 emulation)",
+                  (unsigned)access, (unsigned)es3Access);
+        }
+    }
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    void *p = ame193_ptr_glMapBufferRange(GL_COPY_WRITE_BUFFER, offset, length, es3Access);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+    return p;
+}
+
+GLboolean glUnmapNamedBuffer(GLuint buffer) {
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame193_ptr_glUnmapBuffer, "glUnmapBuffer");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame193_ptr_glUnmapBuffer) return GL_FALSE;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    GLboolean r = ame193_ptr_glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+    return r;
+}
+
+void glFlushMappedNamedBufferRange(GLuint buffer, GLintptr offset, GLsizeiptr length) {
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame193_ptr_glFlushMappedBufferRange, "glFlushMappedBufferRange");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame193_ptr_glFlushMappedBufferRange) return;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    ame193_ptr_glFlushMappedBufferRange(GL_COPY_WRITE_BUFFER, offset, length);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+}
+
+void glGetNamedBufferSubData(GLuint buffer, GLintptr offset, GLsizeiptr size, void *data) {
+    // ES3 无 glGetBufferSubData（桌面独有）—— map+memcpy+unmap 模拟
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame193_ptr_glMapBufferRange, "glMapBufferRange");
+    AME173_RESOLVE(ame193_ptr_glUnmapBuffer, "glUnmapBuffer");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame193_ptr_glMapBufferRange) return;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    void *p = ame193_ptr_glMapBufferRange(GL_COPY_WRITE_BUFFER, offset, size, GL_MAP_READ_BIT);
+    if (p != NULL) {
+        if (data != NULL) memcpy(data, p, (size_t)size);
+        if (ame193_ptr_glUnmapBuffer) ame193_ptr_glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+    }
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+}
+
+void glNamedBufferStorage(GLuint buffer, GLsizeiptr size, const void *data, GLbitfield flags) {
+    // ES3 无不可变存储（desktop 4.4 / ES3.1 buffer_storage）——用
+    // glNamedBufferData 语义兜底（可变但内容一致），flags 仅记录。
+    static int s_ame193_storageWarn = 0;
+    if (s_ame193_storageWarn < 4) {
+        s_ame193_storageWarn++;
+        NSLog(@"[tinygl4angle] Task193: glNamedBufferStorage(buf=%u size=%lld flags=0x%X) emulated via NamedBufferData (ES3 has no immutable storage)",
+              (unsigned)buffer, (long long)size, (unsigned)flags);
+    }
+    glNamedBufferData(buffer, size, data, 0x88E4 /* GL_STATIC_DRAW */);
+}
+
+void glClearNamedBufferSubData(GLuint buffer, GLenum internalformat, GLintptr offset, GLsizeiptr size, GLenum format, GLenum type, const void *data) {
+    // map + 按字节清零 + unmap（internalformat 精确清零值语义简化为零填充）
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame193_ptr_glMapBufferRange, "glMapBufferRange");
+    AME173_RESOLVE(ame193_ptr_glUnmapBuffer, "glUnmapBuffer");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame193_ptr_glMapBufferRange) return;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    void *p = ame193_ptr_glMapBufferRange(GL_COPY_WRITE_BUFFER, offset, size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+    if (p != NULL) {
+        memset(p, 0, (size_t)size);
+        if (ame193_ptr_glUnmapBuffer) ame193_ptr_glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+    }
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+}
+
+// ---- VAO-DSA 族（绑定保存/恢复法）----
+typedef void (*ame193_fn_glBindVertexArray)(GLuint);
+static ame193_fn_glBindVertexArray ame193_ptr_glBindVertexArray;
+typedef void (*ame193_fn_glGenVertexArrays)(GLsizei, GLuint *);
+static ame193_fn_glGenVertexArrays ame193_ptr_glGenVertexArrays;
+typedef void (*ame193_fn_glBindVertexBuffer)(GLuint, GLuint, GLintptr, GLsizei);
+static ame193_fn_glBindVertexBuffer ame193_ptr_glBindVertexBuffer;
+typedef void (*ame193_fn_glVertexAttribFormat)(GLuint, GLint, GLenum, GLboolean, GLuint);
+static ame193_fn_glVertexAttribFormat ame193_ptr_glVertexAttribFormat;
+typedef void (*ame193_fn_glVertexAttribBinding)(GLuint, GLuint);
+static ame193_fn_glVertexAttribBinding ame193_ptr_glVertexAttribBinding;
+typedef void (*ame193_fn_glEnableVertexAttribArray)(GLuint);
+static ame193_fn_glEnableVertexAttribArray ame193_ptr_glEnableVertexAttribArray;
+typedef void (*ame193_fn_glDisableVertexAttribArray)(GLuint);
+static ame193_fn_glDisableVertexAttribArray ame193_ptr_glDisableVertexAttribArray;
+typedef void (*ame193_fn_glVertexAttribDivisor)(GLuint, GLuint);
+static ame193_fn_glVertexAttribDivisor ame193_ptr_glVertexAttribDivisor;
+
+void glCreateVertexArrays(GLsizei n, GLuint *arrays) {
+    AME173_RESOLVE(ame193_ptr_glGenVertexArrays, "glGenVertexArrays");
+    if (ame193_ptr_glGenVertexArrays) ame193_ptr_glGenVertexArrays(n, arrays);
+    static int s_ame193_vaoLogs = 0;
+    if (s_ame193_vaoLogs < 4) {
+        s_ame193_vaoLogs++;
+        NSLog(@"[tinygl4angle] Task193 dsa: glCreateVertexArrays(n=%d) -> first=%u",
+              (int)n, (n > 0 && arrays) ? (unsigned)arrays[0] : 0u);
+    }
+}
+
+static GLuint ame193_saveVAO(void) {
+    ame192_resolve_buffer_helpers();
+    if (!ame192_ptr_glGetIntegerv) return 0;
+    GLint vao = 0;
+    ame192_ptr_glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+    return (GLuint)vao;
+}
+
+void glVertexArrayElementBuffer(GLuint vaobj, GLuint buffer) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    if (!ame193_ptr_glBindVertexArray) return;
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame192_resolve_buffer_helpers();
+    if (ame192_ptr_glBindBuffer) ame192_ptr_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+    ame193_ptr_glBindVertexArray(prev);
+}
+
+void glVertexArrayVertexBuffer(GLuint vaobj, GLuint bindingindex, GLuint buffer, GLintptr offset, GLsizei stride) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    AME173_RESOLVE(ame193_ptr_glBindVertexBuffer, "glBindVertexBuffer");
+    if (!ame193_ptr_glBindVertexArray || !ame193_ptr_glBindVertexBuffer) return;
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame193_ptr_glBindVertexBuffer(bindingindex, buffer, offset, stride);
+    ame193_ptr_glBindVertexArray(prev);
+}
+
+void glVertexArrayAttribFormat(GLuint vaobj, GLuint attribindex, GLint size, GLenum type, GLboolean normalized, GLuint relativeoffset) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    AME173_RESOLVE(ame193_ptr_glVertexAttribFormat, "glVertexAttribFormat");
+    if (!ame193_ptr_glBindVertexArray || !ame193_ptr_glVertexAttribFormat) return;
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame193_ptr_glVertexAttribFormat(attribindex, size, type, normalized, relativeoffset);
+    ame193_ptr_glBindVertexArray(prev);
+}
+
+void glVertexArrayAttribBinding(GLuint vaobj, GLuint attribindex, GLuint bindingindex) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    AME173_RESOLVE(ame193_ptr_glVertexAttribBinding, "glVertexAttribBinding");
+    if (!ame193_ptr_glBindVertexArray || !ame193_ptr_glVertexAttribBinding) return;
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame193_ptr_glVertexAttribBinding(attribindex, bindingindex);
+    ame193_ptr_glBindVertexArray(prev);
+}
+
+void glEnableVertexArrayAttrib(GLuint vaobj, GLuint index) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    AME173_RESOLVE(ame193_ptr_glEnableVertexAttribArray, "glEnableVertexAttribArray");
+    if (!ame193_ptr_glBindVertexArray || !ame193_ptr_glEnableVertexAttribArray) return;
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame193_ptr_glEnableVertexAttribArray(index);
+    ame193_ptr_glBindVertexArray(prev);
+}
+
+void glDisableVertexArrayAttrib(GLuint vaobj, GLuint index) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    AME173_RESOLVE(ame193_ptr_glDisableVertexAttribArray, "glDisableVertexAttribArray");
+    if (!ame193_ptr_glBindVertexArray || !ame193_ptr_glDisableVertexAttribArray) return;
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame193_ptr_glDisableVertexAttribArray(index);
+    ame193_ptr_glBindVertexArray(prev);
+}
+
+void glVertexArrayBindingDivisor(GLuint vaobj, GLuint bindingindex, GLuint divisor) {
+    AME173_RESOLVE(ame193_ptr_glBindVertexArray, "glBindVertexArray");
+    AME173_RESOLVE(ame193_ptr_glVertexAttribDivisor, "glVertexAttribDivisor");
+    if (!ame193_ptr_glBindVertexArray || !ame193_ptr_glVertexAttribDivisor) return;
+    // 注意：divisor 是 per-attribute（ES3 glVertexAttribDivisor）而非
+    // per-binding（桌面 glVertexArrayBindingDivisor）——对 bindingindex
+    // 属性设置即近似（MC 的用法里两者一致）。
+    GLuint prev = ame193_saveVAO();
+    ame193_ptr_glBindVertexArray(vaobj);
+    ame193_ptr_glVertexAttribDivisor(bindingindex, divisor);
+    ame193_ptr_glBindVertexArray(prev);
 }
 
 
