@@ -927,3 +927,17 @@ Work Log:
 Stage Summary:
 - 装机锚点：vgpu（"direct-elements-ebo" 探针 0x0502 归零 + "@ Pre render 1282" 归零 + 1.8.9 方块纹理恢复）；i18n（手动切 English 全界面正常英文）；Forge 26.1.2（越过模块解析进入游戏）；横屏（"Task191: portrait window -> content rotated +/-Ndeg by device orientation" 持向正确 + 换手不反）；ANGLE（"[tinygl4angle] Task191 ubo: ..." 系列 + "uboAlign=/uboBind=" 数据裁决方向：零绑定=绑定路径断裂 / UNALIGNED-256=对齐语义差异 / 全正常=下一轮查 spvc 改写）；控件崩溃若再现（"[SceneDelegate] Task191: uncaught-exception handler re-armed at willConnect" 在场 + "Uncaught exception:" 符号栈自证）
 - 遗留：ANGLE 黑屏根因待 Task191 UBO 数据裁决；vgpu sobel WARN（上游，非阻塞）
+---
+Task ID: 191 (续)
+Agent: main (Super Z)
+Task: CI 两轮拉锯终局
+
+Work Log:
+- round 1（62a179e）run 36418190483 failure：JavaApp/Makefile:25 'missing separator (did you mean TAB instead of 8 spaces?)'——launcher.jar 规则的 Task191 stash 编辑把【整个 Makefile】的 TAB 重写成了 8 空格（Edit 工具的写入副作用），全部 recipe 语法报废
+- 热修（956ea9b）：git show 3d4aacc:JavaApp/Makefile 逐字节恢复原版 → python 脚本插入（显式 \t，assert 旧块 TAB 形态命中）→ 全文审计零空格缩进命令行 + 110 TAB 行 → make -n 解析干净
+- CI 终局：run 36418929593（956ea9b）= completed success
+- 教训：①Makefile 是 TAB 敏感文件，Edit 工具写入会做 tab→space 转换——修改 Makefile 必须走脚本插入（python 显式 \t）并事后 cat -A 审计；②本地有 make，提交前 make -n 干跑一次即可拦住此类事故（本轮修完已补跑）
+
+Stage Summary:
+- Task191 全链闭环：六项修复 + verify 45/45 + CI 绿，新 IPA 就绪
+- 装机验证锚点：vgpu direct-elements-ebo 0x0502 归零/方块纹理恢复；i18n 手动切英文正常；Forge 26.1.2 越过模块解析；横屏 Task191 rotated by device orientation；ANGLE Task191 ubo 系列裁决方向；控件崩溃自证锚点
