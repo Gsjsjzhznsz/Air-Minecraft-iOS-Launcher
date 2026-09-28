@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 6.0.0
-[Pre-Init] Commit: dde0f82 (main)
+[Pre-Init] Commit: 956ea9b (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -14,6 +14,7 @@
 * dynamic-codesigning: NO
 [Debugging] Debug log enabled: YES
 [Pre-init] Restored game directory preference (default)
+[SceneDelegate] Task191: uncaught-exception handler re-armed at willConnect
 [SceneDelegate] Task188: geometry request declined (expected in window mode; Info.plist UIRequiresFullScreen is the primary fix): 当前窗口模式不允许以编程方式更改界面方向。
 [HomeAvatar] Task172 branch: network fetch started (URL present, length=211)
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
@@ -23,33 +24,59 @@
 [PLPreferences] Getter could not find preference general.disable_window_rotation_shim
 [SceneDelegate] Task189: landscape window transform evaluated (bounds={{0, 0}, {1180, 820}} rotated=0)
 [SceneDelegate] Terracotta temporarily disabled for crash investigation
+[PLPreferences] Getter could not find preference general.disable_window_rotation_shim
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
 [HomeAvatar] Task172 fetch completion: img=yes (128x128)
 [HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [HomeAvatar] Task172 fetch completion: img=yes (128x128)
 [HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260927)
-[HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Library/Caches/IconLoader, mirror enabled: YES
+[HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [LauncherRootVC] Loaded 918 remote versions
-[SceneDelegate] Task56 geometry retry on becomeActive failed: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
-[SceneDelegate] Task56 geometry retry on becomeActive (orientation=1 not landscape)
-[PLPreferences] Getter could not find preference general.disable_window_rotation_shim
-[SceneDelegate] Task189: portrait window -> content rotated 90deg (scene={{0, 0}, {820, 1180}} content={{0, 0}, {1180, 820}} angle=+90deg)
-[SceneDelegate] Task56 geometry retry on becomeActive failed: Error Domain=UISceneErrorDomain Code=101 "当前窗口模式不允许以编程方式更改界面方向。" UserInfo={NSLocalizedDescription=当前窗口模式不允许以编程方式更改界面方向。}
-[SceneDelegate] Task56 geometry retry on becomeActive (orientation=1 not landscape)
-[PLPreferences] Getter could not find preference general.disable_window_rotation_shim
-[SceneDelegate] Task189: portrait window -> content rotated 90deg (scene={{0, 0}, {820, 1180}} content={{0, 0}, {1180, 820}} angle=+90deg)
+[PLPreferences] Getter could not find preference controlrepo.mirror_idx
+[DownloadVC] Task173 version manifest candidates: 2
+[DownloadVC] Task173 version manifest loaded from piston-meta.mojang.com (916 versions)
+[RightPanel] Task156: info card -> settings (deepLink=<none>)
+[PLPreferences] Setter could not find preference controlrepo.mirror_idx
+[ControlRepo] Task189: index loaded via mirror chain, 3 layouts
 [PLPreferences] Getter could not find preference controlrepo.mirror_idx
 [DownloadVC] Task173 version manifest candidates: 2
 [DownloadVC] Task173 version manifest loaded from piston-meta.mojang.com (916 versions)
 [PLPreferences] Setter could not find preference controlrepo.mirror_idx
 [ControlRepo] Task189: index loaded via mirror chain, 3 layouts
-[ControlRepo] Task189: downloading layout large-buttons (layouts/large-buttons.json) via mirror chain
+[ControlRepo] Task189: downloading layout minimal-fps (layouts/minimal-fps.json) via mirror chain
 [PLPreferences] Getter could not find preference controlrepo.mirror_idx
 [PLPreferences] Setter could not find preference controlrepo.mirror_idx
-[ControlRepo] Task189: layout saved -> /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/controlmap/large-buttons.json
+[ControlRepo] Task189: layout saved -> /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/controlmap/minimal-fps.json
+2026-09-28 20:19:21.458 AngelAuraAmethyst[7516:895629] CoreText note: Client requested name ".SFCompact", it will get TimesNewRomanPSMT rather than the intended font. All system UI font access should be through proper APIs such as CTFontCreateUIFontForLanguage() or +[UIFont systemFontOfSize:].
+2026-09-28 20:19:21.458 AngelAuraAmethyst[7516:895629] CoreText note: Set a breakpoint on CTFontLogSystemFontNameRequest to debug.
+2026-09-28 20:19:25.413 AngelAuraAmethyst[7516:895629] [CurseForgeAPI] API Key source: runtime preference (length=11, prefix=((void *...)
+2026-09-28 20:19:25.413 AngelAuraAmethyst[7516:895629] [CurseForgeAPI] API Key source: runtime preference (length=11, prefix=((void *...)
+2026-09-28 20:19:25.413 AngelAuraAmethyst[7516:895629] [CurseForgeAPI] searchModWithFilters starting request: https://api.curseforge.com/v1/mods/search?gameId=432&classId=6&pageSize=1&index=0
+2026-09-28 20:19:25.860 AngelAuraAmethyst[7516:895941] [CurseForgeAPI] searchModWithFilters JSON parse failed
+2026-09-28 20:19:25.860 AngelAuraAmethyst[7516:895941] 
+========== [CurseForgeAPI] DEBUG ==========
+📍 Request: GET https://api.curseforge.com/v1/mods/search?gameId=432&classId=6&pageSize=1&index=0
+📍 Request Headers:
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     x-api-key: ((void *... (len=11)
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     Accept: application/json
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941] 📍 Response: statusCode=403, contentType=text/plain, dataLength=37
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     x-cache: Error from cloudfront
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     Content-Type: text/plain
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     Server: Kestrel
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     Via: 1.1 32a126c3b52235b211058fc85b27c888.cloudfront.net (CloudFront)
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     x-amz-cf-pop: HKG54-P1
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     Date: Mon, 28 Sep 2026 12:19:25 GMT
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     Content-Length: 37
+2026-09-28 20:19:25.861 AngelAuraAmethyst[7516:895941]     x-amz-cf-id: ooaHGeryKthcV_1WWfksgY_1MdBakhIDQl4sxkX_jKQh5bqjMkZgjQ==
+2026-09-28 20:19:25.862 AngelAuraAmethyst[7516:895941] 📍 JSON Parse Error: domain=NSCocoaErrorDomain, code=3840, desc=未能读取数据，因为它的格式不正确。
+2026-09-28 20:19:25.862 AngelAuraAmethyst[7516:895941] 📍 Response Body (first 2048 bytes):
+Forbidden: API Key missing or invalid
+2026-09-28 20:19:25.862 AngelAuraAmethyst[7516:895941] ========== [CurseForgeAPI] END DEBUG ==========
+2026-09-28 20:19:25.862 AngelAuraAmethyst[7516:895941] [CurseForgeAPI] ❌ Request failed - statusCode=403, contentType=text/plain, error=未能读取数据，因为它的格式不正确。, snippet=Forbidden: API Key missing or invalid
+[PLPrefTable] Task131: pick opened: debug.jit_enabler (7 options)
 *** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '*** -[__NSArrayM insertObject:atIndex:]: object cannot be nil'
 *** First throw call stack:
-(0x1908a7190 0x190624380 0x1908355a8 0x10a44545c 0x10a4457cc 0x10a447c90 0x10a442db8 0x10a44317c 0x10a51492c 0x10a516fac 0x10a526ea4 0x1951b1648 0x1951b22ec 0x1951b21bc 0x194ace568 0x194b9a090 0x194adbc3c 0x194adb95c 0x194ad1814 0x194ad0e74 0x194ad7b88 0x194ad7928 0x2c3157bc0 0x190868c20 0x190868b94 0x19084a268 0x190849384 0x19084a7f4 0x23ac5ff24 0x194b281cc 0x10a3e4d00 0x10227f0f8 0x10227cb50 0x19069b5b8)
+(0x1908a7190 0x190624380 0x1908355a8 0x10ac454d8 0x10ac45848 0x10ac47d0c 0x10ac42e34 0x10ac431f8 0x10ad149d0 0x10ad17050 0x10ad27100 0x1951b1648 0x1951b22ec 0x1951b21bc 0x194ace568 0x194b9a090 0x194adbc3c 0x194adb95c 0x194ad1814 0x194ad0e74 0x194ad7b88 0x194ad7928 0x2c3157bc0 0x190868c20 0x190868b94 0x19084a268 0x190849384 0x19084a7f4 0x23ac5ff24 0x194b281cc 0x10abe4d00 0x1023fb0f8 0x1023f8b50 0x19069b5b8)
 libc++abi: terminating due to uncaught exception of type NSException
