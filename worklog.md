@@ -903,3 +903,9 @@ Work Log:
 Stage Summary:
 - 装机锚点：账号列表卡片与版本管理页观感一致（新拟态开关两态一致）；长按任意账号=系统上下文菜单（选用/删除/角色）；安装方式页相邻卡净距=版本号页
 - 教训：①128 系"级联子校验器"可能整轮漏顺延（184 轮只治了 165-168）——全量复跑 + stash 对拍才是零新增失败的充分证据；②`ann["announcements"][N]` 双重下标形态要单列重锚模式；③python 字面量嵌 \" 时 @ 前缀易被吃——校验器 needle 用单引号写
+
+### Task 190 补记：CI 两轮拉锯终局
+- round 1（66d850f）run 36397990325 failure：AccountListViewController.m:599 `UIActionAttributesDestructive` 在构建 SDK 不存在（编译器点名真名 UIMenuElementAttributesDestructive）→ cc3e1b1 热修 + verify_task190 D 组改锚真常量并拒绝旧别名
+- round 2（cc3e1b1）run 36403614574 failure：泛型管线方法体 6 处 `property 'contentView' not found on object of type 'UIView *'`（"方法体只用 UIView 级 API" 的勘察漏判——contentView 属性本身就不在 UIView 基类上）→ 63e86f3 热修 2：泛型签名改 `(UIView *)cell contentView:(UIView *)contentView` 双参数由类型化包装点传入（22 处机械改名，方法体其余逐字节不变）；163 B3/B4 + 168 A9 重锚到 contentView.* 前缀（语义不变）；verify_task190 A 组加"泛型体内零 cell.contentView"门
+- CI 终局：run 36406783918（63e86f3）= **completed success**
+- 教训：本机无 clang，"方法体只用了 XX 级 API" 的结论必须逐符号核对（属性也算符号）；SDK 常量名以编译器批注为准
