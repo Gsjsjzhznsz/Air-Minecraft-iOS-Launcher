@@ -6,6 +6,7 @@
 #import "AIMessageCell.h"
 #import "MarkdownParser.h"
 #import "LauncherPreferences.h"
+#import "../utils.h"   // Task193：ame193 i18n 迁移需要 localize()
 
 // 说明：助手气泡采用白 0.08 半透明底，聊天气泡不叠加 UIVisualEffectView 毛玻璃，
 // 以避免滚动表格中反复插入模糊视图导致的性能/复用问题；外层内容区已由

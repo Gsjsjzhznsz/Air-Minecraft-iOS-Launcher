@@ -5,6 +5,7 @@
 
 #import "AIInputBarView.h"
 #import "LauncherPreferences.h"
+#import "../utils.h"   // Task193：ame193 i18n 迁移需要 localize()
 
 /// 输入胶囊高度
 static const CGFloat kInputFieldHeight = 38.0;

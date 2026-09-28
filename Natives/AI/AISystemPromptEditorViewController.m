@@ -9,6 +9,7 @@
 #import "AiSettings.h"
 #import "BackgroundManager.h"
 #import "LauncherPreferences.h"
+#import "../utils.h"   // Task193：ame193 i18n 迁移需要 localize()
 
 @interface AISystemPromptEditorViewController () <UITextViewDelegate>
 @property (nonatomic, strong) UITextView *textView;
