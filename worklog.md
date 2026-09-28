@@ -970,3 +970,18 @@ Work Log:
 
 Stage Summary:
 - 两个 Task 193（图标 + 六修）在单提交序列上共存，CI 待推
+
+---
+Task ID: 193 (CI 收尾)
+Agent: main (Super Z)
+Task: CI 三轮拉锯终局
+
+Work Log:
+- round 1（0b54acd，run 36449463916）失败：i18n 迁移器打断了 LauncherPreferencesViewController.m:1917 的多行字符串拼接（mem_help.message 的 localize( 开在前一行，行内排除规则看不见首片段）→ "expected )"。热修 afa3882：还原拼接 + 四表删除孤儿键 ame193.misc.10（180→179）+ 基线 2408→2407 扫荡 15 验证器 + 全部 ame193 包装的平衡形态审计（零嫌疑）
+- round 2（afa3882，run 36450753778）失败：三个 AI UI 文件没 import utils.h（localize 未声明 + ARC int→NSString 级联）。热修 da75974：AIMessageCell/AIInputBarView/AISystemPromptEditorViewController 补 ../utils.h + 全树声明审计（零缺失）
+- round 3（da75974，run 36452197673）completed success，产物 .ipa + .tipa + dSYM 就绪
+
+Stage Summary:
+- Task 193 全链闭环：六修一轮 + MobileGlues 2.0.18 + 图标会话合并，verify_task193 86/86，CI 绿，新 IPA 就绪
+- 装机验证锚点六件：vgpu "Task193 step-attrs" 系列（四步错误归因裁决 0x0502）+ 方块材质恢复；gl4es "constructor bootstrap complete"（不再 strstr 崩）；Forge 26.1.2 "eglCreateWindowSurface REUSED"（越过 No graphics backend）；控件仓库下载 v1 布局不再崩；ANGLE "extension cache built" + DSA 激活 + "[dlsym] Task193: GL symbol resolution FAILED" 点名残余缺项；MobileGlues 运行日志可见 2.0.18
+- 教训三连：多行拼接的 i18n 迁移必须语句级（非行级）排除；ObjC 文件迁移前先查 localize 声明可达性；本地无 ObjC 编译器时用"声明审计 + 平衡形态审计"两道软门补
