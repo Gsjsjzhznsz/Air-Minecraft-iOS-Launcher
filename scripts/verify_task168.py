@@ -70,9 +70,9 @@ check("A8 动态收口退役（Task172）：attach 调用点全撤；Task177 重
       "[cardTarget ame_attachNeumorphShadowOnly];" not in bm_m
       and "subview.layer.cornerRadius = cardTarget.layer.cornerRadius;" not in bm_m
       and "- (void)ame_attachNeumorphShadowOnly" not in engine_m)
-check("A9 宿主链放行裁剪维持（Task172 ON 分支保留：阴影越出卡片边界）",
-      "cell.contentView.clipsToBounds = NO;" in bm_m
-      and "cell.contentView.layer.masksToBounds = NO;" in bm_m)
+check("A9 宿主链放行裁剪维持（Task190 重锚：泛型方法 contentView 参数化后为 contentView.* 前缀；Task172 ON 分支语义不变：阴影越出卡片边界）",
+      "contentView.clipsToBounds = NO;" in bm_m
+      and "contentView.layer.masksToBounds = NO;" in bm_m)
 check("A10 cell 管线实底尾部：ame_applyNeumorphSurface 仍在（规格表面+双阴影）",
       "[target ame_applyNeumorphSurface];" in bm_m)
 check("A11 边界维持：列表行 applyCardEffectToCell 仍 Flat 平贴（Task184 重锚：Flat 单签名恒定底回归）",

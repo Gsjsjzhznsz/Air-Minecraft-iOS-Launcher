@@ -28,13 +28,15 @@ print("== A. BackgroundManager 泛型管线（Collection/Table 共用 Task172 �
 bm = rdrepo("Natives/BackgroundManager.m")
 bmh = rdrepo("Natives/BackgroundManager.h")
 check("A", "泛型实现 ame190_applyCardPipelineToCell 存在",
-      "- (void)ame190_applyCardPipelineToCell:(UIView *)cell {" in bm)
-check("A", "Collection 包装转发泛型实现",
+      "- (void)ame190_applyCardPipelineToCell:(UIView *)cell contentView:(UIView *)contentView {" in bm)
+check("A", "Collection 包装转发泛型实现（contentView 类型化传参）",
       "- (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {" in bm
-      and "[self ame190_applyCardPipelineToCell:cell];" in bm)
+      and bm.count("[self ame190_applyCardPipelineToCell:cell contentView:cell.contentView];") == 2)
 check("A", "Table 包装 applyEffectToTableViewCell 转发泛型实现",
-      "- (void)applyEffectToTableViewCell:(UITableViewCell *)cell {" in bm
-      and bm.count("[self ame190_applyCardPipelineToCell:cell];") == 2)
+      "- (void)applyEffectToTableViewCell:(UITableViewCell *)cell {" in bm)
+_gm = bm.split("- (void)ame190_applyCardPipelineToCell:", 1)[1].split("- (void)applyCardEffectToCell:", 1)[0]
+check("A", "泛型方法体内零 cell.contentView（CI run 36403614574：UIView 基类无此属性）",
+      "cell.contentView" not in _gm and "contentView" in _gm)
 check("A", "泛型实现正文保留 Task172 三段式关键调用",
       "ame_applyNeumorphSurface" in bm.split("ame190_applyCardPipelineToCell", 1)[1]
       and "cardsNeumorphEnabled" in bm.split("ame190_applyCardPipelineToCell", 1)[1]

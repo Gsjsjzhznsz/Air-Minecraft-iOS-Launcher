@@ -125,15 +125,15 @@ check("B1  引擎新增 ame_removeNeumorphShadow（h 声明 + m 实现）",
 check("B2  CollectionViewCell 无壁纸分支挂双阴影（Flat -> NeumorphSurface）",
       "[target ame_applyNeumorphSurface];" in bm
       and "[target ame_applyNeumorphSurfaceFlatWithRadius:radius];" not in bm)
-check("B3  宿主链放行裁剪（无壁纸分支 cell.clipsToBounds=NO + contentView masks=NO）",
+check("B3  宿主链放行裁剪（Task190 重锚：泛型方法 contentView 参数化——cell.clipsToBounds=NO + contentView masks=NO 语义不变）",
       "cell.clipsToBounds = NO;" in bm
-      and "cell.contentView.layer.masksToBounds = NO;" in bm)
+      and "contentView.layer.masksToBounds = NO;" in bm)
 check("B3b 表格卡片行的 Flat 形态裁剪不受影响（Task184 重锚：clips=YES 保留，Flat 单签名回归）",
       "cell.clipsToBounds = YES;" in bm
       and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
 check("B4  壁纸分支清残留阴影（applyEffectToView + CollectionViewCell 双入口）",
       bm.count("[view ame_removeNeumorphShadow];") >= 1
-      and "[cell.contentView ame_removeNeumorphShadow];" in bm
+      and "[contentView ame_removeNeumorphShadow];" in bm  # Task190 重锚：泛型方法 contentView 参数化
       and "[cardTarget ame_removeNeumorphShadow];" in bm)
 check("B5  新管线 applyNeumorphCardEffectToView（h 声明 + m 实现）",
       "- (void)applyNeumorphCardEffectToView:(UIView *)view;" in bh

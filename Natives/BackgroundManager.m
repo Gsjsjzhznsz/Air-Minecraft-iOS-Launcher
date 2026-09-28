@@ -1142,18 +1142,21 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     // （VersionManagerViewController / VMTileBaseCell，走本管线）逐像素
     // 同构——旧 applyEffectToCell: 是 Task172 之前的无开关管线，走它会
     // 在新拟态开关两种状态下都与版本页行为不一致。
-    [self ame190_applyCardPipelineToCell:cell];
+    [self ame190_applyCardPipelineToCell:cell contentView:cell.contentView];
 }
 
 - (void)applyEffectToTableViewCell:(UITableViewCell *)cell {
-    [self ame190_applyCardPipelineToCell:cell];
+    [self ame190_applyCardPipelineToCell:cell contentView:cell.contentView];
 }
 
 // Task190：Task172 三段式卡面管线的泛型实现（原内联于
-// applyEffectToCollectionViewCell:，方法体逐字节原样搬移——本来只使用
-// UIView 级 API，参数从 UICollectionViewCell 放宽为 UIView 的零行为
-// 变化重构；开关开启 = 规格表面 + 双阴影的"正常态"，关闭 = 旧管线）。
-- (void)ame190_applyCardPipelineToCell:(UIView *)cell {
+// applyEffectToCollectionViewCell:，方法体逐字节原样搬移；开关开启 =
+// 规格表面 + 双阴影的"正常态"，关闭 = 旧管线）。
+// CI 修复（run 36403614574 实锤）：UIView 基类没有 contentView 属性
+//（property 'contentView' not found on object of type 'UIView *'）——
+// 泛型参数收窄为 cell + contentView 双参数，由类型化包装点传入，
+// 方法体除 cell.contentView -> contentView 改写外逐字节不变。
+- (void)ame190_applyCardPipelineToCell:(UIView *)cell contentView:(UIView *)contentView {
     if (!cell) return;
 
     // Task172 重写（用户定稿"用正常的状态重写……不要继续用之前不知道写成
@@ -1172,7 +1175,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         // 残留（此前壁纸毛玻璃插在 cardTarget 里）也要一并清掉。
         UIView *target = nil;
         CGFloat radius = 0;
-        for (UIView *sub in cell.contentView.subviews) {
+        for (UIView *sub in contentView.subviews) {
             if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
                 [sub removeFromSuperview];
                 continue;
@@ -1187,9 +1190,9 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             }
         }
         if (!target) {
-            target = cell.contentView;
-            radius = cell.contentView.layer.cornerRadius > 0
-                ? cell.contentView.layer.cornerRadius : 12;
+            target = contentView;
+            radius = contentView.layer.cornerRadius > 0
+                ? contentView.layer.cornerRadius : 12;
         }
         for (UIView *sub in [target.subviews copy]) {
             if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
@@ -1197,13 +1200,13 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             }
         }
         cell.backgroundColor = [UIColor clearColor];
-        cell.contentView.backgroundColor = [UIColor clearColor];
+        contentView.backgroundColor = [UIColor clearColor];
         // 宿主链逐层放行裁剪：阴影必须越出卡片边界投到磁贴间隙——相邻淡
         // 阴影叠加属新拟态正常形态，collectionView 边界外的阴影由其自身裁剪收口。
         cell.clipsToBounds = NO;
         cell.layer.masksToBounds = NO;
-        cell.contentView.clipsToBounds = NO;
-        cell.contentView.layer.masksToBounds = NO;
+        contentView.clipsToBounds = NO;
+        contentView.layer.masksToBounds = NO;
         [target ame_applyNeumorphSurface];
         // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（渐变
         // 表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），文字/
@@ -1218,7 +1221,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     if (![self hasBackground]) {
         UIView *target = nil;
         CGFloat radius = 0;
-        for (UIView *sub in cell.contentView.subviews) {
+        for (UIView *sub in contentView.subviews) {
             if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
                 [sub removeFromSuperview];
                 continue;
@@ -1233,19 +1236,19 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             }
         }
         if (!target) {
-            target = cell.contentView;
-            radius = cell.contentView.layer.cornerRadius > 0
-                ? cell.contentView.layer.cornerRadius : 12;
+            target = contentView;
+            radius = contentView.layer.cornerRadius > 0
+                ? contentView.layer.cornerRadius : 12;
         }
         for (UIView *sub in [target.subviews copy]) {
             if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
                 [sub removeFromSuperview];
             }
         }
-        [cell.contentView ame_removeNeumorphShadow];
+        [contentView ame_removeNeumorphShadow];
         [target ame_removeNeumorphShadow];
         cell.backgroundColor = [UIColor clearColor];
-        cell.contentView.backgroundColor = [UIColor clearColor];
+        contentView.backgroundColor = [UIColor clearColor];
         [self applyEffectToView:target];
         return;
     }
@@ -1262,7 +1265,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         // 位置/尺寸/圆角全部对齐；无容器时回退 contentView（行为同旧）。
         UIView *cardTarget = nil;
         CGFloat cardRadius = 0;
-        for (UIView *subview in cell.contentView.subviews) {
+        for (UIView *subview in contentView.subviews) {
             if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
                 continue; // blur 层不参与容器探测
             }
@@ -1276,19 +1279,19 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             }
         }
         if (!cardTarget) {
-            cardTarget = cell.contentView;
-            cardRadius = cell.contentView.layer.cornerRadius > 0
-                ? cell.contentView.layer.cornerRadius : 12;
+            cardTarget = contentView;
+            cardRadius = contentView.layer.cornerRadius > 0
+                ? contentView.layer.cornerRadius : 12;
         }
 
         // Task163：切回壁纸管线前清残留阴影承载层（开关刚关闭的场景，
         // 无壁纸新拟态卡片会挂在 contentView 或卡片容器上）。
-        [cell.contentView ame_removeNeumorphShadow];
+        [contentView ame_removeNeumorphShadow];
         [cardTarget ame_removeNeumorphShadow];
 
         if (self.uiEffect == BackgroundUIEffectBlur) {
             // 毛玻璃
-            for (UIView *subview in cell.contentView.subviews) {
+            for (UIView *subview in contentView.subviews) {
                 if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
                     [subview removeFromSuperview];
                 }
@@ -1318,10 +1321,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
             [cardTarget insertSubview:blurView atIndex:0];
             cardTarget.backgroundColor = [UIColor clearColor];
             cell.backgroundColor = [UIColor clearColor];
-            cell.contentView.backgroundColor = [UIColor clearColor];
+            contentView.backgroundColor = [UIColor clearColor];
         } else {
             // 半透明
-            for (UIView *subview in cell.contentView.subviews) {
+            for (UIView *subview in contentView.subviews) {
                 if ([subview isKindOfClass:[UIVisualEffectView class]] && subview.tag == kBackgroundBlurTag) {
                     [subview removeFromSuperview];
                 }
@@ -1338,7 +1341,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 cardTarget.backgroundColor = [UIColor colorWithWhite:0.1 alpha:self.uiOpacity];
             }
             cell.backgroundColor = [UIColor clearColor];
-            cell.contentView.backgroundColor = [UIColor clearColor];
+            contentView.backgroundColor = [UIColor clearColor];
         }
         return;
     }
