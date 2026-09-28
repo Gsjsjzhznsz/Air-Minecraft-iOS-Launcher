@@ -596,7 +596,9 @@ static NSMutableSet *ame128_validatedSet(void) {
                                                  handler:^(UIAction *action) {
         [self ame190_deleteAccountAtIndexPath:indexPath];
     }];
-    ame190_delete.attributes = UIActionAttributesDestructive;
+    // CI 修复（run 36397990325 实锤）：attributes 常量必须用
+    // UIMenuElementAttributesDestructive（编译器点名本 SDK 真名；勿用旧别名）
+    ame190_delete.attributes = UIMenuElementAttributesDestructive;
     [actions addObject:ame190_delete];
 
     UIMenu *menu = [UIMenu menuWithTitle:displayName children:actions];

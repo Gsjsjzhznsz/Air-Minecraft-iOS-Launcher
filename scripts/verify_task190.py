@@ -113,9 +113,10 @@ check("D", "选用账号（person.circle -> ame190_selectAccountAtIndexPath）",
       'systemImageNamed:@"person.circle"' in ac
       and 'localize(@"account.menu.use"' in ac
       and ac.count("[self ame190_selectAccountAtIndexPath:indexPath];") >= 2)
-check("D", "删除账号（trash + UIActionAttributesDestructive -> ame190_deleteAccountAtIndexPath）",
+check("D", "删除账号（trash + UIMenuElementAttributesDestructive -> ame190_deleteAccountAtIndexPath）",
       'systemImageNamed:@"trash"' in ac
-      and "UIActionAttributesDestructive" in ac
+      and "UIMenuElementAttributesDestructive" in ac
+      and "UIActionAttributesDestructive" not in ac  # CI run 36397990325：本 SDK 无此旧别名（编译器点名真名）
       and ac.count("[self ame190_deleteAccountAtIndexPath:indexPath];") >= 2)
 check("D", "Task129b 角色切换项保留（3P 多角色 + UUID 归一化打勾）",
       "ame129b_switchAccountAtIndexPath:indexPath toProfile:p];" in ac
