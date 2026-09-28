@@ -882,3 +882,24 @@ Stage Summary:
 - 装机锚点：vgpu（textureGather 编译错误归零 = 白屏闭环链第四环）；ANGLE（"Task188 readback #N center rgba=..." 非黑=呈现丢弃 / 黑=spvc 语义；"Task188 fb: alphaBits=..."；"Task188 layer: pixelFormat=..."；"Task188 phase-tag"）；Forge/NeoForge（"Task188: stray file ... removed" + "Task188: post-processor verification passed/FAILED"）；横屏（启动即横屏，无 Portrait 窗口）；控件仓库（"[ControlRepo] Task188: index loaded/downloading/saved"）
 - Forge/NeoForge 用户路径：重装即自愈（杂散文件清除 + 缺件显式报错 + processor 重跑补件）
 - 遗留：ANGLE 黑屏待 readback/alphaBits 数据裁决方向（呈现 vs spvc 语义）；他人 26.3 误装需新包验证一键流；LiveContainer 宿主下 UIRequiresFullScreen 传递性待装机确认
+
+---
+Task ID: 190
+Agent: main (Super Z)
+Task: 账号卡片与已安装版本页同构（圆形头像/正文标题/灰字类型/去箭头/长按菜单）+ 安装方式页间距对齐版本号页 + BackgroundManager 泛型管线抽取
+
+Work Log:
+- 家法：fetch 对齐 b941662（远端 Task189 hotfix 已绿），空号 190 确认（185-189 已被并行轮占用）
+- 用户定稿四点：①安装方式页每个按钮间距=版本号页 ②账号选项样式=已安装版本页（左图标→圆形头像、标题为正文、灰字为账号类型、删右侧箭头）③长按呼出 (person.circle)选用账号/(红字trash)删除账号 ④（继承 184 轮口径）样式基准=版本管理页 VMTileBaseCell/VMVersionCardCell
+- BackgroundManager 泛型抽取：applyEffectToCollectionViewCell 正文逐字节迁入 ame190_applyCardPipelineToCell:(UIView*)，新增 applyEffectToTableViewCell: 表格入口（Task172 三段式与新拟态开关两种状态下与版本页逐字节一致；旧 applyEffectToCell: 是无开关旧管线不采用）
+- AME190AccountCardCell（AccountListViewController.m 内私有类）：VMTile 阴影档 0.12/6/(0,3)+layoutSubviews shadowPath、contentContainer 12pt 连续圆角+白0.08+0.5pt 白0.10 描边、选中态 accent 1.5 描边+0.10 淡底+右上 20pt 徽章（VMVersionCardCell 三层强化镜像）、触摸 0.96 弹簧、正规复用（出列拆光重建退役）；圆形头像 dp:34（=版本页 iconContainer 位）、标题 sp:15 semibold label 色、灰字 sp:11 secondary=账号类型（Task136 彩色胶囊退役）、无 chevron；几何=上下 4 内缩（行距 8pt）+左右 24 总边距（版本页 section16+item8 语义）
+- 长按菜单全账户化：选择链收口 ame190_selectAccountAtIndexPath（原 didSelect 主体原样迁入，点击/菜单共用）、删除链收口 ame190_deleteAccountAtIndexPath（原 commitEditingStyle 分支迁入，左滑共用）、Task129b 第三方多角色角色项保留（UUID 归一化打勾）、Task130b 行内 person.2 按钮+actionSheet 退役（objc/runtime.h import 随撤）
+- 安装方式页间距：卡间 section 头 10→4，净距=4 下内缩+4 头+4 上内缩=12pt 与 DownloadViewController（minimumLineSpacing 4+内缩 4+4）一致；行高 64 与卡内缩不动
+- l10n：account.menu.use/delete ×4 主语言（2155→2157）；task190_reanchor.py：计数锚 22 文件 + 公告窗口族顺延（task190@2 插入，非钉位索引 ≥2 全体 +1，len 23→24）+ 136 G2/F6/I2、137 F10/G3/G4/D3、130 F1-F4、184 D、180 G 组诚实重锚
+- 175 陈旧锚治理：F4（Task183/184 撤销 180 背景透明度后回归 Task178 cardsNeumorphOpacity 双挂点——184 轮漏顺延）+ G1（公告索引对齐现实 task175@8）
+- 级联 sweep 全量复跑 + stash 对拍：100-111/132/135/140/156 基线同态零新增失败（逐一对拍相等）；129/130/131/141/149/150/157/159/160/161/162/164/165/166/167/168/169/170/171/172/173/173b/174/175/177/179/183/184/185/186/188/189 全绿
+- verify_task190.py 新建 58 项（A 泛型管线/B 间距/C 同构/D 菜单/E 退役/F 保留/G l10n/H CI 纪律含 188 同序括号门）；公告 task190@2 + version.h REVISION 附录 + 双 worklog
+
+Stage Summary:
+- 装机锚点：账号列表卡片与版本管理页观感一致（新拟态开关两态一致）；长按任意账号=系统上下文菜单（选用/删除/角色）；安装方式页相邻卡净距=版本号页
+- 教训：①128 系"级联子校验器"可能整轮漏顺延（184 轮只治了 165-168）——全量复跑 + stash 对拍才是零新增失败的充分证据；②`ann["announcements"][N]` 双重下标形态要单列重锚模式；③python 字面量嵌 \" 时 @ 前缀易被吃——校验器 needle 用单引号写

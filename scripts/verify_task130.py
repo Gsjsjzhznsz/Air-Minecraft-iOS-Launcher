@@ -178,20 +178,21 @@ check("E11 AppDelegate 接线 + PLPreferences 哨兵默认键注册（setPrefObj
       "ame130_migrateMgPerfDefaults();" in ad
       and '@"task130_perf_defaults_migrated": @NO' in plp)
 
-print("== F. 档案旁切换角色按钮（免密）==")
+print("== F. 切换角色（Task190 重锚：用户定稿账号卡与已安装版本页同构、卡片无多余控件——Task130b 行内 person.2 按钮 + actionSheet 退役，角色切换收敛进全账户长按菜单 Task129b 角色项；免密链零回退）==")
 al = rd("Natives/AccountListViewController.m")
-check("F1 ame130b_switchRoleTapped + actionSheet 形态",
-      "ame130b_switchRoleTapped:(UIButton *)sender" in al
-      and "UIAlertControllerStyleActionSheet" in al)
-check("F2 按钮创建门（第三方 + availableProfiles>=2，与长按菜单同口径）",
-      "ame130b_profiles.count >= 2" in al and 'systemImageNamed:@"person.2"' in al)
-check("F3 关联对象 row 绑定（cell 复用安全）",
-      'objc_setAssociatedObject(ame130b_switchBtn, "ame130b_row"' in al
-      and 'objc_getAssociatedObject(sender, "ame130b_row")' in al)
-check("F4 popover 锚定在按钮旁（iPad 悬浮形态）",
-      "alert.popoverPresentationController.sourceView = sender;" in al)
-check("F5 复用 ame129b_switchAccountAtIndexPath（switchToProfile 免密链）",
-      al.count("ame129b_switchAccountAtIndexPath:indexPath toProfile:p") >= 2)
+check("F1 行内按钮/actionSheet 退役（ame130b_switchRoleTapped 零残留）",
+      "ame130b_switchRoleTapped" not in al
+      and 'systemImageNamed:@"person.2"' not in al)
+check("F2 关联对象 row 绑定随之退役",
+      "objc_setAssociatedObject" not in al and "objc_getAssociatedObject" not in al
+      and "#import <objc/runtime.h>" not in al)
+check("F3 长按菜单保留 Task129b 角色项（免密链唯一入口）",
+      al.count("ame129b_switchAccountAtIndexPath:indexPath toProfile:p") == 1
+      and "contextMenuConfigurationForRowAtIndexPath" in al
+      and "UIMenuElementStateOn" in al)
+check("F4 account.switch_role.button l10n 四语言（键保留，未消费也保留）",
+      all('"account.switch_role.button"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
+          for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 check("F6 account.switch_role.button l10n 四语言",
       all('"account.switch_role.button"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
           for l in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
@@ -317,7 +318,7 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
                   rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), re.M)))
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
 check("H3 四语言键集一致（Task157 基线 1952 = Task156 基线 1952 + Task157 组件键 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2155,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2157,
       f"counts={[len(s) for s in sets]}")
 
 delta_ok = True

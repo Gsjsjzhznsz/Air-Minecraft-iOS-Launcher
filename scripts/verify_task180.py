@@ -80,7 +80,7 @@ check('C', '恢复默认按钮不再写 0.75/1.0 双键', 'manager.backgroundOpa
 check('C', '恢复默认写 uiOpacity 0.7（历史形态）', 'manager.uiOpacity = 0.7;' in st)
 check('C', '新拟态开关行 tags 410 保留', 'neumorphSwitch.tag = 410;' in st)
 
-# ============ D. l10n（×6 语言 + 计数 2155 保持；183 回退键集） ============
+# ============ D. l10n（×6 语言 + 计数 2157 保持；183 回退键集） ============
 RES = os.path.join(N, 'resources')
 for lang, expect_1296 in [
     ('en', 'Opacity'),
@@ -101,7 +101,7 @@ for lang in ['en', 'zh-Hans', 'zh-CN', 'zh-Hant']:
     s = io.open(os.path.join(RES, f'{lang}.lproj/Localizable.strings'), encoding='utf-8').read()
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     tot = len(keys) if tot is None else tot
-    check('D', f'{lang} 唯一键总数 == 2155', len(keys) == 2155, f'got {len(keys)}')
+    check('D', f'{lang} 唯一键总数 == 2157', len(keys) == 2157, f'got {len(keys)}')
 
 # ============ E. 按钮接线——183 撤销（回归恒定底色）+ 头像防御保留 ============
 rp = rd('LauncherRightPanelViewController.m')
@@ -137,11 +137,22 @@ check('F', '实例页 blurView 回归（不接透明度）', 'backgroundOpacity'
 
 # ============ G. 账号/头像/安装页（180 功能修复保留 + 183 安装页新配方重锚） ============
 ac = rd('AccountListViewController.m')
-check('G', '账号 cell 凸起管线（180 重写保留）', '[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:cardView];' in ac)
-check('G', '账号 cell 引擎头 import（CI 462 修：pinned 半径是引擎分类符号）', '#import "UIKit+NativeSurface.h"' in ac)
-check('G', '账号 cell 圆角钉 16（180 重写保留）', '[cardView ame_setNeumorphPinnedCornerRadius:16];' in ac)
-check('G', '账号 cell 裁剪放行（180 重写保留）', 'cell.contentView.layer.masksToBounds = NO;' in ac)
-check('G', '账号 cell 自绘阴影退场（180 重写保留）', 'shadowOpacity = 0.12' not in ac)
+# Task190 重锚：用户定稿账号卡与已安装版本页同构（AME190AccountCardCell）——
+# 180 的内联卡（cardView + 凸起管线直挂 + 钉 16 + 自绘阴影退役断言）整体被
+# 同构卡替代：管线换 Task172 三段式泛型入口 applyEffectToTableViewCell，卡面
+# 规格移交 VMTileBaseCell 镜像（12pt 连续圆角 + 0.12/6 阴影 + shadowPath）。
+check('G', '账号 cell 卡面管线（Task190 重锚：同构卡走 Task172 三段式泛型入口）',
+      '[[BackgroundManager sharedManager] applyEffectToTableViewCell:self];' in ac)
+check('G', '账号 cell 不再直挂引擎符号/不再 import 引擎头（经 BackgroundManager 转介）',
+      '#import "UIKit+NativeSurface.h"' not in ac
+      and 'ame_setNeumorphPinnedCornerRadius' not in ac)
+check('G', '账号 cell 同构卡规格（12pt 连续圆角 + VMTile 阴影档 + shadowPath 随帧）',
+      'self.contentContainer.layer.cornerRadius = 12;' in ac
+      and 'self.layer.shadowOpacity = 0.12;' in ac
+      and 'bezierPathWithRoundedRect:shadowRect' in ac)
+check('G', '账号 cell 裁剪放行（保留）', 'self.contentView.layer.masksToBounds = NO;' in ac)
+check('G', '账号 cell 无旧内联卡残留（cardView/钉 16/白 0.10 零出现）',
+      'cardView' not in ac and 'ame_setNeumorphPinnedCornerRadius' not in ac)
 check('G', 'reloadAccountList 去重（180 双保险保留）', 'ame180_seenIds' in ac and 'dedup account entry by id' in ac)
 check('G', 'reloadAccountList 过滤坏文件（180 双保险保留）', 'NSErrorObject' in ac and 'skipping unreadable account file' in ac)
 ba = rd('authenticator/BaseAuthenticator.m')

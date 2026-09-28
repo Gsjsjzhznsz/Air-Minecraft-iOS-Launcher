@@ -135,6 +135,8 @@
 "account.switch_role.done" = "已切換到 %@";
 "account.switch_role.failed" = "切換失敗：%@";
 "account.switch_role.button" = "切換角色";
+"account.menu.use" = "選用帳號";
+"account.menu.delete" = "刪除帳號";
 "account.switch_role.relogin_required" = "該伺服器不允許在當前存取權杖上切換角色，且本機尚未保存該帳戶的登入憑證。請重新登入一次該帳戶，之後即可免密切換。";
 
 "login.warn.title.legacy_device" = "Amethyst 的下一个版本将与此设备不兼容。";

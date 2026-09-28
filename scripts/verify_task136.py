@@ -203,10 +203,10 @@ check("F4  计数徽章（游戏目录/已安装版本）= AmeBadgeLabel：高 2
       and "sp:12" in vm)
 check("F5  计数徽章右侧 18pt 安全边距保留",
       "countBadge.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18" in vm)
-check("F6  账户类型徽章：高 24 + 圆角 12 + 12pt 字",
-      "badgeLabel.heightAnchor constraintEqualToConstant:24" in read("Natives/AccountListViewController.m")
-      and "badgeLabel.layer.cornerRadius = 12" in read("Natives/AccountListViewController.m")
-      and "badgeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold]" in read("Natives/AccountListViewController.m"))
+check("F6  账户类型标识（Task190 重锚：用户定稿灰字为账号类型——类型判别口径保留，彩色胶囊退役）",
+      "ame190_accountTypeTextForAccount:" in read("Natives/AccountListViewController.m")
+      and '[UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular]' in read("Natives/AccountListViewController.m")
+      and "self.typeLabel.textColor = [UIColor secondaryLabelColor];" in read("Natives/AccountListViewController.m"))
 check("F7  模组下载列表的下载按钮回归 Task89 之前原生样式（accent 底白字胶囊；Task137 重锚）",
       "_downloadButton.backgroundColor = accentColor();" in read("Natives/ModTableViewCell.m")
       and "_downloadButton.layer.cornerRadius = 13.0" in read("Natives/ModTableViewCell.m"))
@@ -219,8 +219,8 @@ ml = read("Natives/installer/ModLoaderInstallViewController.m")
 check("G1  每个加载器独立 section（insetGrouped 独立圆角卡）",
       "return _loaders.count + ([self currentOptions].count > 0 ? 1 : 0);" in ml
       and "return 1;  // Task136：每个加载器 section 仅一行卡片" in ml)
-check("G2  卡片间距 10pt（无标题 section 头高 10 + footer 0.01）",
-      "if (section < (NSInteger)_loaders.count) return 10;" in ml
+check("G2  卡片间距（Task190 重锚：用户要求与版本号页一致——section 头 10->4，净距 = 4 下内缩 + 4 头 + 4 上内缩 = 12pt）",
+      "if (section < (NSInteger)_loaders.count) return 4;" in ml
       and "return 0.01;" in ml)
 check("G3  两类 cell 视觉自洽（Task184 重锚：VersionCardCell 同构——cardContainer init 挂凸起管线 ×3，逐帧 effect 调用退役）",
       ml.count("[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];") == 3
@@ -278,11 +278,11 @@ check("I1  全仓 nm_convex/nm_flat/nm_pill 引擎调用点清零",
                         "Natives/ModTableViewCell.m",
                         "Natives/LauncherRootViewController.m",
                         "Natives/BackgroundManager.m"])))
-check("I2  卡片圆角回归原生逐元素取值（版本卡 12/资源卡 12/Mod版本卡 12/账户卡 16/筛选 14/自定义行 12/崩溃卡 16）",
+check("I2  卡片圆角回归原生逐元素取值（Task190 重锚：账户卡与已安装版本页同构 = 12pt；版本卡 12/资源卡 12/Mod版本卡 12/筛选 14/自定义行 12/崩溃卡 16）",
       "cardContainer.layer.cornerRadius = 12" in read("Natives/VersionCardCell.m")
       and "contentView.layer.cornerRadius = 12.0" in read("Natives/ResourceCardTableViewCell.m")
       and "cardContainer.layer.cornerRadius = 12" in read("Natives/ModVersionTableViewCell.m")
-      and "cardView.layer.cornerRadius = 16" in read("Natives/AccountListViewController.m")
+      and "self.contentContainer.layer.cornerRadius = 12;" in read("Natives/AccountListViewController.m")
       and "filterContainerView.layer.cornerRadius = 14" in read("Natives/AssetVersionViewController.m")
       and "self.contentView.layer.cornerRadius = 12;" in read("Natives/HomeCustomizeViewController.m")
       and read("Natives/PLCrashView.m").count("layer.cornerRadius = 16;  // Task137") == 3)

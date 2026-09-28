@@ -1136,6 +1136,24 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 }
 
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell {
+    // Task190：Collection 与 Table cell 从此共用同一 Task172 三段式管线
+    // （正文整体迁入泛型 ame190_applyCardPipelineToCell:，此处仅剩转发）。
+    // 动因：账号列表（UITableView）按用户定稿与已安装版本页
+    // （VersionManagerViewController / VMTileBaseCell，走本管线）逐像素
+    // 同构——旧 applyEffectToCell: 是 Task172 之前的无开关管线，走它会
+    // 在新拟态开关两种状态下都与版本页行为不一致。
+    [self ame190_applyCardPipelineToCell:cell];
+}
+
+- (void)applyEffectToTableViewCell:(UITableViewCell *)cell {
+    [self ame190_applyCardPipelineToCell:cell];
+}
+
+// Task190：Task172 三段式卡面管线的泛型实现（原内联于
+// applyEffectToCollectionViewCell:，方法体逐字节原样搬移——本来只使用
+// UIView 级 API，参数从 UICollectionViewCell 放宽为 UIView 的零行为
+// 变化重构；开关开启 = 规格表面 + 双阴影的"正常态"，关闭 = 旧管线）。
+- (void)ame190_applyCardPipelineToCell:(UIView *)cell {
     if (!cell) return;
 
     // Task172 重写（用户定稿"用正常的状态重写……不要继续用之前不知道写成

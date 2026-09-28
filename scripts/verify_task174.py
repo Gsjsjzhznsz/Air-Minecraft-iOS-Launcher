@@ -20,7 +20,7 @@ verify_task174.py -- 新拟态画布接管（晕影根修）+ 透明度百分比
     双分支 + 一次性取证日志）
   B 百分比实时回显（slider→contentView→cell→tag501）
   C 既有语义不回潮（开关门/灰化反转/卡片管线/回调链）
-  D l10n 零新增（四主语言计数 2155 = 十症状并行会话并入后 1954->2155）
+  D l10n 零新增（四主语言计数 2157 = 十症状并行会话并入后 1954->2157）
   E 公告 + version.h
   F 配平
   G 级联零新增失败（当前失败 ⊆ 基线 ∪ 具名沙箱传播簇）
@@ -138,8 +138,8 @@ check("C4 卡片本体透明度原语（Task184 重锚：管线双挂点回归�
 # ============================================================
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
-check("D1 四主语言键集一致且计数 = 2155（Task174 零新增；十症状并行会话并入后 1954->2155）",
-      all(len(k) == 2155 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
+check("D1 四主语言键集一致且计数 = 2157（Task174 零新增；十症状并行会话并入后 1954->2157）",
+      all(len(k) == 2157 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 check("D2 开关键六语言在位（Task184 重锚：neumorph.opacity 键回归，button.opacity 退役，interface.title 保留）",
       "background.cards.neumorph.interface.title" in KEYSETS[0]
       and "background.cards.neumorph.opacity.title" in KEYSETS[0]
@@ -153,22 +153,22 @@ check("D2 开关键六语言在位（Task184 重锚：neumorph.opacity 键回归
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告（Task185 重锚：并行会话 task184@2 插入后全体非钉位再 +1；本条（task174）顺延 anns[9]；server/task169 pin 不动）且 id 唯一",
+check("E1 公告（Task185 重锚：并行会话 task184@2 插入后全体非钉位再 +1；本条（task174）顺延 anns[10]；server/task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[4]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[5]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[6]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[7]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[8]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[9]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[10]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[11]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[12]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[13]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[14]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t174 = anns[8]
+      and anns[5]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[6]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[7]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[8]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[9]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[10]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[11]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[12]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[13]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[14]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[15]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t174 = anns[9]
 check("E2 公告内容锚（晕影根因=壁纸垫底/画布接管/百分比实时回显 + EN 尾注）",
       "晕影" in t174["summary"] and "画布接管" in t174["summary"]
       and "壁纸" in t174["content"] and "实时回显" in t174["content"]

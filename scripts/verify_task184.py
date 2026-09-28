@@ -116,10 +116,10 @@ check('C', 'RightPanel 按钮透明度接线已撤（底色恒定）',
 
 # ============ D. 保留项（180 重写 + 默认值） ============
 ac = rd('AccountListViewController.m')
-check('D', '账号列表凸起重写保留（管线 + 钉 16 + 裁剪放行）',
-      'applyNeumorphCardEffectToView:cardView];' in ac
-      and '[cardView ame_setNeumorphPinnedCornerRadius:16];' in ac
-      and 'cell.contentView.layer.masksToBounds = NO;' in ac)
+check('D', '账号卡（Task190 重锚：与已安装版本页同构 AME190AccountCardCell——旧 Task180 内联卡面退役，管线换 Task172 三段式泛型入口）',
+      'applyEffectToTableViewCell:self];' in ac
+      and 'AME190AccountCardCell' in ac
+      and 'self.contentView.layer.masksToBounds = NO;' in ac)  # Task190：新 cell 类内为 self. 前缀
 ba = rd('authenticator/BaseAuthenticator.m')
 check('D', '账号复制双保险保留（写盘收口 + 读侧去重）',
       'ame180_savedAccountId' in ba and 'ame180_seenIds' in ac)

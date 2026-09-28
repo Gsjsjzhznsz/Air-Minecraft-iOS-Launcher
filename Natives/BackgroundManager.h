@@ -112,6 +112,10 @@ typedef NS_ENUM(NSInteger, BackgroundUIEffect) {
 // Apply UI effect to any UIView (blur or translucent based on settings)
 - (void)applyEffectToView:(UIView *)view;
 - (void)applyEffectToCollectionViewCell:(UICollectionViewCell *)cell;
+/// Task190：Task172 三段式卡面管线（新拟态开关感知）的表格 cell 入口——
+/// 与 applyEffectToCollectionViewCell: 完全同一条管线（泛型实现共用），
+/// 账号列表卡片（已安装版本页同构）由此获得与版本卡逐字节一致的行为。
+- (void)applyEffectToTableViewCell:(UITableViewCell *)cell;
 - (void)applyEffectToCell:(UITableViewCell *)cell;
 /// Task136：表格 cell 的"卡片化"新拟态样式（下载页模组加载器等与上级菜单
 /// 对齐的页面专用）——无自定义背景时 cell 整体应用凸出表面（圆角 50 基准、

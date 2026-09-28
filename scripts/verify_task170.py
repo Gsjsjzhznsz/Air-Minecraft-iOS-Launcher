@@ -129,8 +129,8 @@ check("E1 六语言键全部恢复（Task184 重锚）", all(v is not None for v
 check("E2 六语言旧键退役",
       all(old_key + '"' not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
-check("E3 四主语言键集一致且计数 = 2155（Task178 重锚：opacity.title 键恢复）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2155
+check("E3 四主语言键集一致且计数 = 2157（Task178 重锚：opacity.title 键恢复）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2157
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -144,18 +144,18 @@ ids = [a["id"] for a in anns]
 check("F1 公告（Task185 重锚：并行会话 task184@2 插入后全体非钉位再 +1；179@4、178@5、177@6、175@7、174@8、toggle173@9、ten173@10、172@11、171@12、170@13、168@14；anns[1] task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[4]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[5]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[6]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[7]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[8]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[9]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[10]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[11]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[12]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[13]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[14]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[13]
+      and anns[5]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[6]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[7]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[8]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[9]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[10]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[11]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[12]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[13]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[14]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[15]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[14]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]

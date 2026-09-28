@@ -2914,3 +2914,51 @@
 // (6 keys with context-specific Chinese now map to one generic entry),
 // language-picker proper names.
 // ============================================================================
+
+// REVISION 18 addendum (Amethyst Task 190, no bump): account card restyled
+// isomorphic to the installed-versions page + account long-press menu +
+// installer page spacing aligned to the version-number page.
+// (1) AME190AccountCardCell (AccountListViewController.m): the account card
+// now mirrors VMTileBaseCell/VMVersionCardCell from
+// VersionManagerViewController exactly -- 12pt continuous-corner container
+// (white 0.08 base + 0.5pt white 0.10 border, accent 1.5pt border + accent
+// 0.10 fill + 20pt accent check badge when selected), VMTile shadow spec
+// 0.12/6/(0,3) with layoutSubviews shadowPath, and the 0.96 spring
+// touch-scale. Per user spec: left icon -> circular avatar (dp:34, same
+// slot as the version-page icon container), title = account name in the
+// version-page name style (sp:15 semibold label color), gray line =
+// account type (sp:11 secondary; the Task136 colored type pill is
+// retired), NO right chevron. Card surface runs through the new
+// BackgroundManager applyEffectToTableViewCell: -- the Task172 three-stage
+// pipeline extracted into a generic ame190_applyCardPipelineToCell: so
+// table cells get byte-identical behavior to collection cells in both
+// neumorph-switch states (the old applyEffectToCell: is pre-Task172 and
+// was NOT reused). Geometry: 4pt top/bottom insets (8pt card gap) + 24pt
+// side margins = version page section(16)+item(8) semantics.
+// (2) Long-press menu for every account (user spec):
+// (person.circle) "Use account" routes into ame190_selectAccountAtIndexPath:
+// (the exact former didSelectRowAtIndexPath body -- tap and menu share one
+// selection chain), (red/destructive trash) "Delete account" routes into
+// ame190_deleteAccountAtIndexPath: (the former commitEditingStyle delete
+// branch -- swipe-to-delete still delegates there). Task129b third-party
+// multi-profile switch entries stay between the two actions (UUID-
+// normalized checkmark, switchToProfile rebind without password); the
+// Task130b inline person.2 button + actionSheet is retired (the card has
+// no extra controls per user spec; objc/runtime.h import removed with it).
+// (3) Installer page spacing (user: "each button's spacing must match the
+// version-number page"): inter-loader section header height 10 -> 4, so
+// the visible gap between card faces = 4 (card bottom inset) + 4 (header)
+// + 4 (card top inset) = 12pt, identical to DownloadViewController's
+// minimumLineSpacing 4 + 4/4 insets. Row height 64 and card insets
+// unchanged.
+// (4) l10n: +2 keys across en/zh-Hans/zh-CN/zh-Hant (account.menu.use /
+// account.menu.delete; unique-key count 2155 -> 2157). Cascade re-anchors:
+// l10n count gates and the announcement window family (task190@2 inserted,
+// all non-pinned indices >= 2 shift +1, total 24), verify_task136 G2/F6/I2
+// (installer spacing, type pill -> gray text, account card radius 16 -> 12),
+// verify_task137 D3, verify_task130 F (inline button retirement, menu
+// consolidation), verify_task184 D (account card pipeline anchors).
+// Anchors: account cards render like the installed-versions page in both
+// neumorph-switch states; long-press on any account shows Use account /
+// Delete account; installer page card gap equals the version-number page.
+// ============================================================================

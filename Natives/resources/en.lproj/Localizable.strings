@@ -135,6 +135,8 @@
 "account.switch_role.done" = "Switched to %@";
 "account.switch_role.failed" = "Switch failed: %@";
 "account.switch_role.button" = "Switch character";
+"account.menu.use" = "Use account";
+"account.menu.delete" = "Delete account";
 "account.switch_role.relogin_required" = "This server does not allow switching profiles on the current access token, and no login credentials are saved on this device yet. Please log in to this account once more; after that, switching becomes password-free.";
 
 "login.warn.title.legacy_device" = "The next release of Amethyst will not be compatible with this device.";

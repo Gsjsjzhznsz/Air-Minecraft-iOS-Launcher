@@ -165,8 +165,8 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     m = re.search(r'^"' + re.escape(new_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     vals[lg] = m.group(1) if m else None
 check("D1 六语言新键在位且非空", all(vals.values()), str(vals))
-check("D2 四主语言键集一致且计数 = 2155（Task178 重锚：opacity.title 键恢复）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2155
+check("D2 四主语言键集一致且计数 = 2157（Task178 重锚：opacity.title 键恢复）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2157
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -187,22 +187,22 @@ check("D4 neumorph.opacity 键（Task184 重锚：六语言全在，interface �
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告（Task185 重锚：并行会话 task184@2 插入后全体非钉位再 +1；本条（新拟态 task173）顺延 anns[10]；server/task169 pin 不动）且 id 唯一",
+check("E1 公告（Task185 重锚：并行会话 task184@2 插入后全体非钉位再 +1；本条（新拟态 task173）顺延 anns[11]；server/task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[4]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[5]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[6]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[7]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[8]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[9]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[10]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[11]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[12]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[13]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[14]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t173 = anns[9]
+      and anns[5]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[6]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[7]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[8]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[9]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[10]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[11]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[12]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[13]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[14]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[15]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t173 = anns[10]
 check("E2 公告内容锚（复现方法/正常态/晕影/字体 + EN 尾注）",
       "正常态" in t173["content"] and "晕影" in t173["content"]
       and "字体" in t173["content"] and "EN:" in t173["content"]

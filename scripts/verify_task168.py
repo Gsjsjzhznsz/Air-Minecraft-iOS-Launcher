@@ -120,8 +120,8 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     m = re.search(r'^"' + re.escape(l10n_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     l10n_vals[lg] = m.group(1) if m else None
 check("B7 六语言键全部在位（Task184 重锚）", all(v is not None for v in l10n_vals.values()), str(l10n_vals))
-check("B8 四主语言键集一致且计数 = 2155（Task178 重锚：opacity.title 键恢复，净增 1）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2155
+check("B8 四主语言键集一致且计数 = 2157（Task178 重锚：opacity.title 键恢复，净增 1）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2157
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -171,11 +171,11 @@ check("C10 抽取/幂等脚本入库（可重跑再生成）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("D1 公告顺延（Task184 重锚：task184@2 插入后 task168 顺延至 anns[14]；task169 F5 钉死 anns[1] 不动）且 id 唯一",
+check("D1 公告顺延（Task184 重锚：task184@2 插入后 task168 顺延至 anns[15]；task169 F5 钉死 anns[1] 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[14]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t168 = anns[14]
+      and anns[15]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t168 = anns[15]
 check("D2 公告内容：根因叙述 + 双形态 + 两个维护路径",
       "447a677" in t168["content"] and "透明度/模糊" in t168["content"]
       and "announcements.json" in t168["content"] and "help-faq.json" in t168["content"]

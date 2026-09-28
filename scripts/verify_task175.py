@@ -227,10 +227,10 @@ check("F3 柔和档引擎整体退役（Task177 重锚：属性/透传原语/0.3
       and "lightOpacity = 0.50" not in engine_m
       and "ame_wallpaperSoftProfile != soft" not in engine_m
       and "ame177_surfaceLayer" in engine_m)
-check("F4 柔和档退役 + 卡体透明度挂点（Task180 重锚：两挂点读背景透明度）",
+check("F4 柔和档退役 + 卡体透明度挂点（Task190 重锚：Task183/184 撤销 180 背景透明度后回归 Task178 cardsNeumorphOpacity 双挂点——泛型管线挂点 + applyNeumorphCardEffectToView 挂点）",
       bm.count("ame_setNeumorphWallpaperSoft") == 0
-      and bm.count("[view ame_applyNeumorphCardOpacity:self.backgroundOpacity];") == 1
-      and bm.count("[target ame_applyNeumorphCardOpacity:self.backgroundOpacity];") == 1)  # Task180
+      and bm.count("[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") == 1
+      and bm.count("[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];") == 1)  # Task183/184 撤销 + Task190 泛型抽取保持挂点形态
 check("F5 规格档不回退（Task177 重锚：恒 1.0 不透明度 = shadowOpacity = 1.0 ×2 层）",
       engine_m.count("shadowOpacity = 1.0") == 2)
 
@@ -239,18 +239,20 @@ check("F5 规格档不回退（Task177 重锚：恒 1.0 不透明度 = shadowOpa
 # ============================================================
 print("== G. 文档 ==")
 anns = json.loads(rd("announcements.json"))["announcements"]
-check("G1 公告 task175@6（Task181 重锚：task180@2/task179@3 插入；server/task169 pin 不动；177@5；175@6；174@7；172@10；168@13）",
+check("G1 公告 task175@8（Task190 重锚：Task184 轮漏顺延的陈旧锚对齐现实——task190@2/task184@3/task180@4/task179@5/task178@6/task177@7/task175@8/task174@9/172@12/168@15；server/task169 pin 不动）",
       anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[2]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and anns[3]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[4]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[5]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[6]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[7]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[10]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[13]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t175 = anns[6]
+      and anns[2]["id"] == "task190-account-card-installer-spacing-2026-09-28"
+      and anns[3]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"
+      and anns[4]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and anns[5]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[6]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[7]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[8]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[9]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[12]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[15]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t175 = anns[8]
 check("G2 公告内容六条全列 + EN 尾注 + 装机锚点",
       all(k in t175["content"] for k in
           ["ANGLE", "下载量", "头像", "物品栏", "Forge", "壁纸", "[Task175]"])
@@ -267,8 +269,8 @@ check("G3 version.h Task 175 addendum（六主题 + 三个装机锚点 + 六条�
       and "11.15.1.2318" in vh)
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
-check("G4 l10n 计数（Task178 重锚：neumorph.opacity.title 键恢复后 2155）",
-      all(len(k) == 2155 for k in KEYSETS)
+check("G4 l10n 计数（Task178 重锚：neumorph.opacity.title 键恢复后 2157）",
+      all(len(k) == 2157 for k in KEYSETS)
       and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 fb = json.loads(rd("Natives/resources/announcements-fallback.json"))
 fbi = fb["announcements"]

@@ -1,7 +1,5 @@
 #import <AuthenticationServices/AuthenticationServices.h>
-#import <objc/runtime.h>   // Task 130b：按钮 row 关联对象
 #import "NMToast.h"
-#import "UIKit+NativeSurface.h" // Task180：ame_setNeumorphPinnedCornerRadius（引擎分类符号）
 
 #import "authenticator/BaseAuthenticator.h"
 #import "authenticator/ThirdPartyAuthenticator.h"
@@ -12,6 +10,7 @@
 #import "LauncherPreferences.h"
 #import "UIImageView+AFNetworking.h"
 #import "BackgroundManager.h"
+#import "ScreenUtils.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 
@@ -19,6 +18,248 @@
 
 @property(nonatomic, strong) NSMutableArray *accountList;
 @property(nonatomic) ASWebAuthenticationSession *authVC;
+
+@end
+
+#pragma mark - AME190AccountCardCell（Task190：已安装版本页同构账号卡片）
+
+// 用户定稿：账号选项样式 = "已安装的版本"页面（VersionManagerViewController
+// 的 VMTileBaseCell / VMVersionCardCell）同构——
+//   - 外层 cell 全透明 + 卡面阴影规格照搬 VMTileBaseCell（0.12/6/(0,3) +
+//     layoutSubviews 内 shadowPath 随帧更新，Task152 黑直角根修同款）
+//   - contentContainer：12pt 连续圆角 + 白 0.08 基底 + 0.5pt 白 0.10 描边；
+//     选中态换 accent 1.5pt 描边 + accent 0.10 淡底（VMVersionCardCell
+//     规范 9.1 三层选中强化原样镜像）
+//   - 卡面管线：applyEffectToTableViewCell（Task172 三段式泛型管线——与
+//     版本页 applyEffectToCollectionViewCell 为同一条管线，新拟态开关两种
+//     状态下行为逐字节一致；旧 applyEffectToCell: 是无开关旧管线，不采用）
+//   - 左侧 = 圆形头像（用户：卡片左部的图标改成头像（圆形）；尺寸对齐
+//     版本页 iconContainer 的 dp:34）
+//   - 标题 = 账号名正文（版本页 nameLabel 规格 sp:15 semibold 原生 label 色）
+//   - 灰字 = 账号类型（用户：灰字为账号类型；版本页 versionLabel 规格
+//     sp:11 secondary。原 Task136 彩色类型胶囊随重写退役）
+//   - 右侧无箭头（用户：把卡片右部的箭头删掉）；选中徽章 = 20pt accent
+//     圆角方块 + 白勾（VMVersionCardCell selectedBadge 同位 top+10/-14）
+//   - 触摸缩放弹簧动画（VMTileBaseCell 同款 0.96 / 0.25 spring）
+//   - 上下 4pt 内缩（版本卡 item contentInsets 语义，相邻卡面净距 8pt =
+//     版本页 iPhone 档）+ 左右 24pt 总边距（版本页 section 16 + item 8）
+@interface AME190AccountCardCell : UITableViewCell
+@property (nonatomic, strong) UIView *contentContainer;
+@property (nonatomic, strong) UIImageView *avatarView;
+@property (nonatomic, strong) UILabel *usernameLabel;
+@property (nonatomic, strong) UILabel *typeLabel;
+@property (nonatomic, strong) UIView *selectedBadge;
+- (void)ame190_configureWithUsername:(NSString *)username
+                            typeText:(NSString *)typeText
+                           avatarURL:(NSString *)avatarURLStr
+                            selected:(BOOL)selected;
+@end
+
+@implementation AME190AccountCardCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString *)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        [self ame190_setupViews];
+    }
+    return self;
+}
+
+- (void)ame190_setupViews {
+    // 外层 cell 全透明（plain 表格无 inset-grouped 系统白底，但选中高亮/
+    // 复用重装仍防御性清一遍——ModLoaderInstall AME184ClearTableViewCellChrome
+    // 同款配方）；裁剪逐层放行，阴影可越出卡片边界
+    self.backgroundColor = [UIColor clearColor];
+    self.contentView.backgroundColor = [UIColor clearColor];
+    self.selectionStyle = UITableViewCellSelectionStyleNone;
+    self.clipsToBounds = NO;
+    self.layer.masksToBounds = NO;
+    self.contentView.clipsToBounds = NO;
+    self.contentView.layer.masksToBounds = NO;
+    UIView *clearSel = [[UIView alloc] init];
+    clearSel.backgroundColor = [UIColor clearColor];
+    clearSel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.selectedBackgroundView = clearSel;
+
+    // 阴影：VMTileBaseCell 规范 5.2 中阴影档（0.12, 6, (0,3)）
+    self.layer.shadowColor = [UIColor blackColor].CGColor;
+    self.layer.shadowOffset = CGSizeMake(0, 3);
+    self.layer.shadowOpacity = 0.12;
+    self.layer.shadowRadius = 6;
+
+    // ----- 卡片容器（VMTileBaseCell 规范 5.1：12pt 连续圆角卡面宿主）-----
+    self.contentContainer = [[UIView alloc] init];
+    self.contentContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    self.contentContainer.layer.cornerRadius = 12;
+    self.contentContainer.layer.cornerCurve = kCACornerCurveContinuous;
+    self.contentContainer.layer.masksToBounds = YES;
+    self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
+    self.contentContainer.layer.borderWidth = 0.5;
+    self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
+    [self.contentView addSubview:self.contentContainer];
+
+    // 卡面管线：Task172 三段式泛型管线（与已安装版本页同一条，Task190
+    // 新入口；管线在 init 单次挂载，引擎 layoutSubviews 按 bounds 自刷）
+    [[BackgroundManager sharedManager] applyEffectToTableViewCell:self];
+
+    // ----- 左侧圆形头像（dp:34，占位底色 + DefaultAccount 默认图）-----
+    CGFloat ame190_avatarSize = [ScreenUtils dp:34];
+    self.avatarView = [[UIImageView alloc] init];
+    self.avatarView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
+    self.avatarView.layer.cornerRadius = ame190_avatarSize / 2;
+    self.avatarView.layer.cornerCurve = kCACornerCurveContinuous;
+    self.avatarView.layer.masksToBounds = YES;
+    self.avatarView.backgroundColor = [UIColor tertiarySystemFillColor];
+    self.avatarView.image = [UIImage imageNamed:@"DefaultAccount"];
+    [self.contentContainer addSubview:self.avatarView];
+
+    // ----- 标题 = 账号名（版本页 nameLabel 规格：sp:15 semibold label 色）-----
+    self.usernameLabel = [[UILabel alloc] init];
+    self.usernameLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.usernameLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:15] weight:UIFontWeightSemibold];
+    self.usernameLabel.textColor = [UIColor labelColor];
+    self.usernameLabel.numberOfLines = 1;
+    self.usernameLabel.adjustsFontSizeToFitWidth = YES;
+    self.usernameLabel.minimumScaleFactor = 0.75;
+    self.usernameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    [self.contentContainer addSubview:self.usernameLabel];
+
+    // ----- 灰字 = 账号类型（版本页 versionLabel 规格：sp:11 secondary）-----
+    self.typeLabel = [[UILabel alloc] init];
+    self.typeLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.typeLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
+    self.typeLabel.textColor = [UIColor secondaryLabelColor];
+    self.typeLabel.numberOfLines = 1;
+    self.typeLabel.adjustsFontSizeToFitWidth = YES;
+    self.typeLabel.minimumScaleFactor = 0.7;
+    self.typeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+    [self.contentContainer addSubview:self.typeLabel];
+
+    // ----- 选中徽章（VMVersionCardCell selectedBadge 同款：20pt accent 圆角
+    // 方块 + 白勾 9pt bold，top+10 / 右 -14）-----
+    self.selectedBadge = [[UIView alloc] init];
+    self.selectedBadge.translatesAutoresizingMaskIntoConstraints = NO;
+    self.selectedBadge.backgroundColor = accentColor();
+    self.selectedBadge.layer.cornerRadius = 10;
+    self.selectedBadge.layer.cornerCurve = kCACornerCurveContinuous;
+    self.selectedBadge.layer.masksToBounds = YES;
+    self.selectedBadge.hidden = YES;
+    [self.contentContainer addSubview:self.selectedBadge];
+
+    UIImageView *checkmark = [[UIImageView alloc] init];
+    checkmark.translatesAutoresizingMaskIntoConstraints = NO;
+    checkmark.image = [UIImage systemImageNamed:@"checkmark" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:9 weight:UIFontWeightBold]];
+    checkmark.tintColor = [UIColor whiteColor];
+    [self.selectedBadge addSubview:checkmark];
+
+    CGFloat ame190_textLead = 14 + ame190_avatarSize + 10;   // 头像 leading 14 + 直径 + 10pt 间距
+    [NSLayoutConstraint activateConstraints:@[
+        // 卡片容器：上下 4 / 左右 24 内缩（版本页 section.contentInsets 16 +
+        // item contentInsets 8 = 24pt 总边距语义）
+        [self.contentContainer.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:4],
+        [self.contentContainer.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-4],
+        [self.contentContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:24],
+        [self.contentContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-24],
+
+        // 头像：左 14，垂直居中，dp:34 圆
+        [self.avatarView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:14],
+        [self.avatarView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
+        [self.avatarView.widthAnchor constraintEqualToConstant:ame190_avatarSize],
+        [self.avatarView.heightAnchor constraintEqualToConstant:ame190_avatarSize],
+
+        // 文字块：头像右侧 10；标题顶 16 / 灰字紧跟 3 / 灰字底 16——
+        // 高度链完整，自动行高（约 70pt 卡面 + 8pt 行距 = 版本页同档）
+        [self.usernameLabel.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:ame190_textLead],
+        [self.usernameLabel.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:16],
+        [self.usernameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.selectedBadge.leadingAnchor constant:-8],
+
+        [self.typeLabel.leadingAnchor constraintEqualToAnchor:self.usernameLabel.leadingAnchor],
+        [self.typeLabel.topAnchor constraintEqualToAnchor:self.usernameLabel.bottomAnchor constant:3],
+        [self.typeLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.selectedBadge.leadingAnchor constant:-8],
+        [self.typeLabel.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-16],
+
+        // 选中徽章：右上（版本页同位）
+        [self.selectedBadge.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
+        [self.selectedBadge.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:10],
+        [self.selectedBadge.widthAnchor constraintEqualToConstant:20],
+        [self.selectedBadge.heightAnchor constraintEqualToConstant:20],
+        [checkmark.centerXAnchor constraintEqualToAnchor:self.selectedBadge.centerXAnchor],
+        [checkmark.centerYAnchor constraintEqualToAnchor:self.selectedBadge.centerYAnchor],
+    ]];
+}
+
+// Task152 镜像：阴影路径随卡片实际 frame 更新——透明 cell 的阴影若无
+// shadowPath 会以直角 bounds 绘制，在圆角卡片四角外露出黑色直角
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGRect shadowRect = self.contentContainer.frame;
+    if (!CGRectIsEmpty(shadowRect)) {
+        self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:shadowRect
+                                                           cornerRadius:12.0].CGPath;
+    }
+}
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    self.avatarView.image = [UIImage imageNamed:@"DefaultAccount"];
+    self.usernameLabel.text = nil;
+    self.typeLabel.text = nil;
+    self.selectedBadge.hidden = YES;
+    [self ame190_applySelectedAppearance:NO];
+}
+
+// 规范 9.1 三层选中强化（VMVersionCardCell configure 原样镜像：边框 + 徽章 + 底色）
+- (void)ame190_applySelectedAppearance:(BOOL)selected {
+    self.selectedBadge.hidden = !selected;
+    self.selectedBadge.backgroundColor = accentColor();
+    if (selected) {
+        self.contentContainer.layer.borderColor = accentColor().CGColor;
+        self.contentContainer.layer.borderWidth = 1.5;
+        self.contentContainer.backgroundColor = [accentColor() colorWithAlphaComponent:0.10];
+    } else {
+        self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
+        self.contentContainer.layer.borderWidth = 0.5;
+        self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
+    }
+}
+
+- (void)ame190_configureWithUsername:(NSString *)username
+                            typeText:(NSString *)typeText
+                           avatarURL:(NSString *)avatarURLStr
+                            selected:(BOOL)selected {
+    self.usernameLabel.text = username;
+    self.typeLabel.text = typeText;
+
+    if (avatarURLStr.length > 0) {
+        NSString *pic = [avatarURLStr stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
+        [self.avatarView setImageWithURL:[NSURL URLWithString:pic]
+                        placeholderImage:[UIImage imageNamed:@"DefaultAccount"]];
+    }
+    [self ame190_applySelectedAppearance:selected];
+}
+
+// 触摸缩放弹簧动画（VMTileBaseCell 同款 0.96 / 0.25 spring）
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesBegan:touches withEvent:event];
+    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
+        self.transform = CGAffineTransformMakeScale(0.96, 0.96);
+    } completion:nil];
+}
+
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesEnded:touches withEvent:event];
+    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
+        self.transform = CGAffineTransformIdentity;
+    } completion:nil];
+}
+
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+    [super touchesCancelled:touches withEvent:event];
+    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
+        self.transform = CGAffineTransformIdentity;
+    } completion:nil];
+}
 
 @end
 
@@ -44,13 +285,16 @@
     // 参照 FCL：卡片式账户列表，去除默认分割线，圆角卡片自带视觉分隔
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.backgroundColor = [UIColor clearColor];
-    self.tableView.estimatedRowHeight = 88;
+    // Task190：行高自动维度——卡面 ≈ 16+标题+3+灰字+16 + 上下 4pt 内缩
+    //（约 78pt 行 / 70pt 卡，已安装版本页同档间距）
+    self.tableView.estimatedRowHeight = 78;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     // 底部内边距避免最后一个 cell 被浮动按钮遮挡
     self.tableView.contentInset = UIEdgeInsetsMake(8, 0, 80, 0);
     self.tableView.scrollIndicatorInsets = self.tableView.contentInset;
-    // 注册卡片 cell
-    [self.tableView registerClass:UITableViewCell.class forCellReuseIdentifier:@"accountCardCell"];
+    // 注册卡片 cell（Task190：已安装版本页同构 AME190AccountCardCell，
+    // 正规复用替代旧"出列拆光重建"内联卡）
+    [self.tableView registerClass:AME190AccountCardCell.class forCellReuseIdentifier:@"accountCardCell"];
 
     // 添加底部"添加账户"浮动按钮（FCL 风格）
     [self setupAddAccountButton];
@@ -143,25 +387,18 @@
     return self.accountList.count;
 }
 
-/// 计算账户类型标签文字与配色（参照 FCL：微软=蓝、第三方=橙、本地=灰、Demo=紫）
-- (void)applyAccountTypeBadgeForAccount:(NSDictionary *)accountData
-                              badgeLabel:(UILabel *)badgeLabel {
-    NSString *username = accountData[@"username"];
+/// 账号类型文字（Task190：用户定稿"灰字为账号类型"——原 Task136 彩色
+/// 类型胶囊随卡片同构重写退役，类型判别口径原样保留：微软=Microsoft、第三方、本地、Demo=演示）
+- (NSString *)ame190_accountTypeTextForAccount:(NSDictionary *)accountData {
+    NSString *username = accountData[@"username"] ?: @"";
     if ([username hasPrefix:@"Demo."]) {
-        badgeLabel.text = localize(@"login.option.demo", @"演示");
-        badgeLabel.backgroundColor = [UIColor colorWithRed:0.55 green:0.35 blue:0.85 alpha:1.0];
+        return localize(@"login.option.demo", @"演示");
     } else if (accountData[@"clientToken"] != nil) {
-        badgeLabel.text = localize(@"login.option.3rdparty", @"第三方");
-        badgeLabel.backgroundColor = [UIColor colorWithRed:0.92 green:0.55 blue:0.18 alpha:1.0];
+        return localize(@"login.option.3rdparty", @"第三方");
     } else if (accountData[@"xboxGamertag"] == nil) {
-        badgeLabel.text = localize(@"login.option.local", @"本地");
-        // Task137：原生中性灰底（白字在深浅色下均可读；其余账户类型仍为品牌色底）
-        badgeLabel.backgroundColor = [UIColor systemGrayColor];
-    } else {
-        // 微软账户
-        badgeLabel.text = @"Microsoft";
-        badgeLabel.backgroundColor = [UIColor colorWithRed:0.20 green:0.55 blue:0.95 alpha:1.0];
+        return localize(@"login.option.local", @"本地");
     }
+    return @"Microsoft";
 }
 
 /// 当前选中的账户 accountId（用于卡片显示选中状态）
@@ -174,213 +411,42 @@
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
 {
-    // FCL 风格卡片 cell：圆角 + 毛玻璃 + 左侧头像 + 中间用户名/副标题 + 右侧类型徽章/选中勾
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"accountCardCell" forIndexPath:indexPath];
-
-    // 重置 cell：移除上一次复用残留的 contentView 子视图
-    for (UIView *sub in cell.contentView.subviews) {
-        [sub removeFromSuperview];
-    }
-    cell.accessoryType = UITableViewCellAccessoryNone;
-    cell.accessoryView = nil;
-    cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    cell.backgroundColor = [UIColor clearColor];
-    cell.contentView.backgroundColor = [UIColor clearColor];
-
+    // Task190：账号卡 = 已安装版本页同构 cell（AME190AccountCardCell，见
+    // 文件头类注释）。旧实现每次出列拆除全部子视图重建（Task137/180 多轮
+    // 内联卡叠加，卡面 = 白 0.10 + 16pt 圆角 + 旧管线，与版本页观感不一致
+    // ——用户实测"白色外框里有了一条边"），现随新 cell 类正规复用；
+    // 读侧去重/坏文件过滤（Task180 双保险）在 reloadAccountList 原样保留。
+    AME190AccountCardCell *cell = [tableView dequeueReusableCellWithIdentifier:@"accountCardCell" forIndexPath:indexPath];
+    if (indexPath.row >= self.accountList.count) return cell;
     NSDictionary *accountData = self.accountList[indexPath.row];
-    NSString *displayName = accountData[@"username"];
-    NSString *subtitle = @"";
 
-    // 副标题：Demo 账户显示"演示账户"，第三方显示服务器名，微软显示 Xbox gamertag，本地显示"离线模式"
+    // 标题 = 账号名（Demo 账户去掉前缀展示）
+    NSString *displayName = accountData[@"username"] ?: @"";
     if ([displayName hasPrefix:@"Demo."]) {
         displayName = [displayName substringFromIndex:5];
-        subtitle = localize(@"login.option.demo", @"演示账户");
-    } else if (accountData[@"clientToken"] != nil) {
-        // 第三方账户：显示其 authserver 地址
-        subtitle = accountData[@"authserver"] ?: localize(@"login.option.3rdparty", @"第三方账户");
-    } else if (accountData[@"xboxGamertag"] == nil) {
-        subtitle = localize(@"login.option.local", @"离线模式");
-    } else {
-        subtitle = accountData[@"xboxGamertag"] ?: @"Microsoft";
     }
 
-    // Task180：重写 UI 兼顾新拟态开关（用户口径“账号选项阴影处被遮罩而
-    // 显示残缺的新拟态，请重写UI并兼顾新拟态开关”）——原 applyEffectToView
-    // 无壁纸档是平贴表面（masksToBounds=YES）且不读新拟态开关，自绘
-    // CALayer 阴影也被宿主裁剪杀掉（残缺根因）。换接凸起管线：开关开 =
-    // Task177 三层引擎完整双阴影（开关/背景透明度滑条全链生效），关 =
-    // 旧管线毛玻璃/半透明/平贴；裁剪逐层放行（投影越出 cell 边界的呼吸
-    // 空间，BackgroundManager applyEffectToCollectionViewCell 同款配方）。
-    // 自绘阴影退场（新拟态规格由引擎接管，边框保留）。
-    cell.clipsToBounds = NO;
-    cell.layer.masksToBounds = NO;
-    cell.contentView.clipsToBounds = NO;
-    cell.contentView.layer.masksToBounds = NO;
-
-    // 卡片容器（圆角 + 半透明背景 + 毛玻璃）
-    UIView *cardView = [[UIView alloc] init];
-    cardView.translatesAutoresizingMaskIntoConstraints = NO;
-    cardView.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10];
-    cardView.layer.cornerRadius = 16;  // Task137：回归原生卡片圆角
-    cardView.layer.cornerCurve = kCACornerCurveContinuous;
-    cardView.layer.borderWidth = 0.5;
-    cardView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.12].CGColor;
-    [cell.contentView addSubview:cardView];
-    // Task178 圆角钉住：引擎默认按宿主短边等比改写圆角（本卡短边 ~80pt
-    // 时会被压到下限 8pt），钉 16pt 保住 Task137 定稿圆角
-    [cardView ame_setNeumorphPinnedCornerRadius:16];
-    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:cardView];
-
-    // 左侧头像
-    UIImageView *avatarView = [[UIImageView alloc] init];
-    avatarView.translatesAutoresizingMaskIntoConstraints = NO;
-    avatarView.contentMode = UIViewContentModeScaleAspectFill;
-    avatarView.clipsToBounds = YES;
-    avatarView.layer.cornerRadius = 24;
-    avatarView.layer.cornerCurve = kCACornerCurveContinuous;
-    // Task137：原生占位底色
-    avatarView.backgroundColor = [UIColor tertiarySystemFillColor];
-    avatarView.image = [UIImage imageNamed:@"DefaultAccount"];
-    [cardView addSubview:avatarView];
-    NSString *picURLStr = [accountData[@"profilePicURL"] stringByReplacingOccurrencesOfString:@"\\/" withString:@"/"];
-    if (picURLStr.length > 0) {
-        [avatarView setImageWithURL:[NSURL URLWithString:picURLStr] placeholderImage:[UIImage imageNamed:@"DefaultAccount"]];
-    }
-
-    // 用户名
-    UILabel *usernameLabel = [[UILabel alloc] init];
-    usernameLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    usernameLabel.text = displayName;
-    usernameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    usernameLabel.textColor = [UIColor labelColor];
-    usernameLabel.adjustsFontSizeToFitWidth = YES;
-    usernameLabel.minimumScaleFactor = 0.7;
-    usernameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    [cardView addSubview:usernameLabel];
-
-    // 副标题
-    UILabel *subtitleLabel = [[UILabel alloc] init];
-    subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    subtitleLabel.text = subtitle;
-    subtitleLabel.font = [UIFont systemFontOfSize:12];
-    subtitleLabel.textColor = [UIColor secondaryLabelColor];
-    subtitleLabel.adjustsFontSizeToFitWidth = YES;
-    subtitleLabel.minimumScaleFactor = 0.7;
-    subtitleLabel.lineBreakMode = NSLineBreakByTruncatingTail;
-    [cardView addSubview:subtitleLabel];
-
-    // 右侧账户类型徽章（Task136：高 24 ≈ 两行 12pt 字、圆角随高取半、
-    // 宽度随字体自适应）
-    UILabel *badgeLabel = [[UILabel alloc] init];
-    badgeLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    badgeLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
-    badgeLabel.textColor = [UIColor whiteColor];
-    badgeLabel.textAlignment = NSTextAlignmentCenter;
-    badgeLabel.layer.cornerRadius = 12;
-    badgeLabel.layer.cornerCurve = kCACornerCurveContinuous;
-    badgeLabel.layer.masksToBounds = YES;
-    [cardView addSubview:badgeLabel];
-    [self applyAccountTypeBadgeForAccount:accountData badgeLabel:badgeLabel];
-
-    // 选中状态指示
-    UIImageView *checkmark = [[UIImageView alloc] init];
-    checkmark.translatesAutoresizingMaskIntoConstraints = NO;
-    checkmark.image = [UIImage systemImageNamed:@"checkmark.circle.fill"];
-    checkmark.tintColor = [UIColor colorWithRed:0.20 green:0.65 blue:0.40 alpha:1.0];
-    checkmark.contentMode = UIViewContentModeScaleAspectFit;
-    [cardView addSubview:checkmark];
-
-    // Task 130b：第三方多角色账户的行内「切换角色」按钮（用户反馈：选完
-    // 角色后想换角色只能重输密码——v5.1.0 无 Task129b 的长按菜单，且长按
-    // 本身发现性差）。按钮位于卡片右侧、类型徽章与选中勾之间的垂直中部；
-    // 点击弹出角色 actionSheet（与长按菜单共用 ame129b_switchAccountAtIndexPath，
-    // switchToProfile 走 refresh 重绑，免重输密码）。仅当 availableProfiles
-    // >= 2 时创建（判别口径与长按菜单一致：accountType 显式 + clientToken
-    // 嗅探回退）。
-    UIButton *ame130b_switchBtn = nil;
-    {
-        NSString *ame130b_type = accountData[@"accountType"];
-        BOOL ame130b_is3P;
-        if (ame130b_type.length > 0) {
-            ame130b_is3P = [ame130b_type isEqualToString:@"thirdparty"];
-        } else {
-            ame130b_is3P = (accountData[@"clientToken"] != nil);
-        }
-        NSArray *ame130b_profiles = accountData[@"availableProfiles"];
-        if (ame130b_is3P && [ame130b_profiles isKindOfClass:NSArray.class] &&
-            ame130b_profiles.count >= 2) {
-            ame130b_switchBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-            ame130b_switchBtn.translatesAutoresizingMaskIntoConstraints = NO;
-            [ame130b_switchBtn setImage:[UIImage systemImageNamed:@"person.2"]
-                              forState:UIControlStateNormal];
-            ame130b_switchBtn.tintColor = [UIColor colorWithRed:0.30 green:0.55 blue:1.0 alpha:1.0];
-            ame130b_switchBtn.accessibilityLabel = localize(@"account.switch_role.button", @"切换角色");
-            // row 绑定：cell 复用后按钮随卡片重建（cellForRow 每次移除旧子
-            // 视图），关联对象携带当前 row，避免闭包捕获过期 indexPath。
-            objc_setAssociatedObject(ame130b_switchBtn, "ame130b_row",
-                                     @(indexPath.row), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            [ame130b_switchBtn addTarget:self
-                                   action:@selector(ame130b_switchRoleTapped:)
-                         forControlEvents:UIControlEventTouchUpInside];
-            [cardView addSubview:ame130b_switchBtn];
-        }
-    }
-
+    // 选中态：accountId 精确比对（同名账户也能正确区分）
     NSString *selectedAccountId = [self currentSelectedAccountId];
     BOOL isCurrentSelected = (selectedAccountId.length > 0 &&
                               [selectedAccountId isEqualToString:accountData[@"accountId"]]);
-    checkmark.hidden = !isCurrentSelected;
 
-    // 卡片内边距与子视图布局约束
-    [NSLayoutConstraint activateConstraints:@[
-        // Task180：上下 6→10pt——新拟态双阴影外扩 ~8pt 需呼吸空间，
-    // 原 6pt 相邻卡阴影互叠/被邻卡压边
-    [cardView.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor constant:10],
-        [cardView.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor constant:16],
-        [cardView.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor constant:-16],
-        [cardView.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor constant:-10],
-
-        [avatarView.leadingAnchor constraintEqualToAnchor:cardView.leadingAnchor constant:14],
-        [avatarView.centerYAnchor constraintEqualToAnchor:cardView.centerYAnchor],
-        [avatarView.widthAnchor constraintEqualToConstant:48],
-        [avatarView.heightAnchor constraintEqualToConstant:48],
-
-        [usernameLabel.leadingAnchor constraintEqualToAnchor:avatarView.trailingAnchor constant:14],
-        [usernameLabel.topAnchor constraintEqualToAnchor:cardView.topAnchor constant:18],
-        [usernameLabel.trailingAnchor constraintEqualToAnchor:badgeLabel.leadingAnchor constant:-8],
-
-        [subtitleLabel.leadingAnchor constraintEqualToAnchor:usernameLabel.leadingAnchor],
-        [subtitleLabel.topAnchor constraintEqualToAnchor:usernameLabel.bottomAnchor constant:3],
-        [subtitleLabel.trailingAnchor constraintEqualToAnchor:usernameLabel.trailingAnchor],
-        [subtitleLabel.bottomAnchor constraintEqualToAnchor:cardView.bottomAnchor constant:-18],
-
-        [badgeLabel.trailingAnchor constraintEqualToAnchor:cardView.trailingAnchor constant:-14],
-        [badgeLabel.centerYAnchor constraintEqualToAnchor:usernameLabel.centerYAnchor],
-        [badgeLabel.heightAnchor constraintEqualToConstant:24],
-        [badgeLabel.widthAnchor constraintGreaterThanOrEqualToConstant:52],
-
-        [checkmark.trailingAnchor constraintEqualToAnchor:cardView.trailingAnchor constant:-14],
-        [checkmark.bottomAnchor constraintEqualToAnchor:cardView.bottomAnchor constant:-14],
-        [checkmark.widthAnchor constraintEqualToConstant:20],
-        [checkmark.heightAnchor constraintEqualToConstant:20],
-    ]];
-
-    // Task 130b：切换角色按钮约束（底部行、选中勾左侧——与顶部徽章/用户名
-    // 行零重叠；点按热区 32x32 比图标大，小屏友好）。
-    if (ame130b_switchBtn != nil) {
-        [NSLayoutConstraint activateConstraints:@[
-            [ame130b_switchBtn.trailingAnchor constraintEqualToAnchor:checkmark.leadingAnchor constant:-10],
-            [ame130b_switchBtn.centerYAnchor constraintEqualToAnchor:checkmark.centerYAnchor],
-            [ame130b_switchBtn.widthAnchor constraintEqualToConstant:32],
-            [ame130b_switchBtn.heightAnchor constraintEqualToConstant:32],
-        ]];
-    }
-
+    [cell ame190_configureWithUsername:displayName
+                              typeText:[self ame190_accountTypeTextForAccount:accountData]
+                             avatarURL:accountData[@"profilePicURL"]
+                              selected:isCurrentSelected];
     return cell;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:NO];
+    [self ame190_selectAccountAtIndexPath:indexPath];
+}
+
+/// Task190：账户选择流程收口（原 didSelectRowAtIndexPath 主体原样迁入）——
+/// 点击卡片与长按菜单"选用账号"共用同一条选择链，杜绝双入口行为漂移。
+- (void)ame190_selectAccountAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.row >= self.accountList.count) return;
     UITableViewCell *cell = [self.tableView cellForRowAtIndexPath:indexPath];
 
     self.modalInPresentation = YES;
@@ -478,98 +544,72 @@ static NSMutableSet *ame128_validatedSet(void) {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
-// Task 129b（FCL 多角色管理）：多角色第三方账户长按 -> 角色切换菜单（公开
-// UIContextMenuConfiguration API，长按系统呈现；与设置页悬浮 pick 语义一致）。
-// 每个角色一个 action，当前绑定角色打勾；点击后走 switchToProfile（refresh
-// 绑定 + 旧账户文件清理 + selected_account 迁移），完成后刷新列表。
+// Task190：长按菜单全账户化（用户定稿：长按呼出选项 —— (person.circle)
+// 选用账号、(红字 trash) 删除账号）。原 Task129b 仅第三方多角色账户有
+// 长按菜单、Task130b 又为其补了行内 person.2 按钮（长按发现性补偿）——
+// 随卡片同构重写统一收敛到这一个长按菜单：所有账户均有两项主操作；
+// 第三方多角色账户在两项之间保留 Task129b 的角色切换项
+//（ame129b_switchAccountAtIndexPath → switchToProfile refresh 重绑，免密）。
 - (UIContextMenuConfiguration *)tableView:(UITableView *)tableView
     contextMenuConfigurationForRowAtIndexPath:(NSIndexPath *)indexPath
     point:(CGPoint)point API_AVAILABLE(ios(13.0)) {
     if (indexPath.row >= self.accountList.count) return nil;
     NSDictionary *accountData = self.accountList[indexPath.row];
-
-    // 仅第三方账户且有已保存角色表（Task129b 登录时写入）且多于 1 个
-    NSString *ame128_type = accountData[@"accountType"];
-    BOOL is3P = [ame128_type isEqualToString:@"thirdparty"] ?: (accountData[@"clientToken"] != nil);
-    if (!is3P) return nil;
-    NSArray *profiles = accountData[@"availableProfiles"];
-    if (![profiles isKindOfClass:[NSArray class]] || profiles.count < 2) return nil;
-
-    NSString *currentProfileId = accountData[@"profileId"];
     NSString *displayName = accountData[@"username"] ?: @"";
     NSMutableArray<UIAction *> *actions = [NSMutableArray array];
-    for (NSDictionary *p in profiles) {
-        if (![p isKindOfClass:[NSDictionary class]]) continue;
-        NSString *pid = [p[@"id"] isKindOfClass:[NSString class]] ? p[@"id"] : nil;
-        NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"?";
-        if (pid.length == 0) continue;
-        // UUID 归一化比较（服务器可能返回无连字符形式）
-        NSString *pidNorm = [pid stringByReplacingOccurrencesOfString:@"-" withString:@""];
-        NSString *curNorm = [currentProfileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
-        __block UIAction *action = [UIAction actionWithTitle:pname image:nil identifier:nil
-            handler:^(UIAction *a) {
-                [self ame129b_switchAccountAtIndexPath:indexPath toProfile:p];
-            }];
-        action.state = [pidNorm isEqualToString:curNorm] ? UIMenuElementStateOn : UIMenuElementStateOff;
-        [actions addObject:action];
-    }
-    if (actions.count < 2) return nil;
 
-    NSString *menuTitle = [NSString stringWithFormat:localize(@"account.switch_role.title", @"切换角色 — %@"), displayName];
-    UIMenu *menu = [UIMenu menuWithTitle:menuTitle children:actions];
+    // ① 选用账号（person.circle）——与点击卡片同一条选择链
+    [actions addObject:[UIAction actionWithTitle:localize(@"account.menu.use", @"选用账号")
+                                           image:[UIImage systemImageNamed:@"person.circle"]
+                                      identifier:nil
+                                          handler:^(UIAction *action) {
+        [self ame190_selectAccountAtIndexPath:indexPath];
+    }]];
+
+    // ② 第三方多角色账户：Task129b 角色切换项原样保留（当前角色打勾）
+    NSString *ame128_type = accountData[@"accountType"];
+    BOOL is3P = [ame128_type isEqualToString:@"thirdparty"] ?: (accountData[@"clientToken"] != nil);
+    NSArray *profiles = accountData[@"availableProfiles"];
+    if (is3P && [profiles isKindOfClass:[NSArray class]] && profiles.count >= 2) {
+        NSString *currentProfileId = accountData[@"profileId"];
+        for (NSDictionary *p in profiles) {
+            if (![p isKindOfClass:[NSDictionary class]]) continue;
+            NSString *pid = [p[@"id"] isKindOfClass:[NSString class]] ? p[@"id"] : nil;
+            NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"?";
+            if (pid.length == 0) continue;
+            // UUID 归一化比较（服务器可能返回无连字符形式）
+            NSString *pidNorm = [pid stringByReplacingOccurrencesOfString:@"-" withString:@""];
+            NSString *curNorm = [currentProfileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
+            UIAction *action = [UIAction actionWithTitle:pname image:nil identifier:nil
+                handler:^(UIAction *a) {
+                    [self ame129b_switchAccountAtIndexPath:indexPath toProfile:p];
+                }];
+            action.state = [pidNorm isEqualToString:curNorm] ? UIMenuElementStateOn : UIMenuElementStateOff;
+            [actions addObject:action];
+        }
+    }
+
+    // ③ 删除账号（trash，红色破坏性）——与左滑删除同一条删除链
+    UIAction *ame190_delete = [UIAction actionWithTitle:localize(@"account.menu.delete", @"删除账号")
+                                                  image:[UIImage systemImageNamed:@"trash"]
+                                             identifier:nil
+                                                 handler:^(UIAction *action) {
+        [self ame190_deleteAccountAtIndexPath:indexPath];
+    }];
+    ame190_delete.attributes = UIActionAttributesDestructive;
+    [actions addObject:ame190_delete];
+
+    UIMenu *menu = [UIMenu menuWithTitle:displayName children:actions];
     return [UIContextMenuConfiguration configurationWithIdentifier:nil previewProvider:nil
         actionProvider:^UIMenu * _Nullable(NSArray<UIMenuElement *> * _Nonnull suggestedActions) {
             return menu;
         }];
 }
 
-/// Task 130b：行内「切换角色」按钮回调（卡片右侧 person.2 图标）。
-/// 弹出悬浮 actionSheet 角色列表（与设置页悬浮 pick 同形态；iPad 经
-/// popover 锚定在按钮旁）——用户实测反馈"想换角色只能重输密码"的直达
-/// 入口。选中走 ame129b_switchAccountAtIndexPath（switchToProfile：
-/// refresh 重绑，免密码）；长按 contextMenu（Task129b）保留，双入口共用。
-- (void)ame130b_switchRoleTapped:(UIButton *)sender {
-    NSNumber *rowNum = objc_getAssociatedObject(sender, "ame130b_row");
-    if (![rowNum isKindOfClass:NSNumber.class]) return;
-    NSIndexPath *indexPath = [NSIndexPath indexPathForRow:rowNum.integerValue inSection:0];
-    if (indexPath.row >= self.accountList.count) return;   // 列表已变（删除/刷新后旧按钮）
-    NSDictionary *accountData = self.accountList[indexPath.row];
-    NSArray *profiles = accountData[@"availableProfiles"];
-    if (![profiles isKindOfClass:NSArray.class]) return;
-
-    NSString *currentProfileId = accountData[@"profileId"];
-    NSString *displayName = accountData[@"username"] ?: @"";
-    NSString *message = [NSString stringWithFormat:localize(@"account.switch_role.title", @"切换角色 — %@"), displayName];
-
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:message
-                                                                   message:nil
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-    for (NSDictionary *p in profiles) {
-        if (![p isKindOfClass:NSDictionary.class]) continue;
-        NSString *pid = [p[@"id"] isKindOfClass:[NSString class]] ? p[@"id"] : nil;
-        NSString *pname = [p[@"name"] isKindOfClass:[NSString class]] ? p[@"name"] : @"?";
-        if (pid.length == 0) continue;
-        NSString *title = pname;
-        // ✓ 当前角色（UUID 归一化比较，与长按菜单同口径）
-        NSString *pidNorm = [pid stringByReplacingOccurrencesOfString:@"-" withString:@""];
-        NSString *curNorm = [currentProfileId stringByReplacingOccurrencesOfString:@"-" withString:@""];
-        if ([pidNorm isEqualToString:curNorm]) {
-            title = [NSString stringWithFormat:@"✓ %@", title];
-        }
-        [alert addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault
-            handler:^(UIAlertAction *a) {
-                [self ame129b_switchAccountAtIndexPath:indexPath toProfile:p];
-            }]];
-    }
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", nil)
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
-    // iPad：actionSheet 以 popover 锚定在按钮旁（悬浮面板）；iPhone 底部弹出。
-    alert.popoverPresentationController.sourceView = sender;
-    alert.popoverPresentationController.sourceRect = sender.bounds;
-    alert.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
-    [self presentViewController:alert animated:YES completion:nil];
-}
+// Task190：Task130b 行内「切换角色」按钮（person.2 + actionSheet）随账号
+// 卡片同构重写退役——卡片右侧仅保留选中徽章（用户定稿卡片无多余控件），
+// 角色切换入口收敛进全账户长按菜单的 Task129b 角色项（ame129b_
+// switchAccountAtIndexPath 免密链原样保留，见上方 contextMenu 实现）。
 
 /// Task 129b：执行角色切换（长按菜单的 action 回调）
 - (void)ame129b_switchAccountAtIndexPath:(NSIndexPath *)indexPath toProfile:(NSDictionary *)profile {
@@ -602,31 +642,40 @@ static NSMutableSet *ame128_validatedSet(void) {
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         // TODO: invalidate token
-
-        // 用 accountId 作为文件名（唯一标识），同名账户删除互不影响
-        // 若 accountId 缺失（旧格式账户未迁移），回退到 username
-        NSString *accountId = self.accountList[indexPath.row][@"accountId"];
-        if (accountId.length == 0) {
-            accountId = self.accountList[indexPath.row][@"username"];
-        }
-        NSFileManager *fm = [NSFileManager defaultManager];
-        NSString *path = [NSString stringWithFormat:@"%s/accounts/%@.json", getenv("POJAV_HOME"), accountId];
-        if (self.whenDelete != nil) {
-            self.whenDelete(accountId);
-        }
-        NSString *xuid = self.accountList[indexPath.row][@"xuid"];
-        if (xuid) {
-            [MicrosoftAuthenticator clearTokenDataOfProfile:xuid];
-        }
-        [fm removeItemAtPath:path error:nil];
-        // 若删除的正是当前选中账户，清空 selected_account，避免下次启动尝试加载已删除的账户
-        if ([getPrefObject(@"internal.selected_account") isEqualToString:accountId]) {
-            setPrefObject(@"internal.selected_account", @"");
-            [BaseAuthenticator setCurrent:nil];
-        }
-        [self.accountList removeObjectAtIndex:indexPath.row];
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
+        [self ame190_deleteAccountAtIndexPath:indexPath];
     }
+}
+
+/// Task190：删除流程收口（原 commitEditingStyle 删除分支原样迁入）——
+/// 左滑删除与长按菜单"删除账号"共用同一条删除链：whenDelete 回调、
+/// MSA token 清理、账户文件删除、选中态清空、行删除动画。
+- (void)ame190_deleteAccountAtIndexPath:(NSIndexPath *)indexPath {
+    if (indexPath.row >= self.accountList.count) return;
+    NSDictionary *accountData = self.accountList[indexPath.row];
+
+    // 用 accountId 作为文件名（唯一标识），同名账户删除互不影响
+    // 若 accountId 缺失（旧格式账户未迁移），回退到 username
+    NSString *accountId = accountData[@"accountId"];
+    if (accountId.length == 0) {
+        accountId = accountData[@"username"];
+    }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *path = [NSString stringWithFormat:@"%s/accounts/%@.json", getenv("POJAV_HOME"), accountId];
+    if (self.whenDelete != nil) {
+        self.whenDelete(accountId);
+    }
+    NSString *xuid = accountData[@"xuid"];
+    if (xuid) {
+        [MicrosoftAuthenticator clearTokenDataOfProfile:xuid];
+    }
+    [fm removeItemAtPath:path error:nil];
+    // 若删除的正是当前选中账户，清空 selected_account，避免下次启动尝试加载已删除的账户
+    if ([getPrefObject(@"internal.selected_account") isEqualToString:accountId]) {
+        setPrefObject(@"internal.selected_account", @"");
+        [BaseAuthenticator setCurrent:nil];
+    }
+    [self.accountList removeObjectAtIndex:indexPath.row];
+    [self.tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
 }
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath

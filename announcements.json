@@ -24,6 +24,17 @@
       "image_url": ""
     },
     {
+      "id": "task190-account-card-installer-spacing-2026-09-28",
+      "title": "账号卡片与已安装版本页同构 + 长按菜单（选用/删除账号）+ 安装方式页间距对齐版本号页",
+      "date": "2026-09-28",
+      "summary": "账号选项卡片按用户定稿与已安装版本页面同构：圆形头像、标题正文、灰字显示账号类型、去掉右侧箭头；长按呼出菜单（选用账号 / 删除账号）；安装方式页卡片间距与版本号页一致。",
+      "content": "## 账号界面与安装方式页定稿\n\n- **账号卡片同构**：账号选项样式与\"已安装的版本\"页面完全一致——12pt 连续圆角卡片、白 0.08 基底 + 细描边、选中态 accent 边框 + 右上角选中徽章\n- **圆形头像**：卡片左部图标改为圆形头像（与版本页图标同位同尺寸）\n- **标题为正文**：标题行显示账号名；**灰字为账号类型**（Microsoft / 第三方 / 本地 / 演示），原右侧彩色类型胶囊退役\n- **去箭头**：卡片右部箭头删除，右侧仅保留当前账号选中徽章\n- **长按菜单**：所有账号长按呼出——(person.circle) 选用账号、(红字 trash) 删除账号；第三方多角色账户保留免密切换角色项\n- **安装方式页间距**：每个加载器卡片的间距与版本号选择页完全一致（卡片净距 12pt）\n\nEN: Account cards now match the installed-versions page (circular avatar, body title, gray account-type line, no arrow) with a long-press menu (Use account / Delete account); installer page card spacing now matches the version-number page.\n\n---\n\n装机锚点：账号列表卡片与版本管理页观感一致（新拟态开关两种状态均一致）；长按任意账号出现系统上下文菜单；安装方式页相邻卡片净距与版本号页相同。",
+      "priority": "normal",
+      "action_url": "",
+      "action_title": "",
+      "image_url": ""
+    },
+    {
       "id": "task184-revert-180-ui-whitespace-fix-2026-09-27",
       "title": "撤销 Task180 UI 效果调整 + 安装方式页面按版本号选择界面真正重写（白色底层边框根修）",
       "date": "2026-09-27",

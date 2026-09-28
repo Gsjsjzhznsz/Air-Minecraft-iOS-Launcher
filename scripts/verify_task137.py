@@ -180,9 +180,9 @@ check("D1  三表面 API（Task160 新拟态回归：三方法统一走 ame_appl
 check("D2  AmeBadgeLabel 胶囊裁剪幸存 + Task160 新拟态宿主放行阴影（masksToBounds = NO）+ cell 平贴保裁剪",
       nsm.count("self.layer.masksToBounds = YES;") == 2
       and "self.layer.masksToBounds = NO; // Task137 教训：YES 会裁掉外阴影" in nsm)
-check("D3  逐元素原生圆角（版本卡 12 / 账户卡 16 / 筛选 14 / 崩溃卡 16 / 磁贴 16 / 加载器名条 10）",
+check("D3  逐元素原生圆角（Task190 重锚：账户卡与已安装版本页同构 = 12pt；版本卡 12 / 筛选 14 / 崩溃卡 16 / 磁贴 16 / 加载器名条 10）",
       "cardContainer.layer.cornerRadius = 12" in vc
-      and "cardView.layer.cornerRadius = 16" in read("Natives/AccountListViewController.m")
+      and "self.contentContainer.layer.cornerRadius = 12;" in read("Natives/AccountListViewController.m")
       and "filterContainerView.layer.cornerRadius = 14" in read("Natives/AssetVersionViewController.m")
       and read("Natives/PLCrashView.m").count("layer.cornerRadius = 16;  // Task137") == 3
       and "self.contentView.layer.cornerRadius = 16;" in read("Natives/LauncherNewsViewController.m")
@@ -265,9 +265,9 @@ check("F8  顶卡头像交换幸存（半透明边框 2.5 + 正圆 + 欢迎语�
       and "welcomeStack.centerYAnchor constraintEqualToAnchor:self.avatarImageView.centerYAnchor" in read("Natives/LauncherNewsViewController.m"))
 check("F9  设置页图标本体着色幸存（Task136 Item 5 零回退）",
       "iconView.tintColor = iconColor;" in read("Natives/LauncherPreferencesViewController.m"))
-check("F10 加载器分节卡片幸存（每加载器一 section + 10pt 间距）",
+check("F10 加载器分节卡片幸存（Task190 重锚：每加载器一 section + 卡间头 4pt = 净距 12pt 对齐版本号页）",
       "return 1;  // Task136：每个加载器 section 仅一行卡片" in read("Natives/installer/ModLoaderInstallViewController.m")
-      and "if (section < (NSInteger)_loaders.count) return 10;" in read("Natives/installer/ModLoaderInstallViewController.m"))
+      and "if (section < (NSInteger)_loaders.count) return 4;" in read("Natives/installer/ModLoaderInstallViewController.m"))
 
 print()
 print("=" * 72)
@@ -385,10 +385,15 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       # 新增（4 语言各 1 行，四主语言计数 1953 -> 1954，与键集守卫一致）；
       # 提交后 diff 清空走第二分支自愈。
       or all("background.cards.neumorph.interface.title" in l
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task190 重锚：account.menu.use/delete 两键新增（4 语言 ×2 行，四主语言
+      # 计数 2155 -> 2157）；提交后 diff 清空走第二分支自愈。
+      or all("account.menu." in l
              for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
-check("G4  工作区改动仅限预期文件集（提交后自愈）",
+check("G4  工作区改动仅限预期文件集（Task190 重锚：+announcements.json +scripts/task190_；提交后自愈）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "scripts/task158_",
+                                     "scripts/task190_", "announcements.json",
                                      "worklog.md", "JavaApp/", "Makefile"))
           for ln in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],
                                    capture_output=True, text=True).stdout.splitlines()

@@ -1612,9 +1612,8 @@ static NSString *ame185ShowAllRow(NSInteger hiddenCount) {
 #pragma mark - TableView
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    // Task136：每个加载器一行独立 section（insetGrouped 渲染为独立圆角卡，
-    // 卡间 10pt 间距），附加选项仍为独立末节——与上级菜单（版本卡列表）的
-    // 卡片样式与间距对齐
+    // Task136：每个加载器一行独立 section（insetGrouped 渲染为独立圆角卡），
+    // 附加选项仍为独立末节——与上级菜单（版本卡列表）的卡片样式对齐
     return _loaders.count + ([self currentOptions].count > 0 ? 1 : 0);
 }
 
@@ -1636,9 +1635,12 @@ static NSString *ame185ShowAllRow(NSInteger hiddenCount) {
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
     // Task136：带标题的 section（首节/附加选项节）自动高度；
-    // 其余加载器卡间 section 头高 10pt = 卡片间距
+    // Task190：其余加载器卡间 section 头高 4pt——卡片自身上下内缩各 4pt，
+    // 相邻卡面净距 = 4(下内缩) + 4(头) + 4(上内缩) = 12pt，与上级版本号页
+    // （DownloadViewController：minimumLineSpacing 4 + 卡片上下内缩 4+4）
+    // 完全一致；旧 10pt 头使净距 18pt，用户实测偏大要求对齐
     if (section == 0) return UITableViewAutomaticDimension;
-    if (section < (NSInteger)_loaders.count) return 10;
+    if (section < (NSInteger)_loaders.count) return 4;
     return UITableViewAutomaticDimension;
 }
 

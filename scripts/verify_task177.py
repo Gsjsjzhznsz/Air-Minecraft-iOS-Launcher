@@ -15,7 +15,7 @@ CSS 参考（bigbear-ui styles/mixin/_index.scss + _variables.scss）：
 
 Task178 重锚（2026-09-26）：用户定稿转向——"只有那个透明度拉条可以改变
   新拟态的透明度，字体始终是不透明的；开关不管咋样都不会使其他选项变灰"。  卡片本体透明度滑条/引擎原语/落盘键恢复（适配 Task177 三层引擎：承载视图
-  整体 alpha），灰化全退，新闻卡圆角钉住 12pt；四主语言 2155。
+  整体 alpha），灰化全退，新闻卡圆角钉住 12pt；四主语言 2157。
 
 本轮定稿（Task177 历史口径）：
   1) 引擎三层结构 = 投影对（clear，+/-N，shadowOpacity 1.0，shadowRadius=blur/2）
@@ -179,8 +179,8 @@ all_six = [rd(f"Natives/resources/{lg}.lproj/Localizable.strings") for lg in ["e
 check("D1 neumorph.opacity.title 键 ×6 语言全部在位（Task184 重锚：回归键；button.opacity 退役）",
       all('"background.cards.neumorph.opacity.title"' in t for t in all_six)
       and all('"background.button.opacity.title"' not in t for t in all_six))
-check("D2 四主语言唯一键计数 2155（Task178 重锚：1954+1）",
-      all(len(k) == 2155 for k in KEYSETS),
+check("D2 四主语言唯一键计数 2157（Task178 重锚：1954+1）",
+      all(len(k) == 2157 for k in KEYSETS),
       detail=str([len(k) for k in KEYSETS]))
 check("D3 四主语言键集一致",
       KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
@@ -193,23 +193,23 @@ check("D4 interface.title 键保留（开关行标题）",
 print("== E. 文档（公告/version.h/fallback） ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 # Task179 重锚：task179@2 插入，全体顺延 +1，len 21。
-check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[3]；server/169 钉 0/1 不动）",
-      len(ann) == 23  # Task184：+1
+check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[4]；server/169 钉 0/1 不动）",
+      len(ann) == 24  # Task184：+1
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[2]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
-      and ann[3]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
-      and ann[4]["id"] == "task179-eight-fixes-2026-09-26"  # Task184 顺延
-      and ann[5]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
+      and ann[3]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
+      and ann[4]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
+      and ann[5]["id"] == "task179-eight-fixes-2026-09-26"  # Task184 顺延
+      and ann[6]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
 check("E2 公告后续顺序整体 +1（Task184 重锚：177→6 / 175→7 / 174→8 / 双173→9,10）",
-      ann[6]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann[7]["id"] == "task175-six-fixes-2026-09-26"
-      and ann[8]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann[9]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann[10]["id"] == "task173-ten-fixes-2026-09-26")
+      ann[7]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann[8]["id"] == "task175-six-fixes-2026-09-26"
+      and ann[9]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann[10]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann[11]["id"] == "task173-ten-fixes-2026-09-26")
 check("E3 公告内容锚（Task184 重锚：task177 内容锚随条目顺延）",
-      "bigbear-ui" in ann[6]["content"] and "neu-white" in ann[6]["content"]
-      and "不要加任何的透明度" in ann[6]["summary"])
+      "bigbear-ui" in ann[7]["content"] and "neu-white" in ann[7]["content"]
+      and "不要加任何的透明度" in ann[7]["summary"])
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E4 version.h Task 177 附录（含设备日志锚）",
       "Amethyst Task 177" in vh and "[Task177] neumorph UI spec rewrite" in vh)
