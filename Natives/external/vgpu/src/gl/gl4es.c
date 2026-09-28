@@ -1169,13 +1169,20 @@ void gl4es_scratch_vertex(int alloc) {
     LOAD_GLES(glBindBuffer);
     LOAD_GLES(glGenBuffers);
     if(!glstate->scratch_vertex) {
-        glGenBuffers(1, &glstate->scratch_vertex);
+        // Task192：虚拟 id 根修——裸 glGenBuffers 解析到本库自身的
+        // gl4es_glGenBuffers 包装器（软件计数器分配虚拟 id，real_buffer=0，
+        // 从不调用真驱动）→ 把虚拟名绑给真驱动在 ES3/ANGLE 上是
+        // GL_INVALID_OPERATION（名字未经驱动 glGenBuffers 生成）→ 后续
+        // glBufferSubData/glDrawElements 全部 0x0502，每次绘制都失败。
+        // 对照组 listdraw.c:742 的成功路径用的正是 gles_glGenBuffers。
+        // AMIGAOS4 分支同理。vgpu/Task191 的 direct-elements-ebo 崩源。
+        gles_glGenBuffers(1, &glstate->scratch_vertex);
     }
     if(glstate->scratch_vertex_size < alloc) {
 #ifdef AMIGAOS4
         LOAD_GLES(glDeleteBuffers);
         GLuint old_buffer = glstate->scratch_vertex;
-        glGenBuffers(1, &glstate->scratch_vertex);
+        gles_glGenBuffers(1, &glstate->scratch_vertex);
         gles_glDeleteBuffers(1, &old_buffer);
 #endif
         gles_glBindBuffer(GL_ARRAY_BUFFER, glstate->scratch_vertex);
@@ -1195,7 +1202,9 @@ void gl4es_scratch_indices(int alloc) {
     LOAD_GLES(glBindBuffer);
     LOAD_GLES(glGenBuffers);
     if(!glstate->scratch_indices) {
-        glGenBuffers(1, &glstate->scratch_indices);
+        // Task192：同上——真驱动 id（详见 gl4es_scratch_vertex 注释）。
+        gles_glGenBuffers(1, &glstate->scratch_indices);
+        SHUT_LOGD("VGPU Task192: scratch EBO allocated (real driver id=%u)\n", glstate->scratch_indices);
     }
     gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, glstate->scratch_indices);
     if(glstate->scratch_indices_size < alloc) {

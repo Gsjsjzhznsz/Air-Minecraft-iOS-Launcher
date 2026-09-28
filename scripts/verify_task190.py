@@ -167,8 +167,8 @@ check("F", "reloadAccountList 唯一实现（Task162 CI 教训）",
 check("F", "账号文件全链仍走 accountId 键（128/129b/删除链口径一致）",
       ac.count('accountData[@"accountId"]') >= 3)
 
-# ============ G. l10n（×4 主语言 + 计数 2157） ============
-print("== G. l10n account.menu.use/delete ×4 + 计数 2157->2157 ==")
+# ============ G. l10n（×4 主语言 + 计数 2228） ============
+print("== G. l10n account.menu.use/delete ×4 + 计数 2228->2157 ==")
 RES = "Natives/resources"
 expect = {
     "en":      ("Use account", "Delete account"),
@@ -181,7 +181,7 @@ for lang, (u, d) in expect.items():
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     check("G", f"{lang} account.menu.use/delete 键值", f'"account.menu.use" = "{u}";' in s
           and f'"account.menu.delete" = "{d}";' in s)
-    check("G", f"{lang} 唯一键总数 == 2157", len(keys) == 2157, f"got {len(keys)}")
+    check("G", f"{lang} 唯一键总数 == 2228", len(keys) == 2228, f"got {len(keys)}")
     check("G", f"{lang} account.switch_role.* 历史键保留",
           'account.switch_role.button' in keys and 'account.switch_role.title' in keys)
 

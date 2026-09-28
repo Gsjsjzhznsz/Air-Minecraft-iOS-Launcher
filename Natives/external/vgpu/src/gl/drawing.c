@@ -72,12 +72,28 @@ void ame189_census(GLenum mode, GLsizei count) {
 
 void ame189_afterDraw(const char *site, GLenum mode, GLsizei count, GLenum idxType) {
     static unsigned int probed = 0, hits = 0;
-    if (probed >= 120) return;   // 取证窗口：仅启动期前 120 次真实绘制
+    // Task192：lastFailSite —— 窗口摘要用（记录首个失败位；函数内 static
+    // 保持与语法门提取器（task189_vgpu_syntax）自包含兼容）。
+    static char lastFailSite[64] = "<none>";
+    if (probed >= 120) {
+        // Task192：窗口收尾摘要——静默≠成功不可判读。120 次探测结束时打一条
+        // 总账（probed/errors + 首个失败 site），装机日志凭一行即可裁决
+        // Task192 的 scratch EBO 修复是否归零（期望 errors=0）。
+        if (probed == 120) {
+            probed++;
+            SHUT_LOGD("VGPU Task192 afterDraw window closed: probed=120 errors=%u firstFailSite=%s%s\n",
+                      hits, (hits > 0) ? lastFailSite : "<none>",
+                      (hits == 0) ? " (all green -- Task192 scratch-EBO fix verified)" : "");
+        }
+        return;
+    }
     probed++;
     GLenum err = gles_glGetError();
     if (err == 0) return;
     hits++;
     if (hits <= 8) {
+        strncpy(lastFailSite, site, sizeof(lastFailSite) - 1);
+        lastFailSite[sizeof(lastFailSite) - 1] = '\0';
         SHUT_LOGD("VGPU Task189 post-draw error #%u: site=%s mode=0x%04X count=%d idxType=0x%04X -> GL error 0x%04X (re-injected for the app)\n",
                   hits, site, (unsigned)mode, (int)count, (unsigned)idxType, (unsigned)err);
     }

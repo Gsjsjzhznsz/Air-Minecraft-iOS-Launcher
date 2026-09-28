@@ -81,7 +81,31 @@ $(OUTPUTDIR)/launcher.jar: $(CLASSES) check_empty_classes
 	@if [ -d "$(basename $@)/com/mojang/text2speech" ]; then \
 		mv $(basename $@)/com/mojang/text2speech $(OUTPUTDIR)/.task191_t2s_stash; \
 	fi
+	# Task192（Forge 26.1.2 崩溃第四轮，同族第三包）：剔除
+	# com/mojang/blaze3d/platform（iOS MacosUtil no-op 桩）。
+	# 病历（956ea9b 装机 latestlog.2，Forge-26.1.2-64.1.3 会话）：
+	#   java.lang.module.ResolutionException: Modules minecraft and
+	#   launcher export package com.mojang.blaze3d.platform to module
+	#   net.minecraftforge.forge
+	# 机制与 Task188（com.apple.ios.audio）/Task191（text2speech）同族：
+	# bootstrap 2.1.7 把 launcher.jar 模块化（自动模块导出全部包），
+	# 而 minecraft 客户端 jar 自带 com.mojang.blaze3d.platform → 双导出。
+	# 与前两例不同：本包的"正主"是 minecraft 自己（无法挪走），桩只能
+	# 撤。MacosUtil 桩原本靠 Pojav 类加载器 first-wins 遮蔽真类（真类
+	# 经 java-objc-bridge 驱动 AppKit，iOS 上崩溃）——模块层建立后该
+	# 遮蔽对 Forge 会话本就失效（MC 类从 minecraft 模块加载，系统
+	# classpath 的桩不可见）。真类的 AppKit 调用由原生 AppKitStub 层
+	# （Task99/100：NSApplication/NSMenu selector 拦截 + 通用 nil no-op，
+	# 7a30912 会话已实证 MacosUtil.java:27 NPE 被治愈）接管。
+	# 桩源码保留在 src/（编译不受影响，仅不进 launcher.jar）。
+	@rm -rf $(OUTPUTDIR)/.task192_blaze3d_stash
+	@if [ -d "$(basename $@)/com/mojang/blaze3d" ]; then \
+		mv $(basename $@)/com/mojang/blaze3d $(OUTPUTDIR)/.task192_blaze3d_stash; \
+	fi
 	@$(BOOTJDK)/jar -cf $@ -C $(basename $@) .
+	@if [ -d "$(OUTPUTDIR)/.task192_blaze3d_stash" ]; then \
+		mv $(OUTPUTDIR)/.task192_blaze3d_stash $(basename $@)/com/mojang/blaze3d; \
+	fi
 	@if [ -d "$(OUTPUTDIR)/.task191_t2s_stash" ]; then \
 		mv $(OUTPUTDIR)/.task191_t2s_stash $(basename $@)/com/mojang/text2speech; \
 	fi

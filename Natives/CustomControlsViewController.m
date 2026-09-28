@@ -817,8 +817,31 @@ CGFloat currentY;
         self.pickerMapping.delegate = self;
         self.pickerMapping.dataSource = self;
         [self.pickerMapping reloadAllComponents];
+        // Task192：仓库布局按钮的 keycodes 防护（"仓库里面的控件崩溃"根修）。
+        // 病历（956ea9b 装机 latestlog.1，符号化 dSYM+IPA 反汇编定位）：
+        //   NSInvalidArgumentException '-[__NSArrayM insertObject:atIndex:]:
+        //   object cannot be nil'——崩点 = 下方 didSelectRow 的下标赋值
+        //   properties[@"keycodes"][i] = keyValueMap[选中行]。
+        // 两个入口洞：
+        //   ① 仓库布局 JSON 的 keycodes 值不在 initKeycodeTable 表内 →
+        //      indexOfObject = NSNotFound → selectRow:NSNotFound → 组件无有效
+        //      选中行 → selectedRowInComponent 越界 → keyValueMap[越界] = nil
+        //      → 下标赋 nil → 崩溃（line 823 的程序化 didSelect 在菜单打开
+        //      瞬间就会触发，即"点开仓库控件就崩"）；
+        //   ② keycodes 数组不足 4 项（简单按钮常见 1-2 项）→ 读 [i] 越界 nil
+        //      → indexOfObject:nil 另一种异常。
+        // 修复：选中行钳位（NSNotFound→0）+ keycodes 不足 4 项补零。
+        if (![self.targetButton.properties[@"keycodes"] isKindOfClass:[NSArray class]]) {
+            self.targetButton.properties[@"keycodes"] = [NSMutableArray arrayWithArray:@[@0, @0, @0, @0]];
+        } else if ([self.targetButton.properties[@"keycodes"] count] < 4) {
+            NSMutableArray *ame192_padded = [NSMutableArray arrayWithArray:self.targetButton.properties[@"keycodes"]];
+            while (ame192_padded.count < 4) [ame192_padded addObject:@0];
+            self.targetButton.properties[@"keycodes"] = ame192_padded;
+        }
         for (int i = 0; i < 4; i++) {
-            [self.pickerMapping selectRow:[self.keyValueMap indexOfObject:self.targetButton.properties[@"keycodes"][i]] inComponent:i animated:NO];
+            NSUInteger ame192_idx = [self.keyValueMap indexOfObject:self.targetButton.properties[@"keycodes"][i]];
+            if (ame192_idx == NSNotFound) ame192_idx = 0;   // 未知键码 → 首行（免崩）
+            [self.pickerMapping selectRow:ame192_idx inComponent:i animated:NO];
         }
         [self pickerView:self.pickerMapping didSelectRow:0 inComponent:0];
 
@@ -1058,8 +1081,24 @@ CGFloat currentY;
         self.keyCodeMap[[pickerView selectedRowInComponent:3]]
     ];
 
+    // Task192：下标赋值双守卫（崩点本体，见 viewDidLoad 同名注释）——
+    // 值 nil（选中行越界/keyValueMap 短表）或 keycodes 非可变数组时跳过
+    // 写入并打锚点日志，宁可丢一次编辑也不要崩溃。
     for (int i = 0; i < 4; i++) {
-        self.targetButton.properties[@"keycodes"][i] = self.keyValueMap[[self.pickerMapping selectedRowInComponent:i]];
+        NSInteger ame192_row = [self.pickerMapping selectedRowInComponent:i];
+        id ame192_val = (ame192_row >= 0 && ame192_row < (NSInteger)self.keyValueMap.count)
+            ? self.keyValueMap[ame192_row] : nil;
+        id ame192_arr = self.targetButton.properties[@"keycodes"];
+        if (ame192_val == nil || ![ame192_arr isKindOfClass:[NSMutableArray class]]) {
+            static int s_ame192_skipped = 0;
+            if (s_ame192_skipped < 4) {
+                ++s_ame192_skipped;
+                NSLog(@"[CustomControls] Task192: keycode write skipped (comp=%d row=%ld val=%ld arr=%@) -- repo layout guard",
+                      i, (long)ame192_row, (long)(!!ame192_val), [ame192_arr class]);
+            }
+            continue;
+        }
+        ((NSMutableArray *)ame192_arr)[i] = ame192_val;
     }
 }
 

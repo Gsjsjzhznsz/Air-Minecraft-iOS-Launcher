@@ -592,6 +592,12 @@ payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mith
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo17)
 	cp -R $(SOURCEDIR)/Natives/resources/en.lproj/LaunchScreen.storyboardc $(WORKINGDIR)/AngelAuraAmethyst.app/Base.lproj/ || exit 1
 	cp -R $(SOURCEDIR)/Natives/resources/* $(WORKINGDIR)/AngelAuraAmethyst.app/ || exit 1
+	# Task192：gl4es EGL 解析根修（4 字节二进制补丁）——proc_address 回退
+	# dlsym(RTLD_NEXT) 在 iOS 加载序下永远找不到先于 gl4es 加载的
+	# libEGL/libGLESv2 框架（它们是 gl4es 的依赖，加载在它之前）→ 构造器
+	# 内 egl_* 全 NULL → 调 NULL → SIGSEGV pc=0（956ea9b 装机 latestlog.old）。
+	# 改为 RTLD_DEFAULT（全局作用域可见这些框架）。补丁幂等 + 指纹防漂移。
+	python3 $(SOURCEDIR)/scripts/patch_gl4es_rtld_default.py $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/libgl4es_114.dylib || exit 1
 	cp $(WORKINGDIR)/*.dylib $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/ || exit 1
 	# spirv-cross 软链接（防御性兜底）：若 MobileGlues 构建产出 libspirv-cross-c-shared.0.dylib，
 	# 创建 libspirv-cross.dylib 软链接，兼容按 macOS 默认名加载的 native 代码。

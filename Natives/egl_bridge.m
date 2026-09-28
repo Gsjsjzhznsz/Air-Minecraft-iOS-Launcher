@@ -206,6 +206,14 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         // Task 144：POJAV_RENDERER 同步导出 —— 已于 Task 145 撤销：Sodium 0.9.2
         // 的 PostLaunchChecks.isUsingPojavLauncher 检测到该变量即在首帧抛异常
         // （详见 JavaLauncher.m Task145 主导出处）。gl4es 全局上下文模型无需重绑定门。
+        // Task192：gl4es 预双保险——RTLD_GLOBAL 预载 ANGLE 框架，使 egl*/gl*
+        // 符号进入全局作用域。gl4es 构造器经 proc_address 解析 egl_*（补丁后
+        // RTLD_DEFAULT，见 scripts/patch_gl4es_rtld_default.py），全局可见性
+        // 是该路径的前置条件；即便 gl4es_114 由下方统一 dlopen(RTLD_GLOBAL)
+        // 加载（其依赖框架随之全局化），这里显式预载保证顺序无关的确定性。
+        NSLog(@"[egl_bridge] Task192: preloading ANGLE frameworks RTLD_GLOBAL for gl4es EGL resolution");
+        dlopen("@executable_path/Frameworks/libEGL.framework/libEGL", RTLD_NOW | RTLD_GLOBAL);
+        dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2", RTLD_NOW | RTLD_GLOBAL);
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MOBILEGLUES]) {
         renderer = @ RENDERER_NAME_MOBILEGLUES;

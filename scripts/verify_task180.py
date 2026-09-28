@@ -80,7 +80,7 @@ check('C', '恢复默认按钮不再写 0.75/1.0 双键', 'manager.backgroundOpa
 check('C', '恢复默认写 uiOpacity 0.7（历史形态）', 'manager.uiOpacity = 0.7;' in st)
 check('C', '新拟态开关行 tags 410 保留', 'neumorphSwitch.tag = 410;' in st)
 
-# ============ D. l10n（×6 语言 + 计数 2157 保持；183 回退键集） ============
+# ============ D. l10n（×6 语言 + 计数 2228 保持；183 回退键集） ============
 RES = os.path.join(N, 'resources')
 for lang, expect_1296 in [
     ('en', 'Opacity'),
@@ -101,7 +101,7 @@ for lang in ['en', 'zh-Hans', 'zh-CN', 'zh-Hant']:
     s = io.open(os.path.join(RES, f'{lang}.lproj/Localizable.strings'), encoding='utf-8').read()
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     tot = len(keys) if tot is None else tot
-    check('D', f'{lang} 唯一键总数 == 2157', len(keys) == 2157, f'got {len(keys)}')
+    check('D', f'{lang} 唯一键总数 == 2228', len(keys) == 2228, f'got {len(keys)}')
 
 # ============ E. 按钮接线——183 撤销（回归恒定底色）+ 头像防御保留 ============
 rp = rd('LauncherRightPanelViewController.m')

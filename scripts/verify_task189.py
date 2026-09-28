@@ -145,8 +145,14 @@ check("F11 vgpu 镜像源报错日志锚点", "[ControlRepo] Task189: mirror #" 
 KEYS = 185
 for lang in ("en", "zh-Hans", "zh-CN", "zh-Hant"):
     s = read("Natives/resources/%s.lproj/Localizable.strings" % lang)
+    # Task192 重锚：Task189 注册块之后追加了 Task192 的 AI 批次注册，
+    # 计数范围收窄为 [Task189 标记, 下一个 Task 标记) —— Task189 自己的键恒 185。
     block = s.split("/* Task189 i18n registration", 1)
-    n = len(re.findall(r'^"[^"]+" = "', block[1], re.M)) if len(block) > 1 else 0
+    if len(block) > 1:
+        seg = re.split(r"/\* Task19[0-9]+ i18n registration", block[1])[0]
+        n = len(re.findall(r'^"[^"]+" = "', seg, re.M))
+    else:
+        n = 0
     check("G1 %s 注册 %d 键" % (lang, KEYS), n == KEYS, "got %d" % n)
     check("G2 %s download.tab.controls" % lang, '"download.tab.controls"' in s)
 zh = read("Natives/resources/zh-Hans.lproj/Localizable.strings")

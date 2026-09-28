@@ -34,6 +34,37 @@ extern __weak UIWindow *mainWindow;
         extern void uncaughtExceptionHandler(NSException *exception);
         NSSetUncaughtExceptionHandler(&uncaughtExceptionHandler);
         NSLog(@"[SceneDelegate] Task191: uncaught-exception handler re-armed at willConnect");
+        // Task192：定时复挂（LC 覆盖战争的终局方案）。
+        // 病历（956ea9b latestlog.1）：willConnect 点的 re-arm 日志在场，
+        // 但 insertObject nil 崩溃仍走系统默认裸地址输出——证明 LC 在
+        // willConnect 之后（框架装载/invokeAppMain 尾段）又装了自己的
+        // 处理器。与其追挂载点竞速，改为周期性检测+抢回：每 2 秒查
+        // NSGetUncaughtExceptionHandler() 是否仍是我们的，被偷就装回
+        // （每次抢回都打锚点）。60 秒后降频到 30 秒。最后一次安装者
+        // 生效——只要我们在崩溃前的任一 tick 抢回，符号化栈就到手。
+        static dispatch_source_t s_ame192_timer = NULL;
+        static BOOL s_ame192_started = NO;
+        if (!s_ame192_started) {
+            s_ame192_started = YES;
+            s_ame192_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0,
+                dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
+            dispatch_source_set_timer(s_ame192_timer, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
+                                      2 * NSEC_PER_SEC, NSEC_PER_SEC);
+            __block int64_t ame192_elapsed = 0;
+            dispatch_source_set_event_handler(s_ame192_timer, ^{
+                ame192_elapsed += 2;
+                if (ame192_elapsed > 60) {
+                    dispatch_source_set_timer(s_ame192_timer, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC),
+                                              30 * NSEC_PER_SEC, NSEC_PER_SEC);
+                }
+                if (NSGetUncaughtExceptionHandler() != &uncaughtExceptionHandler) {
+                    NSSetUncaughtExceptionHandler(&uncaughtExceptionHandler);
+                    NSLog(@"[SceneDelegate] Task192: uncaught-exception handler STOLEN (was=%p) -- re-armed at t+%llds",
+                          (void *)NSGetUncaughtExceptionHandler(), (long long)ame192_elapsed);
+                }
+            });
+            dispatch_resume(s_ame192_timer);
+        }
     }
 
     // 强制横屏 (iOS 16+)

@@ -6,6 +6,7 @@
 //
 
 #import "AIProviderConfigViewController.h"
+#import "utils.h"
 #import "AiProvider.h"
 #import "AiProviderStore.h"
 #import "AiAPIClient.h"
@@ -39,7 +40,7 @@ NS_ASSUME_NONNULL_END
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"提供商配置";
+    self.title = localize(@"ame192.ai.pc.title", nil);
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
     self.view.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.04];
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
@@ -92,7 +93,7 @@ NS_ASSUME_NONNULL_END
 
     UILabel *infoLabel = [[UILabel alloc] init];
     infoLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    infoLabel.text = @"支持 OpenAI / DeepSeek / Kimi / GLM / Ollama 等任意 OpenAI 兼容接口。填写 Base URL 与模型名即可使用。";
+    infoLabel.text = localize(@"ame192.ai.pc.intro", nil);
     infoLabel.font = [UIFont systemFontOfSize:13 weight:UIFontWeightRegular];
     infoLabel.textColor = [UIColor secondaryLabelColor];
     infoLabel.numberOfLines = 0;
@@ -101,7 +102,7 @@ NS_ASSUME_NONNULL_END
     // 新增按钮
     UIButton *addButton = [UIButton buttonWithType:UIButtonTypeSystem];
     addButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [addButton setTitle:@"＋ 新增提供商" forState:UIControlStateNormal];
+    [addButton setTitle:localize(@"ame192.ai.pc.add", nil) forState:UIControlStateNormal];
     addButton.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     [addButton setTitleColor:accentColor() forState:UIControlStateNormal];
     addButton.backgroundColor = [accentColor() colorWithAlphaComponent:0.15];
@@ -213,7 +214,7 @@ NS_ASSUME_NONNULL_END
     // 名称
     UILabel *nameLabel = [[UILabel alloc] init];
     nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    nameLabel.text = provider.name.length > 0 ? provider.name : @"未命名提供商";
+    nameLabel.text = provider.name.length > 0 ? provider.name : localize(@"ame192.ai.pc.unnamed", nil);
     nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
     nameLabel.textColor = [UIColor labelColor];
     nameLabel.numberOfLines = 1;
@@ -222,7 +223,7 @@ NS_ASSUME_NONNULL_END
     // 模型
     UILabel *modelLabel = [[UILabel alloc] init];
     modelLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    modelLabel.text = provider.model.length > 0 ? provider.model : @"未设置模型";
+    modelLabel.text = provider.model.length > 0 ? provider.model : localize(@"ame192.ai.pc.no_model", nil);
     modelLabel.font = [UIFont monospacedSystemFontOfSize:12 weight:UIFontWeightRegular];
     modelLabel.textColor = [UIColor secondaryLabelColor];
     modelLabel.numberOfLines = 1;
@@ -232,7 +233,7 @@ NS_ASSUME_NONNULL_END
     // Base URL
     UILabel *urlLabel = [[UILabel alloc] init];
     urlLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    urlLabel.text = provider.baseURL.length > 0 ? provider.baseURL : @"未设置 Base URL";
+    urlLabel.text = provider.baseURL.length > 0 ? provider.baseURL : localize(@"ame192.ai.pc.no_url", nil);
     urlLabel.font = [UIFont systemFontOfSize:12];
     urlLabel.textColor = [UIColor secondaryLabelColor];
     urlLabel.numberOfLines = 1;
@@ -318,7 +319,7 @@ NS_ASSUME_NONNULL_END
 - (nullable NSArray<UITableViewRowAction *> *)tableView:(UITableView *)tableView editActionsForRowAtIndexPath:(NSIndexPath *)indexPath {
     __weak typeof(self) weakSelf = self;
     UITableViewRowAction *deleteAction = [UITableViewRowAction rowActionWithStyle:UITableViewRowActionStyleDestructive
-                                                                           title:@"删除"
+                                                                           title:localize(@"ame192.ai.pc.delete", nil)
                                                                          handler:^(UITableViewRowAction * _Nonnull action, NSIndexPath * _Nonnull ip) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         AiProvider *provider = [AiProviderStore sharedStore].providers[ip.row];
@@ -359,12 +360,12 @@ NS_ASSUME_NONNULL_END
 - (void)viewDidLoad {
     [super viewDidLoad];
     _isEditing = (self.provider != nil);
-    self.title = _isEditing ? @"编辑提供商" : @"新增提供商";
+    self.title = _isEditing ? localize(@"ame192.ai.pc.edit_title", nil) : localize(@"ame192.ai.pc.new_title", nil);
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
     self.view.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.04];
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 
-    UIBarButtonItem *saveItem = [[UIBarButtonItem alloc] initWithTitle:@"保存"
+    UIBarButtonItem *saveItem = [[UIBarButtonItem alloc] initWithTitle:localize(@"ame192.ai.pc.save", nil)
                                                                  style:UIBarButtonItemStyleDone
                                                                 target:self
                                                                 action:@selector(saveAction)];
@@ -389,12 +390,12 @@ NS_ASSUME_NONNULL_END
 }
 
 - (void)buildFields {
-    _nameField = [self makeTextField:@"例如 DeepSeek / OpenAI / Ollama" keyboard:UIKeyboardTypeDefault secure:NO];
+    _nameField = [self makeTextField:localize(@"ame192.ai.pc.name_ph", nil) keyboard:UIKeyboardTypeDefault secure:NO];
     _baseURLField = [self makeTextField:@"https://api.deepseek.com/v1" keyboard:UIKeyboardTypeURL secure:NO];
     _apiKeyField = [self makeTextField:@"API Key" keyboard:UIKeyboardTypeDefault secure:YES];
-    _modelField = [self makeTextField:@"例如 deepseek-chat" keyboard:UIKeyboardTypeDefault secure:NO];
-    _maxTokensField = [self makeTextField:@"留空使用默认 4096" keyboard:UIKeyboardTypeNumberPad secure:NO];
-    _contextWindowField = [self makeTextField:@"留空使用默认 8192" keyboard:UIKeyboardTypeNumberPad secure:NO];
+    _modelField = [self makeTextField:localize(@"ame192.ai.pc.model_ph", nil) keyboard:UIKeyboardTypeDefault secure:NO];
+    _maxTokensField = [self makeTextField:localize(@"ame192.ai.pc.temp_ph", nil) keyboard:UIKeyboardTypeNumberPad secure:NO];
+    _contextWindowField = [self makeTextField:localize(@"ame192.ai.pc.ctx_ph", nil) keyboard:UIKeyboardTypeNumberPad secure:NO];
 
     _temperatureSlider = [[UISlider alloc] init];
     _temperatureSlider.minimumValue = 0;
@@ -421,7 +422,7 @@ NS_ASSUME_NONNULL_END
     _baseURLField.text = self.provider.baseURL;
     // API Key 已存在时不回显明文，仅显示占位提示，留空表示保留原密钥
     if (self.provider.apiKey.length > 0) {
-        _apiKeyField.placeholder = @"已保存（重新输入以修改）";
+        _apiKeyField.placeholder = localize(@"ame192.ai.pc.key_saved", nil);
     }
     _modelField.text = self.provider.model;
     _temperatureSlider.value = self.provider.temperature;
@@ -455,8 +456,8 @@ NS_ASSUME_NONNULL_END
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"连接信息";
-    if (section == 1) return @"参数";
+    if (section == 0) return localize(@"ame192.ai.pc.section_conn", nil);
+    if (section == 1) return localize(@"ame192.ai.pc.section_params", nil);
     return nil;
 }
 
@@ -469,7 +470,7 @@ NS_ASSUME_NONNULL_END
     if (indexPath.section == 0) {
         switch (indexPath.row) {
             case 0:
-                [self configureInputCell:cell label:@"名称" field:_nameField];
+                [self configureInputCell:cell label:localize(@"ame192.ai.pc.name", nil) field:_nameField];
                 break;
             case 1:
                 [self configureInputCell:cell label:@"Base URL" field:_baseURLField];
@@ -478,13 +479,13 @@ NS_ASSUME_NONNULL_END
                 [self configureInputCell:cell label:@"API Key" field:_apiKeyField];
                 break;
             case 3:
-                [self configureInputCell:cell label:@"模型" field:_modelField];
+                [self configureInputCell:cell label:localize(@"ame192.ai.pc.model", nil) field:_modelField];
                 break;
         }
     } else if (indexPath.section == 1) {
         switch (indexPath.row) {
             case 0: {
-                cell.textLabel.text = @"温度";
+                cell.textLabel.text = localize(@"ame192.ai.pc.temperature", nil);
                 if (!_temperatureLabel) {
                     _temperatureLabel = [[UILabel alloc] init];
                     _temperatureLabel.font = [UIFont monospacedSystemFontOfSize:15 weight:UIFontWeightRegular];
@@ -504,14 +505,14 @@ NS_ASSUME_NONNULL_END
                 break;
             }
             case 1:
-                [self configureInputCell:cell label:@"最大 Token 上限" field:_maxTokensField];
+                [self configureInputCell:cell label:localize(@"ame192.ai.pc.max_tokens", nil) field:_maxTokensField];
                 break;
             case 2:
-                [self configureInputCell:cell label:@"上下文窗口" field:_contextWindowField];
+                [self configureInputCell:cell label:localize(@"ame192.ai.pc.context_window", nil) field:_contextWindowField];
                 break;
         }
     } else {
-        cell.textLabel.text = @"测试连接";
+        cell.textLabel.text = localize(@"ame192.ai.pc.test", nil);
         cell.textLabel.textAlignment = NSTextAlignmentCenter;
         cell.textLabel.textColor = accentColor();
     }
@@ -542,7 +543,7 @@ NS_ASSUME_NONNULL_END
         footer.textColor = [UIColor secondaryLabelColor];
         footer.textAlignment = NSTextAlignmentCenter;
         footer.numberOfLines = 0;
-        footer.text = @"测试连接会向此提供商发送一条极短的 \"ping\" 请求以验证可用性。";
+        footer.text = localize(@"ame192.ai.pc.test_desc", nil);
         return footer;
     }
     return nil;
@@ -596,15 +597,15 @@ NS_ASSUME_NONNULL_END
     AiProvider *provider = [self providerFromForm];
     NSString *name = [provider.name stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (name.length == 0) {
-        [self showMessage:@"提示" body:@"请填写提供商名称"];
+        [self showMessage:localize(@"ame192.ai.pc.notice", nil) body:localize(@"ame192.ai.pc.need_name", nil)];
         return;
     }
     if (provider.baseURL.length == 0) {
-        [self showMessage:@"提示" body:@"请填写 Base URL"];
+        [self showMessage:localize(@"ame192.ai.pc.notice", nil) body:localize(@"ame192.ai.pc.need_url", nil)];
         return;
     }
     if (provider.model.length == 0) {
-        [self showMessage:@"提示" body:@"请填写模型名称"];
+        [self showMessage:localize(@"ame192.ai.pc.notice", nil) body:localize(@"ame192.ai.pc.need_model", nil)];
         return;
     }
 
@@ -630,11 +631,11 @@ NS_ASSUME_NONNULL_END
 - (void)testConnectionAction {
     AiProvider *provider = [self providerFromForm];
     if (provider.baseURL.length == 0 || provider.model.length == 0) {
-        [self showMessage:@"无法测试" body:@"请先填写 Base URL 与模型名称。"];
+        [self showMessage:localize(@"ame192.ai.pc.test_failed_title", nil) body:localize(@"ame192.ai.pc.test_fill_first", nil)];
         return;
     }
 
-    UIAlertController *loading = [UIAlertController alertControllerWithTitle:@"测试连接" message:@"正在测试，请稍候…" preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertController *loading = [UIAlertController alertControllerWithTitle:localize(@"ame192.ai.pc.test", nil) message:localize(@"ame192.ai.pc.testing", nil) preferredStyle:UIAlertControllerStyleAlert];
     [self presentViewController:loading animated:YES completion:nil];
 
     AiAPIClient *client = [[AiAPIClient alloc] init];
@@ -642,9 +643,9 @@ NS_ASSUME_NONNULL_END
         dispatch_async(dispatch_get_main_queue(), ^{
             [loading dismissViewControllerAnimated:YES completion:^{
                 if (error) {
-                    [self showMessage:@"连接失败" body:error.localizedDescription ?: @"未知错误"];
+                    [self showMessage:localize(@"ame192.ai.pc.conn_failed", nil) body:error.localizedDescription ?: localize(@"ame192.ai.unknown_error", nil)];
                 } else {
-                    [self showMessage:@"连接成功" body:successMessage ?: @"连接成功"];
+                    [self showMessage:localize(@"ame192.ai.pc.conn_success", nil) body:successMessage ?: localize(@"ame192.ai.pc.conn_success", nil)];
                 }
             }];
         });
@@ -655,7 +656,7 @@ NS_ASSUME_NONNULL_END
     UIAlertController *alert = [UIAlertController alertControllerWithTitle:title
                                                                    message:body
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"好" style:UIAlertActionStyleDefault handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"ame192.ai.pc.ok", nil) style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:alert animated:YES completion:nil];
 }
 

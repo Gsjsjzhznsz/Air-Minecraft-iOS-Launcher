@@ -678,6 +678,19 @@ NSString* localize(NSString* key, NSString* comment) {
         }
     }
 
+    // Task192：localize() 永不返回 nil 加固。
+    // 病历（956ea9b 装机 latestlog.1）：insertObject:atIndex: object cannot be
+    // nil 崩溃 + 数组字面量/pickList 均以 localize() 结果为元素——上方的
+    // UIKit 系统翻译层是唯一可能返回 nil 的出口：
+    //   ① bundleWithIdentifier:@"com.apple.UIKit" 查找失败 → [nil ...] = nil；
+    //   ② 各中间层 [value isEqualToString:key] 对 nil receiver 恒为 NO，
+    //     "未命中"分支永不触发——nil 一路穿透返回。
+    // 修复：任何出口为 nil/空时回落为 key 本身（与既有"裸键显示"语义一致，
+    // 用户至少看到 i18n 键名而不是崩溃/空串）。
+    if (value == nil || [value length] == 0) {
+        return key;
+    }
+
     return value;
 }
 

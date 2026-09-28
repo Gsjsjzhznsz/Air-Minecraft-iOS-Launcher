@@ -748,6 +748,152 @@ void glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint unif
     }
 }
 
+// ============================================================================
+// Task192（ANGLE 黑屏第四轮）：DSA buffer 族实现 + 参数日志。
+// 病历（956ea9b 装机 latestlog.txt，ANGLE 26.3 FO 会话）三铁证：
+//   (1) [Render thread/INFO]: DSA support not detected.
+//   (2) Thread[#3,Render thread,...]: No context is current or a function
+//       that is not available...（LWJGL NULL 函数指针异常，DSA 探测即抛）
+//   (3) Task191 UBO 探针零命中：glBindBufferRange/Base/glUniformBlockBinding
+//       经本 dylib 的转发【零调用】——RenderPearl 的矩阵上传根本不走传统
+//       bind 路径；combined with readback=(0,0,0,0) + 58fps + 零编译错误 =
+//       MVP 全零裁剪一切片元。
+// 推论：MC 26.3 的 GL 后端 DSA 优先（glCreateBuffers 探测），探测失败后
+// 的"降级"路径未覆盖我们这套 ES3 + 无 DSA 符号的环境（探测本身抛的 NULL
+// 函数异常即 line-803 打印）。修法：在本 dylib 实现 DSA buffer 族——
+// ES3 无 DSA，用 GL_COPY_WRITE_BUFFER 通用绑定点做 bind-free 语义
+// （保存/改绑/操作/恢复，四步原子）；探测命中后 MC 走 DSA 路径，
+// 矩阵经 glNamedBufferSubData 上传 + glBindBuffersRange/Base 批量绑点。
+// 装机锚点："[tinygl4angle] Task192 dsa: ..." 系列（探测成功 + 首批调用
+// 参数）+ Task188 swap 探针的 uboBind 从 0 变非 0。
+// ============================================================================
+#ifndef GL_COPY_WRITE_BUFFER
+#define GL_COPY_WRITE_BUFFER 0x8F37
+#endif
+#ifndef GL_COPY_READ_BUFFER
+#define GL_COPY_READ_BUFFER 0x8F36
+#endif
+
+static int ame192_dsaLogs = 0;
+
+typedef void (*ame192_fn_glGenBuffers)(GLsizei, GLuint *);
+static ame192_fn_glGenBuffers ame192_ptr_glGenBuffers;
+void glCreateBuffers(GLsizei n, GLuint *buffers) {
+    // DSA 语义：只生成名字，不绑定。ES3 的 glGenBuffers 同语义。
+    AME173_RESOLVE(ame192_ptr_glGenBuffers, "glGenBuffers");
+    if (ame192_ptr_glGenBuffers) {
+        ame192_ptr_glGenBuffers(n, buffers);
+    }
+    if (ame192_dsaLogs < 8) {
+        ame192_dsaLogs++;
+        NSLog(@"[tinygl4angle] Task192 dsa: glCreateBuffers(n=%d) -> first=%u (DSA probe should now SUCCEED)", (int)n, (n > 0 && buffers) ? (unsigned)buffers[0] : 0u);
+    }
+}
+
+typedef void (*ame192_fn_glBindBuffer)(GLenum, GLuint);
+static ame192_fn_glBindBuffer ame192_ptr_glBindBuffer;
+typedef void (*ame192_fn_glGetIntegerv)(GLenum, GLint *);
+static ame192_fn_glGetIntegerv ame192_ptr_glGetIntegerv;
+typedef void (*ame192_fn_glBufferData)(GLenum, GLsizeiptr, const void *, GLenum);
+static ame192_fn_glBufferData ame192_ptr_glBufferData;
+typedef void (*ame192_fn_glBufferSubData)(GLenum, GLintptr, GLsizeiptr, const void *);
+static ame192_fn_glBufferSubData ame192_ptr_glBufferSubData;
+
+static void ame192_resolve_buffer_helpers(void) {
+    AME173_RESOLVE(ame192_ptr_glBindBuffer, "glBindBuffer");
+    AME173_RESOLVE(ame192_ptr_glGetIntegerv, "glGetIntegerv");
+    AME173_RESOLVE(ame192_ptr_glBufferData, "glBufferData");
+    AME173_RESOLVE(ame192_ptr_glBufferSubData, "glBufferSubData");
+}
+
+void glNamedBufferData(GLuint buffer, GLsizeiptr size, const void *data, GLenum usage) {
+    ame192_resolve_buffer_helpers();
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame192_ptr_glBufferData) return;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    ame192_ptr_glBufferData(GL_COPY_WRITE_BUFFER, size, data, usage);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+    if (ame192_dsaLogs < 8) {
+        ame192_dsaLogs++;
+        NSLog(@"[tinygl4angle] Task192 dsa: glNamedBufferData(buf=%u size=%lld usage=0x%X)", (unsigned)buffer, (long long)size, (unsigned)usage);
+    }
+}
+
+void glNamedBufferSubData(GLuint buffer, GLintptr offset, GLsizeiptr size, const void *data) {
+    ame192_resolve_buffer_helpers();
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame192_ptr_glBufferSubData) return;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    ame192_ptr_glBufferSubData(GL_COPY_WRITE_BUFFER, offset, size, data);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+    if (ame192_dsaLogs < 8) {
+        ame192_dsaLogs++;
+        NSLog(@"[tinygl4angle] Task192 dsa: glNamedBufferSubData(buf=%u off=%lld size=%lld) -- MVP upload path", (unsigned)buffer, (long long)offset, (long long)size);
+    }
+}
+
+typedef void (*ame191_fn_glBindBufferBase)(GLenum, GLuint, GLuint);
+typedef void (*ame191_fn_glBindBufferRange)(GLenum, GLuint, GLuint, GLintptr, GLsizeiptr);
+
+void glBindBuffersBase(GLenum target, GLuint first, GLsizei count, const GLuint *buffers) {
+    AME173_RESOLVE(ame191_ptr_glBindBufferBase, "glBindBufferBase");
+    if (!ame191_ptr_glBindBufferBase) return;
+    if (buffers == NULL) {
+        // NULL 数组 = 解绑 [first, first+count) 全部绑定点
+        for (GLsizei i = 0; i < count; i++) {
+            ame191_ptr_glBindBufferBase(target, first + (GLuint)i, 0);
+        }
+    } else {
+        for (GLsizei i = 0; i < count; i++) {
+            ame191_ptr_glBindBufferBase(target, first + (GLuint)i, buffers[i]);
+        }
+    }
+    if (ame192_dsaLogs < 8) {
+        ame192_dsaLogs++;
+        NSLog(@"[tinygl4angle] Task192 dsa: glBindBuffersBase(target=0x%X first=%u count=%d, firstBuf=%u)", (unsigned)target, (unsigned)first, (int)count, (buffers && count > 0) ? (unsigned)buffers[0] : 0u);
+    }
+}
+
+void glBindBuffersRange(GLenum target, GLuint first, GLsizei count, const GLuint *buffers, const GLintptr *offsets, const GLsizeiptr *sizes) {
+    AME173_RESOLVE(ame191_ptr_glBindBufferRange, "glBindBufferRange");
+    if (!ame191_ptr_glBindBufferRange) return;
+    if (buffers == NULL) {
+        for (GLsizei i = 0; i < count; i++) {
+            ame191_ptr_glBindBufferRange(target, first + (GLuint)i, 0, 0, 0);
+        }
+    } else {
+        for (GLsizei i = 0; i < count; i++) {
+            ame191_ptr_glBindBufferRange(target, first + (GLuint)i, buffers[i],
+                                         (offsets ? offsets[i] : 0), (sizes ? sizes[i] : 0));
+        }
+    }
+    if (ame192_dsaLogs < 8) {
+        ame192_dsaLogs++;
+        NSLog(@"[tinygl4angle] Task192 dsa: glBindBuffersRange(target=0x%X first=%u count=%d, firstBuf=%u off=%lld size=%lld%s)",
+              (unsigned)target, (unsigned)first, (int)count,
+              (buffers && count > 0) ? (unsigned)buffers[0] : 0u,
+              (long long)((offsets && count > 0) ? offsets[0] : 0),
+              (long long)((sizes && count > 0) ? sizes[0] : 0),
+              ((offsets && count > 0 && (offsets[0] & 0xFF) != 0) ? " [UNALIGNED-256!]" : ""));
+    }
+}
+
+typedef void (*ame192_fn_glGetBufferParameteriv)(GLenum, GLenum, GLint *);
+static ame192_fn_glGetBufferParameteriv ame192_ptr_glGetBufferParameteriv;
+void glGetNamedBufferParameteriv(GLuint buffer, GLenum pname, GLint *params) {
+    ame192_resolve_buffer_helpers();
+    AME173_RESOLVE(ame192_ptr_glGetBufferParameteriv, "glGetBufferParameteriv");
+    if (!ame192_ptr_glBindBuffer || !ame192_ptr_glGetIntegerv || !ame192_ptr_glGetBufferParameteriv) return;
+    GLint prev = 0;
+    ame192_ptr_glGetIntegerv(GL_COPY_WRITE_BUFFER, &prev);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, buffer);
+    ame192_ptr_glGetBufferParameteriv(GL_COPY_WRITE_BUFFER, pname, params);
+    ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
+}
+
+
 
 typedef void (*ame173_fn_glCopyImageSubData)(GLuint, GLenum, GLint, GLint, GLint, GLint, GLuint, GLenum, GLint, GLint, GLint, GLint, GLsizei, GLsizei, GLsizei);
 static ame173_fn_glCopyImageSubData ame173_ptr_glCopyImageSubData;
