@@ -9,6 +9,22 @@
 - (void)doAddButton:(ControlButton *)button atIndex:(NSNumber *)index {
     NSUndoManager *undo = self.undoManager;
 
+    // Task191：insertObject nil 防护（"放大/操作控件崩溃"防御轮）。
+    // 病历（dde0f82 装机 latestlog.1）：控件仓库下载 large-buttons 保存后
+    // NSInvalidArgumentException '-[__NSArrayM insertObject:atIndex:]:
+    // object cannot be nil'（裸地址栈，静态审计 12 处 insertObject 未闭环）。
+    // 本方法 4 处 insertObject 的 object（button.properties / drawerData）
+    // 在【布局切换后重放旧 undo 栈】时可悬垂：loadControlFile 重建
+    // layoutDictionary 但不清 undo 栈，旧 invocation 携带的 button 与其
+    // properties 可能已随旧字典释放（NSInvocation 默认不 retain 参数）。
+    // 防御：object 为 nil 时打锚点日志跳过插入（视觉上少一个按钮，
+    // 好过崩溃）；布局切换点同步清栈（见 loadControlFile 调用侧）。
+    if (!button || !button.properties || !index) {
+        NSLog(@"[CustomControls] Task191: doAddButton guarded (button=%ld properties=%ld index=%ld) -- stale undo replay?",
+              (long)(!!button), (long)(!!(button ? button.properties : nil)), (long)(!!index));
+        return;
+    }
+
     if ([button isKindOfClass:ControlSubButton.class]) {
         undo.actionName = localize(@"custom_controls.button_menu.add_subbutton", nil);
 

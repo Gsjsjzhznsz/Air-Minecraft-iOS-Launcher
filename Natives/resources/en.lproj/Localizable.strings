@@ -2145,7 +2145,7 @@
 "custom_controls.repo.update_available" = "Update to v%@";
 "custom_controls.repo.download.failed" = "Layout download failed";
 "custom_controls.repo.download.invalid" = "Invalid layout file (not a control layout)";
-"custom_controls.repo.download.done" = "Downloaded "%@" — pick it in the Load menu";
+"custom_controls.repo.download.done" = "Downloaded \"%@\" — pick it in the Load menu";
 
 /* Task189 i18n registration (185 keys) */
 "ame189.ai.safety_ask" = "Confirm each write (Ask)";

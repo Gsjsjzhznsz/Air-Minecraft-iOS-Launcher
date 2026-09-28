@@ -909,3 +909,21 @@ Stage Summary:
 - round 2（cc3e1b1）run 36403614574 failure：泛型管线方法体 6 处 `property 'contentView' not found on object of type 'UIView *'`（"方法体只用 UIView 级 API" 的勘察漏判——contentView 属性本身就不在 UIView 基类上）→ 63e86f3 热修 2：泛型签名改 `(UIView *)cell contentView:(UIView *)contentView` 双参数由类型化包装点传入（22 处机械改名，方法体其余逐字节不变）；163 B3/B4 + 168 A9 重锚到 contentView.* 前缀（语义不变）；verify_task190 A 组加"泛型体内零 cell.contentView"门
 - CI 终局：run 36406783918（63e86f3）= **completed success**
 - 教训：本机无 clang，"方法体只用了 XX 级 API" 的结论必须逐符号核对（属性也算符号）；SDK 常量名以编译器批注为准
+---
+Task ID: 191
+Agent: main (Super Z)
+Task: dde0f82 四日志分诊 + 用户六项反馈根修轮：vgpu 方块材质损坏（client-index EBO 化）/ i18n 手动切换裸键名（en.lproj 语法 + 兜底链）/ Forge 26.1.2 text2speech 包冲突 / 控件编辑器崩溃防御 / 强制横屏方向反转 / ANGLE 黑屏第三轮取证
+
+Work Log:
+- 日志归位：latestlog.old.txt=vgpu 1.8.9-forge 会话（材质损坏，29k 行）/ latestlog.2=fabric 26.3 ANGLE 会话（黑屏，10k 行，正常退出）/ latestlog.txt=Forge 26.1.2 启动崩（408 行 exit(1)）/ latestlog.1=控件仓库下载后 insertObject nil 崩溃（55 行）
+- vgpu 根修（Task189 探针裁决闭环）：post-draw 8/8 命中同形态 direct-elements TRIANGLES count=6 USHORT → 0x0502 = QUADS(4)→TRIANGLES(6) 转换产物（scratch CPU 指针）被驱动拒绝；对照组 listdraw 真实 EBO 路径零失败 + 实体（立即模式）正常 = Apple iOS ES 拒绝 client-memory index array（顶点 client array 被接受）。修复 drawing.c ame191_drawElementsViaEBO：scratch EBO 上传（gl4es_scratch_indices + glBufferSubData）→ fpe 前端完整链 NULL 偏移画 → 恢复 EBO=0；ES1.1 保原路径；探针站点名 direct-elements-ebo
+- i18n 根修：en.lproj 2148 行 "Downloaded "%@"" 值内未转义引号 → 字符串提前闭合 → 整表 oldstyle-plist 解析失败 → 手动切英文全界面裸键名（系统中文走 zh-Hans 表故一直不可见）。修复：引号转义 + localize() 双路径加 zh-Hans 兜底层（任何单一语言表损坏不再暴露键名）+ scripts/task191_validate_strings.py 严格 tokenizer（逐字符模拟 Apple 解析，抓出并看护全部 40+ lproj）
+- Forge 26.1.2 根修：ResolutionException "Modules mojang.stubs and launcher export package com.mojang.text2speech to module logging"——bootstrap 2.1.7 把 launcher.jar 一并模块化（1.20.1 时代 ignoreList 不再庇护），与 mojang-stubs.jar 双供 Task158 桩包。修复 JavaApp/Makefile：launcher.jar 打包时 stash-mv 剔除 text2speech（打完恢复目录保住 mojang-stubs 的 cp 源）；mojang-stubs.jar 成唯一持有者（模块层 + 系统 classpath first-wins 双满足）；stash 残留防御性清场
+- 控件编辑器崩溃防御（dde0f82 裸地址栈未闭环）：doAddButton 四处 insertObject 加 nil 防护（悬垂 undo 重放锚点日志）+ loadControlFile 清 undo 栈（布局切换语义边界）+ SceneDelegate willConnect re-arm 补锚点日志（下轮自证）
+- 强制横屏根修：Task189 的 ±90° 选向用 scene.interfaceOrientation（窗口模式恒报 Portrait，与设备实际持向解耦）→ 换手时 180° 反 + 设备旋转无重评估时机。修复 SceneDelegate：角度跟 UIDevice 物理方向（LandscapeRight→+90 / LandscapeLeft→-90 / 不明确保持）+ 横窗持向基线与 180° 翻转跟随 + UIDeviceOrientationDidChangeNotification 监听（加速计采样开启、断连摘除）
+- ANGLE 第三轮取证（Task188 裁决"真黑内容"后假设空间收敛 UBO）：tinygl4angle 显式转发 glBindBufferRange/glBindBufferBase/glUniformBlockBinding（此前 dlsym 直落 ANGLE ES 原生，无观测点）+ 前 8 次参数日志 + 非 256 对齐 offset 标记 + swap 探针读 uboAlign/uboBind（GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT/BINDING）+ phase-tag 噪音根修（探针块入口清错，RenderPearl 自产的 desktop-only 查询 1280 不再伪装成探针错误）
+- 验证：verify_task191 45/45（A i18n 3 + B vgpu 6 + C forge 6 + D 控件 3 + E 横屏 9 + F ANGLE 7 + G 语法门 8 + H 级联 3）；task189_vgpu_syntax 80/80；级联 188:53、189:80、190:59 全绿；EBO 镜像 harness 通过（上传字节数==绘制字节数、fpe 收 NULL、画后 EBO 归零）；Makefile stash 序列干跑通过（jar 内无 text2speech、cp 源保留、幂等）；version.h REVISION 附录
+
+Stage Summary:
+- 装机锚点：vgpu（"direct-elements-ebo" 探针 0x0502 归零 + "@ Pre render 1282" 归零 + 1.8.9 方块纹理恢复）；i18n（手动切 English 全界面正常英文）；Forge 26.1.2（越过模块解析进入游戏）；横屏（"Task191: portrait window -> content rotated +/-Ndeg by device orientation" 持向正确 + 换手不反）；ANGLE（"[tinygl4angle] Task191 ubo: ..." 系列 + "uboAlign=/uboBind=" 数据裁决方向：零绑定=绑定路径断裂 / UNALIGNED-256=对齐语义差异 / 全正常=下一轮查 spvc 改写）；控件崩溃若再现（"[SceneDelegate] Task191: uncaught-exception handler re-armed at willConnect" 在场 + "Uncaught exception:" 符号栈自证）
+- 遗留：ANGLE 黑屏根因待 Task191 UBO 数据裁决；vgpu sobel WARN（上游，非阻塞）

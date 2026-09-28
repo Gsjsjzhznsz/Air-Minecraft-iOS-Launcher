@@ -688,6 +688,67 @@ void glVertexAttribDivisor(GLuint index, GLuint divisor) {
     }
 }
 
+// ============================================================================
+// Task191（ANGLE 黑屏第三轮取证）：UBO 绑定族显式转发 + 参数日志。
+// 背景：RenderPearl 纯 UBO 上传矩阵（Task187 反编译定案），Task188 readback
+// 裁决"真黑内容"（中心像素 rgba=(0,0,0,0) + layer opaque=1 + 58fps 全速
+// + 零编译错误）→ 剩余假设空间集中在"UBO 数据未到达着色器"（MVP 全 0 →
+// 全部片元被裁剪 → 只剩 clearColor 黑）。
+// 本层此前【未实现】glBindBufferRange/glBindBufferBase——LWJGL 的 dlsym 落到
+// ANGLE libGLESv2 的 ES 原生符号（desktop 与 ES 3.0 同签名同语义，功能上
+// 等价可用），因此这不是缺失修复而是取证布点：把绑定流引到本层打参数，
+// 前几次日志即可裁决 (a) MC 是否真的绑定 UBO（零调用 = 绑定路径断裂）
+// 与 (b) offset 是否违反 GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT（ES 驱动会
+// GL_INVALID_VALUE 拒绝绑定 → 矩阵丢失；desktop GL 对 UBO 同样要求对齐，
+// 但 RenderPearl 在真桌面 GL 上从未触发——若这里出现非对齐 offset 即是
+// ANGLE 桥的语义差异点）。
+// 装机锚点："[tinygl4angle] Task191 ubo: ..." 系列。
+// ============================================================================
+typedef void (*ame191_fn_glBindBufferRange)(GLenum, GLuint, GLuint, GLintptr, GLsizeiptr);
+static ame191_fn_glBindBufferRange ame191_ptr_glBindBufferRange;
+void glBindBufferRange(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size) {
+    AME173_RESOLVE(ame191_ptr_glBindBufferRange, "glBindBufferRange");
+    if (ame191_ptr_glBindBufferRange) {
+        ame191_ptr_glBindBufferRange(target, index, buffer, offset, size);
+    }
+    static int ame191_uboLogs = 0;
+    if (target == 0x8A11 /*GL_UNIFORM_BUFFER*/ && ame191_uboLogs < 8) {
+        ame191_uboLogs++;
+        NSLog(@"[tinygl4angle] Task191 ubo: glBindBufferRange(idx=%u buf=%u offset=%lld size=%lld%s)",
+              (unsigned)index, (unsigned)buffer, (long long)offset, (long long)size,
+              ((offset & 0xFF) != 0) ? " [UNALIGNED-256!]" : "");
+    }
+}
+
+typedef void (*ame191_fn_glBindBufferBase)(GLenum, GLuint, GLuint);
+static ame191_fn_glBindBufferBase ame191_ptr_glBindBufferBase;
+void glBindBufferBase(GLenum target, GLuint index, GLuint buffer) {
+    AME173_RESOLVE(ame191_ptr_glBindBufferBase, "glBindBufferBase");
+    if (ame191_ptr_glBindBufferBase) {
+        ame191_ptr_glBindBufferBase(target, index, buffer);
+    }
+    static int ame191_uboBaseLogs = 0;
+    if (target == 0x8A11 /*GL_UNIFORM_BUFFER*/ && ame191_uboBaseLogs < 8) {
+        ame191_uboBaseLogs++;
+        NSLog(@"[tinygl4angle] Task191 ubo: glBindBufferBase(idx=%u buf=%u)", (unsigned)index, (unsigned)buffer);
+    }
+}
+
+typedef void (*ame191_fn_glUniformBlockBinding)(GLuint, GLuint, GLuint);
+static ame191_fn_glUniformBlockBinding ame191_ptr_glUniformBlockBinding;
+void glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding) {
+    AME173_RESOLVE(ame191_ptr_glUniformBlockBinding, "glUniformBlockBinding");
+    if (ame191_ptr_glUniformBlockBinding) {
+        ame191_ptr_glUniformBlockBinding(program, uniformBlockIndex, uniformBlockBinding);
+    }
+    static int ame191_ubbLogs = 0;
+    if (ame191_ubbLogs < 8) {
+        ame191_ubbLogs++;
+        NSLog(@"[tinygl4angle] Task191 ubo: glUniformBlockBinding(prog=%u block=%u bind=%u)", (unsigned)program, (unsigned)uniformBlockIndex, (unsigned)uniformBlockBinding);
+    }
+}
+
+
 typedef void (*ame173_fn_glCopyImageSubData)(GLuint, GLenum, GLint, GLint, GLint, GLint, GLuint, GLenum, GLint, GLint, GLint, GLint, GLsizei, GLsizei, GLsizei);
 static ame173_fn_glCopyImageSubData ame173_ptr_glCopyImageSubData;
 void glCopyImageSubData(GLuint srcName, GLenum srcTarget, GLint srcLevel, GLint srcX, GLint srcY, GLint srcZ,

@@ -84,6 +84,35 @@ void ame189_afterDraw(const char *site, GLenum mode, GLsizei count, GLenum idxTy
     errorShim(err);   // 回注：MC 随后的 glGetError 仍能看到该错误
 }
 
+// ============================================================================
+// Task191：direct-elements 的 EBO 化（方块"线条化/材质损坏"根修）。
+// 病历（dde0f82 装机 latestlog.old.txt，1.8.9-forge vgpu 会话）：
+//   Task189 post-draw 探针 8/8 命中，全部同一形态——
+//     site=direct-elements mode=0x0004(GL_TRIANGLES) count=6
+//     idxType=0x1403(GL_UNSIGNED_SHORT) -> GL error 0x0502
+//   即 QUADS(4 顶点)->TRIANGLES(6 索引) 转换产物（glstate->scratch CPU 指针）
+//   直传 gles_glDrawElements 被驱动拒绝；MC 侧 "@ Pre render 1282" 每帧
+//   2178 次。对照组：listdraw.c 的 list-elements 路径（真实 EBO + NULL
+//   偏移）零失败，且立即模式实体渲染完全正常——差异面锁定为【客户端
+//   内存索引数组】：Apple iOS 的 ES 实现拒绝 client-memory index array
+//   （顶点 client array 被接受，direct-arrays 全绿），而 gl4es 在 QUADS
+//   转换/直传时恰好在用 CPU 索引指针。
+// 修法：与 listdraw.c 同构——把索引上传到 scratch EBO 再画。保持 fpe
+//   前端链完整（realize_glenv 的 program/属性设置不能绕过），画完恢复
+//   EBO=0。ES1.1（无此限制的环境）保持原直传路径不变。
+// 装机锚点：site=direct-elements-ebo 且 GL error 0x0502 归零；
+//   MC "@ Pre render 1282" 计数归零；1.8.9 方块纹理恢复正常。
+// ============================================================================
+static void ame191_drawElementsViaEBO(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices) {
+    LOAD_GLES2_(glBindBuffer);
+    LOAD_GLES2_(glBufferSubData);
+    GLsizei bytes = count * ((type == GL_UNSIGNED_INT) ? (GLsizei)sizeof(GLuint) : (GLsizei)sizeof(GLushort));
+    gl4es_scratch_indices(bytes);   // 分配（如需扩容）+ 绑定 scratch EBO
+    gles_glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, bytes, indices);
+    fpe_glDrawElements(mode, count, type, NULL);   // fpe 链完整；NULL 偏移在 EBO 绑定下 = 从 scratch 读取
+    gl4es_use_scratch_indices(0);   // 恢复 EBO=0，不留跨调用状态
+}
+
 static GLboolean is_cache_compatible(GLsizei count) {
     #define T2(AA, A, B) \
     if(glstate->vao->AA!=glstate->vao->B.enabled) return GL_FALSE; \
@@ -493,8 +522,18 @@ if(count>500000) return;
                 ame189_afterDraw("direct-arrays", mode, count, 0);   // Task189 取证
             }
             else {
-                gles_glDrawElements(mode, count, (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT, (sindices?((void*)sindices):((void*)iindices)));
-                ame189_afterDraw("direct-elements", mode, count, (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT);   // Task189 取证
+                // Task191：ES2+ 上 direct-elements 一律经 scratch EBO 提交
+                //（Apple iOS ES 拒绝 client-memory index array，见上方病历）；
+                // ES1.1 环境保持原 CPU 指针直传（该环境无此限制）。
+                GLenum ame191_type = (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT;
+                const GLvoid *ame191_ptr = (sindices)?((void*)sindices):((void*)iindices);
+                if (hardext.esversion > 1) {
+                    ame191_drawElementsViaEBO(mode, count, ame191_type, ame191_ptr);
+                    ame189_afterDraw("direct-elements-ebo", mode, count, ame191_type);   // Task191 取证：EBO 路径
+                } else {
+                    gles_glDrawElements(mode, count, ame191_type, ame191_ptr);
+                    ame189_afterDraw("direct-elements", mode, count, ame191_type);
+                }
             }
         } else {
             if(!iindices && !sindices)

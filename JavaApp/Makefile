@@ -22,45 +22,69 @@ all: $(TARGETS) $(OUTPUTDIR)/mojang-stubs.jar
 # 改进：发现空 class 文件时先从 classes/ 目录重新复制（修复 cp 与 javac 并行竞态
 # 导致次级 class 文件如 NarratorDummy.class 为空的偶发问题），重试后仍为空才报错。
 check_empty_classes:
-	@set -e
-	@echo "Checking for empty class files"
-	@for f in $$(find $(OUTPUTDIR) -not -path '$(OUTPUTDIR)/classes/*' -name '*.class' -size 0 2>/dev/null); do \
-		rel=$${f#$(OUTPUTDIR)/}; \
-		module=$$(echo "$$rel" | cut -d/ -f1); \
-		classpath=$${rel#$$module/}; \
-		src="$(OUTPUTDIR)/classes/$$classpath"; \
-		if [ -f "$$src" ] && [ -s "$$src" ]; then \
-			echo "Warning: re-copying empty $$classpath from classes/"; \
-			cp -f "$$src" "$$f"; \
-		fi; \
-	done
-	@EMPTY_CLASSES=$$(find $(OUTPUTDIR) -not -path '$(OUTPUTDIR)/classes/*' -name '*.class' -size 0 2>/dev/null); \
-	if [ -n "$$EMPTY_CLASSES" ]; then \
-		echo "Error: found empty class files in $@: $$EMPTY_CLASSES"; \
-		exit 1; \
-	fi
+        @set -e
+        @echo "Checking for empty class files"
+        @for f in $$(find $(OUTPUTDIR) -not -path '$(OUTPUTDIR)/classes/*' -name '*.class' -size 0 2>/dev/null); do \
+                rel=$${f#$(OUTPUTDIR)/}; \
+                module=$$(echo "$$rel" | cut -d/ -f1); \
+                classpath=$${rel#$$module/}; \
+                src="$(OUTPUTDIR)/classes/$$classpath"; \
+                if [ -f "$$src" ] && [ -s "$$src" ]; then \
+                        echo "Warning: re-copying empty $$classpath from classes/"; \
+                        cp -f "$$src" "$$f"; \
+                fi; \
+        done
+        @EMPTY_CLASSES=$$(find $(OUTPUTDIR) -not -path '$(OUTPUTDIR)/classes/*' -name '*.class' -size 0 2>/dev/null); \
+        if [ -n "$$EMPTY_CLASSES" ]; then \
+                echo "Error: found empty class files in $@: $$EMPTY_CLASSES"; \
+                exit 1; \
+        fi
 
 # Rules for building java class
 $(CLASSES): $(OUTPUTDIR)/%.class: $(SOURCEDIR)/%.java
-	@set -e
-	$(eval TARGET=$(word 2, $(subst /, ,$@)))
-	@mkdir -p $(OUTPUTDIR)/classes
-	@mkdir -p $(dir $@)
-	@echo "Compiling $<"
-	@$(BOOTJDK)/javac $(JCFLAGS) -d $(OUTPUTDIR)/classes $<
-	@cp $(@:$(OUTPUTDIR)/$(TARGET)/%.class=$(OUTPUTDIR)/classes/%*.class) $(dir $@)/
-	@# 防御性校验：CI 偶发产生空 class 文件（cp 与 javac/并行任务竞态），
-	@# 复制后若主 class 仍为 0 字节则重试一次，避免 check_empty_classes 误报中断构建。
-	@if [ -e "$@" ] && [ ! -s "$@" ]; then \
-		echo "Warning: $@ is empty after cp, retrying copy"; \
-		cp -f $(@:$(OUTPUTDIR)/$(TARGET)/%.class=$(OUTPUTDIR)/classes/%*.class) $(dir $@)/; \
-	fi
+        @set -e
+        $(eval TARGET=$(word 2, $(subst /, ,$@)))
+        @mkdir -p $(OUTPUTDIR)/classes
+        @mkdir -p $(dir $@)
+        @echo "Compiling $<"
+        @$(BOOTJDK)/javac $(JCFLAGS) -d $(OUTPUTDIR)/classes $<
+        @cp $(@:$(OUTPUTDIR)/$(TARGET)/%.class=$(OUTPUTDIR)/classes/%*.class) $(dir $@)/
+        @# 防御性校验：CI 偶发产生空 class 文件（cp 与 javac/并行任务竞态），
+        @# 复制后若主 class 仍为 0 字节则重试一次，避免 check_empty_classes 误报中断构建。
+        @if [ -e "$@" ] && [ ! -s "$@" ]; then \
+                echo "Warning: $@ is empty after cp, retrying copy"; \
+                cp -f $(@:$(OUTPUTDIR)/$(TARGET)/%.class=$(OUTPUTDIR)/classes/%*.class) $(dir $@)/; \
+        fi
 
 $(OUTPUTDIR)/launcher.jar: $(CLASSES) check_empty_classes
-	@set -e
-	@echo "Creating $@"
-	@cp -r $(SOURCEDIR)/launcher/META-INF $(basename $@)/ 2>/dev/null || true
-	@$(BOOTJDK)/jar -cf $@ -C $(basename $@) .
+        @set -e
+        @echo "Creating $@"
+        @cp -r $(SOURCEDIR)/launcher/META-INF $(basename $@)/ 2>/dev/null || true
+        # Task191（Forge 26.1.2 崩溃根修）：launcher.jar 剔除 com/mojang/text2speech。
+        # 病历（dde0f82 装机 latestlog.txt，Forge-26.1.2-64.1.3 会话）：
+        #   java.lang.module.ResolutionException: Modules mojang.stubs and
+        #   launcher export package com.mojang.text2speech to module logging
+        # 机制：Forge 26.1.2 的 bootstrap 2.1.7（net.minecraftforge.bootstrap）
+        # 在模块解析时把 launcher.jar 与 mojang-stubs.jar 一并模块化（自动
+        # 模块名 launcher / mojang.stubs），两 jar 均含 com/mojang/text2speech
+        # → 双供应商 split-package，模块图解析当场失败（exit(1)，swapOK=0）。
+        # 1.20.1 时代不踩坑是因旧 bootstrap 遵守 -DignoreList（Task154 的
+        # launcher.jar 排除仍生效）；26.1.2 行为已变，包必须全局唯一。
+        # 归属决策：mojang-stubs.jar 是唯一持有者——模块层（GameNarrator 的
+        # MC-BOOTSTRAP 桩，Task158）与系统类加载器（classpath 上它排在
+        # launcher.jar 之前，first-wins）都由它满足；launcher 主代码对该包
+        # 零引用（grep 实证，仅 Tools.java 的库名过滤字符串）。
+        # 实现注意：打 jar 前把目录移走、打完恢复——mojang-stubs.jar 规则
+        # 仍依赖 $(OUTPUTDIR)/launcher/com/mojang/text2speech 的存在（cp 源）。
+        # stash 目录防御性清场（上次构建中断的残留会让 mv 落进嵌套目录）。
+        @rm -rf $(OUTPUTDIR)/.task191_t2s_stash
+        @if [ -d "$(basename $@)/com/mojang/text2speech" ]; then \
+                mv $(basename $@)/com/mojang/text2speech $(OUTPUTDIR)/.task191_t2s_stash; \
+        fi
+        @$(BOOTJDK)/jar -cf $@ -C $(basename $@) .
+        @if [ -d "$(OUTPUTDIR)/.task191_t2s_stash" ]; then \
+                mv $(OUTPUTDIR)/.task191_t2s_stash $(basename $@)/com/mojang/text2speech; \
+        fi
 
 # 按 LWJGL 版本分别产出一个合并 jar（3.3.3 与 3.4.1）。
 #
@@ -75,56 +99,56 @@ $(OUTPUTDIR)/launcher.jar: $(CLASSES) check_empty_classes
 #   3) build/lwjgl/ —— Amethyst overlay（GLFW.java 等带 iOS 桥接的改写类），
 #      必须最后覆盖。
 $(OUTPUTDIR)/lwjgl-%.jar: $(CLASSES) check_empty_classes
-	@set -e
-	@echo "Creating $@"
-	@mkdir -p $(OUTPUTDIR)/lwjgl_lib_$*
-	@cd $(OUTPUTDIR)/lwjgl_lib_$* && $(BOOTJDK)/jar -xf "../../../lwjgl.jar" && rm -rf META-INF
-	# 仓库根 lwjgl.jar 里混入了 3 个用 JDK 25 编译的类（major 69）：
-	#   org/lwjgl/openal/SOFTSystemEvent{,s,ProcI}.class
-	# 它是"3.3.3 提供 3.4.1 API 兼容"的定制版，这 3 个类是从 3.4.1 一并塞进来的。
-	# 3.4.1 自带它们的 Java 8 版本，下一步解压后会被覆盖回来；但 3.3.3 没有这些
-	# 类，若保留 JDK 25 版本，Java 8 上的老版本 MC 一旦碰到就会抛
-	# UnsupportedClassVersionError。因此在叠加版本化 jar 之前先删掉。
-	@cd $(OUTPUTDIR)/lwjgl_lib_$* && find org/lwjgl/openal -maxdepth 1 -name 'SOFTSystemEvent*.class' -delete 2>/dev/null || true
-	@cd $(OUTPUTDIR)/lwjgl_lib_$* && find ../../libs/lwjgl-$* -name 'lwjgl*.jar' -exec $(BOOTJDK)/jar -xf {} \; && rm -rf META-INF
-	@cp -R $(OUTPUTDIR)/lwjgl/* $(OUTPUTDIR)/lwjgl_lib_$*/
-	# Task188（Forge 26.1.2 崩溃根修）：撤除 com/apple/ios/audio 镜像。
-	# 病历（15fddc2 latestlog.2 实锤）：Forge 的模块化引导把 launcher.jar 与
-	# lwjgl-341.jar 一并解析为命名模块，两 jar 均含 com.apple.ios.audio →
-	#   java.lang.module.ResolutionException: Modules launcher and lwjgl
-	#   export package com.apple.ios.audio to module com.sun.jna.platform
-	# → ForgeBootstrap 直接退出（exit(1)，swapOK=0）。
-	# 审计结论：lwjgl overlay（src/lwjgl）对 com.apple.ios.audio 零引用，
-	# 唯一消费者是 JavaSound 的 ServiceLoader（META-INF/services），而
-	# launcher.jar 恒在 classpath —— 类留在 launcher.jar 单处即可被发现，
-	# 镜像纯属历史冗余（c71dcfa SDL-hook provider mirror 时代引入）。
-	# services 文件一并撤除：provider 类不在本 jar 时，classpath 上的
-	# launcher.jar 同名 services 条目仍会被 ServiceLoader 命中，行为等价。
-	@$(BOOTJDK)/jar -cf $@ -C $(OUTPUTDIR)/lwjgl_lib_$* .
+        @set -e
+        @echo "Creating $@"
+        @mkdir -p $(OUTPUTDIR)/lwjgl_lib_$*
+        @cd $(OUTPUTDIR)/lwjgl_lib_$* && $(BOOTJDK)/jar -xf "../../../lwjgl.jar" && rm -rf META-INF
+        # 仓库根 lwjgl.jar 里混入了 3 个用 JDK 25 编译的类（major 69）：
+        #   org/lwjgl/openal/SOFTSystemEvent{,s,ProcI}.class
+        # 它是"3.3.3 提供 3.4.1 API 兼容"的定制版，这 3 个类是从 3.4.1 一并塞进来的。
+        # 3.4.1 自带它们的 Java 8 版本，下一步解压后会被覆盖回来；但 3.3.3 没有这些
+        # 类，若保留 JDK 25 版本，Java 8 上的老版本 MC 一旦碰到就会抛
+        # UnsupportedClassVersionError。因此在叠加版本化 jar 之前先删掉。
+        @cd $(OUTPUTDIR)/lwjgl_lib_$* && find org/lwjgl/openal -maxdepth 1 -name 'SOFTSystemEvent*.class' -delete 2>/dev/null || true
+        @cd $(OUTPUTDIR)/lwjgl_lib_$* && find ../../libs/lwjgl-$* -name 'lwjgl*.jar' -exec $(BOOTJDK)/jar -xf {} \; && rm -rf META-INF
+        @cp -R $(OUTPUTDIR)/lwjgl/* $(OUTPUTDIR)/lwjgl_lib_$*/
+        # Task188（Forge 26.1.2 崩溃根修）：撤除 com/apple/ios/audio 镜像。
+        # 病历（15fddc2 latestlog.2 实锤）：Forge 的模块化引导把 launcher.jar 与
+        # lwjgl-341.jar 一并解析为命名模块，两 jar 均含 com.apple.ios.audio →
+        #   java.lang.module.ResolutionException: Modules launcher and lwjgl
+        #   export package com.apple.ios.audio to module com.sun.jna.platform
+        # → ForgeBootstrap 直接退出（exit(1)，swapOK=0）。
+        # 审计结论：lwjgl overlay（src/lwjgl）对 com.apple.ios.audio 零引用，
+        # 唯一消费者是 JavaSound 的 ServiceLoader（META-INF/services），而
+        # launcher.jar 恒在 classpath —— 类留在 launcher.jar 单处即可被发现，
+        # 镜像纯属历史冗余（c71dcfa SDL-hook provider mirror 时代引入）。
+        # services 文件一并撤除：provider 类不在本 jar 时，classpath 上的
+        # launcher.jar 同名 services 条目仍会被 ServiceLoader 命中，行为等价。
+        @$(BOOTJDK)/jar -cf $@ -C $(OUTPUTDIR)/lwjgl_lib_$* .
 
 # lwjgl.jar 仅作占位：all 目标因 src/lwjgl 是源码目录而列出它，但运行时使用
 # lwjgl-333.jar / lwjgl-341.jar。build/lwjgl.jar 不得进入 app 的 libs 目录，
 # 否则会被 classpath 中的 libs/* 与版本化 jar 一并加载，造成同名类冲突。
 $(OUTPUTDIR)/lwjgl.jar: $(OUTPUTDIR)/lwjgl-333.jar $(OUTPUTDIR)/lwjgl-341.jar
-	@echo "Skipping $@ (lwjgl-333.jar / lwjgl-341.jar are used instead)"
+        @echo "Skipping $@ (lwjgl-333.jar / lwjgl-341.jar are used instead)"
 
 $(OUTPUTDIR)/patchjna_agent.jar: $(CLASSES)
-	@set -e
-	@mv $(basename $@)/com/sun/jna/Platform.class $(basename $@)/com/sun/jna/Platform.class.patch
-	@echo "Creating $@"
-	@$(BOOTJDK)/jar -cfm $@ $(SOURCEDIR)/patchjna_agent.txt -C $(basename $@) .
+        @set -e
+        @mv $(basename $@)/com/sun/jna/Platform.class $(basename $@)/com/sun/jna/Platform.class.patch
+        @echo "Creating $@"
+        @$(BOOTJDK)/jar -cfm $@ $(SOURCEDIR)/patchjna_agent.txt -C $(basename $@) .
 
 $(OUTPUTDIR)/patchsvc.jar: $(CLASSES)
-	@set -e
-	@mv $(basename $@)/de/maxhenkel/lame4j/Mp3Decoder.class $(basename $@)/de/maxhenkel/lame4j/Mp3Decoder.class.patch
-	@mv $(basename $@)/de/maxhenkel/lame4j/Mp3Encoder.class $(basename $@)/de/maxhenkel/lame4j/Mp3Encoder.class.patch
-	@mv $(basename $@)/de/maxhenkel/opus4j/OpusDecoder.class $(basename $@)/de/maxhenkel/opus4j/OpusDecoder.class.patch
-	@mv $(basename $@)/de/maxhenkel/opus4j/OpusEncoder.class $(basename $@)/de/maxhenkel/opus4j/OpusEncoder.class.patch
-	@mv $(basename $@)/de/maxhenkel/rnnoise4j/Denoiser.class $(basename $@)/de/maxhenkel/rnnoise4j/Denoiser.class.patch
-	@mv $(basename $@)/de/maxhenkel/speex4j/AutomaticGainControl.class $(basename $@)/de/maxhenkel/speex4j/AutomaticGainControl.class.patch
-	@rm -rf $(basename $@)/de/maxhenkel/*/*.class
-	@echo "Creating $@"
-	@$(BOOTJDK)/jar -cfm $@ $(SOURCEDIR)/patchsvc.txt -C $(basename $@) .
+        @set -e
+        @mv $(basename $@)/de/maxhenkel/lame4j/Mp3Decoder.class $(basename $@)/de/maxhenkel/lame4j/Mp3Decoder.class.patch
+        @mv $(basename $@)/de/maxhenkel/lame4j/Mp3Encoder.class $(basename $@)/de/maxhenkel/lame4j/Mp3Encoder.class.patch
+        @mv $(basename $@)/de/maxhenkel/opus4j/OpusDecoder.class $(basename $@)/de/maxhenkel/opus4j/OpusDecoder.class.patch
+        @mv $(basename $@)/de/maxhenkel/opus4j/OpusEncoder.class $(basename $@)/de/maxhenkel/opus4j/OpusEncoder.class.patch
+        @mv $(basename $@)/de/maxhenkel/rnnoise4j/Denoiser.class $(basename $@)/de/maxhenkel/rnnoise4j/Denoiser.class.patch
+        @mv $(basename $@)/de/maxhenkel/speex4j/AutomaticGainControl.class $(basename $@)/de/maxhenkel/speex4j/AutomaticGainControl.class.patch
+        @rm -rf $(basename $@)/de/maxhenkel/*/*.class
+        @echo "Creating $@"
+        @$(BOOTJDK)/jar -cfm $@ $(SOURCEDIR)/patchsvc.txt -C $(basename $@) .
 
 # Task 158（Forge 模块层 mojang 桩）：Forge 的 MC-BOOTSTRAP/GAME 模块层对
 # 系统类加载器完全不可见（securejarhandler ModuleClassLoader 的父链是
@@ -138,19 +162,19 @@ $(OUTPUTDIR)/patchsvc.jar: $(CLASSES)
 # Java 侧 preProcessLibraries _skip（进 classpath 会与桩 split-package）。
 # 装机锚点：Forge 1.20.1 过 GameNarrator（NoClassDefFoundError: Narrator 消失）。
 $(OUTPUTDIR)/mojang-stubs.jar: $(OUTPUTDIR)/launcher.jar
-	@set -e
-	@rm -rf $(OUTPUTDIR)/mojang-stubs
-	@mkdir -p $(OUTPUTDIR)/mojang-stubs/com/mojang
-	@if [ ! -d "$(OUTPUTDIR)/launcher/com/mojang/text2speech" ]; then \
-		echo "ERROR: launcher classes missing com/mojang/text2speech (Task158 mojang-stubs)"; \
-		exit 1; \
-	fi
-	@cp -R $(OUTPUTDIR)/launcher/com/mojang/text2speech $(OUTPUTDIR)/mojang-stubs/com/mojang/
-	@cd $(OUTPUTDIR)/mojang-stubs && $(BOOTJDK)/jar -cf ../mojang-stubs.jar com
-	@echo "Created $(OUTPUTDIR)/mojang-stubs.jar (Forge module-layer com.mojang.text2speech stubs, Task158)"
+        @set -e
+        @rm -rf $(OUTPUTDIR)/mojang-stubs
+        @mkdir -p $(OUTPUTDIR)/mojang-stubs/com/mojang
+        @if [ ! -d "$(OUTPUTDIR)/launcher/com/mojang/text2speech" ]; then \
+                echo "ERROR: launcher classes missing com/mojang/text2speech (Task158 mojang-stubs)"; \
+                exit 1; \
+        fi
+        @cp -R $(OUTPUTDIR)/launcher/com/mojang/text2speech $(OUTPUTDIR)/mojang-stubs/com/mojang/
+        @cd $(OUTPUTDIR)/mojang-stubs && $(BOOTJDK)/jar -cf ../mojang-stubs.jar com
+        @echo "Created $(OUTPUTDIR)/mojang-stubs.jar (Forge module-layer com.mojang.text2speech stubs, Task158)"
 
 clean:
-	rm -rf $(OUTPUTDIR)
+        rm -rf $(OUTPUTDIR)
 
 .SUFFIXES: .java
 .PHONY: all clean

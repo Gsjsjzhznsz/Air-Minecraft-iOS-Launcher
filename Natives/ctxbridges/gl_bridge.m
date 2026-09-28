@@ -797,7 +797,15 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
         //     拷贝；此处 4 字节 RGBA 读走独立小分配路径，并预清错误队列。
         // ============================================================
         {
-            // (1) 相位标记：state 块读完后若错误队列非空，点名相位
+            // (1) 相位标记：state 块读完后若错误队列非空，点名相位。
+            // Task191 修正：探针块【入口】先清一次错误队列（探针帧每 200 帧
+            // 一次、且 MobileGlues 会话不走本函数的这段——Task76 担心的
+            // "清错吞掉待转译错误"在此不适用）；否则 MC 自身调用产生的
+            // 遗留错误（如 RenderPearl 的 desktop-only 查询 1280）会被
+            // phase-tag 误报为探针自产，日志里 15/15 帧全是噪音、真正要
+            // 点名的相位反而被淹没。清错后 phase-tag 非零 = 探针内真有
+            // 非法 pname（不该发生，出现即是 bug 信号）。
+            while (es.getError()) {}
             unsigned int ame188_err = es.getError();
             if (ame188_err != 0) {
                 NSLog(@"[RenderDiag] Task188 phase-tag: GL error 0x%x pending AFTER Task187 state queries (bad pname is among drawFb/readFb/viewport/clear/mask/scissor/enable queries)", ame188_err);
@@ -807,6 +815,20 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             if (es.getIntegerv != NULL) {
                 es.getIntegerv(0x0D55 /*GL_ALPHA_BITS*/, &ame188_alphaBits);
                 es.getIntegerv(0x0D56 /*GL_DEPTH_BITS*/, &ame188_depthBits);
+            }
+            // (2b) Task191（ANGLE 黑屏第三轮）：UBO 绑定面取证。判读锚定：
+            // RenderPearl 纯 UBO 上传矩阵（Task187 反编译定案）+ readback 中心
+            // 像素真黑 + layer opaque=1（Task188 裁决"真黑内容"）→ 剩余假设
+            // 空间 = UBO 数据未到达着色器（MVP 全 0 → 全部片元被裁剪 →
+            // 只剩 clearColor）。两个只读查询（均 ES 3.0 合法）：
+            //   uboAlign  = GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT（驱动对齐要求，
+            //               通常 256；ANGLE on iOS 若报异常值即是线索）
+            //   uboBind   = GL_UNIFORM_BUFFER_BINDING（swap 时点的残留绑定；
+            //               恒 0 = MC 从未成功绑定 UBO = 绑定路径断裂的信号）
+            int ame191_uboAlign = -1, ame191_uboBind = -1;
+            if (es.getIntegerv != NULL) {
+                es.getIntegerv(0x8A34 /*GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT*/, &ame191_uboAlign);
+                es.getIntegerv(0x8A28 /*GL_UNIFORM_BUFFER_BINDING*/, &ame191_uboBind);
             }
             // (3) 1x1 中心回读
             static int s_task188_reads = 0;
@@ -824,8 +846,8 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
                       s_task188_reads, viewport[0] + viewport[2] / 2, viewport[1] + viewport[3] / 2,
                       ame188_px[0], ame188_px[1], ame188_px[2], ame188_px[3], ame188_rbErr);
             }
-            NSLog(@"[RenderDiag] Task188 fb: alphaBits=%d depthBits=%d readbackDone=%d (alphaBits=8 => premultiplied-black composite hypothesis live)",
-                  ame188_alphaBits, ame188_depthBits, (int)ame188_readOK);
+            NSLog(@"[RenderDiag] Task188 fb: alphaBits=%d depthBits=%d readbackDone=%d uboAlign=%d uboBind=%d (alphaBits=8 => premultiplied-black composite hypothesis live; uboBind=0 at swap => MC never binds UBO, matrix-upload path broken)",
+                  ame188_alphaBits, ame188_depthBits, (int)ame188_readOK, ame191_uboAlign, ame191_uboBind);
         }
     }
     // Task 76：退役 while(es.getError() != 0) 清错循环——它会把底层 ANGLE

@@ -2962,3 +2962,87 @@
 // neumorph-switch states; long-press on any account shows Use account /
 // Delete account; installer page card gap equals the version-number page.
 // ============================================================================
+
+// REVISION 18 addendum (Amethyst Task 191, no bump): six-feedback root-fix
+// round on the dde0f82 device logs (four fresh sessions uploaded).
+// (1) vgpu block corruption ("blocks like lines", entities fine): the
+//     Task189 post-draw probe adjudicated 8/8 hits, all identical --
+//     direct-elements mode=GL_TRIANGLES count=6 idxType=USHORT -> 0x0502.
+//     That is the QUADS(4-vert)->TRIANGLES(6-index) conversion product (a
+//     glstate->scratch CPU pointer) handed straight to gles_glDrawElements;
+//     MC's own "@ Pre render 1282" fired 2178x. The control group (immediate
+//     entities, listdraw.c's real-EBO list-elements path) never failed --
+//     Apple iOS ES rejects client-memory INDEX arrays (vertex client arrays
+//     are accepted; direct-arrays stayed green). FIX (vgpu drawing.c):
+//     ame191_drawElementsViaEBO uploads the indices into the scratch EBO
+//     (gl4es_scratch_indices + glBufferSubData), draws via the intact fpe
+//     front-end with a NULL offset under that binding, then restores EBO=0;
+//     ES1.1 keeps the legacy direct path. Anchors: site=direct-elements-ebo
+//     with 0x0502 gone, "@ Pre render 1282" count zeroed, 1.8.9 block
+//     textures restored.
+// (2) i18n manual language switch showing raw "i18n_str_N" keys everywhere:
+//     en.lproj/Localizable.strings line 2148 carried an UNESCAPED inner
+//     quote pair ("Downloaded "%@" -- ...") which terminates the value
+//     string early and makes the whole table fail old-style plist parsing;
+//     with the system language on Chinese (zh-Hans table intact) the bug
+//     was invisible until the user manually picked English. FIX: quotes
+//     escaped; localize() gains a zh-Hans last-resort tier on BOTH the
+//     override and system paths (any single broken/missing table now falls
+//     back to the fullest translation instead of exposing raw keys);
+//     scripts/task191_validate_strings.py is a strict Apple-oldstyle-plist
+//     tokenizer now guarding all 40+ lproj tables in CI-runnable form.
+// (3) Forge 26.1.2 launch crash: ResolutionException "Modules mojang.stubs
+//     and launcher export package com.mojang.text2speech to module logging"
+//     -- bootstrap 2.1.7 modularizes BOTH launcher.jar and mojang-stubs.jar
+//     (the 1.20.1-era ignoreList no longer shields launcher.jar), and both
+//     carried the Task158 stub package. FIX (JavaApp/Makefile): launcher.jar
+//     no longer carries com/mojang/text2speech (stash-mv around the jar
+//     command, restored after so the mojang-stubs cp source survives);
+//     mojang-stubs.jar is now the sole owner serving both the module layer
+//     and the system classpath (first-wins, it precedes launcher.jar).
+// (4) Controls-editor crash ("zooming a control crashes"): the repo-download
+//     session (latestlog.1) died in insertObject:atIndex: object-nil right
+//     after "layout saved"; the Task189 re-armed uncaught handler never
+//     printed (bare-address OS stack). Defense in depth: doAddButton nil
+//     guards its four insertObject sites (stale-undo-replay hangover
+//     anchor), loadControlFile now clears the undo stack (layout switch is
+//     a semantic boundary; old invocations reference dead buttons), and the
+//     SceneDelegate willConnect re-arm is now observable ("Task191:
+//     uncaught-exception handler re-armed at willConnect") so the next
+//     occurrence self-identifies.
+// (5) Forced-landscape inverted direction ("portrait then landscape: the
+//     orientation stays reversed"): Task189 picked the 90-degree direction
+//     from scene.interfaceOrientation, which under LiveContainer's window
+//     mode always reports Portrait (decoupled from how the device is
+//     actually held) -- wrong sign on hand-swap = a 180-degree flip, and no
+//     re-evaluation on device-orientation changes (window geometry is
+//     independent in free-window mode). FIX (SceneDelegate): the angle now
+//     follows UIDevice physical orientation (LandscapeRight -> +90,
+//     LandscapeLeft -> -90, ambiguous -> keep), landscape windows gain a
+//     held-orientation baseline with 180-degree flip-follow when the device
+//     is swapped, and UIDeviceOrientationDidChangeNotification (with
+//     accelerometer generation begun, observer removed on disconnect)
+//     triggers re-evaluation. Anchors: "Task191: portrait window ->
+//     content rotated +/-Ndeg by device orientation" and "Task191:
+//     landscape window flipped=...".
+// (6) ANGLE black screen round three (Task188 adjudicated genuinely-black
+//     content: center pixel (0,0,0,0), layer opaque=1, 58fps, zero compile
+//     errors): the remaining hypothesis space is UBO data never reaching
+//     the shaders (RenderPearl is UBO-only; MVP all-zero clips every
+//     fragment, leaving the black clear). Shipped: tinygl4angle now
+//     explicitly forwards glBindBufferRange/glBindBufferBase/
+//     glUniformBlockBinding (previously resolved straight to ANGLE's ES
+//     natives) logging the first bindings each -- zero calls = broken bind
+//     path; a non-256-aligned offset is tagged "[UNALIGNED-256!]"; the
+//     swap probe reads GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT and
+//     GL_UNIFORM_BUFFER_BINDING (uboAlign/uboBind in the Task188 fb line;
+//     uboBind=0 at swap = MC never binds UBO). The phase-tag noise is also
+//     root-fixed: the probe block now clears the error queue on entry, so
+//     RenderPearl's own desktop-only-query 1280s no longer masquerade as
+//     probe-self errors (15/15 frames of noise in the last log).
+// Verification: verify_task191 45/45 (A i18n 3, B vgpu 6, C forge 6,
+// D controls 3, E landscape 9, F angle 7, G syntax gates 8, H cascade 3);
+// task189_vgpu_syntax 80/80; cascade 188:53, 189:80, 190:59 all green;
+// the EBO mirror harness passes (upload bytes == draw bytes, fpe receives
+// NULL, EBO unbound after) and the Makefile stash sequence dry-runs clean.
+// ============================================================================

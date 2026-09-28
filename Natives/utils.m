@@ -646,8 +646,17 @@ NSString* localize(NSString* key, NSString* comment) {
             NSBundle *enBundle = [NSBundle bundleWithPath:enPath];
             value = [enBundle localizedStringForKey:key value:nil table:nil];
             if ([value isEqualToString:key]) {
-                // 英文也没有，尝试 UIKit 系统翻译
-                value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+                // Task191：zh-Hans 兜底（en.lproj 曾因一行值内未转义引号整表解析
+                // 失败，用户手动切换语言后全界面显示 "i18n_str_N" 裸键名——任何
+                // 单一语言表损坏/缺键时，退到最全的 zh-Hans 表而不是把键名
+                // 直接暴露给用户。
+                NSString *zhPath = [NSBundle.mainBundle pathForResource:@"zh-Hans" ofType:@"lproj"];
+                NSBundle *zhBundle = [NSBundle bundleWithPath:zhPath];
+                value = [zhBundle localizedStringForKey:key value:nil table:nil];
+                if ([value isEqualToString:key]) {
+                    // 英文也没有，尝试 UIKit 系统翻译
+                    value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+                }
             }
         }
     } else {
@@ -658,7 +667,13 @@ NSString* localize(NSString* key, NSString* comment) {
             NSBundle* languageBundle = [NSBundle bundleWithPath:path];
             value = [languageBundle localizedStringForKey:key value:nil table:nil];
             if ([value isEqualToString:key]) {
-                value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+                // Task191：zh-Hans 兜底（同上，系统语言表损坏/缺键时的防线）
+                NSString *zhPath = [NSBundle.mainBundle pathForResource:@"zh-Hans" ofType:@"lproj"];
+                NSBundle *zhBundle = [NSBundle bundleWithPath:zhPath];
+                value = [zhBundle localizedStringForKey:key value:nil table:nil];
+                if ([value isEqualToString:key]) {
+                    value = [[NSBundle bundleWithIdentifier:@"com.apple.UIKit"] localizedStringForKey:key value:nil table:nil];
+                }
             }
         }
     }

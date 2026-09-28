@@ -13,6 +13,9 @@
 extern __weak UIWindow *mainWindow;
 
 @interface SceneDelegate ()
+// Task191：横向窗口的持向基线（首次观察到该横向窗口时的设备方向）。
+// 设备对调（LandscapeLeft <-> LandscapeRight）时内容补转 180°。
+@property (nonatomic, assign) UIDeviceOrientation ame191_landscapeBaseline;
 @end
 
 @implementation SceneDelegate
@@ -22,9 +25,15 @@ extern __weak UIWindow *mainWindow;
 
     // Task189：异常处理器晚装复挂（AppDelegate 挂载点之后 LC 若再覆盖，
     // 此处再抢回一次——场景连接是 UI 阶段最后的稳定挂载点）。
+    // Task191：补装机锚点日志——dde0f82 会话（latestlog.1）的 insertObject
+    // nil 崩溃仍走系统默认输出（无 "Uncaught exception:" 符号栈），
+    // 且日志里两处 re-arm 均不可见（AppDelegate 点无日志输出、此处
+    // 静默安装）——先让 willConnect 点的 re-arm 可观测，下轮日志直接
+    // 判定此点是否安装成功、还是 LC 在更晚时机再次覆盖。
     {
         extern void uncaughtExceptionHandler(NSException *exception);
         NSSetUncaughtExceptionHandler(&uncaughtExceptionHandler);
+        NSLog(@"[SceneDelegate] Task191: uncaught-exception handler re-armed at willConnect");
     }
 
     // 强制横屏 (iOS 16+)
@@ -110,6 +119,15 @@ extern __weak UIWindow *mainWindow;
     NSLog(@"[SceneDelegate] Task189: landscape window transform evaluated (bounds=%@ rotated=%d)",
           NSStringFromCGRect(self.window.windowScene.coordinateSpace.bounds),
           (int)!CGAffineTransformIsIdentity(self.window.transform));
+
+    // Task191：设备持向变化重评估（±90°/180° 跟手的唯一时机——窗口几何
+    // 在自由窗口模式下不随设备旋转变化，didUpdateCoordinateSpace 不够）。
+    // 开启加速计采样 + 监听方向变化通知；sceneDidDisconnect 摘除。
+    [[UIDevice currentDevice] beginGeneratingDeviceOrientationNotifications];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(ame191_deviceOrientationDidChange:)
+                                                 name:UIDeviceOrientationDidChangeNotification
+                                               object:nil];
 
     // Task137：Task136 的 NMContrast 动态文字对比度扫描器随新拟态一并退役。
     // 深底深字问题改为直接修复（各元素使用系统语义色/动态色自动适配，
@@ -222,6 +240,8 @@ extern __weak UIWindow *mainWindow;
 - (void)sceneDidDisconnect:(UIScene *)scene {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"UIThemeChanged" object:nil];
     [[NSNotificationCenter defaultCenter] removeObserver:self name:@"AppLanguageChanged" object:nil];
+    // Task191：设备方向监听摘除（配对 willConnect 的注册）。
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:UIDeviceOrientationDidChangeNotification object:nil];
     // Task137：window traitCollection KVO 已随 NMTheme 退役（注册与摘除同步移除）
 }
 
@@ -270,21 +290,29 @@ extern __weak UIWindow *mainWindow;
 }
 
 // ============================================================================
-// Task189（强制横屏第三轮）：窗口内容旋转兜底。
+// Task189（强制横屏第三轮）→ Task191（方向反转根修）：窗口内容旋转兜底。
 // 病历：Task187（plist 移除 Portrait）与 Task188（UIRequiresFullScreen=true）
 // 双双真机无效——c3f4623 会话实测仍处窗口模式（geometry 请求 Code=101 拒绝），
 // 根因 = LiveContainer 宿主流程里窗口化由宿主 app 的 plist/scene 清单决定，
 // 来宾（本 app）的方向声明不被 UIKit 采纳。
-// 方案：窗口 bounds 呈竖向（高 > 宽 * 1.02，留出近方形窗口的判定死区）时，
-// 对 self.window 施加 90° 旋转 transform 并把窗口自身坐标系换为横屏
-// （bounds 高宽互换、center 对齐场景中心）。效果：
-//   - 全部 UI 与游戏内容横屏呈现，铺满窗口无黑边；
-//   - 触控经 UIKit 逆变换自动映射到横屏坐标系（hit-testing 走 window 变换）；
-//   - 安全区/刘海内缩在旋转坐标系内自动正确（Task187 的 inset 读取基于
-//     view 层 safeAreaInsets，随坐标系平移）；
-//   - 横屏窗口 transform 恒等，与既有行为零差异。
-// 重评估时机：willConnect（首次）+ scene:didUpdateCoordinateSpace:（用户
-// 调整窗口尺寸 / 设备旋转导致场景 bounds 变化时）。
+// Task189 首版对竖向窗口固定 +90°（按 scene.interfaceOrientation 选向）。
+// Task191 病历（dde0f82 装机，用户实测"竖屏之后再横屏，方向会一直反的"）：
+//   (a) scene.interfaceOrientation 在窗口模式下恒报 Portrait（与设备实际
+//       持向解耦）→ 设备倒持/换手时 ±90° 选错，内容相差 180°（"反的"）；
+//   (b) 窗口几何变化之外（设备旋转但窗口 bounds 不变的自由窗口）无重评估
+//       时机 → 陈旧 transform 一直挂着。
+// 修法（Task191）：
+//   - 旋转角度改由 UIDevice 物理方向（加速计，独立于窗口几何）决定：
+//     LandscapeRight（顶部朝右）→ +90°（内容顶部转向屏幕右）；
+//     LandscapeLeft（顶部朝左）→ -90°；Portrait/平放/未知 → 保持当前角；
+//   - 横向窗口也参与：设备持向相对"首次观察到该横向窗口时的持向"翻转
+//     180° 时，内容补转 180°（两手持 iPad 对调的场景）；
+//   - 新增 UIDeviceOrientationDidChangeNotification 监听 + 开启加速计
+//     采样（beginGeneratingDeviceOrientationNotifications），任何持向
+//     变化立即重评估。
+// 效果：全持向横屏呈现（竖窗 ±90 跟手、横窗 180° 翻转跟手）。
+// 重评估时机：willConnect（首次）+ didUpdateCoordinateSpace（窗口几何
+// 变化）+ orientationDidChange（设备持向变化）。
 // 逃生舱：偏好 general.disable_window_rotation_shim = true 可关闭（出现
 // 触控/键盘错位等极端兼容问题时无需重编译即可回退）。
 // ============================================================================
@@ -296,22 +324,54 @@ extern __weak UIWindow *mainWindow;
     CGRect sb = scene.coordinateSpace.bounds;
     if (sb.size.width <= 0 || sb.size.height <= 0) return;
 
+    UIDeviceOrientation dev = [UIDevice currentDevice].orientation;
+
     // 仅在"明显竖向"的窗口旋转（1.02 死区：近方形窗口旋转无收益反而扰动）
     BOOL portraitWindow = (sb.size.height > sb.size.width * 1.02);
     if (!portraitWindow) {
-        if (!CGAffineTransformIsIdentity(self.window.transform)) {
-            self.window.transform = CGAffineTransformIdentity;
+        // ---- 横向窗口 ----
+        // Task191：记录/对比持向，设备对调（180° 翻转）时内容补转 180°。
+        if (self.ame191_landscapeBaseline == UIDeviceOrientationUnknown ||
+            self.ame191_landscapeBaseline == UIDeviceOrientationPortrait ||
+            self.ame191_landscapeBaseline == UIDeviceOrientationPortraitUpsideDown ||
+            self.ame191_landscapeBaseline == UIDeviceOrientationFaceUp ||
+            self.ame191_landscapeBaseline == UIDeviceOrientationFaceDown) {
+            // 基线无效（首次观察/上一窗口是竖向）：以当前持向为基线，不旋转。
+            self.ame191_landscapeBaseline = dev;
+            if (!CGAffineTransformIsIdentity(self.window.transform)) {
+                self.window.transform = CGAffineTransformIdentity;
+                self.window.frame = sb;
+                NSLog(@"[SceneDelegate] Task189: window is landscape -> rotation removed (baseline=%ld)", (long)dev);
+            }
+            return;
+        }
+        BOOL flipped = ((self.ame191_landscapeBaseline == UIDeviceOrientationLandscapeRight && dev == UIDeviceOrientationLandscapeLeft) ||
+                        (self.ame191_landscapeBaseline == UIDeviceOrientationLandscapeLeft && dev == UIDeviceOrientationLandscapeRight));
+        CGAffineTransform want = flipped ? CGAffineTransformMakeRotation((CGFloat)M_PI) : CGAffineTransformIdentity;
+        if (!CGAffineTransformEqualToTransform(self.window.transform, want)) {
+            self.window.transform = want;
             self.window.frame = sb;
-            NSLog(@"[SceneDelegate] Task189: window is landscape -> rotation removed");
+            NSLog(@"[SceneDelegate] Task191: landscape window flipped=%d (baseline=%ld dev=%ld) -> content %s",
+                  (int)flipped, (long)self.ame191_landscapeBaseline, (long)dev, flipped ? "rotated 180deg" : "upright");
         }
         return;
     }
 
-    // 旋转方向：跟随窗口当前报告的界面方向（PortraitUpsideDown 取反向，
-    // 其余一律 +90°——窗口竖向时系统多报 Portrait，设备倒持时内容同样倒置
-    // 可读）。M_PI_2 = 顺时针 90°。
-    CGFloat angle = (scene.interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown)
-                        ? (CGFloat)(-M_PI_2) : (CGFloat)M_PI_2;
+    // ---- 竖向窗口：±90° 由设备物理持向决定（Task191 根修）----
+    // LandscapeRight（设备顶部朝右，从 Portrait 顺时针转）→ 内容顶部需指向
+    // 屏幕右 → +90°（顺时针）；LandscapeLeft（顶部朝左）→ -90°。
+    // Portrait/倒持/平放/未知：保持当前旋转角（不确定时不动，避免抖动）。
+    CGFloat angle;
+    CGAffineTransform cur = self.window.transform;
+    if (dev == UIDeviceOrientationLandscapeRight) {
+        angle = (CGFloat)M_PI_2;
+    } else if (dev == UIDeviceOrientationLandscapeLeft) {
+        angle = (CGFloat)(-M_PI_2);
+    } else if (!CGAffineTransformIsIdentity(cur)) {
+        return;   // 持向不明确但已在旋转：保持
+    } else {
+        angle = (CGFloat)M_PI_2;   // 持向不明确且未旋转：默认 +90°
+    }
     CGAffineTransform rot = CGAffineTransformMakeRotation(angle);
     if (CGAffineTransformIsIdentity(self.window.transform) ||
         !CGAffineTransformEqualToTransform(self.window.transform, rot) ||
@@ -319,10 +379,12 @@ extern __weak UIWindow *mainWindow;
         self.window.transform = rot;
         self.window.bounds = CGRectMake(0, 0, sb.size.height, sb.size.width);
         self.window.center = CGPointMake(sb.size.width / 2.0, sb.size.height / 2.0);
-        NSLog(@"[SceneDelegate] Task189: portrait window -> content rotated 90deg (scene=%@ content=%@ angle=%+.0fdeg)",
-              NSStringFromCGRect(sb), NSStringFromCGRect(self.window.bounds),
-              (float)(angle * 180.0 / M_PI));
+        NSLog(@"[SceneDelegate] Task191: portrait window -> content rotated %+.0fdeg by device orientation %ld (scene=%@ content=%@)",
+              (float)(angle * 180.0 / M_PI), (long)dev,
+              NSStringFromCGRect(sb), NSStringFromCGRect(self.window.bounds));
     }
+    // 竖向窗口期间基线失效（回到横向窗口时会重新取基线）
+    self.ame191_landscapeBaseline = UIDeviceOrientationUnknown;
 }
 
 - (void)scene:(UIScene *)scene didUpdateCoordinateSpace:(id<UICoordinateSpace>)coordinateSpace
@@ -330,6 +392,15 @@ extern __weak UIWindow *mainWindow;
                                         traitCollection:(UITraitCollection *)traitCollection {
     // Task189：窗口尺寸/方向变化（窗口模式下的拖拽调整、设备旋转）后
     // 重评估内容旋转。轻微去抖：下一帧执行，避开变更回调内的布局重入。
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [weakSelf ame189_applyLandscapeWindowTransform];
+    });
+}
+
+// Task191：设备持向变化（窗口几何可能不变）也触发重评估——±90°/180°
+// 跟手的唯一时机。去抖同上。
+- (void)ame191_deviceOrientationDidChange:(NSNotification *)notification {
     __weak typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
         [weakSelf ame189_applyLandscapeWindowTransform];

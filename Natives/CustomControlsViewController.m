@@ -177,6 +177,10 @@
 }
 
 - (void)loadControlFile:(NSString *)file {
+    // Task191：布局切换 = 语义边界，undo 栈必须清空。旧栈的 invocation
+    // 携带旧布局的 button/properties/index，重放会把悬垂对象插进新字典
+    //（insertObject nil 崩溃的候选路径），且"跨布局撤销"本身无意义。
+    [self.undoManager removeAllActions];
     [self.ctrlView loadControlFile:file];
     for (ControlButton *button in self.ctrlView.subviews) {
         [button addGestureRecognizer:[[UITapGestureRecognizer alloc]
