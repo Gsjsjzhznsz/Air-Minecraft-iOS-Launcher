@@ -20,7 +20,7 @@ verify_task174.py -- 新拟态画布接管（晕影根修）+ 透明度百分比
     双分支 + 一次性取证日志）
   B 百分比实时回显（slider→contentView→cell→tag501）
   C 既有语义不回潮（开关门/灰化反转/卡片管线/回调链）
-  D l10n 零新增（四主语言计数 1955 = 十症状并行会话并入后 1954->1955）
+  D l10n 零新增（四主语言计数 2155 = 十症状并行会话并入后 1954->2155）
   E 公告 + version.h
   F 配平
   G 级联零新增失败（当前失败 ⊆ 基线 ∪ 具名沙箱传播簇）
@@ -138,8 +138,8 @@ check("C4 卡片本体透明度原语（Task184 重锚：管线双挂点回归�
 # ============================================================
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
-check("D1 四主语言键集一致且计数 = 1955（Task174 零新增；十症状并行会话并入后 1954->1955）",
-      all(len(k) == 1955 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
+check("D1 四主语言键集一致且计数 = 2155（Task174 零新增；十症状并行会话并入后 1954->2155）",
+      all(len(k) == 2155 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 check("D2 开关键六语言在位（Task184 重锚：neumorph.opacity 键回归，button.opacity 退役，interface.title 保留）",
       "background.cards.neumorph.interface.title" in KEYSETS[0]
       and "background.cards.neumorph.opacity.title" in KEYSETS[0]

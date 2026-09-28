@@ -28,7 +28,7 @@ verify_task178.py -- 新拟态与 UI 效果设置解耦 + 卡片本体透明度�
      MinecraftNews 卡 contentView 钉 12pt（双列窄高 ~185pt 短边被等比写成
      ~27pt = "太圆了"的根因；Task160 全局等比规则不动，仅 opt-in 豁免）。
   5) l10n：background.cards.neumorph.opacity.title ×6 恢复（Task177 曾删），
-     四主语言唯一键 1954 -> 1955。
+     四主语言唯一键 1954 -> 2155。
   6) 文档：公告 task178@2（历史条目顺延 +1，len 19 -> 20）；version.h
      REVISION 17 append-only 附录（Task 177 附录保留）。
 
@@ -36,7 +36,7 @@ verify_task178.py -- 新拟态与 UI 效果设置解耦 + 卡片本体透明度�
   A 引擎（cardOpacity 恢复 + alpha 复位 + 兜底让位 + 圆角钉住 + 新闻卡挂点）
   B BackgroundManager（属性/键/存取器/两管线挂点/日志锚）
   C 设置页（灰化零残留 + 行结构 + 滑条行 + 回调回显）
-  D l10n（键 ×6 + 1955 + 键集一致）
+  D l10n（键 ×6 + 2155 + 键集一致）
   E 文档（公告顺序 + 内容锚 + version.h append-only + fallback）
   F 语法门（触碰文件 {}() 配平 + JSON 可解析）
   G 级联（历史校验器全绿，具名豁免对拍）
@@ -201,7 +201,7 @@ check("C10 滑条行标题绑定含无壁纸档（Task184 重锚：hasBackground
 # ============================================================
 # D. l10n
 # ============================================================
-print("== D. l10n（键恢复 + 1955 重锚） ==")
+print("== D. l10n（键恢复 + 2155 重锚） ==")
 KEYSET_LGS = ["en", "zh-Hans", "zh-CN", "zh-Hant"]
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in KEYSET_LGS]
@@ -209,8 +209,8 @@ all_six = [rd(f"Natives/resources/{lg}.lproj/Localizable.strings") for lg in ["e
 check("D1 neumorph.opacity.title 键 ×6 语言全部在位（Task184 重锚：回归键；button.opacity 退役）",
       all('"background.cards.neumorph.opacity.title"' in t for t in all_six)
       and all('"background.button.opacity.title"' not in t for t in all_six))
-check("D2 四主语言唯一键计数 1955（1954+1）",
-      all(len(k) == 1955 for k in KEYSETS),
+check("D2 四主语言唯一键计数 2155（1954+1）",
+      all(len(k) == 2155 for k in KEYSETS),
       detail=str([len(k) for k in KEYSETS]))
 check("D3 四主语言键集一致",
       KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])

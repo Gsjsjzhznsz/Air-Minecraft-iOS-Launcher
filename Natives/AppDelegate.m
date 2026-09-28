@@ -18,6 +18,20 @@ extern dispatch_group_t fatalExitGroup;
 #pragma mark - UISceneSession lifecycle
 
 - (UISceneConfiguration *)application:(UIApplication *)application configurationForConnectingSceneSession:(UISceneSession *)connectingSceneSession options:(UISceneConnectionOptions *)options {
+    // Task189：异常处理器晚装复挂。main.m 预初始化里装的
+    // NSSetUncaughtExceptionHandler 被 LiveContainer 宿主（其共享框架在
+    // invokeAppMain 前后装载自己的崩溃处理链）覆盖——c3f4623 会话的
+    // insertObject:atIndex: nil 崩溃走的是系统默认输出（latestlog 只有
+    // "*** Terminating ..." 裸地址栈，无我方 handler 的符号化栈与
+    // fatal trace），证据 = 装了等于没装。此处 + SceneDelegate willConnect
+    // 双点重挂（后装者生效），把符号化崩溃捕获抢回来：任何 NSException
+    // 崩溃下一次装机日志直接给出 App 符号栈。
+    {
+        extern void uncaughtExceptionHandler(NSException *exception);
+        NSSetUncaughtExceptionHandler(&uncaughtExceptionHandler);
+        NSLog(@"[AppDelegate] Task189: uncaught-exception handler re-armed after container setup");
+    }
+
     // 一次性迁移旧版全局下载源偏好到分类镜像策略键（幂等，早于任何 UI 读取偏好）
     migrateDownloadSourcePreferences();
 

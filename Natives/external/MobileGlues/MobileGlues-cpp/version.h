@@ -2804,3 +2804,113 @@
 // Verification: verify_task188 (this round) + gcc syntax gate on
 // pack/shaderconv.c post-emulation.
 // ============================================================================
+
+// ============================================================================
+// REVISION 17 -- Task 189 addendum (six-log adjudication of c3f4623 +
+// six-fix round).
+//
+// (1) vgpu "blocks render like lines" (1.8.9-forge session): the Task188
+// textureGather emulation closed the white screen -- shaders now compile
+// clean, fps=30, swapOK thousands, session ran until user quit. The new
+// symptom is geometry-level. Static audit (quads->triangles index gen,
+// GoUniformMatrix4fv transpose + -1 guard, adjust_vertices, FPE vertex
+// attrib bridge, renderlist mode merging) all clean; the ONE hard anomaly
+// is MC's own "1282: Invalid operation @ Pre render" firing ~851x (once
+// per frame) -- a failing per-frame GL call that 1.8.9 reports but the
+// shim layer never surfaces. Shipped forensics (no blind geometry change):
+// ame189_census (primitive histogram at glBegin/glDrawArrays/glDrawElements/
+// glDrawRangeElements entries, reported every 4096 draws, 3 reports) +
+// ame189_afterDraw (first 120 real draws get a post-draw glGetError read;
+// hits are logged with full draw params and RE-INJECTED via errorShim so
+// MC's own error checks stay intact) + glPolygonMode trip-wire (GL_LINE/
+// GL_POINT requests logged, 4 max). Files: src/gl/drawing.c, listdraw.c,
+// gl4es.c, gl4es.h. Local gate: scripts/task189_vgpu_syntax.py (extracts
+// the two functions verbatim and runs a behavioral mirror; caught a real
+// census reset bug pre-merge). Anchors: "VGPU Task189 census #N" /
+// "VGPU Task189 post-draw error #N" / "VGPU Task189: glPolygonMode(...)".
+//
+// (2) ANGLE black screen (26.3 fabric session): Task188's decisive 1x1
+// readback NEVER RAN -- readbackDone=0 across all 15 probe frames. Root
+// cause: ame_es() dropped the glReadPixels dlsym in the Task75 cleanup
+// and the Task146 renderer-side dispatch only re-arms it for Mithril/
+// MobileGL-family renderers; ANGLE and vgpu sessions both got NULL.
+// Fix: s_es.readPixels dlsym restored in ame_es() (the pinned
+// libGLESv2 is the same ANGLE instance those sessions run on; the 1x1
+// small-allocation path stays clear of the Task75 SIGBUS). The probe now
+// fires on BOTH renderer families -- next log's center-pixel rgba either
+// names the presentation layer (non-black) or the content layer (black ->
+// spvc rewrite audit). Session facts recorded: layer opaque=1 (weakens
+// the premultiplied-alpha theory), only 15 debug messages total, all
+// "Invalid pname" 1:1 with our own probe frames.
+//
+// (3) Forge 26.1.2 launch crash (ResolutionException round 2): Task188
+// removed the com/apple/ios/audio mirror but android.util remained
+// double-exported -- "Modules lwjgl and launcher export package
+// android.util to module logging" (Forge Bootstrap 2.1.7 dies at module
+// resolution, exit(1), swapOK=0). The duplicate came from Task156, which
+// deliberately compiled the five android/util ArrayMap stubs into the
+// lwjgl overlay so GLFW.class's ArrayMap fields resolve through the
+// MC-BOOTSTRAP ModuleClassLoader. Fix: the five stubs moved to a lwjgl-
+// private package org.lwjgl.ame (byte-identical classes, package
+// declaration renamed; keyAt() etc. keep working) and GLFW.java now
+// imports org.lwjgl.ame.ArrayMap -- the lwjgl module no longer exports
+// android.util at all, which fixes BOTH the split package AND the
+// original Task156 visibility (the type now lives in the lwjgl module
+// itself). launcher.jar keeps its android.util copy exclusively.
+//
+// (4) Forced landscape, round three: Task188's UIRequiresFullScreen=true
+// proved ineffective under LiveContainer -- the host app's plist owns
+// windowing and the guest's declarations are never consulted (geometry
+// request still declined Code=101, still window mode). New approach that
+// needs no OS cooperation: when the window bounds are portrait (height >
+// width * 1.02), SceneDelegate rotates the UIWindow content 90 degrees
+// (transform + swapped bounds + centered) -- UI, game and touches (UIKit
+// inverse-transform hit testing) all stay consistent, content fills the
+// window with no letterbox; landscape windows keep the identity transform
+// (zero change). Re-evaluated at willConnect, sceneDidBecomeActive and
+// scene:didUpdateCoordinateSpace (window resize / device rotation).
+// Escape hatch pref: general.disable_window_rotation_shim.
+// Anchors: "[SceneDelegate] Task189: portrait window -> content rotated
+// 90deg" / "landscape window transform evaluated (rotated=N)".
+//
+// (5) Control repository, round two (user: "too hidden -- put it in the
+// Downloads tab like FCL, and add acceleration for China"): the repo is
+// now the 8th first-class tab of DownloadViewController (segment 控件,
+// embedded ControlRepoViewController child VC, no sidebar/no search on
+// this tab, searchBar height collapses to 0) alongside the existing
+// editor long-press entry. China reachability: the two-URL primary/
+// fallback is now a SIX-mirror sticky chain -- ghfast.top, gh-proxy.com,
+// fastly.jsdelivr.net, gcore.jsdelivr.net, cdn.jsdelivr.net,
+// raw.githubusercontent.com direct -- starting from the last-winning
+// mirror (pref controlrepo.mirror_idx), 12s per-mirror timeout, JSON
+// validation unchanged (HTML error pages from proxies are rejected).
+// Anchors: "[ControlRepo] Task189: mirror #N won/failed/index loaded via
+// mirror chain".
+//
+// (6) Crash triage: the repo-download NSInvalidArgumentException crash
+// ("insertObject:atIndex: object cannot be nil" right after "layout
+// saved") shows the OS default terminate output, meaning our
+// NSSetUncaughtExceptionHandler installed in main.m pre-init was
+// overridden (LiveContainer installs its own; last installer wins).
+// Re-armed at two late points (AppDelegate scene-configuration +
+// SceneDelegate willConnect) so our symbolicated stack + fatal-trace
+// writer owns the next crash. Static audit of all 12 insertObject sites
+// found no nil-capable path in the repo flow -- the next occurrence will
+// self-identify via "[AppDelegate] Task189: uncaught-exception handler
+// re-armed" followed by the symbolicated "Uncaught exception:" block.
+//
+// (7) i18n round one (user: "many hardcoded Chinese strings"): the
+// localize() infrastructure is complete (all 1362 existing keys
+// registered) -- the debt was (a) 157 mp.* MPLocalized keys never
+// registered (every language saw the Chinese fallback) and (b) ~460 raw
+// literals. This round: 185 keys registered across en/zh-Hans/zh-CN/
+// zh-Hant (mp.* complete + 28 ame189.* for the migrated launcher strings
+// -- RightPanel cards, JIT timeout trio, AI safety mode with stable
+// safe/ask/yolo pickKeys, uikit_bridge alerts, JavaLauncher import
+// warning, LTW renderer warning, utils fallbacks, the new Controls tab
+// title). Known skips (next round): AI/* ~310 strings, logic-matched
+// literals (isEqualToString against display strings -- VersionCardCell
+// release/snapshot, 全部 filters, 新建版本 label), mp variant keys
+// (6 keys with context-specific Chinese now map to one generic entry),
+// language-picker proper names.
+// ============================================================================

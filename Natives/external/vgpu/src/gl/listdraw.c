@@ -359,7 +359,7 @@ void draw_renderlist(renderlist_t *list) {
     LOAD_GLES2_(glBindBuffer);
     gl4es_glPushClientAttrib(GL_CLIENT_VERTEX_ARRAY_BIT);
 
-	int old_tex;
+        int old_tex;
     GLushort *indices;
     int use_texgen[MAX_TEX] = {0};
     old_tex = glstate->texture.client;
@@ -422,7 +422,7 @@ void draw_renderlist(renderlist_t *list) {
         if (list->set_tmu) {
             gl4es_glActiveTexture(GL_TEXTURE0+list->tmu);
         }
-	    if (list->set_texture) {
+            if (list->set_texture) {
             gl4es_glBindTexture(list->target_texture, list->texture);
         }
         // raster
@@ -442,7 +442,7 @@ void draw_renderlist(renderlist_t *list) {
             //glBitmap(r->width, r->height, r->xorig, r->yorig, r->xmove, r->ymove, r->raster);
             render_raster_list(list->raster);
         }
-		// bitmaps
+                // bitmaps
         if (list->bitmaps) {
             for (int i=0; i<list->bitmaps->count; i++) {
                 bitmap_list_t *l = &list->bitmaps->list[i];
@@ -482,7 +482,7 @@ void draw_renderlist(renderlist_t *list) {
         if (list->linestipple_op) {
             gl4es_glLineStipple(list->linestipple_factor, list->linestipple_pattern);
         }
-		
+                
         if (list->texenv) {
             khash_t(texenv) *tgn = list->texenv;
             rendertexenv_t *m;
@@ -708,9 +708,9 @@ void draw_renderlist(renderlist_t *list) {
         GLenum mode;
         mode = list->mode;
         if ((glstate->polygon_mode == GL_LINE) && (mode>=GL_TRIANGLES))
-			mode = GL_LINES;
-		if ((glstate->polygon_mode == GL_POINT) && (mode>=GL_TRIANGLES))
-			mode = GL_POINTS;
+                        mode = GL_LINES;
+                if ((glstate->polygon_mode == GL_POINT) && (mode>=GL_TRIANGLES))
+                        mode = GL_POINTS;
 
         if (indices) {
             if (glstate->render_mode == GL_SELECT) {
@@ -748,8 +748,10 @@ void draw_renderlist(renderlist_t *list) {
                         gles_glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, list->vbo_indices);
                         vbo_indices = 1;
                     }
-                    if(list->instanceCount==1)
+                    if(list->instanceCount==1) {
                         gles_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
+                        ame189_afterDraw("list-elements", mode, list->ilen, GL_UNSIGNED_SHORT);   // Task189 取证
+                    }
                     else {
                         for (glstate->instanceID=0; glstate->instanceID<list->instanceCount; ++glstate->instanceID)
                             gles_glDrawElements(mode, list->ilen, GL_UNSIGNED_SHORT, vbo_indices?NULL:indices);
@@ -760,7 +762,7 @@ void draw_renderlist(renderlist_t *list) {
                 }
             }
         } else {
-            if (glstate->render_mode == GL_SELECT) {	
+            if (glstate->render_mode == GL_SELECT) {    
                 vertexattrib_t vtx = {0};
                 vtx.pointer = list->vert;
                 vtx.type = GL_FLOAT;
@@ -777,10 +779,12 @@ void draw_renderlist(renderlist_t *list) {
                         int k = fill_lineIndices(list->mode_inits?list->mode_inits:&tmp, list->mode_inits?list->mode_init_len:1, list->mode, NULL, list->ind_lines);
                         list->ind_line = k;
                     }
-					gles_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
+                                        gles_glDrawElements(mode, list->ind_line, GL_UNSIGNED_SHORT, list->ind_lines);
                 } else {
-                    if(list->instanceCount==1)
+                    if(list->instanceCount==1) {
                         gles_glDrawArrays(mode, 0, len);
+                        ame189_afterDraw("list-arrays", mode, len, 0);   // Task189 取证
+                    }
                     else {
                         for (glstate->instanceID=0; glstate->instanceID<list->instanceCount; ++glstate->instanceID)
                             gles_glDrawArrays(mode, 0, len);

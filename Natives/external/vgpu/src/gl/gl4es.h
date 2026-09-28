@@ -96,20 +96,20 @@ extern glstate_t *glstate;
 void fpe_Init(glstate_t *glstate);       // defined in fpe.c
 void fpe_Dispose(glstate_t *glstate);    // defined in fpe.c
 
-static inline void errorGL() {	// next glGetError will be from GL 
-	glstate->shim_error = 0;
+static inline void errorGL() {  // next glGetError will be from GL 
+        glstate->shim_error = 0;
 }
-static inline void errorShim(GLenum error) {	// next glGetError will be "error" from gl4es
-	glstate->shim_error = 1;
-	glstate->last_error = error;
+static inline void errorShim(GLenum error) {    // next glGetError will be "error" from gl4es
+        glstate->shim_error = 1;
+        glstate->last_error = error;
 }
 static inline void noerrorShim() {
-	errorShim(GL_NO_ERROR);
+        errorShim(GL_NO_ERROR);
 }
 
 static inline void noerrorShimNoPurge() {
-	glstate->shim_error = 2;
-	glstate->last_error = GL_NO_ERROR;
+        glstate->shim_error = 2;
+        glstate->last_error = GL_NO_ERROR;
 }
 
 void gl4es_scratch(int alloc);
@@ -117,6 +117,9 @@ void gl4es_scratch_vertex(int alloc);
 void gl4es_scratch_indices(int alloc);
 void gl4es_use_scratch_vertex(int use);
 void gl4es_use_scratch_indices(int use);
+// Task189 取证：drawing.c 定义（普查与绘制后错误归因），listdraw.c 等共用
+void ame189_census(GLenum mode, GLsizei count);
+void ame189_afterDraw(const char *site, GLenum mode, GLsizei count, GLenum idxType);
 
 void ToBuffer(int first, int count);
 void UnBuffer();

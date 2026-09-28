@@ -10,6 +10,80 @@
 #include "loader.h"
 #include "render.h"
 
+// ============================================================================
+// Task189 取证：绘制普查（census）+ 绘制后错误归因（post-draw attribution）。
+// 病历（c3f4623 latestlog.old.txt = Task188 构建真机，1.8.9-forge 会话）：
+// FPE 着色器链四层修复后编译全绿、fps=30、swapOK 千级，但用户实测"所有
+// 方块渲染像线条"，且 MC 自检 "1282: Invalid operation @ Pre render" 851 次
+// （约每帧一条）。静态审计（quads→triangles 索引生成 / GoUniformMatrix4fv
+// 转置与 -1 守卫 / adjust_vertices / fpe 顶点属性桥）全部干净，无法定位，
+// 改为取证三件套（零行为变更，仅观测）：
+//   (1) ame189_census —— 在 glDrawArrays/glDrawElements/glBegin 入口按原始
+//       图元类型计数（含 GL_QUADS 本体），每 4096 次一报（前 3 次），回答
+//       "方块到底以什么图元、多大批次提交"；
+//   (2) ame189_afterDraw —— 前 120 次【真实】绘制调用后读错误队列，命中即
+//       打全参数并把错误 errorShim 回注（MC 侧 glGetError 语义不变，仅
+//       多错误并集会折叠为最后一条——取证窗口限启动期，可接受），把每帧
+//       1282 的元凶钉到具体调用与参数；
+//   (3) gl4es.c glPolygonMode 绊线 —— 若线框被请求（GL_LINE），"线条渲染"
+//       的第一嫌疑即坐实。
+// 普查与归因互相独立：普查不限次（纯计数，每 4096 次一行日志），归因仅
+// 启动窗口（120 次后永久关闭，零稳态开销）。
+// ============================================================================
+void ame189_census(GLenum mode, GLsizei count) {
+    static unsigned int bucket[11];
+    static unsigned long long sum[11];
+    static unsigned int total = 0, reports = 0;
+    static const char *const names[11] = {
+        "POINTS", "LINES", "LINE_LOOP", "LINE_STRIP", "TRIANGLES",
+        "TRIANGLE_STRIP", "TRIANGLE_FAN", "QUADS", "QUAD_STRIP", "POLYGON", "OTHER"
+    };
+    int i = 10;
+    switch (mode) {
+        case GL_POINTS: i = 0; break;
+        case GL_LINES: i = 1; break;
+        case GL_LINE_LOOP: i = 2; break;
+        case GL_LINE_STRIP: i = 3; break;
+        case GL_TRIANGLES: i = 4; break;
+        case GL_TRIANGLE_STRIP: i = 5; break;
+        case GL_TRIANGLE_FAN: i = 6; break;
+        case GL_QUADS: i = 7; break;
+        case GL_QUAD_STRIP: i = 8; break;
+        case GL_POLYGON: i = 9; break;
+        default: i = 10; break;
+    }
+    bucket[i]++;
+    sum[i] += (count > 0) ? (unsigned long long)count : 0;
+    total++;
+    if (total == 4096 && reports < 3) {
+        reports++;
+        char buf[640];
+        int n = snprintf(buf, sizeof(buf), "VGPU Task189 census #%u after %u draws:", reports, total);
+        for (int k = 0; k < 11 && n > 0 && (size_t)n < sizeof(buf); k++) {
+            if (bucket[k])
+                n += snprintf(buf + n, sizeof(buf) - n, " %s=%u(avg %llu)",
+                              names[k], bucket[k], bucket[k] ? (sum[k] / bucket[k]) : 0);
+        }
+        SHUT_LOGD("%s\n", buf);
+        for (int k = 0; k < 11; k++) { bucket[k] = 0; sum[k] = 0; }
+        total = 0;   // 分窗计数：与 bucket 同步归零，否则 total==4096 永不再触发
+    }
+}
+
+void ame189_afterDraw(const char *site, GLenum mode, GLsizei count, GLenum idxType) {
+    static unsigned int probed = 0, hits = 0;
+    if (probed >= 120) return;   // 取证窗口：仅启动期前 120 次真实绘制
+    probed++;
+    GLenum err = gles_glGetError();
+    if (err == 0) return;
+    hits++;
+    if (hits <= 8) {
+        SHUT_LOGD("VGPU Task189 post-draw error #%u: site=%s mode=0x%04X count=%d idxType=0x%04X -> GL error 0x%04X (re-injected for the app)\n",
+                  hits, site, (unsigned)mode, (int)count, (unsigned)idxType, (unsigned)err);
+    }
+    errorShim(err);   // 回注：MC 随后的 glGetError 仍能看到该错误
+}
+
 static GLboolean is_cache_compatible(GLsizei count) {
     #define T2(AA, A, B) \
     if(glstate->vao->AA!=glstate->vao->B.enabled) return GL_FALSE; \
@@ -134,13 +208,13 @@ static renderlist_t *arrays_to_renderlist(renderlist_t *list, GLenum mode,
                 if(glstate->vao->vertexattrib[ATT_SECONDARY].size==GL_BGRA)
                     glstate->vao->secondary.ptr = copy_gl_pointer_color_bgra(glstate->vao->vertexattrib[ATT_SECONDARY].pointer, glstate->vao->vertexattrib[ATT_SECONDARY].stride, 4, 0, count);
                 else
-                    glstate->vao->secondary.ptr = copy_gl_pointer(&glstate->vao->vertexattrib[ATT_SECONDARY], 4, 0, count);		// alpha chanel is always 0 for secondary...
+                    glstate->vao->secondary.ptr = copy_gl_pointer(&glstate->vao->vertexattrib[ATT_SECONDARY], 4, 0, count);             // alpha chanel is always 0 for secondary...
                     list->secondary = glstate->vao->secondary.ptr + 4*skip;
             } else {
                 if(glstate->vao->vertexattrib[ATT_SECONDARY].size==GL_BGRA)
                     list->secondary = copy_gl_pointer_color_bgra(glstate->vao->vertexattrib[ATT_SECONDARY].pointer, glstate->vao->vertexattrib[ATT_SECONDARY].stride, 4, skip, count);
                 else
-                    list->secondary = copy_gl_pointer(&glstate->vao->vertexattrib[ATT_SECONDARY], 4, skip, count);		// alpha chanel is always 0 for secondary...
+                    list->secondary = copy_gl_pointer(&glstate->vao->vertexattrib[ATT_SECONDARY], 4, skip, count);              // alpha chanel is always 0 for secondary...
             }
         }
         if (glstate->vao->vertexattrib[ATT_NORMAL].enabled) {
@@ -211,7 +285,7 @@ static renderlist_t *arrays_add_renderlist(renderlist_t *a, GLenum mode,
             if(glstate->vao->vertexattrib[ATT_SECONDARY].size==GL_BGRA)
                 copy_gl_pointer_color_bgra_noalloc(a->secondary+a->len*4, glstate->vao->vertexattrib[ATT_SECONDARY].pointer, glstate->vao->vertexattrib[ATT_SECONDARY].stride, 4, skip, count);
             else
-                copy_gl_pointer_noalloc(a->secondary+a->len*4, &glstate->vao->vertexattrib[ATT_SECONDARY], 4, skip, count);		// alpha chanel is always 0 for secondary...
+                copy_gl_pointer_noalloc(a->secondary+a->len*4, &glstate->vao->vertexattrib[ATT_SECONDARY], 4, skip, count);             // alpha chanel is always 0 for secondary...
         if (a->fogcoord) copy_gl_pointer_raw_noalloc(a->fogcoord+a->len*1, &glstate->vao->vertexattrib[ATT_FOGCOORD], 1, skip, count);
         for (int i=0; i<a->maxtex; i++)
             if (a->tex[i]) copy_gl_pointer_tex_noalloc(a->tex[i]+a->len*4, &glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+i], 4, skip, count);
@@ -414,10 +488,14 @@ if(count>500000) return;
 
         // POLYGON mode as LINE is "intercepted" and drawn using list
         if(instancecount==1 || hardext.esversion==1) {
-            if(!iindices && !sindices)
+            if(!iindices && !sindices) {
                 gles_glDrawArrays(mode, first, count);
-            else
+                ame189_afterDraw("direct-arrays", mode, count, 0);   // Task189 取证
+            }
+            else {
                 gles_glDrawElements(mode, count, (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT, (sindices?((void*)sindices):((void*)iindices)));
+                ame189_afterDraw("direct-elements", mode, count, (sindices)?GL_UNSIGNED_SHORT:GL_UNSIGNED_INT);   // Task189 取证
+            }
         } else {
             if(!iindices && !sindices)
                 fpe_glDrawArraysInstanced(mode, first, count,instancecount);
@@ -447,11 +525,12 @@ if(count>500000) return;
 void gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices) {
     //printf("glDrawRangeElements(%s, %i, %i, %i, %s, @%p), inlist=%i, pending=%d\n", PrintEnum(mode), start, end, count, PrintEnum(type), indices, (glstate->list.active)?1:0, glstate->list.pending);
     count = adjust_vertices(mode, count);
+    ame189_census(mode, count);   // Task189 取证：原始图元普查
     
     if (count<0) {
-		errorShim(GL_INVALID_VALUE);
-		return;
-	}
+                errorShim(GL_INVALID_VALUE);
+                return;
+        }
     if (count==0) {
         noerrorShim();
         return;
@@ -470,7 +549,7 @@ void gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei co
         }
     }
 
-	noerrorShim();
+        noerrorShim();
     GLushort *sindices = NULL;
     GLuint *iindices = NULL;
     bool need_free = !(
@@ -507,7 +586,7 @@ void gl4es_glDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei co
             }
         }
 
-		NewStage(list, STAGE_DRAW);
+                NewStage(list, STAGE_DRAW);
 
         glstate->list.active = list = arrays_to_renderlist(list, mode, start, end + 1);
         list->indices = sindices;
@@ -553,11 +632,12 @@ void gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid 
     // TODO: split for count > 65535?
     // special check for QUADS and TRIANGLES that need multiple of 4 or 3 vertex...
     count = adjust_vertices(mode, count);
+    ame189_census(mode, count);   // Task189 取证：原始图元普查
     
     if (count<0) {
-		errorShim(GL_INVALID_VALUE);
-		return;
-	}
+                errorShim(GL_INVALID_VALUE);
+                return;
+        }
     if (count==0) {
         noerrorShim();
         return;
@@ -576,7 +656,7 @@ void gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid 
         }
     }
 
-	noerrorShim();
+        noerrorShim();
     GLushort *sindices = NULL;
     GLuint *iindices = NULL;
     bool need_free = !(
@@ -613,7 +693,7 @@ void gl4es_glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid 
             return;
         }
 
-		NewStage(list, STAGE_DRAW);
+                NewStage(list, STAGE_DRAW);
 
         glstate->list.active = list = arrays_to_renderlist(list, mode, min, max + 1);
         list->indices = sindices;
@@ -656,11 +736,12 @@ void gl4es_glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     //printf("glDrawArrays(%s, %d, %d), list=%p pending=%d\n", PrintEnum(mode), first, count, glstate->list.active, glstate->list.pending);
     // special check for QUADS and TRIANGLES that need multiple of 4 or 3 vertex...
     count = adjust_vertices(mode, count);
+    ame189_census(mode, count);   // Task189 取证：原始图元普查（含 GL_QUADS）
 
-	if (count<0) {
-		errorShim(GL_INVALID_VALUE);
-		return;
-	}
+        if (count<0) {
+                errorShim(GL_INVALID_VALUE);
+                return;
+        }
     if (count==0) {
         noerrorShim();
         return;
@@ -676,7 +757,7 @@ void gl4es_glDrawArrays(GLenum mode, GLint first, GLsizei count) {
         }
         return;
     }
-	noerrorShim();
+        noerrorShim();
 
     bool intercept = should_intercept_render(mode);
     //BATCH Mode
@@ -707,9 +788,9 @@ void gl4es_glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     }
 
     /*if (glstate->polygon_mode == GL_LINE && mode>=GL_TRIANGLES)
-		mode = GL_LINE_LOOP;*/
+                mode = GL_LINE_LOOP;*/
     if (glstate->polygon_mode == GL_POINT && mode>=GL_TRIANGLES)
-		mode = GL_POINTS;
+                mode = GL_POINTS;
 
     if (intercept) {
         renderlist_t *list;
@@ -1281,10 +1362,10 @@ void glDrawRangeElementsBaseVertexARB(GLenum mode, GLuint start, GLuint end, GLs
 void gl4es_glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei primcount) {
     count = adjust_vertices(mode, count);
 
-	if (count<0) {
-		errorShim(GL_INVALID_VALUE);
-		return;
-	}
+        if (count<0) {
+                errorShim(GL_INVALID_VALUE);
+                return;
+        }
     if (count==0) {
         noerrorShim();
         return;
@@ -1300,7 +1381,7 @@ void gl4es_glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsize
         }
         return;
     }
-	noerrorShim();
+        noerrorShim();
 
     bool intercept = should_intercept_render(mode);
     //BATCH Mode
@@ -1325,9 +1406,9 @@ void gl4es_glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsize
     }
 
     /*if (glstate->polygon_mode == GL_LINE && mode>=GL_TRIANGLES)
-		mode = GL_LINE_LOOP;*/
+                mode = GL_LINE_LOOP;*/
     if (glstate->polygon_mode == GL_POINT && mode>=GL_TRIANGLES)
-		mode = GL_POINTS;
+                mode = GL_POINTS;
 
     if (intercept) {
         renderlist_t *list = NULL;
@@ -1376,9 +1457,9 @@ void gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, cons
     count = adjust_vertices(mode, count);
     
     if (count<0) {
-		errorShim(GL_INVALID_VALUE);
-		return;
-	}
+                errorShim(GL_INVALID_VALUE);
+                return;
+        }
     if (count==0) {
         noerrorShim();
         return;
@@ -1397,7 +1478,7 @@ void gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, cons
         }
     }
 
-	noerrorShim();
+        noerrorShim();
     GLushort *sindices = NULL;
     GLuint *iindices = NULL;
     bool need_free = !(
@@ -1419,7 +1500,7 @@ void gl4es_glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, cons
         renderlist_t *list = NULL;
         GLsizei min, max;
 
-		NewStage(glstate->list.active, STAGE_DRAW);
+                NewStage(glstate->list.active, STAGE_DRAW);
         list = glstate->list.active;
 
         if(!need_free) {

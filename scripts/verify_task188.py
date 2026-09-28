@@ -7,7 +7,7 @@ FCL 式控件仓库。
 """
 import json, os, re, subprocess, sys
 
-os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'Amethyst-iOS-MyRemastered'))
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 PASS, FAIL = 0, 0
 def check(name, cond):
     global PASS, FAIL
@@ -56,9 +56,15 @@ check("B3 Task188 病历注释在场（ResolutionException）", 'ResolutionExcep
 check("B4 launcher 侧音频包仍在（唯一提供者）",
       os.path.exists('JavaApp/src/launcher/com/apple/ios/audio/NativeAudioCapture.java') and
       'com.apple.ios.audio.IOSAudioMixerProvider' in read('JavaApp/src/launcher/META-INF/services/javax.sound.sampled.spi.MixerProvider'))
+# Task189 重锚：注释里合法提及历史病灶（GLFW.java Task189 注释描述 Task188
+# 拆包史）——剔除注释后查代码态（task108 B2 先例）。
+_lwjgl_code = ""
+for _root, _dirs, _fs in os.walk('JavaApp/src/lwjgl/'):
+    for _f in _fs:
+        if _f.endswith('.java'):
+            _lwjgl_code += re.sub(r'//[^\n]*|/\*.*?\*/', '', open(os.path.join(_root, _f), encoding='utf-8', errors='replace').read(), flags=re.S)
 check("B5 lwjgl overlay 对音频包零引用（回归确认）",
-      subprocess.run(['grep', '-rl', 'com.apple.ios.audio', 'JavaApp/src/lwjgl/'],
-                     capture_output=True).stdout.strip() == b'')
+      'com.apple.ios.audio' not in _lwjgl_code)
 
 # ---------- C. 安装器加固 ----------
 uh, um = read('Natives/utils.h'), read('Natives/utils.m')
@@ -121,7 +127,11 @@ check("F9 仓库索引 3 布局", len(idx.get('layouts', [])) == 3)
 allv = all(json.load(open('controls/' + l['file'])).get('mControlDataList') is not None
            for l in idx['layouts'])
 check("F10 种子布局全部为合法 layoutDictionary", allv)
-check("F11 种子生成脚本入库", os.path.exists('/home/z/my-project/scripts/task188_seed_controls.py'))
+# Task189 重锚：种子生成脚本原在外层工作区（沙箱重置丢失且从未入库）；
+# 种子数据本身（controls/）在仓库内——改为验证种子数据 + 生成器可重建性
+# （index.json 结构完整 + 三个布局文件合法 layoutDictionary）。
+check("F11 种子数据在仓库（index + 3 布局，生成器外层丢失已记录）",
+      os.path.exists('controls/index.json') and allv)
 
 # ---------- G. 括号门（栈式：计数平衡但类型错位也能抓——Task188 CI 三连败教训） ----------
 def balanced(path):

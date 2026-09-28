@@ -1,5 +1,6 @@
 #import "DownloadViewController.h"
 #import "BackgroundManager.h"
+#import "ControlRepoViewController.h"   // Task189：下载页控件仓库 tab
 // IconLoader：统一的项目图标加载器（双层缓存 + 降采样 + 并发控制 + CDN 镜像），
 // 替代 UIImageView+AFNetworking（仅内存缓存，无降采样，无镜像）
 // 参照 FCL Glide + ZL2 Coil 的最佳实践
@@ -466,6 +467,8 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 // 避免 hidden=YES 时仍占空间导致 tabSegment 与 searchBar 之间出现"大白条"。
 @property (nonatomic, strong) NSLayoutConstraint *versionFilterHeightConstraint;
 @property (nonatomic, strong) UISearchBar *searchBar;
+// Task189：控件仓库 tab 折叠搜索框用（hidden 不释放约束空间，需高度归零）
+@property (nonatomic, strong) NSLayoutConstraint *searchBarHeightConstraint;
 @property (nonatomic, strong) UIButton *filterButton;
 @property (nonatomic, strong) UIButton *importModpackButton;  // 整合包 tab 专用导入按钮（参照 FCL）
 @property (nonatomic, strong) NSLayoutConstraint *importModpackButtonWidthConstraint;
@@ -536,6 +539,12 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 @property (nonatomic, assign) BOOL hasMoreWorlds;
 @property (nonatomic, assign) BOOL isLoadingWorlds;
 @property (nonatomic, strong) NSString *worldSearchQuery;
+
+// Task189：控件仓库 tab（FCL 式下载页直达）。第 8 个 tab 内嵌
+// ControlRepoViewController（含下拉刷新/镜像链/下载校验全套装），
+// 侧边栏与搜索框不适用于本 tab。
+@property (nonatomic, strong) UIView *controlRepoContainer;
+@property (nonatomic, strong) ControlRepoViewController *controlRepoChildVC;
 
 // 源切换 UI（仿 FCL 安卓风格的圆角胶囊切换器：Modrinth 绿 / CurseForge 橙）
 @property (nonatomic, strong) UIView *sourceSwitchContainer;
@@ -753,16 +762,19 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     [self setupResourcepackTableView];
     [self setupDatapackTableView];
     [self setupWorldTableView];
+    [self setupControlRepoTab];   // Task189：第 8 个 tab（控件仓库，FCL 式下载页直达）
     [self setupLoadingIndicator];
     [self setupEmptyLabel];
 }
 
 - (void)setupTabSegment {
     // 精简标签文字为单字+图标，避免在窄屏上拥挤截断（参照 FCL 紧凑 tab）
-    self.tabSegment = [[UISegmentedControl alloc] initWithItems:@[localize(@"i18n_str_39", nil), localize(@"i18n_str_1283", nil), localize(@"i18n_str_1284", nil), localize(@"i18n_str_1285", nil), localize(@"i18n_str_1286", nil), localize(@"i18n_str_1287", nil), localize(@"i18n_str_119", nil)]];
+    // Task189：第 8 个 tab = 控件仓库（用户反馈“控件仓库太不显眼”——从
+    // 编辑器长按菜单入口升级为下载页一级 tab，与 FCL 的下载页布局对齐）
+    self.tabSegment = [[UISegmentedControl alloc] initWithItems:@[localize(@"i18n_str_39", nil), localize(@"i18n_str_1283", nil), localize(@"i18n_str_1284", nil), localize(@"i18n_str_1285", nil), localize(@"i18n_str_1286", nil), localize(@"i18n_str_1287", nil), localize(@"i18n_str_119", nil), localize(@"download.tab.controls", nil)]];
     self.tabSegment.translatesAutoresizingMaskIntoConstraints = NO;
     self.tabSegment.selectedSegmentIndex = 0;
-    // 调小字体，确保 7 个 tab 在 iPhone 竖屏也能完整显示
+    // 调小字体，确保 8 个 tab 在窄屏也能完整显示
     NSDictionary *textAttrs = @{NSFontAttributeName: [UIFont systemFontOfSize:12 weight:UIFontWeightMedium]};
     [self.tabSegment setTitleTextAttributes:textAttrs forState:UIControlStateNormal];
     [self.tabSegment addTarget:self action:@selector(tabChanged:) forControlEvents:UIControlEventValueChanged];
@@ -852,6 +864,10 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         [self.filterButton.widthAnchor constraintEqualToConstant:44],
         [self.filterButton.heightAnchor constraintEqualToConstant:44]
     ]];
+    // Task189：搜索框高度约束（minimal 风格固有高度 36pt 固定住）——控件仓库
+    // tab 折叠为 0（hidden 不释放约束空间），其他 tab 恢复 36。
+    self.searchBarHeightConstraint = [self.searchBar.heightAnchor constraintEqualToConstant:36];
+    self.searchBarHeightConstraint.active = YES;
 
     // 默认宽度 0（隐藏时不占空间），整合包 tab 切换时设为 80
     self.importModpackButtonWidthConstraint = [self.importModpackButton.widthAnchor constraintEqualToConstant:0];
@@ -1440,6 +1456,33 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     return nil;
 }
 
+// Task189：控件仓库 tab —— 下载页第 8 个一级 tab（FCL 式直达）。
+// 内嵌 ControlRepoViewController 子控制器（自带下拉刷新/六源镜像链/下载
+// 校验/已装角标）。本 tab 无搜索、无侧边栏、无筛选段——容器直接锚在
+// versionFilterSegment 底部（非版本 tab 时其高度折叠为 0，容器即贴着
+// tabSegment 之下），底部铺到安全区。
+- (void)setupControlRepoTab {
+    self.controlRepoContainer = [[UIView alloc] initWithFrame:CGRectZero];
+    self.controlRepoContainer.translatesAutoresizingMaskIntoConstraints = NO;
+    self.controlRepoContainer.backgroundColor = [UIColor clearColor];
+    self.controlRepoContainer.hidden = YES;
+    [self.view addSubview:self.controlRepoContainer];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.controlRepoContainer.topAnchor constraintEqualToAnchor:self.searchBar.bottomAnchor constant:4],
+        [self.controlRepoContainer.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.controlRepoContainer.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.controlRepoContainer.bottomAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.bottomAnchor]
+    ]];
+
+    self.controlRepoChildVC = [[ControlRepoViewController alloc] init];
+    [self addChildViewController:self.controlRepoChildVC];
+    self.controlRepoChildVC.view.frame = self.controlRepoContainer.bounds;
+    self.controlRepoChildVC.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.controlRepoContainer addSubview:self.controlRepoChildVC.view];
+    [self.controlRepoChildVC didMoveToParentViewController:self];
+}
+
 - (void)setupLoadingIndicator {
     self.loadingIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     self.loadingIndicator.translatesAutoresizingMaskIntoConstraints = NO;
@@ -1480,8 +1523,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     [UIView transitionWithView:self.view duration:0.2 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
         self.versionFilterSegment.hidden = (index != 0);
         self.versionCollectionView.hidden = (index != 0);
-        // 搜索框对所有 tab 都显示（版本 tab 用于按版本号前缀过滤本地+远程版本列表）
-        self.searchBar.hidden = NO;
+        // 搜索框：版本 tab 用于版本号过滤，其余资产 tab 用于搜索；
+        // Task189：控件仓库 tab（index 7）无搜索语义（仓库列表自带刷新/角标）——隐藏
+        self.searchBar.hidden = (index == 7);
         // 过滤按钮仅在版本 tab 显示（用于调出版本类型筛选/排序选项）
         self.filterButton.hidden = (index != 0);
         self.modTableView.hidden = (index != 1);
@@ -1490,6 +1534,8 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
         self.datapackTableView.hidden = (index != 4);
         self.modpackTableView.hidden = (index != 5);
         self.worldTableView.hidden = (index != 6);
+        // Task189：控件仓库容器只在 index 7 显示（首访懒拉取由其 viewDidLoad 触发）
+        self.controlRepoContainer.hidden = (index != 7);
     } completion:nil];
 
     // 源切换仅在非版本 tab 显示；世界 tab 强制 CurseForge，无需切换
@@ -1503,7 +1549,8 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     // FCL page_download.xml：5 个资产 tab（mod/modpack/resourcepack/world/shaderpack）共用
     // 左侧 30% 筛选栏。版本 tab 是独立布局（versionFilterSegment + collectionView），无 sidebar。
     // 这里 100% 对齐 FCL：所有非版本 tab 都显示 sidebar（含世界 tab）。
-    BOOL showSidebar = (index != 0);
+    // Task189：控件仓库 tab（index 7）无筛选语义——不显示 sidebar，列表铺满。
+    BOOL showSidebar = (index != 0 && index != 7);
     self.filterSidebarContainer.hidden = !showSidebar;
     // 根据屏幕宽度按 30% 比例计算侧边栏宽度（FCL constraintWidth_percent=0.3）
     CGFloat screenWidth = self.view.bounds.size.width;
@@ -1521,11 +1568,15 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 
     // 下载源切换：世界 tab 强制 CurseForge，隐藏源切换；其他非版本 tab 显示
     // FCL page_download.xml：仅当有多个来源时才显示 source Spinner
-    self.sidebarSourceContainer.hidden = (index == 0 || index == 6);
+    // Task189：控件仓库 tab（index 7）源由镜像链自动处理——不显示源切换
+    self.sidebarSourceContainer.hidden = (index == 0 || index == 6 || index == 7);
 
     // versionFilterSegment 高度同步切换：版本 tab 显示 32pt，其他 tab 设为 0 不占空间，
     // 避免 hidden=YES 仍占空间导致 tabSegment 与 searchBar 之间出现"大白条"
     self.versionFilterHeightConstraint.constant = (index == 0) ? 32 : 0;
+
+    // Task189：控件仓库 tab 折叠搜索框（高度 0 + hidden），其他 tab 恢复
+    self.searchBarHeightConstraint.constant = (index == 7) ? 0 : 36;
 
     // 整合包 tab 显示"导入本地整合包"按钮（参照 FCL 安卓），其他 tab 隐藏且宽度归零不占空间
     BOOL showImportButton = (index == 5);
@@ -3939,10 +3990,10 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 - (void)ame169_showJITTimeoutInlineWithRetry:(void(^)(void))handler {
     NSLog(@"[JIT] [DownloadVC] Task169 JIT wait timed out, showing retry alert");
     UIAlertController *retry = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
-                                                                   message:@"JIT 开启等待超时（120 秒）。请确认 JIT 工具（StikDebug 等）已安装并可正常拉起后选择重试；也可在设置中选择其它 JIT 开启方式。\nTimeout waiting for JIT (120s). Make sure your JIT enabler app is alive, then retry."
+                                                                   message:@localize(@"ame189.jit.timeout_msg", nil)
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [retry addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
-    [retry addAction:[UIAlertAction actionWithTitle:@"重试 / Retry" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+    [retry addAction:[UIAlertAction actionWithTitle:localize(@"ame189.jit.retry", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         [self invokeAfterJITEnabled:handler ?: ^{}];
     }]];
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {

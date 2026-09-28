@@ -94,13 +94,17 @@ print("C. Forge android.util 模块层可见性（GLFWErrorCallback ArrayMap）"
 print("=" * 72)
 stub = ["ArrayMap.java", "ContainerHelpers.java", "EmptyArray.java",
         "MapCollections.java", "Objects.java"]
-check("C1 lwjgl overlay 含 5 个 android/util 桩源",
-      all(os.path.exists(f"JavaApp/src/lwjgl/android/util/{f}") for f in stub))
+# Task189 重锚：五存根自 android/util 迁至 org/lwjgl/ame（Forge Bootstrap
+# 2.1.7 拒绝 lwjgl+launcher 双导出 android.util；语义不变——ArrayMap 仍在
+# lwjgl 模块内，Task156 的 MC-BOOTSTRAP 可见性目标由更强形态达成）。
+check("C1 lwjgl overlay 含 5 个 org/lwjgl/ame 桩源（Task189 迁移后形态）",
+      all(os.path.exists(f"JavaApp/src/lwjgl/org/lwjgl/ame/{f}") for f in stub))
 check("C2 launcher 侧桩保留（-cp 类路径仍可见，Tools.java 引用不破）",
       all(os.path.exists(f"JavaApp/src/launcher/android/util/{f}") for f in stub))
 glfw_java = rd("JavaApp/src/lwjgl/org/lwjgl/glfw/GLFW.java")
+# Task189 重锚：import 改 org.lwjgl.ame.ArrayMap（存根同批迁移，字段不变）
 check("C3 overlay GLFW.java 的 ArrayMap 字段在位（触发链保留）",
-      "import android.util.*" in glfw_java and "ArrayMap<Long, GLFWWindowProperties>" in glfw_java)
+      "import org.lwjgl.ame.ArrayMap;" in glfw_java and "ArrayMap<Long, GLFWWindowProperties>" in glfw_java)
 # 合并 jar 规则把 build/lwjgl/** 全量拷进两个版本的 lwjgl jar（JavaApp/Makefile）
 check("C4 JavaApp/Makefile lwjgl 合并规则覆盖 overlay 全目录（android/util 类会进 jar）",
       "cp -R $(OUTPUTDIR)/lwjgl/* $(OUTPUTDIR)/lwjgl_lib_$*/" in rd("JavaApp/Makefile"))
@@ -164,7 +168,7 @@ for lg in langs:
     sets.append(keys)
     check(f"F[{lg}] footer 键在位", "background.effect.footer" in keys)
 check("F1 四主语言键集一致（1952 = Task157 基线 1948 + Task159 净增 4（新增 5 键，退役 memory.current））",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 1955,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2155,
       f"counts={[len(x) for x in sets]}")
 for f in ["Natives/BackgroundSettingsViewController.m", "Natives/JavaLauncher.m",
           "Natives/egl_bridge.m", "Natives/SurfaceViewController.m",

@@ -4,7 +4,18 @@
  */
 package org.lwjgl.glfw;
 
-import android.util.*;
+// Task189（Forge 26.1.2 模块冲突根修）：原 import android.util.* —— Task156
+// 为解决 GLFW.class 的 ArrayMap 字段在 MC-BOOTSTRAP ModuleClassLoader 下不可
+// 见，曾把五个 android/util 存根同时编译进 lwjgl overlay（两 jar 均携带）。
+// Task188 拆掉 com.apple.ios.audio 双导出后，Forge Bootstrap 2.1.7 的模块
+// 解析在 android.util 上再次失败：
+//   java.lang.module.ResolutionException: Modules lwjgl and launcher
+//   export package android.util to module logging
+// 根修：存根迁至 lwjgl 私有包 org.lwjgl.ame（类逐字节原样，仅改包声明），
+// lwjgl 模块从此不再导出 android.util；launcher.jar 独占该包（其自动模块
+// 读取层内全部模块，ArrayMap 仍可经 lwjgl 模块解析）。keyAt() 等 ArrayMap
+// 专有 API 保持可用（零行为变更）。
+import org.lwjgl.ame.ArrayMap;
 
 import java.lang.annotation.Native;
 import java.lang.reflect.*;

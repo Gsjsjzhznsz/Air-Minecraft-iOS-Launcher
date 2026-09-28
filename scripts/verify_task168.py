@@ -120,8 +120,8 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     m = re.search(r'^"' + re.escape(l10n_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     l10n_vals[lg] = m.group(1) if m else None
 check("B7 六语言键全部在位（Task184 重锚）", all(v is not None for v in l10n_vals.values()), str(l10n_vals))
-check("B8 四主语言键集一致且计数 = 1955（Task178 重锚：opacity.title 键恢复，净增 1）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1955
+check("B8 四主语言键集一致且计数 = 2155（Task178 重锚：opacity.title 键恢复，净增 1）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2155
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]

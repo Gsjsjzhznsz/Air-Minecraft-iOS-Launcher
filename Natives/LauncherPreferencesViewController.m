@@ -273,10 +273,13 @@
         // AI 助手分区：直接与 AiSettings 打通（AiSettings 读写 NSUserDefaults，不走通用偏好存储）
         if ([section isEqualToString:@"ai"]) {
             if ([key isEqualToString:@"safety_mode"]) {
+                // Task189：存储值改稳定 ID（safe/ask/yolo）——旧中文显示串
+                // 仅存在于历史 UI 层往返，NSUserDefaults 恒存枚举号，零迁移负担；
+                // pickList 本地化展示，✓ 标记按 ID 匹配。
                 switch ([[AiSettings sharedSettings] safetyMode]) {
-                    case AiSafetyModeSafe:  return @"只读自动执行（Safe）";
-                    case AiSafetyModeAsk:   return @"写操作逐次确认（Ask）";
-                    case AiSafetyModeYOLO:  return @"自动批准（YOLO）";
+                    case AiSafetyModeSafe:  return @"safe";
+                    case AiSafetyModeAsk:   return @"ask";
+                    case AiSafetyModeYOLO:  return @"yolo";
                 }
             }
             if ([key isEqualToString:@"markdown_enabled"]) {
@@ -350,9 +353,15 @@
                     mode = (AiSafetyMode)[value integerValue];
                 } else if ([value isKindOfClass:[NSString class]]) {
                     NSString *s = value;
-                    if ([s containsString:@"逐次确认"]) {
+                    // Task189：稳定 ID 优先；模式词兜底兼容任何语言的显示串
+                    //（所有翻译都保留括号内的 Safe/Ask/YOLO 模式词）。
+                    if ([s containsString:@"ask"]) {
                         mode = AiSafetyModeAsk;
-                    } else if ([s containsString:@"自动批准"]) {
+                    } else if ([s containsString:@"yolo"]) {
+                        mode = AiSafetyModeYOLO;
+                    } else if ([s containsString:@"Ask"]) {
+                        mode = AiSafetyModeAsk;
+                    } else if ([s containsString:@"YOLO"]) {
                         mode = AiSafetyModeYOLO;
                     }
                 }
@@ -1436,18 +1445,20 @@
               }
             },
             @{@"key": @"safety_mode",
-              @"title": @"默认安全模式",
+              @"title": localize(@"ame189.ai.safety_mode_title", nil),
               @"icon": @"hand.raised.fill",
               @"type": self.typePickField,
+              // Task189：pickKeys 稳定 ID + pickList 本地化（Task132 存储值命中
+              // pickKeys → 显示 pickList 的既有协议不变）
               @"pickKeys": @[
-                  @"只读自动执行（Safe）",
-                  @"写操作逐次确认（Ask）",
-                  @"自动批准（YOLO）"
+                  @"safe",
+                  @"ask",
+                  @"yolo"
               ],
               @"pickList": @[
-                  @"只读自动执行（Safe）",
-                  @"写操作逐次确认（Ask）",
-                  @"自动批准（YOLO）"
+                  localize(@"ame189.ai.safety_safe", nil),
+                  localize(@"ame189.ai.safety_ask", nil),
+                  localize(@"ame189.ai.safety_yolo", nil)
               ]
             },
             @{@"key": @"markdown_enabled",

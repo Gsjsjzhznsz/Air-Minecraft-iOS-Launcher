@@ -4,19 +4,47 @@
 #import "LauncherPreferences.h"
 #include <stdlib.h>  // getenv（POJAV_HOME；显式包含，不依赖伞头传递）
 
-// 仓库远端：主源 raw.githubusercontent.com，回退 jsDelivr CDN（国内可达性）。
+// ============================================================================
+// Task189：下载源镜像链（国内可达性专项）。
+// 病历：Task188 上线 raw.githubusercontent 主源 + jsDelivr 回退——真机日志
+// 实测主源在国內裸连基本不可达，cdn.jsdelivr.net 也间歇性被重置；用户实测
+// “下载版本错误/无法使用”。本轮改为六源镜像链 + 粘性记忆：
+//   1. ghfast.top（GitHub 反代，国内直连快）
+//   2. gh-proxy.com（GitHub 反代）
+//   3. fastly.jsdelivr.net（jsDelivr Fastly 边缘）
+//   4. gcore.jsdelivr.net（jsDelivr GCore 边缘）
+//   5. cdn.jsdelivr.net（jsDelivr 主域）
+//   6. raw.githubusercontent.com（官方直连，海外/代理环境）
+// 策略：从上次成功源（偏好 controlrepo.mirror_idx）开始依序尝试，任一成功
+// 即记住该源（粘性，下次直接从它开始）；全部失败才报错。单源超时 10s。
 // 索引结构见仓库 controls/index.json：
 //   { "version": 1, "layouts": [ { id/name/author/description/file/version/size } ] }
 // 布局文件为编辑器 layoutDictionary 同构 JSON（mControlDataList 等键，
 // dynamicX/dynamicY 相对定位表达式 => 分辨率无关、跨设备可分享）。
-static NSString *const kTask188IndexPrimary =
-    @"https://raw.githubusercontent.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/main/controls/index.json";
-static NSString *const kTask188IndexFallback =
-    @"https://cdn.jsdelivr.net/gh/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher@main/controls/index.json";
-static NSString *const kTask188FilePrimaryFmt =
-    @"https://raw.githubusercontent.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/main/controls/%@";
-static NSString *const kTask188FileFallbackFmt =
-    @"https://cdn.jsdelivr.net/gh/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher@main/controls/%@";
+// ============================================================================
+static NSString *const kTask189RepoOwner = @"Gsjsjzhznsz";
+static NSString *const kTask189RepoName = @"Air-Minecraft-iOS-Launcher";
+static NSString *const kTask189RepoRef = @"main";
+static NSString *const kTask189RepoDir = @"controls";
+
+/// 镜像链长度与顺序（Task189）。0-1=GitHub 反代（前缀拼接），
+/// 2-4=jsDelivr（Fastly/GCore/主域），5=官方直连（兜底）。
+static NSInteger const kTask189MirrorCount = 6;
+
+static NSString *task189_mirrorURL(NSInteger idx, NSString *relPath) {
+    static NSString *const kProxies[2] = { @"https://ghfast.top/", @"https://gh-proxy.com/" };
+    static NSString *const kJsDelivr[3] = { @"fastly", @"gcore", @"cdn" };
+    NSString *raw = [NSString stringWithFormat:@"https://raw.githubusercontent.com/%@/%@/%@/%@/%@",
+                       kTask189RepoOwner, kTask189RepoName, kTask189RepoRef, kTask189RepoDir, relPath];
+    if (idx >= 0 && idx < 2) {
+        return [NSString stringWithFormat:@"%@%@", kProxies[idx], raw];
+    }
+    if (idx >= 2 && idx < 5) {
+        return [NSString stringWithFormat:@"https://%@.jsdelivr.net/gh/%@/%@@%@/%@/%@",
+                kJsDelivr[idx - 2], kTask189RepoOwner, kTask189RepoName, kTask189RepoRef, kTask189RepoDir, relPath];
+    }
+    return raw;  // idx 5：官方直连（兜底）
+}
 
 @interface ControlRepoViewController ()
 @property (nonatomic, strong) NSMutableArray<NSDictionary *> *layouts;
@@ -26,6 +54,54 @@ static NSString *const kTask188FileFallbackFmt =
 @end
 
 @implementation ControlRepoViewController
+
+- (NSInteger)task189_stickyMirror {
+    NSInteger idx = [getPrefObject(@"controlrepo.mirror_idx") integerValue];
+    if (idx < 0 || idx >= kTask189MirrorCount) idx = 0;
+    return idx;
+}
+
+- (void)task189_rememberMirror:(NSInteger)idx {
+    setPrefObject(@"controlrepo.mirror_idx", @(idx));
+}
+
+/// Task189：按镜像链拉取（索引与布局文件共用）。从粘性源开始环形尝试，
+/// 全部失败才回调错误；成功即记忆源并回调数据。
+/// 注意 tryNext 是【递归块】：必须 __block 声明（块内自引用，无 __block 时
+/// 捕获的是未赋值的副本，首个镜像失败即空块调用闪退）。
+- (void)fetchRepoFile:(NSString *)relPath completion:(void (^)(NSData *, NSError *))completion {
+    NSInteger start = [self task189_stickyMirror];
+    __block NSInteger tried = 0;
+    __weak typeof(self) weakSelf = self;
+    __block void (^tryNext)(NSError *) = nil;
+    tryNext = ^(NSError *lastErr) {
+        typeof(self) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        if (tried >= kTask189MirrorCount) {
+            completion(nil, lastErr ?: [NSError errorWithDomain:@"ControlRepo" code:-1
+                                               userInfo:@{NSLocalizedDescriptionKey:@"all mirrors failed"}]);
+            return;
+        }
+        NSInteger idx = (start + tried) % kTask189MirrorCount;
+        tried++;
+        NSString *url = task189_mirrorURL(idx, relPath);
+        [strongSelf fetchOneURL:url completion:^(NSData *data, NSError *err) {
+            typeof(self) strongSelf2 = weakSelf;
+            if (data && !err) {
+                [strongSelf2 task189_rememberMirror:idx];
+                if (idx != start) {
+                    NSLog(@"[ControlRepo] Task189: mirror #%ld won (sticky updated from #%ld)", (long)idx, (long)start);
+                }
+                completion(data, nil);
+                return;
+            }
+            NSLog(@"[ControlRepo] Task189: mirror #%ld failed for %@ (%@)", (long)idx, relPath,
+                  err.localizedDescription ?: @"unknown");
+            tryNext(err);
+        }];
+    };
+    tryNext(nil);
+}
 
 - (instancetype)init {
     self = [super initWithStyle:UITableViewStylePlain];
@@ -81,13 +157,11 @@ static NSString *const kTask188FileFallbackFmt =
 
 - (void)fetchIndex {
     [self.refreshControl beginRefreshing];
-    [self fetchURL:kTask188IndexPrimary
-        fallback:kTask188IndexFallback
-        completion:^(NSData *data, NSError *error) {
+    [self fetchRepoFile:@"index.json" completion:^(NSData *data, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [self.refreshControl endRefreshing];
             if (!data || error) {
-                NSLog(@"[ControlRepo] Task188: index fetch failed: %@", error.localizedDescription ?: @"unknown");
+                NSLog(@"[ControlRepo] Task189: index fetch failed (all mirrors): %@", error.localizedDescription ?: @"unknown");
                 self.loadFailed = YES;
                 [self.layouts removeAllObjects];
                 [self.tableView reloadData];
@@ -96,7 +170,7 @@ static NSString *const kTask188FileFallbackFmt =
             id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
             NSArray *arr = ([obj isKindOfClass:[NSDictionary class]]) ? obj[@"layouts"] : nil;
             if (![arr isKindOfClass:[NSArray class]]) {
-                NSLog(@"[ControlRepo] Task188: index JSON invalid (no layouts array)");
+                NSLog(@"[ControlRepo] Task189: index JSON invalid (no layouts array)");
                 self.loadFailed = YES;
                 [self.layouts removeAllObjects];
                 [self.tableView reloadData];
@@ -109,19 +183,9 @@ static NSString *const kTask188FileFallbackFmt =
                     [self.layouts addObject:e];
                 }
             }
-            NSLog(@"[ControlRepo] Task188: index loaded, %lu layouts", (unsigned long)self.layouts.count);
+            NSLog(@"[ControlRepo] Task189: index loaded via mirror chain, %lu layouts", (unsigned long)self.layouts.count);
             [self scanLocalVersions];
         });
-    }];
-}
-
-- (void)fetchURL:(NSString *)primary fallback:(NSString *)fallback
-      completion:(void (^)(NSData *, NSError *))completion {
-    [self fetchOneURL:primary completion:^(NSData *data, NSError *err) {
-        if (data && !err) { completion(data, nil); return; }
-        [self fetchOneURL:fallback completion:^(NSData *d2, NSError *e2) {
-            completion(d2, e2 ?: err);
-        }];
     }];
 }
 
@@ -129,7 +193,8 @@ static NSString *const kTask188FileFallbackFmt =
     NSURL *url = [NSURL URLWithString:urlString];
     if (!url) { completion(nil, [NSError errorWithDomain:@"ControlRepo" code:-1 userInfo:@{NSLocalizedDescriptionKey:@"invalid url"}]); return; }
     NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
-    req.timeoutInterval = 20.0;
+    // Task189：镜像链单源超时收紧到 12s（六源最坏 72s；旧 20s 只有两源时代的值）
+    req.timeoutInterval = 12.0;
     req.cachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
     NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:req
         completionHandler:^(NSData *data, NSURLResponse *resp, NSError *error) {
@@ -200,10 +265,8 @@ static NSString *const kTask188FileFallbackFmt =
     [self.downloading addObject:layoutId];
     NSString *file = [e[@"file"] isKindOfClass:[NSString class]] ? e[@"file"] :
                      [NSString stringWithFormat:@"layouts/%@.json", layoutId];
-    NSLog(@"[ControlRepo] Task188: downloading layout %@ (%@)", layoutId, file);
-    NSString *primary = [NSString stringWithFormat:kTask188FilePrimaryFmt, file];
-    NSString *fallback = [NSString stringWithFormat:kTask188FileFallbackFmt, file];
-    [self fetchURL:primary fallback:fallback completion:^(NSData *data, NSError *error) {
+    NSLog(@"[ControlRepo] Task189: downloading layout %@ (%@) via mirror chain", layoutId, file);
+    [self fetchRepoFile:file completion:^(NSData *data, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [self.downloading removeObject:layoutId];
             if (!data || error) {
@@ -227,7 +290,7 @@ static NSString *const kTask188FileFallbackFmt =
                 [NMToast showMessage:localize(@"custom_controls.repo.download.failed", nil)];
                 return;
             }
-            NSLog(@"[ControlRepo] Task188: layout saved -> %@", dest);
+            NSLog(@"[ControlRepo] Task189: layout saved -> %@", dest);
             [self scanLocalVersions];
             [NMToast showMessage:[NSString stringWithFormat:localize(@"custom_controls.repo.download.done", nil), layoutId]];
             if (self.whenLayoutDownloaded) self.whenLayoutDownloaded(layoutId);

@@ -276,7 +276,14 @@ static ame_es_t ame_es(void) {
     // Task187：状态快照双查询（缺符号时快照自动降级跳过，不影响探针主体）
     s_es.getFloatv       = (ame_es_getfloat_t)dlsym(h, "glGetFloatv");
     s_es.getBooleanv     = (ame_es_getbool_t)dlsym(h, "glGetBooleanv");
-    // Task 75：glReadPixels 解析已移除（回读探针退役，Swap 路径零回读）。
+    // Task 189：glReadPixels 解析恢复。Task 75 退役全屏回读探针时一并移除了
+    // 指针解析，但 Task188 新增的 1x1 中心像素回读依赖它——且该回读只经
+    // Task146 渲染器侧 dispatch（Mithril/MobileGL 族）拿到指针，ANGLE 与
+    // vgpu 会话双双落空：latestlog.1 实测 readbackDone=0（15 个探针帧全部
+    // 静默跳过），黑屏二分的关键数据点缺失。本源 pin 的 libGLESv2 与
+    // ANGLE/tinygl4angle 会话的上下文同属一个 ANGLE 实例，直接解析即可。
+    // 1x1 小分配走独立路径，不经 Task75 SIGBUS 的全屏 CopyBGRA8ToRGBA8。
+    s_es.readPixels      = (ame_es_readpx_t)dlsym(h, "glReadPixels");
     s_es.getError        = (ame_es_geterr_t)dlsym(h, "glGetError");
     s_es.isEnabled       = (ame_es_isenabled_t)dlsym(h, "glIsEnabled");
     s_es.enable          = (ame_es_enable_t)dlsym(h, "glEnable");

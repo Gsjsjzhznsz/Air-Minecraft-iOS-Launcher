@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package android.util;
+package org.lwjgl.ame;
 
 import java.util.Collection;
 import java.util.Map;

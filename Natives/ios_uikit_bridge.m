@@ -62,7 +62,7 @@ void ame187_showAccountRepairDialog(NSString *username, NSString *accountId, NSS
         UIAlertController *alert = [UIAlertController
             alertControllerWithTitle:localize(@"Error", nil)
                              message:[NSString stringWithFormat:
-                @"账号凭据已丢失（更换安装方式/恢复备份后常见）。\n\n点击「删除账号并重新登录」将移除「%@」并直接打开登录页面，登录后即可恢复正版皮肤与联机功能。\nAccount tokens are missing from the keychain. Tap Repair to remove \"%@\" and sign in again.",
+                localize(@"ame189.uikit.account_repair_msg", nil),
                 username ?: @"?", username ?: @"?"]
                       preferredStyle:UIAlertControllerStyleAlert];
         UIWindow *previousKeyWindow = UIWindow.mainWindow;
@@ -135,9 +135,9 @@ void ame187_showAccountRepairDialog(NSString *username, NSString *accountId, NSS
 // 并触发 launchGame（JIT 等待链照常接管，与用户手动流程完全一致）。
 void ame173_showJvmUsedRestartDialog(NSString *profileName) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"需要重启启动器"
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:localize(@"ame189.uikit.restart_title", nil)
             message:[NSString stringWithFormat:
-                @"Forge 安装器占用了本次会话的 Java 运行时（进程内只能创建一次 JVM）。\n\n点击「重启并启动」后启动器将退出，重新打开后将自动启动「%@」并完成 JIT 授权。\n\nThe mod installer used this session's Java runtime (one JVM per process). Tap Restart & Launch, reopen the launcher, and %@ will auto-launch.",
+                localize(@"ame189.uikit.restart_msg", nil),
                 profileName ?: @"", profileName ?: @""]
             preferredStyle:UIAlertControllerStyleAlert];
         // Task173 CI 修复：previousKeyWindow 必须在 action 捕获之前声明
@@ -154,7 +154,7 @@ void ame173_showJvmUsedRestartDialog(NSString *profileName) {
                 }
             }
         }]];
-        [alert addAction:[UIAlertAction actionWithTitle:@"重启并启动 / Restart & Launch"
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"ame189.uikit.restart_button", nil)
                                                   style:UIAlertActionStyleDefault
                                                 handler:^(UIAlertAction *action) {
             if (profileName.length > 0) {

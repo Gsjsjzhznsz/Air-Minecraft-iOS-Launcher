@@ -15,7 +15,7 @@ CSS 参考（bigbear-ui styles/mixin/_index.scss + _variables.scss）：
 
 Task178 重锚（2026-09-26）：用户定稿转向——"只有那个透明度拉条可以改变
   新拟态的透明度，字体始终是不透明的；开关不管咋样都不会使其他选项变灰"。  卡片本体透明度滑条/引擎原语/落盘键恢复（适配 Task177 三层引擎：承载视图
-  整体 alpha），灰化全退，新闻卡圆角钉住 12pt；四主语言 1955。
+  整体 alpha），灰化全退，新闻卡圆角钉住 12pt；四主语言 2155。
 
 本轮定稿（Task177 历史口径）：
   1) 引擎三层结构 = 投影对（clear，+/-N，shadowOpacity 1.0，shadowRadius=blur/2）
@@ -179,8 +179,8 @@ all_six = [rd(f"Natives/resources/{lg}.lproj/Localizable.strings") for lg in ["e
 check("D1 neumorph.opacity.title 键 ×6 语言全部在位（Task184 重锚：回归键；button.opacity 退役）",
       all('"background.cards.neumorph.opacity.title"' in t for t in all_six)
       and all('"background.button.opacity.title"' not in t for t in all_six))
-check("D2 四主语言唯一键计数 1955（Task178 重锚：1954+1）",
-      all(len(k) == 1955 for k in KEYSETS),
+check("D2 四主语言唯一键计数 2155（Task178 重锚：1954+1）",
+      all(len(k) == 2155 for k in KEYSETS),
       detail=str([len(k) for k in KEYSETS]))
 check("D3 四主语言键集一致",
       KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])

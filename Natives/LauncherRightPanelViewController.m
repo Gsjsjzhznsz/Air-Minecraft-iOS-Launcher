@@ -488,13 +488,13 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // 内存两卡改用 ROM 芯片符号：扩展内存限制=实心 memorychip.fill（SF 3.0），
     // 扩展虚拟内存=空心 memorychip（SF 2.0，即原内存上限提升卡同款图标），
     // 均按用户指定；原名 arrow.up.left.and.arrow.down.right 退场。
-    UIView *launcherVersionCard = [self makeInfoCardWithIcon:@"cube.transparent" accent:cardGreen title:@"启动器版本" valueLabel:&_launcherVersionCardValue];
-    UIView *gameVersionCard = [self makeInfoCardWithIcon:@"gamecontroller" accent:cardGreen title:@"游戏版本" valueLabel:&_gameVersionCardValue];
-    UIView *deviceCard = [self makeInfoCardWithIcon:deviceIconName accent:cardBlue title:@"设备" valueLabel:&_deviceCardValue];
-    UIView *systemCard = [self makeInfoCardWithIcon:@"applelogo" accent:cardBlue title:@"系统" valueLabel:&_systemCardValue];
+    UIView *launcherVersionCard = [self makeInfoCardWithIcon:@"cube.transparent" accent:cardGreen title:localize(@"ame189.rp.launcher_version", nil) valueLabel:&_launcherVersionCardValue];
+    UIView *gameVersionCard = [self makeInfoCardWithIcon:@"gamecontroller" accent:cardGreen title:localize(@"ame189.rp.game_version", nil) valueLabel:&_gameVersionCardValue];
+    UIView *deviceCard = [self makeInfoCardWithIcon:deviceIconName accent:cardBlue title:localize(@"ame189.rp.device", nil) valueLabel:&_deviceCardValue];
+    UIView *systemCard = [self makeInfoCardWithIcon:@"applelogo" accent:cardBlue title:localize(@"ame189.rp.system", nil) valueLabel:&_systemCardValue];
     UIView *jitCard = [self makeInfoCardWithIcon:@"hare" accent:cardOrange title:@"JIT" valueLabel:&_jitCardValue];
-    UIView *memLimitCard = [self makeInfoCardWithIcon:@"memorychip.fill" accent:cardOrange title:@"扩展内存限制" valueLabel:&_memLimitCardValue];
-    UIView *extVMCard = [self makeInfoCardWithIcon:@"memorychip" accent:cardAmber title:@"扩展虚拟内存" valueLabel:&_extVMCardValue];
+    UIView *memLimitCard = [self makeInfoCardWithIcon:@"memorychip.fill" accent:cardOrange title:localize(@"ame189.rp.mem_limit", nil) valueLabel:&_memLimitCardValue];
+    UIView *extVMCard = [self makeInfoCardWithIcon:@"memorychip" accent:cardAmber title:localize(@"ame189.rp.ext_vm", nil) valueLabel:&_extVMCardValue];
 
     // Task156：信息卡点击直达对应入口（用户反馈"右边侧边栏的信息能不能点击
     // 直达对应的入口"）。映射：启动器版本→设置·检查更新（深链）、游戏版本→
@@ -522,7 +522,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     NSString *shortVersion = [NSBundle mainBundle].infoDictionary[@"CFBundleShortVersionString"] ?: @"";
     NSString *buildVersion = [NSBundle mainBundle].infoDictionary[@"CFBundleVersion"] ?: @"";
     if (shortVersion.length == 0) {
-        shortVersion = @"未知";
+        shortVersion = localize(@"ame189.common.unknown", nil);
     }
     if (buildVersion.length > 0 && ![buildVersion isEqualToString:shortVersion]) {
         self.launcherVersionCardValue.text = [NSString stringWithFormat:@"%@ (%@)", shortVersion, buildVersion];
@@ -893,11 +893,11 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // 卡片配色固定与内存权限卡同色系（用户指定），状态由正文文字表达。
     if (enabled && DeviceHasJITFlags(JIT_FLAG_FORCE_MIRRORED | JIT_FLAG_HAS_TXM) &&
         !JIT26IsLikelyDebuggerKeepAttached()) {
-        self.jitCardValue.text = @"已启用（启动时附加）";
+        self.jitCardValue.text = localize(@"ame189.rp.jit_attached", nil);
     } else if (enabled) {
-        self.jitCardValue.text = @"已开启";
+        self.jitCardValue.text = localize(@"ame189.common.on", nil);
     } else {
-        self.jitCardValue.text = @"未开启";
+        self.jitCardValue.text = localize(@"ame189.common.off", nil);
     }
 }
 
@@ -1082,8 +1082,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     BOOL memLimit = getEntitlementValue(@"com.apple.developer.kernel.increased-memory-limit");
     BOOL extVM = getEntitlementValue(@"com.apple.developer.kernel.extended-virtual-addressing");
 
-    self.memLimitCardValue.text = memLimit ? @"已开启" : @"未开启";
-    self.extVMCardValue.text = extVM ? @"已开启" : @"未开启";
+    self.memLimitCardValue.text = memLimit ? localize(@"ame189.common.on", nil) : localize(@"ame189.common.off", nil);
+    self.extVMCardValue.text = extVM ? localize(@"ame189.common.on", nil) : localize(@"ame189.common.off", nil);
 }
 
 #pragma mark - 自定义外观（字体颜色）
@@ -1853,10 +1853,10 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
 - (void)ame169_showJITTimeoutAlertWithRetry:(void(^)(void))handler {
     NSLog(@"[JIT] [RightPanel] Task169 JIT wait timed out, showing retry alert");
     UIAlertController *retry = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                                                                   message:@"JIT 开启等待超时（120 秒）。请确认 JIT 工具（StikDebug 等）已安装并可正常拉起后选择重试；也可在设置中选择其它 JIT 开启方式。\nTimeout waiting for JIT (120s). Make sure your JIT enabler app is alive, then retry."
+                                                                   message:@localize(@"ame189.jit.timeout_msg", nil)
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [retry addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
-    [retry addAction:[UIAlertAction actionWithTitle:@"重试 / Retry" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+    [retry addAction:[UIAlertAction actionWithTitle:localize(@"ame189.jit.retry", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
         [self invokeAfterJITEnabled:handler];
     }]];
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
@@ -2018,7 +2018,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
             self.gameVersionCardValue.text = versionId;
         }
     } else {
-        self.gameVersionCardValue.text = @"未选择";
+        self.gameVersionCardValue.text = localize(@"ame189.rp.not_selected", nil);
     }
 
     [self updateLaunchButtonState];

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package android.util;
+package org.lwjgl.ame;
 
 import java.lang.reflect.Array;
 import java.util.Collection;

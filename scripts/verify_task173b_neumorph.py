@@ -165,8 +165,8 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     m = re.search(r'^"' + re.escape(new_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
     vals[lg] = m.group(1) if m else None
 check("D1 六语言新键在位且非空", all(vals.values()), str(vals))
-check("D2 四主语言键集一致且计数 = 1955（Task178 重锚：opacity.title 键恢复）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 1955
+check("D2 四主语言键集一致且计数 = 2155（Task178 重锚：opacity.title 键恢复）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2155
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]

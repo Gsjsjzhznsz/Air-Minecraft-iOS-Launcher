@@ -123,7 +123,9 @@ check("D3 1.2GB native reserve", "availMB - 1200" in u)
 check("D4 floor 1024", "ceilingMB = 1024;" in u)
 check("D5 launch clamp wired into ame141",
       "Task173：Jetsam 安全钳制" in u and "mem = ame173_ceiling;" in u)
-check("D6 toast on clamp", "exceeds device limit, clamped" in u)
+# Task189 重锚：钳制 toast 文案迁 i18n 键 ame189.utils.mem_clamped
+#（en 值保留 "exceeds the device limit; clamped" 语义；zh 值为原文案）。
+check("D6 toast on clamp（Task189 i18n 键形态）", "ame189.utils.mem_clamped" in u)
 uh = rd("Natives/utils.h")
 check("D7 header declares ceiling", "int ame173_safeHeapCeilingMB(void);" in uh)
 ps = rd("Natives/ProfileSettingsViewController.m")

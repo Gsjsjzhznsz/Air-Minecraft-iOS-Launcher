@@ -80,7 +80,7 @@ static NSString *ame96_machineIdentifier(void) {
 NSString *getDeviceMarketingName(void) {
     NSString *machine = ame96_machineIdentifier();
     if (machine.length == 0) {
-        return [UIDevice currentDevice].model ?: @"未知设备";
+        return [UIDevice currentDevice].model ?: localize(@"ame189.common.unknown_device", nil);
     }
     static NSDictionary<NSString *, NSString *> *table;
     static dispatch_once_t once;
@@ -954,7 +954,7 @@ int ame141_currentLaunchAllocMem(void) {
               mem, ame173_ceiling);
         dispatch_async(dispatch_get_main_queue(), ^{
             [NMToast showMessage:[NSString stringWithFormat:
-                @"内存 %dMB 超过设备安全上限，已降至 %dMB / Memory %dMB exceeds device limit, clamped to %dMB",
+                localize(@"ame189.utils.mem_clamped", nil),
                 mem, ame173_ceiling, mem, ame173_ceiling]];
         });
         mem = ame173_ceiling;

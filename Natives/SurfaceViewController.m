@@ -1824,7 +1824,7 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self dismissLaunchOverlayOnError];
                 showDialog(localize(@"Error", nil),
-                    [NSString stringWithFormat:@"LTW 渲染器不支持 MC %@：\n\n26.x 的云渲染管线需要纹理缓冲（samplerBuffer），而 LTW 在 iOS 上的 ES 3.0 后端无法提供，启动后必崩在标题界面。\n\n请到 设置 → 视频设置 → 渲染器 切换到 Zink 或 MobileGlues 后重试。LTW 仍可用于 1.21.x 及更早版本。", ame87_versionId]);
+                    [NSString stringWithFormat:localize(@"ame189.svc.ltw_unsupported", nil), ame87_versionId]);
             });
             return;
         }

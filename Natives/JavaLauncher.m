@@ -688,7 +688,7 @@ static void ame95_warnIncompleteImport(NSString *gameDir) {
         if (names.count >= 5) break;
     }
     NSMutableString *msg = [NSMutableString stringWithFormat:
-        @"该整合包导入时缺失 %lu 个文件（下载失败 %lu / 被跳过 %lu），游戏可能因此崩溃或功能异常。\n\n",
+        localize(@"ame189.jl.missing_header", nil),
         (unsigned long)(failedCount + skippedCount), (unsigned long)failedCount, (unsigned long)skippedCount];
     if (names.count > 0) {
         for (NSString *n in names) {
@@ -696,11 +696,11 @@ static void ame95_warnIncompleteImport(NSString *gameDir) {
         }
         NSUInteger totalMissing = failedCount + skippedCount;
         if (totalMissing > names.count) {
-            [msg appendFormat:@"  ……等共 %lu 个\n", (unsigned long)totalMissing];
+            [msg appendFormat:localize(@"ame189.jl.missing_more", nil), (unsigned long)totalMissing];
         }
         [msg appendString:@"\n"];
     }
-    [msg appendString:@"建议：删除该实例并重新导入（可换个下载源），或在 Mod 管理器中补齐缺失文件。\n本次将照常启动，此提醒只显示一次。"];
+    [msg appendString:localize(@"ame189.jl.missing_footer", nil)];
     NSLog(@"[ImportGuard] Task95: incomplete import detected (failed=%lu skipped=%lu) -- one-shot reminder shown; launch continues",
           (unsigned long)failedCount, (unsigned long)skippedCount);
     showDialog(localize(@"Warning", nil), msg);
