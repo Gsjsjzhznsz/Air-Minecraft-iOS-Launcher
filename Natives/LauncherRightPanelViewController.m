@@ -1853,7 +1853,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
 - (void)ame169_showJITTimeoutAlertWithRetry:(void(^)(void))handler {
     NSLog(@"[JIT] [RightPanel] Task169 JIT wait timed out, showing retry alert");
     UIAlertController *retry = [UIAlertController alertControllerWithTitle:localize(@"i18n_str_437", nil)
-                                                                   message:@localize(@"ame189.jit.timeout_msg", nil)
+                                                                   message:localize(@"ame189.jit.timeout_msg", nil)
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [retry addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
     [retry addAction:[UIAlertAction actionWithTitle:localize(@"ame189.jit.retry", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {

@@ -3990,7 +3990,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 - (void)ame169_showJITTimeoutInlineWithRetry:(void(^)(void))handler {
     NSLog(@"[JIT] [DownloadVC] Task169 JIT wait timed out, showing retry alert");
     UIAlertController *retry = [UIAlertController alertControllerWithTitle:localize(@"launcher.wait_jit.title", nil)
-                                                                   message:@localize(@"ame189.jit.timeout_msg", nil)
+                                                                   message:localize(@"ame189.jit.timeout_msg", nil)
                                                             preferredStyle:UIAlertControllerStyleAlert];
     [retry addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
     [retry addAction:[UIAlertAction actionWithTitle:localize(@"ame189.jit.retry", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {

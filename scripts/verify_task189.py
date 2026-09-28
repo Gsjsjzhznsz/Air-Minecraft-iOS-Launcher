@@ -158,6 +158,20 @@ check("G4 RightPanel 卡片标题/值已迁移",
       and 'ame189.common.on' in rp)
 check("G5 JIT 超时三处共享键", all('ame189.jit.timeout_msg' in read(f) for f in
       ("Natives/LauncherRightPanelViewController.m", "Natives/LauncherNavigationController.m", "Natives/DownloadViewController.m")))
+# Task189 CI 热修教训：message:@localize(...) 的杂散 @ 语法错（括号门抓不到、
+# 锚点门抓不到——只有真编译器能抓）。本地无 clang，改为全 Natives 扫描该
+# 非法模式（@ 后只能跟字面量/表达式盒子/类名，不能跟函数调用）。
+_stray = []
+for _root, _dirs, _fs in os.walk("Natives"):
+    for _f in _fs:
+        if _f.endswith((".m", ".mm")):
+            _p = os.path.join(_root, _f)
+            _s = re.sub(r'//(?!\*)[^\n]*', '', read(_p))
+            _s = re.sub(r'/\*.*?\*/', '', _s, flags=re.S)
+            _s = re.sub(r'@"(?:[^"\\]|\\.)*"', '""', _s)
+            if re.search(r'@localize\(', _s):
+                _stray.append(_p)
+check("G12 全仓零 @localize( 杂散 @（CI ba953ac 教训）", not _stray, str(_stray[:3]))
 lp = read("Natives/LauncherPreferencesViewController.m")
 check("G6 AI 安全模式稳定 ID + 本地化 pickList",
       '"safe"' in lp and '"ask"' in lp and '"yolo"' in lp and "ame189.ai.safety_safe" in lp)
