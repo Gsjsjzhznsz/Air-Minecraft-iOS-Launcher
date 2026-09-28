@@ -3,7 +3,7 @@
 [Pre-Init] GitHub: https://github.com/herbrine8403/Amethyst-iOS-MyRemastered
 [Pre-Init] Please try not to post this log of the remastered launcher to the original GitHub Issues for help.
 [Pre-Init] Version: 6.0.0
-[Pre-Init] Commit: c3f4623 (main)
+[Pre-Init] Commit: dde0f82 (main)
 [Pre-Init] Device: iPad Air 11-inch (M4)
 [Pre-Init] iPadOS 27.0 (24A437) (Unjailbroken)
 [Pre-init] Entitlements availability:
@@ -20,6 +20,8 @@
 [PLPreferences] Getter could not find preference internal.autolaunch_profile
 [HomeAvatar] Task172 branch: network fetch started (URL present, length=211)
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
+[PLPreferences] Getter could not find preference general.disable_window_rotation_shim
+[SceneDelegate] Task189: landscape window transform evaluated (bounds={{0, 0}, {1180, 820}} rotated=0)
 [SceneDelegate] Terracotta temporarily disabled for crash investigation
 [HomeAvatar] Task172 sync skipped: currentAvatar is nil (check branch log above)
 [HomeAvatar] Task172 fetch completion: img=yes (128x128)
@@ -27,18 +29,380 @@
 [HomeAvatar] Task172 fetch completion: img=yes (128x128)
 [HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260927)
-[HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [IconLoader] Initialization complete, disk cache directory: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Library/Caches/IconLoader, mirror enabled: YES
+[HomeAvatar] Task172 direct-sync: 1 visible profile cell(s), image 128x128
 [LauncherRootVC] Loaded 918 remote versions
+[Task173] safe heap ceiling: os_proc_available_memory=12202MB -> Xmx ceiling 11002MB (native reserve 1200MB)
+[MCDL] SHA1 passed for 26.1.2.json
+[MCDL] insertSafety: how to insert assetIndex?
+[MCDL] insertSafety: how to insert assets?
+[MCDL] Replacing JNA 5.17.0 with 5.13.0 for iOS compatibility (required by Forge-26.1.2-64.1.3)
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-freetype:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-glfw:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-jemalloc:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-openal:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-opengl:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-stb:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl-tinyfd:3.4.1:natives-windows-x86
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-linux
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-macos
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-macos-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-arm64
+[MDCL] Skipped library org.lwjgl:lwjgl:3.4.1:natives-windows-x86
+[MCDL] Task187: verify stage entered (elapsed 2.9s since downloadVersion:)
+[JIT] [RightPanel] invokeAfterJITEnabled: dynamicCS=0 trollStore=0 CS_DEBUGGED=0 ppid=1 traced=0 exn=0 JIT_FLAGS=0x7
+[JIT] [RightPanel] Task134 enabler=auto noScript=0
+sandbox_extension_issue_file failed for : 2 (No such file or directory)
+[JIT] [RightPanel] Task179 background task assertion: id=2 valid=1 (remaining bg time fg(n/a))
+[JIT] Task181 isJITEnabled wait begin: startForeground=1 traced=0 exn=0 csdbg=0
+[JIT] Task169 isJITEnabled: still waiting after 0s (traced=0 exn=0)
+[JIT] [RightPanel] Task176 openURL stikjit:// -> 1
+[JIT] Task181 isJITEnabled app went to BACKGROUND while waiting (traced=0 exn=0)
 [IconLoader] App entered background: cancelled all ongoing downloads
+[JIT] Task181 isJITEnabled condition satisfied after 3.1s (traced=1 exn=1)
+[JIT] [RightPanel] Task183 wait-completed block entered on main (ok=1)
+[JIT] [RightPanel] Task183 invoking launch handler
+[TouchController] Task172 profile 'Forge-26.1.2-64.1.3' TouchController off -- global settings untouched
+[SurfaceSwap] Task183 launching SurfaceViewController (synchronous root swap; version=(null))
 [BingWallpaper] Task151 metadata synced: 8 items (host=https://cn.bing.com, today=20260927)
-[DownloadVC] Task173 version manifest candidates: 2
-[DownloadVC] Task173 version manifest loaded from piston-meta.mojang.com (916 versions)
-[ControlRepo] Task188: index loaded, 3 layouts
-[ControlRepo] Task188: index loaded, 3 layouts
-[ControlRepo] Task188: downloading layout large-buttons (layouts/large-buttons.json)
-[ControlRepo] Task188: layout saved -> /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/controlmap/large-buttons.json
-*** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: '*** -[__NSArrayM insertObject:atIndex:]: object cannot be nil'
-*** First throw call stack:
-(0x1908a7190 0x190624380 0x1908355a8 0x10a2a13c8 0x10a2a1738 0x10a2a3bfc 0x10a29ed24 0x10a29f0e8 0x10a36ff90 0x10a372610 0x10a381c5c 0x1951b1648 0x1951b22ec 0x1951b21bc 0x194ace568 0x194b9a090 0x194adbc3c 0x194adb95c 0x194ad1814 0x194ad0e74 0x194ad7b88 0x194ad7928 0x2c3157bc0 0x190868c20 0x190868b94 0x19084a268 0x190849384 0x19084a7f4 0x23ac5ff24 0x194b281cc 0x10a240d00 0x102a5b0f8 0x102a58b50 0x19069b5b8)
-libc++abi: terminating due to uncaught exception of type NSException
+[SurfaceViewController] FPS counter setup: profileRenderer=(null), envRenderer=(null), graphicsApi=(null), isVulkan=0, configuredVulkanExpected=0 (actual path decided at runtime via pojavIsActualVulkanPath)
+[SurfaceVC] CAMetalLayer configured: drawableSize=2360x1640, maximumDrawableCount=3, presentsWithTransaction=0, drawsAsynchronously=1, contentsScale=2.00
+[CustomControls] Task83b decorative sub-button pass-through enabled #1 (name=, touch no longer swallowed)
+[CustomControls] Task83b decorative sub-button pass-through enabled #2 (name=, touch no longer swallowed)
+[TouchController] Sender ready on port 12450
+[SurfaceViewController] Launching Minecraft with accountId: 47e84d5d-0c12-4d51-b768-236bd1779682, version: 25, size: 2360x1640
+[JavaLauncher] Beginning JVM launch
+[JavaLauncher] MoltenVK performance tracking + IMMEDIATE present mode requested for VSync diagnosis
+[JavaLauncher] Framerate unlock configuration:
+[JavaLauncher]   video.disable_game_vsync=1
+[JavaLauncher]   POJAV_DISABLE_VSYNC=1
+[JavaLauncher]   UIScreen.maximumFramesPerSecond=60
+[JavaLauncher] Reading custom environment variables
+[JavaLauncher] Warning: skipped empty value custom env variable: 
+[DyldLVBypass] TXM debug JIT mapping active — keeping debugger attached for dyld bypass
+[DyldLVBypass] init
+[DyldLVBypass] Using redirectFunctionMirrored
+[DyldLVBypass] found dyld_mmap at 0x1906aa7d4
+[DyldLVBypass] hook dyld_mmap succeed!
+[DyldLVBypass] found dyld_fcntl at 0x1906a16cc
+[DyldLVBypass] hook dyld_fcntl succeed!
+[JavaLauncher] init_loadMobileGluesConfig: renderer=libmobileglues.dylib
+[JavaLauncher] MobileGlues renderer detected, config will take effect.
+[JavaLauncher] Task158: mg GLES backend -> MobileGlues (enableANGLE=3 ForceEnable, customGLVersion=32; 5.1.0 semantics, FSR1 linkage follows fsr1_setting)
+[JavaLauncher]   mobileglues.enable_no_error = 0 -> enableNoError = 0
+[JavaLauncher]   mobileglues.enable_ext_timer_query = 1 -> enableExtTimerQuery = 1
+[JavaLauncher]   mobileglues.enable_ext_compute_shader = 0 -> enableExtComputeShader = 0
+[JavaLauncher]   mobileglues.enable_ext_direct_state_access = 0 -> enableExtDirectStateAccess = 0
+[JavaLauncher]   mobileglues.max_glsl_cache_size = 128 -> maxGlslCacheSize = 128
+[JavaLauncher]   mobileglues.multidraw_mode = 0 -> multidrawOrder = native,multiindirect,multibasevertex,multiarrays,indirect,basevertex,unroll,compute (旧键 multidrawMode 已被 MG 2.0.16+ 弃用，不再写入)
+[JavaLauncher]   mobileglues.angle_depth_clear_fix_mode = 0 -> angleDepthClearFixMode = 0
+[JavaLauncher]   mobileglues.fsr1_setting = 0 -> fsr1Setting = 0
+[JavaLauncher] Task130: AMETHYST_FSR_RCAS_SHARPNESS=-1.0000 exported (RCAS sharpness, mpv scale, default 0.2, negative = off)
+[JavaLauncher] MobileGlues config written to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/MG/config.json
+[JavaLauncher] config.json content:
+{
+  "multidrawOrder" : "native,multiindirect,multibasevertex,multiarrays,indirect,basevertex,unroll,compute",
+  "fsr1Setting" : 0,
+  "fsr1RcasSharpness" : -1,
+  "maxGlslCacheSize" : 128,
+  "enableANGLE" : 3,
+  "enableExtDirectStateAccess" : 0,
+  "customGLVersion" : 32,
+  "enableExtTimerQuery" : 1,
+  "enableExtComputeShader" : 0,
+  "enableNoError" : 0,
+  "angleDepthClearFixMode" : 0
+}
+[JavaLauncher] Task138: POJAV_NATIVEDIR=/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents (controlify JNA direct-mapping guard: libsdl4j ffi closure thunks are non-executable on iOS, steer Pojav-aware mods to graceful GLFW fallback)
+[PLDisplayLinkTarget] displayLinkTick #1 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[JavaLauncher] Task158: library gate clean (82 present, 62 skipped)
+[PLProfiles] Applying javaVersion (25)
+[Amethyst] Task120: MobileGL backend override active (profile renderer was (null) -> libmobileglues.dylib)
+[JavaLauncher] RENDERER is set to libmobileglues.dylib
+[JavaLauncher] GRAPHICS_API is set to default
+[Task181] keybind marker present (/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/options.txt.amethyst-keybinds-v1) — user customizations preserved, no forced reset this launch
+[Task67] ===== options.txt keybind dump (pre-sanitize) =====
+[Task67]   toggleCrouch:false (sneak/sprint toggle mode)
+[Task67]   toggleSprint:false (sneak/sprint toggle mode)
+[Task67]   key_key.attack:key.mouse.left
+[Task67]   key_key.use:key.mouse.right
+[Task67]   key_key.forward:key.keyboard.w
+[Task67]   key_key.left:key.keyboard.a
+[Task67]   key_key.back:key.keyboard.s
+[Task67]   key_key.right:key.keyboard.d
+[Task67]   key_key.jump:key.keyboard.space
+[Task67]   key_key.sneak:key.keyboard.left.shift
+[Task67]   key_key.sprint:key.keyboard.left.control
+[Task67]   key_key.drop:key.keyboard.q
+[Task67]   key_key.inventory:key.keyboard.e
+[Task67]   key_key.chat:key.keyboard.t
+[Task67]   key_key.playerlist:key.keyboard.tab
+[Task67]   key_key.pickItem:key.mouse.middle
+[Task67]   key_key.command:key.keyboard.slash
+[Task67]   key_key.socialInteractions:key.keyboard.p
+[Task67]   key_key.toggleGui:key.keyboard.f1
+[Task67]   key_key.toggleSpectatorShaderEffects:key.keyboard.f4
+[Task67]   key_key.screenshot:key.keyboard.f2
+[Task67]   key_key.togglePerspective:key.keyboard.f5
+[Task67]   key_key.smoothCamera:key.keyboard.unknown
+[Task67] SUSPICIOUS (unknown-scancode binding, left as-is): key_key.smoothCamera:key.keyboard.unknown
+[Task67]   key_key.fullscreen:key.keyboard.f11
+[Task67]   key_key.spectatorOutlines:key.keyboard.unknown
+[Task67] SUSPICIOUS (unknown-scancode binding, left as-is): key_key.spectatorOutlines:key.keyboard.unknown
+[Task67]   key_key.spectatorHotbar:key.mouse.middle
+[Task67]   key_key.swapOffhand:key.keyboard.f
+[Task67]   key_key.saveToolbarActivator:key.keyboard.c
+[Task67]   key_key.loadToolbarActivator:key.keyboard.x
+[Task67]   key_key.advancements:key.keyboard.l
+[Task67]   key_key.quickActions:key.keyboard.g
+[Task67]   key_key.debug.overlay:key.keyboard.f3
+[Task67]   key_key.debug.modifier:key.keyboard.f3
+[Task67]   key_key.hotbar.1:key.keyboard.1
+[Task67]   key_key.hotbar.2:key.keyboard.2
+[Task67]   key_key.hotbar.3:key.keyboard.3
+[Task67]   key_key.hotbar.4:key.keyboard.4
+[Task67]   key_key.hotbar.5:key.keyboard.5
+[Task67]   key_key.hotbar.6:key.keyboard.6
+[Task67]   key_key.hotbar.7:key.keyboard.7
+[Task67]   key_key.hotbar.8:key.keyboard.8
+[Task67]   key_key.hotbar.9:key.keyboard.9
+[Task67]   key_key.debug.reloadChunk:key.keyboard.a
+[Task67]   key_key.debug.showHitboxes:key.keyboard.b
+[Task67]   key_key.debug.clearChat:key.keyboard.d
+[Task67]   key_key.debug.crash:key.keyboard.c
+[Task67]   key_key.debug.showChunkBorders:key.keyboard.g
+[Task67]   key_key.debug.showAdvancedTooltips:key.keyboard.h
+[Task67]   key_key.debug.copyRecreateCommand:key.keyboard.i
+[Task67]   key_key.debug.spectate:key.keyboard.n
+[Task67]   key_key.debug.switchGameMode:key.keyboard.f4
+[Task67]   key_key.debug.debugOptions:key.keyboard.f6
+[Task67]   key_key.debug.focusPause:key.keyboard.p
+[Task67]   key_key.debug.dumpDynamicTextures:key.keyboard.s
+[Task67]   key_key.debug.reloadResourcePacks:key.keyboard.t
+[Task67]   key_key.debug.profiling:key.keyboard.l
+[Task67]   key_key.debug.copyLocation:key.keyboard.c
+[Task67]   key_key.debug.dumpVersion:key.keyboard.v
+[Task67]   key_key.debug.profilingChart:key.keyboard.1
+[Task67]   key_key.debug.fpsCharts:key.keyboard.2
+[Task67]   key_key.debug.networkCharts:key.keyboard.3
+[Task67]   key_key.debug.lightmapTexture:key.keyboard.4
+[Task67] ===== keybind sanitize: 0 repairs needed (all canonical / defaults) =====
+[JavaLauncher] Looking for Java 25 or later
+[JavaLauncher] JAVA_HOME has been set to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk
+[Task141] launch memory from auto ratio: 2966 MB
+[JavaLauncher] Max RAM allocation is set to 2966 MB
+[JavaLauncher] Task68 GC/safepoint pause logging enabled (-Xlog:gc,safepoint -> stdout)
+[JavaLauncher] library.path = /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks
+[Amethyst] Task112: OpenAL pinned to /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/Frameworks/libopenal.dylib
+[JavaLauncher] Published Metallum surface view: 0x1260d2d80 (scale=2)
+[JavaLauncher] Added JVM property -Dmax.fps=260 (frame rate unlock layer 4)
+[JavaLauncher] Adding authlib-injector arguments for third party account
+[ThirdPartyAuthenticator] Added prefetched metadata parameter (length=1780)
+[JavaLauncher] Added authlib-injector arg: -javaagent:/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/authlib-injector/authlib-injector.jar=https://littleskin.cn/api/yggdrasil/
+[JavaLauncher] Added authlib-injector arg: -Dauthlibinjector.side=client
+[JavaLauncher] Added authlib-injector arg: -Dauthlibinjector.yggdrasil.prefetched=eyJtZXRhIjp7ImZlYXR1cmUuZW5hYmxlX21vamFuZ19hbnRpX2ZlYXR1cmVzIjp0cnVlLCJmZWF0dXJlLmVuYWJsZV9wcm9maWxlX2tleSI6dHJ1ZSwiZmVhdHVyZS5ub25fZW1haWxfbG9naW4iOnRydWUsImZlYXR1cmUub3BlbmlkX2NvbmZpZ3VyYXRpb25fdXJsIjoiaHR0cHM6Ly9vcGVuLmxpdHRsZXNraW4uY24vLndlbGwta25vd24vb3BlbmlkLWNvbmZpZ3VyYXRpb24iLCJpbXBsZW1lbnRhdGlvbk5hbWUiOiJZZ2dkcmFzaWwgQ29ubmVjdCIsImltcGxlbWVudGF0aW9uVmVyc2lvbiI6IjAuMC44IiwibGlua3MiOnsiYW5ub3VuY2VtZW50IjoiaHR0cHM6Ly9saXR0bGVza2luLmNuL2FwaS9hbm5vdW5jZW1lbnRzIiwiaG9tZXBhZ2UiOiJodHRwczovL2xpdHRsZXNraW4uY24iLCJyZWdpc3RlciI6Imh0dHBzOi8vbGl0dGxlc2tpbi5jbi9hdXRoL3JlZ2lzdGVyIn0sInNlcnZlck5hbWUiOiJMaXR0bGVTa2luIn0sInNpZ25hdHVyZVB1YmxpY2tleSI6Ii0tLS0tQkVHSU4gUFVCTElDIEtFWS0tLS0tXG5NSUlDSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQWc4QU1JSUNDZ0tDQWdFQXJHY05PT0ZJcUxKU3FvRTN1MGhqXG50T0VuT2NFVDN3ajlEcnNzMUJFNnNCcWdQbzBiTXVsT1VMaHFqa2MvdUgvd3lvc1luenczeGFhekp0ODdqVEhoXG5KOEJQTXhDZVFNb3lFZFJvUzNKbmoxRzBLZXpqNEEyYjYxUEpKTTFEcHZEQWNxUUJZc3JTZHBCSis1Mk1qb0dTXG52Sm9lUU81WFVsSlZRbTIxL0htSm5xc1BoemNBNkhnWTcxUkhZRTV4bmhwV0ppUHhMS1VQdG10NkNOWVVRUW9TXG5vMnYzNlhXZ01tTEJaaEFiTk9QeFlYKzFpb3hLYW1qaExPMjlVaHd0Z1k5VTZQV0VPNy9TQmZYenlSUFR6aFBWXG4ybkhxN0tKcWQ4SUlybHRzbHY2aS80RkVNODFpdlMvbW0rUE4zaFlsSVlLNno2WW1paTFuclFBcGxzSjY3T0dxXG5ZSHRXS092cGZUek9vbGx1Z3NSaWhrQUc0T0I2aE0wUHI0NWpqQzNUSWM3ZU83a09nSWNHVUdVUUd1dXVnREV6XG5KMU45RkZXbk4vSDZQOXVrRmVnNVNtR0M1K3dtVVBaWkN0TkJMcjhvOHNJNUg3UWhLN05nd0NhR0ZvWXVpQUdMXG5nejNrLzNZd0o0MEJid1FheVEyZ0lxZW56K1hPRklBbGFqdisvbnlmY0R2Wkg5dkdOS1A5bFZjSFhVVDVZUm5TXG5aU0hvNWx3dlZyWVVycUVBYmgvekR6OFFNRXlpdWpXdlVrUGhaczlmaDZmaW1VR3h0bThtRklQQ3RQSlZYamVZXG53RDNMdnQzYUlCMUpIZFVUSlIzZUVjNGVJYVRLTXdNUHlKUnpWbjV6S3NpdGFaejNubi9jT0Evd1pDOW9xeUVVXG5tYzloNlpNUlRSVUVFNFR0YUp5ZzlsTUNBd0VBQVE9PVxuLS0tLS1FTkQgUFVCTElDIEtFWS0tLS0tXG4iLCJza2luRG9tYWlucyI6WyJsaXR0bGVza2luLmNuIl19
+[JavaLauncher] JVM GC optimization: G1GC + MaxGCPauseMillis=50 + StringDeduplication (Java 17+)
+[SDLHook] Task133: libjli image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/libjli.dylib) -- rebinding its _dlopen slots
+[SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
+[SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
+[SDLHook] Task134: JVM image watchdog started (200ms dyld scan, chain-independent JNA rebind backstop)
+[JavaLauncher] Caciocavallo: isJava8=0 libs=libs_caciocavallo17 mode=/a
+[JavaLauncher] Reading custom JVM flags
+[Init] Found JLI lib
+[LWJGLSel] Task98: MC major 26 extracted from version id "Forge-26.1.2-64.1.3" -> LWJGL 341 (SDL3 bindings)
+[JavaLauncher] Using LWJGL 341 (mcVersion=Forge-26.1.2-64.1.3)
+[JavaLauncher] Using LWJGL jar at /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/libs/lwjgl-341/lwjgl.jar
+[CwdAlign] Task97: process CWD aligned to game dir: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default
+[AppKitStub] Task99: NSApplication/NSMenu/NSMenuItem stubs installed (iOS has no AppKit; MC 26.3 MacosUtil menu walk no-ops, numberOfItems=0)
+[Init] Calling JLI_Launch
+[PLDisplayLinkTarget] displayLinkTick #2 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[PLDisplayLinkTarget] displayLinkTick #3 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[SDLHook] Task133: libjvm image detected (/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib) -- rebinding its _dlopen slots
+[SDLHook] Task133: _dlopen slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlopen chain now routes through the hook
+[SDLHook] Task133: _dlsym slots rebound for image (hits=1, classic+value-scan) -- JVM-side _dlsym chain now routes through the hook
+[PLDisplayLinkTarget] displayLinkTick #4 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+OpenJDK 64-Bit Server VM warning: Option UseCompressedClassPointers was deprecated in version 25.0 and will likely be removed in a future release.
+OpenJDK 64-Bit Server VM warning: Compact object headers require compressed class pointers. Disabling compact object headers.
+[PLDisplayLinkTarget] displayLinkTick #5 (configuredVulkan=0, actualVulkanPath=0, stateChanged=0)
+[JIT26] Requesting 64 MB for JIT mapping
+[JIT26] Got JIT mapping 0x163438000 from debugger
+[JIT26] mapping at RW=0x167438000, RX=0x163438000
+[2026-09-28T18:50:06.955+0800][0.264s] Using G1
+WARNING: Unknown module: cpw.mods.bootstraplauncher specified to --add-exports
+WARNING: package sun.security.action not in java.base
+[authlib-injector] [INFO] Logging file: /var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/authlib-injector.log
+[authlib-injector] [INFO] Version: 1.2.8
+[authlib-injector] [INFO] Authentication server: https://littleskin.cn/api/yggdrasil/
+PatchJNAAgent: premain called
+Arc Capes DNS Injector
+Parts of Alibaba's DCM library were used, please read https://github.com/alibaba/java-dns-cache-manipulator/blob/main/README.md for more info
+Added DNS cache entry: s.optifine.net/23.95.137.176
+[2026-09-28T18:50:07.193+0800][0.502s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 10M->2M(128M) 1.813ms
+[2026-09-28T18:50:07.193+0800][0.502s] Safepoint "G1CollectForAllocation", Time since last: 213476542 ns, Reaching safepoint: 1708 ns, At safepoint: 1835709 ns, Leaving safepoint: 2583 ns, Total: 1840000 ns, Threads: 0 runnable, 12 total
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::staticFieldBase has been called by com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
+WARNING: Please consider reporting this to the maintainers of class com.github.caciocavallosilano.cacio.ctc.CTCPreloadClassLoader
+WARNING: sun.misc.Unsafe::staticFieldBase will be removed in a future release
+[PojavLauncher] VSync disabled, maxFps/maxFramerate/framerateLimit set to 260
+[PojavLauncher]   enableVsync=false
+[PojavLauncher]   maxFps=260
+[PojavLauncher]   maxFramerate=260
+[PojavLauncher]   framerateLimit=260
+[PojavLauncher]   inactivityFpsLimit=minimized
+[PojavLauncher] Task104 on-disk verification: inactivityFpsLimit=minimized maxFps=260 enableVsync=false
+[PojavLauncher] MC 26.2+ graphicsApi cleared (default)
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by net.kdt.pojavlaunch.value.MinecraftAccount in an unnamed module (file:/private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/libs/launcher.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Library com.google.guava:guava: Replaced version guava with guava
+Library com.google.guava:failureaccess: Replaced version failureaccess with failureaccess
+Library org.jspecify:jspecify: Replaced version jspecify with jspecify
+[Tools] Replacing JNA 5.17.0 with 5.13.0 for iOS compatibility
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+Launching Minecraft Forge-26.1.2-64.1.3
+[PojavLauncher] LWJGL selected by launcher: 341, reported version: 3.4.1 (metadata: 3.4.1)
+[PojavLauncher] Using fallback log4j config: /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/log4j-rce-patch-1.12.xml
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+[Tools] LWJGL report version: 3.4.1 (from version metadata; sodium PreLaunchChecks gate, Task94)
+Args init finished. Now starting game
+[2026-09-28T18:50:07.519+0800][0.828s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 84M->36M(128M) 2.784ms
+[2026-09-28T18:50:07.519+0800][0.828s] Safepoint "G1CollectForAllocation", Time since last: 323609125 ns, Reaching safepoint: 21667 ns, At safepoint: 2858291 ns, Leaving safepoint: 7084 ns, Total: 2887042 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:07.647+0800][0.956s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 80M->45M(128M) 3.457ms
+[2026-09-28T18:50:07.647+0800][0.956s] Safepoint "G1CollectForAllocation", Time since last: 124424791 ns, Reaching safepoint: 4834 ns, At safepoint: 3475083 ns, Leaving safepoint: 9708 ns, Total: 3489625 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:07.742+0800][1.051s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 93M->56M(128M) 3.601ms
+[2026-09-28T18:50:07.742+0800][1.051s] Safepoint "G1CollectForAllocation", Time since last: 91091000 ns, Reaching safepoint: 2209 ns, At safepoint: 3618583 ns, Leaving safepoint: 12875 ns, Total: 3633667 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:07.827+0800][1.136s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 100M->66M(128M) 3.010ms
+[2026-09-28T18:50:07.828+0800][1.136s] Safepoint "G1CollectForAllocation", Time since last: 82437792 ns, Reaching safepoint: 3791 ns, At safepoint: 3027834 ns, Leaving safepoint: 10458 ns, Total: 3042083 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:07.842+0800][1.151s] GC(5) Pause Young (Concurrent Start) (G1 Humongous Allocation) 70M->71M(128M) 1.627ms
+[2026-09-28T18:50:07.843+0800][1.151s] GC(6) Concurrent Mark Cycle
+[2026-09-28T18:50:07.843+0800][1.151s] Safepoint "G1TryInitiateConcMark", Time since last: 13336000 ns, Reaching safepoint: 24375 ns, At safepoint: 1660583 ns, Leaving safepoint: 7834 ns, Total: 1692792 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:07.851+0800][1.159s] GC(6) Pause Remark 97M->97M(134M) 0.974ms
+[2026-09-28T18:50:07.851+0800][1.159s] Safepoint "G1PauseRemark", Time since last: 7004958 ns, Reaching safepoint: 21500 ns, At safepoint: 985458 ns, Leaving safepoint: 4167 ns, Total: 1011125 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:07.853+0800][1.162s] GC(6) Pause Cleanup 100M->100M(134M) 0.017ms
+[2026-09-28T18:50:07.853+0800][1.162s] Safepoint "G1PauseCleanup", Time since last: 2634042 ns, Reaching safepoint: 19791 ns, At safepoint: 38709 ns, Leaving safepoint: 5041 ns, Total: 63541 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:07.853+0800][1.162s] GC(6) Concurrent Mark Cycle 10.940ms
+[2026-09-28T18:50:07.872+0800][1.180s] GC(7) Pause Young (Prepare Mixed) (G1 Evacuation Pause) 127M->105M(146M) 4.502ms
+[2026-09-28T18:50:07.872+0800][1.180s] Safepoint "G1CollectForAllocation", Time since last: 13815500 ns, Reaching safepoint: 21959 ns, At safepoint: 4536333 ns, Leaving safepoint: 8417 ns, Total: 4566709 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:07.888+0800][1.197s] GC(8) Pause Young (Mixed) (G1 Evacuation Pause) 121M->115M(290M) 4.438ms
+[2026-09-28T18:50:07.888+0800][1.197s] Safepoint "G1CollectForAllocation", Time since last: 11935916 ns, Reaching safepoint: 1334 ns, At safepoint: 4451916 ns, Leaving safepoint: 5542 ns, Total: 4458792 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:07.986+0800][1.295s] GC(9) Pause Young (Normal) (G1 Evacuation Pause) 187M->123M(290M) 3.570ms
+[2026-09-28T18:50:07.986+0800][1.295s] Safepoint "G1CollectForAllocation", Time since last: 94241708 ns, Reaching safepoint: 11375 ns, At safepoint: 3586167 ns, Leaving safepoint: 4583 ns, Total: 3602125 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:08.089+0800][1.397s] GC(10) Pause Young (Normal) (G1 Evacuation Pause) 193M->129M(290M) 4.028ms
+[2026-09-28T18:50:08.089+0800][1.397s] Safepoint "G1CollectForAllocation", Time since last: 98756584 ns, Reaching safepoint: 2541 ns, At safepoint: 4046209 ns, Leaving safepoint: 3458 ns, Total: 4052208 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:08.182+0800][1.491s] GC(11) Pause Young (Concurrent Start) (G1 Humongous Allocation) 179M->145M(290M) 3.908ms
+[2026-09-28T18:50:08.182+0800][1.491s] Safepoint "G1TryInitiateConcMark", Time since last: 89660917 ns, Reaching safepoint: 2416 ns, At safepoint: 3926000 ns, Leaving safepoint: 10000 ns, Total: 3938416 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:08.182+0800][1.491s] GC(12) Concurrent Mark Cycle
+[2026-09-28T18:50:08.190+0800][1.499s] GC(12) Pause Remark 157M->125M(290M) 1.081ms
+[2026-09-28T18:50:08.191+0800][1.499s] Safepoint "G1PauseRemark", Time since last: 7144542 ns, Reaching safepoint: 3542 ns, At safepoint: 1104541 ns, Leaving safepoint: 2125 ns, Total: 1110208 ns, Threads: 1 runnable, 17 total
+[2026-09-28T18:50:08.196+0800][1.504s] GC(12) Pause Cleanup 125M->125M(290M) 0.017ms
+[2026-09-28T18:50:08.196+0800][1.504s] Safepoint "G1PauseCleanup", Time since last: 5149959 ns, Reaching safepoint: 3833 ns, At safepoint: 25625 ns, Leaving safepoint: 3833 ns, Total: 33291 ns, Threads: 0 runnable, 17 total
+[2026-09-28T18:50:08.196+0800][1.505s] GC(12) Concurrent Mark Cycle 13.723ms
+Ignoring duplicate module on SecureModuleFinder: com.google.gson: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/google/code/gson/gson/2.13.2/gson-2.13.2.jar!/]
+Ignoring duplicate module on SecureModuleFinder: jtracy: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-linux.jar!/]
+Ignoring duplicate module on SecureModuleFinder: jtracy: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-macos.jar!/]
+Ignoring duplicate module on SecureModuleFinder: jtracy: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-macos-arm64.jar!/]
+Ignoring duplicate module on SecureModuleFinder: jtracy: Jar[jar:file:///private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Data/Application/2F698363-B8A7-430A-9A69-A4233058DC65/Documents/instances/default/libraries/com/mojang/jtracy/1.0.37/jtracy-1.0.37-natives-windows.jar!/]
+java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at net.kdt.pojavlaunch.Tools.launchMinecraft(Tools.java:134)
+	at net.kdt.pojavlaunch.PojavLauncher.launchMinecraft(PojavLauncher.java:312)
+	at net.kdt.pojavlaunch.PojavLauncher.main(PojavLauncher.java:53)
+Caused by: java.lang.reflect.InvocationTargetException
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.base/java.lang.reflect.Method.invoke(Unknown Source)
+	at net.minecraftforge.bootstrap.Bootstrap.bootstrapMain(Bootstrap.java:133)
+	at net.minecraftforge.bootstrap.Bootstrap.start(Bootstrap.java:53)
+	at net.minecraftforge.bootstrap.ForgeBootstrap.main(ForgeBootstrap.java:19)
+	... 5 more
+Caused by: java.lang.module.ResolutionException: Modules mojang.stubs and launcher export package com.mojang.text2speech to module logging
+	at java.base/java.lang.module.Resolver.resolveFail(Unknown Source)
+	at java.base/java.lang.module.Resolver.failTwoSuppliers(Unknown Source)
+	at java.base/java.lang.module.Resolver.checkExportSuppliers(Unknown Source)
+	at java.base/java.lang.module.Resolver.finish(Unknown Source)
+	at java.base/java.lang.module.Configuration.<init>(Unknown Source)
+	at java.base/java.lang.module.Configuration.resolveAndBind(Unknown Source)
+	at java.base/java.lang.module.Configuration.resolveAndBind(Unknown Source)
+	at net.minecraftforge.bootstrap@2.1.7/net.minecraftforge.bootstrap.Bootstrap.moduleMain(Bootstrap.java:166)
+	... 10 more
+[RenderDiag] exit(1) snapshot: swapOK=0 swapFail=0
+exit(1) called
+
+===== [Amethyst fatal trace] 2026-09-28 18:50:08.252 =====
+reason: exit(1) called
+thread: (unnamed)
+  #00 0x10cbe504c  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  ame_write_fatal_trace + 69708
+  #01 0x10cbe5908  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/AngelAuraAmethyst  hooked_exit + 71944
+  #02 0x1338a02a4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN2os5_exitEi + 9044644
+  #03 0x1338a0298  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN25permit_forbidden_function4exitEi + 9044632
+  #04 0x1334e8e38  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _Z18notify_vm_shutdownv + 5148216
+  #05 0x133b7bcd4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN7VM_Exit4doitEv + 12041428
+  #06 0x133b7af74  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN12VM_Operation8evaluateEv + 12038004
+  #07 0x133b83100  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread18evaluate_operationEP12VM_Operation + 12071168
+  #08 0x133b83854  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread13inner_executeEP12VM_Operation + 12073044
+  #09 0x133b82dd8  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN8VMThread3runEv + 12070360
+  #10 0x133af43d4  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZN6Thread8call_runEv + 11486164
+  #11 0x133898dcc  /private/var/mobile/Containers/Data/Application/C0D59969-9D27-4DAF-A08D-7CE2679E371F/Documents/Applications/com.air-devs.air.app/java_runtimes/java-25-openjdk/lib/server/libjvm.dylib  _ZL19thread_native_entryP6Thread + 9014732
+  #12 0x190752038  /usr/lib/system/libsystem_pthread.dylib  _pthread_start + 16440
+  #13 0x19074e91c  /usr/lib/system/libsystem_pthread.dylib  thread_start + 2332
+
+[PLCrashView] User tapped exit launcher, exiting process directly
+[RenderDiag] exit(0) snapshot: swapOK=0 swapFail=0
+exit(0) called
