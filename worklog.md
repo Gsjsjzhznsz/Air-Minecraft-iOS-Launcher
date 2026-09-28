@@ -941,3 +941,19 @@ Work Log:
 Stage Summary:
 - Task191 全链闭环：六项修复 + verify 45/45 + CI 绿，新 IPA 就绪
 - 装机验证锚点：vgpu direct-elements-ebo 0x0502 归零/方块纹理恢复；i18n 手动切英文正常；Forge 26.1.2 越过模块解析；横屏 Task191 rotated by device orientation；ANGLE Task191 ubo 系列裁决方向；控件崩溃自证锚点
+
+---
+Task ID: 193
+Agent: main (Super Z)
+Task: 启动器软件图标替换——上游 Amethyst 六边形 → 用户上传草方块立方体（Light 家族最小触碰）+ 上游资产出处审计归档
+
+Work Log:
+- 溯源审计（用户">1 年上游资产别动"规则 + 全部图标逐字节比对上游 herbrine8403/Amethyst-iOS-MyRemastered）：14/14 全部 SAME-AS-UPSTREAM；上游历史 Dark/Development 主图与 resources 全部小图 = 2022-11-25 "Add alternate Dark icon"（Pixelmator XMP 2022-11-25 佐证），Light 主图三张 = 2025-05-29 "[Branding] Add the final logo"，AppLogo-Vector = XMP 2025-05-25；本 fork git 历史为单笔压平（8d634b4），故 git 时间戳不可用，以 PNG 内嵌元数据 + 上游树哈希定案
+- 用户对矛盾拍板前上传新图标 IMG_9288.jpeg 至仓库根目录（690×690 JPEG，附件通道故障期间走 GitHub 网页上传）；采用最小触碰集：AppIcon-Light.appiconset 三外观槽（universal/dark/tinted 同图三份，与上游装运约定一致）+ AppIcon-Light60x60@2x（iPhone 主图标）+ AppIcon-Light76x76@2x~ipad（iPad 主图标）；690→1024 LANCZOS 上采样、152/120 下采样；README 顶部展示图自动跟随
+- 保持不动：Dark/Development 备用三套（设置页选择器不可达）、AppLogo-Vector（零代码引用）、无后缀 AppIcon60x60/76x76（Info.plist/pbxproj 零引用）；Info.plist/Contents.json 未动一行（纯位图同名覆盖，引用按文件名解析）
+- 文档：announcements.json task193@2 插入（24→25，task190→3、task184→4 窗口族顺延）；version.h Task193 附录（REVISION 18 append-only）；verify_task173 M3 索引 [3..11]→[4..12]（9 处）+ verify_task190 [2]→[3] 重锚
+- verify_task193 新建 36 项（A 尺寸 5 / B 替换离上游 5+同图约定 1 / C 上游保持 10 / D 配置纯净 5 / E 溯源 8 / F 公告 2 / G compile 2）全绿；级联 173:123/123、190:ALL GREEN、192:52/52、129:47/47；140 七失败经 stash 对拍 HEAD 基线逐项相同（设备日志读取类环境性既有，零新增）
+- 教训：task193_docs.py 首版定义了 patch_version_h() 却忘在主流程调用——"改了"与"调用改了"必须以产物 grep 计数定案（本轮 verify D 组断言当场抓获，脚本已改幂等版）
+
+Stage Summary:
+- 装机锚点：重装后桌面图标 = 草方块立方体（iPhone/iPad 一致，浅色/深色/着色外观同图）；上游品牌资产零触碰可一键回滚（blob 哈希全档归档于 verify_task193）

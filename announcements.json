@@ -24,6 +24,17 @@
       "image_url": ""
     },
     {
+      "id": "task193-app-icon-replace-2026-09-28",
+      "title": "启动器图标换新：上游 Amethyst 六边形 → 草方块立方体（Air 定制品牌第一步）",
+      "date": "2026-09-28",
+      "summary": "应用图标由上游遗留的浅蓝六边形替换为草方块立方体（用户上传素材）。仅替换实际生效的 Light 家族（1024×3 + 120 + 152）；Dark/Development 备用图标与 AppLogo-Vector 等上游资产按约定保持不动。",
+      "content": "## 启动器图标换新\n\n- **新图标**：草方块立方体（绿顶棕底，用户上传的 IMG_9288.jpeg，690→LANCZOS 出 1024/152/120 全尺寸）\n- **替换范围（最小触碰）**：AppIcon-Light.appiconset 三张（universal/dark/tinted 外观同图三份，与上游做法一致）+ AppIcon-Light60x60@2x（iPhone 主图标）+ AppIcon-Light76x76@2x~ipad（iPad 主图标）+ README 顶部展示图自动跟随\n- **保持不动**：AppIcon-Dark / AppIcon-Development 备用三套、AppLogo-Vector、无引用的无后缀 AppIcon60x60/76x76 —— 全部为上游 2022/2025 遗留资产（blob 哈希与上游逐字节一致，本轮已查证归档）\n- **零代码改动**：图标为纯位图资源，仅文件名被引用（Contents.json/Info.plist 未动一行），同名覆盖即生效\n\nEN: The launcher icon is now the user-supplied grass-block cube (was the upstream Amethyst hexagon). Only the actually-served Light family was replaced (1024×3 + 120 + 152); Dark/Development alternates and AppLogo-Vector stay pristine upstream assets.\n\n---\n\n装机锚点：重装后桌面图标 = 草方块立方体（iPhone/iPad 一致，浅色/深色/着色外观同图）；设置页关于图标无变化（未动）。",
+      "priority": "normal",
+      "action_url": "",
+      "action_title": "",
+      "image_url": ""
+    },
+    {
       "id": "task190-account-card-installer-spacing-2026-09-28",
       "title": "账号卡片与已安装版本页同构 + 长按菜单（选用/删除账号）+ 安装方式页间距对齐版本号页",
       "date": "2026-09-28",

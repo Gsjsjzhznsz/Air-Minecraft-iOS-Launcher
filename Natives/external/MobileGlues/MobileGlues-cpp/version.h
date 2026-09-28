@@ -3046,3 +3046,19 @@
 // the EBO mirror harness passes (upload bytes == draw bytes, fpe receives
 // NULL, EBO unbound after) and the Makefile stash sequence dry-runs clean.
 // ============================================================================
+
+// REVISION 18 addendum (Amethyst Task 193, no bump): the launcher app icon
+// (Light family) replaced with the user-uploaded grass-block cube artwork
+// (repo-root IMG_9288.jpeg, 690x690 -> LANCZOS 1024/152/120). Replaced set =
+// AppIcon-Light.appiconset all three appearance slots (universal/dark/tinted,
+// same-image x3 exactly as upstream shipped them) + AppIcon-Light60x60@2x
+// (iPhone primary per Info.plist CFBundlePrimaryIcon) + AppIcon-Light76x76@2x~ipad
+// (iPad primary). Provenance audit archived in verify_task193: ALL 14 icon files
+// were byte-identical to upstream herbrine8403/Amethyst-iOS-MyRemastered (Dark+
+// Development iconsets and the resources PNGs date to 2022-11-25, Light set to
+// 2025-05-29 'Add the final logo', AppLogo-Vector XMP 2025-05-25); per the user's
+// >1y rule those stay pristine. Zero code/config changes: Contents.json and
+// Info.plist untouched, icons are pure bitmaps referenced by filename only.
+// Verification: verify_task193 (A dims 5, B replaced-vs-upstream 5, C untouched
+// 9, D config purity 3, E provenance 3, F announcement 2, G source-present 1).
+// ============================================================================
