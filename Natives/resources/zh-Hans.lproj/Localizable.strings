@@ -2582,7 +2582,6 @@
 "ame193.misc.7" = "提供商配置";
 "ame193.misc.8" = "会话列表";
 "ame193.misc.9" = "Markdown 渲染";
-"ame193.misc.10" = "iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\\n\\n";
 "ame193.misc.11" = "安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@";
 "ame193.misc.12" = "显示全部（还有 %ld 个更早的版本）";
 "ame193.misc.jit_not_handled" = "%@ 未接管启动请求（未安装或版本过旧？）。请在设置的 JIT 开启工具中换用其它工具后重试。";

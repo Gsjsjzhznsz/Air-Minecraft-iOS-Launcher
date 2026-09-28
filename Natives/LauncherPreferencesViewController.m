@@ -1913,7 +1913,7 @@
     UIAlertController *alert = [UIAlertController
         alertControllerWithTitle:localize(@"mem_help.title", @"关于内存限制")
                          message:localize(@"mem_help.message",
-                             localize(@"ame193.misc.10", @"iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\n\n")
+                             @"iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\n\n"
                               "解决方法：\n"
                               "使用 GetMoreRam (LiveContainer 插件) 解除内存限制。\n"
                               "GetMoreRam 仓库：github.com/hugeBlack/GetMoreRam\n\n"

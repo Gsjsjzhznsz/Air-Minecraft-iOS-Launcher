@@ -202,10 +202,10 @@ import re as _re
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     n = len(set(_re.findall(r'^"([^"]+)"\s*=',
                             rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), _re.M)))
-    check("M", f"{lang} 唯一键 2408", n == 2408, f"got {n}")
+    check("M", f"{lang} 唯一键 2407", n == 2407, f"got {n}")
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     t = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
-    check("M", f"{lang} ame193 键 180 个", len(_re.findall(r'^"ame193\.', t, _re.M)) == 180)
+    check("M", f"{lang} ame193 键 179 个", len(_re.findall(r'^"ame193\.', t, _re.M)) == 179)
 mp = rd("Natives/MultiplayerViewController.m")
 check("M", "MP 硬编码中文清零（localize 包装后）", mp.count('localize(@"ame193.') >= 100)
 check("M", "混合语 JIT 串迁移",
