@@ -264,6 +264,16 @@ const GLubyte * glGetString(GLenum name) {
     AME173_RESOLVE(ame173_real_glGetString, "glGetString");
     const GLubyte *result = ame173_real_glGetString ? ame173_real_glGetString(name) : NULL;
     ame173_forensics();
+    // Task203：状态查询观察器（printf 版，NSLog 在 dylib 内静默不进日志）。
+    // MC/LWJGL 的 caps 构建到底问了什么、拿到了什么——首 12 次记名。
+    {
+        static int s_ame203_gs = 0;
+        if (s_ame203_gs < 12) {
+            s_ame203_gs++;
+            printf("[tinygl4angle] Task203 query: glGetString #%d name=0x%04X -> \"%.60s\"\n",
+                   s_ame203_gs, (unsigned)name, result ? (const char *)result : "<NULL>");
+        }
+    }
     // Task193：旧式扩展枚举路径与索引式（glGetStringi）同口径——追加
     // GL_ARB_direct_state_access（DSA 通告，见 ame193 块注释）。
     // Task197：通告默认撤回（默认原样返回真实串，仅 env 门控时追加）。
@@ -273,7 +283,7 @@ const GLubyte * glGetString(GLenum name) {
     if (name == GL_VERSION && result) {
         const char *ame179_s = ame179_spoofDesktopVersion((const char *)result);
         if (ame179_s != (const char *)result) {
-            NSLog(@"[TinyGL] Task179 desktop identity: GL_VERSION '%s' -> '%s' (ES3 context, facade-form spoof)",
+            printf("[TinyGL] Task179 desktop identity: GL_VERSION '%s' -> '%s' (ES3 context, facade-form spoof)\n",
                   (const char *)result, ame179_s);
             return (const GLubyte *)ame179_s;
         }
@@ -286,7 +296,7 @@ const GLubyte * glGetString(GLenum name) {
         const char *s = (const char *)result;
         const char *ame179_s = ame179_spoofDesktopGlsl(s);
         if (ame179_s != s) {
-            NSLog(@"[TinyGL] Task179 desktop identity: GLSL '%s' -> '%s' (ES3 context, facade-form spoof)",
+            printf("[TinyGL] Task179 desktop identity: GLSL '%s' -> '%s' (ES3 context, facade-form spoof)\n",
                   s, ame179_s);
             s = ame179_s;
         }
@@ -294,7 +304,7 @@ const GLubyte * glGetString(GLenum name) {
         static char ame173_glslbuf[256];
         if (l > 12 && strncmp(s, "OpenGL GLSL ", 12) == 0 && l - 12 < sizeof(ame173_glslbuf)) {
             strlcpy(ame173_glslbuf, s + 12, sizeof(ame173_glslbuf));
-            NSLog(@"[TinyGL] Task173 GLSL version string normalized: '%s' -> '%s' (Iris semver parse)", s, ame173_glslbuf);
+            printf("[TinyGL] Task173 GLSL version string normalized: '%s' -> '%s' (Iris semver parse)\n", s, ame173_glslbuf);
             return (const GLubyte *)ame173_glslbuf;
         }
         return (const GLubyte *)s;
@@ -330,7 +340,7 @@ void glEnable(GLenum cap) {
         static int s_ame187_logged = 0;
         if (s_ame187_logged < 2) {
             ++s_ame187_logged;
-            NSLog(@"[tinygl4angle] Task187: accepted desktop-only glEnable(0x%04X) as no-op (RenderPearl unconditional init; ES rejects with HIGH debug error)", (unsigned)cap);
+            printf("[tinygl4angle] Task187: accepted desktop-only glEnable(0x%04X) as no-op (RenderPearl unconditional init; ES rejects with HIGH debug error)\n", (unsigned)cap);
         }
         return;
     }
@@ -497,6 +507,135 @@ void glFramebufferTexture(GLenum target, GLenum attachment, GLuint texture, GLin
         // ES 降级：2D 纹理挂 2D 挂点（MC 主用 2D RT；cube/3D 场景罕见）
         glFramebufferTexture2D(target, attachment, GL_TEXTURE_2D, texture, level);
     }
+}
+
+// ============================================================================
+// Task203：ANGLE 黑屏定谳流量观察器（64fdaf2 装机 latestlog.1 复盘）。
+// 病历核心矛盾：swapOK=185（渲染循环活着）+ 着色器编译全过 + 图集尺寸
+// 正常 + 回读 (0,0,0,0)（真黑内容），但 Task191/192 的 UBO 族调用记录
+// 为零（glBindBufferBase/Range/UniformBlockBinding/glBindBuffersBase
+// 一个都没被调）——std140 uniform block 声明在着色器里，矩阵却从未
+// 经任何可见路径上传。同时 NSLog 在本 dylib 内整体静默（主二进制走
+// 重定向进日志，dylib 的 NSLog 落 os_log 不被捕获）——此前"锚点未
+// 出现 = 代码未执行"的推理全部作废，本轮全部转 printf 后重开取证。
+// 观察器三组（全部 printf、首 N 次 + 绘制类周期抽样，指针解析失败
+// 安全 no-op 与转发族同款）：
+//   (1) 状态查询族：glGetString/glGetIntegerv/glGetStringi 首几次的
+//       name/pname+结果头 —— MC 的 caps 构建路径与扩展表真相；
+//   (2) 矩阵上传族：glUniformMatrix4fv/glUniform4fv/glUniform1iv/
+//       glUniform1f —— 若 MC 走经典 uniform 路径而非 UBO，这里现形；
+//   (3) 绘制族：glUseProgram/glDrawElements/glDrawArrays/
+//       glDrawElementsInstanced/glDrawArraysInstanced（sodium 区块管线）
+//       —— 若一个 draw 都没有 = 几何从未提交，黑屏定谳。
+// ============================================================================
+// (2) 矩阵/标量 uniform 转发 + 计数（经典 uniform 路径取证）。
+// 注：glUniformMatrix4fv 已由 Task186 的 AME186 转置桥覆盖（transpose
+// 语义根修）——其调用计数观察器直接并入 AME186_MATRIX_FN 宏（见下），
+// 此处不重定义；下列为 Task186 未覆盖的向量/标量族。
+typedef void (*ame203_fn_glUniform4fv)(GLint, GLsizei, const GLfloat *);
+static ame203_fn_glUniform4fv ame203_ptr_u4fv;
+void glUniform4fv(GLint location, GLsizei count, const GLfloat *value) {
+    AME173_RESOLVE(ame203_ptr_u4fv, "glUniform4fv");
+    static unsigned s_ame203_u4 = 0;
+    unsigned ame203_no = ++s_ame203_u4;
+    if (ame203_no <= 8) {
+        printf("[tinygl4angle] Task203 uniform: glUniform4fv #%u loc=%d count=%d\n",
+               ame203_no, (int)location, (int)count);
+    }
+    if (ame203_ptr_u4fv) ame203_ptr_u4fv(location, count, value);
+}
+
+typedef void (*ame203_fn_glUniform1iv)(GLint, GLsizei, const GLint *);
+static ame203_fn_glUniform1iv ame203_ptr_u1iv;
+void glUniform1iv(GLint location, GLsizei count, const GLint *value) {
+    AME173_RESOLVE(ame203_ptr_u1iv, "glUniform1iv");
+    if (ame203_ptr_u1iv) ame203_ptr_u1iv(location, count, value);
+}
+
+typedef void (*ame203_fn_glUniform1f)(GLint, GLfloat);
+static ame203_fn_glUniform1f ame203_ptr_u1f;
+void glUniform1f(GLint location, GLfloat v0) {
+    AME173_RESOLVE(ame203_ptr_u1f, "glUniform1f");
+    if (ame203_ptr_u1f) ame203_ptr_u1f(location, v0);
+}
+
+typedef void (*ame203_fn_glUniform2f)(GLint, GLfloat, GLfloat);
+static ame203_fn_glUniform2f ame203_ptr_u2f;
+void glUniform2f(GLint location, GLfloat v0, GLfloat v1) {
+    AME173_RESOLVE(ame203_ptr_u2f, "glUniform2f");
+    if (ame203_ptr_u2f) ame203_ptr_u2f(location, v0, v1);
+}
+
+typedef void (*ame203_fn_glUniform3f)(GLint, GLfloat, GLfloat, GLfloat);
+static ame203_fn_glUniform3f ame203_ptr_u3f;
+void glUniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) {
+    AME173_RESOLVE(ame203_ptr_u3f, "glUniform3f");
+    if (ame203_ptr_u3f) ame203_ptr_u3f(location, v0, v1, v2);
+}
+
+// (3) 绘制族转发 + 计数（几何提交取证）。
+typedef void (*ame203_fn_glUseProgram)(GLuint);
+static ame203_fn_glUseProgram ame203_ptr_useProgram;
+void glUseProgram(GLuint program) {
+    AME173_RESOLVE(ame203_ptr_useProgram, "glUseProgram");
+    static unsigned s_ame203_pu = 0;
+    unsigned ame203_no = ++s_ame203_pu;
+    if (ame203_no <= 8 || (ame203_no % 5000) == 0) {
+        printf("[tinygl4angle] Task203 draw: glUseProgram #%u prog=%u\n", ame203_no, (unsigned)program);
+    }
+    if (ame203_ptr_useProgram) ame203_ptr_useProgram(program);
+}
+
+typedef void (*ame203_fn_glDrawElements)(GLenum, GLsizei, GLenum, const void *);
+static ame203_fn_glDrawElements ame203_ptr_drawElems;
+void glDrawElements(GLenum mode, GLsizei count, GLenum type, const void *indices) {
+    AME173_RESOLVE(ame203_ptr_drawElems, "glDrawElements");
+    static unsigned s_ame203_de = 0;
+    unsigned ame203_no = ++s_ame203_de;
+    if (ame203_no <= 8 || (ame203_no % 4000) == 0) {
+        printf("[tinygl4angle] Task203 draw: glDrawElements #%u mode=%u count=%d\n",
+               ame203_no, (unsigned)mode, (int)count);
+    }
+    if (ame203_ptr_drawElems) ame203_ptr_drawElems(mode, count, type, indices);
+}
+
+typedef void (*ame203_fn_glDrawArrays)(GLenum, GLint, GLsizei);
+static ame203_fn_glDrawArrays ame203_ptr_drawArrays;
+void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
+    AME173_RESOLVE(ame203_ptr_drawArrays, "glDrawArrays");
+    static unsigned s_ame203_da = 0;
+    unsigned ame203_no = ++s_ame203_da;
+    if (ame203_no <= 8 || (ame203_no % 4000) == 0) {
+        printf("[tinygl4angle] Task203 draw: glDrawArrays #%u mode=%u first=%d count=%d\n",
+               ame203_no, (unsigned)mode, (int)first, (int)count);
+    }
+    if (ame203_ptr_drawArrays) ame203_ptr_drawArrays(mode, first, count);
+}
+
+typedef void (*ame203_fn_glDrawElementsInstanced)(GLenum, GLsizei, GLenum, const void *, GLsizei);
+static ame203_fn_glDrawElementsInstanced ame203_ptr_drawElemsInst;
+void glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount) {
+    AME173_RESOLVE(ame203_ptr_drawElemsInst, "glDrawElementsInstanced");
+    static unsigned s_ame203_dei = 0;
+    unsigned ame203_no = ++s_ame203_dei;
+    if (ame203_no <= 8 || (ame203_no % 4000) == 0) {
+        printf("[tinygl4angle] Task203 draw: glDrawElementsInstanced #%u mode=%u count=%d inst=%d\n",
+               ame203_no, (unsigned)mode, (int)count, (int)instancecount);
+    }
+    if (ame203_ptr_drawElemsInst) ame203_ptr_drawElemsInst(mode, count, type, indices, instancecount);
+}
+
+typedef void (*ame203_fn_glDrawArraysInstanced)(GLenum, GLint, GLsizei, GLsizei);
+static ame203_fn_glDrawArraysInstanced ame203_ptr_drawArraysInst;
+void glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instancecount) {
+    AME173_RESOLVE(ame203_ptr_drawArraysInst, "glDrawArraysInstanced");
+    static unsigned s_ame203_dai = 0;
+    unsigned ame203_no = ++s_ame203_dai;
+    if (ame203_no <= 8 || (ame203_no % 4000) == 0) {
+        printf("[tinygl4angle] Task203 draw: glDrawArraysInstanced #%u mode=%u count=%d inst=%d\n",
+               ame203_no, (unsigned)mode, (int)count, (int)instancecount);
+    }
+    if (ame203_ptr_drawArraysInst) ame203_ptr_drawArraysInst(mode, first, count, instancecount);
 }
 
 // ---- Task183：buffer 纹理 -> 2D 纹理 PBO 桥（与 spvc-shim 的 C 族着色器
@@ -701,7 +840,7 @@ void glBindBufferRange(GLenum target, GLuint index, GLuint buffer, GLintptr offs
     static int ame191_uboLogs = 0;
     if (target == 0x8A11 /*GL_UNIFORM_BUFFER*/ && ame191_uboLogs < 8) {
         ame191_uboLogs++;
-        NSLog(@"[tinygl4angle] Task191 ubo: glBindBufferRange(idx=%u buf=%u offset=%lld size=%lld%s)",
+        printf("[tinygl4angle] Task191 ubo: glBindBufferRange(idx=%u buf=%u offset=%lld size=%lld%s)\n",
               (unsigned)index, (unsigned)buffer, (long long)offset, (long long)size,
               ((offset & 0xFF) != 0) ? " [UNALIGNED-256!]" : "");
     }
@@ -717,7 +856,7 @@ void glBindBufferBase(GLenum target, GLuint index, GLuint buffer) {
     static int ame191_uboBaseLogs = 0;
     if (target == 0x8A11 /*GL_UNIFORM_BUFFER*/ && ame191_uboBaseLogs < 8) {
         ame191_uboBaseLogs++;
-        NSLog(@"[tinygl4angle] Task191 ubo: glBindBufferBase(idx=%u buf=%u)", (unsigned)index, (unsigned)buffer);
+        printf("[tinygl4angle] Task191 ubo: glBindBufferBase(idx=%u buf=%u)\n", (unsigned)index, (unsigned)buffer);
     }
 }
 
@@ -731,7 +870,7 @@ void glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint unif
     static int ame191_ubbLogs = 0;
     if (ame191_ubbLogs < 8) {
         ame191_ubbLogs++;
-        NSLog(@"[tinygl4angle] Task191 ubo: glUniformBlockBinding(prog=%u block=%u bind=%u)", (unsigned)program, (unsigned)uniformBlockIndex, (unsigned)uniformBlockBinding);
+        printf("[tinygl4angle] Task191 ubo: glUniformBlockBinding(prog=%u block=%u bind=%u)\n", (unsigned)program, (unsigned)uniformBlockIndex, (unsigned)uniformBlockBinding);
     }
 }
 
@@ -773,7 +912,7 @@ void glCreateBuffers(GLsizei n, GLuint *buffers) {
     }
     if (ame192_dsaLogs < 8) {
         ame192_dsaLogs++;
-        NSLog(@"[tinygl4angle] Task192 dsa: glCreateBuffers(n=%d) -> first=%u (DSA probe should now SUCCEED)", (int)n, (n > 0 && buffers) ? (unsigned)buffers[0] : 0u);
+        printf("[tinygl4angle] Task192 dsa: glCreateBuffers(n=%d) -> first=%u (DSA probe should now SUCCEED)\n", (int)n, (n > 0 && buffers) ? (unsigned)buffers[0] : 0u);
     }
 }
 
@@ -803,7 +942,7 @@ void glNamedBufferData(GLuint buffer, GLsizeiptr size, const void *data, GLenum 
     ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
     if (ame192_dsaLogs < 8) {
         ame192_dsaLogs++;
-        NSLog(@"[tinygl4angle] Task192 dsa: glNamedBufferData(buf=%u size=%lld usage=0x%X)", (unsigned)buffer, (long long)size, (unsigned)usage);
+        printf("[tinygl4angle] Task192 dsa: glNamedBufferData(buf=%u size=%lld usage=0x%X)\n", (unsigned)buffer, (long long)size, (unsigned)usage);
     }
 }
 
@@ -817,7 +956,7 @@ void glNamedBufferSubData(GLuint buffer, GLintptr offset, GLsizeiptr size, const
     ame192_ptr_glBindBuffer(GL_COPY_WRITE_BUFFER, (GLuint)prev);
     if (ame192_dsaLogs < 8) {
         ame192_dsaLogs++;
-        NSLog(@"[tinygl4angle] Task192 dsa: glNamedBufferSubData(buf=%u off=%lld size=%lld) -- MVP upload path", (unsigned)buffer, (long long)offset, (long long)size);
+        printf("[tinygl4angle] Task192 dsa: glNamedBufferSubData(buf=%u off=%lld size=%lld) -- MVP upload path\n", (unsigned)buffer, (long long)offset, (long long)size);
     }
 }
 
@@ -839,7 +978,7 @@ void glBindBuffersBase(GLenum target, GLuint first, GLsizei count, const GLuint 
     }
     if (ame192_dsaLogs < 8) {
         ame192_dsaLogs++;
-        NSLog(@"[tinygl4angle] Task192 dsa: glBindBuffersBase(target=0x%X first=%u count=%d, firstBuf=%u)", (unsigned)target, (unsigned)first, (int)count, (buffers && count > 0) ? (unsigned)buffers[0] : 0u);
+        printf("[tinygl4angle] Task192 dsa: glBindBuffersBase(target=0x%X first=%u count=%d, firstBuf=%u)\n", (unsigned)target, (unsigned)first, (int)count, (buffers && count > 0) ? (unsigned)buffers[0] : 0u);
     }
 }
 
@@ -858,7 +997,7 @@ void glBindBuffersRange(GLenum target, GLuint first, GLsizei count, const GLuint
     }
     if (ame192_dsaLogs < 8) {
         ame192_dsaLogs++;
-        NSLog(@"[tinygl4angle] Task192 dsa: glBindBuffersRange(target=0x%X first=%u count=%d, firstBuf=%u off=%lld size=%lld%s)",
+        printf("[tinygl4angle] Task192 dsa: glBindBuffersRange(target=0x%X first=%u count=%d, firstBuf=%u off=%lld size=%lld%s)\n",
               (unsigned)target, (unsigned)first, (int)count,
               (buffers && count > 0) ? (unsigned)buffers[0] : 0u,
               (long long)((offsets && count > 0) ? offsets[0] : 0),
@@ -996,14 +1135,14 @@ static void ame193_buildExtCache(void) {
     }
     AME173_RESOLVE(ame193_real_getStringi, "glGetStringi");
     if (ame193_getInt == NULL || ame193_real_getStringi == NULL) {
-        NSLog(@"[tinygl4angle] Task193: ext cache build skipped (getIntegerv=%p getStringi=%p)",
+        printf("[tinygl4angle] Task193: ext cache build skipped (getIntegerv=%p getStringi=%p)\n",
               (void *)ame193_getInt, (void *)ame193_real_getStringi);
         return;
     }
     GLint n = 0;
     ame193_getInt(GL_NUM_EXTENSIONS, &n);
     if (n <= 0) {
-        NSLog(@"[tinygl4angle] Task193: GL_NUM_EXTENSIONS=%d (driver reports none) -- indexed enumeration unavailable", (int)n);
+        printf("[tinygl4angle] Task193: GL_NUM_EXTENSIONS=%d (driver reports none) -- indexed enumeration unavailable\n", (int)n);
         return;
     }
     char **cache = (char **)calloc((size_t)n + ame197_effectiveExtCount(), sizeof(char *));
@@ -1020,15 +1159,24 @@ static void ame193_buildExtCache(void) {
     ame193_extCache = cache;
     ame193_extCount = filled;
     if (ame197_append > 0) {
-        NSLog(@"[tinygl4angle] Task193: extension cache built: %d real + %zu appended (GL_ARB_direct_state_access advertised; MC DSA probe should now SUCCEED)",
+        printf("[tinygl4angle] Task193: extension cache built: %d real + %zu appended (GL_ARB_direct_state_access advertised; MC DSA probe should now SUCCEED)\n",
               (int)n, ame197_append);
     } else {
-        NSLog(@"[tinygl4angle] Task197: DSA advertisement WITHDRAWN (extension cache keeps %d real entries; MC takes DirectStateAccess.Emulated classic path). Set AME193_DSA_ADVERTISE=1 to re-enable for forensics",
+        printf("[tinygl4angle] Task197: DSA advertisement WITHDRAWN (extension cache keeps %d real entries; MC takes DirectStateAccess.Emulated classic path). Set AME193_DSA_ADVERTISE=1 to re-enable for forensics\n",
               (int)n);
     }
 }
 
 const GLubyte *glGetStringi(GLenum name, GLuint index) {
+    // Task203：索引式枚举观察器（MC 的 caps 到底走不走这条路径）。
+    {
+        static int s_ame203_gsi = 0;
+        if (s_ame203_gsi < 12) {
+            s_ame203_gsi++;
+            printf("[tinygl4angle] Task203 query: glGetStringi #%d name=0x%04X index=%u\n",
+                   s_ame203_gsi, (unsigned)name, (unsigned)index);
+        }
+    }
     if (name == GL_EXTENSIONS) {
         ame193_buildExtCache();
         if (ame193_extCache != NULL) {
@@ -1048,6 +1196,16 @@ const GLubyte *glGetStringi(GLenum name, GLuint index) {
 typedef void (*ame193_fn_glGetIntegerv)(GLenum, GLint *);
 static ame193_fn_glGetIntegerv ame193_ptr_glGetIntegerv;
 void glGetIntegerv(GLenum pname, GLint *params) {
+    // Task203：整数查询观察器（GL_NUM_EXTENSIONS 是否被 MC 问过；
+    // 值在转发后可能被改写，这里只记 pname——名字即证据）。
+    {
+        static int s_ame203_gi = 0;
+        if (s_ame203_gi < 12) {
+            s_ame203_gi++;
+            printf("[tinygl4angle] Task203 query: glGetIntegerv #%d pname=0x%04X\n",
+                   s_ame203_gi, (unsigned)pname);
+        }
+    }
     if (pname == GL_NUM_EXTENSIONS && params != NULL) {
         ame193_buildExtCache();
         if (ame193_extCache != NULL) {
@@ -1079,10 +1237,10 @@ static const GLubyte *ame193_appendExtString(const GLubyte *real) {
     }
     *w = '\0';
     if (ame197_append > 0) {
-        NSLog(@"[tinygl4angle] Task193: GL_EXTENSIONS legacy string appended GL_ARB_direct_state_access (len %zu -> %zu)",
+        printf("[tinygl4angle] Task193: GL_EXTENSIONS legacy string appended GL_ARB_direct_state_access (len %zu -> %zu)\n",
               len, (size_t)(w - ame193_extStringCache));
     } else {
-        NSLog(@"[tinygl4angle] Task197: DSA advertisement WITHDRAWN on legacy GL_EXTENSIONS string too (len %zu unchanged)",
+        printf("[tinygl4angle] Task197: DSA advertisement WITHDRAWN on legacy GL_EXTENSIONS string too (len %zu unchanged)\n",
               len);
     }
     return (const GLubyte *)ame193_extStringCache;
@@ -1132,7 +1290,7 @@ void *glMapNamedBufferRange(GLuint buffer, GLintptr offset, GLsizeiptr length, G
         static int s_ame193_persistWarn = 0;
         if (s_ame193_persistWarn < 4) {
             s_ame193_persistWarn++;
-            NSLog(@"[tinygl4angle] Task193: glMapNamedBufferRange persistent/coherent bits stripped (0x%X -> 0x%X; ES3 emulation)",
+            printf("[tinygl4angle] Task193: glMapNamedBufferRange persistent/coherent bits stripped (0x%X -> 0x%X; ES3 emulation)\n",
                   (unsigned)access, (unsigned)es3Access);
         }
     }
@@ -1190,7 +1348,7 @@ void glNamedBufferStorage(GLuint buffer, GLsizeiptr size, const void *data, GLbi
     static int s_ame193_storageWarn = 0;
     if (s_ame193_storageWarn < 4) {
         s_ame193_storageWarn++;
-        NSLog(@"[tinygl4angle] Task193: glNamedBufferStorage(buf=%u size=%lld flags=0x%X) emulated via NamedBufferData (ES3 has no immutable storage)",
+        printf("[tinygl4angle] Task193: glNamedBufferStorage(buf=%u size=%lld flags=0x%X) emulated via NamedBufferData (ES3 has no immutable storage)\n",
               (unsigned)buffer, (long long)size, (unsigned)flags);
     }
     glNamedBufferData(buffer, size, data, 0x88E4 /* GL_STATIC_DRAW */);
@@ -1237,7 +1395,7 @@ void glCreateVertexArrays(GLsizei n, GLuint *arrays) {
     static int s_ame193_vaoLogs = 0;
     if (s_ame193_vaoLogs < 4) {
         s_ame193_vaoLogs++;
-        NSLog(@"[tinygl4angle] Task193 dsa: glCreateVertexArrays(n=%d) -> first=%u",
+        printf("[tinygl4angle] Task193 dsa: glCreateVertexArrays(n=%d) -> first=%u\n",
               (int)n, (n > 0 && arrays) ? (unsigned)arrays[0] : 0u);
     }
 }
@@ -1608,6 +1766,13 @@ static int ame186_transposeLogged = 0;
 #define AME186_MATRIX_FN(FN, COLS, ROWS) \
 void (*gles_##FN)(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value); \
 void FN(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) { \
+    /* Task203：矩阵调用计数观察器（黑屏定谳仪表，printf 版）*/ \
+    static unsigned s_ame203_mfn = 0; \
+    if (s_ame203_mfn <= 8) { \
+        ++s_ame203_mfn; \
+        printf("[tinygl4angle] Task203 uniform: %s #%u loc=%d count=%d transpose=%d\n", \
+               #FN, s_ame203_mfn, (int)location, (int)count, (int)transpose); \
+    } \
     LOOKUP_FUNC(FN) \
     if (!gles_##FN) return; \
     if (transpose == GL_FALSE || value == NULL || count <= 0) { \
@@ -1703,7 +1868,7 @@ void glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsizei widt
         if (!maxTextureSize) {
             glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
             // maxTextureSize = 16384;
-            // NSLog(@"Maximum texture size: %d", maxTextureSize);
+            // printf("Maximum texture size: %d\n", maxTextureSize);
         }
         proxy_width = ((width<<level)>maxTextureSize)?0:width;
         proxy_height = ((height<<level)>maxTextureSize)?0:height;

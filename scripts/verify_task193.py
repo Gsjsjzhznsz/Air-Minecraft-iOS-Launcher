@@ -96,7 +96,7 @@ for s in ("scripts/task193_icon.py", "scripts/task193_announce.py", "scripts/tas
 # ============ F. announcement: task193@2, family shifted, pin intact ============
 print("== F. 公告窗口族 ==")
 ann = json.loads(io.open("announcements.json", encoding="utf-8").read())["announcements"]
-check("F", "条目数 25 -> 26 -> 27（Task201 四连修公告@2 插入；Task202 末位追加零位移）", len(ann) == 27, f"actual={len(ann)}")
+check("F", "条目数 -> 28（Task202/203 末位追加零位移）", len(ann) == 28, f"actual={len(ann)}")
 check("F", "Task201 重锚：task193 顺延至 [3]，task190 顺延至 [4]，置顶公告 [0] 未动",
       len(ann) > 3 and ann[3]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[4]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))

@@ -344,6 +344,11 @@ public class PojavLauncher {
         //   问题，启动器无法代为修复（上游议题库同族崩溃均由移除 OptiFine
         //   解决）。检测仅打警示锚点（日志 + FAQ 指引），不阻断启动——
         //   用户可能装的是恰好兼容的版本，让游戏自己证明。
+        // Task203（误报修复）：64fdaf2 装机日志实锤——用户已把 OptiFine 改名
+        //   为 .jar.disabled（禁用），检测仍匹配（只查文件名含 "optifine"）
+        //   并打出吓人的不兼容警告。加 .jar 后缀门：只有【活跃】的
+        //   OptiFine（mods/*.jar）才告警，禁用副本（.jar.disabled / .disabled
+        //   / .txt 等一切非 .jar 形态）不再触发。
         if (version != null && version.id != null
                 && version.id.toLowerCase(java.util.Locale.ROOT).contains("forge")) {
             java.io.File ame202ModsDir = new java.io.File(Tools.DIR_GAME_NEW, "mods");
@@ -351,6 +356,7 @@ public class PojavLauncher {
             if (ame202ModsList != null) {
                 for (String ame202ModName : ame202ModsList) {
                     if (ame202ModName != null
+                            && ame202ModName.toLowerCase(java.util.Locale.ROOT).endsWith(".jar")
                             && ame202ModName.toLowerCase(java.util.Locale.ROOT).contains("optifine")) {
                         System.out.println("[PojavLauncher] Task202: OptiFine detected alongside Forge (mods/"
                             + ame202ModName + ", version=" + version.id

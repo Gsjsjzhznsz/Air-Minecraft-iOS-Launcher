@@ -162,8 +162,10 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
 # Task138 重锚：Task135 的 14 个 TAB 行已随提交入 HEAD，"+14" 形态在
 # 提交后恒假；长期不变量 = 工作树与 HEAD 一致 + dep_sdl3_guard 目标在位。
-check("E10 Makefile TAB 基线 = HEAD + 3 且双守卫在位（Task202 重锚：ggstr 垫片接线 +3 TAB 行）",
-      cur_tab == head_tab + 3 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+check("E10 Makefile TAB 基线 = 绝对 484 且双守卫在位（Task203 重锚：+3 已随 64fdaf2 入 HEAD）",
+      # Task202 的 "+3" 对拍口径在 64fdaf2 提交后恒假（+3 已入 HEAD）；
+      # Task203 起转绝对基线（本轮 Makefile 零改动）。
+      cur_tab == 484 and head_tab == 484 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 

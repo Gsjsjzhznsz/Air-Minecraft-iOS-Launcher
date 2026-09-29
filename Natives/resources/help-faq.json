@@ -201,7 +201,7 @@
         {
           "icon": "exclamationmark.triangle",
           "title": "Forge 整合包启动崩溃（IForgeVertexFormat / OptiFine 报错）？",
-          "description": "日志出现 java.lang.ClassNotFoundException: net.minecraftforge...IForgeVertexFormat 或 OptiFine 相关反射失败时，是整合包里携带的 OptiFine 与当前 Forge 版本二进制不兼容（接口签名漂移），属模组侧问题。\n\n解决方法：删除 mods 文件夹里的 OptiFine（或换与该 Forge 版本匹配的 OptiFine 构建）后重启。启动器检测到 Forge + OptiFine 共存时会在日志打警示锚点（[PojavLauncher] Task202: OptiFine detected alongside Forge），方便快速确认。"
+          "description": "日志出现 java.lang.ClassNotFoundException: net.minecraftforge...IForgeVertexFormat 或 OptiFine 相关反射失败时，是整合包里携带的 OptiFine 与当前 Forge 版本二进制不兼容（接口签名漂移），属模组侧问题。\n\n解决方法：删除 mods 文件夹里的 OptiFine（或换与该 Forge 版本匹配的 OptiFine 构建）后重启。启动器检测到 Forge + OptiFine 共存时会在日志打警示锚点（[PojavLauncher] Task202: OptiFine detected alongside Forge），方便快速确认。\n\n另：Forge 26.x 启动时若弹出 \"missing software!\" 的 tiny file dialogs 提示（询问是否打开 early-display-errors 网页），这是 Forge 进度小窗初始化失败后的错误弹窗回退——iOS 没有桌面弹窗组件，控制台 y/n 读到 EOF 会自动跳过，不会卡死。最新构建已默认禁用 Forge 进度小窗（该小窗在转译层上本就初始化失败），更新后此提示不再出现。"
         }
       ]
     }

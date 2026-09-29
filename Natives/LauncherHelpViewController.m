@@ -38,10 +38,38 @@
     // 仓库根 help-faq.json = 维护源，Natives/resources/help-faq.json = 随包
     // 运行时读取，两文件逐字节一致由 verify_task168 把守漂移）。条目字段：
     // icon（SF Symbols 名）/ title（标题）/ description（简介）。
-    // 历史口径不变：本页自 Task82 起为纯中文页面（不做 54 语言 l10n），
-    // JSON 内容同口径——条目为项目 worklog 定案的真实结论，非泛泛帮助文案。
+    // Task203（FAQ i18n，用户反馈"问题标签页国际化一点都没有"）：
+    //   纯中文口径撤销。加载遵循 localize() 同款三级回退——
+    //   (1) 用户在设置里选的语言（app_language，含 system→系统语言）
+    //       对应的 <lang>.lproj/help-faq.json；
+    //   (2) en.lproj/help-faq.json（英文全量翻译，37 条）；
+    //   (3) 包根 help-faq.json（zh-Hans 基线——其余 50 语言的老口径）。
+    //   随包翻译件：en/zh-Hant/zh-CN 三个 lproj（zh-CN 与 zh-Hans 同文）。
+    //   NSBundle pathForResource 的 lproj 探测跟随系统语言而非应用内选择，
+    //   故此处分语言目录手工解析（与 utils.m localize() 同构）。
     // 解析失败时页面呈现空分组（不崩溃），日志留痕便于发现坏包。
-    NSString *path = [NSBundle.mainBundle pathForResource:@"help-faq" ofType:@"json"];
+    NSString *path = nil;
+    id ame203LangRaw = getPrefObject(@"general.app_language");
+    NSString *ame203Lang = [ame203LangRaw isKindOfClass:[NSString class]] ? (NSString *)ame203LangRaw : nil;
+    if (ame203Lang == nil || [ame203Lang isEqualToString:@"system"]) {
+        // system：跟随系统首选语言（NSBundle 原生探测）
+        path = [NSBundle.mainBundle pathForResource:@"help-faq" ofType:@"json"];
+    } else {
+        NSString *lprojPath = [NSBundle.mainBundle pathForResource:ame203Lang ofType:@"lproj"];
+        NSString *cand = lprojPath ? [lprojPath stringByAppendingPathComponent:@"help-faq.json"] : nil;
+        if (cand && [[NSFileManager defaultManager] fileExistsAtPath:cand]) {
+            path = cand;
+        } else {
+            // 回退 1：en
+            NSString *enPath = [NSBundle.mainBundle pathForResource:@"en" ofType:@"lproj"];
+            NSString *enCand = enPath ? [enPath stringByAppendingPathComponent:@"help-faq.json"] : nil;
+            path = (enCand && [[NSFileManager defaultManager] fileExistsAtPath:enCand]) ? enCand : nil;
+        }
+        if (path == nil) {
+            // 回退 2：包根（zh-Hans 基线）
+            path = [NSBundle.mainBundle pathForResource:@"help-faq" ofType:@"json"];
+        }
+    }
     NSData *data = path ? [NSData dataWithContentsOfFile:path] : nil;
     NSDictionary *root = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
     NSArray *cats = [root isKindOfClass:[NSDictionary class]] ? root[@"categories"] : nil;

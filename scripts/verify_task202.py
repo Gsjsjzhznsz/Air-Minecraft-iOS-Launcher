@@ -24,16 +24,21 @@ def rd(path):
         return f.read()
 
 
-# ============ A. gl4es 崩溃免疫（二进制垫片 + 接线 + 锚点） ============
+# ============ A. gl4es 崩溃免疫（Task203 v2：ADRP+ADD 双点改写，vtool-proof） ============
+# Task203 勘误：v1 洞穴垫片（0x6400）被 CI 的 vtool 平台重打标静默清零
+# （节间隙非节数据，重序列化被抹）→ 装机 SIGILL @+0x6400。v2 在两个
+# glGetString 调用点原地改写（都在 __text 内），本节按 v2 形态验证。
 ps = rd("scripts/patch_gl4es_ggstr_nullguard.py")
-check("A", "垫片脚本存在且带根因病历（strstr(NULL) + 首个 needle）",
+check("A", "补丁脚本 v2 存在且带双病历（v1 vtool 清零 + strstr(NULL) 首个 needle）",
       "GL_APPLE_texture_2D_limited_npot" in ps and "GetHardwareExtensions" in ps
-      and "0x1bc2b4" in ps.lower() or "0x1BC2B4" in ps)
-check("A", "垫片语义三要素（save LR / cbnz 透传 / adr 空串）",
-      "0xF81F0FFE" in ps and "0xB5000080" in ps and "0x10000080" in ps and "0xF94003FE" in ps)
-check("A", "洞穴地址 0x6400 且 __text 边界核验（0x64f8）",
-      "SHIM_ADDR = 0x6400" in ps and "0x64f8" in ps)
-check("A", "幂等 + 指纹门 + --verify 三件套",
+      and "vtool" in ps and "0x1BC2B0" in ps and "0x1BDE4C" in ps)
+check("A", "v2 语义要素（双调用点 ADRP+ADD + 空串锚 0x1CE9A2 + 无洞穴依赖）",
+      "EMPTY_STR_ADDR = 0x1CE9A2" in ps and "enc_adrp_x0" in ps and "enc_add_x0_x0_imm12" in ps
+      and "SHIM_ADDR" not in ps)
+check("A", "指纹与守护（两处原始字序 + 后续活代码守护字 + needle 前缀审计门）",
+      "0x5283E060" in ps and "0x5283E000" in ps and "0xF9404FE8" in ps and "0xF94067E8" in ps
+      and "needle_prefix" in ps)
+check("A", "幂等 + 漂移拒绝 + --verify 三件套",
       "PATCH PRESENT" in ps and "binary drift" in ps and "--verify" in ps)
 
 mk = rd("Makefile")
@@ -187,8 +192,11 @@ check("H", "version.h REVISION 18 附录（Task202 八节 + no bump 理由）",
       "REVISION 18 addendum (Task 202, no bump" in vh and "ggstr_nullguard" in vh
       and "54 bundled .lproj" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))["announcements"]
-check("H", "公告 27 条且末位是 Task202（零索引位移）",
-      len(ann) == 27 and ann[-1]["id"] == "task202-october-fix-wave")
+check("H", "公告 28 条且末位是 Task203（零索引位移）",
+      # Task203 重锚：task202 末位追加后 task203 又末位追加（27→28）；
+      # 历史锚（[2]=task196 / [3]=task193 / [0]=server）不变。
+      len(ann) == 28 and ann[-1]["id"] == "task203-october-fix-wave"
+      and ann[26]["id"] == "task202-october-fix-wave")
 check("H", "公告索引锚保持（[2]=task196 / [3]=task193 / [0]=server）",
       ann[2]["id"] == "task196-quad-fixes-2026-09-29" and ann[3]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[0]["id"].startswith("server-recommend"))
@@ -253,11 +261,14 @@ check("I", "Java 结构平衡（大括号/圆括号增量对称）",
       and (cur.count('(') - cur.count(')')) == (head.count('(') - head.count(')')))
 
 st = subprocess.run(["git", "-C", REPO, "status", "--short"], capture_output=True, text=True).stdout
-# 兼容 unstaged（" M Makefile"）与 staged（"M  Makefile"）两种形态；
-# 提交后本检查自然失效（工作树干净），TAB 数由 verify_task129 的 HEAD+3 重锚长期把守。
-mk_dirty = re.search(r"^[AM]{1,2}\s+Makefile$", st, re.M) is not None
-check("I", "Makefile 未被 TAB 化破坏（改动仅 +3 行）",
-      mk_dirty and mk.count("patch_gl4es_ggstr_nullguard") == 1)
+# Task203 重锚：Task202 的 Makefile 改动已随 64fdaf2 入 HEAD——本检查的
+# "dirty" 口径自此恒假。长期不变量改 absolutist：ggstr 接线行在位 +
+# TAB 绝对基线 484（= 481 基线 + Task202 的 3 行；本轮 Makefile 零改动）。
+# （本轮工作树亦不再改 Makefile，HEAD 同含该行。）
+mk_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
+check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 484）",
+      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 484,
+      f"tabs={mk_tab}")
 
 # strings 表语法门：每行引号配对
 bad_strings = []

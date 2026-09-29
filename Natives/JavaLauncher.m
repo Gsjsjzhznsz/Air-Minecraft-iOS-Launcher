@@ -2260,6 +2260,18 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
     // Disable Forge 1.16.x early progress window
     PUSH_MARGV_LITERAL("-Dfml.earlyprogresswindow=false");
+    // Task203：Forge 26.x（64.x）early display 抑制散弹。装机病历
+    // （用户实测，Forge 26.1.2 + MobileGlues）：early display 的独立小
+    // 上下文在转译层上初始化着色器失败（"An error occurred initializing
+    // shaders"）→ Forge 退到 LWJGL tiny file dialogs 的错误弹窗 → iOS 无
+    // applescript/kdialog/zenity → "missing software!" 控制台 y/n 回退
+    // （stdin=/dev/null，EOF 即返回，不会死锁，但提示吓人且 early display
+    // 本身已废）。旧属性名 fml.earlyprogresswindow 对 26.x 已失效，
+    // 补齐新代 Forge/NeoForge 的两个属性名；未知属性对 JVM/其他框架
+    // 无害（忽略）。early display 被跳过后 Forge 无进度小窗直接进主
+    // 渲染——在转译层上反而更稳（少一个异构 GL 上下文）。
+    PUSH_MARGV_LITERAL("-Dneoforge.enabledEarlyDisplay=false");
+    PUSH_MARGV_LITERAL("-Dforge.disableEarlyDisplay=true");
 
     // Load java
     NSString *libjlipath8 = [NSString stringWithFormat:@"%@/lib/jli/libjli.dylib", javaHome]; // java 8

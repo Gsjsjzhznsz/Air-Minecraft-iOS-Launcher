@@ -1859,12 +1859,28 @@ static void *ame202_eglGPA_wrapper(const char *procname) {
 }
 
 /// Task202 GL 符号钉扎入口（hooked_dlsym 调用；返回非 NULL 表示已接管）。
+/// Task203 门控修正（vgpu 1.8.9 崩溃根修，64fdaf2 装机 latestlog.old.txt）：
+///   原门 = "libtinygl4angle 已加载即钉扎"。但 gl_bridge 的 dlsym_EGL 对一切
+///   非自 EGL 渲染器（vgpu/gl4es/LTW…）都用 libtinygl4angle 当 EGL 源
+///   dlopen —— tinygl4angle 在【所有】GL 会话里都是已加载状态，休眠无害。
+///   Task202 的钉扎把这个休眠镜像激活：vgpu 会话里 MC 的早期 GL 调用
+///   （glGetError/glBindTexture 等）被劫持到 tinygl4angle → vgpu 的惰性
+///   引导（pack/load.c 的 load_all，首 GL 入口触发）永不运行 → 后续
+///   glMultMatrixf（tinygl4angle 不导出、回落 vgpu）在 NULL glstate 上
+///   SIGSEGV（装机实锤：gl4es_glMultMatrixf+0x2c；且日志出现两条
+///   "[tinygl4angle] Task182 gles pin" = 劫持铁证，旧会话为零）。
+///   修法：钉扎只在 AMETHYST_RENDERER == libtinygl4angle 的会话生效
+///   （JavaLauncher 在 JVM 启动前 setenv，游戏会话全程正确）。
 static void *ame202_pinGLSymbol(void *handle, const char *name) {
     if (name == NULL) return NULL;
     if (!(name[0] == 'g' && name[1] == 'l') && strncmp(name, "egl", 3) != 0) return NULL;
+    // Task203：会话门——仅 ANGLE 会话钉扎（见上）。auto/gl4es/vgpu/LTW/
+    // MobileGlues/Mithril/MoltenVK 一律不钉。
+    const char *ame203_renderer = getenv("AMETHYST_RENDERER");
+    if (ame203_renderer == NULL || strstr(ame203_renderer, "libtinygl4angle") == NULL) return NULL;
     if (ame202_callerIsTinygl()) return NULL;   // tinygl4angle 自身解析不经此门
     void *ame202_tiny = ame202_tinyglHandle();
-    if (ame202_tiny == NULL) return NULL;       // 非 ANGLE 会话（未加载）零影响
+    if (ame202_tiny == NULL) return NULL;       // 理论不可达（渲染器会话必已加载）——防御性保留
     if (strcmp(name, "eglGetProcAddress") == 0) {
         if (ame202_real_eglGPA == NULL) {
             ame202_real_eglGPA = orig_dlsym(ame202_tiny, name);

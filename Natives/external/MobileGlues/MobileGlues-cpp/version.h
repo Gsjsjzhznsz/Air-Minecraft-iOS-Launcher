@@ -3211,3 +3211,58 @@
 // Verification: verify_task202 (52 checks); l10n baseline sweep 2408 ->
 //     2418 across anchored verifiers; announcement count 26 -> 27 sweep;
 //     regression batch diffed against HEAD (zero new failures).
+// REVISION 18 addendum (Task 203, no bump -- launcher-side renderer fixes
+//     and diagnostics only; no MobileGlues conversion surface touched).
+// Round driven by the 64fdaf2 device-log trio (latestlog.1 ANGLE 26.3
+//     still black / latestlog.txt gl4es 1.8.9 SIGILL / latestlog.old vgpu
+//     1.8.9 SIGSEGV) plus user reports (FAQ tab zero i18n; Forge 26.1.2 +
+//     MobileGlues tiny file dialogs early-display prompt).
+// (1) gl4es patch v2 (vtool-proof): the v1 cave shim at 0x6400 was
+//     silently ZERO-WIPED by METHOD_CHANGE_PLAT's `vtool -set-build-version`
+//     re-serialization (inter-section gaps are not section data; the BL
+//     inside __text survived, the cave did not) -- the shipped IPA held
+//     BL->zeros = UDF = SIGILL at libgl4es+0x6400, exactly as the device
+//     reported. v2 patches BOTH GetHardwareExtensions glGetString call
+//     sites (GL_EXTENSIONS @0x1BC2B0 and GL_VENDOR @0x1BDE4C) in-place
+//     with ADRP+ADD pointing at the needle cstring's NUL terminator
+//     (0x1CE9A2, inside __TEXT,__cstring) -- both writes live in real
+//     sections, vtool-proof by construction; zero cave dependency.
+// (2) vgpu crash root fix (pin scope): gl_bridge's dlsym_EGL dlopens
+//     libtinygl4angle as the EGL source for every non-self-EGL renderer,
+//     so tinygl4angle is loaded (dormant) in ALL GL sessions -- the v1
+//     pin gate ("loaded => pin") hijacked vgpu sessions' early GL calls
+//     to tinygl4angle, so vgpu's lazy load_all() bootstrap never ran and
+//     glMultMatrixf died on NULL glstate (device: gl4es_glMultMatrixf+0x2c;
+//     two "[tinygl4angle] Task182 gles pin" lines in a vgpu log = the
+//     smoking gun). The pin now engages only when AMETHYST_RENDERER names
+//     libtinygl4angle (ANGLE sessions), restoring vgpu's bootstrap.
+// (3) tinygl4angle diagnostics unlocked: NSLog inside the dylib lands in
+//     os_log (invisible in the captured stdout/stderr log) while printf
+//     is captured -- 25 anchors converted, invalidating the previous
+//     "anchor absent => code path absent" readings (the Task187 no-op
+//     demonstrably RAN with its anchor invisible).
+// (4) ANGLE black-screen traffic observers: query-family entry logs
+//     (glGetString/glGetStringi/glGetIntegerv, first 12) + matrix-upload
+//     forwarders (glUniformMatrix4fv/4fv/1iv/1f/2f/3f) + draw-family
+//     forwarders (glUseProgram/glDrawElements/glDrawArrays/
+//     glDrawElementsInstanced/glDrawArraysInstanced, first 8 + periodic)
+//     -- next device log adjudicates whether MC uploads matrices via
+//     classic uniforms or never binds UBOs, and whether any geometry is
+//     submitted at all.
+// (5) FAQ i18n (user report: "issues tab has zero internationalization"):
+//     help-faq.json now ships per-language under en/zh-Hant/zh-CN lprojs
+//     (full 37-entry English translation + traditional conversion +
+//     simplified copy); the loader honors the in-app app_language choice
+//     with localize()-style fallback (chosen lang -> en -> zh-Hans base);
+//     system-language follows NSBundle's native resolution.
+// (6) Forge 26.x early-display shotgun: -Dneoforge.enabledEarlyDisplay=
+//     false and -Dforge.disableEarlyDisplay=true added next to the legacy
+//     fml.earlyprogresswindow (26.x ignored the old name; the early
+//     display's shader init fails on translation layers and its error
+//     dialog falls back to a tiny file dialogs console y/n on iOS).
+// (7) OptiFine detection false-positive fix: only active mods/*.jar
+//     trigger the warning (a user's .jar.disabled rename still matched
+//     and scared). FAQ Forge entry documents the tinyfd prompt.
+// Verification: verify_task203; Makefile untouched this round (TAB
+//     baseline 484 stable); l10n strings baseline unchanged (2418; the
+//     FAQ JSONs are not strings tables).

@@ -1071,3 +1071,25 @@ Work Log:
 Stage Summary:
 - 装机锚点：gl4es 1.8.9 应活着进菜单（垫片为纯二进制补丁无运行时日志；观察 = 不再启动即崩 + "Using GLES 2.0 backend" 正常打印 + "[main_hook] Task202: libgl4es_114 image base = ..." 基址锚点行）；Metal 26.3 启动遮罩自动消（无需手点）；vgpu 会话看 Task202 teximage/texsubimage 探针的图集尺寸与 err 归因；ANGLE 会话看 GetProcAddress NULL 记名清单；Forge+OptiFine 看启动警告行
 - 议题 #1/#2 修复后待装机反馈关单；语言选择器设置页应出现 54 语言（非四主表带"部分翻译"后缀）
+---
+Task ID: 203
+Agent: main (Super Z)
+Task: 64fdaf2 三份装机日志判读 + 四根因根治（gl4es SIGILL / vgpu 钉扎劫持 / tinygl4angle NSLog 静默 / Forge early display）+ FAQ i18n 三语全量 + OptiFine 误报修复
+
+Work Log:
+- 判读（三份新日志全会话映射）：latestlog.1 = ANGLE 26.3 fabric 仍黑屏（swapOK=185 渲染循环活着、回读 (0,0,0,0) 真黑、UBO 族零调用）；latestlog.txt = 1.8.9-forge + gl4es SIGILL @ libgl4es+0x6400；latestlog.old = 1.8.9-forge + vgpu SIGSEGV @ gl4es_glMultMatrixf+0x2c。全部来自 64fdaf2 构建（Task202 代码在场）
+- A gl4es SIGILL 根因（法证闭环）：下载 CI 产物 IPA 实测——装机二进制 0x1BC2B4 处 BL 补丁【在场】但 0x6400 洞穴【全零】= Task202 垫片被 vtool 清零。机理：METHOD_CHANGE_PLAT 的 `vtool -set-build-version` 在补丁【之后】运行并整体重序列化 Mach-O——节间隙（0x6400-0x64F8，__text 之前）不属于任何节，重序列化时被抹；BL 在 __text 内得以幸存 → BL→零区 = UDF = SIGILL。修法（v2，vtool-proof by construction）：彻底弃洞穴，两个 glGetString 调用点（GL_EXTENSIONS @0x1BC2B0 + GL_VENDOR @0x1BDE4C，capstone 全函数扫描证实仅此两处）原地改写 `movz w0,#imm + blr x8` → `adrp x0,#0x1ce000 + add x0,x0,#0x9a2`——x0 直接指向 needle 串 "GL_APPLE_texture_2D_limited_npot " 的 NUL 终止符（0x1CE9A2，__cstring 真节内）；strstr("", needle)==NULL → 全部扩展检查报"不存在" → 构造器完整跑完。两处补丁全在 __text 活代码区 = vtool 逐字节保留（v1 的 BL 幸存已实证）。全部 strstr 消费者核验：-0xc8（扩展）/-0xd8（vendor）双槽都由补丁点喂、-0xa0（eglQueryString）上下文无关安全
+- B vgpu 崩溃根因（劫持链实锤）：旧会话（e4d704e）有 "VGPU: Calling load_all() → LIBGL: Initialising vgpu gl4es" 完整引导，新会话【零引导】+ 出现两条 "[tinygl4angle] Task182 gles pin"（ANGLE 的内部解析日志出现在 vgpu 会话 = 劫持铁证）。机理：gl_bridge 的 dlsym_EGL 对一切非自 EGL 渲染器用 RENDERER_NAME_MTL_ANGLE（libtinygl4angle.dylib）当 EGL 源 dlopen——tinygl4angle 在【所有】GL 会话中都是已加载（休眠）状态；Task202 钉扎层的门 = "已加载即钉扎" → vgpu 会话的早期 GL 调用（glGetError/glBindTexture/glTexParameterfv）被劫持到 tinygl4angle → vgpu 的 pack/load.c 惰性引导（首 GL 入口触发 load_all → initialize_gl4es → glstate）永不运行 → 后续 glMultMatrixf（tinygl4angle 不导出、回落 vgpu）在 NULL glstate 上 SIGSEGV。修法：钉扎加会话门——getenv("AMETHYST_RENDERER") 含 "libtinygl4angle" 才生效（JavaLauncher 在 JVM 启动前 setenv，全程正确；auto/gl4es/vgpu/LTW/MobileGlues/Mithril/MoltenVK 一律不钉）
+- C tinygl4angle NSLog 静默（诊断黑洞揭穿）：实证三链——(1) Task187 的 no-op 生效（0x884F/0x8642 的 ANGLE HIGH 调试消息被消音 = 我们的 glEnable 拦截确实在跑）但其 NSLog 锚点零输出；(2) printf 系（Task181/182）46 行全在；(3) 主二进制的 NSLog 走 stdout 重定向进日志、dylib 的 NSLog 落 os_log（不被捕获）。结论：此前"锚点未出现 = 代码未执行"的推理【全部作废】——扩展缓存可能一直在正常构建。修法：25 处 NSLog → printf（ame173_forensics 的嵌套 NSString 参数转 UTF8String）
+- D ANGLE 流量观察器（下轮定谳仪表）：三组 printf 观察器——(1) 查询族：glGetString/glGetStringi/glGetIntegerv 首次记名（name/pname + 结果头）；(2) 矩阵族：计数器并入 AME186_MATRIX_FN 宏（九函数全覆盖，含 transpose 参数）+ glUniform4fv 首次记名 + glUniform1iv/1f/2f/3f 转发；(3) 绘制族：glUseProgram/glDrawElements/glDrawArrays/glDrawElementsInstanced/glDrawArraysInstanced 首 8 次 + 周期抽样。下轮日志直接裁决：MC 的 caps 走哪条枚举路径、矩阵走经典 uniform 还是 UBO、几何有没有提交
+- E FAQ i18n（用户报告"问题标签页国际化一点都没有"）：加载器改随应用内语言（localize() 同构三级回退：所选语言 lproj → en → 包根 zh-Hans 基线；system 走 NSBundle 原生探测）；en.lproj/help-faq.json 全量翻译 37 条（渲染与性能 11 / 输入与控制 4 / 安装与数据 7 / 故障排除 15，图标序列逐条对齐）；zh-Hant（zhconv zh-tw 变体，啟動 口径与既有繁体表一致）+ zh-CN（简体同文）机器生成并对齐校验
+- F Forge 26.x early display（用户报告 tiny file dialogs "missing software!"）：fml.earlyprogresswindow 对 26.x 已失效（Task202 已推但没拦住）→ 补 -Dneoforge.enabledEarlyDisplay=false + -Dforge.disableEarlyDisplay=true（未知属性无害）。stdin=/dev/null → tinyfd 控制台 y/n 读 EOF 即跳过不死锁；FAQ Forge 条目补说明（四语同步）
+- G OptiFine 检测误报：装机日志实锤——用户已把 OptiFine 改名 .jar.disabled（禁用），检测只查文件名含 "optifine" 仍告警。加 .jar 后缀门，只有活跃 mods/*.jar 触发
+- H 文档：version.h REVISION 18 Task203 附录（no bump）；announcements.json task203-october-fix-wave 末位追加（27→28，索引锚保全）
+- 验证器：verify_task203 新写 32/32（A v2 补丁本地全生命周期实测 + 产物反汇编核验 / B 门控 / C printf 化 / D 观察器 / E FAQ 三语对齐 / F 属性散弹 / G 后缀门 / H 文档 / I 语法门含 HEAD 对拍）；verify_task202 A 节重写（v2 形态）+ H/I 锚重锚（公告 28、TAB 绝对基线 484）；verify_task129 I4 / verify_task135 E10 重锚（Task202 的 +3 已入 HEAD，对拍口径转绝对 484）；verify_task196_197_198_201 E / verify_task193 F 公告计数重锚 28；全量回归扫荡 69 失败与 HEAD stash 对拍【零新增】且修复 HEAD 的 4 个失败（129/130/131/203 锚过期）
+- 事故记录：JavaApp 路径笔误（pojvlaunch 少 a）引发"文件系统故障"假警报——实际是探针/恢复脚本写错路径 + 一次 touch 创建幽灵文件 + 恢复脚本写空 25 文件；经 git checkout HEAD -- JavaApp 全量恢复 + OptiFine 补丁重应用。教训：路径要复制粘贴，不要手打
+- AME186 冲突事故：Task203 初版 glUniformMatrix4fv 重定义撞 Task186 转置桥（task193_tinygl_syntax.sh 语法门拦截）——观察器并入宏内解决，语法门恢复通过
+
+Stage Summary:
+- 装机锚点：gl4es 1.8.9 应活着进菜单（不再 SIGILL；构造器完整跑完）；vgpu 1.8.9 恢复 Task202 之前的行为（有 LIBGL 引导横幅）；ANGLE 会话将出现 Task203 query/uniform/draw 计数行（黑屏定谳仪表）；Forge 26.x 无 tinyfd 提示；FAQ 页随语言显示
+- 下轮判读优先级：① ANGLE 的 Task203 观察器——矩阵上传路径（AME186 计数器 vs UBO 零调用）与绘制计数（几何是否提交）直接定谳黑屏；② vgpu 材质损坏（上轮纹理探针数据回来后分析）；③ 1.8.9 两渲染器回归确认

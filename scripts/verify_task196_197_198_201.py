@@ -204,7 +204,7 @@ check("E", "公告条目在场且四锚点齐备", e196 is not None and all(
 check("E", "公告位置：新条目@2，task193 顺延@3",
       ann[2]["id"] == "task196-quad-fixes-2026-09-29"
       and ann[3]["id"] == "task193-app-icon-replace-2026-09-28")
-check("E", "公告计数 26 -> 27（Task202 末位追加）", len(ann) == 27, f"got {len(ann)}")
+check("E", "公告计数 27 -> 28（Task202/203 各末位追加）", len(ann) == 28, f"got {len(ann)}")
 sv = os.path.join(REPO, "docs/surveys")
 check("E", "两份调查报告入仓",
       os.path.isfile(os.path.join(sv, "2026-09-29-upstream-sync-survey.md"))

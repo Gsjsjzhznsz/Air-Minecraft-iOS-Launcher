@@ -257,6 +257,14 @@
    "action_title": "",
    "image_url": "",
    "pin": false
+  },
+  {
+   "id": "task203-october-fix-wave",
+   "title": "十月修复波：1.8.9 双渲染器崩溃根治 + 帮助页多语言",
+   "date": "2026-09-30",
+   "pinned": false,
+   "summary": "1.8.9 的 gl4es 与 vgpu 崩溃均已根治（补丁工艺与钉扎门控两处根修）；帮助/FAQ 页面新增英文与繁简中文内容；Forge 26.x 启动弹窗抑制。ANGLE 黑屏诊断仪表已上线，下一轮日志定谳。",
+   "content": "## 本轮修复\n\n**1.8.9 两个渲染器的崩溃（根治）**\n\n- **gl4es**：上一轮的二进制垫片被 CI 打包环节的 vtool 重打标静默清零（节间隙不属于任何节，重序列化时被抹掉），执行到垫片即 SIGILL。本轮改为直接在两个查询调用点上原地改写为\"空串指针装载\"，补丁全部落在真实代码节内，vtool 不可能再破坏。\n- **vgpu**：上一轮的符号钉扎层误把 vgpu 会话的 GL 调用劫持到休眠的 ANGLE 镜像，vgpu 的惰性初始化永不触发，首次矩阵调用即崩溃。钉扎现在只在 ANGLE 会话生效。\n\n**帮助 / FAQ 页面国际化**\n\n- \"使用问题\"页面此前只有中文；现在英文为全量翻译（37 条），繁体中文完整转换，简体同步；其余语言沿用中文基线（与主界面回退一致）。\n\n**Forge 26.x 启动弹窗**\n\n- Forge 进度小窗在转译层上初始化失败后的 \"missing software!\" 弹窗提示，已通过默认禁用进度小窗抑制（更新后不再出现）。\n\n**ANGLE 黑屏**\n\n- 本轮装上了完整的渲染流量仪表（状态查询 / 矩阵上传 / 绘制调用全部记名），下一份装机日志可直接定谳黑屏发生在哪一环。\n\n---\n\nOctober fix wave: both 1.8.9 renderer crashes root-fixed (a binary-patch technique rework and a pin-scope fix); the help/FAQ page gains English (full 37-entry translation) and traditional/simplified Chinese; Forge 26.x early-display prompt suppressed. ANGLE black-screen traffic instrumentation is live -- the next device log adjudicates the failing stage directly."
   }
  ]
 }
