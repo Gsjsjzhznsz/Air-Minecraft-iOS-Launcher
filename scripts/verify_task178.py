@@ -227,7 +227,7 @@ print("== E. 文档（公告/version.h/fallback） ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 # Task179 重锚：task179@2 插入，task178 顺延至 ann[3]，len 21。
 check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[4]，len 23）",
-      len(ann) == 26  # Task184+1 -> Task193+1 -> Task201+1
+      len(ann) == 27  # Task184+1 -> Task193+1 -> Task201+1 -> Task202+1 (appended at END; display layer sorts by pin+date, physical position irrelevant)
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
       and ann[5]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入

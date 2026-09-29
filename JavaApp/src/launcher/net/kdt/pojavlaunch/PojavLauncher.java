@@ -336,6 +336,33 @@ public class PojavLauncher {
         // 使用问题（FAQ）标签页「画面模糊」条目：sodium-extra 在 Mac 伪装环境下会把
         // 帧缓冲减半，用户可在模组设置里自行关闭（追求帧率用 FSR 档位）。
 
+        // Task202（E）：Forge + OptiFine 共存检测（26.1.2 崩溃定性）。
+        // 病历（e4d704e 装机日志，Forge 26.1.2 会话）：崩溃链 =
+        //   IForgeVertexFormat ClassNotFoundException + OptiFine 反射全面失败
+        //   （OptiFine 构建与 Forge 64.1.3 的接口签名漂移：4 vs 5 参数）——
+        //   整合包内携带的 OptiFine 与该 Forge 版本二进制不兼容，属模组侧
+        //   问题，启动器无法代为修复（上游议题库同族崩溃均由移除 OptiFine
+        //   解决）。检测仅打警示锚点（日志 + FAQ 指引），不阻断启动——
+        //   用户可能装的是恰好兼容的版本，让游戏自己证明。
+        if (version != null && version.id != null
+                && version.id.toLowerCase(java.util.Locale.ROOT).contains("forge")) {
+            java.io.File ame202ModsDir = new java.io.File(Tools.DIR_GAME_NEW, "mods");
+            String[] ame202ModsList = ame202ModsDir.isDirectory() ? ame202ModsDir.list() : null;
+            if (ame202ModsList != null) {
+                for (String ame202ModName : ame202ModsList) {
+                    if (ame202ModName != null
+                            && ame202ModName.toLowerCase(java.util.Locale.ROOT).contains("optifine")) {
+                        System.out.println("[PojavLauncher] Task202: OptiFine detected alongside Forge (mods/"
+                            + ame202ModName + ", version=" + version.id
+                            + ") -- known-incompatible combination (IForgeVertexFormat CNFE / reflection"
+                            + " signature drift on Forge 64.x); if the game crashes, remove OptiFine or use a"
+                            + " matching build -- see the FAQ tab (使用问题)");
+                        break;
+                    }
+                }
+            }
+        }
+
         Tools.launchMinecraft(account, version, serverIp);
     }
 }

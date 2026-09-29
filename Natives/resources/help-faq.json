@@ -192,6 +192,16 @@
           "icon": "waveform.path.ecg",
           "title": "整合包创建新世界时闪退（无崩溃报告、日志戛然而止）？",
           "description": "典型表现：主菜单/标题界面一切正常，点“创建新的世界”后画面卡住或直接闪退；latestlog.txt 最后一行戛然而止（无 exit、无崩溃堆栈、无 hs_err），常见结尾是 spark 的 Starting background profiler... 或 [Amethyst] Patching ...libasyncProfiler.so.tmp。\n\n机制：spark 分析器在首次开启服务器（创建/进入世界）时会把自己内置的原生库 libasyncProfiler 解包到 config/spark/tmp 并加载。这个库是 macOS 平台且带代码签名——启动器把它的平台标签改写为 iOS 后，签名哈希不再匹配，系统加载器直接杀进程（静默闪退，无法捕获）。这是“已签名库改平台必死”：未签名库重标签无害，已签名库重标签必死。\n\n启动器已修复（Task106 双层 + Task107 修正）：①拦截该库加载——spark 检测到加载失败会自动回退到纯 Java 采样器（分析功能照常可用，游戏继续）；②通用防护——平台重标签后自动重建 ad-hoc 签名（重算页哈希，Task107：原“中和为无签名”方案被证实会引发 JNA 加载失败——系统加载器对无签名库一律拒载，日志报 missing code signature；已签名库重标签必死但重签名后可正常加载）。验证方法：日志搜 “[Amethyst] Task106: blocked dlopen”（拦截生效）或 “[Amethyst] Task107: re-signed”（重签名生效）——出现后建档继续推进即修复生效；旧构建临时自救：整合包里移除 spark。\n\n仍闪退且最后一行不是 spark 相关：留意内存——创建世界是内存峰值阶段（实测 537 mods 包建档前已 5.1GB），设备内存告急时系统也会静默杀进程；可适当调低启动器的最大内存或减少视距。"
+        },
+        {
+          "icon": "cpu",
+          "title": "Metal (metallum) 渲染器进游戏后崩溃怎么办？",
+          "description": "若切换到视频设置或资源重载后在游戏内崩溃（崩溃栈落在 AGXMetalConverter/AGX 设备驱动层），这是 Metal 渲染器（metallum 后端）在部分系统版本上的已知问题，上游同样未修复，启动器无法代为绕过。\n\n临时方案：设置 → 视频 → 渲染器换回 ANGLE、gl4es 或 MobileGlues 继续游玩（存档与模组不受渲染器切换影响）。\n\n启动画面需要手动点\"取消启动\"的问题已修复（Metal 首帧信号已接入，遮罩会在画面出来时自动消失）。"
+        },
+        {
+          "icon": "exclamationmark.triangle",
+          "title": "Forge 整合包启动崩溃（IForgeVertexFormat / OptiFine 报错）？",
+          "description": "日志出现 java.lang.ClassNotFoundException: net.minecraftforge...IForgeVertexFormat 或 OptiFine 相关反射失败时，是整合包里携带的 OptiFine 与当前 Forge 版本二进制不兼容（接口签名漂移），属模组侧问题。\n\n解决方法：删除 mods 文件夹里的 OptiFine（或换与该 Forge 版本匹配的 OptiFine 构建）后重启。启动器检测到 Forge + OptiFine 共存时会在日志打警示锚点（[PojavLauncher] Task202: OptiFine detected alongside Forge），方便快速确认。"
         }
       ]
     }

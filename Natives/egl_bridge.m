@@ -232,6 +232,12 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         // （gl_bridge.m Task179/182 路径），临时上下文同为 ES3，构造器缓存
         // 的能力检测结果与游戏会话一致。
         {
+            // Task202 入口锚点：装机日志（e4d704e latestlog.1）显示 Task193
+            // 的四个结果锚点（complete/FAILED/skipped/EGL incomplete）全部
+            // 缺席，而崩溃紧跟 Task192 预载之后——块是否被进入都无法从
+            // 日志判断。此锚点无条件打印（先于 static 去重门），下轮日志
+            // 可直接裁决"块未进入"vs"进入后静默"。
+            NSLog(@"[egl_bridge] Task202: Task193 gl4es bootstrap block ENTERED (renderer=%@)", renderer);
             static BOOL s_ame193_gl4esDone = NO;
             if (!s_ame193_gl4esDone) {
                 s_ame193_gl4esDone = YES;

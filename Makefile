@@ -598,6 +598,9 @@ payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mith
 	# 内 egl_* 全 NULL → 调 NULL → SIGSEGV pc=0（956ea9b 装机 latestlog.old）。
 	# 改为 RTLD_DEFAULT（全局作用域可见这些框架）。补丁幂等 + 指纹防漂移。
 	python3 $(SOURCEDIR)/scripts/patch_gl4es_rtld_default.py $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/libgl4es_114.dylib || exit 1
+	# Task202——gl4es 构造器崩溃免疫：GetHardwareExtensions 的 glGetString(GL_EXTENSIONS) 无上下文时返回 NULL，
+	# 首个 strstr(NULL) 峻 SIGSEGV（e4d704e 装机 latestlog.1 反盘；垫片把 NULL 换成空串，构造器完整跑完）
+	python3 $(SOURCEDIR)/scripts/patch_gl4es_ggstr_nullguard.py $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/libgl4es_114.dylib || exit 1
 	cp $(WORKINGDIR)/*.dylib $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/ || exit 1
 	# spirv-cross 软链接（防御性兜底）：若 MobileGlues 构建产出 libspirv-cross-c-shared.0.dylib，
 	# 创建 libspirv-cross.dylib 软链接，兼容按 macOS 默认名加载的 native 代码。

@@ -1146,6 +1146,29 @@ static bool ame_SDL_GL_SwapWindow(void *window) {
 // GlBackend.loadLibrary 仍报 "glGetError mismatch" → 回落 Vulkan →
 // Iris No GLCapabilities 崩溃。修法 = 镜像链逐字对齐 GL$1 的 macOS 分支
 // （只查 OSMesaGetProcAddress），指针一致性对所有渲染器按构造成立。
+/// Task202：SDL_GL_GetProcAddress 解析观察器——首 12 个成功解析记名
+/// （含来源路径：黑屏裁决需要知道 MC 的函数从哪条链拿到）+ NULL 去重
+/// 全量记名（ANGLE 黑屏定谳：点名缺失函数）。纯取证，零行为改变。
+static void ame202_gpaObserve(const char *proc, const char *src, void *result) {
+    if (result != NULL) {
+        static int s_ame202_ok = 0;
+        if (s_ame202_ok < 12) {
+            s_ame202_ok++;
+            NSLog(@"[SDLGL] Task202: GetProcAddress OK #%d: %s (via %s)",
+                  s_ame202_ok, proc, src);
+        }
+    } else {
+        static const char *s_ame202_seen[160];
+        static int s_ame202_n = 0;
+        for (int i = 0; i < s_ame202_n; i++) {
+            if (strcmp(s_ame202_seen[i], proc) == 0) return;
+        }
+        if (s_ame202_n < 160) s_ame202_seen[s_ame202_n++] = proc;
+        NSLog(@"[SDLGL] Task202: GetProcAddress NULL (dedup #%d): %s -- MC will see a NULL pointer",
+              s_ame202_n, proc);
+    }
+}
+
 static void *ame_SDL_GL_GetProcAddress(const char *proc) {
     if (proc == NULL) return NULL;
     void *h = ame_rendererHandle();
@@ -1162,14 +1185,21 @@ static void *ame_SDL_GL_GetProcAddress(const char *proc) {
         }
         if (g_lwjglMirrorGPA != NULL) {
             void *p = ((void *(*)(const char *))g_lwjglMirrorGPA)(proc);
-            if (p != NULL) return p;
+            if (p != NULL) {
+                ame202_gpaObserve(proc, "OSMesa mirror", p);
+                return p;
+            }
         }
         // 对齐 GL$1 的回退：dlsym(lib, name)
         void *p = dlsym(h, proc);
-        if (p != NULL) return p;
+        if (p != NULL) {
+            ame202_gpaObserve(proc, "renderer dlsym", p);
+            return p;
+        }
     }
     void *r = ame_real_GL_GetProcAddress ? ame_real_GL_GetProcAddress(proc) : NULL;
     if (r == NULL) r = dlsym(RTLD_DEFAULT, proc);
+    ame202_gpaObserve(proc, "real SDL / RTLD_DEFAULT", r);
     return r;
 }
 

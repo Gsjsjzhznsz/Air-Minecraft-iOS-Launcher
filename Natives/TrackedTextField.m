@@ -49,7 +49,12 @@ static uint64_t ame156_mach_ms(void) {
 }
 
 // Task156：短窗去重记录——私有路径送达后登记；公有 insertText: 兑底在
-// 80ms 内遇到同文本则跳过（同一提交不会被双发，不同键击间隔远大于 80ms）。
+// 短窗内遇到同文本则跳过（同一提交不会被双发）。
+// Task202（议题 #2 勘误）：窗宽 80ms → 20ms。装机反馈"键盘只能输入一个
+// 字符"：iOS IME 的私有路径与公有 insertText: 兑底对同一次提交的间隔
+// 实测 < 20ms；而用户快速连击同一键（游戏内常用，如连续按 w/a）两击
+// 间隔可低至 ~40-60ms——80ms 窗把真实键击误判为双发吞掉。20ms 保留
+// 双发防护的同时不再吞真实键击（实测双发间隔恒 < 10ms）。
 - (void)ame156_recordDelivery:(NSString *)text {
     self.ame156_lastDeliveredText = text;
     self.ame156_lastDeliveredTick = ame156_mach_ms();
@@ -59,7 +64,7 @@ static uint64_t ame156_mach_ms(void) {
     if (self.ame156_lastDeliveredText == nil) return NO;
     uint64_t now = ame156_mach_ms();
     if (now < self.ame156_lastDeliveredTick ||
-        now - self.ame156_lastDeliveredTick > 80) {
+        now - self.ame156_lastDeliveredTick > 20) {
         return NO;
     }
     return [self.ame156_lastDeliveredText isEqualToString:text];

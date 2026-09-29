@@ -914,8 +914,20 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
         datab += (uintptr_t)glstate->vao->unpack->data;
         
     GLvoid *pixels = (GLvoid *)datab;
-    border = 0;	//TODO: something?
+    border = 0; //TODO: something?
     noerrorShim();
+
+    // Task202：图集基础上传归因探针（材质损坏裁决）。
+    // 病历（e4d704e latestlog.2，1.8.9 vgpu）：MC 日志 "Created: 16x16
+    // textures-atlas"——图集只分配了初始尺寸从未长大（正常应数百像素，
+    // 缝合器会多次重分配）；同时 424 次 GL 1282（~20/秒 = tick 频率，
+    // 指向动画纹理 SubImage 更新链）。本探针记录入口参数 + 实际分发
+    // 路径（npot 重分配 vs 直传）+ 分发后真错误，首 8 全参 + 每 120 次
+    // 采样，下轮日志定谳图集为何不长大。
+    static unsigned s_ame202_tiCalls = 0;
+    unsigned ame202_tiNo = ++s_ame202_tiCalls;
+    GLint ame202_tiW = width, ame202_tiH = height, ame202_tiLvl = level;
+    int ame202_tiWant = (ame202_tiNo <= 8);
 
     gltexture_t *bound = glstate->texture.bound[glstate->texture.active][itarget];
 
@@ -1026,7 +1038,7 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
     if (globals4es.automipmap) {
         if (level>0)
             if ((globals4es.automipmap==1) || (globals4es.automipmap==3) || bound->mipmap_need) {
-                return;			// has been handled by auto_mipmap
+                return;                 // has been handled by auto_mipmap
             }
             else if(globals4es.automipmap==2)
                 bound->mipmap_need = 1;
@@ -1159,7 +1171,7 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
         if (globals4es.texstream && (target==GL_TEXTURE_2D || target==GL_TEXTURE_RECTANGLE_ARB) && (width>=256 && height>=224) && 
         ((internalformat==GL_RGB) || (internalformat==3) || (internalformat==GL_RGB8) || (internalformat==GL_BGR) || (internalformat==GL_RGB5) || (internalformat==GL_RGB565)) || (globals4es.texstream==2) ) {
             bound->streamingID = AddStreamed(width, height, bound->texture);
-            if (bound->streamingID>-1) {	// success
+            if (bound->streamingID>-1) {        // success
                 bound->shrink = 0;  // no shrink on Stream texture
                 bound->streamed = true;
                 ApplyFilterID(bound->streamingID, bound->min_filter, bound->mag_filter);
@@ -1168,7 +1180,7 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
                 LOAD_GLES(glEnable);
                 if (tmp)
                     gles_glDisable(GL_TEXTURE_2D);
-                ActivateStreaming(bound->streamingID);	//Activate the newly created texture
+                ActivateStreaming(bound->streamingID);  //Activate the newly created texture
                 format = GL_RGB;
                 type = GL_UNSIGNED_SHORT_5_6_5;
                 if (tmp)
@@ -1178,7 +1190,7 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
         }
 #endif
         if (!bound->streamed)
-            swizzle_texture(width, height, &format, &type, internalformat, new_format, NULL, bound);	// convert format even if data is NULL
+            swizzle_texture(width, height, &format, &type, internalformat, new_format, NULL, bound);    // convert format even if data is NULL
         if (bound->shrink!=0) {
             switch(globals4es.texshrink) {
             case 1: //everything / 2
@@ -1393,6 +1405,16 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
                                         format, type, pixels);
                                         DBG(CheckGLError(1);)
                 }
+                // Task202 探针：npot 重分配路径（TexImage 分配 POT 载体 +
+                // SubImage 上传实际内容）——图集缝合器每次长大都走这里
+                if (ame202_tiWant || ((ame202_tiNo % 120) == 0)) {
+                    LOAD_GLES(glGetError);
+                    GLenum ame202_tiErr = gles_glGetError ? gles_glGetError() : 0;
+                    SHUT_LOGD("VGPU Task202 teximage #%u RESIZE-PATH: level=%d in=%dx%d -> pot=%dx%d fmt=0x%04X type=0x%04X tex=%u err=0x%04X\n",
+                              ame202_tiNo, (int)ame202_tiLvl, (int)ame202_tiW, (int)ame202_tiH,
+                              (int)nwidth, (int)nheight, (unsigned)format, (unsigned)type,
+                              (unsigned)bound->texture, (unsigned)ame202_tiErr);
+                }
 #ifdef NO_1x1
                 if(level==0 && (width==1 && height==1 && pixels)) {
                     // complete the texture, juste in case it use GL_REPEAT
@@ -1410,6 +1432,15 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
                 gles_glTexImage2D(rtarget, level, format, width, height, border,
                                 format, type, pixels);
                 DBG(CheckGLError(1);)
+                // Task202 探针：直传路径（尺寸即 POT，无需重分配）
+                if (ame202_tiWant || ((ame202_tiNo % 120) == 0)) {
+                    LOAD_GLES(glGetError);
+                    GLenum ame202_tiErr = gles_glGetError ? gles_glGetError() : 0;
+                    SHUT_LOGD("VGPU Task202 teximage #%u DIRECT-PATH: level=%d size=%dx%d fmt=0x%04X type=0x%04X tex=%u err=0x%04X\n",
+                              ame202_tiNo, (int)ame202_tiLvl, (int)ame202_tiW, (int)ame202_tiH,
+                              (unsigned)format, (unsigned)type,
+                              (unsigned)bound->texture, (unsigned)ame202_tiErr);
+                }
             }
             // check if base_level is set... and calculate lower level mipmap
             if(bound->base_level == level && !(bound->max_level==level && level==0)) {
@@ -1471,7 +1502,7 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
             gles_glTexParameteri( rtarget, GL_GENERATE_MIPMAP, GL_FALSE );*/
         } else {
             if (pixels)
-                gl4es_glTexSubImage2D(rtarget, level, 0, 0, width, height, format, type, pixels);	// (should never happens) updload the 1st data...
+                gl4es_glTexSubImage2D(rtarget, level, 0, 0, width, height, format, type, pixels);       // (should never happens) updload the 1st data...
         }
         if(bound->mipmap_need && !bound->mipmap_done) {
             if(bound->mipmap_auto)
@@ -1532,11 +1563,23 @@ void gl4es_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
         return;
     }
     
+    // Task202：动画纹理更新归因探针（材质损坏裁决）。
+    // 424 次 GL 1282（~20/秒 = tick 频率）指向本函数——动画纹理每 tick
+    // 更新图集子区。入口只记参数（不读错误——入口读到的只是队列残留），
+    // 真错误在最终 gles 分发后读（无 noerrorShim 干扰）。首 8 全参 +
+    // 每 120 次采样 + shrink 变换前后对照（shrink 若非 0 会改写
+    // xoffset/yoffset/width/height——图集坐标错位的候选根因）。
+    static unsigned s_ame202_tsCalls = 0;
+    unsigned ame202_tsNo = ++s_ame202_tsCalls;
+    int ame202_tsWant = (ame202_tsNo <= 8) || ((ame202_tsNo % 120) == 0);
+    GLint ame202_tsInX = xoffset, ame202_tsInY = yoffset;
+    GLsizei ame202_tsInW = width, ame202_tsInH = height;
+
     gltexture_t *bound = glstate->texture.bound[glstate->texture.active][itarget];
     if (globals4es.automipmap) {
         if (level>0)
             if ((globals4es.automipmap==1) || (globals4es.automipmap==3) || bound->mipmap_need) {
-                return;			// has been handled by auto_mipmap
+                return;                 // has been handled by auto_mipmap
             }
             else
                 bound->mipmap_need = 1;
@@ -1657,7 +1700,7 @@ void gl4es_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
     }
     
     if (globals4es.texstream && bound->streamed) {
-/*	// copy the texture to the buffer
+/*      // copy the texture to the buffer
     void* tmp = GetStreamingBuffer(bound->streamingID);
     for (int yy=0; yy<height; yy++) {
         memcpy(tmp+((yy+yoffset)*bound->width+xoffset)*2, pixels+(yy*width)*2, width*2);
@@ -1666,6 +1709,18 @@ void gl4es_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
         errorGL();
         gles_glTexSubImage2D(rtarget, level, xoffset, yoffset,
                      width, height, format, type, pixels);
+        // Task202 探针：主分发后读真错误（直接 gles 调用，不经 shim）
+        if (ame202_tsWant) {
+            LOAD_GLES(glGetError);
+            GLenum ame202_tsErr = gles_glGetError ? gles_glGetError() : 0;
+            SHUT_LOGD("VGPU Task202 texsub #%u: level=%d in=(%d,%d %dx%d) out=(%d,%d %dx%d) fmt=0x%04X type=0x%04X tex=%u shrink=%d ratio=%d,%d err=0x%04X\n",
+                      ame202_tsNo, (int)level,
+                      (int)ame202_tsInX, (int)ame202_tsInY, (int)ame202_tsInW, (int)ame202_tsInH,
+                      (int)xoffset, (int)yoffset, (int)width, (int)height,
+                      (unsigned)format, (unsigned)type, (unsigned)bound->texture,
+                      (int)bound->shrink, (int)bound->ratiox, (int)bound->ratioy,
+                      (unsigned)ame202_tsErr);
+        }
         DBG(CheckGLError(1);)
         // check if base_level is set... and calculate lower level mipmap
         if(bound->base_level == level && !(bound->max_level==level && level==0)) {

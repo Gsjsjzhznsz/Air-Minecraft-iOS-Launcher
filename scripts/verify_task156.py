@@ -114,9 +114,9 @@ print("D. IME（iPadOS 27）")
 print("=" * 72)
 check("D1 TrackedTextField：公有 insertText: 兜底（UIKeyInput）",
       "- (void)insertText:(NSString *)text {" in ttf and "[super insertText:text];" in ttf)
-check("D2 TrackedTextField：80ms 同文本去重（记录 + 查询成对）",
+check("D2 TrackedTextField：同文本去重（记录 + 查询成对；Task202 议题#2 勘误：80ms -> 20ms）",
       "ame156_recordDelivery" in ttf and "ame156_recentlyDelivered" in ttf
-      and "> 80" in ttf)
+      and "> 20" in ttf and "> 80" not in ttf)
 check("D3 TrackedTextField：私有路径送达后登记（防公有路径双发）",
       ttf.count("[self ame156_recordDelivery:text]") == 3)
 check("D4 TrackedTextField：setAttributedMarkedText nil 守卫 + 长度钳制",
@@ -168,7 +168,7 @@ for lg in langs:
     sets.append(keys)
     check(f"F[{lg}] footer 键在位", "background.effect.footer" in keys)
 check("F1 四主语言键集一致（1952 = Task157 基线 1948 + Task159 净增 4（新增 5 键，退役 memory.current））",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2408,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2418,
       f"counts={[len(x) for x in sets]}")
 for f in ["Natives/BackgroundSettingsViewController.m", "Natives/JavaLauncher.m",
           "Natives/egl_bridge.m", "Natives/SurfaceViewController.m",

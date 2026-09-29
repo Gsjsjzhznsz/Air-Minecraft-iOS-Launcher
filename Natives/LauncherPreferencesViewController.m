@@ -32,6 +32,95 @@
 #import "AI/AISystemPromptEditorViewController.h"
 #import "AI/AiSettings.h"
 
+// ============================================================================
+// Task202（G）：语言选择器全量化
+// 用户反馈：设置里的语言只能手动选 2 个（+system 共 3 项），要求把全部
+// 内置语言填进去。bundle 里实际装着 54 个 <code>.lproj 语言表（crowdin
+// 同步体系，见 crowdin.yml），此前 pickKeys 却只硬编码了 system/zh-Hans/en。
+// localize()（utils.m）对任意语言码本来就通用：目标 lproj 未命中 → en
+// → zh-Hans 三级回退，所以这里的全部 54 个码都可以直接作为 app_language
+// 存储值生效，零额外接线。
+// 非四主表（zh-Hans/zh-Hant/en/zh-CN，键数 2442）的翻译都只覆盖部分
+// 键（如 ja 1868 / km 1863），显示名追加"部分翻译"标记（ame202.lang.partial）
+// 以免用户误以为是完整翻译。
+// ============================================================================
+/// 枚举 mainBundle 内全部语言表目录（"xx.lproj" → "xx"），按码字典序排序。
+/// dispatch_once 缓存——目录集在运行期不变，54 项枚举没必要每行刷新都跑。
+static NSArray* ame202_availableLanguageCodes(void) {
+    static NSArray *ame202_codes = nil;
+    static dispatch_once_t ame202_once;
+    dispatch_once(&ame202_once, ^{
+        NSMutableArray *ame202_list = [NSMutableArray array];
+        for (NSString *ame202_path in [NSBundle.mainBundle pathsForResourcesOfType:@"lproj"
+                                                                        inDirectory:nil]) {
+            NSString *ame202_name = ame202_path.lastPathComponent;
+            // Base.lproj 是界面基座资源不是语言；过短的 "xx.lproj" 之外形态不收
+            if ([ame202_name hasSuffix:@".lproj"] && ame202_name.length > 6 &&
+                ![ame202_name isEqualToString:@"Base.lproj"]) {
+                [ame202_list addObject:[ame202_name substringToIndex:ame202_name.length - 6]];
+            }
+        }
+        [ame202_list sortUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+        ame202_codes = [ame202_list copy];
+    });
+    return ame202_codes;
+}
+
+/// 语言码 → 选择器显示名。原生名优先（用户看得懂），NSLocale(en) 兜底，
+/// 玩笑语言（Minecraft 特有码）手工表覆盖，最后裸码保底。
+/// 四主表之外的码追加"部分翻译"标记。
+static NSString* ame202_languageDisplayName(NSString *ame202_code) {
+    static NSDictionary *ame202_native = nil;
+    static dispatch_once_t ame202_once;
+    dispatch_once(&ame202_once, ^{
+        ame202_native = @{
+            @"af": @"Afrikaans",          @"ar": @"العربية",
+            @"az": @"Azərbaycan dili",    @"ba": @"Башҡортса",
+            @"bn": @"বাংলা",              @"bn-IN": @"বাংলা (ভারত)",
+            @"ca": @"Català",             @"cs": @"Čeština",
+            @"da": @"Dansk",              @"de": @"Deutsch",
+            @"el": @"Ελληνικά",           @"en": @"English",
+            @"en-GB": @"English (UK)",    @"es": @"Español",
+            @"et": @"Eesti",              @"fa": @"فارسی",
+            @"fi": @"Suomi",              @"fil": @"Filipino",
+            @"fr": @"Français",           @"he": @"עברית",
+            @"hi": @"हिन्दी",              @"hu": @"Magyar",
+            @"id": @"Bahasa Indonesia",   @"it": @"Italiano",
+            @"ja": @"日本語",              @"kk": @"Қазақша",
+            @"km": @"ភាសាខ្មែរ",           @"ko": @"한국어",
+            @"la": @"Latina",             @"lt": @"Lietuvių",
+            @"ms": @"Bahasa Melayu",      @"nl": @"Nederlands",
+            @"no": @"Norsk",              @"pl": @"Polski",
+            @"pt": @"Português",          @"pt-BR": @"Português (Brasil)",
+            @"ro": @"Română",             @"ru": @"Русский",
+            @"sk": @"Slovenčina",         @"sr": @"Српски",
+            @"sr-Latn": @"Srpski (Latin)", @"sv": @"Svenska",
+            @"th": @"ไทย",                @"tr": @"Türkçe",
+            @"tt": @"Татарча",            @"uk": @"Українська",
+            @"vi": @"Tiếng Việt",         @"zh-Hans": @"简体中文",
+            @"zh-Hant": @"繁體中文",       @"zh-CN": @"简体中文 (zh-CN)",
+            // Minecraft 特有玩笑语言（NSLocale 不认识，手工表）
+            @"en-PT": @"Pirate Speak",    @"en-UD": @"English (Upside Down)",
+            @"lol": @"LOLCAT",            @"pr": @"Prussian",
+        };
+    });
+    NSString *ame202_name = ame202_native[ame202_code];
+    if (ame202_name.length == 0) {
+        ame202_name = [[NSLocale localeWithLocaleIdentifier:@"en"]
+            displayNameForKey:NSLocaleIdentifier value:ame202_code];
+    }
+    if (ame202_name.length == 0) {
+        ame202_name = ame202_code;
+    }
+    // 四主表 = 完整翻译；其余（含 ja/km 等高覆盖表）都存在未翻译键，
+    // 回退链会把缺键显示成 en/zh-Hans 内容——追加标记说明。
+    if (![@[@"zh-Hans", @"zh-Hant", @"en", @"zh-CN"] containsObject:ame202_code]) {
+        ame202_name = [ame202_name stringByAppendingFormat:@" · %@",
+            localize(@"ame202.lang.partial", nil)];
+    }
+    return ame202_name;
+}
+
 @interface LauncherPreferencesViewController()
 // Task 150（[可撤销] 删除渲染器全局控制）：rendererKeys/rendererList 属性
 // 退役（唯一消费者 = 设置页渲染器行，行删后无读取方）
@@ -454,6 +543,17 @@
         return ![visibleVC isKindOfClass:NSClassFromString(@"SurfaceViewController")];
     };
 
+    // Task202（G）：app_language 行的动态键值表——system + 全部 54 个内置
+    // 语言码。在此预构建局部数组，字典字面量内只做引用（不使用语句
+    // 表达式——上轮结论：该形态在树内无先例，维护风险不值当）。
+    NSArray *ame202_langKeys =
+        [@[@"system"] arrayByAddingObjectsFromArray:ame202_availableLanguageCodes()];
+    NSMutableArray *ame202_langNames = [NSMutableArray
+        arrayWithObject:localize(@"i18n_str_382", nil)];
+    for (NSString *ame202_code in ame202_availableLanguageCodes()) {
+        [ame202_langNames addObject:ame202_languageDisplayName(ame202_code)];
+    }
+
     // --- 定义弹窗显示的 Block，防止循环引用使用 weakSelf ---
     __weak typeof(self) weakSelf = self;
     void (^showTouchInfoAlert)(BOOL) = ^(BOOL enabled) {
@@ -537,16 +637,11 @@
               @"icon": @"globe",
               @"type": self.typePickField,
               @"enableCondition": whenNotInGame,
-              @"pickKeys": @[
-                  @"system",
-                  @"zh-Hans",
-                  @"en"
-              ],
-              @"pickList": @[
-                  localize(@"i18n_str_382", nil),
-                  localize(@"ame193.misc.6", @"简体中文"),
-                  @"English"
-              ],
+              // Task202（G）：system + 全部内置语言（bundle 实测 54 个
+              // .lproj 表）。localize() 的 en→zh-Hans 回退链对任意码
+              // 通用（utils.m），缺键语言显示回退内容 + "部分翻译"标记。
+              @"pickKeys": ame202_langKeys,
+              @"pickList": ame202_langNames,
               @"action": ^(NSString *value){
                   // 语言切换后发送通知，让界面重新加载以应用新语言
                   [[NSNotificationCenter defaultCenter] postNotificationName:@"AppLanguageChanged" object:value];

@@ -265,7 +265,7 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     sets.append(ks)
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
 check("I3 四语言键集一致（Task138 基线 2228 = Task134 的 1916 + 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2408,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2418,
       f"counts={[len(s) for s in sets]}")
 
 # Makefile TAB 完整性（9e6fc27/129 双教训）
@@ -273,11 +273,13 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("I4 Makefile TAB 完整（Task138 重锚：cur == head + dep_sdl3_guard 在位）",
+check("I4 Makefile TAB 完整（Task202 重锚：cur == head + 3（ggstr 垫片接线）+ 双守卫在位）",
       # Task138 重锚：Task135 的 dep_sdl3_guard 14 个 TAB 行已随提交入 HEAD，
-      # "+14" 形态自此恒假（135 提交后即结构性失效）；Task138 未触碰
-      # Makefile，可长期存活的不变量 = 工作树与 HEAD 一致 + 守卫目标在位。
-      cur_tab == head_tab and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk,
+      # "+14" 形态自此恒假；Task202 重锚：gl4es ggstr nullguard 垫片接线
+      # 追加 3 个 TAB 行（注释 2 + 命令 1），允许 +3 的合法增长；守卫
+      # 目标（dep_sdl3_guard + patch_gl4es_ggstr_nullguard）双在位。
+      cur_tab == head_tab + 3 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 
 print("== J. 级联 ==")

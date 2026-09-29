@@ -4,6 +4,7 @@
 //
 
 #import "AiSession.h"
+#import "../utils.h"   // Task202：默认会话标题 i18n 迁移需要 localize()
 
 @implementation AiSession
 
@@ -17,7 +18,7 @@
     self = [super init];
     if (self) {
         _identifier = [NSUUID UUID].UUIDString;
-        _title = @"新会话";
+        _title = localize(@"ame202.ai.new_session", @"新会话");
         NSDate *now = [NSDate date];
         _createdAt = now;
         _updatedAt = now;

@@ -2588,3 +2588,15 @@
 "ame193.misc.11" = "Install verification failed; the following files are missing or corrupt. Please retry the installation: %@";
 "ame193.misc.12" = "Show all (%ld older versions)";
 "ame193.misc.jit_not_handled" = "%@ did not handle the launch request (not installed or too old?). Please switch to another JIT enabler in Settings and retry.";
+
+// Task202: language selector full list + i18n migration round (mojibake fix, AI ask dialogs, session title, java-dialog copy)
+"ame202.lang.partial" = "partial translation";
+"ame202.surface.version_load_failed" = "Failed to load the game version. Please reselect a version.";
+"ame202.surface.login_required" = "Please sign in first.";
+"ame202.ai.custom_option" = "Custom…";
+"ame202.ai.custom_prompt" = "Enter a custom answer";
+"ame202.ai.input_here" = "Type here…";
+"ame202.ai.confirm" = "OK";
+"ame202.ai.cancel" = "Cancel";
+"ame202.ai.new_session" = "New chat";
+"ame202.common.copy" = "Copy";

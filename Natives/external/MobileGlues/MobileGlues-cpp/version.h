@@ -3139,3 +3139,75 @@
 // re-anchors on 165/167/171/172/174/175/177/178/170/168/173b -- task165 now
 // 34/34); survey reports archived under docs/surveys/.
 // ============================================================================
+// REVISION 18 addendum (Task 202, no bump -- none of this round's changes
+//     alter MobileGlues conversion behavior; the dlsym pinning is inert in
+//     MobileGlues sessions because libtinygl4angle is not loaded there
+//     (NOLOAD self-handle returns NULL) and MobileGlues' own gl* exports
+//     are untouched).
+// (1) gl4es constructor crash immunity (binary patch, vendored libgl4es_
+//     114.dylib): device log e4d704e/latestlog.1 (1.8.9-forge + gl4es)
+//     crashed at GetHardwareExtensions+0xf90 -> _platform_strstr because
+//     the constructor ran context-less and glGetString(GL_EXTENSIONS)
+//     returned NULL (first needle "GL_APPLE_texture_2D_limited_npot").
+//     Re-verified by local disassembly: call site 0x1bc2b4 (blr x8 via the
+//     globals slot at 0x1e0938), result cached at [x29,#-0xc8]. The Task193
+//     context-bootstrap anchors never fired (blind spot now covered by a
+//     Task202 entry anchor in egl_bridge). Fix = crash-immunity shim: the
+//     blr is redirected to a 32-byte cave stub at 0x6400 that calls the
+//     same pointer and substitutes an empty string for NULL (strstr("",
+//     needle) == NULL -> every extension check reports "not present", the
+//     constructor completes, gl4es falls back to default caps instead of
+//     dying). Zero behavior change when a context IS current. Script:
+//     scripts/patch_gl4es_ggstr_nullguard.py (fingerprint-gated, idempotent,
+//     Makefile-wired next to the Task192 RTLD patch).
+// (2) vgpu texture-corruption adjudication instrumentation: the Task193
+//     step-attrs probe read GL_ARRAY_BUFFER_BINDING (0x8894) instead of
+//     GL_ELEMENT_ARRAY_BUFFER_BINDING (0x8895) -- every eabBefore/eabNow in
+//     the device log was the VERTEX binding, not the index binding (the
+//     "EBO swapped out" appearance was an artifact). Corrected constant +
+//     attribution probes on the texture paths: glTexImage2D (which dispatch
+//     branch the atlas grows through, npot-resize vs direct, post-dispatch
+//     real error) and glTexSubImage2D (entry vs shrink-transformed params,
+//     per-call real error) -- first 8 full + every-120th sample, targeting
+//     the "Created: 16x16 textures-atlas" + 424x GL 1282 @ tick-rate
+//     symptom cluster.
+// (3) Metal first-frame signal: Metallum sessions produce no GL swap and
+//     are not the Vulkan displayLink path, so pojavIncrementFpsCounter was
+//     never called and the launch overlay waited for a manual cancel.
+//     CAMetalLayer nextDrawable is now swizzled (main_hook.m, dispatch_once)
+//     to count frames during AMETHYST_METAL sessions while the game runs;
+//     the first-frame notification dedup lives in egl_bridge as before.
+// (4) GL symbol pinning + eglGetProcAddress wrapper (main_hook.m): gl*/egl*
+//     dlsym resolutions prefer libtinygl4angle when loaded (extension
+//     cache + desktop-GL completion + version facade apply to every
+//     resolution path); the eglGetProcAddress slot additionally gets a
+//     logging wrapper. callerIsTinygl (noinline, return-address level 1)
+//     keeps tinygl4angle's own fallback dlsym out of the pin (self-lock
+//     guard). NULL-resolution forensics upgraded from the Task193 30-cap
+//     to a deduped full list ([dlsym] Task202 anchors).
+// (5) Input fixes (GitHub issues #1/#2): IME same-text dedup window 80ms
+//     -> 20ms (rapid repeat keystrokes were being swallowed as duplicates
+//     -- "keyboard only types one character"); two-finger scroll now
+//     suppresses cursor movement while the pan gesture is active (async
+//     flag clear so the gesture-Ended-before-touchesEnded ordering cannot
+//     leak a trailing MOVE), and the tap tolerance grew 5x5 -> 24x24 pt
+//     (natural finger drift was eating virtual-mouse clicks).
+// (6) Language selector completeness: the launcher previously offered
+//     system/zh-Hans/en only; it now enumerates all 54 bundled .lproj
+//     tables at runtime (dispatch_once cache + native display names +
+//     "partial translation" marker for non-primary tables whose fallback
+//     chain shows en/zh-Hans content for missing keys).
+// (7) i18n migration round: two mojibake dialog strings in
+//     SurfaceViewController (UTF-8-as-Latin-1, context-restored), the AI
+//     ask-tool dialog family, the default AI session title, and the
+//     Java-dialog bridge's OK/Copy migrated to localize() with 10 new
+//     ame202.* keys across the four primary tables (baseline 2408 -> 2418).
+// (8) Forge + OptiFine coexistence detection (PojavLauncher.java): Forge
+//     sessions with an OptiFine jar in mods/ log a warning anchor (the
+//     IForgeVertexFormat CNFE / reflection signature drift family is a
+//     mod-side incompatibility; FAQ entry added with the removal guidance).
+// FAQ: +2 entries (Metal metallum crash guidance + Forge/OptiFine
+//     characterization), 35 -> 37, both copies synced.
+// Verification: verify_task202 (52 checks); l10n baseline sweep 2408 ->
+//     2418 across anchored verifiers; announcement count 26 -> 27 sweep;
+//     regression batch diffed against HEAD (zero new failures).

@@ -139,7 +139,7 @@ vals = set(base.values())
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first），
 # 唯一键基线 1916 -> 1918
 check("D3 四语言唯一键集一致且为 Task151 基线 2228（Task178 重锚：opacity.title 键恢复）",
-      vals == {2408}, str(base))
+      vals == {2418}, str(base))
 r2 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_sdl3_eventfilter_guard.py"),
                      os.path.join(REPO, "Natives/resources/Frameworks/libSDL3.dylib")],
                     capture_output=True, text=True, timeout=60)
@@ -162,8 +162,9 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
 # Task138 重锚：Task135 的 14 个 TAB 行已随提交入 HEAD，"+14" 形态在
 # 提交后恒假；长期不变量 = 工作树与 HEAD 一致 + dep_sdl3_guard 目标在位。
-check("E10 Makefile TAB 基线 = HEAD 且 dep_sdl3_guard 在位（Task138 重锚）",
-      cur_tab == head_tab and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk,
+check("E10 Makefile TAB 基线 = HEAD + 3 且双守卫在位（Task202 重锚：ggstr 垫片接线 +3 TAB 行）",
+      cur_tab == head_tab + 3 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 
 print(f"\n==== RESULT: {'ALL PASS' if FAIL == 0 else 'FAILED'} ({PASS}/{PASS+FAIL}) ====")

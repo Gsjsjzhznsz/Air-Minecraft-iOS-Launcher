@@ -5,6 +5,7 @@
 
 #import "AiAskTool.h"
 #import <UIKit/UIKit.h>
+#import "../utils.h"   // Task202：AI 问筹对话框 i18n 迁移需要 localize()
 
 @implementation AiAskTool
 
@@ -165,26 +166,26 @@
 
     // 自定义输入
     if (allowCustom) {
-        [alert addAction:[UIAlertAction actionWithTitle:@"自定义…"
+        [alert addAction:[UIAlertAction actionWithTitle:localize(@"ame202.ai.custom_option", @"自定义…")
                                                   style:UIAlertActionStyleDefault
                                                 handler:^(UIAlertAction *action) {
             UIViewController *presenting2 = [self topmostPresentableViewController];
             UIAlertController *textAlert = [UIAlertController
                 alertControllerWithTitle:[NSString stringWithFormat:@"%lu. %@", (unsigned long)(index + 1), question]
-                                 message:@"请输入自定义回答"
+                                 message:localize(@"ame202.ai.custom_prompt", @"请输入自定义回答")
                           preferredStyle:UIAlertControllerStyleAlert];
             [textAlert addTextFieldWithConfigurationHandler:^(UITextField *textField) {
-                textField.placeholder = @"在此输入…";
+                textField.placeholder = localize(@"ame202.ai.input_here", @"在此输入…");
                 textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
             }];
-            [textAlert addAction:[UIAlertAction actionWithTitle:@"确定"
+            [textAlert addAction:[UIAlertAction actionWithTitle:localize(@"ame202.ai.confirm", @"确定")
                                                           style:UIAlertActionStyleDefault
                                                         handler:^(UIAlertAction *submit) {
                 NSString *text = [textAlert.textFields.firstObject.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
                 [answers addObject:@{@"question": question, @"answer": (text.length ? text : @"")}];
                 [self presentStepAtIndex:(index + 1) steps:steps answers:answers completion:completion];
             }]];
-            [textAlert addAction:[UIAlertAction actionWithTitle:@"取消"
+            [textAlert addAction:[UIAlertAction actionWithTitle:localize(@"ame202.ai.cancel", @"取消")
                                                           style:UIAlertActionStyleCancel
                                                         handler:^(UIAlertAction *cancel) {
                 [self finishWithCancel:completion];
@@ -195,7 +196,7 @@
     }
 
     // 取消
-    [alert addAction:[UIAlertAction actionWithTitle:@"取消"
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"ame202.ai.cancel", @"取消")
                                               style:UIAlertActionStyleCancel
                                             handler:^(UIAlertAction *action) {
         [self finishWithCancel:completion];

@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <objc/runtime.h>   // Task202：CAMetalLayer nextDrawable 交换（Metal 首帧信号）
 #import "PLLogOutputView.h"
 #import "SurfaceViewController.h"
 #import "ios_uikit_bridge.h"
@@ -432,8 +433,11 @@ void* hooked_dlopen(const char* path, int mode) {
                                           strstr(path, ".tmp") != NULL ||
                                           strstr(path, "java") != NULL ||
                                           strstr(path, "lwjgl") != NULL);
+    // Task202：gl4es 加载记录（镜像基址锚点，见下方记录块）——必须入
+    // needsPostLoadFixup 才能避开 musttail 早退路径。
+    BOOL needsGl4esRecord = path != NULL && strstr(path, "libgl4es_114") != NULL;
     // Task 132/133 同样需要拿到真实句柄做后处理，与 zink 重绑同款非尾返路径
-    BOOL needsPostLoadFixup = needsZinkRebind || needsJnaDlsymRebind || needsT133Scan;
+    BOOL needsPostLoadFixup = needsZinkRebind || needsJnaDlsymRebind || needsT133Scan || needsGl4esRecord;
 
     void *handle;
     if (shouldUseDyldBypass26PPL) {
@@ -464,6 +468,18 @@ void* hooked_dlopen(const char* path, int mode) {
     if (handle && needsZinkRebind) {
         NSLog(@"[ZinkStrideFix] libOSMesa loaded via dlopen, re-rebinding Vulkan symbols");
         rebindZinkStrideFixForNewImage();
+    }
+    // Task202：gl4es 镜像基址记录——装机日志的崩溃栈带 slide 偏移
+    // （帧号如 initialize_gl4es+0x798 需镜像基址反推文件偏移）；本行
+    // 把基址打进日志，下轮日志可直接符号化。ggstr nullguard 垫片已在
+    // 构建期接入（scripts/patch_gl4es_ggstr_nullguard.py）。
+    if (handle && path != NULL && strstr(path, "libgl4es_114") != NULL) {
+        void *ame202_init = orig_dlsym(handle, "initialize_gl4es");
+        Dl_info ame202_info;
+        if (ame202_init != NULL && dladdr(ame202_init, &ame202_info) != 0 && ame202_info.dli_fbase != NULL) {
+            NSLog(@"[main_hook] Task202: libgl4es_114 image base = %p (crash-stack slide anchor; ggstr nullguard shim in build)",
+                  ame202_info.dli_fbase);
+        }
     }
     // Task 132：libjnidispatch 的 _dlsym 槽位重绑定（见 sdl3_hook.m）。
     // 幂等（重复加载安全）；失败仅记日志不阻断加载。
@@ -1723,6 +1739,156 @@ static int amethyst_spvc_compiler_compile(void *compiler, const char **source) {
     return g_real_spvc_compiler_compile(compiler, source);
 }
 
+// ============================================================================
+// Task202：Metal 首帧信号 + GL 符号钉扎 + eglGetProcAddress 包装
+//
+// 病历一（Metal 遮罩挂起，e4d704e 装机 latestlog.old.txt，26.3 + Metal）：
+//   启动遮罩的解除条件 = PojavFirstFrameRendered 通知（egl_bridge 的
+//   s_firstFrameRendered 门）。GL 路径由 pojavSwapBuffers 发信号、Vulkan
+//   路径由 CADisplayLink displayLinkTick（pojavIsActualVulkanPath 门）发
+//   信号——Metal（Metallum javaagent 的原生 Metal 后端）两者皆非：无 GL
+//   swap，clientAPI 也不是 GLFW_NO_API → pojavIncrementFpsCounter 无人
+//   调用 → 首帧信号失联 → 遮罩挂起等用户手动点"取消启动"。
+//   修法：交换 CAMetalLayer 的 nextDrawable 实现——Metal 渲染每帧必取
+//   drawable，游戏中每次成功取到即计帧（GL 路径 pojavSwapBuffers 同款
+//   语义；首帧通知由 egl_bridge 的门去重，帧率计数口径与 GL 一致）。
+//   门控：AMETHYST_METAL=1（JavaLauncher 的 Metal 会话环境链）且
+//   SurfaceViewController.isRunning——避免启动器自身 UI 的 Metal 层在
+//   启动前误发信号，也避免 GL/Vulkan 会话双重计帧。
+//
+// 病历二（ANGLE 黑屏"扩展缓存未生效"，e4d704e 装机 latestlog.txt）：
+//   设备扩展列表只有 2 条 + tinygl4angle 扩展缓存锚点全部缺席 → MC 26.3
+//   的 GL 函数解析绕过了我们的拦截层（eglGetProcAddress 直取 raw 框架
+//   实现，或 RTLD_DEFAULT 全局作用域按加载顺序落错镜像）。
+//   修法：hooked_dlsym 对 gl*/egl* 名字优先从 libtinygl4angle（已加载
+//   时）解析——扩展缓存 + 桌面 GL 补全 + 版本伪装全部生效；
+//   eglGetProcAddress 单独包一层记名（MC 经此路径要了什么、哪些返回
+//   NULL——黑屏定谳的直接证据）。tinygl4angle 自身的解析不经此门
+//   （callerIsTinygl 返回地址检查——它的 ame182_resolve 兜底
+//   dlsym(framework, gl*) 若被钉扎截胡会解析回自己 = 无限递归）。
+// ============================================================================
+
+/// Metal 会话门：AMETHYST_METAL=1 且游戏运行中。
+static BOOL ame202_metalSessionArmed(void) {
+    static int s_ame202_metal = -1;
+    if (s_ame202_metal < 0) {
+        const char *ame202_env = getenv("AMETHYST_METAL");
+        s_ame202_metal = (ame202_env != NULL && strcmp(ame202_env, "1") == 0) ? 1 : 0;
+    }
+    return s_ame202_metal ? [SurfaceViewController isRunning] : NO;
+}
+
+static IMP ame202_orig_nextDrawable = NULL;
+
+static id ame202_nextDrawable_hook(id self, SEL _cmd) {
+    id ame202_drawable = ((id (*)(id, SEL))ame202_orig_nextDrawable)(self, _cmd);
+    if (ame202_drawable != nil && ame202_metalSessionArmed()) {
+        pojavIncrementFpsCounter();
+    }
+    return ame202_drawable;
+}
+
+static void ame202_installMetalFirstFrameHook(void) {
+    static dispatch_once_t ame202_once;
+    dispatch_once(&ame202_once, ^{
+        Class ame202_cls = objc_getClass("CAMetalLayer");
+        if (ame202_cls == NULL) {
+            NSLog(@"[main_hook] Task202: CAMetalLayer class not found -- Metal first-frame hook not installed");
+            return;
+        }
+        Method ame202_m = class_getInstanceMethod(ame202_cls, @selector(nextDrawable));
+        if (ame202_m == NULL) {
+            NSLog(@"[main_hook] Task202: CAMetalLayer nextDrawable method not found -- Metal first-frame hook not installed");
+            return;
+        }
+        ame202_orig_nextDrawable = method_getImplementation(ame202_m);
+        method_setImplementation(ame202_m, (IMP)ame202_nextDrawable_hook);
+        NSLog(@"[main_hook] Task202: CAMetalLayer nextDrawable hook installed (Metal first-frame signal; fires only in AMETHYST_METAL sessions while running)");
+    });
+}
+
+/// libtinygl4angle 镜像句柄（NOLOAD 自取——绝不触发加载；gl_bridge 的
+/// ame145_rendererHandle 是 static 无法跨文件引用，这里同源同句柄）。
+static void *ame202_tinyglHandle(void) {
+    static void *s_ame202_tiny = NULL;
+    static BOOL s_ame202_tried = NO;
+    if (!s_ame202_tried) {
+        s_ame202_tried = YES;
+        s_ame202_tiny = orig_dlopen("@rpath/libtinygl4angle.dylib", RTLD_LAZY | RTLD_NOLOAD);
+        if (s_ame202_tiny == NULL) {
+            s_ame202_tiny = orig_dlopen("@executable_path/Frameworks/libtinygl4angle.dylib", RTLD_LAZY | RTLD_NOLOAD);
+        }
+    }
+    return s_ame202_tiny;
+}
+
+/// hooked_dlsym 的直接调用者是否 tinygl4angle 自身（其 ame182_resolve 的
+/// 兜底 dlsym(framework, gl*) 不能被钉扎截胡——会解析回自己）。
+/// noinline + 返回地址层级 1：level0 = hooked_dlsym 内的调用点，
+/// level1 = hooked_dlsym 的调用者（即真正的发起方）。
+__attribute__((noinline))
+static BOOL ame202_callerIsTinygl(void) {
+    void *ame202_ra = __builtin_return_address(1);
+    Dl_info ame202_info;
+    if (ame202_ra == NULL || dladdr(ame202_ra, &ame202_info) == 0) return NO;
+    return ame202_info.dli_fname != NULL && strstr(ame202_info.dli_fname, "tinygl4angle") != NULL;
+}
+
+/// GL 符号 NULL 解析记名（去重全量——Task193 的 30 截断升级版；黑屏/
+/// 崩溃定谳时点名全部缺失函数，不再截断）。
+static void ame202_logNullGL(const char *name) {
+    static const char *s_ame202_seen[160];
+    static int s_ame202_n = 0;
+    for (int i = 0; i < s_ame202_n; i++) {
+        if (strcmp(s_ame202_seen[i], name) == 0) return;
+    }
+    if (s_ame202_n < 160) s_ame202_seen[s_ame202_n++] = name;
+    NSLog(@"[dlsym] Task202: GL symbol resolution NULL (dedup #%d): %s",
+          s_ame202_n, name);
+}
+
+/// eglGetProcAddress 包装：记名 + 透传 tinygl4angle 的实现。
+static void *(*ame202_real_eglGPA)(const char *) = NULL;
+
+static void *ame202_eglGPA_wrapper(const char *procname) {
+    void *ame202_p = ame202_real_eglGPA ? ame202_real_eglGPA(procname) : NULL;
+    if (ame202_p == NULL && procname != NULL) {
+        ame202_logNullGL(procname);
+    }
+    return ame202_p;
+}
+
+/// Task202 GL 符号钉扎入口（hooked_dlsym 调用；返回非 NULL 表示已接管）。
+static void *ame202_pinGLSymbol(void *handle, const char *name) {
+    if (name == NULL) return NULL;
+    if (!(name[0] == 'g' && name[1] == 'l') && strncmp(name, "egl", 3) != 0) return NULL;
+    if (ame202_callerIsTinygl()) return NULL;   // tinygl4angle 自身解析不经此门
+    void *ame202_tiny = ame202_tinyglHandle();
+    if (ame202_tiny == NULL) return NULL;       // 非 ANGLE 会话（未加载）零影响
+    if (strcmp(name, "eglGetProcAddress") == 0) {
+        if (ame202_real_eglGPA == NULL) {
+            ame202_real_eglGPA = orig_dlsym(ame202_tiny, name);
+        }
+        if (ame202_real_eglGPA != NULL) {
+            static BOOL s_ame202_gpaLogged = NO;
+            if (!s_ame202_gpaLogged) {
+                s_ame202_gpaLogged = YES;
+                NSLog(@"[main_hook] Task202: eglGetProcAddress pinned to tinygl4angle + wrapper (real=%p) -- MC's egl-path resolutions now flow through our interception layer",
+                      (void *)ame202_real_eglGPA);
+            }
+            return (void *)ame202_eglGPA_wrapper;
+        }
+        return NULL;
+    }
+    void *ame202_pin = orig_dlsym(ame202_tiny, name);
+    if (ame202_pin != NULL) {
+        return ame202_pin;
+    }
+    // tinygl4angle 未导出该名字：回落原路径（最终解析仍为 NULL 时由
+    // hooked_dlsym 尾部的 Task193 兜底记名——这里的回退不代表失败）。
+    return NULL;
+}
+
 void* hooked_dlsym(void* handle, const char* name) {
     // Task 133：入口镜像扫描（兜底触发面）——即使 dlopen 链因意外形态
     // 失守（如 JVM 库换了名字/路径），启动器自身的高频 dlsym（egl_bridge/
@@ -1730,6 +1896,13 @@ void* hooked_dlsym(void* handle, const char* name) {
     // 之前把已加载的 libjli/libjvm/libjnidispatch 绑进 hook。增量游标，
     // 无新镜像时开销 = 一次 dyld 计数调用。
     amethyst_task133_ensure_jvm_chain();
+    // Task202：GL 符号钉扎——gl*/egl* 优先从 libtinygl4angle 解析（已
+    // 加载时），拦截层（扩展缓存/桌面 GL 补全/版本伪装）对一切 dlsym 路
+    // 径生效；eglGetProcAddress 额外包记名层。非 ANGLE 会话零影响。
+    {
+        void *ame202_pin = ame202_pinGLSymbol(handle, name);
+        if (ame202_pin != NULL) return ame202_pin;
+    }
     // SDL3 兼容层：建窗前强制 ES profile、主窗口复用、EGL 兼容重试、
     // Vulkan loader 句柄共享。返回非 NULL 表示已接管该符号。
     {
@@ -1848,16 +2021,12 @@ void* hooked_dlsym(void* handle, const char* name) {
     // 日志不打印符号名，黑屏根因无法进一步定位。LWJGL GL$1 的 macOS
     // 分支只做 OSMesaGetProcAddress（恒 0）+ dlsym(lib, name)（GLBackend
     // 镜像链实证）——把 LWJGL natives 的 _dlsym 槽重绑到本 hook 后，
-    // 这里能给每个 gl* 前缀的 NULL 解析记名（前 30 个）。下一轮装机
-    // 日志直接点名缺失函数，DSA/黑屏裁决一步到位。
+    // 这里能给每个 gl* 前缀的 NULL 解析记名。
+    // Task202 升级：30 截断 → ame202_logNullGL 去重全量（钉扎层先记
+    // tinygl4angle 未导出的名字；这里是原始解析仍为 NULL 的兜底记名）。
     void *ame193_res = orig_dlsym(handle, name);
     if (ame193_res == NULL && name != NULL && name[0] == 'g' && name[1] == 'l') {
-        static int s_ame193_glNulls = 0;
-        if (s_ame193_glNulls < 30) {
-            s_ame193_glNulls++;
-            NSLog(@"[dlsym] Task193: GL symbol resolution FAILED: %s (handle=%p) -- LWJGL/MC will see a NULL function pointer",
-                  name, handle);
-        }
+        ame202_logNullGL(name);
     }
     return ame193_res;
 }
@@ -1875,6 +2044,9 @@ int hooked_open(const char *path, int oflag, ...) {
 }
 
 void init_hookFunctions() {
+    // Task202：Metal 首帧信号（CAMetalLayer nextDrawable 交换）——
+    // Metal 会话的启动遮罩自动解除；dispatch_once 幂等。
+    ame202_installMetalFirstFrameHook();
     struct rebinding rebindings[] = (struct rebinding[]){
         {"abort", hooked_abort, (void *)&orig_abort},
         {"__assert_rtn", hooked___assert_rtn, NULL},

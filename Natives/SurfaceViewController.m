@@ -363,6 +363,12 @@ static BOOL ame83_fsr_capable_renderer(NSString *renderer) {
 
 @property(nonatomic) BOOL enableMouseGestures, enableHotbarGestures;
 
+// Task202（议题 #1）：双指滚动手势进行中标记——cancelsTouchesInView=NO
+// 让双指同时喂进了光标移动路径（滚动时虚拟鼠标光标跟着跑）。手势
+// Began/Changed 置位，Ended/Cancelled 异步清除（手势 Ended 先于同批
+// touchesEnded 派发，同步清会让尾批 MOVE 逃逸出抑制窗）。
+@property(nonatomic) BOOL ame202ScrollGestureActive;
+
 @property(nonatomic) UIImpactFeedbackGenerator *lightHaptic;
 @property(nonatomic) UIImpactFeedbackGenerator *mediumHaptic;
 
@@ -1803,7 +1809,7 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
             NSLog(@"[SurfaceViewController] Error: metadata is nil");
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self dismissLaunchOverlayOnError];
-                showDialog(localize(@"Error", nil), @"æ¸¸æçæ®å è½½å¤±è´¥ï¼è¯·éæ°éæ©çæ¬");
+                showDialog(localize(@"Error", nil), localize(@"ame202.surface.version_load_failed", @"游戏版本加载失败，请重新选择版本"));
             });
             return;
         }
@@ -1844,7 +1850,7 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
             NSLog(@"[SurfaceViewController] Error: no authenticator available");
             dispatch_async(dispatch_get_main_queue(), ^{
                 [self dismissLaunchOverlayOnError];
-                showDialog(localize(@"Error", nil), @"è¯·åç»å½è´¦æ·");
+                showDialog(localize(@"Error", nil), localize(@"ame202.surface.login_required", @"请先登录账号"));
             });
             return;
         }
@@ -2232,6 +2238,13 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
     // 所以从未暴露）。FSR 除法保持原位（Task78 锚点）。
     if (mgFsrScale > 0.0f) screenScale /= mgFsrScale;
     screenScale *= resolutionScale;
+    // Task202（议题 #1）：双指滚动手势进行中——光标移动抑制（虚拟/非虚拟
+    // 鼠标同门；ACTION_DOWN/UP 不受影响，点击照常）。锚点照常推进：
+    // 滚动结束后的首个 MOVE 不会把光标瞬移到旧锚点的反向 delta 上。
+    if (!isGrabbing && event == ACTION_MOVE && self.ame202ScrollGestureActive) {
+        lastVirtualMousePoint = location;
+        return;
+    }
     if (!isGrabbing) {
         if (virtualMouseEnabled) {
             if (event == ACTION_MOVE) {
@@ -2342,7 +2355,10 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
     CGPoint locationInView = [touchEvent locationInView:self.surfaceView];
     switch (event) {
         case ACTION_DOWN:
-            self.clickRange = CGRectMake(locationInView.x - 2, locationInView.y - 2, 5, 5);
+            // Task202（议题 #1）：点击容差 5x5 → 24x24pt（居中）。装机反馈
+            // “虚拟鼠标点击失效”：手指轻点的自然漂移普遍超过 5pt（指尖
+            // 接触面变化 + 抬起漂移），旧容差把真实点击误判为拖拽吞掉。
+            self.clickRange = CGRectMake(locationInView.x - 12, locationInView.y - 12, 24, 24);
             self.shouldTriggerClick = YES;
             break;
         case ACTION_MOVE:
@@ -2552,6 +2568,19 @@ static BOOL ame87_mcVersionRequiresTextureBuffer(NSString *mcVersionId) {
         if(self.shouldTriggerHaptic) {
             [self.lightHaptic impactOccurred];
         }
+    }
+
+    // Task202（议题 #1）：滚动手势活跃标记——Began/Changed 置位；
+    // Ended/Cancelled 异步清除（手势 Ended 先于同批 touchesEnded 派发，
+    // 同步清会让尾批 MOVE 逃逸抑制窗，光标小跳一帧）。
+    if (sender.state == UIGestureRecognizerStateBegan ||
+        sender.state == UIGestureRecognizerStateChanged) {
+        self.ame202ScrollGestureActive = YES;
+    } else if (sender.state == UIGestureRecognizerStateEnded ||
+               sender.state == UIGestureRecognizerStateCancelled) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.ame202ScrollGestureActive = NO;
+        });
     }
 
     if (isGrabbing) return;

@@ -2586,3 +2586,15 @@
 "ame193.misc.11" = "安装产物校验失败，以下文件缺失或损坏，请重试安装 / Install verification failed, missing or corrupt: %@";
 "ame193.misc.12" = "显示全部（还有 %ld 个更早的版本）";
 "ame193.misc.jit_not_handled" = "%@ 未接管启动请求（未安装或版本过旧？）。请在设置的 JIT 开启工具中换用其它工具后重试。";
+
+// Task202: language selector full list + i18n migration round (mojibake fix, AI ask dialogs, session title, java-dialog copy)
+"ame202.lang.partial" = "部分翻译";
+"ame202.surface.version_load_failed" = "游戏版本加载失败，请重新选择版本";
+"ame202.surface.login_required" = "请先登录账号";
+"ame202.ai.custom_option" = "自定义…";
+"ame202.ai.custom_prompt" = "请输入自定义回答";
+"ame202.ai.input_here" = "在此输入…";
+"ame202.ai.confirm" = "确定";
+"ame202.ai.cancel" = "取消";
+"ame202.ai.new_session" = "新会话";
+"ame202.common.copy" = "复制";

@@ -119,11 +119,16 @@ void ame189_afterDraw(const char *site, GLenum mode, GLsizei count, GLenum idxTy
 // 装机锚点：site=direct-elements-ebo 且 GL error 0x0502 归零；
 //   MC "@ Pre render 1282" 计数归零；1.8.9 方块纹理恢复正常。
 // ============================================================================
-// Task193：ES3 真驱动查询用 GL_ELEMENT_ARRAY_BUFFER_BINDING=0x8894（本仓
-// src/gl/gles.h 里的 0x8895 是桌面 GL 的值，对 ANGLE ES3 上下文是
-// GL_INVALID_ENUM）。glstate.h 未定义该常量，这里补 ES3 值。
+// Task202 勘误：Task193 注释声称"0x8895 是桌面 GL 的值、对 ANGLE ES3 是
+// GL_INVALID_ENUM"——这是错的。GL 注册表（ES 2/3 与桌面共用）：
+//   GL_ARRAY_BUFFER_BINDING          = 0x8894
+//   GL_ELEMENT_ARRAY_BUFFER_BINDING  = 0x8895
+// Task193 用 0x8894 查询 → 读到的是【顶点】缓冲绑定而非【索引】缓冲，
+// 装机日志里 eabNow 的全部读数都是错源（"EBO 在绘制时被换出"的表象即
+// 由此而来——顶点绑定与 scratch EBO 的 id 自然对不上）。改回正确的
+// 0x8895，下轮装机日志的 eabBefore/eabNow 才能真实反映索引缓冲状态。
 #ifndef AME193_EAB_BINDING
-#define AME193_EAB_BINDING 0x8894
+#define AME193_EAB_BINDING 0x8895
 #endif
 
 static void ame191_drawElementsViaEBO(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices) {

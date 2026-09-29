@@ -96,7 +96,7 @@ for s in ("scripts/task193_icon.py", "scripts/task193_announce.py", "scripts/tas
 # ============ F. announcement: task193@2, family shifted, pin intact ============
 print("== F. 公告窗口族 ==")
 ann = json.loads(io.open("announcements.json", encoding="utf-8").read())["announcements"]
-check("F", "条目数 25 -> 26（Task201 四连修公告@2 插入）", len(ann) == 26, f"actual={len(ann)}")
+check("F", "条目数 25 -> 26 -> 27（Task201 四连修公告@2 插入；Task202 末位追加零位移）", len(ann) == 27, f"actual={len(ann)}")
 check("F", "Task201 重锚：task193 顺延至 [3]，task190 顺延至 [4]，置顶公告 [0] 未动",
       len(ann) > 3 and ann[3]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[4]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
@@ -127,8 +127,8 @@ check("H", "单次 glBufferData 上传（listdraw 同构）",
       "gles_glBufferData(GL_ELEMENT_ARRAY_BUFFER, bytes, indices, GL_DYNAMIC_DRAW);" in drawing)
 check("H", "旧 SubData 两段式退役",
       "gles_glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, bytes, indices);" not in drawing)
-check("H", "EAB 绑定查询用 ES3 值 0x8894（AME193_EAB_BINDING）",
-      "#define AME193_EAB_BINDING 0x8894" in drawing)
+check("H", "EAB 绑定查询用 ELEMENT_ARRAY_BUFFER_BINDING=0x8895（Task202 勘误：Task193 的 0x8894 实为 ARRAY_BUFFER_BINDING——顶点而非索引缓冲）",
+      "#define AME193_EAB_BINDING 0x8895" in drawing)
 check("H", "gl4es_scratch_indices 退役为绑定+名字（size 跟踪移除）",
       "Task193：本函数退役为" in gl4es_c and "scratch_indices_size < alloc" not in gl4es_c)
 check("H", "首调用基线 + 前 8 错误调用日志（装机锚点）",
@@ -187,8 +187,9 @@ check("L", "VAO-DSA 族（8 函数）",
                             "glVertexArrayVertexBuffer", "glVertexArrayAttribFormat",
                             "glVertexArrayAttribBinding", "glEnableVertexArrayAttrib",
                             "glDisableVertexArrayAttrib", "glVertexArrayBindingDivisor"]))
-check("L", "dlsym GL NULL 取证（hooked_dlsym）",
-      "GL symbol resolution FAILED" in rd("Natives/main_hook.m"))
+check("L", "dlsym GL NULL 取证（hooked_dlsym；Task202 升级为 ame202_logNullGL 去重全量）",
+      "GL symbol resolution NULL (dedup" in rd("Natives/main_hook.m")
+      and "ame202_logNullGL" in rd("Natives/main_hook.m"))
 check("L", "LWJGL natives dlsym 重绑（触发面 + 镜像扫描）",
       'strstr(path, "lwjgl") != NULL' in rd("Natives/main_hook.m") and
       "isLwjglNative" in rd("Natives/sdl3_hook.m"))
@@ -202,7 +203,7 @@ import re as _re
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     n = len(set(_re.findall(r'^"([^"]+)"\s*=',
                             rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), _re.M)))
-    check("M", f"{lang} 唯一键 2408", n == 2408, f"got {n}")
+    check("M", f"{lang} 唯一键 2418", n == 2418, f"got {n}")
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     t = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
     check("M", f"{lang} ame193 键 179 个", len(_re.findall(r'^"ame193\.', t, _re.M)) == 179)

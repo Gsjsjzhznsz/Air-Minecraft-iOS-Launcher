@@ -1050,3 +1050,24 @@ Work Log:
 Stage Summary:
 - 装机锚点四条："[JavaLauncher] Metal renderer selected: AMETHYST_METAL=1" + "Task201: Metallum agent enabled: -javaagent:metallum_agent.jar (mcVersion=26.x)"（26.x）/ "Task201: Metallum agent skipped: MC major < 26"（老版本，正常跳过）+ 设置→视频→渲染器出现 "Metal (metallum)" + 26.x 进游戏出画面
 - Forge 26.1.2 用户可先用 Metal 旁路；gl4es 崩溃与 Forge 26.1.2 需下轮装机日志
+---
+Task ID: 202
+Agent: main (Super Z)
+Task: e4d704e 四份装机日志判读收官 + 五渲染器修复轮（gl4es 崩溃根治 / Metal 首帧 / vgpu 纹理归因 / ANGLE 观察器 / Forge 定性）+ 两 GitHub 议题 + 语言选择器 54 语言全量化 + i18n 清扫
+
+Work Log:
+- 判读（四份日志全会话映射）：latestlog.1 = gl4es 1.8.9 崩溃；latestlog.txt = ANGLE 26.3 fabric 黑屏；latestlog.old.txt = Metal 26.3 进游戏后 AGX 崩溃；latestlog.2/old = vgpu 会话
+- A gl4es 根治：反汇编钉死崩溃链 initialize_gl4es(+0x798) → GetHardwareExtensions(+0xf90) → strstr——构造器无当前上下文时 glGetString(GL_EXTENSIONS)=NULL，首个 needle "GL_APPLE_texture_2D_limited_npot" 即 SIGSEGV（真实文件偏移 0x1BC2F4，slide=0x147898000 页对齐反推）。三层修复：① patch_gl4es_ggstr_nullguard.py 二进制垫片（0x6400 洞穴 = __text 前 21KB 对齐零区）把 strstr(NULL,...) 的 NULL 换成空串——构造器完整跑完不再崩；② Makefile payload 接线（patch_gl4es_rtld_default 之后、+3 TAB 行）；③ main_hook.m hooked_dlopen 记录 libgl4es 镜像基址（崩溃栈 slide 锚点）。Task193 块四锚全缺的谜底：代码在构建里（0b54acd..6629ce2 零改动），唯一自洽解释是临时上下文已 current 但 glGetString 仍 NULL——垫片从数据面根治而非纠结上下文时序
+- B Metal 首帧：根因 = Metal 渲染无 GL swap → pojavIncrementFpsCounter 永不触发 → 启动遮罩不消。修法：method_exchange CAMetalLayer nextDrawable（Metal 每帧必取 drawable），ame202_metalSessionArmed（AMETHYST_METAL=1 + SurfaceViewController.isRunning）时消遮罩。附带 dlsym 升级/钉扎（hooked_dlsym 对 glGetString 族解析到主程序外来实现时记录并钉扎我方 ANGLE）+ eglGetProcAddress 包装。AGX 驱动层崩溃（视频设置→资源重载→createTexture 后、无 GL 栈帧、上游同款未修）→ FAQ 建档指引，不追代码修复
+- C vgpu 勘误+归因：Task193 探针读错常量——0x8894 是 GL_ARRAY_BUFFER_BINDING（顶点）而非 ELEMENT（0x8895），eabBefore/eabNow 全部失真；修正后下轮日志才能真实反映索引缓冲。旧探针数据反转载决：bind/data/draw 全清、0x0502 只是队列积压残留——EBO 路径已修好，材质损坏另有其因。真凶指向纹理路径：图集只有 16x16（正常数百像素）+ 424 次 1282 错误 ≈ 20次/秒 = tick 频率动画纹理更新。修复：gl4es_glTexSubImage2D/glTexImage2D 归因探针（首 8 次全参 + 每 120 次窗口汇总，错误读取放最终 gles 分发后避开 noerrorShim 清零；TexImage 含 npot RESIZE-PATH 变体）——下轮日志直接定谳
+- D ANGLE 三观察器：黑屏定性为真黑内容（Task189 回读中心像素 (0,0,0,0)×3 = 真渲染了黑色）+ MC 26.3 从未绑定 UBO（uboBind=0，矩阵从未进着色器）+ 设备扩展列表仅 2 条（tinygl4angle 扩展缓存锚点全缺 = 拦截被 SDL_GL_GetProcAddress/eglGetProcAddress 路径绕过）。修：sdl3_hook GetProcAddress NULL 记名（去重全量代替 30 截断）+ 首 12 成功记名 + dlsym NULL 记名升级 + egl_bridge Task193 块入口锚点（ENTERED 行——下次日志直接看出块有没有跑）
+- E Forge 定性：崩溃栈 IForgeVertexFormat ClassNotFoundException + OptiFine 反射全面失败（4 vs 5 参数签名漂移）= 整合包内 OptiFine 与 Forge 64.1.3 二进制不兼容，属模组侧问题。修：PojavLauncher.java 启动参数全扫描（args 结构 [accountId/-jar, versionId, serverIp]，不能只看 args[1]）检测 mods/ 下 OptiFine 共存 → 警告打印 + FAQ 给解法（移除 OptiFine 或换匹配版本）
+- F i18n 清扫：修复 SurfaceViewController 两处乱码串（UTF-8 误编码的"游戏版本加载失败/请先登录账号"）→ ame202.surface.version_load_failed / login_required；AI 聊天界面 6 键（ai.cancel/confirm/custom_option/custom_prompt/input_here/new_session）；PLCrashView 崩溃对话框 OK/Copy 本地化（ame202.common.copy）。共 10 新键，四主表 2408→2418
+- G 语言选择器：app_language 从 system/zh-Hans/en 三项 → system + 全部 54 个内置 lproj。ame202_availableLanguageCodes()（dispatch_once 缓存，过滤 Base.lproj，字典序）+ ame202_languageDisplayName()（54 语言原生名手工表，含 Minecraft 玩笑语言 en-PT/en-UD/lol/pr；NSLocale(en) 兜底 + 裸码保底；非四主表追加 ame202.lang.partial "部分翻译" 标记）。localize() 三级回退（目标 lproj→en→zh-Hans）保证任意码可用
+- H 两议题：#2 键盘只能输入一个字符 = Task156 的 80ms 同文本去重窗把快速重复键击吞掉 → 20ms；#1 虚拟鼠标 = 双指滚动时 cancelsTouchesInView=NO 使 MOVE 仍喂给光标 → ame202ScrollGestureActive 标记（手势 Began/Changed 置位、MOVE 抑制、Ended **异步**清除——同步清会把先到的手势 Ended 清掉后到的 touchesEnded 又放行）+ 点击容差 5x5→24x24pt（居中）
+- I/J 文档：FAQ +2=37（Metal AGX 崩溃指引 + Forge/OptiFine 定性）；version.h REVISION 18 Task202 附录（不 bump——本轮零 MobileGlues 转换面改动）；announcements.json task202-october-fix-wave 末位追加（26→27，显示层按置顶+日期排序故物理末位零索引位移）；docs/surveys 两份调查报告 git add -f 强制入库（/docs 在 .gitignore——Task201 当年 add 被静默跳过的教训）
+- 验证：verify_task202 新写 57/57（A 垫片 8 / B metal 8 / C vgpu 9 / D angle 7 / E forge 5 / F i18n 7 / G input 6 / H docs 4 / I 语法门 / J 级联）；verify_task129 Makefile TAB 重锚 HEAD+3（484）；22 个验证器 l10n 基线 2408→2418 扫荡；.strings 语法门四表零差异；67 项回归失败与纯 HEAD stash 对拍 100% 同态（存量沙箱环境漂移，零新增）
+
+Stage Summary:
+- 装机锚点：gl4es 1.8.9 应活着进菜单（垫片为纯二进制补丁无运行时日志；观察 = 不再启动即崩 + "Using GLES 2.0 backend" 正常打印 + "[main_hook] Task202: libgl4es_114 image base = ..." 基址锚点行）；Metal 26.3 启动遮罩自动消（无需手点）；vgpu 会话看 Task202 teximage/texsubimage 探针的图集尺寸与 err 归因；ANGLE 会话看 GetProcAddress NULL 记名清单；Forge+OptiFine 看启动警告行
+- 议题 #1/#2 修复后待装机反馈关单；语言选择器设置页应出现 54 语言（非四主表带"部分翻译"后缀）
