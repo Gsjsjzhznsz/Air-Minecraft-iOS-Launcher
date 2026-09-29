@@ -194,19 +194,19 @@ print("== E. 文档（公告/version.h/fallback） ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 # Task179 重锚：task179@2 插入，全体顺延 +1，len 21。
 check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[4]；server/169 钉 0/1 不动）",
-      len(ann) == 24  # Task184：+1
+      len(ann) == 26  # Task184+1 -> Task193+1 -> Task201+1
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[3]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
-      and ann[4]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
-      and ann[5]["id"] == "task179-eight-fixes-2026-09-26"  # Task184 顺延
-      and ann[6]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
+      and ann[5]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
+      and ann[6]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
+      and ann[7]["id"] == "task179-eight-fixes-2026-09-26"  # Task184 顺延
+      and ann[8]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
 check("E2 公告后续顺序整体 +1（Task184 重锚：177→6 / 175→7 / 174→8 / 双173→9,10）",
-      ann[7]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann[8]["id"] == "task175-six-fixes-2026-09-26"
-      and ann[9]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann[10]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann[11]["id"] == "task173-ten-fixes-2026-09-26")
+      ann[9]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann[10]["id"] == "task175-six-fixes-2026-09-26"
+      and ann[11]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann[12]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann[13]["id"] == "task173-ten-fixes-2026-09-26")
 check("E3 公告内容锚（Task184 重锚：task177 内容锚随条目顺延）",
       "bigbear-ui" in ann[7]["content"] and "neu-white" in ann[7]["content"]
       and "不要加任何的透明度" in ann[7]["summary"])

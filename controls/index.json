@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-09-28",
+  "updated": "2026-09-29",
   "layouts": [
     {
       "id": "classic",
@@ -8,8 +8,8 @@
       "author": "Air Team",
       "description": "随启动器内建的经典控件布局：左摇杆 + 16 个核心按钮 + 右侧抽屉，适合绝大多数玩法。",
       "file": "layouts/classic.json",
-      "version": "1.0",
-      "size": 99221
+      "version": "7",
+      "size": 99219
     },
     {
       "id": "minimal-fps",
@@ -17,8 +17,8 @@
       "author": "Air Team",
       "description": "去掉抽屉、按钮半透明，视野最大化，适合射击类整合包与 PvP。",
       "file": "layouts/minimal-fps.json",
-      "version": "1.0",
-      "size": 11134
+      "version": "7",
+      "size": 11132
     },
     {
       "id": "large-buttons",
@@ -26,8 +26,8 @@
       "author": "Air Team",
       "description": "所有按钮与摇杆放大 30%，大手与横屏大屏设备友好。",
       "file": "layouts/large-buttons.json",
-      "version": "1.0",
-      "size": 98636
+      "version": "7",
+      "size": 98634
     }
   ]
 }

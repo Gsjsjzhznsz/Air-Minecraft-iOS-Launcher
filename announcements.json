@@ -24,6 +24,13 @@
       "image_url": ""
     },
     {
+      "id": "task196-quad-fixes-2026-09-29",
+      "title": "三根因终局修复（vgpu 方块损坏 / ANGLE 黑屏 / 控件堆角）+ 新渲染器 Metal (metallum)",
+      "date": "2026-09-29",
+      "summary": "vgpu 1.8.x 方块损坏 = 显示列表回放（useVbo 默认关，已强制开）；ANGLE 26.3 黑屏 = DSA 与默认帧缓冲冲突（已撤回通告，同 ES/4.0 黑屏根因家族）；控件仓库挤成一坨 = 种子误盖 version 1.0（已重落戳 + 加载器救回，坏副本自愈）。另从上游同步 Metal (metallum) 原生 Metal 渲染器（javaagent 注入，26.x 专用）。",
+      "content": "## 三根因终局修复（装机日志全部实证钉死）\n\n**1. vgpu 方块材质损坏 + 看门狗卡死（1.8.9）**\n\n- 实锤：渲染线程反复卡在 `GL11.glCallList <- RenderList`，原生崩溃落在 libvgpu.dylib 的 `gl4es_glCallList`（SIGSEGV）\n- 根因：反编译 1.8.9 实证 `useVbo` 默认 **false**，地形走显示列表；gl4es 显示列表回放在 iOS ES3 上损坏捕获的顶点数据（实体走立即模式所以正常）\n- 修复：vgpu 会话启动时强制 `useVbo=true`，地形改走已修好的 VBO/EBO 路径\n- 注意：1.7.10- 无此选项，vgpu 上仍不可用（请换其他渲染器）\n\n**2. ANGLE 黑屏（26.3）—— 有声音、真黑、58fps**\n\n- 实锤：DSA 检测开启后每帧 1547 次 \"Only NONE or BACK are valid draw buffers\"（GL 1282 高危）→ 渲染打到错误目标 → 中心像素 (0,0,0,0) 真黑\n- 根因：与 ES/4.0 黑屏（Task165/166）同家族——DSA 开 = 黑屏，关 = 可玩\n- 修复：撤回 GL_ARB_direct_state_access 通告，MC 走经典 Emulated 路径；Task193 的扩展表补全保留\n- 取证开关：`AME193_DSA_ADVERTISE=1` 可强制开回（诊断用）\n\n**3. 控件仓库「全部挤在一坨」**\n\n- 根因：仓库种子是 v7 格式（动态坐标表达式）却误盖 `version 1.0` → 加载链按老格式跑转换：按键绑定被清零 + 坐标覆写成 0 → 全部堆左上角\n- 修复：种子重落戳 version 7 + 加载器「误戳救回」——**已下载的坏副本重新加载即自愈，无需重新下载**\n\n## 新渲染器：Metal (metallum)\n\n- 从上游同步的原生 Metal 后端（javaagent 注入，非 GL 转译），上游已在 iPhone 17 Pro / iOS 27.2 实测 26.2 / 26.3 原版 + Forge + Fabric\n- 入口：设置 → 视频 → 渲染器 → **Metal (metallum)**\n- 仅 MC 26.x 可用（旧版本 MC 的 Java 8 加载不了 agent，会自动跳过）\n- 26.x 用户建议优先尝试；**Forge 26.1.2 崩溃可先用它旁路**\n\n**装机验证锚点**：`Task196 useVbo=true forced` / `Task197: DSA advertisement WITHDRAWN` / `Task198 mis-stamped version rescue` / `Task201: Metallum agent enabled`\n\nEN: This round pins three root causes with on-device evidence (vgpu display-list corruption, ANGLE DSA-vs-default-framebuffer black screen, control-repo mis-stamped version) and ports the native Metal renderer \"Metallum\" from upstream (26.x only)."
+    },
+    {
       "id": "task193-app-icon-replace-2026-09-28",
       "title": "启动器图标换新：上游 Amethyst 六边形 → 草方块立方体（Air 定制品牌第一步）",
       "date": "2026-09-28",

@@ -54,6 +54,15 @@ extern "C" {
 #define RENDERER_NAME_MOBILEGLUES "libmobileglues.dylib"
 #define RENDERER_NAME_VK_ZINK "libOSMesa.8.dylib"
 #define RENDERER_NAME_VULKAN "libMoltenVK.dylib"
+// Metal 渲染器（metallum / MetalUniversal，Task201 随上游同步移植）：图形后端
+// 由 metallum agent（javaagent 注入）走原生 Metal（直接 MTLDevice），不经 EGL
+// 渲染器转译。JavaLauncher 检测到该选择后置 AMETHYST_METAL=1（agent 据此打开
+// 渲染 patch），并把 AMETHYST_RENDERER 回落 auto（Surface 的 GL 上下文仍由
+// ANGLE 提供），与 metallum 官方集成一致。仅在 MC major >= 26 时挂载 agent
+// （其 class 文件版本 65.0 需 Java 21+，老版本 MC 的 Java 8 加载即崩）。
+// 渲染器 dylib 由 agent jar 自带（natives/ios/libmetallum.dylib，运行期解出）；
+// Frameworks 里的入库副本仅为渲染器选择器的存在性过滤服务。
+#define RENDERER_NAME_METAL "libmetallum.dylib"
 // LTW (Large Thin Wrapper) - OpenGL Core 3.3 → OpenGL ES 3 转译层
 // 复刻自官方 MojoLauncher/LTW 仓库，完美支持 Sodium + Iris 光影：
 //   - 伪装成 OpenGL 3.3 Core Profile 让 MC 1.17+ 正常运行

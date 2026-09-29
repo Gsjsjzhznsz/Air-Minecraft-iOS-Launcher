@@ -180,7 +180,7 @@ import json
 anns = json.load(open(f"{REPO}/announcements.json"))["announcements"]
 # Task185 重锚：并行会话 task184@2 插入，task172 再顺延 anns[10] -> anns[11]。
 check("H2 announcements task172@10（Task181 重锚：task180/task179/178/177/175/174/双 task173 后；server-pin/task169 钉 0/1）",
-      anns[12].get("id") == "task172-six-fixes-2026-09-25"
+      anns[14].get("id") == "task172-six-fixes-2026-09-25"
       and anns[0].get("id") == "server-recommend-2026-09-24"
       and "task169" in anns[1].get("id", ""))
 

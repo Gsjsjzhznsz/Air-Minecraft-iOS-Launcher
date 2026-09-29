@@ -179,6 +179,44 @@ void convertV1Layout(NSMutableDictionary* dict) {
 
 BOOL convertLayoutIfNecessary(NSMutableDictionary* dict) {
     int version = [dict[@"version"] intValue];
+    // Task 198（控件仓库"挤成一坨"修复）：误盖落戳救回。
+    // 病历：仓库种子文件本是 v7 格式（mControlDataList 按钮带 keycodes 数组 +
+    // dynamicX/dynamicY 相对定位表达式、无静态 x/y、scaledAt≈100 基准），却被
+    // 误盖 "version":"1.0"。加载链把它当真 V1 老布局跑转换：
+    //   V1 段：单数键 "keycode" 缺省（nil→0）→ keycodes 数组被整体替换成 [0]
+    //          （按钮全部失去按键绑定）；width/height 被 scaledAt=101 重除
+    //          再乘 50（尺寸近乎减半）；
+    //   V2 段：isDynamicBtn=false 的按钮读静态 x/y（v7 无此键，nil→0）→
+    //          dynamicX 被覆写成 "0.000000 * ${screen_width}"；
+    //   → 全部控件堆到屏幕左上角 + 按钮不可用（用户实测"全部挤在一坨"）。
+    // 判据（真 V1 不可能满足）：mControlDataList 里【任一】按钮同时具有
+    //   ① "keycodes" 为 NSArray —— V1 的键名是单数 "keycode"，"keycodes"
+    //      数组是 V1 转换的【产物】，转换前的 V1 文件里不可能存在；
+    //   ② "dynamicX" 为 NSString；
+    //   ③ 无静态 "x" 键。
+    //   三者齐备 = 这本来就是转换后的新格式，低版本号是误盖。
+    // 处置：直接落戳 version=7，跳过整条转换链（scaledAt 语义同因：v7 的
+    // scaledAt 已是 100 基准，V1 转换会重置后再动 width/height —— 灾难）。
+    // 本救回同时治愈【已下载到设备的坏副本】（无需重新下载，重新加载即自愈）；
+    // 种子源文件自身的修正（version=7 重落戳 + index.json 版本元数据同步）
+    // 见仓库 controls/ 目录 —— 推送后新下载的文件自带正确落戳。
+    if (version <= 1) {
+        NSArray *ame198_controls = dict[@"mControlDataList"];
+        if ([ame198_controls isKindOfClass:[NSArray class]]) {
+            for (NSDictionary *ame198_btn in ame198_controls) {
+                if (![ame198_btn isKindOfClass:[NSDictionary class]]) continue;
+                if ([ame198_btn[@"keycodes"] isKindOfClass:[NSArray class]] &&
+                    [ame198_btn[@"dynamicX"] isKindOfClass:[NSString class]] &&
+                    ame198_btn[@"x"] == nil) {
+                    dict[@"version"] = @(7);
+                    NSLog(@"[CustomControls] Task198: mis-stamped version=%d rescued to 7 (button '%@' carries keycodes-array + dynamicX + no static x -- impossible for a real V1 layout), conversion chain skipped",
+                          version, ame198_btn[@"name"]);
+                    version = 7;
+                    break;
+                }
+            }
+        }
+    }
     switch (version) {
         case 0:
         case 1:

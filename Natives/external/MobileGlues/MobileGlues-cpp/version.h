@@ -3079,3 +3079,63 @@
 // Verification: verify_task193 (A dims 5, B replaced-vs-upstream 5, C untouched
 // 9, D config purity 3, E provenance 3, F announcement 2, G source-present 1).
 // ============================================================================
+
+// REVISION 18 addendum (Amethyst Tasks 196/197/198/201, no bump -- none of
+// these touch the MobileGlues conversion path; MG links glslang directly,
+// the shaderc impl/shim chain serves other consumers):
+// (1) Task 196 (vgpu 1.8.x block-texture corruption + watchdog hang): device
+//     log caught the render thread stuck in GL11.glCallList <- RenderList
+//     with the native crash in libvgpu.dylib's gl4es_glCallList (SIGSEGV).
+//     Decompiled 1.8.9 GameSettings: useVbo defaults FALSE -> terrain goes
+//     through display lists, and gl4es display-list replay corrupts captured
+//     vertex data on iOS ES3 (entities use immediate mode, hence fine).
+//     Fix: PojavLauncher.launchMinecraft now forces useVbo=true for vgpu
+//     sessions before the first options.txt save (on-disk verify after save;
+//     1.7.10- has no such key -- write is ignored, display lists remain
+//     unsolvable there, use another renderer).
+// (2) Task 197 (ANGLE black screen endgame): with Task193 advertising
+//     GL_ARB_direct_state_access, MC 26.3 took the DirectStateAccess.Core
+//     path and hammered the DEFAULT framebuffer every frame (1547x "Only
+//     NONE or BACK are valid draw buffers", 2234 GL errors total) -> wrong
+//     render target -> genuinely-black pixels with 58fps swap + audio.
+//     Twin of the Task166 MobileGlues DSA-off fix. Fix: tinygl4angle
+//     WITHDRAWS the DSA advertisement (extension cache machinery kept;
+//     Task192/193 DSA function bodies kept, exported and harmless;
+//     AME193_DSA_ADVERTISE=1 re-enables for forensics). MC falls back to
+//     DirectStateAccess.Emulated classic bind-then-operate.
+// (3) Task 198 (control repo "everything piles up in the corner"): repo seed
+//     layouts are v7-format (keycodes array + dynamicX/dynamicY, no static
+//     x/y, scaledAt~100) but mis-stamped "version":"1.0", so the loader ran
+//     the V1 chain: keycodes replaced with [0] (all buttons unbound),
+//     width/height re-divided by scaledAt, then V2 overwrote dynamicX with
+//     "0.000000 * ${screen_width}" (static x absent, nil->0) -> every control
+//     at top-left + unusable. Fix: convertLayoutIfNecessary rescues the mis-
+//     stamp (any mControlDataList button carrying keycodes-array + dynamicX
+//     + no static x is impossible for a real V1) by re-stamping version=7
+//     and skipping the chain; the three repo seeds + index.json re-stamped
+//     to "7" (future downloads correct; already-downloaded copies self-heal
+//     on next load).
+// (4) Task 201 (Metallum Metal renderer, synced from upstream herbrine8403/
+//     Amethyst-iOS-MyRemastered): native Metal backend via -javaagent
+//     (com.metallum.agent.MetallumAgent, class 65.0). Ported: metallum_agent.
+//     jar -> JavaApp/libs/others/ (payload packs app/libs/), libmetallum.dylib
+//     -> Frameworks (picker existence filter; the agent extracts its own
+//     runtime copy), libspirv-cross-c-shared.0.impl.dylib replaced with the
+//     upstream build (identical 12383-symbol export set incl. the 40 MSL
+//     entries -- zero regression verified), shaderc_impl_glue.c gains the
+//     glslang_program_map_io step (upstream-shaderc parity; Metallum's
+//     MetalCrossShaderCompiler is binding/location-sensitive), renderer
+//     table gains the Metal entry at the END (index stability), AMETHYST_
+//     METAL=1 env + renderer->auto fallback, --add-opens=java.base/java.lang
+//     (agent defineClass), mcMajor>=26 gate for the -javaagent mount (Java 8
+//     sessions cannot load class-65 agent bytecode). Deliberately NOT synced:
+//     upstream's bare libspvc.dylib / libspirv-cross.dylib /
+//     libspirv-cross-c-shared.0.dylib copies (all the same real library) --
+//     they would bypass our serializing spvc shim (Task175 family).
+// Verification: verify_task196_197_198_201 51/51 (A vgpu 8, B angle 10,
+// C controls 9, D metallum 14, E docs/l10n 10); the 2407->2408 l10n baseline
+// sweep covers 16 verifiers (19 references); announcement window family
+// re-anchored (task196 quad-fixes @ [2], incl. repaying Task193's missed
+// re-anchors on 165/167/171/172/174/175/177/178/170/168/173b -- task165 now
+// 34/34); survey reports archived under docs/surveys/.
+// ============================================================================

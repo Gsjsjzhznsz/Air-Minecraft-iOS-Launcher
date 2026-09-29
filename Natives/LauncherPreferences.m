@@ -374,6 +374,17 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         @{@"key": @ RENDERER_NAME_VULKAN,
           @"name": localize(@"preference.title.renderer.debug.vulkan", nil),
           @"file": @ RENDERER_NAME_VULKAN},
+        // Metal（metallum / MetalUniversal，Task201 随上游同步移植）：原生 Metal
+        // 后端，对应 dylib 为 libmetallum.dylib（由 metallum agent jar 在运行期
+        // 解出，见 utils.h RENDERER_NAME_METAL 与 JavaLauncher.m 置
+        // AMETHYST_METAL=1 的分支）。刻意追加在表末：已有 profile / 全局偏好里
+        // 存的 renderer 值（libxxx.dylib）在 pick 控件里按下标配对，插到中间
+        // 会让这些已存值显示错位（上游同款结论）。仅 MC >= 26 会话实际生效
+        // （agent 的 class 65.0 需 Java 21+，老版本 MC 的 Java 8 挂载即崩，
+        // JavaLauncher 的 mcMajor>=26 门控负责跳过）。
+        @{@"key": @ RENDERER_NAME_METAL,
+          @"name": localize(@"preference.title.renderer.debug.metal", nil),
+          @"file": @ RENDERER_NAME_METAL}
         // Task 132（MG 三端合并，用户明令）：MobileGL 家族三后端条目从本表
         // 退役，合并为 MobileGlues 分区的单一 pick 行（typePickField 悬浮
         // 浮窗，选项 MobileGlues (Vulkan 直连) / (GLES 后端) / (OpenGL 4.0

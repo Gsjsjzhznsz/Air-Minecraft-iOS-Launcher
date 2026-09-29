@@ -181,7 +181,7 @@ for lang, (u, d) in expect.items():
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     check("G", f"{lang} account.menu.use/delete 键值", f'"account.menu.use" = "{u}";' in s
           and f'"account.menu.delete" = "{d}";' in s)
-    check("G", f"{lang} 唯一键总数 == 2408", len(keys) == 2407, f"got {len(keys)}")
+    check("G", f"{lang} 唯一键总数 == 2408", len(keys) == 2408, f"got {len(keys)}")
     check("G", f"{lang} account.switch_role.* 历史键保留",
           'account.switch_role.button' in keys and 'account.switch_role.title' in keys)
 
@@ -232,7 +232,7 @@ for fn in ("Natives/AccountListViewController.m", "Natives/BackgroundManager.m",
             stack.pop()
     check("H", f"{os.path.basename(fn)} 严格栈匹配括号平衡", ok and not stack)
 check("H", "announcements/task190 条目存在且为最新任务条目",
-      json.loads(rdrepo("announcements.json"))["announcements"][3]["id"].startswith("task190-"))
+      json.loads(rdrepo("announcements.json"))["announcements"][4]["id"].startswith("task190-"))
 
 print("=" * 72)
 print(f"PASS {len(PASS)}  FAIL {len(FAIL)}")

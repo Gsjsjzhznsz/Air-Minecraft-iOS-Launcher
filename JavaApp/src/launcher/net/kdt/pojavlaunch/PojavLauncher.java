@@ -66,6 +66,27 @@ public class PojavLauncher {
         MCOptionUtils.set("fullscreen", "false");
         MCOptionUtils.set("overrideWidth", size[0]);
         MCOptionUtils.set("overrideHeight", size[1]);
+        // Task 196（vgpu 1.8.x 方块材质损坏 + 看门狗卡死修复）：
+        // 装机日志铁证（latestlog.txt，1.8.9-forge 会话）：看门狗栈反复停在
+        //   GL11.glCallList ← RenderList.func_178001_a
+        // 且原生崩溃栈落在 libvgpu.dylib 的 gl4es_glCallList（SIGSEGV ← ANGLE memmove）。
+        // 根因：反编译 1.8.9 GameSettings（avh.class）实证 useVbo 默认 false ——
+        // 1.8.x 地形渲染默认走显示列表（glCallList），实体走立即模式所以正常。
+        // vgpu（gl4es 血统）的显示列表模拟在 iOS ES3 上回放捕获的顶点数据
+        // 损坏：方块几何/材质错乱，回放到损坏段直接 SIGSEGV。
+        // 修复：vgpu 会话强制 useVbo=true，地形改走 Task191/193 已修好的
+        // VBO/EBO 路径（装机实证 step-attrs 四步探针全 0 —— 0x0502 是残留
+        // 旧错误，EBO 路径本身健康）。
+        // 兼容性：1.8+ 均有 useVbo 选项；1.7.10- 无此键，写入会被 MC 忽略
+        // （无副作用，但 1.7.10- 的显示列表问题在 vgpu 上依然无解，需换渲染器）。
+        // 时序：必须在【第一块 save()】之前插入 —— 后续 graphicsApi/lang 的
+        // load() 均从磁盘重读（本值已落盘，安全存续），不会丢失。
+        String ame196Renderer = System.getenv("AMETHYST_RENDERER");
+        if (ame196Renderer != null && ame196Renderer.contains("vgpu")) {
+            MCOptionUtils.set("useVbo", "true");
+            System.out.println("[PojavLauncher] Task196 useVbo=true forced (vgpu session: "
+                + ame196Renderer + ", 1.8.x display-list crash workaround)");
+        }
         // 解锁帧率（关闭垂直同步 + 解除 maxFps 限制）：
         // MC 默认 enableVsync=true，会把帧率锁在屏幕刷新率（60Hz 锁 60、120Hz ProMotion 锁 120）。
         // 同时 MC 默认 maxFps=120，即使关闭 VSync 也会被 maxFps 限制。
@@ -160,6 +181,12 @@ public class PojavLauncher {
                 + "inactivityFpsLimit=" + MCOptionUtils.getFromFile("inactivityFpsLimit")
                 + " maxFps=" + MCOptionUtils.getFromFile("maxFps")
                 + " enableVsync=" + MCOptionUtils.getFromFile("enableVsync"));
+        }
+        // Task 196：落盘校验（必须在 save() 之后 —— getFromFile 直读磁盘，
+        // save 前读到的是旧盘值）。装机日志锚点：useVbo=true。
+        if (ame196Renderer != null && ame196Renderer.contains("vgpu")) {
+            System.out.println("[PojavLauncher] Task196 on-disk verification: useVbo="
+                + MCOptionUtils.getFromFile("useVbo"));
         }
 
         // 提示 renderpearl 跳过 OIT 管线编译

@@ -1540,6 +1540,18 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             NSLog(@"[Amethyst] Task120: MobileGL backend override active (profile renderer was %@ -> %@)",
                   profileRenderer, renderer);
         }
+        // Metal 渲染器（libmetallum.dylib，Task201 随上游同步移植）：图形后端由
+        // metallum agent 走原生 Metal（直接 MTLDevice），不经过 EGL 渲染器。
+        // 渲染器回落 auto（→ANGLE）仅为 Surface 提供 GL 上下文，与 metallum
+        // 官方集成一致（渲染器只管 GL/Vulkan 回退）。★ 必须置 AMETHYST_METAL=1：
+        // agent 只认这个开关来打开渲染 patch（MetallumAgent.IS_METAL_RENDERER），
+        // 否则整段渲染 patch 关闭 —— 日志 "non-Metal renderer: ... render patches
+        // disabled"，26.2 起不来。
+        if ([renderer isEqualToString:@ RENDERER_NAME_METAL]) {
+            setenv("AMETHYST_METAL", "1", 1);
+            NSLog(@"[JavaLauncher] Metal renderer selected: AMETHYST_METAL=1 (EGL renderer falls back to auto for surface)");
+            renderer = @"auto";
+        }
         NSLog(@"[JavaLauncher] RENDERER is set to %@\n", renderer);
         setenv("AMETHYST_RENDERER", renderer.UTF8String, 1);
         // Task 147：彻底不再导出 POJAV_RENDERER（含 Mithril）。Task 145 的
@@ -2155,6 +2167,43 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
   
     NSString *librariesPath = [NSString stringWithFormat:@"%@/libs", NSBundle.mainBundle.bundlePath];
     PUSH_MARGV_FORMAT(@"-javaagent:%@/patchjna_agent.jar=", librariesPath);
+    // [Metallum agent]（Task201 随上游同步）原生 Metal 后端（26.2 / 26.3）：
+    //   * jar 由 JavaApp/libs/others/ 随包落在 app/libs/（见根 Makefile 的 payload 目标），
+    //     agent 自带 metallum 类集与 natives/ios（libmetallum.dylib、libspvc.dylib），
+    //     运行期自行解出到沙盒，不需要 Frameworks 另行放置。
+    //   * 注入范围由 agent 自己判定（premain 按 MC 版本 / 加载器分流：26.2 走
+    //     classes262 类集、Fabric 缺桩时跳过相应步骤、Forge 走 dummy provider
+    //     且不注入自带 slf4j）。
+    //   * jar 不在 libs/ 时安静跳过，便于回滚与 A/B。
+    //   * [fix/java8-agent] 只对 MC major >= 26 挂载：agent 的 class 文件版本是
+    //     65.0（Java 21+ 编译），而老版本 MC 走 Java 8（class 上限 52.0）——
+    //     此前"老版本 MC 没有目标类，转换器天然 no-op"的假设漏掉了 agent
+    //     本身在 Java 8 上就加载不了这件事（UnsupportedClassVersionError ->
+    //     "processing of -javaagent failed" -> JVM 直接 abort，premain 阶段
+    //     全灭，GL/SFPEW 代码根本没机会跑）。
+    //     26.x 强制 Java 25（ResolveLwjglVersion 同款 major 判定），class 65 可加载。
+    if ([[NSFileManager defaultManager] fileExistsAtPath:
+            [librariesPath stringByAppendingPathComponent:@"metallum_agent.jar"]]) {
+        NSString *metallumMcVersionId = nil;
+        if ([launchTarget isKindOfClass:NSDictionary.class]) {
+            metallumMcVersionId = [launchTarget[@"id"] description];
+        } else if ([launchTarget isKindOfClass:NSString.class]) {
+            metallumMcVersionId = (NSString *)launchTarget;
+        }
+        NSInteger metallumMcMajor = ame98_mcMajorFromVersionId(metallumMcVersionId);
+        if (metallumMcMajor >= 26) {
+            PUSH_MARGV_FORMAT(@"-javaagent:%@/metallum_agent.jar=", librariesPath);
+            // 把实例的 MC 版本 id 传给 agent（按版本选 metallum 类映射）
+            if (metallumMcVersionId.length > 0) {
+                PUSH_MARGV_FORMAT(@"-Dmetallum.mc.version=%@", metallumMcVersionId);
+            }
+            NSLog(@"[JavaLauncher] Task201: Metallum agent enabled: -javaagent:metallum_agent.jar (mcVersion=%@)",
+                  metallumMcVersionId);
+        } else {
+            NSLog(@"[JavaLauncher] Task201: Metallum agent skipped: MC major %ld < 26 (agent needs Java 21+ class files, this session runs Java 8)",
+                  (long)metallumMcMajor);
+        }
+    }
     if(getPrefBool(@"general.cosmetica")) {
         PUSH_MARGV_FORMAT(@"-javaagent:%@/arc_dns_injector.jar=23.95.137.176", librariesPath);
     }
@@ -2305,6 +2354,16 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
 
         // Required by Cosmetica to inject DNS
         PUSH_MARGV_LITERAL("--add-opens=java.base/java.net=ALL-UNNAMED");
+
+        // ★ [FIX262]（Task201 随上游同步）java.base/java.lang 必须对未命名模块 open：
+        //   metallum agent 用 defineClass 把 metallum 类集直接定义进 MC 的类加载器，
+        //   走的是 ClassLoader#defineClass 反射 + setAccessible(true)。未命名模块下
+        //   setAccessible 需要显式 opens，否则抛 InaccessibleObjectException:
+        //     module java.base does not "opens java.lang" to unnamed module
+        //   ⇒ defineMetallumClasses 整段失败，metallum 一个类都定义不上 ⇒ 26.2 起不来。
+        //   （Forge 下 agent 是命名模块，另由 agent 侧 Instrumentation.redefineModule
+        //     打开；这一条对两条路径都安全、无副作用。）
+        PUSH_MARGV_LITERAL("--add-opens=java.base/java.lang=ALL-UNNAMED");
 
         // Setup Caciocavallo
         PUSH_MARGV_LITERAL("-Dawt.toolkit=com.github.caciocavallosilano.cacio.ctc.CTCToolkit");

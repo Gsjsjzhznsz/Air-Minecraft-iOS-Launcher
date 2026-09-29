@@ -264,6 +264,7 @@
 "preference.title.renderer.debug.vulkan" = "MoltenVK（26.2+）- 导出 Vulkan 1.4";
 "preference.title.renderer.debug.mobilegl" = "MobileGL（Vulkan 直呈·預設）- GL→Vulkan→Metal，無逐幀回讀";
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL（GLES 後端）- GL→OpenGL ES，實驗性";
+"preference.title.renderer.debug.metal" = "Metal (metallum)";
 
 "preference.detail.renderer" = "改變要使用的OpenGL渲染引擎";
 

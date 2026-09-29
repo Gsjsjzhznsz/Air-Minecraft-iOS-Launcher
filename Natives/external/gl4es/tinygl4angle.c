@@ -287,6 +287,7 @@ const GLubyte * glGetString(GLenum name) {
     ame173_forensics();
     // Task193：旧式扩展枚举路径与索引式（glGetStringi）同口径——追加
     // GL_ARB_direct_state_access（DSA 通告，见 ame193 块注释）。
+    // Task197：通告默认撤回（默认原样返回真实串，仅 env 门控时追加）。
     if (name == GL_EXTENSIONS && result) {
         return ame193_appendExtString(result);
     }
@@ -929,6 +930,14 @@ void glGetNamedBufferParameteriv(GLuint buffer, GLenum pname, GLint *params) {
 //       glDisableVertexArrayAttrib/glVertexArrayBindingDivisor（ELEMENT/
 //       ARRAY/VERTEX_ARRAY 绑定保存恢复法）。MC 若走 VAO-DSA 也不再踩 NULL。
 // 遗留观测：hooked_dlsym 的 [dlsym] Task193 GL NULL 日志将点名残余缺项。
+//
+// ============================================================================
+// Task197 判决（装机复盘，详见 ame193_extraExts 定义处的取证注）：
+// 上述第 (1) 层的 DSA 通告被【撤回】—— 26.3 装机实证 DSA 开启后
+// DirectStateAccess.Core 每帧把附件/draw-buffers 操作打到默认帧缓冲
+// （1547 × 1282 HIGH），渲染目标错位 → 真黑 + 有声音。扩展表补全
+// （glGetStringi / GL_NUM_EXTENSIONS 拦截）保留；(2)(3) 层的 DSA 函数
+// 实现保留（导出无害）。通告默认关闭，AME193_DSA_ADVERTISE=1 可复原。
 // ============================================================================
 #ifndef GL_NUM_EXTENSIONS
 #define GL_NUM_EXTENSIONS 0x821D
@@ -962,10 +971,35 @@ void glGetNamedBufferParameteriv(GLuint buffer, GLenum pname, GLint *params) {
 #define GL_VERTEX_ATTRIB_ARRAY_DIVISOR 0x88FE
 #endif
 
+// Task197（ANGLE 黑屏终局）：DSA 通告默认撤回 —— env 门控可复原。
+// 装机铁证（latestlog.old.txt，26.3 + tinygl4angle 会话）：
+//   00:52:08 "ARB_direct_state_access detected, enabling DSA"（GlDevice 构造期）
+//   随后 1547 × "Only NONE or BACK are valid draw buffers for the default
+//   framebuffer"（id=1282 HIGH）+ 2234 个 1282 总错 —— MC 走
+//   DirectStateAccess.Core 后把附件/draw-buffers 操作打到默认帧缓冲，
+//   渲染目标错位 → 真黑（中心像素 rgba(0,0,0,0)）但 swap 58fps + 有声音。
+//   与 Task166 在 MobileGlues 上 A/B 实证的孪生根因（DSA 开=黑屏、关=可玩
+//   且 FSR 生效）同源；上游 herbrine#143 同病未修。撤回通告后 MC 走
+//   DirectStateAccess.Emulated 经典路径（bind-then-operate），Task193 的
+//   扩展表补全保留 —— "DSA-off + 扩展缓存"组合此前从未装机测过
+//   （Task193 当时同时改了两个变量）。Task192/193 已实现的 DSA 函数体
+//   保留（导出无害，MC 不再主动探测调用）。
+//   取证通道：AME193_DSA_ADVERTISE=1 可强制开回通告（诊断用，勿出厂）。
+#define AME193_DSA_EXT "GL_ARB_direct_state_access"
 static const char *const ame193_extraExts[] = {
-    "GL_ARB_direct_state_access",
+    AME193_DSA_EXT,
 };
 #define AME193_EXTRA_EXT_COUNT (sizeof(ame193_extraExts) / sizeof(ame193_extraExts[0]))
+// Task197：生效的追加扩展数（默认 0 = 撤回；env 门控可复原为全量）。
+// 注意：两处消费点（索引式缓存 + 旧式字符串追加）都必须走本函数。
+static size_t ame197_effectiveExtCount(void) {
+    static int cached = -1;
+    if (cached < 0) {
+        const char *env = getenv("AME193_DSA_ADVERTISE");
+        cached = (env != NULL && strcmp(env, "1") == 0) ? 1 : 0;
+    }
+    return (size_t)(cached ? AME193_EXTRA_EXT_COUNT : 0);
+}
 static char **ame193_extCache = NULL;   // 真实 + 追加 的完整扩展串列表
 static GLuint ame193_extCount = 0;
 
@@ -993,20 +1027,26 @@ static void ame193_buildExtCache(void) {
         NSLog(@"[tinygl4angle] Task193: GL_NUM_EXTENSIONS=%d (driver reports none) -- indexed enumeration unavailable", (int)n);
         return;
     }
-    char **cache = (char **)calloc((size_t)n + AME193_EXTRA_EXT_COUNT, sizeof(char *));
+    char **cache = (char **)calloc((size_t)n + ame197_effectiveExtCount(), sizeof(char *));
     GLuint filled = 0;
     for (GLint i = 0; i < n; i++) {
         const GLubyte *s = ame193_real_getStringi(GL_EXTENSIONS, (GLuint)i);
         if (s == NULL) continue;
         cache[filled++] = strdup((const char *)s);
     }
-    for (size_t k = 0; k < AME193_EXTRA_EXT_COUNT; k++) {
+    size_t ame197_append = ame197_effectiveExtCount();
+    for (size_t k = 0; k < ame197_append; k++) {
         cache[filled++] = strdup(ame193_extraExts[k]);
     }
     ame193_extCache = cache;
     ame193_extCount = filled;
-    NSLog(@"[tinygl4angle] Task193: extension cache built: %d real + %zu appended (GL_ARB_direct_state_access advertised; MC DSA probe should now SUCCEED)",
-          (int)n, AME193_EXTRA_EXT_COUNT);
+    if (ame197_append > 0) {
+        NSLog(@"[tinygl4angle] Task193: extension cache built: %d real + %zu appended (GL_ARB_direct_state_access advertised; MC DSA probe should now SUCCEED)",
+              (int)n, ame197_append);
+    } else {
+        NSLog(@"[tinygl4angle] Task197: DSA advertisement WITHDRAWN (extension cache keeps %d real entries; MC takes DirectStateAccess.Emulated classic path). Set AME193_DSA_ADVERTISE=1 to re-enable for forensics",
+              (int)n);
+    }
 }
 
 const GLubyte *glGetStringi(GLenum name, GLuint index) {
@@ -1046,20 +1086,26 @@ static const GLubyte *ame193_appendExtString(const GLubyte *real) {
     if (real == NULL) return NULL;
     if (ame193_extStringCache != NULL) return (const GLubyte *)ame193_extStringCache;
     size_t len = strlen((const char *)real);
+    size_t ame197_append = ame197_effectiveExtCount();
     size_t extra = 0;
-    for (size_t k = 0; k < AME193_EXTRA_EXT_COUNT; k++) extra += strlen(ame193_extraExts[k]) + 1;
+    for (size_t k = 0; k < ame197_append; k++) extra += strlen(ame193_extraExts[k]) + 1;
     ame193_extStringCache = (char *)malloc(len + extra + 2);
     memcpy(ame193_extStringCache, real, len);
     char *w = ame193_extStringCache + len;
-    for (size_t k = 0; k < AME193_EXTRA_EXT_COUNT; k++) {
+    for (size_t k = 0; k < ame197_append; k++) {
         *w++ = ' ';
         size_t l = strlen(ame193_extraExts[k]);
         memcpy(w, ame193_extraExts[k], l);
         w += l;
     }
     *w = '\0';
-    NSLog(@"[tinygl4angle] Task193: GL_EXTENSIONS legacy string appended GL_ARB_direct_state_access (len %zu -> %zu)",
-          len, (size_t)(w - ame193_extStringCache));
+    if (ame197_append > 0) {
+        NSLog(@"[tinygl4angle] Task193: GL_EXTENSIONS legacy string appended GL_ARB_direct_state_access (len %zu -> %zu)",
+              len, (size_t)(w - ame193_extStringCache));
+    } else {
+        NSLog(@"[tinygl4angle] Task197: DSA advertisement WITHDRAWN on legacy GL_EXTENSIONS string too (len %zu unchanged)",
+              len);
+    }
     return (const GLubyte *)ame193_extStringCache;
 }
 

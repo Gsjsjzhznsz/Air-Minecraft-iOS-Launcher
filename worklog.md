@@ -985,3 +985,68 @@ Stage Summary:
 - Task 193 全链闭环：六修一轮 + MobileGlues 2.0.18 + 图标会话合并，verify_task193 86/86，CI 绿，新 IPA 就绪
 - 装机验证锚点六件：vgpu "Task193 step-attrs" 系列（四步错误归因裁决 0x0502）+ 方块材质恢复；gl4es "constructor bootstrap complete"（不再 strstr 崩）；Forge 26.1.2 "eglCreateWindowSurface REUSED"（越过 No graphics backend）；控件仓库下载 v1 布局不再崩；ANGLE "extension cache built" + DSA 激活 + "[dlsym] Task193: GL symbol resolution FAILED" 点名残余缺项；MobileGlues 运行日志可见 2.0.18
 - 教训三连：多行拼接的 i18n 迁移必须语句级（非行级）排除；ObjC 文件迁移前先查 localize 声明可达性；本地无 ObjC 编译器时用"声明审计 + 平衡形态审计"两道软门补
+
+---
+Task ID: 196
+Agent: main (Super Z)
+Task: vgpu 1.8.x 方块材质损坏 + 看门狗卡死修复（useVbo 强制）
+
+Work Log:
+- 装机日志分诊（latestlog.txt，1.8.9-forge 会话）：看门狗栈反复停在 GL11.glCallList <- RenderList.func_178001_a；原生崩溃栈落在 libvgpu.dylib 的 gl4es_glCallList（SIGSEGV ← ANGLE memmove）；mcVersion=1.8.9-forge-11.15.1.2318
+- 反编译 1.8.9 GameSettings（avh.class，上轮会话完成）：useVbo 键存在、布尔解析、默认 false —— 1.8.x 地形默认走显示列表；实体走立即模式所以正常（与"实体正常、方块坏"线索吻合）
+- Task193 的 step-attrs 四步归因探针装机全 0 —— 0x0502 是残留旧错误，EBO 修复本身健康，排除 VBO 路径嫌疑
+- 修复：PojavLauncher.launchMinecraft 在第一块 save() 之前、vgpu 会话（AMETHYST_RENDERER contains "vgpu"）强制 MCOptionUtils.set("useVbo","true")；落盘校验（getFromFile）置于 save() 之后（save 前读到的是旧盘值——上轮会话的时序修正结论）；后续 graphicsApi/lang 的 load() 均从磁盘重读，本值安全存续
+- 兼容性：1.8+ 均有 useVbo 键；1.7.10- 无此键，写入被 MC 忽略（vgpu 上 1.7.10- 显示列表问题仍无解，需换渲染器）
+
+Stage Summary:
+- 装机锚点："[PojavLauncher] Task196 useVbo=true forced (vgpu session..." + "Task196 on-disk verification: useVbo=true"；预期 1.8.9 方块渲染恢复 + 看门狗不再卡 glCallList
+- 刻意不做：不在 native 层 hook glCallList（治标且复杂）；不动 vgpu 显示列表实现本体
+
+---
+Task ID: 197
+Agent: main (Super Z)
+Task: ANGLE 26.3 黑屏终局（DSA 通告撤回）
+
+Work Log:
+- 装机日志分诊（latestlog.old.txt，26.3 + tinygl4angle 会话）：00:52:08 "ARB_direct_state_access detected, enabling DSA"（GlDevice 构造期，DSA 检测由我们 Task193 的通告触发）→ 随后 1547 × "Only NONE or BACK are valid draw buffers for the default framebuffer"（id=1282 HIGH）+ 2234 个 1282 总错 → 渲染打到错误目标 → 中心像素 rgba(0,0,0,0) 真黑，swap 58fps + 有声音
+- 根因锁定：MC 26.3 走 DirectStateAccess.Core 后每帧把附件/draw-buffers 操作打到默认帧缓冲；与 Task166 在 MobileGlues 上 A/B 实证的孪生同根因（DSA 开=黑屏、关=可玩且 FSR 生效）；上游 herbrine#143（2026-09-17 开放，症状逐字同型）无人修——我方谱系首创
+- 26.3 反编译取证（上轮会话完成）：GlDevice 构造期 DSA 检测、presentTexture 每帧 blit 到 framebuffer 0、Core.bindFrameBufferTextures 直呼 glNamedFramebufferTexture 不经绑定——机制链完整
+- 修复：tinygl4angle 的 ame193_extraExts 通告改为 ame197_effectiveExtCount() 门控（默认 0 = 撤回；AME193_DSA_ADVERTISE=1 强制开回供取证）；索引式扩展缓存与旧式 GL_EXTENSIONS 字符串追加点两处消费点都走门控；Task193 的扩展表补全机制保留（"DSA-off + 扩展缓存"组合此前从未装机测过——Task193 当时同时改了两个变量）；Task192/193 的 DSA 函数体保留（导出无害）
+- 判据澄清：dlsym 失败清单里无 framebuffer-DSA 函数（glCreateFramebuffers/glNamedFramebufferTexture/glBlitNamedFramebuffer 全部解析成功）——符号层面无缺口，纯通告策略问题
+
+Stage Summary:
+- 装机锚点："[tinygl4angle] Task197: DSA advertisement WITHDRAWN"（缓存路径 + 旧式字符串路径两条）+ MC 侧 "DSA support not detected"（而非 enabling DSA）+ 26.3 出画面
+- 回滚通道：AME193_DSA_ADVERTISE=1
+
+---
+Task ID: 198
+Agent: main (Super Z)
+Task: 控件仓库"全部挤在一坨"修复（误盖落戳救回 + 种子重戳）
+
+Work Log:
+- 取证：controls/layouts/ 三份种子均为 v7 格式（mControlDataList 按钮带 keycodes 数组 + dynamicX/dynamicY 相对表达式、无静态 x/y、scaledAt=101）却盖 "version":"1.0"；除 ESC（合法 0,0）外表达式完好（如 0.99601203 * ${screen_width} - ${width}）
+- 根因链：convertLayoutIfNecessary 见 version 1 → convertV1Layout：单数键 "keycode" 缺省（nil→0）→ keycodes 数组被整体替换成 [0]（按钮全部失去绑定）+ width/height 被 scaledAt=101 重除再乘 50（尺寸近乎减半）→ convertV2Layout：isDynamicBtn=false 按钮读静态 x/y（不存在，nil→0）→ dynamicX 被覆写成 "0.000000 * ${screen_width}" → 全部控件堆左上角 + 不可用
+- 修复①（加载器救回，治已下载坏副本）：convertLayoutIfNecessary 对 version<=1 的文件检查 mControlDataList——任一按钮同时具有 keycodes(NSArray) + dynamicX(NSString) + 无静态 x 即不可能为真 V1（"keycodes" 数组是 V1 转换的产物），直接落戳 version=7 跳过整条转换链；锚点日志 "Task198: mis-stamped version rescued"
+- 修复②（种子重戳，治未来下载）：三份种子 "version": "1.0" → "7"（外科手术式替换，其余字节不动）；index.json 三条目 version 同步 "7" + updated 日期 + size 字段更新为真实字节数（app 不校验 size，纯卫生；scanLocalVersions 对字符串/数字版本均兼容）
+- 仓库源即本仓库——推送后新下载自带正确落戳；已下载副本重新加载即自愈（无需重新下载）
+
+Stage Summary:
+- 装机锚点："[CustomControls] Task198: mis-stamped version rescued to 7"（老副本救回）或下载新副本后无该日志且布局正常；控件不再堆角、按键绑定恢复
+- scripts/task198_seed_restamp.py 保留为证据（断言每文件恰 1 处替换 + 按钮级无 version 键 + 落盘后解析验证）
+
+---
+Task ID: 201
+Agent: main (Super Z)
+Task: Metallum Metal 渲染器同步移植（上游 herbrine8403）+ 上游二轮调查归档
+
+Work Log:
+- 上游二轮调查（两份报告入仓 docs/surveys/）：fork 点 3c13d5e5（08-31）以来上游 346 commits（~90 为我方回移，标记扫描 76+）；Metallum 定位为 javaagent 注入的原生 Metal 后端（Premain-Class: com.metallum.agent.MetallumAgent，自带 natives/ios + ios12111 双套 metallum/spvc，868 entries）；上游实测 iPhone 17 Pro/iOS 27.2 跑 26.2/26.3 原版+Forge+Fabric（cc122400/#147、7ac756ca/#148、184321a7/#149）；议题调查 517 条三仓库扫描：herbrine#143 与我方 ANGLE 黑屏同病未修、Forge 26.1.2=LWJGL 缺口族（我方桩已在位，崩溃另有原因待日志）、平台限制三件建档（1440MB 内存帽 / iOS 27 TXM / 假补丁警告）
+- 移植内容：metallum_agent.jar → JavaApp/libs/others/（payload 的 cp libs/others/* → app/libs/ 已就位）；libmetallum.dylib → Frameworks（渲染器选择器存在性过滤用；agent 运行期自行解出）；libspirv-cross-c-shared.0.impl.dylib 替换为上游构建（Mach-O 导出符号解析：与旧 impl 唯一导出集完全一致 12383 个、MSL 后端 40 入口在场——零回归；垫片按名转发 API 稳定）；utils.h RENDERER_NAME_METAL；渲染器表末位条目（上游同款"索引稳定"结论：插中间会让已存 renderer 值错位）；JavaLauncher 四块：AMETHYST_METAL=1 + renderer 回落 auto（agent 只认此开关）、--add-opens=java.base/java.lang（defineClass 需要opens）、-javaagent 注入带 mcMajor>=26 门控（862f8b48 同款：agent class 65.0 在 Java 8 上 JVM abort）、-Dmetallum.mc.version 传递；surface 指针发布块（-Dmetallum.ios.view.pointer）已在树（早前同步带入，+surface 方法核实存在）；shaderc_impl_glue.c 补 glslang_program_map_io（上游 shaderc 对齐：link 后、SPIRV 生成前的 IO 映射，Metallum 的 MetalCrossShaderCompiler 对 binding/location 敏感）；AiSettingsTools.m 双映射（解析键 angle 先于 metal 防 MetalANGLE 误匹配 + 友好名）；l10n 四主语言 preference.title.renderer.debug.metal（"Metal (metallum)"，与上游逐字一致）
+- 刻意不同步：上游三个 spirv 裸副本（libspvc.dylib / libspirv-cross.dylib / libspirv-cross-c-shared.0.dylib，同一真库）——会绕过我方 Task175 串行化垫片链（并发编译互踩崩溃家族）；上游 Makefile 的 shaderc 预编译 blob——我方 Task45 从源码构建形态保持
+- 文档：version.h REVISION 18 附录（不 bump——四项均不改 MobileGlues 转换行为，MG 直连 glslang，shaderc 链另有消费者）；announcements.json task196 四连修公告@2 插入（25→26）；16 个验证器 2407→2408 基线扫荡（19 处引用）；公告窗口族全量重锚（含偿还 Task193 轮漏锚的 165/167/171/172/174/175/177/178/170/168/173b——task165 修后 34/34）
+- 副产物：task179_inc/tinygl4angle_harness.c 由验证器级联触发再生成（task179_transform.py 从当前 tinygl4angle.c 派生，断言全过 = Task197 代码纯 C 兼容）——衍生副本同步入册
+- 验证：verify_task196_197_198_201 51/51（A vgpu 8 / B angle 10 / C controls 9 / D metallum 14 / E docs 10）；公告索引静态审计全 FRESH（扩展模式覆盖 .get 与 ["announcements"][N] 形态）；全部修改源码括号平衡 HEAD 对拍同态；本地无 ObjC/Java 编译器，CI 为最终编译门
+
+Stage Summary:
+- 装机锚点四条："[JavaLauncher] Metal renderer selected: AMETHYST_METAL=1" + "Task201: Metallum agent enabled: -javaagent:metallum_agent.jar (mcVersion=26.x)"（26.x）/ "Task201: Metallum agent skipped: MC major < 26"（老版本，正常跳过）+ 设置→视频→渲染器出现 "Metal (metallum)" + 26.x 进游戏出画面
+- Forge 26.1.2 用户可先用 Metal 旁路；gl4es 崩溃与 Forge 26.1.2 需下轮装机日志
