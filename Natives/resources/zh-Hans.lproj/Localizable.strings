@@ -223,7 +223,7 @@
 "preference.title.mod_mirror-official" = "官方源";
 "preference.title.mod_mirror-mcim" = "MCIM镜像源";
 "preference.title.debug_logging" = "调试日志";
-"preference.detail.debug_logging" = "完整的记录启动器的各种活动事件到latestlog.txt文件内,有助于开发者更容易的发现错误。但Minecraft游戏内FPS可能会降低(频繁的记录日志内容会使得CPU负载变高)";
+"preference.detail.debug_logging" = "将启动器的各种活动事件记录到 latestlog.txt，并（自下次游戏会话起）输出更详细的渲染器诊断日志：纹理/绘制归因探针、着色器与 uniform 块追踪、GL 后端日志。便于开发者定位显示问题，但日志写入更频繁，游戏 FPS 可能降低。";
 "preference.title.jitstreamer_server" = "JitStreamer的服务器地址";
 "preference.detail.jitstreamer_server" = "该选项将自定义获取 JIT 权限地址的 JitStreamer 服务器。能用就别动！";
 "preference.title.enable_altkit" = "使用 AltKit 启用 JIT";
@@ -2598,3 +2598,4 @@
 "ame202.ai.cancel" = "取消";
 "ame202.ai.new_session" = "新会话";
 "ame202.common.copy" = "复制";
+

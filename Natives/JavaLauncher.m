@@ -52,6 +52,24 @@ void init_loadDefaultEnv() {
     // Fix white color on banner and sheep, since GL4ES 1.1.5
     setenv("LIBGL_NORMALIZE", "1", 1);
 
+    // Task205：日志等级（启动器设置"调试日志"行，general.debug_logging——复用既有键，
+    // Task202 前它只控启动器侧 NSDebugLog，本轮起同时驱动渲染器诊断粒度）。
+    // debug 级全线放宽渲染器诊断粒度：
+    //   - vgpu：Task202 材质探针/Task189 绘制归因/Task193 四步归因/Task205
+    //     墓碑的限频放宽 + realize_glenv 属性装配 tracer 上线（材质损坏/
+    //     UV 错位类问题一击定位）
+    //   - tinygl4angle：Task191/203/204 观察器扩容（首 N 次 → 更多）
+    //   - 预编译 gl4es：开 LIBGL_LOGSHADERERROR（唯一可用杠杆，无源码）
+    // 标准级保持既有限频，零额外开销。env 在 JVM 启动前设置，游戏会话
+    // 全程生效；设置变更下次会话生效（行内 NSLog 已提示）。
+    if (getPrefBool(@"general.debug_logging")) {
+        setenv("AMETHYST_LOG_LEVEL", "debug", 1);
+        setenv("LIBGL_LOGSHADERERROR", "1", 1);
+        NSLog(@"[JavaLauncher] Task205: AMETHYST_LOG_LEVEL=debug (renderer diagnostics verbose)");
+    } else {
+        setenv("AMETHYST_LOG_LEVEL", "standard", 1);
+    }
+
     // Override OpenGL version to 4.1 for Zink
     setenv("MESA_GL_VERSION_OVERRIDE", "4.1", 1);
 

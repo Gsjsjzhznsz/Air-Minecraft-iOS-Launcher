@@ -13,6 +13,39 @@
 #include "fpe_cache.h"
 #include "fpe.h"
 
+// ============================================================================
+// Task205：日志等级助手 + 两个 debug 级 tracer（用户需求——渲染器错误更详细
+// 显示；由启动器设置"调试日志"行驱动 AMETHYST_LOG_LEVEL=debug）。
+//   (1) fpe_gl*Pointer 早退检测器：早退守卫"指针相同即跳过更新"在同指针
+//       不同 stride/size 的真实碰撞时会把旧格式沿用下去——UV 错位类问题
+//       的潜在源头，debug 级直接现形。
+//   (2) realize_glenv 属性装配 tracer：每个 glVertexAttribPointer 发射时
+//       打 (slot,size,stride,real_buffer,real_pointer)——材质损坏类问题
+//       一击定位（悬空/错位/墓碑化指针全部现形）。
+// 标准级零开销（一次 getenv 缓存判断）。
+// ============================================================================
+static int ame205_debug(void) {
+    static int cached = -1;
+    if (cached == -1) {
+        const char *v = getenv("AMETHYST_LOG_LEVEL");
+        cached = (v != NULL && strcmp(v, "debug") == 0) ? 1 : 0;
+    }
+    return cached;
+}
+#define AME205_EARLYRET_TRACE(ATT, WHAT) do { \
+    if (ame205_debug()) { \
+        vertexattrib_t *w_ = &glstate->vao->vertexattrib[ATT]; \
+        if (w_->size != (size) || w_->type != (type) || w_->stride != (stride)) { \
+            static int s_hits_ = 0; \
+            if (s_hits_ < 32) { \
+                ++s_hits_; \
+                printf("LIBGL: VGPU Task205 pointer-earlyret: %s same ptr but format changed (old size=%d type=0x%04X stride=%d -> new size=%d stride=%d)\n", \
+                       WHAT, (int)w_->size, (unsigned)w_->type, (int)w_->stride, (int)(size), (int)(stride)); \
+            } \
+        } \
+    } \
+} while (0)
+
 //#define DEBUG
 #ifdef DEBUG
 #pragma GCC optimize 0
@@ -692,8 +725,10 @@ void fpe_glSecondaryColorPointer(GLint size, GLenum type, GLsizei stride, const 
 
 void fpe_glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
     DBG(printf("fpe_glVertexPointer(%d, %s, %d, %p)\n", size, PrintEnum(type), stride, pointer);)
-    if(pointer==glstate->vao->vertexattrib[ATT_VERTEX].pointer)
+    if(pointer==glstate->vao->vertexattrib[ATT_VERTEX].pointer) {
+        AME205_EARLYRET_TRACE(ATT_VERTEX, "vertex");   // Task205：同指针异格式检测（debug 级）
         return;
+    }
     glstate->vao->vertexattrib[ATT_VERTEX].size = size;
     glstate->vao->vertexattrib[ATT_VERTEX].type = type;
     glstate->vao->vertexattrib[ATT_VERTEX].stride = stride;
@@ -738,8 +773,10 @@ void fpe_glTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid
 
 void fpe_glTexCoordPointerTMU(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer, int TMU) {
     DBG(printf("fpe_glTexCoordPointer(%d, %s, %d, %p) on tmu=%d\n", size, PrintEnum(type), stride, pointer, TMU);)
-    if(pointer==glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+TMU].pointer)
+    if(pointer==glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+TMU].pointer) {
+        AME205_EARLYRET_TRACE(ATT_MULTITEXCOORD0+TMU, "texcoord");   // Task205：UV 错位主嫌疑位（debug 级）
         return;
+    }
     glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+TMU].size = size;
     glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+TMU].type = type;
     glstate->vao->vertexattrib[ATT_MULTITEXCOORD0+TMU].stride = stride;
@@ -1472,6 +1509,20 @@ void realize_glenv(int ispoint, int first, int count, GLenum type, const void* i
                     old_buffer = v->real_buffer;
                 }
                 gles_glVertexAttribPointer(i, v->size, v->type, v->normalized, v->stride, v->pointer);
+                // Task205：属性装配 tracer（debug 级）——材质损坏/UV 错位
+                // 类问题的一击定位探针：发射的指针落在墓碑零页 = 删除窗口期
+                // 绘制；size/stride 与应用预期不符 = 格式装配错。
+                if (ame205_debug()) {
+                    static unsigned s_ame205_emits = 0;
+                    if (s_ame205_emits < 96) {
+                        ++s_ame205_emits;
+                        printf("LIBGL: VGPU Task205 attrib-emit #%u: slot=%d size=%d type=0x%04X stride=%d real_buf=%u real_ptr=%p ptr=%p%s\n",
+                               s_ame205_emits, (int)i, (int)v->size, (unsigned)v->type,
+                               (int)v->stride, (unsigned)v->real_buffer,
+                               (void *)v->real_pointer, (void *)v->pointer,
+                               (v->real_buffer == 0 && v->pointer != NULL) ? " [client]" : "");
+                    }
+                }
                 DBG(printf("glVertexAttribPointer(%d, %d, %s, %d, %d, %p)\n", i, v->size, PrintEnum(v->type), v->normalized, v->stride, (GLvoid*)((uintptr_t)v->pointer+((v->buffer)?(uintptr_t)v->buffer->data:0)));)
             }
         } else {

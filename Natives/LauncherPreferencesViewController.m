@@ -720,9 +720,16 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
               @"hasDetail": @YES,
               @"icon": @"doc.badge.gearshape",
               @"type": self.typeSwitch,
+              // Task205：本行升格为全局日志等级开关——除原有启动器侧
+              // NSDebugLog 外，JavaLauncher 读 general.debug_logging 向
+              // 游戏会话导出 AMETHYST_LOG_LEVEL=debug（vgpu 探针放宽限频
+              // + realize 属性装配 tracer、tinygl4angle 观察器扩容、
+              // 预编译 gl4es 开 LIBGL_LOGSHADERERROR）。用户需求原文：
+              // "能不能添加日志等级，比如 debug 等级，可以让渲染器错误
+              // 更为详细的显示错误，放在启动器设置"。设置下次会话生效。
               @"action": ^(BOOL enabled){
                   debugLogEnabled = enabled;
-                  NSLog(@"[Debugging] Debug log enabled: %@", enabled ? @"YES" : @"NO");
+                  NSLog(@"[Debugging] Debug log enabled: %@ (renderer diagnostics verbose from next game session)", enabled ? @"YES" : @"NO");
               }
             },
             @{@"key": @"appicon",

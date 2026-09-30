@@ -1151,3 +1151,52 @@ Work Log:
 Stage Summary:
 - Task204 全链闭环：gl4es 后端钉扎 + vgpu 生成器（双守卫）+ 探针真归因 + ANGLE 数据面观察器；新 IPA 就绪（run 36660194176 artifact）
 - 装机锚点：gl4es 会话 "[egl_bridge] Task204: gl4es backend pin -- glesSlot=YES eglSlot=YES resolver=YES"；vgpu 会话预排干后的 teximage/texsub err 真归因；ANGLE 会话 "Task204 ubo/uniform" 计数行
+
+---
+Task ID: 205
+Agent: main (Super Z)
+Task: 6209ca4 装机三日志判读（vgpu 材质损坏 IMG_0307.png / gl4es 黑屏 / ANGLE 黑屏）+ 用户新需求（CI 缓存加速、日志等级）
+
+Work Log:
+- 沙箱再次回退（HEAD=fa3c154 落后远程 298 提交）；fetch+reset --hard origin/main(6209ca4) 恢复。远程谱系已含 Task203(a599782)/Task204(a8ad6df CI 绿)，上传包 = latestlog.txt(vgpu 1.8.9-Forge) + latestlog.1(gl4es_114 1.8.9-Forge) + latestlog.old.txt(ANGLE MC26.3 fabric) + IMG_0307.png(2360x1640 材质损坏截图)
+- vgpu 判读：①Task202 探针 teximage/texsub 全部 err=0x0000 = 纹理上传路径干净（Task204 预言应验：病灶不在上传）②Task193 四步归因 preErr=0x0502 bindErr/dataErr/drawErr 全 0 = 绘制全成功、错误是队列积压（历史 post-draw 归因全是误报）③着色器编译全绿（"Compiler message"空=成功；961 行 out mediump vec4 FragColor 声明在场）④census QUADS=2449(avg4)+TRIANGLE_STRIP avg0（空 tessellator）⑤VLM 看图：几何位置正确、UI/HUD 完好、仅地表采样错图集区域+条纹 = 系统性 UV 错位。静态审计锁定 gl4es_glDeleteBuffers：rebind_real_buff_arrays 清 want-state 的 real_buffer/real_pointer 但 .pointer 仍指向已 free 的 shadow 内存（clone_gl_pointer 的 pointer=offset+buff->data）→ 删除后下次绘制脏检查触发重发 client 悬空指针 → iOS 接受 client 顶点数组 → 读堆复用后的任意字节当 UV = 截图形态。修法=墓碑化
+- gl4es 判读：Task204 后端钉扎 3/3 落地、strstr 崩溃已根治（游戏循环活、30fps 179 swap、正常退出）但回读 #1/#2/#3 全 (0,0,0,0)=内容级黑（连 clearColor 都没落地）；libgl4es_114 是纯预编译+二进制补丁（仓库无源码），无绘制级可见性 → 本轮靠日志等级功能给下轮装机加诊断杠杆
+- ANGLE 判读（黑屏定谳）：latestlog.old.txt 是 MC26.3 fabric 会话；CFR 反编译 client-263.jar（task129 留存）→ GlPipelineRecompiler.decompileShader 用 spvc_compiler_set_name 把 uniform 块重命名为 _uniform_%02d_%02d/_push_constants + 接口变量 _vert_input_%02d，GlProgram.setupBindGroupLayouts 靠 glGetUniformBlockIndex(重命名) 找块、GlCommandEncoder 靠 glBindBufferRange 绑 UBO。装机日志：glMapBufferRange(0x8A11) 2000+次=矩阵上传活、glBindBufferRange/UniformBlockBinding 零触发、编译出的 ES 源块名 "uniform Projecti"（原始名）= 重命名丢失 → 块查询全 -1 → UBO 永不绑定 → 单位变换 → 4000 实例化四边形全出 NDC → clearColor 黑屏。根因=spvc_shim.c ame175_compile_es_source 用留存 SPIR-V 字新建 ES 编译器，MC 在原编译器上的 set_name 重放缺失
+- 修复方案定稿：A=spvc shim 拦截 set_name 记录+重放；B=vgpu 墓碑化；C=日志等级（设置行+env+原生读取+tracer）；D=CI ccache+brew 缓存
+
+Stage Summary:
+- 三渲染器根因两定谳一延期：ANGLE（重命名丢失）与 vgpu（悬空指针）可根修；gl4es 预编译无源码，靠 C 的调试日志下轮定位
+- 26.3 反编译资产就位（task205/decomp：GlPipelineRecompiler/GlProgram/GlCommandEncoder/GlDevice/GlStateManager）
+
+---
+Task ID: 205 (续)
+Agent: main (Super Z)
+Task: 三修复 + 两功能实现
+
+Work Log:
+- A. spvc_shim.c（ANGLE 黑屏根修，四处）：①ame175_compiler_entry 扩展 names[256]/name_count/entry_point/exec_model（ame205_rename_t）②新拦截导出 spvc_compiler_set_name（转发+按编译器登记，同 id 覆盖、满 256 限频丢弃）与 spvc_compiler_set_entry_point（转发+留存）③ame175_compile_es_source 新增 orig 参数——ES 编译器装好选项后逐条重放 set_name + set_entry_point（SPIR-V result id 同字确定性一致），装机锚点 "[spvc-shim] Task205 rename replay: N names..." ④forget_context/槽位复用彻底释放重命名记录（防跨着色器错重放）
+- B. vgpu buffers.c（材质损坏根修）：ame205_tombstone_attrib_pointers——gl4es_glDeleteBuffers 在 free(buff->data) 前把地址落在 [data, data+size) 的属性 .pointer 重定向到 64KB 静态零页墓碑（vertexattrib[].buffer 是死字段不能用作识别，改地址范围判断）；删除窗口期的绘制退化为退化三角形（不崩/不脏），应用重新 gl*Pointer 自愈。装机锚点 "LIBGL: VGPU Task205 tombstone: N attrib pointer(s) ..."（标准级 4 条/debug 128 条）。附带定谳：maxbatch=0 默认=BATCH 复制路径休眠，VBO 绘制直读驱动侧缓冲——shadow 只在删除窗口被读，墓碑精确命中
+- C. 日志等级（复用既有 general.debug_logging 键，弃新增重复行）：①LauncherPreferencesViewController 既有 debug_logging 行升格注释（原只控启动器侧 NSDebugLog via debugLogEnabled）②JavaLauncher 读 general.debug_logging 导出 AMETHYST_LOG_LEVEL=debug/standard + LIBGL_LOGSHADERERROR=1（预编译 gl4es 唯一杠杆）③vgpu fpe.c 双 tracer：AME205_EARLYRET_TRACE（vertex/texcoord 同指针异格式检测）+ realize_glenv attrib-emit tracer（96 条：slot/size/stride/real_buf/real_ptr——UV 错位一击定位）④tinygl4angle.c 新增 glGetUniformBlockIndex 观察器（ANGLE 修复验证探针：idx>=0=重放成功/-1=仍失败，前 12+每 512 抽样+debug 128）⑤preference.detail.debug_logging 文案升级（en+zh-Hans，说明渲染器诊断范围）
+- D. CI 缓存（.github/workflows/development.yml，CRLF 保真脚本 scripts/task205_ci_cache.py）：①actions/cache 两路——ccache（~/.ccache，键含 Makefile+CMakeLists+vgpu 源码 hash，restore-keys 前缀）+ Homebrew downloads（键含 workflow 文件 hash）②brew install make ccache ③构建步骤接线 CC/CXX=ccache clang + CCACHE_DIR + max_size=2G + zero/show-stats。预期第二次起省 3-4 分钟/次（dep_mg MobileGlues 3.4 分钟=最大单项）
+- 验证：verify_task205 37/37（A 拦截/重放/语法/行为镜像 13 + B 墓碑 6 + C 日志等级 11 + D CI 7）；级联 task175_syntax_gates/task175_spvc_symtab/task193_tinygl_syntax 全绿；172:51/51、173:123/0；task171 失败=存量（纯 HEAD 同败，缺 171 时代装机日志证据文件）；175/176/179 失败=工作区脏树家族（仓库既有"提交后自愈"口径，141/168/170 同款）
+
+Stage Summary:
+- 三渲染器两根修一诊断增强：ANGLE=重命名重放（黑屏定谳修复）；vgpu=墓碑化（材质损坏定谳修复）；gl4es=预编译无源码，靠日志等级下轮定位
+- 日志等级=复用既有开关升格为全局等级（启动器 NSDebugLog + 渲染器诊断双层）
+- CI 缓存=ccache+brew 双路，预期 -3~4 分钟/次
+- 装机验证锚点：ANGLE "[spvc-shim] Task205 rename replay" + "[tinygl4angle] Task205 blockIdx: ... -> >=0"；vgpu "VGPU Task205 tombstone" + 黑屏/条纹消失；开调试日志后 attrib-emit 序列可直接定位任何残余 UV 错位
+
+---
+Task ID: 205 (续二)
+Agent: main (Super Z)
+Task: 级联验证 + 存量债务清点
+
+Work Log:
+- 级联全绿：181:35/0（外层 task181_syntax_gate.py 沙箱收割后重建——状态机括号计数，正则法被注释撇号假阳性）、182:39/0（外层 worklog 沙箱收割停在 Task110 → 从仓库 worklog 重建 Task162 起全部段落；E 门裸计数对 tinygl4angle.c 注释装饰括号假阳性 → 重锚为状态机）、172:51/51、173:123/0、183:50/50、186 全绿、191:45/0、192:52/0、193:86/0、196-201:51/51、202 全绿、203:32/32、204:31/31、205:37/37；语法门 task175_syntax_gates/task175_spvc_symtab(169)/task193_tinygl_syntax(SYNTAX OK, harness 镜像自同步)全绿
+- 机械重锚（存量漂移）：173b/174/175 的 l10n 计数锚 2157 → 2418（四主语言键集 en/zh-Hans/zh-CN/zh-Hant 实测 2418 一致 = Task202 时代合法基线，Task178 的 2157 漏随动）
+- 存量债务清单（全部先于 Task205 存在，纯 6209ca4 复现）：①公告内容锚家族 168-D2/170-F2/173b-E2/174-E2/175-G2+H2/176-I1/179-J1——announcements-fallback.json 被 Task203 重写为 2 条新条目，14+ 历史索引锚（idx 8/9/12/15...）集体孤儿化，需专轮重concile 或退役；②task179 I4/I5/I6 harness 桩生态漂移（纯 6209ca4 的 harness 同样 glDrawElements/glDrawArrays 重定义编译失败）；③task171 缺 171 时代装机证据文件（已由重建的外层门部分修复）
+- 教训：仓库内有 Task87 时代古董 stash（会话开始前存在）——git stash pop 会把古董工作日志溅到当前树上（本次在 worklog.md 冲突后 checkout HEAD 恢复，古董 stash 保持原样未动）；后续 pristine 对拍一律用 git show/git archive，不用 stash
+
+Stage Summary:
+- Task205 自有验证 + 可机械修复的级联全部清零；公告锚/harness 桩两族存量债务已定谳并记录，不阻塞渲染器修复主线
+- 提交 3086a42 已含三修复+两功能；本轮验证器重锚与外层工作区重建随 amend 入库

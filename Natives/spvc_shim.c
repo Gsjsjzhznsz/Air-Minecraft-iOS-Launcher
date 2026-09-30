@@ -99,6 +99,16 @@ static void *ame_spvc_shim_resolve(const char *sym);
 // 1024 槽（静态 ~80KB）对 392 峰值留 2.6x 余量；仍配最旧驱逐兜底。
 #define AME175_REGISTRY_MAX 1024
 
+// Task205：单编译器重命名记录上限（MC 26.3 每着色器 = 接口变量 + uniform 块
+// + push constants，几十条量级；超出限频丢弃——重放缺失只会退回原始名，
+// 与修前行为一致，不会更坏）。
+#define AME205_NAMES_MAX 256
+
+typedef struct {
+    unsigned id;
+    char *name;
+} ame205_rename_t;
+
 typedef struct {
     void *ctx;
     unsigned *words;   // parse_spirv 时留存的 SPIR-V 字副本（本垫片所有）
@@ -115,6 +125,19 @@ typedef struct {
     int backend;
     int live;
     unsigned seq;      // Task183：驱逐用序号（越新越大）
+    // Task205（ANGLE 黑屏根修）：MC 26.3 GlPipelineRecompiler 在【原】编译器
+    // 上用 spvc_compiler_set_name 把 uniform 块改名为 _uniform_%02d_%02d /
+    // _push_constants、接口变量改为 _vert_input_%02d 等，GlProgram 再靠
+    // glGetUniformBlockIndex(重命名) 找块、GlCommandEncoder 靠
+    // glBindBufferRange 绑 UBO。而本垫片的 ES 重写用留存 SPIR-V 字【新建】
+    // 编译器——MC 的重命名只落在原编译器上，ES 产物块名保持原始名
+    //（6209ca4 装机实锤：编译源 "uniform Projecti" 而非 _uniform_00_00）
+    //→ glGetUniformBlockIndex 全 -1 → UBO 永不绑定 → 单位矩阵 → 黑屏。
+    // 修法：拦截 set_name 记录（id, name），ES 编译器编译前重放。
+    ame205_rename_t names[AME205_NAMES_MAX];
+    int name_count;
+    char *entry_point;   // spvc_compiler_set_entry_point 留存（NULL=未设置）
+    int exec_model;
 } ame175_compiler_entry;
 
 static unsigned ame183_seq_counter = 0;
@@ -128,6 +151,53 @@ static void ame183_skip_log(const char *why, int counter) {
 
 static ame175_ctx_entry ame175_ctx_registry[AME175_REGISTRY_MAX];
 static ame175_compiler_entry ame175_compiler_registry[AME175_REGISTRY_MAX];
+
+/// Task205：释放某编译器条目的全部重命名记录（条目复用/驱逐/销毁时调）。
+static void ame205_free_names(ame175_compiler_entry *c) {
+    if (c == NULL) return;
+    for (int i = 0; i < c->name_count && i < AME205_NAMES_MAX; ++i) {
+        free(c->names[i].name);
+        c->names[i].name = NULL;
+    }
+    c->name_count = 0;
+}
+
+/// Task205：记录 set_name（同 id 重复设置 = 覆盖；溢出限频丢弃）。
+static void ame205_record_name(ame175_compiler_entry *c, unsigned id,
+                               const char *name) {
+    if (c == NULL || name == NULL) return;
+    for (int i = 0; i < c->name_count; ++i) {
+        if (c->names[i].id == id) {
+            char *dup = strdup(name);
+            if (dup != NULL) {
+                free(c->names[i].name);
+                c->names[i].name = dup;
+            }
+            return;
+        }
+    }
+    if (c->name_count >= AME205_NAMES_MAX) {
+        static int s_ame205_drop = 0;
+        ++s_ame205_drop;
+        ame183_skip_log("rename registry full -- dropping set_name", s_ame205_drop);
+        return;
+    }
+    char *dup = strdup(name);
+    if (dup == NULL) return;
+    c->names[c->name_count].id = id;
+    c->names[c->name_count].name = dup;
+    ++c->name_count;
+}
+
+/// Task205：按编译器指针找登记条目（未登记返回 NULL）。
+static ame175_compiler_entry *ame205_find_compiler(void *compiler) {
+    if (compiler == NULL) return NULL;
+    for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
+        ame175_compiler_entry *c = &ame175_compiler_registry[i];
+        if (c->live && c->compiler == compiler) return c;
+    }
+    return NULL;
+}
 
 /// 门控：仅 ANGLE（tinygl4angle）渲染器会话启用重写；逃生阀可强制关闭。
 static int ame175_rewrite_enabled(void) {
@@ -206,7 +276,12 @@ static void ame175_forget_context(void *ctx) {
     }
     for (int i = 0; i < AME175_REGISTRY_MAX; ++i) {
         ame175_compiler_entry *c = &ame175_compiler_registry[i];
-        if (c->live && c->ctx == ctx) memset(c, 0, sizeof(*c));
+        if (c->live && c->ctx == ctx) {
+            ame205_free_names(c);
+            free(c->entry_point);
+            c->entry_point = NULL;
+            memset(c, 0, sizeof(*c));
+        }
     }
 }
 
@@ -781,8 +856,12 @@ static char *ame183_sanitize_essl(const char *essl) {
 }
 
 /// 在同一 context 上重建 ES 编译器并编译；失败返回 NULL（调用方回落原源）。
+/// Task205：新增 orig 参数——把 MC 在【原】编译器上的 spvc_compiler_set_name
+/// 重命名与 set_entry_point 重放到新建的 ES 编译器上（见结构体注释；不重放
+/// 则块名保持原始名，MC 的 glGetUniformBlockIndex 全 -1 → 黑屏）。
 static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
-                                            size_t word_count) {
+                                            size_t word_count,
+                                            ame175_compiler_entry *orig) {
     typedef int (*parse_fn_t)(void *, const unsigned *, size_t, void **);
     typedef int (*create_compiler_fn_t)(void *, int, void *, int, void **);
     typedef int (*compile_fn_t)(void *, const char **);
@@ -793,6 +872,8 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
     typedef int (*set_uint_fn_t)(void *, unsigned, unsigned);
     typedef int (*set_bool_fn_t)(void *, unsigned, int);
     typedef int (*install_opts_fn_t)(void *, void *);
+    typedef void (*set_name_fn_t)(void *, unsigned, const char *);
+    typedef void (*set_entry_fn_t)(void *, const char *, int);
 
     parse_fn_t real_parse = (parse_fn_t)ame_spvc_shim_resolve("spvc_context_parse_spirv");
     create_compiler_fn_t real_create =
@@ -845,6 +926,40 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
         }
     }
     if (!options_ok) return NULL;  // ES 编译器留在 ctx 上随 destroy 释放
+
+    // Task205：重放重命名 + 入口点。SPIR-V result id 在同一份字上确定性
+    // 一致，直接按记录的 id 重放到新编译器即可。任一步失败不阻断——
+    // 缺失重命名只是退回原始块名（与修前行为一致），后续装机会从
+    // glGetUniformBlockIndex 的返回值里现形。
+    int ame205_replayed = 0;
+    const char *ame205_entry = NULL;
+    if (orig != NULL) {
+        set_name_fn_t real_set_name =
+            (set_name_fn_t)ame_spvc_shim_resolve("spvc_compiler_set_name");
+        set_entry_fn_t real_set_entry =
+            (set_entry_fn_t)ame_spvc_shim_resolve("spvc_compiler_set_entry_point");
+        if (real_set_name != NULL) {
+            for (int i = 0; i < orig->name_count && i < AME205_NAMES_MAX; ++i) {
+                if (orig->names[i].name == NULL) continue;
+                real_set_name(es_compiler, orig->names[i].id, orig->names[i].name);
+                ++ame205_replayed;
+            }
+        }
+        if (real_set_entry != NULL && orig->entry_point != NULL) {
+            real_set_entry(es_compiler, orig->entry_point, orig->exec_model);
+            ame205_entry = orig->entry_point;
+        }
+        static int s_ame205_replayLogged = 0;
+        if (s_ame205_replayLogged < 4) {
+            ++s_ame205_replayLogged;
+            fprintf(stderr,
+                    "[spvc-shim] Task205 rename replay: %d names%s applied to ES "
+                    "compiler (blocks like _uniform_00_XX / _push_constants survive "
+                    "the ES rewrite now)\n",
+                    ame205_replayed,
+                    ame205_entry ? " + entry point" : "");
+        }
+    }
 
     const char *es_source = NULL;
     if (real_compile(es_compiler, &es_source) != 0 || es_source == NULL) return NULL;
@@ -1026,7 +1141,8 @@ int spvc_compiler_compile(void *compiler, const char **source) {
             if (ame175_ctxe != NULL && ame175_ctxe->last_parsed_ir == ame175_ce->parsed_ir &&
                 ame175_ctxe->words != NULL && ame175_ctxe->word_count > 0) {
                 const char *ame175_es = ame175_compile_es_source(
-                    ame175_ce->ctx, ame175_ctxe->words, ame175_ctxe->word_count);
+                    ame175_ce->ctx, ame175_ctxe->words, ame175_ctxe->word_count,
+                    ame175_ce);   // Task205：携带原编译器条目 → 重放 set_name 重命名
                 // Task176：自证——选项式输出必须真的是 "#version NNN es"。
                 // 0.65 预构建 impl 与 vendored 源版本不一致，选项可能被静默
                 // 吞掉（装机实锤：重写日志已打出但 ANGLE 错误与修前逐字相同）。
@@ -1171,6 +1287,12 @@ int spvc_context_create_compiler(void *context, int backend, void *parsed_ir,
         ame175_compiler_registry[ame175_slot].parsed_ir = parsed_ir;
         ame175_compiler_registry[ame175_slot].backend = backend;
         ame175_compiler_registry[ame175_slot].seq = ++ame183_seq_counter;
+        // Task205：槽位复用/驱逐时彻底清掉旧条目的重命名与入口点记录，
+        // 防止上一着色器的名字重放到这个新编译器上（id 同源但语义不同）。
+        ame205_free_names(&ame175_compiler_registry[ame175_slot]);
+        free(ame175_compiler_registry[ame175_slot].entry_point);
+        ame175_compiler_registry[ame175_slot].entry_point = NULL;
+        ame175_compiler_registry[ame175_slot].exec_model = 0;
     }
     pthread_mutex_unlock(ame_spvc_master_or_local());
     fprintf(stderr, "[spvc-shim] create_compiler backend=%d -> %p rc=%d (t=%.0fms "
@@ -1178,4 +1300,48 @@ int spvc_context_create_compiler(void *context, int backend, void *parsed_ir,
             backend, (compiler ? *compiler : NULL), rc, ame_spvc_shim_ms(),
             ame_spvc_shim_tid());
     return rc;
+}
+
+// ============================================================================
+// Task205：spvc_compiler_set_name / set_entry_point 拦截（ANGLE 黑屏根修）。
+// 垫片此前只导出 6 个入口，其余符号靠 -reexport_library 透传——set_name
+// 直达真实库，我们的 ES 重写（新建编译器）对它一无所知。MC 26.3 的
+// renameDescriptors/renameInterfaceVariables 把 uniform 块改名为
+// _uniform_%02d_%02d / _push_constants、接口变量改为 _vert_input_%02d，
+// GlProgram.setupBindGroupLayouts 靠 glGetUniformBlockIndex(新名) 找块、
+// GlCommandEncoder 靠 glBindBufferRange 绑 UBO——重命名丢失 = 块查询
+// 全 -1 = 矩阵永不绑定 = 单位变换黑屏（6209ca4 装机：块名 "Projecti"
+// 存活、glBindBufferRange 零触发、glMapBufferRange(UBO) 2000+ 次全白搭）。
+// 这里改为垫片内拦截：转发真实库 + 按编译器登记（id, name），供 ES
+// 编译器编译前重放（见 ame175_compile_es_source）。
+// ============================================================================
+void spvc_compiler_set_name(void *compiler, unsigned id, const char *name) {
+    void *real = ame_spvc_shim_resolve("spvc_compiler_set_name");
+    pthread_mutex_lock(ame_spvc_master_or_local());
+    ame175_compiler_entry *ame205_ce = ame205_find_compiler(compiler);
+    if (ame205_ce != NULL) {
+        ame205_record_name(ame205_ce, id, name);
+    }
+    if (real != NULL) {
+        ((void (*)(void *, unsigned, const char *))real)(compiler, id, name);
+    }
+    pthread_mutex_unlock(ame_spvc_master_or_local());
+}
+
+void spvc_compiler_set_entry_point(void *compiler, const char *name, int model) {
+    void *real = ame_spvc_shim_resolve("spvc_compiler_set_entry_point");
+    pthread_mutex_lock(ame_spvc_master_or_local());
+    ame175_compiler_entry *ame205_ce = ame205_find_compiler(compiler);
+    if (ame205_ce != NULL && name != NULL) {
+        char *dup = strdup(name);
+        if (dup != NULL) {
+            free(ame205_ce->entry_point);
+            ame205_ce->entry_point = dup;
+            ame205_ce->exec_model = model;
+        }
+    }
+    if (real != NULL) {
+        ((void (*)(void *, const char *, int))real)(compiler, name, model);
+    }
+    pthread_mutex_unlock(ame_spvc_master_or_local());
 }

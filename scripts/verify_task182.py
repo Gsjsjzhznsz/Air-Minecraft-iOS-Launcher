@@ -150,8 +150,40 @@ check("D4 worklog Stage Summary 三线结论",
 print("== E. 语法门（括号平衡；ObjC 注释/字符串裸括号与基线差值对照） ==")
 def bal(src, o, c):
     return src.count(o) == src.count(c)
-for path, src in [("tinygl4angle.c", tiny),
-                  ("LauncherRightPanelViewController.m", rp), ("LauncherNavigationController.m", nav)]:
+# Task205 重锚：tinygl4angle.c 的裸计数自 Task183 起含注释/字符串装饰括号
+# 存量差 -1（1322/1323，状态机实测真实配平、深度恒 >=0 且终值 0）——裸
+# 计数对装饰括号假阳性，改用注释/字符串感知的状态机判定；另两文件裸
+# 计数本就平衡，保持原口径不动。
+def bal_statemachine(src):
+    i, n = 0, len(src)
+    state = "code"; depth = 0; brace = 0
+    while i < n:
+        c = src[i]; nxt = src[i+1] if i+1 < n else ""
+        if state == "code":
+            if c == "/" and nxt == "/":
+                while i < n and src[i] != "\n": i += 1
+                continue
+            if c == "/" and nxt == "*": state = "block"; i += 2; continue
+            if c == '"': state = "str"; i += 1; continue
+            if c == "'": state = "chr"; i += 1; continue
+            if c == "(": depth += 1
+            elif c == ")": depth -= 1
+            elif c == "{": brace += 1
+            elif c == "}": brace -= 1
+            if depth < 0 or brace < 0: return False
+        elif state == "block":
+            if c == "*" and nxt == "/": state = "code"; i += 2; continue
+        elif state == "str":
+            if c == "\\": i += 2; continue
+            if c == '"': state = "code"
+        elif state == "chr":
+            if c == "\\": i += 2; continue
+            if c == "'": state = "code"
+        i += 1
+    return depth == 0 and brace == 0 and state == "code"
+check("E tinygl4angle.c", bal_statemachine(tiny),
+      f"()={tiny.count('(')}/{tiny.count(')')} {{}}={tiny.count('{')}/{tiny.count('}')} (state-machine balanced; raw -1 is comment/string decoration, pre-Task183)")
+for path, src in [("LauncherRightPanelViewController.m", rp), ("LauncherNavigationController.m", nav)]:
     ok = bal(src, "(", ")") and bal(src, "{", "}")
     check(f"E {path}", ok,
           f"()={src.count('(')}/{src.count(')')} {{}}={src.count('{')}/{src.count('}')}")

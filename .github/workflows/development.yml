@@ -39,10 +39,33 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
           xcodebuild -version || true
 
+      # Task205：CI 构建缓存（用户需求——加速 CI 出包）。
+      #   (1) ccache —— MobileGlues（glslang+SPIRV-Cross+MG 本体，实测 3.4 分钟
+      #       = 全构建最大单项）与 Natives cmake 侧（vgpu/tinygl4angle/垫片）
+      #       的 C/C++ 重编全量命中；键含 Makefile/CMakeLists hash，改构建
+      #       脚本自动失效，restore-keys 前缀命中保证小改动仍部分复用。
+      #   (2) Homebrew 下载缓存 —— make/temurin8/ldid 的 bottle 下载。
+      # 仓库级缓存配额 10GB：ccache 限 2G + brew 约 1G，余量充足；
+      # 发布产物走 artifact/release 不占 cache。
+      - name: Cache ccache compilation cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-macos14-v1-${{ hashFiles('Makefile', 'Natives/CMakeLists.txt', 'Natives/external/vgpu/src/**') }}
+          restore-keys: |
+            ccache-macos14-v1-
+
+      - name: Cache Homebrew downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-macos14-v1-${{ hashFiles('.github/workflows/development.yml') }}
+          restore-keys: |
+            brew-macos14-v1-
       - name: Install GNU Make
         run: |
           brew update
-          brew install make
+          brew install make ccache
 
       - name: Install Java 8 (Temurin) via Homebrew
         run: |
@@ -113,6 +136,14 @@ jobs:
           export PATH=/opt/homebrew/bin:$PATH
           export SLIMMED=0
           export BUILD_MOBILEGL="${BUILD_MOBILEGL:-0}"
+          # Task205：ccache 接线（仅影响 cmake 侧 C/C++ 编译；javac 不受
+          # 影响）。首次运行冷缓存无加速，第二次起 MobileGlues+vgpu 的重编
+          # 全部命中，预计省 3-4 分钟/次。
+          export CCACHE_DIR="$HOME/.ccache"
+          ccache --set-config=max_size=2G || true
+          export CC="ccache clang"
+          export CXX="ccache clang++"
+          ccache --zero-stats 2>/dev/null || true
 
           if [ "${{ matrix.platform_name }}" == "ios" ]; then
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} 2>&1 | tee build_output.log
@@ -125,6 +156,8 @@ jobs:
           else
             gmake -j$(sysctl -n hw.ncpu) dsym package PLATFORM=${{ matrix.platform }} 2>&1 | tee build_output.log
           fi
+          echo '== Task205 ccache stats ==' 2>/dev/null || true
+          ccache --show-stats 2>/dev/null || true
 
       - name: Surface build errors as annotations
         # Task179 CI 诊断：编译器错误行以 GitHub annotation 浮出——job log 需要登录，

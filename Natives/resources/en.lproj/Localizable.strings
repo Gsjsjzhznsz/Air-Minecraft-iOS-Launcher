@@ -223,7 +223,7 @@
 "preference.title.mod_mirror-official" = "Official Source";
 "preference.title.mod_mirror-mcim" = "MCIM Mirror";
 "preference.title.debug_logging" = "Debug logging";
-"preference.detail.debug_logging" = "Logs internal settings and actions to latestlog.txt. This helps the developers find issues easier, but Minecraft may run slower as the logs will be written to more often.";
+"preference.detail.debug_logging" = "Logs internal settings and actions to latestlog.txt, and (from the next game session) enables verbose renderer diagnostics: texture/draw attribution probes, shader and uniform-block traces, and GL backend logs. This helps the developers find display issues much easier, but Minecraft may run slower as the logs will be written to more often.";
 "preference.title.jitstreamer_server" = "The server address of JitStreamer";
 "preference.detail.jitstreamer_server" = "This option gives custom access to JitStreamer servers for JIT addresses.";
 "preference.title.enable_altkit" = "Enable JIT using AltKit";
@@ -2600,3 +2600,4 @@
 "ame202.ai.cancel" = "Cancel";
 "ame202.ai.new_session" = "New chat";
 "ame202.common.copy" = "Copy";
+

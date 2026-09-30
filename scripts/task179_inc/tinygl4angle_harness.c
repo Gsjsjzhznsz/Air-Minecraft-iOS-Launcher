@@ -953,6 +953,37 @@ void glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint unif
 }
 
 // ============================================================================
+// Task205（ANGLE 黑屏根修验证探针 + 日志等级）：glGetUniformBlockIndex 记名。
+// 根修背景见 spvc_shim.c Task205 块注释——重命名（_uniform_%02d_%02d /
+// _push_constants）经 ES 重写丢失 → 本查询返回 -1 → UBO 线全灭。这个探针
+// 让下轮装机日志【一行定谳修复是否生效】：
+//   idx>=0  = 块找到了（重放成功，若仍黑屏看别处）
+//   idx==-1 = 重放仍失败（看 [spvc-shim] Task205 rename replay 日志）
+// 限频：前 12 条全打 + 之后每 512 条抽样；AMETHYST_LOG_LEVEL=debug 时全打
+// （首 128 条）。装机锚点："[tinygl4angle] Task205 blockIdx:"。
+// ============================================================================
+typedef GLint (*ame205_fn_glGetUniformBlockIndex)(GLuint, const GLchar *);
+static ame205_fn_glGetUniformBlockIndex ame205_ptr_blockIdx;
+GLint glGetUniformBlockIndex(GLuint program, const GLchar *name) {
+    AME173_RESOLVE(ame205_ptr_blockIdx, "glGetUniformBlockIndex");
+    GLint ame205_idx = -1;
+    if (ame205_ptr_blockIdx) {
+        ame205_idx = ame205_ptr_blockIdx(program, name);
+    }
+    static unsigned ame205_blockCalls = 0;
+    unsigned ame205_no = ++ame205_blockCalls;
+    int ame205_debug = (getenv("AMETHYST_LOG_LEVEL") != NULL &&
+                        strcmp(getenv("AMETHYST_LOG_LEVEL"), "debug") == 0);
+    if (ame205_no <= 12 || (ame205_debug && ame205_no <= 128) ||
+        (ame205_no % 512) == 0 || ame205_idx == -1) {
+        printf("[tinygl4angle] Task205 blockIdx: glGetUniformBlockIndex(prog=%u name='%s') -> %d%s\n",
+               (unsigned)program, (name ? name : "(null)"), (int)ame205_idx,
+               (ame205_idx == -1) ? " [NOT FOUND]" : "");
+    }
+    return ame205_idx;
+}
+
+// ============================================================================
 // Task192（ANGLE 黑屏第四轮）：DSA buffer 族实现 + 参数日志。
 // 病历（956ea9b 装机 latestlog.txt，ANGLE 26.3 FO 会话）三铁证：
 //   (1) [Render thread/INFO]: DSA support not detected.
