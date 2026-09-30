@@ -1139,3 +1139,15 @@ Work Log:
 Stage Summary:
 - 修复提交待推送；CI 复跑预期绿（撞符号族已全排除 + glX 守卫族已排除）
 - 下轮 vgpu 判读锚点：预排干后的 "VGPU Task202 teximage/texsub" err 值（真归因）+ preErr 常驻 0x0502 的来源定位（若 texsub 干净则图集上传其实成功，病灶在别处——例如 draw 路径的常驻错误源）
+---
+Task ID: 204 (续三)
+Agent: main (Super Z)
+Task: CI 确认
+
+Work Log:
+- CI run 36660194176（a8ad6df）completed success
+- 提交谱系：38d84c1（主修复，CI 红：glX 悬空）→ 5abcff9（生成器 v2 预处理器感知，CI 红：pack.c 重复符号）→ a8ad6df（生成器 v3 双守卫 + 探针预排干，CI 绿）
+
+Stage Summary:
+- Task204 全链闭环：gl4es 后端钉扎 + vgpu 生成器（双守卫）+ 探针真归因 + ANGLE 数据面观察器；新 IPA 就绪（run 36660194176 artifact）
+- 装机锚点：gl4es 会话 "[egl_bridge] Task204: gl4es backend pin -- glesSlot=YES eglSlot=YES resolver=YES"；vgpu 会话预排干后的 teximage/texsub err 真归因；ANGLE 会话 "Task204 ubo/uniform" 计数行
