@@ -33,6 +33,19 @@ jobs:
     permissions:
       contents: write
 
+    # Task205b：brew 挂死免疫 + 全局限时（run 36722042665 教训：
+    # macos-14 runner 上 brew 步骤网络挂死 70 分钟无输出，只能手动取消）。
+    #   (1) job 级禁用 brew auto-update——runner 镜像自带较新 tap，且
+    #       bottle 下载走 Homebrew downloads 缓存；显式 update 只保留
+    #       Install GNU Make 里带看门狗的一次。
+    #   (2) timeout-minutes=60：健康 run 稳定 8-13 分钟（近 10 次实测），
+    #       BUILD_MOBILEGL=1 场景约 30-45 分钟，60 分钟全覆盖；挂死类
+    #       故障从"无限等到手动取消"变成"限时自动失败可重跑"。
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+    timeout-minutes: 60
+
     steps:
       - name: Select Xcode 15.4
         run: |
@@ -63,8 +76,24 @@ jobs:
           restore-keys: |
             brew-macos14-v1-
       - name: Install GNU Make
+        # Task205b：brew update 看门狗（run 36722042665：tap git fetch
+        # 挂死 70 分钟）。后台跑 brew update，5 分钟未完成即击杀放弃——
+        # 失败模式从"挂死 1 小时"退化成"沿用镜像自带 tap 继续"（runner
+        # 镜像 tap 较新，bottle 404 概率低，且下载有 Homebrew downloads
+        # 缓存兜底）。auto-update 已被 job 级 env 全局禁用，本步骤是全
+        # workflow 唯一显式 update 点。kill -9 后遗留的孤儿 git 进程对
+        # 后续 brew install 无害（install 不再触碰 tap 的 git 元数据）。
         run: |
-          brew update
+          brew update &
+          UPDATE_PID=$!
+          ( sleep 300; kill -9 $UPDATE_PID 2>/dev/null || true ) &
+          WATCHDOG=$!
+          if wait $UPDATE_PID; then
+            echo "[brew] tap update ok"
+          else
+            echo "[brew] tap update timed out/failed -- continuing with preinstalled taps"
+          fi
+          kill $WATCHDOG 2>/dev/null || true
           brew install make ccache
 
       - name: Install Java 8 (Temurin) via Homebrew

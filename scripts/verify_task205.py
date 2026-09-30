@@ -25,6 +25,8 @@
      D1 两路 actions/cache 步骤 + 键含 vgpu 源码 hash
      D2 brew install make ccache + CC/CXX 接线 + show-stats
      D3 YAML 可解析（CRLF 保真）
+  E. brew 挂死免疫（Task205b，run 36722042665 教训）
+     E1 job 级禁 auto-update + timeout-minutes + brew update 看门狗
 """
 import os
 import re
@@ -261,6 +263,29 @@ try:
 except ImportError:
     check("D4 YAML 可解析（PyYAML 缺失，降级为括号检查）",
           WF_RAW.count("actions/cache@v4") == 2)
+
+# ============ E. brew 挂死免疫（Task205b，run 36722042665 教训） ============
+# 事故：caf4591 首跑（run 36722042665）brew 步骤在 macos-14 runner 上
+# 网络挂死 70 分钟无输出，被迫手动取消。加固三件：
+#   job 级禁用 auto-update、brew update 看门狗（5 分钟限时）、job 级
+#   timeout-minutes=60（健康 run 实测 8-13 分钟）。
+WF_NORM = WF_RAW.replace("\r\n", "\n")
+check("E1a job 级禁用 auto-update + 全局限时",
+      'HOMEBREW_NO_AUTO_UPDATE: "1"' in WF_RAW
+      and 'HOMEBREW_NO_INSTALL_CLEANUP: "1"' in WF_RAW
+      and "timeout-minutes: 60" in WF_RAW)
+check("E1b brew update 看门狗（后台 + 限时击杀 + 等待判定）",
+      "brew update &" in WF_RAW
+      and "( sleep 300; kill -9 $UPDATE_PID 2>/dev/null || true ) &" in WF_RAW
+      and "if wait $UPDATE_PID; then" in WF_RAW
+      and "kill $WATCHDOG 2>/dev/null || true" in WF_RAW)
+check("E1c 挂死容忍路径（超时后继续安装）",
+      "timed out/failed -- continuing with preinstalled taps" in WF_RAW
+      and "brew install make ccache" in WF_RAW)
+bare_updates = re.findall(r"(?m)^[ \t]*brew update[ \t]*$", WF_NORM)
+check("E1d 无裸 brew update（唯一调用在看门狗内）",
+      len(bare_updates) == 0 and WF_RAW.count("brew update &") == 1,
+      "bare=%d watched=%d" % (len(bare_updates), WF_RAW.count("brew update &")))
 
 print("\n%d passed, %d failed" % (passed, len(failures)))
 if failures:
