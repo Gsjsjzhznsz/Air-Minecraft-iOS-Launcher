@@ -1200,3 +1200,24 @@ Work Log:
 Stage Summary:
 - Task205 自有验证 + 可机械修复的级联全部清零；公告锚/harness 桩两族存量债务已定谳并记录，不阻塞渲染器修复主线
 - 提交 3086a42 已含三修复+两功能；本轮验证器重锚与外层工作区重建随 amend 入库
+
+---
+Task ID: 205b/c/d
+Agent: main (Super Z)
+Task: caf4591 推送后 CI 三轮事故根修（brew 挂死类 + 首次 CI 编译暴露的代码错误）→ 81c3dc9 CI 绿
+
+Work Log:
+- 推送态勘误：Task205 主体提交最终哈希为 caf4591（前段记录的 3086a42 是 amend 前旧哈希，验证器重锚随 amend 一并入库）
+- 事故一（run 36722042665，原始"70 分钟挂死"）：Task205b 初诊"runner 网络挂死"并加 brew update 看门狗（d009320）——后经三份日志取证定谳为【误诊】：brew update 三次实测 30-33 秒健康完成；真凶是 brew install ccache 在 macos-14 上解析出 llvm@22/rust/ruby/gcc 依赖树（无 arm64_sonoma bottle）→ 源码编译 LLVM/Clang，cmake --build 近零输出酷似挂死
+- 事故二（36735179980 attempt 2）：看门狗击杀在途 brew update → tap 半更新毒化 → ChecksumMismatchError: SHA-256 mismatch——看门狗方案有害，RETRACTED
+- Task205c（c6c749c）终案：① ccache 移出 brew，改官方预编译 ccache-4.14.1-darwin.tar.gz（fat 通用二进制 x86_64+arm64，仅链系统库，本地解包验证架构后采用），装进 ~/.local/ccache-tool 并入 actions/cache（键含版本）② brew 只装 make ③ brew update 改容错（|| true），挂死极端交 job 级 timeout-minutes=60 兜底 ④ 构建步骤 PATH 前置 ccache-tool 防遮蔽
+- 事故三（run 36739697080，c6c749c 首跑）：工具链四步骤全过（brew+ccache 预编译方案生效），但构建在 tinygl4angle.c:988 报 conflicting types——caf4591 的原生代码此前从未被 CI 编译（两连死在 brew），glGetUniformBlockIndex 被我写成 GLint（-1 判未找到），mesa glext.h 声明 GLuint（GL_INVALID_INDEX=0xFFFFFFFFu 判未找到）。vgpu_core（buffers.c 墓碑重写+fpe.c tracer）同 run 编译通过
+- 逃逸机制定谳：task193 本地门编译真源码但用 task179_inc/ stub 头，stub glext.h 是空壳 → 真头类型冲突本地不可见、CI 独有。修法双保险：stub glext.h 补 mesa 逐字原型+GL_INVALID_INDEX（证明实验：GLint 版+新 stub = 本地即报 conflicting types）+ verify_task205 C4c 全量文本级 lint（tinygl4angle.c 全部文件作用域定义 vs mesa glext.h 全部 GLAPI 原型比对返回类型）
+- 同场 ABI 审计修复：spvc_compiler_set_entry_point 真头（spirv_cross_c.h）返回 spvc_result（枚举=int ABI），Task205 拦截写成 void——调用方查返回值会读垃圾寄存器。改 int 返回+转发真实库 rc；重放 typedef set_entry_fn_t 同步
+- Task205d（81c3dc9）：tinygl4angle.c GLuint 化+GL_INVALID_INDEX 语义+日志 %u；spvc_shim.c int 返回；stub 头+ harness 镜像同步；verify_task205 47/47（A1b rc 转发锚、C4 GLuint 化、新 C4b/C4c）
+- CI 终局：run 36741829344（81c3dc9）success 14m37s；产物 com.air-devs.air-ios.ipa/tipa（210MB×2）+dSM；ccache 冷跑基线 751/827 可缓存、749 miss（99.7%）——三路缓存（ccache 编译缓存/brew 下载/ccache 本体）全部保存成功，下一轮起命中提速
+
+Stage Summary:
+- CI 闭环达成：caf4591（渲染器双根修+日志等级+CI 缓存）→ d009320（看门狗，后撤）→ c6c749c（ccache 预编译直装+看门狗 RETRACTED）→ 81c3dc9（GLuint 编译修复+ABI 修复+门逃逸堵死）→ 36741829344 绿 + IPA 就绪
+- 新增防回归资产：stub glext.h 真原型、C4c 原型冲突 lint、timeout-minutes=60、ccache 三路缓存
+- 装机锚点不变：ANGLE "[spvc-shim] Task205 rename replay" + "[tinygl4angle] Task205 blockIdx: ... -> 非 4294967295"；vgpu "VGPU Task205 tombstone" + 条纹消失；gl4es 开 debug 日志定位
