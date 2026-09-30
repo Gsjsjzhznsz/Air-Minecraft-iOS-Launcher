@@ -22,11 +22,11 @@
      C4 tinygl4angle glGetUniformBlockIndex 观察器（ANGLE 修复验证探针）
      C5 .strings 详情文案升级（en + zh-Hans）且表可解析
   D. CI 缓存
-     D1 两路 actions/cache 步骤 + 键含 vgpu 源码 hash
-     D2 brew install make ccache + CC/CXX 接线 + show-stats
+     D1 三路 actions/cache 步骤（编译缓存/brew 下载/ccache 本体）
+     D2 brew 只装 make（ccache 已移出 brew，官方预编译直装）+ CC/CXX 接线
      D3 YAML 可解析（CRLF 保真）
-  E. brew 挂死免疫（Task205b，run 36722042665 教训）
-     E1 job 级禁 auto-update + timeout-minutes + brew update 看门狗
+  E. brew 加固（Task205b/c，三份装机日志教训链）
+     E1 job 级禁 auto-update + timeout-minutes + update 容错（看门狗 RETRACTED）
 """
 import os
 import re
@@ -248,7 +248,20 @@ check("D1a ccache 缓存步骤",
 check("D1b Homebrew 缓存步骤",
       "Cache Homebrew downloads" in WF_RAW
       and "path: ~/Library/Caches/Homebrew/downloads" in WF_RAW)
-check("D2a brew 安装 ccache", "brew install make ccache" in WF_RAW)
+check("D1c ccache 本体缓存步骤（Task205c）",
+      "Cache ccache tool itself" in WF_RAW
+      and "key: ccache-tool-macos14-v1-4.14.1" in WF_RAW
+      and "path: ~/.local/ccache-tool" in WF_RAW)
+WF_NORM = WF_RAW.replace("\r\n", "\n")
+check("D2a brew 只装 make（ccache 已移出 brew）",
+      "brew install make ccache" not in WF_RAW
+      and re.search(r"(?m)^[ \t]*brew install make[ \t]*$", WF_NORM) is not None)
+check("D2d ccache 官方预编译直装（brew-free）",
+      "ccache-${CCACHE_TOOL_VERSION}-darwin.tar.gz" in WF_RAW
+      and 'CCACHE_TOOL_VERSION: "4.14.1"' in WF_RAW
+      and 'echo "$PREFIX/bin" >> "$GITHUB_PATH"' in WF_RAW)
+check("D2e 构建步骤 PATH 前置 ccache-tool",
+      'export PATH="$HOME/.local/ccache-tool/bin:/opt/homebrew/bin:$PATH"' in WF_RAW)
 check("D2b CC/CXX 接线",
       'export CC="ccache clang"' in WF_RAW and 'export CXX="ccache clang++"' in WF_RAW
       and 'export CCACHE_DIR="$HOME/.ccache"' in WF_RAW)
@@ -259,33 +272,35 @@ try:
     doc = yaml.safe_load(WF_RAW)
     steps = doc["jobs"]["build"]["steps"]
     cache_steps = [s for s in steps if str(s.get("uses", "")).startswith("actions/cache")]
-    check("D4 YAML 可解析且含 2 个 cache 步骤", len(cache_steps) == 2)
+    check("D4 YAML 可解析且含 3 个 cache 步骤", len(cache_steps) == 3)
 except ImportError:
     check("D4 YAML 可解析（PyYAML 缺失，降级为括号检查）",
-          WF_RAW.count("actions/cache@v4") == 2)
+          WF_RAW.count("actions/cache@v4") == 3)
 
-# ============ E. brew 挂死免疫（Task205b，run 36722042665 教训） ============
-# 事故：caf4591 首跑（run 36722042665）brew 步骤在 macos-14 runner 上
-# 网络挂死 70 分钟无输出，被迫手动取消。加固三件：
-#   job 级禁用 auto-update、brew update 看门狗（5 分钟限时）、job 级
-#   timeout-minutes=60（健康 run 实测 8-13 分钟）。
-WF_NORM = WF_RAW.replace("\r\n", "\n")
+# ============ E. brew 加固（Task205b/c，三份装机日志教训链） ============
+# 事故一（36722042665，70 分钟）：brew install ccache 在 macos-14 上解析出
+#   llvm@22/rust/ruby/gcc 依赖树（均无 arm64_sonoma bottle）→ 源码编译
+#   LLVM/Clang；cmake --build 近零输出酷似网络挂死——初诊"网络挂死"为
+#   误诊（RETRACTED），Task205c 修正。
+# 事故二（36735179980 attempt 2）：Task205b 看门狗击杀在途 brew update
+#   → tap 半更新毒化 → ChecksumMismatchError。看门狗方案 RETRACTED。
+# 终案：ccache 移出 brew（官方预编译包，见 D2d）；brew update 容错；
+#   job 级禁 auto-update + timeout-minutes=60 兜底一切挂死类。
 check("E1a job 级禁用 auto-update + 全局限时",
       'HOMEBREW_NO_AUTO_UPDATE: "1"' in WF_RAW
       and 'HOMEBREW_NO_INSTALL_CLEANUP: "1"' in WF_RAW
       and "timeout-minutes: 60" in WF_RAW)
-check("E1b brew update 看门狗（后台 + 限时击杀 + 等待判定）",
-      "brew update &" in WF_RAW
-      and "( sleep 300; kill -9 $UPDATE_PID 2>/dev/null || true ) &" in WF_RAW
-      and "if wait $UPDATE_PID; then" in WF_RAW
-      and "kill $WATCHDOG 2>/dev/null || true" in WF_RAW)
-check("E1c 挂死容忍路径（超时后继续安装）",
-      "timed out/failed -- continuing with preinstalled taps" in WF_RAW
-      and "brew install make ccache" in WF_RAW)
-bare_updates = re.findall(r"(?m)^[ \t]*brew update[ \t]*$", WF_NORM)
-check("E1d 无裸 brew update（唯一调用在看门狗内）",
-      len(bare_updates) == 0 and WF_RAW.count("brew update &") == 1,
-      "bare=%d watched=%d" % (len(bare_updates), WF_RAW.count("brew update &")))
+check("E1b brew update 容错且看门狗已撤（RETRACTED）",
+      re.search(r"(?m)^[ \t]*brew update \|\| true[ \t]*$", WF_NORM) is not None
+      and "UPDATE_PID" not in WF_RAW and "sleep 300" not in WF_RAW)
+check("E1c 无 ccache 残留于 brew",
+      "brew install make ccache" not in WF_RAW)
+updates = re.findall(r"(?m)^[ \t]*brew update[ \t]*(?:\|\| true)?[ \t]*$", WF_NORM)
+check("E1d brew update 唯一且容错", len(updates) == 1,
+      "updates=%d" % len(updates))
+check("E1e 事故教训锚在案（LLVM 源码编译 + 看门狗毒化 tap）",
+      "ChecksumMismatchError" in WF_RAW and "LLVM" in WF_RAW
+      and "RETRACTED" in WF_RAW)
 
 print("\n%d passed, %d failed" % (passed, len(failures)))
 if failures:

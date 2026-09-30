@@ -33,14 +33,13 @@ jobs:
     permissions:
       contents: write
 
-    # Task205b：brew 挂死免疫 + 全局限时（run 36722042665 教训：
-    # macos-14 runner 上 brew 步骤网络挂死 70 分钟无输出，只能手动取消）。
-    #   (1) job 级禁用 brew auto-update——runner 镜像自带较新 tap，且
-    #       bottle 下载走 Homebrew downloads 缓存；显式 update 只保留
-    #       Install GNU Make 里带看门狗的一次。
+    # Task205b/c：brew 加固 + 全局限时（run 36722042665 教训）。
+    #   (1) job 级禁用 brew auto-update——auto-update 可在任意 brew
+    #       调用里复发；显式 update 只在 Install GNU Make 容错跑一次
+    #       （Task205c 撤销看门狗：击杀在途 update 会毒化 tap）。
     #   (2) timeout-minutes=60：健康 run 稳定 8-13 分钟（近 10 次实测），
-    #       BUILD_MOBILEGL=1 场景约 30-45 分钟，60 分钟全覆盖；挂死类
-    #       故障从"无限等到手动取消"变成"限时自动失败可重跑"。
+    #       BUILD_MOBILEGL=1 场景约 30-45 分钟，60 分钟全覆盖；任何
+    #       挂死类故障从"无限等到手动取消"变成"限时自动失败可重跑"。
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
       HOMEBREW_NO_INSTALL_CLEANUP: "1"
@@ -75,26 +74,50 @@ jobs:
           key: brew-macos14-v1-${{ hashFiles('.github/workflows/development.yml') }}
           restore-keys: |
             brew-macos14-v1-
+      - name: Cache ccache tool itself
+        # Task205c：ccache 本体也进缓存（官方预编译 darwin 包 ~2MB，
+        # x86_64+arm64 通用二进制）。键含版本号：升版本自动失效重取。
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/ccache-tool
+          key: ccache-tool-macos14-v1-4.14.1
+
       - name: Install GNU Make
-        # Task205b：brew update 看门狗（run 36722042665：tap git fetch
-        # 挂死 70 分钟）。后台跑 brew update，5 分钟未完成即击杀放弃——
-        # 失败模式从"挂死 1 小时"退化成"沿用镜像自带 tap 继续"（runner
-        # 镜像 tap 较新，bottle 404 概率低，且下载有 Homebrew downloads
-        # 缓存兜底）。auto-update 已被 job 级 env 全局禁用，本步骤是全
-        # workflow 唯一显式 update 点。kill -9 后遗留的孤儿 git 进程对
-        # 后续 brew install 无害（install 不再触碰 tap 的 git 元数据）。
+        # Task205c（撤销 Task205b 看门狗，RETRACTED）：三份日志定谳——
+        # 原始 70 分钟"网络挂死"实为 brew install ccache 触发 LLVM/Clang
+        # 源码编译（cmake --build 近零输出酷似挂死）；brew update 本体
+        # 三次实测 30-33 秒。看门狗击杀在途 update 反而毒化 tap
+        # （36735179980 attempt 2：ChecksumMismatchError）。现方案：
+        # update 容错（快速失败继续用镜像 tap），挂死类极端情况交给
+        # job 级 timeout-minutes=60 兜底。
         run: |
-          brew update &
-          UPDATE_PID=$!
-          ( sleep 300; kill -9 $UPDATE_PID 2>/dev/null || true ) &
-          WATCHDOG=$!
-          if wait $UPDATE_PID; then
-            echo "[brew] tap update ok"
+          brew update || true
+          brew install make
+
+      - name: Install ccache (upstream prebuilt, brew-free)
+        # Task205c：ccache 移出 brew。brew 的 ccache 在 macos-14 上解析
+        # 出 llvm@22/rust/ruby/gcc 依赖树：llvm@22 无 arm64_sonoma
+        # bottle -> 源码编译 LLVM+Clang（1-2 小时级，即 36722042665
+        # 的 70 分钟"挂死"真身）；openssl@3 3.6.5 同样源码编译且
+        # brew link 撞镜像内 openssl@1.1 符号冲突。官方 release 的
+        # darwin 包仅链系统库（libSystem/libc++）——解包即用 ~5 秒。
+        env:
+          CCACHE_TOOL_VERSION: "4.14.1"
+        run: |
+          set -e
+          PREFIX="$HOME/.local/ccache-tool"
+          mkdir -p "$PREFIX/bin"
+          if [ -x "$PREFIX/bin/ccache" ] && "$PREFIX/bin/ccache" --version 2>/dev/null | head -1 | grep -q "$CCACHE_TOOL_VERSION"; then
+            echo "[ccache-tool] cache hit: $("$PREFIX/bin/ccache" --version | head -1)"
           else
-            echo "[brew] tap update timed out/failed -- continuing with preinstalled taps"
+            echo "[ccache-tool] fetching upstream prebuilt (brew dependency tree avoided)"
+            curl -fsSL "https://github.com/ccache/ccache/releases/download/v${CCACHE_TOOL_VERSION}/ccache-${CCACHE_TOOL_VERSION}-darwin.tar.gz" -o /tmp/ccache-darwin.tar.gz
+            tar -xzf /tmp/ccache-darwin.tar.gz -C /tmp
+            cp "/tmp/ccache-${CCACHE_TOOL_VERSION}-darwin/ccache" "$PREFIX/bin/ccache"
+            chmod +x "$PREFIX/bin/ccache"
+            "$PREFIX/bin/ccache" --version | head -1
           fi
-          kill $WATCHDOG 2>/dev/null || true
-          brew install make ccache
+          echo "$PREFIX/bin" >> "$GITHUB_PATH"
 
       - name: Install Java 8 (Temurin) via Homebrew
         run: |
@@ -162,7 +185,7 @@ jobs:
           BUILD_MOBILEGL: ${{ vars.BUILD_MOBILEGL }}
         run: |
           set -o pipefail
-          export PATH=/opt/homebrew/bin:$PATH
+          export PATH="$HOME/.local/ccache-tool/bin:/opt/homebrew/bin:$PATH"
           export SLIMMED=0
           export BUILD_MOBILEGL="${BUILD_MOBILEGL:-0}"
           # Task205：ccache 接线（仅影响 cmake 侧 C/C++ 编译；javac 不受
