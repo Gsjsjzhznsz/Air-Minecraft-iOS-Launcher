@@ -120,9 +120,10 @@ check("A11 proc_address resolver_global 槽位 = 0x1E3F98（adrp+ldr #0xf98 对�
 print("== B. vgpu darwin aliases (coverage closure) ==")
 gen = rd("scripts/task204_vgpu_gen_aliases.py")
 al = rd("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c")
-check("B1 生成器入库（幂等 + 注释剥离 + 布局不缩）",
+check("B1 生成器入库（幂等 + 注释剥离 + 预处理器感知 + 布局不缩）",
       os.path.exists("scripts/task204_vgpu_gen_aliases.py")
-      and "def strip_comments" in gen and "never shrink" in gen)
+      and "def strip_comments" in gen and "never shrink" in gen
+      and "DEFINES = " in gen and "NOX11" in gen)
 names = set(re.findall(r'\.global _([A-Za-z0-9_]+)', al))
 core = ["glEnable", "glGenTextures", "glDeleteTextures", "glBindTexture",
         "glTexParameteri", "glTexImage2D", "glTexSubImage2D", "glActiveTexture",
@@ -135,36 +136,27 @@ check("B2 核心导出全覆盖（a599782 NULL #7-#15 全家 + 渲染主干）",
       all(("_" + n + "\\n") in al for n in core),
       )
 check("B3 无重复 .global 条目", len(names) == al.count(".global _"))
-check("B4 覆盖规模（>=1100：legacy 944 + Task204 增量）", len(names) >= 1100)
+check("B4 覆盖规模（>=1080：legacy 944 + Task204 增量 150）", len(names) >= 1080)
 check("B5 幻影防护（注释块内的 glGetVertexAttribdv 不导出——其声明被注释包裹；ARB 变体保留）",
       ".global _glGetVertexAttribdv\\n" not in al and ".global _glGetVertexAttribdvARB\\n" in al)
-# zero dangling NEW targets: every _gl4es_* branch target exists as a literal
-# definition in the (comment-stripped) sources or was in the legacy 944
-def strip_comments(t):
-    t = re.sub(r'/\*.*?\*/', '', t, flags=re.S)
-    t = re.sub(r'//[^\n]*', '', t)
-    return t
-import glob
-src_all = ""
-for f in glob.glob("Natives/external/vgpu/src/**/*.c", recursive=True):
-    if "darwin_aliases" in f:
-        continue
-    src_all += strip_comments(rd(f))
-legacy = subprocess.run(
-    ["git", "show", "HEAD:Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c"],
-    capture_output=True, text=True).stdout
-legacy_names = set(re.findall(r'\.global _([A-Za-z0-9_]+)', legacy))
-dangling = []
-for line in al.splitlines():
-    m = re.search(r'\.global _([A-Za-z0-9_]+)\\n\\t_\1: b _([A-Za-z0-9_]+)', line)
-    if not m:
-        continue
-    name, tgt = m.group(1), m.group(2)
-    if name in legacy_names:
-        continue  # device-proven legacy entry
-    if (tgt + "(") not in src_all:
-        dangling.append(name)
-check("B6 新增导出零悬空（分支目标全部有定义——链接安全）", not dangling)
+# CI round-1 lesson: the guarded-out glX* family MUST NOT be aliased (their
+# definitions live inside #ifndef NOX11 which the build compiles away).
+glx_now = sorted(n for n in names if n.startswith("glX"))
+LEGACY_GLX = {"glXGetProcAddress", "glXGetProcAddressARB", "glXReleaseBuffersMESA",
+              "glXSwapInterval", "glXSwapIntervalMESA", "glXSwapIntervalSGI",
+              "glXWaitGL", "glXWaitX"}
+check("B6 CI 教训锚：glX 守卫族排除（NOX11 编译掉定义体的家族不得导出；仅留 8 个无条件遗留项）",
+      set(glx_now) == LEGACY_GLX
+      and ".global _glXCreateContext\\n" not in al
+      and ".global _glXChooseFBConfig\\n" not in al)
+# idempotency + internal dangling guard: rerun the generator, expect exit 0
+# and a byte-identical file.
+before = open("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c", "rb").read()
+r = subprocess.run([sys.executable, "scripts/task204_vgpu_gen_aliases.py"],
+                   capture_output=True, text=True)
+after = open("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c", "rb").read()
+check("B7 生成器重跑幂等 + 内建悬空守卫（exit 0 且文件字节不变）",
+      r.returncode == 0 and before == after)
 
 print("== C. ANGLE round-2 + 探针卫生 ==")
 tg = rd("Natives/external/gl4es/tinygl4angle.c")

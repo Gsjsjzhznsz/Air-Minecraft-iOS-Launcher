@@ -12,12 +12,15 @@
 // were silently unexported -- MC's caps then fell through dlsym(handle, name)
 // to the DEPENDENCY images (raw bundled ANGLE), bypassing vgpu's desktop-GL
 // translation and corrupting textures (two GL id-namespaces, one context).
-// This file now covers AliasExport declarations from EVERY built source file.
+// This file now covers AliasExport declarations from EVERY built source file,
+// preprocessor-evaluated with the build's define set (NOX11 NO_GBM NOEGL
+// DEFAULT_ES=3 SHAREDLIB) so guarded-out code (the glX* family) cannot dangle.
 //
-// Regenerate after touching any AliasExport line or the CMake source lists:
+// Regenerate after touching any AliasExport line, build define, or the CMake
+// source lists:
 //   python3 scripts/task204_vgpu_gen_aliases.py
 //
-// Coverage: 1131 exports (1131 legacy + 0 Task204 additions).
+// Coverage: 1094 exports (1094 legacy + 0 Task204 additions).
 // ============================================================================
 #if defined(__APPLE__)
 __asm__(".global _glAccum\n\t_glAccum: b _gl4es_glAccum\n");
@@ -1106,49 +1109,12 @@ __asm__(".global _glWindowPos3ui\n\t_glWindowPos3ui: b _gl4es_glWindowPos3ui\n")
 __asm__(".global _glWindowPos3uiv\n\t_glWindowPos3uiv: b _gl4es_glWindowPos3uiv\n");
 __asm__(".global _glWindowPos3us\n\t_glWindowPos3us: b _gl4es_glWindowPos3us\n");
 __asm__(".global _glWindowPos3usv\n\t_glWindowPos3usv: b _gl4es_glWindowPos3usv\n");
-__asm__(".global _glXChooseFBConfig\n\t_glXChooseFBConfig: b _gl4es_glXChooseFBConfig\n");
-__asm__(".global _glXChooseFBConfigSGIX\n\t_glXChooseFBConfigSGIX: b _gl4es_glXChooseFBConfig\n");
-__asm__(".global _glXChooseVisual\n\t_glXChooseVisual: b _gl4es_glXChooseVisual\n");
-__asm__(".global _glXCopyContext\n\t_glXCopyContext: b _gl4es_glXCopyContext\n");
-__asm__(".global _glXCreateContext\n\t_glXCreateContext: b _gl4es_glXCreateContext\n");
-__asm__(".global _glXCreateContextAttribs\n\t_glXCreateContextAttribs: b _gl4es_glXCreateContextAttribs\n");
-__asm__(".global _glXCreateContextAttribsARB\n\t_glXCreateContextAttribsARB: b _gl4es_glXCreateContextAttribsARB\n");
-__asm__(".global _glXCreateGLXPixmap\n\t_glXCreateGLXPixmap: b _gl4es_glXCreateGLXPixmap\n");
-__asm__(".global _glXCreateNewContext\n\t_glXCreateNewContext: b _gl4es_glXCreateNewContext\n");
-__asm__(".global _glXCreatePbuffer\n\t_glXCreatePbuffer: b _gl4es_glXCreatePbuffer\n");
-__asm__(".global _glXCreatePixmap\n\t_glXCreatePixmap: b _gl4es_glXCreatePixmap\n");
-__asm__(".global _glXCreateWindow\n\t_glXCreateWindow: b _gl4es_glXCreateWindow\n");
-__asm__(".global _glXDestroyContext\n\t_glXDestroyContext: b _gl4es_glXDestroyContext\n");
-__asm__(".global _glXDestroyGLXPixmap\n\t_glXDestroyGLXPixmap: b _gl4es_glXDestroyGLXPixmap\n");
-__asm__(".global _glXDestroyPbuffer\n\t_glXDestroyPbuffer: b _gl4es_glXDestroyPbuffer\n");
-__asm__(".global _glXDestroyPixmap\n\t_glXDestroyPixmap: b _gl4es_glXDestroyPixmap\n");
-__asm__(".global _glXDestroyWindow\n\t_glXDestroyWindow: b _gl4es_glXDestroyWindow\n");
-__asm__(".global _glXGetClientString\n\t_glXGetClientString: b _gl4es_glXGetClientString\n");
-__asm__(".global _glXGetConfig\n\t_glXGetConfig: b _gl4es_glXGetConfig\n");
-__asm__(".global _glXGetCurrentContext\n\t_glXGetCurrentContext: b _gl4es_glXGetCurrentContext\n");
-__asm__(".global _glXGetCurrentDisplay\n\t_glXGetCurrentDisplay: b _gl4es_glXGetCurrentDisplay\n");
-__asm__(".global _glXGetCurrentDrawable\n\t_glXGetCurrentDrawable: b _gl4es_glXGetCurrentDrawable\n");
-__asm__(".global _glXGetFBConfigAttrib\n\t_glXGetFBConfigAttrib: b _gl4es_glXGetFBConfigAttrib\n");
-__asm__(".global _glXGetFBConfigs\n\t_glXGetFBConfigs: b _gl4es_glXGetFBConfigs\n");
 __asm__(".global _glXGetProcAddress\n\t_glXGetProcAddress: b _gl4es_glXGetProcAddress\n");
 __asm__(".global _glXGetProcAddressARB\n\t_glXGetProcAddressARB: b _gl4es_glXGetProcAddress\n");
-__asm__(".global _glXGetVisualFromFBConfig\n\t_glXGetVisualFromFBConfig: b _gl4es_glXGetVisualFromFBConfig\n");
-__asm__(".global _glXIsDirect\n\t_glXIsDirect: b _gl4es_glXIsDirect\n");
-__asm__(".global _glXMakeContextCurrent\n\t_glXMakeContextCurrent: b _gl4es_glXMakeContextCurrent\n");
-__asm__(".global _glXMakeCurrent\n\t_glXMakeCurrent: b _gl4es_glXMakeCurrent\n");
-__asm__(".global _glXQueryContext\n\t_glXQueryContext: b _gl4es_glXQueryContext\n");
-__asm__(".global _glXQueryDrawable\n\t_glXQueryDrawable: b _gl4es_glXQueryDrawable\n");
-__asm__(".global _glXQueryExtension\n\t_glXQueryExtension: b _gl4es_glXQueryExtension\n");
-__asm__(".global _glXQueryExtensionsString\n\t_glXQueryExtensionsString: b _gl4es_glXQueryExtensionsString\n");
-__asm__(".global _glXQueryServerString\n\t_glXQueryServerString: b _gl4es_glXQueryServerString\n");
-__asm__(".global _glXQueryVersion\n\t_glXQueryVersion: b _gl4es_glXQueryVersion\n");
 __asm__(".global _glXReleaseBuffersMESA\n\t_glXReleaseBuffersMESA: b _gl4es_glXReleaseBuffersMESA\n");
-__asm__(".global _glXSwapBuffers\n\t_glXSwapBuffers: b _gl4es_glXSwapBuffers\n");
 __asm__(".global _glXSwapInterval\n\t_glXSwapInterval: b _gl4es_glXSwapInterval\n");
-__asm__(".global _glXSwapIntervalEXT\n\t_glXSwapIntervalEXT: b _gl4es_glXSwapIntervalEXT\n");
 __asm__(".global _glXSwapIntervalMESA\n\t_glXSwapIntervalMESA: b _gl4es_glXSwapInterval\n");
 __asm__(".global _glXSwapIntervalSGI\n\t_glXSwapIntervalSGI: b _gl4es_glXSwapInterval\n");
-__asm__(".global _glXUseXFont\n\t_glXUseXFont: b _gl4es_glXUseXFont\n");
 __asm__(".global _glXWaitGL\n\t_glXWaitGL: b _gl4es_glXWaitGL\n");
 __asm__(".global _glXWaitX\n\t_glXWaitX: b _gl4es_glXWaitX\n");
 #endif

@@ -3293,9 +3293,14 @@
 //     vgpu's translation entirely. Two GL id-namespaces on one context:
 //     MC's textures vs vgpu's internal wrap-FBO textures collide ->
 //     corrupted materials. Fix: scripts/task204_vgpu_gen_aliases.py
-//     regenerates the file as legacy-944 UNION every AliasExport in the
-//     CMake-built sources (1131 exports, +187, comment-stripped so
-//     phantom declarations in commented-out blocks cannot dangle).
+//     regenerates the file as legacy-944 UNION every AliasExport that
+//     survives the build's preprocessor (NOX11 NO_GBM NOEGL DEFAULT_ES=3
+//     SHAREDLIB evaluated; 1094 exports, +150, comment-stripped so phantom
+//     declarations cannot dangle). CI round-1 lesson baked in: the naive
+//     scan aliased the glX* family whose definitions live inside
+//     #ifndef NOX11 blocks the build compiles away -> link failure; the
+//     preprocessor evaluation now excludes them and the generator refuses
+//     to emit a file with dangling new targets.
 // (3) ANGLE black screen round 2: geometry IS submitted (4000+ instanced
 //     quads), caps path healthy, 58fps swaps -- but center pixel is
 //     (0,0,0,0) = clearColor: everything renders outside the viewport

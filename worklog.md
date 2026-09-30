@@ -1110,3 +1110,17 @@ Work Log:
 Stage Summary:
 - 装机锚点：gl4es 会话 "[egl_bridge] Task204: gl4es backend pin -- glesSlot=YES eglSlot=YES resolver=YES" + 1.8.9 应越过 status:0 活到主菜单/进游戏；vgpu 会话材质应恢复正常（导出闭环后 MC 全 API 走 vgpu 转译）；ANGLE 会话看 "Task204 ubo/uniform" 计数行（绑定零+数据面零 = Java gate；数据面有 = native 丢失）
 - ANGLE 黑屏预计本轮不收口（观察器轮）；下轮判读优先级：① Task204 数据面计数 ② gl4es 1.8.9 回归确认 ③ vgpu 材质确认
+---
+Task ID: 204 (续)
+Agent: main (Super Z)
+Task: CI run 36657392103（38d84c1）失败修复 + 重推
+
+Work Log:
+- CI 判读："Build for ios" 步骤 clang link 失败：Undefined symbols——gl4es_glXChooseFBConfig/glXCreateContext 等 glX 全族 referenced from vgpu_darwin_aliases.c.o。根因：生成器初版只做注释剥离、无预处理器感知——glx.c 的 AliasExport 声明在 #ifndef NOX11 块内，源文本里有（悬空检查被哄过），但构建 -DNOX11 把定义体编没了 → asm 别名分支到不存在的符号
+- 修法（生成器 v2）：active_lines() 预处理器求值器——按 CMake 的 define 集（NOX11 NO_GBM NOEGL DEFAULT_ES=3 SHAREDLIB + __APPLE__）求值 #if/#ifdef/#ifndef/#elif/#else/#endif（defined()/&&/||/!/裸宏，未知表达式保守放行+警告）；声明扫描与定义扫描都走预处理后的活跃行；内建悬空守卫升级为 exit 1（新别名目标无幸存定义即拒写文件）
+- 从 3bf56ee 恢复真基线（944）再生成：1094 条（944 遗留 + 150 增量）；glX 守卫族全排除（仅剩 8 个无条件遗留项：glXGetProcAddress/ARB、SwapInterval 族、WaitGL/WaitX——CI 多月绿证安全）；核心覆盖/幻影防护/幂等/语法全过
+- verify_task204 B 组重锚：B1 加预处理器感知锚；B4 >=1080；B6 改为 CI 教训锚（glX 守卫族排除 + 8 遗留项白名单）；B7 新增（生成器重跑 exit 0 + 字节不变）→ 29/29
+- version.h 附录数字修正（1094/+150 + CI 教训）
+
+Stage Summary:
+- 修复提交待推送；CI 复跑预期绿（glX 族已出局）；装机锚点不变
