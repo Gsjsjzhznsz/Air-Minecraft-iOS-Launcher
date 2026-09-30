@@ -976,18 +976,22 @@ void glUniformBlockBinding(GLuint program, GLuint uniformBlockIndex, GLuint unif
 // ============================================================================
 // Task205（ANGLE 黑屏根修验证探针 + 日志等级）：glGetUniformBlockIndex 记名。
 // 根修背景见 spvc_shim.c Task205 块注释——重命名（_uniform_%02d_%02d /
-// _push_constants）经 ES 重写丢失 → 本查询返回 -1 → UBO 线全灭。这个探针
-// 让下轮装机日志【一行定谳修复是否生效】：
-//   idx>=0  = 块找到了（重放成功，若仍黑屏看别处）
-//   idx==-1 = 重放仍失败（看 [spvc-shim] Task205 rename replay 日志）
+// _push_constants）经 ES 重写丢失 → 本查询全 GL_INVALID_INDEX → UBO 线全灭。
+// 这个探针让下轮装机日志【一行定谳修复是否生效】：
+//   idx != GL_INVALID_INDEX = 块找到了（重放成功，若仍黑屏看别处）
+//   idx == GL_INVALID_INDEX = 重放仍失败（看 [spvc-shim] Task205 rename replay 日志）
 // 限频：前 12 条全打 + 之后每 512 条抽样；AMETHYST_LOG_LEVEL=debug 时全打
 // （首 128 条）。装机锚点："[tinygl4angle] Task205 blockIdx:"。
+// Task205c 返回类型勘误：mesa glext.h（及全部 Khronos 系头）声明本函数
+// 返回 GLuint（GL_INVALID_INDEX=0xFFFFFFFFu 表未找到）——初版写成 GLint
+// （用 -1 判未找到）与真头冲突，CI run 36739697080 编译报 conflicting
+// types。本地门用 stub 头抓不到此类冲突，已在 stub glext.h 补上真原型。
 // ============================================================================
-typedef GLint (*ame205_fn_glGetUniformBlockIndex)(GLuint, const GLchar *);
+typedef GLuint (*ame205_fn_glGetUniformBlockIndex)(GLuint, const GLchar *);
 static ame205_fn_glGetUniformBlockIndex ame205_ptr_blockIdx;
-GLint glGetUniformBlockIndex(GLuint program, const GLchar *name) {
+GLuint glGetUniformBlockIndex(GLuint program, const GLchar *name) {
     AME173_RESOLVE(ame205_ptr_blockIdx, "glGetUniformBlockIndex");
-    GLint ame205_idx = -1;
+    GLuint ame205_idx = GL_INVALID_INDEX;
     if (ame205_ptr_blockIdx) {
         ame205_idx = ame205_ptr_blockIdx(program, name);
     }
@@ -996,10 +1000,10 @@ GLint glGetUniformBlockIndex(GLuint program, const GLchar *name) {
     int ame205_debug = (getenv("AMETHYST_LOG_LEVEL") != NULL &&
                         strcmp(getenv("AMETHYST_LOG_LEVEL"), "debug") == 0);
     if (ame205_no <= 12 || (ame205_debug && ame205_no <= 128) ||
-        (ame205_no % 512) == 0 || ame205_idx == -1) {
-        printf("[tinygl4angle] Task205 blockIdx: glGetUniformBlockIndex(prog=%u name='%s') -> %d%s\n",
-               (unsigned)program, (name ? name : "(null)"), (int)ame205_idx,
-               (ame205_idx == -1) ? " [NOT FOUND]" : "");
+        (ame205_no % 512) == 0 || ame205_idx == GL_INVALID_INDEX) {
+        printf("[tinygl4angle] Task205 blockIdx: glGetUniformBlockIndex(prog=%u name='%s') -> %u%s\n",
+               (unsigned)program, (name ? name : "(null)"), (unsigned)ame205_idx,
+               (ame205_idx == GL_INVALID_INDEX) ? " [NOT FOUND]" : "");
     }
     return ame205_idx;
 }

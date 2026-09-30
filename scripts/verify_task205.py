@@ -19,7 +19,8 @@
      C2 JavaLauncher 导出 AMETHYST_LOG_LEVEL（debug/standard 两态 +
         LIBGL_LOGSHADERERROR）
      C3 fpe.c 双 tracer（earlyret 检测 + attrib-emit）+ ame205_debug 助手
-     C4 tinygl4angle glGetUniformBlockIndex 观察器（ANGLE 修复验证探针）
+     C4 tinygl4angle glGetUniformBlockIndex 观察器（GLuint = mesa 原型对齐）
+     C4b/C4c stub 头真原型 + 原型冲突 lint（Task205c 教训：本地门逃逸）
      C5 .strings 详情文案升级（en + zh-Hans）且表可解析
   D. CI 缓存
      D1 三路 actions/cache 步骤（编译缓存/brew 下载/ccache 本体）
@@ -57,6 +58,7 @@ SPVC = read("Natives/spvc_shim.c")
 BUFFERS = read("Natives/external/vgpu/src/gl/buffers.c")
 FPE = read("Natives/external/vgpu/src/gl/fpe.c")
 TINYGL = read("Natives/external/gl4es/tinygl4angle.c")
+STUB_GLEXT = read("scripts/task179_inc/GL/glext.h")
 PREFS = read("Natives/LauncherPreferencesViewController.m")
 JL = read("Natives/JavaLauncher.m")
 WF_RAW = open(os.path.join(REPO, ".github/workflows/development.yml"), "rb").read().decode("utf-8")
@@ -66,9 +68,11 @@ check("A1a set_name 拦截导出",
       "void spvc_compiler_set_name(void *compiler, unsigned id, const char *name)" in SPVC
       and "ame205_record_name(ame205_ce, id, name)" in SPVC
       and 'ame_spvc_shim_resolve("spvc_compiler_set_name")' in SPVC)
-check("A1b set_entry_point 拦截导出",
-      "void spvc_compiler_set_entry_point(void *compiler, const char *name, int model)" in SPVC
-      and 'ame_spvc_shim_resolve("spvc_compiler_set_entry_point")' in SPVC)
+check("A1b set_entry_point 拦截导出（int 返回 = spvc_result ABI 对齐）",
+      "int spvc_compiler_set_entry_point(void *compiler, const char *name, int model)" in SPVC
+      and 'ame_spvc_shim_resolve("spvc_compiler_set_entry_point")' in SPVC
+      and "ame205_rc = ((int (*)(void *, const char *, int))real)(compiler, name, model);" in SPVC
+      and "return ame205_rc;" in SPVC)
 check("A2a 注册表字段扩展",
       "ame205_rename_t names[AME205_NAMES_MAX];" in SPVC and "int name_count;" in SPVC
       and "char *entry_point;" in SPVC and "#define AME205_NAMES_MAX 256" in SPVC)
@@ -209,9 +213,24 @@ check("C3b earlyret 检测器（vertex+texcoord 双点）",
       and "pointer-earlyret" in FPE)
 check("C3c attrib-emit tracer",
       "VGPU Task205 attrib-emit" in FPE and "s_ame205_emits < 96" in FPE)
-check("C4 glGetUniformBlockIndex 观察器",
-      "GLint glGetUniformBlockIndex(GLuint program, const GLchar *name)" in TINYGL
+check("C4 glGetUniformBlockIndex 观察器（GLuint = mesa 原型对齐）",
+      "GLuint glGetUniformBlockIndex(GLuint program, const GLchar *name)" in TINYGL
+      and "GL_INVALID_INDEX" in TINYGL
+      and "GLint glGetUniformBlockIndex" not in TINYGL
       and "Task205 blockIdx:" in TINYGL and "[NOT FOUND]" in TINYGL)
+# C4b/C4c（Task205c 教训，CI run 36739697080）：本地门用 stub 头，抓不到
+# 真头（mesa glext.h）类型冲突——初版 GLint 返回本地全绿、CI 才炸。
+# 双保险：stub 头补真原型（C4b）+ 全量文本级 lint（C4c）。
+check("C4b stub glext.h 带真原型（本地门逃逸修复）",
+      "GLAPI GLuint APIENTRY glGetUniformBlockIndex (GLuint program, const GLchar *uniformBlockName);" in STUB_GLEXT
+      and "#define GL_INVALID_INDEX                  0xFFFFFFFFu" in STUB_GLEXT)
+_pairs = re.findall(r"GLAPI\s+(\w+)\s+APIENTRY\s+(\w+)\s*\(", read("Natives/external/mesa/GL/glext.h"))
+_proto_ret = {name: ret for ret, name in _pairs}
+_defs = re.findall(r"(?m)^(\w+)\s+(\w+)\s*\(", TINYGL)
+_conflicts = sorted({(ret, name, _proto_ret[name]) for ret, name in _defs
+                     if name in _proto_ret and _proto_ret[name] != ret})
+check("C4c 原型冲突 lint（tinygl4angle.c 定义 vs mesa glext.h）",
+      not _conflicts, "conflicts=%s" % _conflicts[:4])
 en = read("Natives/resources/en.lproj/Localizable.strings")
 zh = read("Natives/resources/zh-Hans.lproj/Localizable.strings")
 check("C5a 详情文案升级（en）",

@@ -873,7 +873,9 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
     typedef int (*set_bool_fn_t)(void *, unsigned, int);
     typedef int (*install_opts_fn_t)(void *, void *);
     typedef void (*set_name_fn_t)(void *, unsigned, const char *);
-    typedef void (*set_entry_fn_t)(void *, const char *, int);
+    /* Task205c：真库返回 spvc_result（枚举 = int ABI）；重放调用点忽略返回值，
+     * 但转换类型必须与真函数一致（初版 void 转换是 ABI 错误）。 */
+    typedef int (*set_entry_fn_t)(void *, const char *, int);
 
     parse_fn_t real_parse = (parse_fn_t)ame_spvc_shim_resolve("spvc_context_parse_spirv");
     create_compiler_fn_t real_create =
@@ -1328,7 +1330,11 @@ void spvc_compiler_set_name(void *compiler, unsigned id, const char *name) {
     pthread_mutex_unlock(ame_spvc_master_or_local());
 }
 
-void spvc_compiler_set_entry_point(void *compiler, const char *name, int model) {
+// Task205c 返回类型勘误：真头（spirv_cross_c.h）声明本函数返回 spvc_result
+// （枚举 = int ABI）——初版拦截写成 void，调用方若检查返回值会读到垃圾
+// 寄存器值。现转发真实库的 rc（真库缺失时返回 0 = SPVC_SUCCESS，因为
+// 垫片此时仍完成了登记职责；此分支正常装机不会走到）。
+int spvc_compiler_set_entry_point(void *compiler, const char *name, int model) {
     void *real = ame_spvc_shim_resolve("spvc_compiler_set_entry_point");
     pthread_mutex_lock(ame_spvc_master_or_local());
     ame175_compiler_entry *ame205_ce = ame205_find_compiler(compiler);
@@ -1340,8 +1346,10 @@ void spvc_compiler_set_entry_point(void *compiler, const char *name, int model) 
             ame205_ce->exec_model = model;
         }
     }
+    int ame205_rc = 0;
     if (real != NULL) {
-        ((void (*)(void *, const char *, int))real)(compiler, name, model);
+        ame205_rc = ((int (*)(void *, const char *, int))real)(compiler, name, model);
     }
     pthread_mutex_unlock(ame_spvc_master_or_local());
+    return ame205_rc;
 }
