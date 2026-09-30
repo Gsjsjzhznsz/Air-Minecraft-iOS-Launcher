@@ -117,14 +117,22 @@ for i in range(0, len(code)-8, 4):
             found_slot = True
 check("A11 proc_address resolver_global 槽位 = 0x1E3F98（adrp+ldr #0xf98 对）", found_slot)
 
-print("== B. vgpu darwin aliases (coverage closure) ==")
+print("== B. vgpu darwin aliases (collision-aware regeneration) ==")
 gen = rd("scripts/task204_vgpu_gen_aliases.py")
 al = rd("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c")
-check("B1 生成器入库（幂等 + 注释剥离 + 预处理器感知 + 布局不缩）",
+check("B1 生成器入库（幂等 + 注释剥离 + 预处理器感知 + 布局不缩 + 碰撞守卫）",
       os.path.exists("scripts/task204_vgpu_gen_aliases.py")
       and "def strip_comments" in gen and "never shrink" in gen
-      and "DEFINES = " in gen and "NOX11" in gen)
+      and "DEFINES = " in gen and "NOX11" in gen
+      and "def plain_name_definitions" in gen)
 names = set(re.findall(r'\.global _([A-Za-z0-9_]+)', al))
+# CI round-2 lesson: pack.c (vgpu_pack) already DEFINES 286 plain-name GL
+# forwarders -> those names are exported by their defining TU; an alias is a
+# duplicate symbol. The core family therefore needs NO alias -- the original
+# round-1 "export gap" theory is retracted for that family.
+pack_text = rd("Natives/external/vgpu/src/gl/pack/pack.c")
+pack_defs = set(re.findall(r'^\s*(?:[A-Za-z_][A-Za-z0-9_ \*]*?\*?\s*)?(gl[A-Za-z0-9_]+)\s*\([^;]*\)\s*\{',
+                           re.sub(r'/\*.*?\*/', '', re.sub(r'//[^\n]*', '', pack_text), flags=re.S), re.M))
 core = ["glEnable", "glGenTextures", "glDeleteTextures", "glBindTexture",
         "glTexParameteri", "glTexImage2D", "glTexSubImage2D", "glActiveTexture",
         "glGetError", "glDrawArrays", "glDrawElements", "glBufferData",
@@ -132,11 +140,11 @@ core = ["glEnable", "glGenTextures", "glDeleteTextures", "glBindTexture",
         "glCheckFramebufferStatus", "glUseProgram", "glUniformMatrix4fv",
         "glVertexAttribPointer", "glViewport", "glClear", "glBlendFunc",
         "glGetString", "glGenFramebuffers", "glFramebufferTexture2D"]
-check("B2 核心导出全覆盖（a599782 NULL #7-#15 全家 + 渲染主干）",
-      all(("_" + n + "\\n") in al for n in core),
-      )
+check("B2 核心族导出双路覆盖（pack.c 定义导出 OR asm 别名——不依赖单一机制）",
+      all((("_" + n + "\\n") in al) or (n in pack_defs) for n in core))
 check("B3 无重复 .global 条目", len(names) == al.count(".global _"))
-check("B4 覆盖规模（>=1080：legacy 944 + Task204 增量 150）", len(names) >= 1080)
+check("B4 覆盖规模（>=944 遗留 + 真空缺增量；碰撞族由 pack.c 承担）",
+      len(names) >= 944 and len(names) <= 1000)
 check("B5 幻影防护（注释块内的 glGetVertexAttribdv 不导出——其声明被注释包裹；ARB 变体保留）",
       ".global _glGetVertexAttribdv\\n" not in al and ".global _glGetVertexAttribdvARB\\n" in al)
 # CI round-1 lesson: the guarded-out glX* family MUST NOT be aliased (their
@@ -145,17 +153,20 @@ glx_now = sorted(n for n in names if n.startswith("glX"))
 LEGACY_GLX = {"glXGetProcAddress", "glXGetProcAddressARB", "glXReleaseBuffersMESA",
               "glXSwapInterval", "glXSwapIntervalMESA", "glXSwapIntervalSGI",
               "glXWaitGL", "glXWaitX"}
-check("B6 CI 教训锚：glX 守卫族排除（NOX11 编译掉定义体的家族不得导出；仅留 8 个无条件遗留项）",
+check("B6 CI 教训锚一：glX 守卫族排除（NOX11 编译掉定义体的家族不得导出；仅留 8 个无条件遗留项）",
       set(glx_now) == LEGACY_GLX
       and ".global _glXCreateContext\\n" not in al
       and ".global _glXChooseFBConfig\\n" not in al)
-# idempotency + internal dangling guard: rerun the generator, expect exit 0
+# CI round-2 lesson: NO alias may duplicate a plain-name definition in a built TU.
+dupes = sorted(n for n in names if n in pack_defs)
+check("B7 CI 教训锚二：别名与 pack.c 裸名定义零交集（重复符号=链接失败）", not dupes)
+# idempotency + internal guards: rerun the generator, expect exit 0
 # and a byte-identical file.
 before = open("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c", "rb").read()
 r = subprocess.run([sys.executable, "scripts/task204_vgpu_gen_aliases.py"],
                    capture_output=True, text=True)
 after = open("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c", "rb").read()
-check("B7 生成器重跑幂等 + 内建悬空守卫（exit 0 且文件字节不变）",
+check("B8 生成器重跑幂等 + 内建守卫（exit 0 且文件字节不变）",
       r.returncode == 0 and before == after)
 
 print("== C. ANGLE round-2 + 探针卫生 ==")
@@ -176,6 +187,10 @@ check("C4 探针 pname 退役（0x8CA9/0x8CAA 查询 → 0x8CA6；heal-blit 绑�
       and "es.bindFramebuffer(0x8CA8" in gb and "es.bindFramebuffer(0x8CA9" in gb)
 check("C5 病历注释（8/8 相关性 + ANGLE 'Invalid pname' 判读入册）",
       "Task204" in gb and "Invalid pname" in gb)
+tx = rd("Natives/external/vgpu/src/gl/texture.c")
+check("C6 vgpu 纹理探针预排干（三路径：RESIZE/DIRECT/texsub——真归因修复）",
+      tx.count("while (gles_glGetError && gles_glGetError()) {}") >= 3
+      and "Task204：探针帧预排干" in tx)
 
 print("== D. 增量回归 ==")
 def run(cmd):

@@ -149,6 +149,20 @@ def scan_declarations(rel):
             out[name] = target
     return out
 
+def plain_name_definitions(rel):
+    """Names DEFINED as plain (non-gl4es_) functions in preprocessed source --
+    their defining TU already exports them; an alias would duplicate the symbol
+    (CI round-2 lesson: pack.c's 286 forwarders)."""
+    text = strip_comments((VGPU / rel).read_text(errors="replace"))
+    defs = set()
+    for line, active in active_lines(text):
+        if not active:
+            continue
+        m = re.match(r'^\s*(?:[A-Za-z_][A-Za-z0-9_ \*]*?\*?\s*)?(gl[A-Za-z0-9_]+|glX[A-Za-z0-9_]+)\s*\([^;]*\)\s*\{', line)
+        if m:
+            defs.add(m.group(1))
+    return defs
+
 def definitions_present(rel):
     """Set of function names defined (signature line) in preprocessed source.
     Over-inclusive by design (prototypes count too): the preprocessor guard
@@ -166,6 +180,7 @@ def definitions_present(rel):
 
 declared = {}
 all_defs = set()
+plain_defined = set()   # names some built TU already DEFINES as a plain function
 for rel in sorted(built):
     p = VGPU / rel
     if not p.exists():
@@ -173,6 +188,20 @@ for rel in sorted(built):
         continue
     declared.update(scan_declarations(rel))
     all_defs |= definitions_present(rel)
+    plain_defined |= plain_name_definitions(rel)
+
+# CI round-2 lesson: vgpu_pack's pack.c already DEFINES 286 plain-name GL
+# forwarders (void glTexImage2D(...) { _LOAD_GLES gl4es_glTexImage2D(...); })
+# -- merged into the same dylib, an asm alias for those names is a DUPLICATE
+# SYMBOL and fails the link. A name with a plain definition in any built TU is
+# already exported by its defining TU (default visibility); never alias it.
+collisions = sorted(set(declared) & plain_defined - set(existing))
+if collisions:
+    print(f"task204_vgpu_gen_aliases: note: {len(collisions)} declared names already "
+          f"defined as plain functions by built TUs (pack.c family) -- not aliased: "
+          f"{collisions[:6]} ...")
+    for n in collisions:
+        declared.pop(n, None)
 
 # --- 4. union + sanity
 union = dict(existing)
@@ -217,7 +246,7 @@ header = f"""// ================================================================
 // source lists:
 //   python3 scripts/task204_vgpu_gen_aliases.py
 //
-// Coverage: {len(union)} exports ({len(existing)} legacy + {len(union) - len(existing)} Task204 additions).
+// Coverage: {len(union)} exports (legacy base never shrinks; additions are\n// collision-guarded against plain-name definitions in built TUs).
 // ============================================================================
 #if defined(__APPLE__)
 """
@@ -229,4 +258,4 @@ lines.append("#endif\n")
 out = "".join(lines)
 ALIAS_FILE.write_text(out)
 print(f"task204_vgpu_gen_aliases: wrote {len(union)} aliases "
-      f"({len(union) - len(existing)} added, {len(existing)} kept) -> {ALIAS_FILE.relative_to(REPO)}")
+      f"(base had {len(existing)}; total {len(union)}) -> {ALIAS_FILE.relative_to(REPO)}")

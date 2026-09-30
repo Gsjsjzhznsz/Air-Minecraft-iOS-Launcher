@@ -1124,3 +1124,18 @@ Work Log:
 
 Stage Summary:
 - 修复提交待推送；CI 复跑预期绿（glX 族已出局）；装机锚点不变
+---
+Task ID: 204 (续二)
+Agent: main (Super Z)
+Task: CI run 36658634587（5abcff9）重复符号失败修复 + vgpu 理论修正 + 探针真归因
+
+Work Log:
+- CI 第二轮判读：link 失败 duplicate symbol '_glGetAttribLocation' 等——vgpu_pack 的 pack.c 与 vgpu_core 合成一个 dylib，pack.c 本来就【定义】286 个裸名 GL 转发（void glTexImage2D(...){ _LOAD_GLES gl4es_glTexImage2D(...); }），我的 asm 别名与它们撞符号
+- 理论修正（诚实入册）：pack.c 定义导出整族现代 GL 裸名 → "导出缺口导致 MC 绕过 vgpu"对这批名字不成立；设备日志的 [dlsym] NULL #7-#15 是次级消费者（cacio 形态的坏句柄）而非 MC caps。vgpu 材质损坏重新定性：首缝 16x16 = 缺失纹理棋盘格（用户所见），重载 512x512 图集 texsub 报 0x0502——但 GL 错误队列粘滞 + 会话里每次 draw 前 preErr=0x0502 常驻，旧探针无法区分"本调用失败"vs"排队残渣"
+- 修法三件：① 生成器 v3 双守卫（预处理器求值 + 裸名碰撞守卫：任何构建 TU 已定义的裸名不得别名化）→ 952 条（944 遗留 + 8 个真空缺 getter：glClearDepthf/glDepthRangef/glGetClipPlanef/glGetLightfv/glGetMaterialfv/glGetShaderPrecisionFormat/glReleaseShaderCompiler/glShaderBinary）；② 头部计数稳定化（幂等字节不变）；③ Task202 三路纹理探针（RESIZE/DIRECT/texsub）预排干——探针帧先清错误队列再分发再读数，下轮日志真归因
+- 验证：verify_task204 31/31（B2 改双路覆盖断言：别名 OR pack.c 定义；B6 CI 教训锚一 glX 守卫族；B7 CI 教训锚二 pack.c 零交集；B8 幂等字节不变；C6 探针预排干锚）；texture.c 括号平衡；task189_vgpu_syntax/task193_tinygl_syntax 绿
+- version.h 附录 (2) 重写为修正后的叙事（RETRACTED 标注 + 真实架构 + 重定性 + 新探针）
+
+Stage Summary:
+- 修复提交待推送；CI 复跑预期绿（撞符号族已全排除 + glX 守卫族已排除）
+- 下轮 vgpu 判读锚点：预排干后的 "VGPU Task202 teximage/texsub" err 值（真归因）+ preErr 常驻 0x0502 的来源定位（若 texsub 干净则图集上传其实成功，病灶在别处——例如 draw 路径的常驻错误源）

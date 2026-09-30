@@ -3283,24 +3283,26 @@
 //     eglGetProcAddress (context-sourced) and the bundled handles, never
 //     RTLD_DEFAULT (the thief channel). Constructor keeps the Task203 v2
 //     patch (it runs during dlopen, before injection is possible).
-// (2) vgpu texture corruption: vgpu_darwin_aliases.c only carried 944 of
-//     the AliasExport declarations (the original generator scanned
-//     gl4eswraps.c only) -- glEnable/glGenTextures/glBindTexture/
-//     glTexImage2D/glTexSubImage2D/glActiveTexture/glGetError/glDrawArrays/
-//     glBufferData/... were unexported, so MC's caps fell through dlsym
-//     (handle, name) to the DEPENDENCY images (macOS dlsym searches the
-//     image's LC_LOAD_DYLIB closure) = raw bundled ANGLE -- bypassing
-//     vgpu's translation entirely. Two GL id-namespaces on one context:
-//     MC's textures vs vgpu's internal wrap-FBO textures collide ->
-//     corrupted materials. Fix: scripts/task204_vgpu_gen_aliases.py
-//     regenerates the file as legacy-944 UNION every AliasExport that
-//     survives the build's preprocessor (NOX11 NO_GBM NOEGL DEFAULT_ES=3
-//     SHAREDLIB evaluated; 1094 exports, +150, comment-stripped so phantom
-//     declarations cannot dangle). CI round-1 lesson baked in: the naive
-//     scan aliased the glX* family whose definitions live inside
-//     #ifndef NOX11 blocks the build compiles away -> link failure; the
-//     preprocessor evaluation now excludes them and the generator refuses
-//     to emit a file with dangling new targets.
+// (2) vgpu texture corruption: round-1 theory (alias export gap) partially
+//     RETRACTED by CI round 2 -- vgpu_pack's pack.c already DEFINES 286
+//     plain-name GL forwarders (void glTexImage2D(...) { _LOAD_GLES
+//     gl4es_glTexImage2D(...); }) in the same dylib, so the core family was
+//     never actually unexported; the device's [dlsym] NULL #7-#15 came from a
+//     secondary consumer with a broken library handle, not MC's caps. The
+//     regenerated alias file (scripts/task204_vgpu_gen_aliases.py) now ships
+//     952 exports (legacy 944 + 8 genuinely-missing getters), with two
+//     CI-lesson guards baked in: (a) preprocessor evaluation of the build's
+//     define set (NOX11 NO_GBM NOEGL DEFAULT_ES=3 SHAREDLIB) so the guarded
+//     glX* family cannot dangle the link; (b) a plain-name collision guard
+//     (an alias for a name any built TU already defines is a duplicate
+//     symbol). The corruption itself is re-adjudicated: the first atlas
+//     stitch is 16x16 (the missing-texture checkerboard = what the user
+//     sees) and the reloaded 512x512 atlas's texsub probes report 0x0502 --
+//     BUT GL errors are sticky-queued and the session shows a standing
+//     preErr=0x0502 before every draw, so the old probe could not
+//     distinguish "this call failed" from "queued residue". All three
+//     texture probes (RESIZE/DIRECT/texsub) now PRE-DRAIN the error queue on
+//     probe frames: the next device log gives true per-call attribution.
 // (3) ANGLE black screen round 2: geometry IS submitted (4000+ instanced
 //     quads), caps path healthy, 58fps swaps -- but center pixel is
 //     (0,0,0,0) = clearColor: everything renders outside the viewport

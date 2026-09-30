@@ -1397,6 +1397,11 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
             
             if (height != nheight || width != nwidth) {
                 errorGL();
+                // Task204：探针帧预排干（同直传路径的归因修复）
+                if (ame202_tiWant || ((ame202_tiNo % 120) == 0)) {
+                    LOAD_GLES(glGetError);
+                    while (gles_glGetError && gles_glGetError()) {}
+                }
                 gles_glTexImage2D(rtarget, level, format, nwidth, nheight, border,
                                 format, type, NULL);
                 DBG(CheckGLError(1);)
@@ -1429,6 +1434,14 @@ void gl4es_glTexImage2D(GLenum target, GLint level, GLint internalformat,
 #endif
             } else {
                 errorGL();
+                // Task204：探针帧预排干——GL 错误队列粘滞，不排干则读数把
+                // 之前调用的残留错误算到本调用头上（a599782 判读教训：每帧
+                // draw 前 preErr=0x0502 常驻，旧 texsub 探针的 0x0502 无法
+                // 区分"本调用失败"vs"排队残渣"）。排干后读到的才是真错误。
+                if (ame202_tiWant || ((ame202_tiNo % 120) == 0)) {
+                    LOAD_GLES(glGetError);
+                    while (gles_glGetError && gles_glGetError()) {}
+                }
                 gles_glTexImage2D(rtarget, level, format, width, height, border,
                                 format, type, pixels);
                 DBG(CheckGLError(1);)
@@ -1707,6 +1720,11 @@ void gl4es_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
     }*/
     } else {
         errorGL();
+        // Task204：探针帧预排干（同 teximage 直传路径的归因修复）
+        if (ame202_tsWant) {
+            LOAD_GLES(glGetError);
+            while (gles_glGetError && gles_glGetError()) {}
+        }
         gles_glTexSubImage2D(rtarget, level, xoffset, yoffset,
                      width, height, format, type, pixels);
         // Task202 探针：主分发后读真错误（直接 gles 调用，不经 shim）
