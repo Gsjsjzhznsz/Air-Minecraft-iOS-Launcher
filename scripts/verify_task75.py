@@ -135,8 +135,8 @@ check("A6f probe 节奏保留（首5帧 + 每200帧 + 非NORMAL态；Task76 演�
       "const BOOL probe = (swapIndex <= 5) || (swapIndex % 200 == 0) || s_mode != 1;" in code)
 check("A6g Task58 官方宏查询保留（EGL_WIDTH/HEIGHT 修正注释）",
       "EGL_WIDTH=0x3057/EGL_HEIGHT=0x3056" in src)
-check("A6h 几何探针 getIntegerv 三查询保留（DRAW/READ/VIEWPORT）",
-      "0x8CA9" in code and "0x8CAA" in code and "0x0BA2" in code)
+check("A6h 几何探针 getIntegerv 查询保留（Task204：0x8CA6 统一绑定 + VIEWPORT；0x8CA9/0x8CAA 被 ANGLE 'Invalid pname' 拒绝已退役，绑定目标常量仍在 heal-blit）",
+      "0x8CA6" in code and "0x0BA2" in code and "0x8CA8" in code)
 
 # A7. 调用链不变：swap → forensics → eglSwapBuffers 顺序
 i_swap = code.find("void gl_swap_buffers() {")

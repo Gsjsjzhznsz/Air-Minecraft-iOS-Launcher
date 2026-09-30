@@ -545,13 +545,6 @@ void glUniform4fv(GLint location, GLsizei count, const GLfloat *value) {
     if (ame203_ptr_u4fv) ame203_ptr_u4fv(location, count, value);
 }
 
-typedef void (*ame203_fn_glUniform1iv)(GLint, GLsizei, const GLint *);
-static ame203_fn_glUniform1iv ame203_ptr_u1iv;
-void glUniform1iv(GLint location, GLsizei count, const GLint *value) {
-    AME173_RESOLVE(ame203_ptr_u1iv, "glUniform1iv");
-    if (ame203_ptr_u1iv) ame203_ptr_u1iv(location, count, value);
-}
-
 typedef void (*ame203_fn_glUniform1f)(GLint, GLfloat);
 static ame203_fn_glUniform1f ame203_ptr_u1f;
 void glUniform1f(GLint location, GLfloat v0) {
@@ -571,6 +564,91 @@ static ame203_fn_glUniform3f ame203_ptr_u3f;
 void glUniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) {
     AME173_RESOLVE(ame203_ptr_u3f, "glUniform3f");
     if (ame203_ptr_u3f) ame203_ptr_u3f(location, v0, v1, v2);
+}
+
+// ============================================================================
+// Task204：ANGLE 黑屏第二轮流量观察器（a599782 装机 latestlog.old.txt 判读）。
+// 定谳进展：几何已提交（glDrawArraysInstanced #4000+，6 顶点实例化四边形
+// = GUI/图集瓦片）、caps 路径健康（glGetStringi 索引式扩展枚举 12 条 +
+// GL_MAJOR/MINOR/NUM_EXTENSIONS 全过）、着色器在用（glUseProgram prog=3/6/9）
+// 、swap 58fps——但中心像素 (0,0,0,0)（clearColor 同值）→ 一切几何落在
+// 视口外（identity 变换 → 像素坐标几何全部出 NDC → 只剩 clearColor）。
+// 且 Task191 的 UBO 绑定观察器（glBindBufferBase/Range/
+// glUniformBlockBinding，printf 版）【零触发】+ Task203 矩阵族零触发
+// → MC 26.3 画了 4000 个四边形却从未绑定 UBO、从未设置 uniform——
+// 数据上传路径整体静默。本轮补齐 Task191/203 都没盯的数据面：
+//   glBufferSubData/glBufferData/glMapBufferRange —— 缓冲分配/写入
+//   （UBO 若有创建/填充，这里现形；零触发 = MC 压根没走 buffer 路径）；
+//   glUniform1i/1iv —— 经典 sampler/标量绑定（计数化升级，Task203 静默版
+//   保留语义、补计数）。
+// 判读口径：绑定零 + 数据面零 = MC 的 uniform 管线在 Java 侧就被关闭
+// （caps 判定问题，下轮反编译 26.3 client.jar 定位具体 gate）；
+// 绑定零 + 数据面有 = 绑定调用本身丢失（native 侧，本层可修）。
+// ============================================================================
+typedef void (*ame204_fn_glBufferSubData)(GLenum, GLintptr, GLsizeiptr, const void *);
+static ame204_fn_glBufferSubData ame204_ptr_bsd;
+void glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const void *data) {
+    AME173_RESOLVE(ame204_ptr_bsd, "glBufferSubData");
+    static unsigned s_ame204_bsd = 0;
+    unsigned ame204_no = ++s_ame204_bsd;
+    if (ame204_no <= 8 || (ame204_no % 2000) == 0) {
+        printf("[tinygl4angle] Task204 ubo: glBufferSubData #%u target=0x%04X off=%lld size=%lld\n",
+               ame204_no, (unsigned)target, (long long)offset, (long long)size);
+    }
+    if (ame204_ptr_bsd) ame204_ptr_bsd(target, offset, size, data);
+}
+
+typedef void (*ame204_fn_glBufferData)(GLenum, GLsizeiptr, const void *, GLenum);
+static ame204_fn_glBufferData ame204_ptr_bd;
+void glBufferData(GLenum target, GLsizeiptr size, const void *data, GLenum usage) {
+    AME173_RESOLVE(ame204_ptr_bd, "glBufferData");
+    static unsigned s_ame204_bd = 0;
+    unsigned ame204_no = ++s_ame204_bd;
+    if (ame204_no <= 8 || (ame204_no % 2000) == 0) {
+        printf("[tinygl4angle] Task204 ubo: glBufferData #%u target=0x%04X size=%lld usage=0x%04X\n",
+               ame204_no, (unsigned)target, (long long)size, (unsigned)usage);
+    }
+    if (ame204_ptr_bd) ame204_ptr_bd(target, size, data, usage);
+}
+
+typedef void *(*ame204_fn_glMapBufferRange)(GLenum, GLintptr, GLsizeiptr, GLbitfield);
+static ame204_fn_glMapBufferRange ame204_ptr_mbr;
+void *glMapBufferRange(GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access) {
+    AME173_RESOLVE(ame204_ptr_mbr, "glMapBufferRange");
+    static unsigned s_ame204_mbr = 0;
+    unsigned ame204_no = ++s_ame204_mbr;
+    if (ame204_no <= 8 || (ame204_no % 2000) == 0) {
+        printf("[tinygl4angle] Task204 ubo: glMapBufferRange #%u target=0x%04X off=%lld len=%lld access=0x%08X\n",
+               ame204_no, (unsigned)target, (long long)offset, (long long)length, (unsigned)access);
+    }
+    if (ame204_ptr_mbr) return ame204_ptr_mbr(target, offset, length, access);
+    return NULL;
+}
+
+typedef void (*ame204_fn_glUniform1i)(GLint, GLint);
+static ame204_fn_glUniform1i ame204_ptr_u1i;
+void glUniform1i(GLint location, GLint v0) {
+    AME173_RESOLVE(ame204_ptr_u1i, "glUniform1i");
+    static unsigned s_ame204_u1i = 0;
+    unsigned ame204_no = ++s_ame204_u1i;
+    if (ame204_no <= 8 || (ame204_no % 2000) == 0) {
+        printf("[tinygl4angle] Task204 uniform: glUniform1i #%u loc=%d v=%d\n",
+               ame204_no, (int)location, (int)v0);
+    }
+    if (ame204_ptr_u1i) ame204_ptr_u1i(location, v0);
+}
+
+typedef void (*ame204_fn_glUniform1iv)(GLint, GLsizei, const GLint *);
+static ame204_fn_glUniform1iv ame204_ptr_u1iv;
+void glUniform1iv(GLint location, GLsizei count, const GLint *value) {
+    AME173_RESOLVE(ame204_ptr_u1iv, "glUniform1iv");
+    static unsigned s_ame204_u1iv = 0;
+    unsigned ame204_no = ++s_ame204_u1iv;
+    if (ame204_no <= 8 || (ame204_no % 2000) == 0) {
+        printf("[tinygl4angle] Task204 uniform: glUniform1iv #%u loc=%d count=%d head=%d\n",
+               ame204_no, (int)location, (int)count, (value && count > 0) ? (int)value[0] : -1);
+    }
+    if (ame204_ptr_u1iv) ame204_ptr_u1iv(location, count, value);
 }
 
 // (3) 绘制族转发 + 计数（几何提交取证）。

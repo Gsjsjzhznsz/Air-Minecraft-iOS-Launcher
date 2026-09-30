@@ -3266,3 +3266,52 @@
 // Verification: verify_task203; Makefile untouched this round (TAB
 //     baseline 484 stable); l10n strings baseline unchanged (2418; the
 //     FAQ JSONs are not strings tables).
+// ============================================================================
+// REVISION 18 addendum (Task 204, no bump -- launcher-side renderer fixes
+// from the a599782 device logs; zero MobileGlues translation-surface changes):
+// (1) gl4es 1.8.9 crash ("glCheckFramebufferStatus returned unknown
+//     status:0"): root cause is gl4es's per-wrapper lazy backend resolution
+//     dlsym(_gles, name) with _gles/_egl statically = RTLD_NEXT -- from
+//     libgl4es the next provider of gl* is the SYSTEM /usr/lib/libGLESv2
+//     (shared-cache ANGLE with NO current context -> glCheckFramebuffer-
+//     Status returns 0). Same thief as Task36/182's "SYMBOL THEFT".
+//     Fix: right after the Task193 bootstrap dlopen, inject the bundled
+//     framework handles into gl4es's _egl (exported, dlsym) and _gles
+//     (private PEXT symbol -- base+0x1de038 via a layout anchor: exported
+//     _egl must sit at base+0x1de040 and _gles still -1), plus
+//     set_getprocaddress(our resolver) so proc_address routes gl* through
+//     eglGetProcAddress (context-sourced) and the bundled handles, never
+//     RTLD_DEFAULT (the thief channel). Constructor keeps the Task203 v2
+//     patch (it runs during dlopen, before injection is possible).
+// (2) vgpu texture corruption: vgpu_darwin_aliases.c only carried 944 of
+//     the AliasExport declarations (the original generator scanned
+//     gl4eswraps.c only) -- glEnable/glGenTextures/glBindTexture/
+//     glTexImage2D/glTexSubImage2D/glActiveTexture/glGetError/glDrawArrays/
+//     glBufferData/... were unexported, so MC's caps fell through dlsym
+//     (handle, name) to the DEPENDENCY images (macOS dlsym searches the
+//     image's LC_LOAD_DYLIB closure) = raw bundled ANGLE -- bypassing
+//     vgpu's translation entirely. Two GL id-namespaces on one context:
+//     MC's textures vs vgpu's internal wrap-FBO textures collide ->
+//     corrupted materials. Fix: scripts/task204_vgpu_gen_aliases.py
+//     regenerates the file as legacy-944 UNION every AliasExport in the
+//     CMake-built sources (1131 exports, +187, comment-stripped so
+//     phantom declarations in commented-out blocks cannot dangle).
+// (3) ANGLE black screen round 2: geometry IS submitted (4000+ instanced
+//     quads), caps path healthy, 58fps swaps -- but center pixel is
+//     (0,0,0,0) = clearColor: everything renders outside the viewport
+//     (identity transform). Task191's UBO-bind observers + Task203's
+//     matrix observers: ZERO hits -- MC 26.3 draws 4000 quads without
+//     ever binding a UBO or setting a uniform. This round adds the
+//     missing data-plane observers (glBufferSubData/glBufferData/
+//     glMapBufferRange/glUniform1i/glUniform1iv counted forwarders) to
+//     adjudicate Java-side gate vs native-side loss next log.
+// (4) Diagnostic hygiene: the Task75/187 geo-probe queried 0x8CA9/
+//     0x8CAA (GL_DRAW/READ_FRAMEBUFFER_BINDING) -- this ANGLE ES3 build
+//     rejects both with "Invalid pname" (8 debug messages = 8 probe
+//     frames, perfect correlation; drawFb/readFb were always the failed
+//     0). Switched to 0x8CA6 (GL_FRAMEBUFFER_BINDING, ES2-legal): zero
+//     GL error leakage + real data. verify_task75 A6h re-anchored.
+// Verification: verify_task204 (new); verify_task203 re-anchored (D
+//     group counts the ame204 resolver family); task193_tinygl_syntax
+//     green; verify_task75/179 stash-diff zero-new-failures (stale
+//     anchors identical on HEAD); derived harness task179_inc resynced.

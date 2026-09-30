@@ -112,8 +112,9 @@ check("D", "绘制族（useProgram/drawElements/drawArrays/两种 instanced 周�
       "Task203 draw: glUseProgram #" in tg and "Task203 draw: glDrawElements #" in tg
       and "Task203 draw: glDrawArrays #" in tg and "Task203 draw: glDrawElementsInstanced #" in tg
       and "Task203 draw: glDrawArraysInstanced #" in tg)
-check("D", "解析失败安全（Task203 转发族经 AME173_RESOLVE；矩阵族经 LOOKUP_FUNC 同款门）",
-      tg.count("AME173_RESOLVE(ame203_ptr_") >= 10 and "if (ame203_ptr_u1iv) ame203_ptr_u1iv(" in tg)
+check("D", "解析失败安全（Task203 转发族经 AME173_RESOLVE；矩阵族经 LOOKUP_FUNC 同款门；Task204 数据面观察器同门）",
+      (tg.count("AME173_RESOLVE(ame203_ptr_") + tg.count("AME173_RESOLVE(ame204_ptr_")) >= 14
+      and "if (ame204_ptr_u1iv) ame204_ptr_u1iv(" in tg)
 
 # ============ E. FAQ i18n ============
 lh = rd("Natives/LauncherHelpViewController.m")

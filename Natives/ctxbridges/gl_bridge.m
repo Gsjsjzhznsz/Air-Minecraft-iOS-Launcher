@@ -749,8 +749,15 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
     if (!probe) return;
 
     int drawFb = 0, readFb = 0, viewport[4] = {0, 0, 0, 0};
-    es.getIntegerv(0x8CA9 /*GL_DRAW_FRAMEBUFFER_BINDING*/, &drawFb);
-    es.getIntegerv(0x8CAA /*GL_READ_FRAMEBUFFER_BINDING*/, &readFb);
+    // Task204：0x8CA9/0x8CAA（GL_DRAW/READ_FRAMEBUFFER_BINDING）被本设备
+    // ANGLE ES3 以 "Invalid pname"（GL_INVALID_ENUM，id=1280 debug 消息）
+    // 拒绝——a599782 装机 latestlog.old 实锤 8 条消息与 8 个探针帧完美
+    // 相关，且 drawFb/readFb 恒 0（查询失败，数据一直是废的）。改查
+    // 0x8CA6（GL_FRAMEBUFFER_BINDING，ES2 起合法）：零 GL 错误 + 拿到真值
+    //（MC 用 FBO 时终于能看见）。readFb 同源（ANGLE 拒绝 0x8CAA，读/写
+    // 绑定在 MC 流程中恒同值；geo-heal blit 的恢复路径用同值正确）。
+    es.getIntegerv(0x8CA6 /*GL_FRAMEBUFFER_BINDING (Task204: was 0x8CA9, ANGLE-rejected)*/, &drawFb);
+    readFb = drawFb;
     es.getIntegerv(0x0BA2 /*GL_VIEWPORT*/, viewport);
 
     // Task187：黑屏二分取证包（ANGLE 黑屏内容层专项）。transpose 嫌疑已被

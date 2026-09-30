@@ -190,6 +190,71 @@ static int pojavFinishOpenGLInit(int result) {
     return result;
 }
 
+// ============================================================================
+// Task204：gl4es 后端解析根治（_gles/_egl 句柄注入 + resolver_global）
+//
+// 病历（a599782 装机 latestlog.1，1.8.9-forge + gl4es 会话）：
+//   MC 死于 java.lang.RuntimeException "glCheckFramebufferStatus returned
+//   unknown status:0"（Framebuffer.java:178，Minecraft.init 早期）——构造器
+//   崩溃已由 Task203 v2 补丁根治、mod 全部加载、GL caps 识别正常，死点后移
+//   到首个 FBO 检查。
+//
+// 根因（二进制反汇编 + 三会话 tri-probe 对拍闭环）：
+//   libgl4es_114 的每个 GL wrapper（framebuffers.c 等）对后端函数做惰性
+//   解析：`dlsym(_gles, "glXXX")`，而 `_gles`/`_egl` 两个全局（符号表
+//   0x1de038/0x1de040，__DATA 初值 = -1 = RTLD_NEXT）从未被改写——
+//   RTLD_NEXT 从 libgl4es 出发搜索"其后"的镜像：tinygl4angle 不导出这些
+//   名字（部分导出表），最终命中【系统 /usr/lib/libGLESv2】（共享缓存里
+//   的系统 ANGLE——tri-probe 实锤 default=0x25bcb6d70 且 ver=<NULL>，与
+//   Task36/Task182 的"SYMBOL THEFT"同源）。系统 ANGLE 上【无当前上下文】
+//   → glCheckFramebufferStatus 返回 0 → MC 抛异常。旧一轮的构造器
+//   strstr(NULL) 崩溃（Task202 病历）与此【同根】：proc_address 的
+//   dlsym(RTLD_DEFAULT) 同样命中系统 GLESv2。
+//
+//   为什么 caps 阶段 GL_MAJOR_VERSION=3 却活得好好的：LWJGL 的
+//   glGetIntegerv 指向 gl4es 自身导出（handle 定向解析），gl4es 内部
+//   应答；只有 wrapper 惰性解析的后端指针被劫走。
+//
+// 修法（三层，全部在 Task193 引导块 dlopen 之后、任何 wrapper 运行之前）：
+//   ① _egl（已导出）直接 dlsym 写入 bundled libEGL.framework 句柄；
+//   ② _gles（PEXT 私有符号，dlsym 不可见）用布局锚定位：离线核验本二进制
+//      _egl 槽 = base+0x1de040、_gles 槽 = base+0x1de038；若运行时
+//      dlsym("egl") == base+0x1de040 且 +0x1de038 处仍为 -1（RTLD_NEXT
+//      初值指纹），则布局无漂移，安全写入 base+0x1de038；
+//   ③ set_getprocaddress(our_resolver)（导出符号；写 proc_address 优先
+//      检查的 resolver_global 槽 0x1E3F98，单参签名 void*(*)(const char*)
+//      ——proc_address 反汇编实证）：egl* → bundled libEGL 句柄；gl* →
+//      eglGetProcAddress（上下文同源，Task182 同链）→ bundled libGLESv2
+//      句柄 → 不回落 RTLD_DEFAULT（那正是系统 GLESv2 的劫持通道）。
+//   此后所有 wrapper 的惰性 dlsym(_gles=真句柄, name) 与 proc_address
+//   解析全部落在 bundled ANGLE 上（与游戏上下文同实例）。
+//   构造器自身不走此路（dlopen 期间已跑完）——Task203 v2 补丁继续兜底，
+//   其代价（vendor 缓存 NULL、扩展检测失明）保持现状，本轮不动。
+// ============================================================================
+static void *ame204_gl4esGles2 = NULL;   // bundled libGLESv2.framework 句柄
+static void *ame204_gl4esEgl = NULL;     // bundled libEGL.framework 句柄
+static void *(*ame204_gl4esEgpa)(const char *) = NULL;  // bundled eglGetProcAddress
+
+static void *ame204_gl4esProcResolver(const char *name) {
+    if (name == NULL) return NULL;
+    if (name[0] == 'g' && name[1] == 'l') {
+        if (ame204_gl4esEgpa != NULL) {
+            void *ame204_p = ame204_gl4esEgpa(name);
+            if (ame204_p != NULL) return ame204_p;
+        }
+        if (ame204_gl4esGles2 != NULL) {
+            void *ame204_p = dlsym(ame204_gl4esGles2, name);
+            if (ame204_p != NULL) return ame204_p;
+        }
+        return NULL;   // gl* 绝不回落 RTLD_DEFAULT —— 那是系统 GLESv2 的劫持通道
+    }
+    if (strncmp(name, "egl", 3) == 0 && ame204_gl4esEgl != NULL) {
+        void *ame204_p = dlsym(ame204_gl4esEgl, name);
+        if (ame204_p != NULL) return ame204_p;
+    }
+    return dlsym(RTLD_DEFAULT, name);
+}
+
 static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
     if (s_openGLInited) {
         // 幂等：重复初始化会二次 dlopen 渲染器、二次 br_init()（eglInitialize），
@@ -302,6 +367,52 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
                             NSLog(@"[egl_bridge] Task193: gl4es constructor bootstrap complete "
                                   @"(libgl4es_114=%p, throwaway ES3 ctx was current during init)",
                                   ame193_gl4es);
+                            // Task204：后端解析根治（见上方大段病历）——句柄注入 +
+                            // resolver_global。必须在任何 wrapper 惰性解析之前执行
+                            //（本块位于 pojavInitOpenGL，游戏上下文/JVM 启动之前）。
+                            if (ame193_gl4es != NULL) {
+                                ame204_gl4esGles2 = dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2",
+                                                            RTLD_NOW | RTLD_LOCAL);
+                                ame204_gl4esEgl = dlopen("@executable_path/Frameworks/libEGL.framework/libEGL",
+                                                          RTLD_NOW | RTLD_LOCAL);
+                                ame204_gl4esEgpa = ame204_gl4esEgl
+                                    ? (void *(*)(const char *))dlsym(ame204_gl4esEgl, "eglGetProcAddress")
+                                    : NULL;
+                                void (*ame204_sgpa)(void *(*)(const char *)) =
+                                    (void (*)(void *(*)(const char *)))dlsym(ame193_gl4es, "set_getprocaddress");
+                                void **ame204_eglSlot = (void **)dlsym(ame193_gl4es, "egl");
+                                void *ame204_base = NULL;
+                                Dl_info ame204_info;
+                                if (ame204_sgpa != NULL && dladdr((void *)ame204_sgpa, &ame204_info) != 0) {
+                                    ame204_base = (void *)ame204_info.dli_fbase;
+                                }
+                                // 布局锚：dlsym("egl") 必须等于 base+0x1de040，且
+                                // +0x1de038 处仍为 RTLD_NEXT 初值（-1）——双指纹
+                                // 通过才写 _gles 槽（防二进制漂移错位写）。
+                                void **ame204_glesSlot = NULL;
+                                if (ame204_base != NULL
+                                    && ame204_eglSlot == (void **)((char *)ame204_base + 0x1de040)
+                                    && *(unsigned long long *)((char *)ame204_base + 0x1de038)
+                                           == 0xFFFFFFFFFFFFFFFFULL) {
+                                    ame204_glesSlot = (void **)((char *)ame204_base + 0x1de038);
+                                }
+                                int ame204_n = 0;
+                                if (ame204_gl4esGles2 != NULL && ame204_gl4esEgl != NULL) {
+                                    if (ame204_glesSlot != NULL) { *ame204_glesSlot = ame204_gl4esGles2; ame204_n++; }
+                                    if (ame204_eglSlot != NULL)   { *ame204_eglSlot = ame204_gl4esEgl; ame204_n++; }
+                                    if (ame204_sgpa != NULL) {
+                                        ame204_sgpa(ame204_gl4esProcResolver);
+                                        ame204_n++;
+                                    }
+                                }
+                                NSLog(@"[egl_bridge] Task204: gl4es backend pin -- glesSlot=%@ eglSlot=%@ resolver=%@ "
+                                      @"(base=%p, gles2=%p egl=%p egpa=%p; %d/3 landed; RTLD_NEXT thief path closed)",
+                                      (ame204_glesSlot != NULL) ? @"YES" : @"NO(layout-anchor-miss)",
+                                      (ame204_eglSlot != NULL) ? @"YES" : @"NO",
+                                      (ame204_sgpa != NULL) ? @"YES" : @"NO",
+                                      ame204_base, ame204_gl4esGles2, ame204_gl4esEgl,
+                                      (void *)ame204_gl4esEgpa, ame204_n);
+                            }
                         } else {
                             // 失败安全：不提前 dlopen，走旧路径（统一 dlopen 处构造器
                             // 仍会 strstr(NULL) 崩溃——但日志留下明确死因锚点）
