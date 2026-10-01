@@ -263,7 +263,7 @@ check("C5c strings 表可解析 + 无新增重复",
 # ============ D. CI 缓存 ============
 check("D1a ccache 缓存步骤",
       "Cache ccache compilation cache" in WF_RAW and "path: ~/.ccache" in WF_RAW
-      and "ccache-macos14-v1-${{ hashFiles('Makefile', 'Natives/CMakeLists.txt', 'Natives/external/vgpu/src/**') }}" in WF_RAW)
+      and "ccache-macos14-v1-${{ hashFiles('Makefile', 'Natives/CMakeLists.txt', 'Natives/external/vgpu/src/**', 'ThirdParty/ZalithLauncher2/src/**') }}" in WF_RAW)
 check("D1b Homebrew 缓存步骤",
       "Cache Homebrew downloads" in WF_RAW
       and "path: ~/Library/Caches/Homebrew/downloads" in WF_RAW)

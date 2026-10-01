@@ -276,6 +276,27 @@ void handle_fatal_exit(int code) {
 void hooked_abort() {
     NSLog(@"abort() called");
     ame_write_fatal_trace("abort() called");
+    // Task208：JVM fatal 的 abort 直通。99a61eb NG-GL4ES 会话实锤：JVM 的
+    // SIGSEGV fatal handler（VMError::report_and_die → os::abort）调用 abort()
+    // 后被 handle_fatal_exit 的 dispatch_group_wait 永久 park——进程不死、
+    // Client 线程卡死在崩溃点（Launch-Watchdog 采样 #1-#5 恒停
+    // JNI.invokePP），用户被迫重启 iOS。JVM fatal 已自写 hs_err +
+    // fatal_trace.txt，park 只会产出僵尸进程。判据：回溯帧中出现
+    // libjvm.dylib 的任意帧（JVM 侧发起的致命错误）。
+    {
+        void *ame208_frames[48];
+        int ame208_n = backtrace(ame208_frames, 48);
+        for (int i = 0; i < ame208_n; ++i) {
+            Dl_info ame208_info;
+            memset(&ame208_info, 0, sizeof(ame208_info));
+            if (dladdr(ame208_frames[i], &ame208_info) && ame208_info.dli_fname != NULL &&
+                strstr(ame208_info.dli_fname, "libjvm.dylib") != NULL) {
+                NSLog(@"[main_hook] Task208: abort() originated inside libjvm (JVM fatal) -- terminating for real, no crash-view park");
+                orig_abort();
+                return;  // orig_abort 不返回；防御性 return
+            }
+        }
+    }
     handle_fatal_exit(SIGABRT);
     orig_abort();
 }

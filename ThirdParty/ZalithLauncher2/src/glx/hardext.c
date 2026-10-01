@@ -290,6 +290,18 @@ void GetHardwareExtensions(int notest) {
 
     // Now get extensions
     const char* Exts = (const char*)gles_glGetString(GL_EXTENSIONS);
+    // Task208 (Amethyst iOS port): NULL guard -- a context-less probe (or a
+    // stolen glGetString resolution, see the CMakeLists PROVENANCE entry 10)
+    // returns NULL here and the strstr family below would SIGSEGV. Degrade to
+    // "no extensions detected" instead of crashing the whole process.
+    if (Exts == NULL) {
+        static int ame208_nullExtsLogged = 0;
+        if (!ame208_nullExtsLogged) {
+            ame208_nullExtsLogged = 1;
+            LOGE("glGetString(GL_EXTENSIONS) returned NULL -- no current context? continuing with zero extensions");
+        }
+        Exts = "";
+    }
 // Parse them!
 #define S(A, B, C)                                                                                                     \
     if (strstr(Exts, A)) {                                                                                             \

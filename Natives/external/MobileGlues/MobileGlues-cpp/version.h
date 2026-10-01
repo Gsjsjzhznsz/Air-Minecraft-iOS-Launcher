@@ -3410,3 +3410,64 @@
 //     (193 F / 173 M3 / 190 H / 196-201 E / 202 H / 203 H + the parallel
 //     verify_task206 F5 len 29 -> 30).
 // ============================================================================
+// REVISION 18 addendum (Amethyst Task 208, 2026-10-01, no bump): the
+// three-renderer device verdict round (99a61eb upload) -- NG-GL4ES timing
+// root fix + ANGLE push-constant block-name root fix + JVM-fatal abort
+// pass-through. (Numbering note: the parallel-session UI round took 207;
+// this renderer round yielded and renumbered to 208.)
+// (1) NG-GL4ES crash + wedged app (latestlog.old, 1.8.9): SIGSEGV in
+//     _platform_strstr <- GetHardwareExtensions <- initialize_gl4es <- the
+//     dyld dlopen chain reached from pojavInitOpenGLInternal's unified
+//     renderer preload -- BEFORE br_init_context, so no EGL context is
+//     current and glGetString (resolved through proc_address's __APPLE__
+//     branch dlsym(RTLD_NEXT,...) to the SYSTEM /usr/lib/libGLESv2, the
+//     Task204 symbol theft) returns NULL, then src/glx/hardext.c
+//     strstr(Exts,...) faults. Task206's assumption (LWJGL dlopens after
+//     the context is current) was wrong: the unified preload runs first.
+//     Wedged-app amplifier: hooked_abort parks the JVM's
+//     VMError::report_and_die abort forever (dispatch_group_wait), the
+//     Client thread never leaves JNI.invokePP (watchdog samples #1-#5),
+//     the user had to reboot iOS. Fix trio: vendored build gains
+//     -DNO_INIT_CONSTRUCTOR (upstream's own switch; initialize_gl4es
+//     becomes a plain export), egl_bridge.m ame208_nggl4es_boot() hooked
+//     at the pojavMakeCurrent tail (post-MakeCurrent = the vgpu
+//     lazy-init equivalent moment, pinned by the Task146 make-current
+//     ordering in the vgpu session) calls initialize_gl4es() after
+//     registering set_getprocaddress (ame204_gl4esProcResolver --
+//     proc_address's host-resolver branch outranks the RTLD_NEXT theft
+//     channel), plus a hardext.c NULL guard on the extension string
+//     (defense in depth; CMakeLists PROVENANCE 10/11).
+// (2) ANGLE transparent blocks (latestlog.old.txt, 26.3): Task206's
+//     EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER option IS applied and the
+//     option-path rewrite succeeds (log: "via option"), yet
+//     _push_constants still returns GL_INVALID_INDEX while _uniform_00_XX
+//     all resolve. Session-local reproduction (SPIRV-Cross a0fba56 built
+//     from the pinned submodule source + a hand-encoded MC-shaped SPIR-V,
+//     full shim-call mirror) pinned the mechanism:
+//     emit_buffer_block_native's block-name collision check -- the
+//     push-constant STRUCT is emitted first under the set_name'd name
+//     "_push_constants" (registered in resource_names), so the BLOCK
+//     falls back to the PC variable's original name ->
+//     glGetUniformBlockIndex("_push_constants") can never find it. Fix:
+//     spvc_shim.c redirects the PC block rename from the type id to the
+//     VARIABLE id (ame208_find_push_constant scans the retained SPIR-V
+//     words for the PushConstant OpTypePointer/OpVariable pair) -- the
+//     fallback name becomes exactly the query name (repro-verified:
+//     layout(std140) uniform _push_constants {...} emitted, SPIR-V 1.0
+//     and 1.5 alike).
+// (3) vgpu material corruption: unchanged (translation-layer defect,
+//     two root-cause rounds exhausted; NG-GL4ES remains the designated
+//     successor for legacy versions).
+// Device anchors: NG session "[egl_bridge] Task208: NG-GL4ES
+//     initialize_gl4es() called post-MakeCurrent (resolver=YES, ...)" +
+//     "Initialising Krypton Wrapper" appearing AFTER the Task146
+//     make-current line (never before any context exists); ANGLE session
+//     "[spvc-shim] Task208: push-constant block rename redirected..." +
+//     the Task205 blockIdx probes for _push_constants turning >= 0 +
+//     blocks opaque.
+// Verification: verify_task208 (A ANGLE redirect + device evidence, B NG
+//     timing trio, C abort pass-through, D docs + cascade);
+//     verify_task206 43/43 re-confirmed post-edit; task175 syntax gates
+//     + bracket balance (egl_bridge/main_hook/spvc_shim) + gcc
+//     -fsyntax-only on spvc_shim.c and the vendored hardext.c all clean.
+// ============================================================================

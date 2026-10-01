@@ -868,10 +868,56 @@ static char *ame183_sanitize_essl(const char *essl) {
     return c_fixed;
 }
 
+/// Task208：在留存的 SPIR-V 字里定位 push-constant 块的 变量 id 与 类型 id。
+/// 扫描 OpTypePointer(32) 的 storage==PushConstant(9)（result, storage, pointee），
+/// 再扫 OpVariable(59) 的 storage==9（type, result, storage）。仅支持单块形态
+/// （SPIR-V 每入口点至多一个 push-constant 块；变量指针类型与记录的 PC 指针
+/// 类型不匹配时保守放弃）。返回 1 = 找到（*pc_var/*pc_type 有效）。
+static int ame208_find_push_constant(const unsigned *words, size_t word_count,
+                                     unsigned *pc_var, unsigned *pc_type) {
+    if (words == NULL || word_count < 5) return 0;
+    unsigned ame208_ptr = 0, ame208_ptrType = 0, ame208_var = 0, ame208_varPtr = 0;
+    size_t off = 5;
+    while (off < word_count) {
+        unsigned w = words[off];
+        unsigned op = w & 0xffffu;
+        unsigned wc = (w >> 16) & 0xffffu;
+        if (wc == 0 || off + wc > word_count) return 0;  // 畸形：交给真解析器处置
+        if (op == 32u && wc >= 4u) {
+            if (words[off + 2] == 9u) {          // OpTypePointer PushConstant
+                ame208_ptr = words[off + 1];
+                ame208_ptrType = words[off + 3];
+            }
+        } else if (op == 59u && wc >= 4u) {
+            if (words[off + 3] == 9u) {          // OpVariable PushConstant
+                ame208_varPtr = words[off + 1];
+                ame208_var = words[off + 2];
+            }
+        }
+        off += wc;
+    }
+    if (ame208_var == 0 || ame208_ptr == 0) return 0;
+    if (ame208_varPtr != ame208_ptr) return 0;   // 多指针/畸形：保守放弃重定向
+    *pc_var = ame208_var;
+    *pc_type = ame208_ptrType;
+    return 1;
+}
+
 /// 在同一 context 上重建 ES 编译器并编译；失败返回 NULL（调用方回落原源）。
 /// Task205：新增 orig 参数——把 MC 在【原】编译器上的 spvc_compiler_set_name
 /// 重命名与 set_entry_point 重放到新建的 ES 编译器上（见结构体注释；不重放
 /// 则块名保持原始名，MC 的 glGetUniformBlockIndex 全 -1 → 黑屏）。
+/// Task208：push-constant 块的重命名重定向到【变量 id】——本地复现定谳
+/// （会话本地复现：SPIRV-Cross a0fba56 从 pin 子模块源构建 + 手工编码 MC
+/// 形态 SPIR-V + 逐位镜像本垫片调用序列）：选项
+/// EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER 生效后 PC 块走
+/// emit_buffer_block_native，其块名碰撞检查发现 PC 结构体（先发射、以
+/// set_name 的名字注册进 resource_names）已占用 "_push_constants" → 块名
+/// 回退成【PC 变量的原始名】→ glGetUniformBlockIndex("_push_constants")
+/// 永远 GL_INVALID_INDEX（7c0a021/99a61eb 两轮装机：_uniform_00_XX 全命中、
+/// 唯 _push_constants ×206 NOT FOUND = ANGLE 方块透明的真根因）。
+/// 把重命名落到变量 id 上：回退名恰好等于 MC 的查询名（复现验证：
+/// layout(std140) uniform _push_constants { ... } 正确产出，v1.0/v1.5 同）。
 static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
                                             size_t word_count,
                                             ame175_compiler_entry *orig) {
@@ -971,10 +1017,32 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
         set_entry_fn_t real_set_entry =
             (set_entry_fn_t)ame_spvc_shim_resolve("spvc_compiler_set_entry_point");
         if (real_set_name != NULL) {
+            // Task208：push-constant 定位（重定向见函数头注释）。
+            unsigned ame208_pcVar = 0, ame208_pcType = 0;
+            int ame208_hasPc =
+                ame208_find_push_constant(words, word_count, &ame208_pcVar, &ame208_pcType);
+            int ame208_redirected = 0;
             for (int i = 0; i < orig->name_count && i < AME205_NAMES_MAX; ++i) {
                 if (orig->names[i].name == NULL) continue;
+                if (ame208_hasPc && orig->names[i].id == ame208_pcType) {
+                    // 重定向：类型 id 的重命名改落到变量 id（回退名 = 查询名）。
+                    real_set_name(es_compiler, ame208_pcVar, orig->names[i].name);
+                    ++ame205_replayed;
+                    ++ame208_redirected;
+                    continue;
+                }
                 real_set_name(es_compiler, orig->names[i].id, orig->names[i].name);
                 ++ame205_replayed;
+            }
+            if (ame208_redirected > 0) {
+                static int s_ame208_pcLogged = 0;
+                if (!s_ame208_pcLogged) {
+                    s_ame208_pcLogged = 1;
+                    fprintf(stderr,
+                            "[spvc-shim] Task208: push-constant block rename redirected "
+                            "to the variable id (emit_buffer_block_native name-collision "
+                            "workaround; _push_constants becomes the emitted block name)\n");
+                }
             }
         }
         if (real_set_entry != NULL && orig->entry_point != NULL) {

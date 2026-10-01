@@ -1291,3 +1291,25 @@ Stage Summary:
 
 ### Task 207 补记：CI 一次过绿
 run 36829397819（db581fa）success，12m41s，产物 ipa/tipa/dSYM 就绪——UI-only 轮零 CI 拉锯（对比并行 Task206 渲染器轮的 11 连拉）。ccache 三路缓存对本轮全命中。
+---
+Task ID: 208
+Agent: main (Super Z)
+Task: 99a61eb 三份装机日志判读（ANGLE 方块透明依旧 / vgpu 材质损坏依旧 / NG-GL4ES 崩溃+应用卡死需重启 iOS）→ 三主题根修（编号从 207 让位给并行 UI 轮，db581fa 家法）
+
+Work Log:
+- 判读（99a61eb 三日志会话映射）：latestlog.old = 1.8.9-forge + NG-GL4ES（SIGSEGV 后应用僵死）；latestlog.old.txt = 26.3 fabric + ANGLE（Task206 选项已装、_push_constants 仍 NOT FOUND）；latestlog.txt = 1.8.9-forge + vgpu（材质损坏依旧，会话以 GL 1282 收场）
+- NG-GL4ES 崩溃定谳（双根因）：崩溃栈 _platform_strstr ← GetHardwareExtensions ← initialize_gl4es ← dyld dlopen 链 ← pojavInitOpenGLInternal ← pojavInitOpenGL ← pojavCreateContext —— Task206 的设计假设（"LWJGL 在上下文 current 后 dlopen，构造器探测落真上下文"）被证伪：统一预加载 dlopen 发生在 br_init_context 之前，线程无任何 EGL 上下文；glGetString 经 vendored loader 的 proc_address __APPLE__ 分支 dlsym(RTLD_NEXT) 解析到系统 /usr/lib/libGLESv2（Task204 符号劫持同源，vgpu 会话 tri-probe default=...ver=<NULL> 印证）返回 NULL → hardext.c strstr(Exts,...) SIGSEGV。卡死放大器：JVM fatal 的 abort() 被 hooked_abort → handle_fatal_exit 的 dispatch_group_wait 永久 park，进程不死、Client 线程永卡 JNI.invokePP（watchdog 采样 #1-#5），用户被迫重启 iOS
+- 修法三件套：① vendored CMakeLists 加 -DNO_INIT_CONSTRUCTOR（上游自带开关，PROVENANCE 10）——initialize_gl4es 变普通导出函数；② egl_bridge.m ame208_nggl4es_boot() 挂 pojavMakeCurrent 尾部（br_make_current 返回即 current；GLFW/LWJGL2 与 SDL3 双路径汇点；vgpu 装机实证等效时机=Task146 make-current 之后才 "LIBGL: Initialising"）显式调用 initialize_gl4es()，前置 eglGetCurrentContext 门；③ boot 内注册 set_getprocaddress(ame204_gl4esProcResolver)——vendored proc_address 的宿主 resolver 分支优先于 RTLD_NEXT，硬件探测+全部惰性解析一并钉到捆绑 ANGLE。附带 vendored hardext.c Exts NULL 退化空串守卫（PROVENANCE 11，纵深防御）
+- hooked_abort 直通修（main_hook.m Task208）：回溯帧含 libjvm.dylib 即 orig_abort() 直通（JVM fatal 已自写 hs_err+fatal_trace，park 只产出僵尸进程）；非 JVM abort 保留 PLCrashView 流
+- ANGLE 方块透明真根因定谳（会话本地全链复现：拉 pin 子模块 SPIRV-Cross a0fba56 源码 g++ 直编 + 手工编码 MC 形态测试 SPIR-V（UBO+push-constant 块+set_name 重放镜像）+ 驱动逐位镜像 shim 调用序列）：① 选项确实生效（此前唯一未验证环节；impl dylib 反汇编证明旧版 setter 的 switch 有 0x2000021 case、install 把 GLSL 子结构拷进编译器）；② PC 块走 emit_buffer_block_native 发射，其块名碰撞检查发现 PC 结构体先以 set_name 名注册进 resource_names → 块名回退成【PC 变量原始名】（复现输出 layout(std140) uniform pcInst{...}）→ glGetUniformBlockIndex("_push_constants") 永远 GL_INVALID_INDEX（与装机 _uniform_00_XX 全命中唯 _push_constants NOT FOUND 完全一致）；③ 附带发现：PC 块含矩阵成员时该路径直接 THROW（layout 规则查表失败）——MC 核心着色器 PC 块均为 vec4 族不受影响，记录在案。修法：spvc_shim.c ame208_find_push_constant（扫留存 SPIR-V 字：OpTypePointer storage=9 → OpVariable storage=9 单块配对）+ 重放循环重定向——PC 类型 id 的重命名改落到变量 id，回退名恰等于 MC 查询名；复现验证修后输出 layout(std140) uniform _push_constants{...}（SPIR-V 1.0/1.5 双版本）
+- vgpu：定性不变（转译层顽疾，两轮根修未愈），NG-GL4ES 为既定接替者——本轮修完 NG 后 1.8.9 用户迁移路径打通
+- 沙箱回退事故（本会话第二次遭遇，Task205 后首次记录）：本轮全部修复曾以 e226188 完成提交，随后环境快照回滚把 .git 与工作树一起退到会话前状态（reflog 铁证：HEAD@{2}=fa3c154 旧 commit，pull/commit 记录消失；push 被拒的真实原因即本地比远端旧 318+2 提交而非 token；后续 rebase 实为纯 fast-forward）。恢复策略：56e6c9a 工作树天然包含 99a61eb 判读证据 + Task206 全部成果，按对话记录完整重做五处源码 + 验证器 + 文档（本段）。教训入库：长会话中 commit 后应立即 push；每次 push 失败先查 reflog 而非假设凭据问题
+- 并行会话协同（db581fa）：UI 轮占用 Task 207 + verify_task207.py（add/add 热区）——本轮按其确立的家法让出编号为 208，全部标记/锚点/日志字符串统一 Task208（装机锚点随之变更，见下）；其公告基线 29→30 与 95 个绝对索引锚重锚不受本轮影响（本轮零公告、零 UI 文件触改）
+- 级联维护：verify_task205 D1a 重锚（Task206 给 ccache key 加了 ThirdParty/ZalithLauncher2/src/** glob，205 验证器没随动——存量断锚，修后 0 failed）
+- 验证：verify_task208 24/24（A ANGLE 重定向+装机证据 6 + B NG 时序三件套 8 + C abort 直通 2 + D 文档级联 8，含 task206 43/43 复跑 + task205 全绿 + 语法门 + 括号平衡 + fsyntax-only + NO_INIT_CONSTRUCTOR 开关语义门）；version.h REVISION 18 Task208 附录（no bump，三主题+装机锚点+验证记录，尾部 SEP 不变量保持）
+
+Stage Summary:
+- NG-GL4ES 崩溃根治待装机验证：装机锚点 "[egl_bridge] Task208: NG-GL4ES initialize_gl4es() called post-MakeCurrent (resolver=YES, ...)" + "Initialising Krypton Wrapper" 出现在 Task146 make-current 之后 + 不再崩溃/卡死（即便未来再崩，JVM fatal 也只会干净退出而非僵死）
+- ANGLE 方块透明根治待装机验证：装机锚点 "[spvc-shim] Task208: push-constant block rename redirected to the variable id" + Task205 blockIdx 探针 _push_constants 从 4294967295 变 >= 0 + 方块恢复不透明
+- vgpu 不修（既定接替策略）；1.8.9 老版本用户换 NG-GL4ES
+- CI 待推送确认：vendored 树两处改动（CMakeLists flags + hardext.c 守卫）进 dep_nggl4es 编译链，本地已尽语法级预验（本轮教训：commit 后立即 push，防快照回滚）

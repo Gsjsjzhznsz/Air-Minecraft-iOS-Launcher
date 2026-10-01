@@ -255,6 +255,87 @@ static void *ame204_gl4esProcResolver(const char *name) {
     return dlsym(RTLD_DEFAULT, name);
 }
 
+// ---- Task208：NG-GL4ES 初始化时序根修（99a61eb latestlog.old 装机定谳）----
+//
+// 病历：Task206 假设 NG dylib 由 LWJGL 在上下文 current 后 dlopen——错。
+// 真实链：pojavCreateContext → pojavInitOpenGL → 统一预加载
+// dlopen("@rpath/libnggl4es.dylib", RTLD_GLOBAL)（本函数尾部统一块），
+// 此时 br_init_context 尚未运行、线程无任何 EGL 上下文；NG 上游的
+// constructor(101) initialize_gl4es 在 dlopen 期间即跑 GetHardwareExtensions：
+//   glGetString(GL_EXTENSIONS) → proc_address 的 __APPLE__ 分支
+//   dlsym(RTLD_NEXT,...) → 系统 /usr/lib/libGLESv2（Task204 符号劫持同源，
+//   vgpu 会话 tri-probe default=0x... ver=<NULL> 实锤）→ 无上下文返回 NULL
+//   → src/glx/hardext.c strstr(Exts,...) → SIGSEGV。
+// 后果放大器：JVM fatal 的 abort() 被 hooked_abort 拦截后 park，进程不死、
+// Client 线程永卡 JNI.invokePP（watchdog 采样 #1-#5），用户被迫重启 iOS。
+//
+// 修法（与 vendored CMakeLists 的 -DNO_INIT_CONSTRUCTOR 配套）：
+//   构造器消失后，由本函数在【上下文真正 current 之后】显式调用导出的
+//   initialize_gl4es()。挂点选 pojavMakeCurrent 尾部（br_make_current 返回
+//   即 current；GLFW/LWJGL2 与 SDL3 两条路径都汇到这里——vgpu 装机实证：
+//   "Task146 make-current" 之后才出现 "LIBGL: Initialising"）。
+//   调用前先注册 set_getprocaddress(ame204_gl4esProcResolver)：proc_address
+//   的宿主 resolver 分支优先于 __APPLE__ 的 dlsym(RTLD_NEXT)，从根上关闭
+//   系统 GLESv2 劫持通道（硬件探测 + 后续所有惰性解析一并免疫）。
+//   eglGetCurrentContext 门：无 current 上下文时跳过并打点（防御性——
+//   initialize_gl4es 自带 inited 幂等，但探测必须在真上下文上才有意义）。
+static void ame208_nggl4es_boot(void) {
+    static volatile int s_ame208_done = 0;
+    if (s_ame208_done) return;
+    const char *ame208_renderer = getenv("AMETHYST_RENDERER");
+    if (ame208_renderer == NULL || strcmp(ame208_renderer, RENDERER_NAME_NGGL4ES) != 0) return;
+
+    // RTLD_NOLOAD：预加载 dlopen 已把镜像载入，这里只取句柄（引用计数 +1，
+    // 不会二次跑初始化——NO_INIT_CONSTRUCTOR 下本也无构造器）。
+    void *ame208_ng = dlopen("@rpath/" RENDERER_NAME_NGGL4ES, RTLD_NOW | RTLD_NOLOAD | RTLD_GLOBAL);
+    if (ame208_ng == NULL) {
+        NSLog(@"[egl_bridge] Task208: NG-GL4ES image not loaded (RTLD_NOLOAD) -- initialize_gl4es NOT called");
+        return;
+    }
+
+    // 后端钉扎（Task204 resolver 复用）。句柄全局只开一次；resolver 注册
+    // 必须先于 initialize_gl4es——硬件探测的 LOAD_GLES 就要走它。
+    if (ame204_gl4esEgpa == NULL) {
+        ame204_gl4esGles2 = dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2",
+                                    RTLD_NOW | RTLD_LOCAL);
+        ame204_gl4esEgl = dlopen("@executable_path/Frameworks/libEGL.framework/libEGL",
+                                  RTLD_NOW | RTLD_LOCAL);
+        ame204_gl4esEgpa = ame204_gl4esEgl
+            ? (void *(*)(const char *))dlsym(ame204_gl4esEgl, "eglGetProcAddress")
+            : NULL;
+    }
+    int ame208_resolver = 0;
+    if (ame204_gl4esEgpa != NULL) {
+        void (*ame208_sgpa)(void *(*)(const char *)) =
+            (void (*)(void *(*)(const char *)))dlsym(ame208_ng, "set_getprocaddress");
+        if (ame208_sgpa != NULL) {
+            ame208_sgpa(ame204_gl4esProcResolver);
+            ame208_resolver = 1;
+        }
+    }
+
+    // 门：确认线程上确有 current 上下文（经由捆绑 ANGLE EGL 查询）。
+    if (ame204_gl4esEgl != NULL) {
+        void *(*ame208_getCurCtx)(void) =
+            (void *(*)(void))dlsym(ame204_gl4esEgl, "eglGetCurrentContext");
+        if (ame208_getCurCtx != NULL && ame208_getCurCtx() == NULL) {
+            NSLog(@"[egl_bridge] Task208: NG-GL4ES boot deferred -- no current EGL context on this thread");
+            return;
+        }
+    }
+
+    void (*ame208_init)(void) = (void (*)(void))dlsym(ame208_ng, "initialize_gl4es");
+    if (ame208_init == NULL) {
+        NSLog(@"[egl_bridge] Task208: initialize_gl4es symbol missing -- NG-GL4ES cannot init");
+        return;
+    }
+    ame208_init();   // 上下文已 current：硬件探测/能力缓存全部落真上下文
+    s_ame208_done = 1;
+    NSLog(@"[egl_bridge] Task208: NG-GL4ES initialize_gl4es() called post-MakeCurrent "
+          "(resolver=%@, handle=%p) -- hardware probe ran on the real game context",
+          ame208_resolver ? @"YES" : @"NO(egpa-missing)", ame208_ng);
+}
+
 static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
     if (s_openGLInited) {
         // 幂等：重复初始化会二次 dlopen 渲染器、二次 br_init()（eglInitialize），
@@ -470,17 +551,28 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         dlopen("@rpath/" RENDERER_NAME_MTL_ANGLE, RTLD_GLOBAL);
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_NGGL4ES]) {
-        // Task206：NG-GL4ES（"Krypton Wrapper"，ZL2 的 gl4es）。与 gl4es/vgpu
-        // 同族同流：EGL 全部由宿主 gl_bridge 从 ANGLE 框架提供（本分支零
-        // EGL 动作）；dylib 由 LWJGL 作为 opengl.libname 在游戏上下文已
-        // current 的渲染线程上 dlopen（RTLD_GLOBAL，依赖闭包把捆绑
-        // libEGL/libGLESv2 框架带入全局作用域）——constructor(101)
-        // initialize_gl4es 的 GetHardwareExtensions 探测因此落在真上下文上
-        //（vgpu 同款装机实证流，NOEGL 语义 = 探测当前上下文、零临时 EGL）。
-        // 后端惰性解析走 proc_address 的 Apple 分支 dlsym(RTLD_DEFAULT)，
-        // 依赖闭包可见性覆盖；宿主升级通道是导出的 set_getprocaddress
-        //（Task204 ame204_gl4esProcResolver 同款），如装机日志显示解析
-        // 缺口再启用（hooked dlopen 钉扎或预引导块），本轮保持最小侵入。
+        // Task206→Task208：NG-GL4ES（"Krypton Wrapper"，ZL2 的 gl4es）。
+        // Task206 的初始设计假设（"dylib 由 LWJGL 在游戏上下文 current 后
+        // dlopen，constructor(101) 探测落真上下文"）被 99a61eb 装机日志证伪：
+        // 真实调用链是 pojavCreateContext → pojavInitOpenGL → 本函数尾部的
+        // 统一预加载 dlopen(RTLD_GLOBAL) —— 发生在 br_init_context 之前，
+        // 线程上没有任何 EGL 上下文 → 构造器 GetHardwareExtensions 的
+        // glGetString（经 proc_address 的 Apple 分支 dlsym(RTLD_NEXT) 解析
+        // 到系统 /usr/lib/libGLESv2，Task204 符号劫持同源）返回 NULL →
+        // hardext.c 的 strstr(Exts,...) SIGSEGV（崩溃栈 _platform_strstr ←
+        // GetHardwareExtensions ← initialize_gl4es ← dyld dlopen 链），
+        // 且 abort() 被 hook 后 park，Client 线程永卡 JNI.invokePP，
+        // 用户被迫重启 iOS。修法（Task208 三件套）：
+        //   ① vendored 构建加 -DNO_INIT_CONSTRUCTOR（上游自带开关）——
+        //      initialize_gl4es 变成普通导出函数，构造器消失；
+        //   ② 本文件 pojavMakeCurrent 尾部的 ame208_nggl4es_boot()：上下文
+        //      真正 current 之后显式调用 initialize_gl4es()（vgpu 惰性初始化
+        //      的等效时机，装机实证流：Task146 make-current 后才出现
+        //      "LIBGL: Initialising"）；
+        //   ③ boot 内注册 set_getprocaddress(ame204_gl4esProcResolver)——
+        //      proc_address 的宿主 resolver 优先分支，关闭 Apple 分支
+        //      dlsym(RTLD_NEXT) 的系统 GLESv2 劫持通道（Task204 同源病）。
+        // EGL 仍全部由宿主 gl_bridge 从 ANGLE 框架提供（本分支零 EGL 动作）。
         NSLog(@"[egl_bridge] Task206: NG-GL4ES renderer: gl4es-family GL-on-ES "
               "translation (glslang+SPIRV-Cross shader pipeline, ZL2 Krypton Wrapper)");
         set_gl_bridge_tbl();
@@ -750,6 +842,10 @@ void pojavSwapBuffers() {
 void pojavMakeCurrent(basic_render_window_t* window) {
     if (!br_make_current) return;
     br_make_current(window);
+    // Task208：NG-GL4ES 初始化点——br_make_current 返回即上下文 current。
+    // 非 nggl4es 渲染器时 ame208_nggl4es_boot 立即返回（一次 getenv 比较，
+    // 零副作用）。幂等：boot 内部 s_ame208_done 门。
+    ame208_nggl4es_boot();
 }
 
 void* pojavCreateContext(basic_render_window_t* contextSrc) {
