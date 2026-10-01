@@ -19,12 +19,43 @@
 // 重新设计要点（参照 FCL 100%）：
 //   1. 版本管理界面只展示：游戏目录切换 + 已安装版本列表
 //   2. 渲染器、图形 API、Mod/光影/资源包管理等全部移到"版本专属设置页"（ProfileSettingsViewController）
-//      点击版本卡片直接进入该版本的专属设置页，设置只对该版本生效（FCL 风格）
+//      设置只对该版本生效（FCL 风格）；Task207 起交互拆分：点卡片 = 选用实例，
+//      卡片右上 ⋯ 钮 = 进入该页编辑（快捷指令语义，⋯ 只编辑不运行）
 //   3. 完全不调用旧 UI（LauncherPrefGameDirViewController / LauncherProfileEditorViewController）
 //   4. 游戏目录卡片支持长按弹出菜单（切换/删除当前目录）
 //   5. 统一使用 accentColor() 与毛玻璃背景，适配启动器新 UI
+//   6. Task207 实例卡快捷指令化（用户创新定稿）：accent 对角渐变卡底 + 左上白色
+//      实例图标（白色模板渲染）+ 右上 ⋯ 编辑钮 + 左下名称/版本两行白字 +
+//      选中内缩高亮环；版本区段列数翻倍（行高沿用旧版单卡行高）
 static NSInteger const kSectionGameDir     = 0;
 static NSInteger const kSectionVersions    = 1;
+
+// Task207：快捷指令实例卡布局常量
+// 旧版实例单卡行高（旧 createLayout 的 84pt 绝对值）——新网格行高动态沿用
+// 此值：一个旧卡位 = 两张新卡（列数翻倍），滚动节奏与旧版一致。
+static const CGFloat kVMVersionRowHeight = 84.0;
+// ⋯ 编辑钮到卡片边缘的间距；选中高亮环内缩距 = 此值 / 3（动态推导，用户定稿
+// "高亮边框宽度为卡片边缘距离省略号按钮距离的1/3"，落地方式 = 边框内缩）。
+static const CGFloat kVMCardEllipsisInset = 12.0;
+// 高亮环描边粗细（内缩方案下取常规 2pt，用户定稿）。
+static const CGFloat kVMCardRingBorderWidth = 2.0;
+
+// Task207：accent 深端色（渐变第二停靠点）——HSB 亮度按系数压暗；
+// 非 HSB 色回退 RGB 等比压暗；两者都失败原样返回。
+static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
+    CGFloat h, s, b, a;
+    if ([color getHue:&h saturation:&s brightness:&b alpha:&a]) {
+        return [UIColor colorWithHue:h
+                          saturation:MIN(1.0, s * 1.05)
+                          brightness:MAX(0.0, b * factor)
+                                alpha:a];
+    }
+    CGFloat r, g, bl, al;
+    if ([color getRed:&r green:&g blue:&bl alpha:&al]) {
+        return [UIColor colorWithRed:r * factor green:g * factor blue:bl * factor alpha:al];
+    }
+    return color;
+}
 
 #pragma mark - Modern Tile Base Cell
 
@@ -166,17 +197,33 @@ static NSInteger const kSectionVersions    = 1;
 
 @end
 
-#pragma mark - Version Card Cell
+#pragma mark - Version Card Cell (Task207 快捷指令样式)
 
+// 竖卡布局替换旧横向行卡（参照快捷指令 App 卡片 + 用户两张截图）：
+//   左上 = 实例图标（沿用 ModLoaderIconHelper/cube 兜底，一律白色模板渲染，
+//          alpha 通道即形状——"兼容透明度"）；
+//   右上 = ⋯ 半透明圆钮（编辑入口，纯编辑不改选中）；
+//   左下 = 实例名（白 semibold）+ 下一行版本号（白 75%）；
+//   选中 = 内缩高亮环：内缩距 = 省略号钮到卡缘间距的 1/3（动态推导），
+//          描边 2pt accentColor（原蓝）+ 同色柔光；
+//   卡底 = 统一主题渐变（accent → 深 accent 对角渐变，白字对比恒定）。
+// 旧 iconContainer/selectedBadge/isolatedBadge/lastPlayedLabel/chevronView
+// 全部退役（用户定稿"纯快捷指令样"）。
 @interface VMVersionCardCell : VMTileBaseCell
-@property (nonatomic, strong) UIView *iconContainer;
+// 左上实例图标（原 loader/兜底图标，白色模板渲染）
 @property (nonatomic, strong) UIImageView *iconView;
+// 右上 ⋯ 编辑钮（纯编辑，不改选中）
+@property (nonatomic, strong) UIButton *ellipsisButton;
+// accent 对角渐变卡底（盖在新拟态表面/壁纸 blur 之上、内容之下）
+@property (nonatomic, strong) UIView *gradientView;
+@property (nonatomic, strong) CAGradientLayer *gradientLayer;
+// 选中内缩高亮环（内缩 = 省略号间距/3，描边 2pt accent + 柔光）
+@property (nonatomic, strong) UIView *selectionRing;
+// 左下名称 + 版本（快捷指令"名称/操作数"位）
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *versionLabel;
-@property (nonatomic, strong) UILabel *lastPlayedLabel;
-@property (nonatomic, strong) UIView *selectedBadge;
-@property (nonatomic, strong) UILabel *isolatedBadge;
-@property (nonatomic, strong) UIImageView *chevronView;
+// ⋯ 点击回调（VC 在 cellForItem 里捕获 profileName 注入）
+@property (nonatomic, copy) void (^ellipsisAction)(void);
 @end
 
 @implementation VMVersionCardCell
@@ -184,30 +231,79 @@ static NSInteger const kSectionVersions    = 1;
 - (void)setupViews {
     [super setupViews];
 
-    CGFloat iconBoxSize = [ScreenUtils dp:34];
-    CGFloat iconSize = [ScreenUtils dp:20];
+    // 紧凑竖卡（84pt 固定行高）内的几何量用固定 pt，不随屏宽缩放：
+    // dp 的 iPad 1.3× 会把图标撑到 ~31pt，与底部两行 sp 白字在 84pt 内重叠；
+    // 字体仍走 sp（上限 1.15×），84pt 预算内各机型均不相碰（iPhone 富余 ~6pt，
+    // iPad 满档 1.15× 时仍余 ~1.6pt）。
+    CGFloat iconSize = 22.0;
     CGFloat nameFont = [ScreenUtils sp:15];
+    CGFloat ellipsisSize = 24.0;
 
-    // 规范 8.2：图标必须放在带类型色的圆角容器内
-    self.iconContainer = [[UIView alloc] init];
-    self.iconContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    self.iconContainer.layer.cornerRadius = 9;
-    self.iconContainer.layer.cornerCurve = kCACornerCurveContinuous;
-    self.iconContainer.backgroundColor = [UIColor systemBlueColor];
-    [self.contentContainer addSubview:self.iconContainer];
+    // ----- 渐变卡底（Task207：统一主题渐变）-----
+    // super 的 Task172 管线已挂新拟态表面（AmeNeumorphShadowView 承载视图）
+    // 或壁纸 blur；本卡的身份面 = accent 渐变，addSubview 追加在内容之前
+    // → 自然盖住上述背景层，且位于后续添加的图标/文字/按钮之下。
+    self.gradientView = [[UIView alloc] init];
+    self.gradientView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.gradientView.layer.cornerRadius = 12;
+    self.gradientView.layer.cornerCurve = kCACornerCurveContinuous;
+    self.gradientView.layer.masksToBounds = YES;
+    self.gradientView.userInteractionEnabled = NO;
+    // Task178 卡体透明度滑条语义沿用（旧语义只淡承载视图，渐变卡同步跟随）
+    self.gradientView.alpha = [[BackgroundManager sharedManager] cardsNeumorphOpacity];
+    [self.contentContainer addSubview:self.gradientView];
 
+    self.gradientLayer = [CAGradientLayer layer];
+    self.gradientLayer.startPoint = CGPointMake(0.0, 0.0);
+    self.gradientLayer.endPoint = CGPointMake(1.0, 1.0);
+    [self.gradientView.layer addSublayer:self.gradientLayer];
+
+    // ----- 左上实例图标：白色模板渲染（alpha 即形状，兼容透明原图）-----
     self.iconView = [[UIImageView alloc] init];
     self.iconView.translatesAutoresizingMaskIntoConstraints = NO;
     self.iconView.contentMode = UIViewContentModeScaleAspectFit;
     self.iconView.image = [UIImage systemImageNamed:@"cube.box.fill"];
     self.iconView.tintColor = [UIColor whiteColor];
-    [self.iconContainer addSubview:self.iconView];
+    [self.contentContainer addSubview:self.iconView];
 
+    // ----- 右上 ⋯ 编辑钮：白 0.28 半透明圆底（参照截图）-----
+    self.ellipsisButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.ellipsisButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ellipsisButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.28];
+    self.ellipsisButton.layer.cornerRadius = ellipsisSize / 2.0;
+    self.ellipsisButton.layer.cornerCurve = kCACornerCurveContinuous;
+    UIImageSymbolConfiguration *ellipsisConfig = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIFontWeightBold];
+    [self.ellipsisButton setImage:[UIImage systemImageNamed:@"ellipsis" withConfiguration:ellipsisConfig]
+                          forState:UIControlStateNormal];
+    self.ellipsisButton.tintColor = [UIColor whiteColor];
+    // 复用长按菜单的"编辑配置"文案做无障碍标签（不新增 l10n 键）
+    self.ellipsisButton.accessibilityLabel = localize(@"i18n_str_1091", nil);
+    [self.ellipsisButton addTarget:self
+                            action:@selector(ellipsisTapped)
+                  forControlEvents:UIControlEventTouchUpInside];
+    [self.contentContainer addSubview:self.ellipsisButton];
+
+    // ----- 选中内缩高亮环（原蓝 accent，用户定稿：内缩 = 省略号间距/3）-----
+    self.selectionRing = [[UIView alloc] init];
+    self.selectionRing.translatesAutoresizingMaskIntoConstraints = NO;
+    self.selectionRing.backgroundColor = [UIColor clearColor];
+    self.selectionRing.layer.borderColor = accentColor().CGColor;
+    self.selectionRing.layer.borderWidth = kVMCardRingBorderWidth;
+    self.selectionRing.layer.cornerRadius = 12.0 - (kVMCardEllipsisInset / 3.0);
+    self.selectionRing.layer.cornerCurve = kCACornerCurveContinuous;
+    // 柔光：accent 渐变卡上保证"原蓝"环可辨识（同色系对比由光晕补足）
+    self.selectionRing.layer.shadowColor = accentColor().CGColor;
+    self.selectionRing.layer.shadowOpacity = 0.45;
+    self.selectionRing.layer.shadowRadius = 5.0;
+    self.selectionRing.layer.shadowOffset = CGSizeZero;
+    self.selectionRing.hidden = YES;
+    [self.contentContainer addSubview:self.selectionRing];
+
+    // ----- 左下名称 + 版本（白字两行，快捷指令位）-----
     self.nameLabel = [[UILabel alloc] init];
     self.nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.nameLabel.font = [UIFont systemFontOfSize:nameFont weight:UIFontWeightSemibold];
-    // 规范 2.1：强制使用系统色
-    self.nameLabel.textColor = [UIColor labelColor];
+    self.nameLabel.textColor = [UIColor whiteColor]; // 彩色渐变卡面白字（Task91 保留语义）
     self.nameLabel.numberOfLines = 1;
     self.nameLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.nameLabel];
@@ -215,122 +311,106 @@ static NSInteger const kSectionVersions    = 1;
     self.versionLabel = [[UILabel alloc] init];
     self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.versionLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
-    // 规范 2.1：副文字用 secondaryLabelColor
-    self.versionLabel.textColor = [UIColor secondaryLabelColor];
+    self.versionLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75];
+    self.versionLabel.numberOfLines = 1;
     self.versionLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.versionLabel];
 
-    self.lastPlayedLabel = [[UILabel alloc] init];
-    self.lastPlayedLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.lastPlayedLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:10] weight:UIFontWeightRegular];
-    // 规范 2.1：元文字用 tertiaryLabelColor
-    self.lastPlayedLabel.textColor = [UIColor tertiaryLabelColor];
-    self.lastPlayedLabel.text = @"";
-    self.lastPlayedLabel.adjustsFontForContentSizeCategory = NO;
-    [self.contentContainer addSubview:self.lastPlayedLabel];
-
-    // 规范 9.1：选中态徽章（第二层强化）
-    self.selectedBadge = [[UIView alloc] init];
-    self.selectedBadge.translatesAutoresizingMaskIntoConstraints = NO;
-    self.selectedBadge.backgroundColor = accentColor();
-    self.selectedBadge.layer.cornerRadius = 10;
-    self.selectedBadge.layer.cornerCurve = kCACornerCurveContinuous;
-    self.selectedBadge.hidden = YES;
-    [self.contentContainer addSubview:self.selectedBadge];
-
-    UIImageView *checkmark = [[UIImageView alloc] init];
-    checkmark.translatesAutoresizingMaskIntoConstraints = NO;
-    checkmark.image = [UIImage systemImageNamed:@"checkmark" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:9 weight:UIFontWeightBold]];
-    checkmark.tintColor = [UIColor whiteColor];
-    [self.selectedBadge addSubview:checkmark];
-
-    self.isolatedBadge = [[UILabel alloc] init];
-    self.isolatedBadge.translatesAutoresizingMaskIntoConstraints = NO;
-    self.isolatedBadge.font = [UIFont systemFontOfSize:9 weight:UIFontWeightSemibold];
-    self.isolatedBadge.textColor = [UIColor whiteColor];
-    self.isolatedBadge.backgroundColor = [UIColor systemTealColor];
-    self.isolatedBadge.textAlignment = NSTextAlignmentCenter;
-    self.isolatedBadge.layer.cornerRadius = 8;
-    self.isolatedBadge.layer.cornerCurve = kCACornerCurveContinuous;
-    self.isolatedBadge.layer.masksToBounds = YES;
-    self.isolatedBadge.text = [[@" " stringByAppendingString:localize(@"i18n_str_2026", nil)] stringByAppendingString:@" "];
-    self.isolatedBadge.hidden = YES;
-    [self.contentContainer addSubview:self.isolatedBadge];
-
-    // 规范 9.4：chevron 暗示可点击
-    self.chevronView = [[UIImageView alloc] init];
-    self.chevronView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.chevronView.image = [UIImage systemImageNamed:@"chevron.right" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIFontWeightSemibold]];
-    self.chevronView.tintColor = [UIColor tertiaryLabelColor];
-    [self.contentContainer addSubview:self.chevronView];
-
+    CGFloat ringInset = kVMCardEllipsisInset / 3.0; // 用户定稿：内缩 = 省略号间距 × 1/3
+    // 名称行与图标的最小净距：必选优先级在极端字重/缩放组合下可能无解
+    //（iPad 满档 sp 时余量本就 ~1.6pt），降为 999 静默让位，不产生冲突日志。
+    NSLayoutConstraint *nameClearance =
+        [self.nameLabel.topAnchor constraintGreaterThanOrEqualToAnchor:self.iconView.bottomAnchor constant:2];
+    nameClearance.priority = 999;
     [NSLayoutConstraint activateConstraints:@[
-        [self.iconContainer.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:14],
-        [self.iconContainer.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
-        [self.iconContainer.widthAnchor constraintEqualToConstant:iconBoxSize],
-        [self.iconContainer.heightAnchor constraintEqualToConstant:iconBoxSize],
-        [self.iconView.centerXAnchor constraintEqualToAnchor:self.iconContainer.centerXAnchor],
-        [self.iconView.centerYAnchor constraintEqualToAnchor:self.iconContainer.centerYAnchor],
+        [self.gradientView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor],
+        [self.gradientView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor],
+        [self.gradientView.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor],
+        [self.gradientView.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor],
+
+        // 图标/⋯钮：统一 kVMCardEllipsisInset 内缩（截图对齐语义）
+        [self.iconView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:kVMCardEllipsisInset],
+        [self.iconView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:kVMCardEllipsisInset],
         [self.iconView.widthAnchor constraintEqualToConstant:iconSize],
         [self.iconView.heightAnchor constraintEqualToConstant:iconSize],
-        [self.nameLabel.leadingAnchor constraintEqualToAnchor:self.iconContainer.trailingAnchor constant:10],
-        [self.nameLabel.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:14],
-        [self.nameLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
+        [self.ellipsisButton.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-kVMCardEllipsisInset],
+        [self.ellipsisButton.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:kVMCardEllipsisInset],
+        [self.ellipsisButton.widthAnchor constraintEqualToConstant:ellipsisSize],
+        [self.ellipsisButton.heightAnchor constraintEqualToConstant:ellipsisSize],
+
+        // 选中环：四边内缩 ringInset = kVMCardEllipsisInset / 3
+        [self.selectionRing.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:ringInset],
+        [self.selectionRing.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:ringInset],
+        [self.selectionRing.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-ringInset],
+        [self.selectionRing.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-ringInset],
+
+        // 名称/版本：左下角两行，版本行距底 10pt
+        nameClearance,
+        [self.nameLabel.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:kVMCardEllipsisInset],
+        [self.nameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentContainer.trailingAnchor constant:-kVMCardEllipsisInset],
         [self.versionLabel.leadingAnchor constraintEqualToAnchor:self.nameLabel.leadingAnchor],
-        [self.versionLabel.topAnchor constraintEqualToAnchor:self.nameLabel.bottomAnchor constant:3],
-        [self.versionLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
-        [self.lastPlayedLabel.leadingAnchor constraintEqualToAnchor:self.nameLabel.leadingAnchor],
-        [self.lastPlayedLabel.topAnchor constraintEqualToAnchor:self.versionLabel.bottomAnchor constant:2],
-        [self.lastPlayedLabel.trailingAnchor constraintEqualToAnchor:self.isolatedBadge.leadingAnchor constant:-6],
-        [self.isolatedBadge.centerYAnchor constraintEqualToAnchor:self.lastPlayedLabel.centerYAnchor],
-        [self.isolatedBadge.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-8],
-        [self.isolatedBadge.heightAnchor constraintEqualToConstant:16],
-        [self.chevronView.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
-        [self.chevronView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
-        [self.chevronView.widthAnchor constraintEqualToConstant:12],
-        [self.chevronView.heightAnchor constraintEqualToConstant:12],
-        [self.selectedBadge.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
-        [self.selectedBadge.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:10],
-        [self.selectedBadge.widthAnchor constraintEqualToConstant:20],
-        [self.selectedBadge.heightAnchor constraintEqualToConstant:20],
-        [checkmark.centerXAnchor constraintEqualToAnchor:self.selectedBadge.centerXAnchor],
-        [checkmark.centerYAnchor constraintEqualToAnchor:self.selectedBadge.centerYAnchor]
+        [self.versionLabel.topAnchor constraintEqualToAnchor:self.nameLabel.bottomAnchor constant:2],
+        [self.versionLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentContainer.trailingAnchor constant:-kVMCardEllipsisInset],
+        [self.versionLabel.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-10]
     ]];
 }
 
-- (void)configureWithName:(NSString *)name version:(NSString *)version isSelected:(BOOL)isSelected isolated:(BOOL)isolated lastPlayed:(NSString *)lastPlayed {
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    // 渐变层铺满宿主（frame-based：CAGradientLayer 无自动布局参与）
+    CGRect gradientBounds = self.gradientView.bounds;
+    if (!CGRectIsEmpty(gradientBounds)) {
+        self.gradientLayer.frame = gradientBounds;
+    }
+    // 高亮环柔光路径随实际 frame 收口（无 shadowPath 的环光按直角 bounds 发散）
+    CGRect ringFrame = self.selectionRing.frame;
+    if (!CGRectIsEmpty(ringFrame)) {
+        self.selectionRing.layer.shadowPath =
+            [UIBezierPath bezierPathWithRoundedRect:ringFrame
+                                       cornerRadius:self.selectionRing.layer.cornerRadius].CGPath;
+    }
+}
+
+/// ⋯ 钮点击 → 转发 VC 注入的编辑回调（纯编辑，不改选中）
+- (void)ellipsisTapped {
+    if (self.ellipsisAction) self.ellipsisAction();
+}
+
+- (void)configureWithName:(NSString *)name version:(NSString *)version isSelected:(BOOL)isSelected {
     self.nameLabel.text = name;
     self.versionLabel.text = version ?: localize(@"i18n_str_1052", nil);
-    self.selectedBadge.hidden = !isSelected;
-    self.selectedBadge.backgroundColor = accentColor();
-    self.isolatedBadge.hidden = !isolated;
-    self.lastPlayedLabel.text = lastPlayed.length > 0 ? lastPlayed : @"";
+    self.selectionRing.hidden = !isSelected;
 
+    // 图标 = 原实例图标来源（Task207 定稿"始终为原来的图标"）：
+    // loader 品牌图标经 ModLoaderIconHelper 检出，无 loader 时回退 cube 兜底；
+    // 统一重渲染为白色模板——alpha 通道即形状，任意透明度原图都兼容。
     NSString *detectedLoader = [ModLoaderIconHelper detectLoaderFromVersionId:version];
     if (detectedLoader) {
         [ModLoaderIconHelper configureImageView:self.iconView
                                       forLoader:detectedLoader
                                  traitCollection:self.traitCollection];
-        // 规范 2.6：加载器品牌色作为图标容器背景
-        self.iconContainer.backgroundColor = [ModLoaderIconHelper brandColorForLoader:detectedLoader];
     } else {
         self.iconView.image = [UIImage systemImageNamed:@"cube.box.fill"];
-        self.iconView.tintColor = [UIColor whiteColor];
-        self.iconContainer.backgroundColor = [UIColor systemBlueColor];
     }
+    self.iconView.image = [self.iconView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    self.iconView.tintColor = [UIColor whiteColor];
 
-    // 规范 9.1：选中态三层强化（边框 + 徽章 + 背景色）
-    if (isSelected) {
-        self.contentContainer.layer.borderColor = accentColor().CGColor;
-        self.contentContainer.layer.borderWidth = 1.5;
-        self.contentContainer.backgroundColor = [accentColor() colorWithAlphaComponent:0.10];
-        self.chevronView.tintColor = accentColor();
-    } else {
-        self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
-        self.contentContainer.layer.borderWidth = 0.5;
-        self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-        self.chevronView.tintColor = [UIColor tertiaryLabelColor];
-    }
+    // 渐变随主题强调色即时刷新（LauncherAppearanceChanged → reloadData 重走此处）
+    UIColor *accent = accentColor();
+    self.gradientLayer.colors = @[(id)accent.CGColor,
+                                  (id)ame207_darkenedAccent(accent, 0.72).CGColor];
+    self.selectionRing.layer.borderColor = accent.CGColor;
+    self.selectionRing.layer.shadowColor = accent.CGColor;
+}
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    self.iconView.image = [UIImage systemImageNamed:@"cube.box.fill"];
+    self.iconView.tintColor = [UIColor whiteColor];
+    self.nameLabel.text = nil;
+    self.versionLabel.text = nil;
+    self.selectionRing.hidden = YES;
+    self.ellipsisAction = nil;
 }
 
 @end
@@ -1253,11 +1333,13 @@ static NSInteger const kSectionVersions    = 1;
             section.boundarySupplementaryItems = @[header];
             return section;
         } else {
-            // 版本卡片区段：紧凑列表（iPad 双列，iPhone 单列）
-            // 规范 4.1：iPad 双列时增加列间距
-            CGFloat itemWidth = isiPad ? 0.5 : 1.0;
-            // 规范 4.1：卡片高度 84pt（给 34pt 图标容器 + 三行文字留呼吸空间）
-            CGFloat itemHeight = 84;
+            // 版本卡片区段：快捷指令样式网格（Task207 用户创新定稿）
+            // 列数在旧版基础上翻倍（旧：iPhone 单列 / iPad 双列 → 新：2 / 4）——
+            // "原来一张卡的位置显示两张卡"；横向组按剩余宽度自动重复子项，
+            // 0.5/0.25 分数宽即每行 2/4 张。
+            CGFloat itemWidth = isiPad ? 0.25 : 0.5;
+            // 行高动态沿用旧版单卡行高（kVMVersionRowHeight = 旧 84pt 绝对值）
+            CGFloat itemHeight = kVMVersionRowHeight;
             NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:itemWidth]
                                                                                        heightDimension:[NSCollectionLayoutDimension absoluteDimension:itemHeight]];
             NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
@@ -1363,11 +1445,13 @@ static NSInteger const kSectionVersions    = 1;
         NSDictionary *profile = PLProfiles.current.profiles[profileName];
         NSString *versionId = profile[@"lastVersionId"] ?: localize(@"i18n_str_1052", nil);
         BOOL isSelected = [profileName isEqualToString:self.selectedProfile];
-        NSString *gameDir = profile[@"gameDir"] ?: @".";
-        BOOL isolated = ![gameDir isEqualToString:@"."];
-        NSString *lastPlayed = [self formatLastPlayed:profile[@"lastPlayed"]];
 
-        [cell configureWithName:profileName version:versionId isSelected:isSelected isolated:isolated lastPlayed:lastPlayed];
+        [cell configureWithName:profileName version:versionId isSelected:isSelected];
+        // Task207：⋯ 钮 = 纯编辑（不改选中；点卡片本体才选用）
+        __weak typeof(self) weakSelf = self;
+        cell.ellipsisAction = ^{
+            [weakSelf editProfile:profileName];
+        };
         return cell;
     }
 }
@@ -1450,9 +1534,10 @@ static NSInteger const kSectionVersions    = 1;
             }
         }
     } else if (indexPath.section == kSectionVersions) {
-        // 点击版本卡片直接进入该版本的专属设置页（FCL 风格）
+        // Task207：点卡片 = 选用该实例（快捷指令"点击即运行"语义）；
+        // 编辑入口移到卡片右上 ⋯ 钮（长按菜单保留选择/编辑/删除三件套不变）。
         NSString *profileName = self.profileList[indexPath.item];
-        [self editProfile:profileName];
+        [self selectProfileNamed:profileName];
     }
 }
 
@@ -1761,23 +1846,24 @@ static NSInteger const kSectionVersions    = 1;
 }
 
 - (void)editProfile:(NSString *)profileName {
-    // 关键修复（实例渲染器不生效）：点击版本卡片进入其实例设置时，
-    // 必须把该 profile 同步为"当前选中实例"。否则用户在实例设置里切换的渲染器
-    // 保存在被点击的 profile 上，而启动游戏时 JavaLauncher 只读取
-    // PLProfiles.current.selectedProfileName（当前选中实例）的 renderer，
-    // 两者不一致时启动会回退到全局 video.renderer（表现为"实例设置改了渲染器，启动却用全局"）。
-    // setSelectedProfileName: 内部会保存并发送 SelectedProfileChanged 通知。
-    if (![PLProfiles.current.selectedProfileName isEqualToString:profileName]) {
-        PLProfiles.current.selectedProfileName = profileName;
-        [self loadProfiles];
-        [self.collectionView reloadData];
-        [self updateEmptyState];
-    }
-
-    // 使用 ProfileSettingsViewController（合并后的统一 Edit Profile 页面，新 UI）
+    // Task207：纯编辑——⋯ 钮/长按菜单进入编辑页不再顺带把该实例设为当前选中
+    //（快捷指令"⋯ 只编辑不运行"语义；选中只由点卡片本体触发）。
+    // 旧逻辑的"实例渲染器不生效"补偿随之退役：那是"点卡即编辑且隐式选中"时代
+    // 的一致性补丁；新交互下选中态与编辑入口解耦，不存在再错位的问题。
     ProfileSettingsViewController *vc = [[ProfileSettingsViewController alloc] init];
     vc.profileName = profileName;
     [self.navigationController pushViewController:vc animated:YES];
+}
+
+/// Task207：选用实例（点卡片本体触发；动作等同旧长按菜单"选用"）。
+/// 已是当前实例时静默跳过（同游戏目录切换的防抖语义）。
+- (void)selectProfileNamed:(NSString *)profileName {
+    if ([profileName isEqualToString:self.selectedProfile]) return;
+    PLProfiles.current.selectedProfileName = profileName;
+    [PLProfiles.current save];
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"SelectedProfileChanged" object:nil];
+    [self loadProfiles];
+    [self.collectionView reloadData];
 }
 
 - (void)deleteProfile:(NSString *)profileName {

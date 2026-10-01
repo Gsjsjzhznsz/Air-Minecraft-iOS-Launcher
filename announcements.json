@@ -24,6 +24,18 @@
    "image_url": ""
   },
   {
+   "id": "task207-shortcuts-instance-cards-2026-10-01",
+   "title": "实例选择页快捷指令化：竖卡双列网格 + 点卡即选用 + ⋯ 纯编辑 + 内缩高亮环",
+   "date": "2026-10-01",
+   "summary": "版本管理页实例卡整体重写为 iOS 快捷指令样式：accent 统一渐变竖卡、左上白色实例图标（原 loader 图标模板化）、右上 ⋯ 编辑钮、左下名称+版本；点卡片=选用实例（旧'进编辑顺带选中'逻辑退役），⋯=纯编辑；选中高亮=内缩 accent 环（内缩距=省略号到卡缘间距的 1/3，2pt 描边+柔光）；密度翻倍：iPhone 2 列 / iPad 4 列，行高沿用旧版单卡 84pt。长按菜单三件套保留。",
+   "content": "## 实例选择页 = 快捷指令（Task207 用户创新定稿）\n\n**视觉**\n\n- 卡底：统一主题渐变（accent → 深 accent 对角 CAGradientLayer），盖在新拟态表面/壁纸 blur 承载层之上、内容之下；卡体透明度滑条（Task178 语义）继续生效\n- 左上：实例图标沿用原来源（ModLoaderIconHelper loader 品牌图 / cube 兜底），统一重渲染为白色模板——alpha 即形状，任意透明度原图兼容\n- 右上：⋯ 半透明圆钮（白 0.28，24pt 圆）\n- 左下：实例名（sp15 semibold 白）+ 版本号（sp11 白 75%）\n\n**交互（快捷指令语义）**\n\n- 点卡片 = 选用该实例（已是当前实例时静默跳过；等同原长按菜单'选用'动作）\n- 点 ⋯ = 纯编辑（进 ProfileSettingsViewController，不再顺带切换选中实例）\n- 长按 = 选择/编辑/删除菜单（保留不变）\n- 选中高亮 = 内缩 accent 环：内缩距 = 省略号钮到卡片边缘间距的 1/3（动态推导 12/3=4pt），2pt accent 描边 + 同色柔光\n\n**布局（密度翻倍）**\n\n- 行高沿用旧版单卡行高 84pt（kVMVersionRowHeight），一个旧卡位 = 两张新卡\n- 列数翻倍：iPhone 1→2 列、iPad 2→4 列（分数宽 0.5/0.25）\n- 卡内几何量用固定 pt（dp 的 iPad 1.3× 会撑爆 84pt 预算）；字体仍走 sp（1.15 上限）\n\n**退役**\n\n- 旧横向行卡五件套：iconContainer / selectedBadge / isolatedBadge / lastPlayedLabel / chevron（用户定稿'纯快捷指令样'）\n\nEnglish: VersionManagerViewController's instance cards rewritten as iOS Shortcuts-style vertical cards (unified accent gradient, white-template icon, ellipsis edit button, name+version footer, inset accent selection ring; density doubled at the legacy 84pt row height; tap = select, ellipsis = pure edit).\n\nTask 207 (user innovation round; number yielded from the parallel Task206 NG-GL4ES port): instance cards restyled isomorphic to the iOS Shortcuts app (two user-supplied reference screenshots), with select-on-tap / edit-on-ellipsis interaction and an inset accent highlight ring whose inset is dynamically derived as one third of the ellipsis-to-edge inset.",
+   "priority": null,
+   "action_url": null,
+   "action_title": null,
+   "image_url": null,
+   "pin": false
+  },
+  {
    "id": "task196-quad-fixes-2026-09-29",
    "title": "三根因终局修复（vgpu 方块损坏 / ANGLE 黑屏 / 控件堆角）+ 新渲染器 Metal (metallum)",
    "date": "2026-09-29",

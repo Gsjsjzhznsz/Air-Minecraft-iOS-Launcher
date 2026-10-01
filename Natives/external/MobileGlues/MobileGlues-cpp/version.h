@@ -3379,3 +3379,34 @@
 //     payload-line anchor 129-A9, FAQ counts (168/202/203), announcement
 //     counts (193/202/203/196-family).
 // ============================================================================
+// REVISION 18 addendum (Amethyst Task 207, no bump): instance-selection page
+//     restyled as iOS Shortcuts-style cards (user innovation brief + two
+//     reference screenshots; number yielded to the parallel Task206 NG-GL4ES
+//     port). VMVersionCardCell rewritten: vertical card on a unified accent ->
+//     darkened-accent diagonal CAGradientLayer (added above the Task172
+//     neumorph-surface/blur carriers, below content; view alpha follows
+//     cardsNeumorphOpacity so the Task178 opacity slider keeps working),
+//     top-left instance icon re-rendered as a WHITE TEMPLATE (original
+//     loader/cube artwork preserved, alpha-as-shape so transparent sources
+//     stay compatible), top-right translucent ellipsis button = PURE EDIT
+//     entry (editProfile no longer implicitly re-selects the profile --
+//     Shortcuts semantics: "..." edits, does not run), bottom-left name
+//     (sp15 semibold white) + version (sp11 white 75%). Selection = inset
+//     accent ring: inset = ellipsis-to-edge inset / 3 (kVMCardEllipsisInset/3,
+//     dynamically derived per user spec), 2pt accent border + soft accent
+//     glow (readability on the same-hue gradient), corner radius 12 - inset.
+//     Legacy per-card isolatedBadge / lastPlayedLabel / selectedBadge /
+//     chevron retired (user-picked "pure Shortcuts" four-element card).
+//     Versions section density doubled: row height keeps the legacy 84pt
+//     single-card slot (kVMVersionRowHeight), columns x2 (iPhone 1->2, iPad
+//     2->4 via fractional 0.5/0.25 widths). Tap card = selectProfileNamed:
+//     (silent no-op when already current), long-press menu unchanged.
+//     Fixed-pt geometry inside the tile (dp 1.3x on iPad would overflow the
+//     84pt budget; fonts stay sp with the 1.15 cap); name-icon clearance
+//     guard demoted to priority 999. l10n: zero new keys (ellipsis a11y
+//     reuses i18n_str_1091). Verify: verify_task207 (new); verify_task91 C2
+//     re-anchored (white-direct-write allowance 2 kept: keep-site
+//     isolatedBadge -> nameLabel); announcement family re-anchored
+//     (193 F / 173 M3 / 190 H / 196-201 E / 202 H / 203 H + the parallel
+//     verify_task206 F5 len 29 -> 30).
+// ============================================================================

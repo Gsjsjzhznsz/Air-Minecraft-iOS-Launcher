@@ -262,16 +262,16 @@ check("F4 渲染器选择条目更新（NG-GL4ES bullet + 记法句；zh/en/zh-H
       sel_ok and "NG-GL4ES first" in en_sel and "老版本優先 NG-GL4ES" in ht_sel)
 
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
-check("F5 公告 29 且末位为 task206-nggl4es-2026-10-01",
-      len(ann) == 29 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+check("F5 公告 30 且末位为 task206-nggl4es-2026-10-01（Task207 重锚：@2 插入 29→30）",
+      len(ann) == 30 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and "NG-GL4ES" in ann[-1]["title"] and "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER" in ann[-1]["content"])
 
 anchor_ok = ('== [12, 4, 7, 15]' in rd("scripts/verify_task202.py")
              and '== [12, 4, 7, 15]' in rd("scripts/verify_task168.py")
-             and "len(ann) == 29" in rd("scripts/verify_task203.py")
-             and "len(ann) == 29" in rd("scripts/verify_task202.py")
-             and "len(ann) == 29" in rd("scripts/verify_task196_197_198_201.py"))
-check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族）", anchor_ok)
+             and "len(ann) == 30" in rd("scripts/verify_task203.py")
+             and "len(ann) == 30" in rd("scripts/verify_task202.py")
+             and "len(ann) == 30" in rd("scripts/verify_task196_197_198_201.py"))
+check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族；Task207 重锚 29→30）", anchor_ok)
 
 # ============ G. version.h ============
 print("== G. version.h 附录 ==")

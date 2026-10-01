@@ -98,7 +98,7 @@ changed_to_theme = {
     "Natives/LauncherPreferencesViewController.m": 0,
     "Natives/BackgroundSettingsViewController.m": 0,
     "Natives/MultiplayerViewController.m": 0,
-    "Natives/VersionManagerViewController.m": 2,  # isolatedBadge/countBadge 彩色底有意保留
+    "Natives/VersionManagerViewController.m": 2,  # Task207 重锚：渐变卡 name 白字 + 头部 countBadge（旧 isolatedBadge 随卡退役；version 白75 为双括号写法不入正则计数）
     "Natives/CustomControlsViewController.m": 0,
 }
 for path, allowed in changed_to_theme.items():
@@ -125,7 +125,7 @@ check("偏好页 textField 底色原生化（tertiarySystemFillColor；Task137 �
 keep_checks = [
     ("Natives/LauncherRightPanelViewController.m", "self.launchButton setTitleColor:[UIColor whiteColor]", None),
     ("Natives/VersionCardCell.m", "self.typeLabel.textColor = [UIColor whiteColor];", None),
-    ("Natives/VersionManagerViewController.m", "self.isolatedBadge.textColor = [UIColor whiteColor];", None),
+    ("Natives/VersionManagerViewController.m", "self.nameLabel.textColor = [UIColor whiteColor];", None),  # Task207 重锚：渐变卡白字位（旧 isolatedBadge 退役）
     ("Natives/GameMenuOverlayView.m", "self.statsLabel.textColor = [UIColor whiteColor];", None),
     ("Natives/PLLogOutputView.m", "cell.textLabel.textColor = UIColor.whiteColor;", None),
     ("Natives/CurseForgeAPIKeyViewController.m", "return [UIColor whiteColor];", None),

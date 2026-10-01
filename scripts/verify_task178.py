@@ -225,29 +225,29 @@ check("D5 新拟态透明度中文文案回归（Task184 重锚）",
 # ============================================================
 print("== E. 文档（公告/version.h/fallback） ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
-# Task179 重锚：task179@2 插入，task178 顺延至 ann[3]，len 21。
-check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[4]，len 23）",
+# Task179 重锚：task179@2 插入，task178 顺延至 ann[4]，len 21。
+check("E1 公告插入链（Task184 重锚：task183@2 插入后 task180 居 ann[5]，len 23）",
       len(ann) == 27  # Task184+1 -> Task193+1 -> Task201+1 -> Task202+1 (appended at END; display layer sorts by pin+date, physical position irrelevant)
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[5]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
-      and ann[6]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
-      and ann[7]["id"] == "task179-eight-fixes-2026-09-26"
-      and ann[8]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
+      and ann[6]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"  # Task184 新入
+      and ann[7]["id"] == "task180-opacity-dual-slider-2026-09-26"  # Task184 顺延
+      and ann[8]["id"] == "task179-eight-fixes-2026-09-26"
+      and ann[9]["id"] == "task178-neumorph-decouple-opacity-2026-09-26")  # Task184 顺延
 check("E2 公告历史条目顺延 +1（Task184 重锚：177→6 / 175→7 / 174→8 / 双173→9,10 / 172→11 / 171→12 / 170→13 / 168→14）",
-      ann[9]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann[10]["id"] == "task175-six-fixes-2026-09-26"
-      and ann[11]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann[12]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann[13]["id"] == "task173-ten-fixes-2026-09-26"
-      and ann[14]["id"] == "task172-six-fixes-2026-09-25"
-      and ann[15]["id"] == "task171-seven-fixes-2026-09-25"
-      and ann[16]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and ann[17]["id"] == "task168-neumorph-faq-json-2026-09-25")
-check("E3 task178 公告内容锚（Task184 重锚：task178 条目顺延至 ann[6]；变灰/透明度/字体/圆角 + EN 尾注）",
-      "变灰" in ann[6]["content"] and "透明度" in ann[6]["content"]
-      and "字体" in ann[6]["content"] and "圆角" in ann[6]["content"]
-      and "EN:" in ann[6]["content"])
+      ann[10]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann[11]["id"] == "task175-six-fixes-2026-09-26"
+      and ann[12]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann[13]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann[14]["id"] == "task173-ten-fixes-2026-09-26"
+      and ann[15]["id"] == "task172-six-fixes-2026-09-25"
+      and ann[16]["id"] == "task171-seven-fixes-2026-09-25"
+      and ann[17]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and ann[18]["id"] == "task168-neumorph-faq-json-2026-09-25")
+check("E3 task178 公告内容锚（Task184 重锚：task178 条目顺延至 ann[7]；变灰/透明度/字体/圆角 + EN 尾注）",
+      "变灰" in ann[7]["content"] and "透明度" in ann[7]["content"]
+      and "字体" in ann[7]["content"] and "圆角" in ann[7]["content"]
+      and "EN:" in ann[7]["content"])
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E4 version.h Task 178 附录（append-only：Task 177 附录保留）",
       "Amethyst Task 178" in vh and "ame_setNeumorphPinnedCornerRadius" in vh

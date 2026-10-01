@@ -1268,3 +1268,23 @@ Stage Summary:
 - Task206 全链闭环：ANGLE push-constant 根修 + NG-GL4ES 移植 + 12 轮 CI 收口，IPA 就绪
 - 装机验证锚点：①ANGLE "[spvc-shim] Task206: EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER enabled" + blockIdx _push_constants ≥0 + 方块不透明；②NG-GL4ES 渲染器列表末位可选（"[egl_bridge] Task206: NG-GL4ES renderer:" + "[JavaLauncher] Task206: NG-GL4ES renderer active" + "Initialising Krypton Wrapper" 横幅）；③1.8.9 老版本材质损坏用户换 NG-GL4ES
 - CI 教训沉淀：vendored 移植的"方言考古"清单（裸 alias 三种形态 + NOEGL 宏缺口 + typedef 对齐 + C17 标签声明 + GLVND 围栏 + 安装/源码 include 布局）与 Makefile/CMake 两门各自的三条铁律（链中注释/if 列表语义/无续行符）
+
+---
+Task ID: 207
+Agent: main (Super Z)
+Task: 实例选择页快捷指令化（用户创新轮；编号让位重锚版）——VMVersionCardCell 竖卡重写 + 点卡选用/⋯纯编辑 + 内缩高亮环 + 密度翻倍
+
+Work Log:
+- 编号风波：本地基于 7c0a021 完成本轮实现并以 206 号提交（78334d5），推送时发现并行会话的 Task206（NG-GL4ES 渲染器移植，11 轮 CI 拉锯至 99a61eb 绿）已占用编号且建了同名 verify_task206.py/task206_docs.py/task206_reanchor2.py——全数让位：checkout -B task207 origin/main，我方 diff 重放 + 三脚本更名 + 全部重锚对准 29→30 新基线
+- 需求五点定稿（AskUserQuestion）：①卡底=统一主题渐变（accent→深 accent 对角）②高亮边框=内缩方案（内缩距=省略号到卡缘间距 1/3，描边 2pt）③密度=行高不变列翻倍④卡内信息=纯快捷指令样（最后游玩+隔离徽章退役）⑤⋯=纯编辑（隐式选中退役）
+- VMVersionCardCell 重写（VersionManagerViewController.m）：CAGradientLayer 对角渐变宿主（addSubview 于 Task172 管线承载层之上、内容之下，alpha 跟随 cardsNeumorphOpacity 保 Task178 滑条语义）；图标沿用 ModLoaderIconHelper 来源统一白色模板渲染（alpha 即形状）；⋯ 钮白 0.28 圆底（a11y 复用 i18n_str_1091，零新增 l10n 键）；名称 sp15 白 + 版本 sp11 白 75%；选中环 = kVMCardEllipsisInset/3 内缩 + 2pt accent 描边 + 0.45 柔光（shadowPath 随帧）；ame207_darkenedAccent 渐变深端
+- 布局：版本区段 0.5/0.25 分数宽（iPhone 1→2 列、iPad 2→4 列），行高沿用旧卡 84pt（kVMVersionRowHeight）；卡内几何固定 pt（dp 的 iPad 1.3× 会撑爆 84 预算，字体仍 sp 1.15 上限）+ nameClearance 999 静默守卫
+- 交互：didSelect 版本区段 → selectProfileNamed:（防抖+save+SelectedProfileChanged 广播）；editProfile 剥离隐式选中段；⋯ 回调 cell.ellipsisAction block（weak self）；长按三件套保留；与并行会话在 VM 内新增的 NG-GL4ES 渲染器映射行（ame140_shortNames）无冲突共存
+- 文档：announcements task207-shortcuts@2（29→30，task206-nggl4es 尾锚保持末位）+ version.h REVISION 18 附录（Task 207，无 bump，尾行恢复 SEP 收口不变量）+ scripts/task207_docs.py（七脚本重锚：193 F/173 M3/190 H/196-201 E/202 H/203 H + 并行 verify_task206 F5/F6）+ task207_reanchor2.py 机械位移九文件 95 处索引锚（N≥2→N+1）+ 165/167 窗口常数扩张（min22→23/min20→21）+ verify_task91 C2 重锚（白字配额保持 2，保留位 isolatedBadge→nameLabel）+ verify_task202 J 门容忍表扩容（168 E7 经 134-E4b 存量漂移放行，纯净 HEAD 复跑 134 66/68 实锤）
+- 验证：verify_task207 32/32 全绿；并行 verify_task206 43/43 全 PASS（F5 长度重锚 + F6 计数锚 30 + G2 SEP 恢复）；91 74/0（TASK91_REPO env 指向本仓库）；190 ALL GREEN、193 86/86、173 123/123、196-201 51/51、202 57/57（J 门扩容后）、203 ALL GREEN、165 34/34、166 64/64、167 31/31、172 51/51；168 41/43 与 170 32/34 的 E7/H1 失败在纯净 origin/main 上逐一复现（134-E4b 日志轮换存量，非本轮引入）；136/137/140/142 基线对拍逐一相同
+- 教训：①推送前必须再 fetch——11 轮 CI 拉锯的并行会话会在你工作期间推进主线，同名脚本（verify_taskNNN.py/taskNNN_docs.py）是 add/add 冲突高发面，让号+更名+重锚是标准解；②并行会话的验证器断言（F5 尾锚/F6 计数锚/G2 SEP 不变量）也是本轮改动的级联面，只重锚自己的脚本不够；③version.h 有"尾部 SEP 收口"的 append-friendly 不变量，追加附录后必须补回 SEP 行
+
+Stage Summary:
+- 实例选择页观感=快捷指令：accent 渐变竖卡双列网格（iPad 四列），左上白图标/右上 ⋯/左下名称+版本；点卡即选用、⋯ 纯编辑、选中=内缩原蓝环
+- 装机锚点：点任意非选中实例卡=立即切换选用（⋯ 与长按"编辑"均不改选中）；选中卡四周 12/3=4pt 内缩、2pt 蓝描边+柔光；iPhone 一行两卡、滚动节奏与旧版一致（行高仍 84）
+- 零新增 l10n 键；旧五件套（iconContainer/selectedBadge/isolatedBadge/lastPlayedLabel/chevronView）随卡退役；verify_task207 为本轮常驻门

@@ -231,8 +231,8 @@ for fn in ("Natives/AccountListViewController.m", "Natives/BackgroundManager.m",
                 break
             stack.pop()
     check("H", f"{os.path.basename(fn)} 严格栈匹配括号平衡", ok and not stack)
-check("H", "announcements/task190 条目存在且为最新任务条目",
-      json.loads(rdrepo("announcements.json"))["announcements"][4]["id"].startswith("task190-"))
+check("H", "announcements/task190 条目存在（Task207 重锚：@2 插入后顺延至 [5]）",
+      json.loads(rdrepo("announcements.json"))["announcements"][5]["id"].startswith("task190-"))
 
 print("=" * 72)
 print(f"PASS {len(PASS)}  FAIL {len(FAIL)}")
