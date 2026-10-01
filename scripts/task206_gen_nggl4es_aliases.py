@@ -413,6 +413,26 @@ def scan_file(rel):
         if name not in pairs:
             pairs[name] = target
 
+    # ---- 5e. AliasDecl declarations (raw text, condition-agnostic).
+    # directstate.c declares two gl4es_-to-gl4es_ internal aliases via
+    #     AliasDecl(RET, NAME, DEF, OLD);
+    # (attributes.h's GNUC branch -- no __APPLE__ retirement, so the vendored
+    # file guards them behind !__APPLE__ like the string_utils family). Form:
+    # exported = NAME (arg 2), target = OLD (arg 4, already fully qualified).
+    _raw = strip_comments((NG / rel).read_text(errors="replace"))
+    for m in re.finditer(r"\bAliasDecl\s*\(", _raw):
+        cp = _balanced(_raw, m.end() - 1)
+        if cp == -1:
+            continue
+        args = split_args(_raw[m.end():cp])
+        if len(args) != 4:
+            continue
+        name = args[1].strip()
+        target = args[3].strip()
+        if re.fullmatch(r"[A-Za-z_]\w*", name) and re.fullmatch(r"[A-Za-z_]\w*", target):
+            if name not in pairs:
+                pairs[name] = target
+
     # ---- 5a. AliasExport leaf instances (finditer: many per line)
     for m in re.finditer(r"\b(AliasExport(?:_A|_D_1|_D|_M|_V|_1)?)\s*\(", full):
         variant = m.group(1)

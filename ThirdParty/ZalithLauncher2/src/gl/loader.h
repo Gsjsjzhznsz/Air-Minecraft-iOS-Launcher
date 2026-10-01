@@ -239,6 +239,26 @@ extern "C"
     DEFINE_RAW(gles, name);                                                                                            \
     { LOAD_RAW_SILENT(gles, name, proc_address(gles, #name)); }
 
+// Task206 (Amethyst iOS port): LOAD_GLES3_OR_EXT is only defined in the
+// non-NOEGL branch upstream, but drawing.c / framebuffers.c use it
+// unguarded (CI run 36806869734: "call to undeclared function
+// 'LOAD_GLES3_OR_EXT'"). NOEGL semantics = resolve on the host-provided
+// current context via proc_address (base name first, EXT fallback second
+// -- mirroring the non-NOEGL branch's eglGetProcAddress chain).
+#define LOAD_GLES3_OR_EXT(name)                                                                                       \
+    DEFINE_RAW(gles, name);                                                                                           \
+    {                                                                                                                  \
+        static bool first = true;                                                                                      \
+        if (first) {                                                                                                   \
+            first = false;                                                                                             \
+            if (gles != NULL) {                                                                                        \
+                gles_##name = (name##_PTR)proc_address(gles, #name);                                                   \
+                if (!gles_##name) gles_##name = (name##_PTR)proc_address(gles, #name "EXT");                          \
+            }                                                                                                          \
+            WARN_NULL(gles_##name);                                                                                    \
+        }                                                                                                              \
+    }
+
 #else // defined(AMIGAOS4) || defined(NOEGL)
 
 #define LOAD_EGL_EXT(name)                                                                                             \

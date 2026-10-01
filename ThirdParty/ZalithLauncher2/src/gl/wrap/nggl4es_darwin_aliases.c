@@ -6,7 +6,7 @@
 // nothing. Pattern (CI-proven tinygl4angle/vgpu AliasDecl form):
 //     _name: b _target
 //
-// Coverage: 1291 exports from the preprocessor-evaluated union of
+// Coverage: 1293 exports from the preprocessor-evaluated union of
 // every AliasExport/A/_D/_D_1/_M/_V/_1 declaration + STUB/GL_GET_MAP/THUNK
 // macro families (token-paste expanded at point of use) + the NATIVE_FUNCTION
 // _HEAD ARB twins (Apple branch drops name##ARB) - 0 plain-
@@ -34,6 +34,8 @@ __asm__(".global _NextStr\n\t_NextStr: b _gl4es_next_str\n");
 __asm__(".global _PrevStr\n\t_PrevStr: b _gl4es_prev_str\n");
 __asm__(".global _ResizeIfNeeded\n\t_ResizeIfNeeded: b _gl4es_resize_if_needed\n");
 __asm__(".global _StrNext\n\t_StrNext: b _gl4es_str_next\n");
+__asm__(".global _gl4es_glDisableClientStatei\n\t_gl4es_glDisableClientStatei: b _gl4es_glDisableClientStateIndexed\n");
+__asm__(".global _gl4es_glEnableClientStatei\n\t_gl4es_glEnableClientStatei: b _gl4es_glEnableClientStateIndexed\n");
 __asm__(".global _glAccum\n\t_glAccum: b _gl4es_glAccum\n");
 __asm__(".global _glActiveTexture\n\t_glActiveTexture: b _gl4es_glActiveTexture\n");
 __asm__(".global _glActiveTextureARB\n\t_glActiveTextureARB: b _gl4es_glActiveTexture\n");

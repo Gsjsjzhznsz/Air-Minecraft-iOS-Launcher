@@ -367,7 +367,12 @@ void APIENTRY_GL4ES gl4es_glEnableClientStateIndexed(GLenum array, GLuint index)
         errorShim(GL_INVALID_ENUM);
     }
 }
+// Task206 (Amethyst iOS port): Apple clang rejects the bare alias attribute
+// (AliasDecl has no __APPLE__ retirement branch); the branch alias is
+// emitted by scripts/task206_gen_nggl4es_aliases.py instead.
+#if !defined(__APPLE__)
 AliasDecl(void,gl4es_glEnableClientStatei,(GLenum array, GLuint index),gl4es_glEnableClientStateIndexed);
+#endif
 
 void APIENTRY_GL4ES gl4es_glDisableClientStateIndexed(GLenum array, GLuint index) {
     DBG(SHUT_LOGD("glDisableClientStateIndexed(%s, %d)\n", PrintEnum(array), index);)
@@ -381,7 +386,9 @@ void APIENTRY_GL4ES gl4es_glDisableClientStateIndexed(GLenum array, GLuint index
         errorShim(GL_INVALID_ENUM);
     }
 }
+#if !defined(__APPLE__)
 AliasDecl(void,gl4es_glDisableClientStatei,(GLenum array, GLuint index),gl4es_glDisableClientStateIndexed);
+#endif
 
 void APIENTRY_GL4ES gl4es_glEnableVertexArray(GLuint vaobj, GLenum array) {
     DBG(SHUT_LOGD("glEnableVertexArray(%d, %s)\n", vaobj, PrintEnum(array));)

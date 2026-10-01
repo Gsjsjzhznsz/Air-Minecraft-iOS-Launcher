@@ -3353,11 +3353,17 @@
 //     attributes.h __APPLE__ retirement (AliasExport -> bare prototypes)
 //     would leave the plain gl* names unexported -- the Task204
 //     two-namespaces corruption disease -- so a generated alias file
-//     covers it: scripts/task206_gen_nggl4es_aliases.py, 1291 asm aliases
+//     covers it: scripts/task206_gen_nggl4es_aliases.py, 1293 asm aliases
 //     (preprocessor-evaluated union of every AliasExport/A/_D/_D_1/_M/_V/
 //     _1 declaration + STUB/GL_GET_MAP/THUNK token-paste families + the
 //     NATIVE_FUNCTION_HEAD ARB twins the Apple branch drops; dangling-
-//     target and bare-collision guards; idempotent). Runtime: renderer
+//     target and bare-collision guards; idempotent; plus the raw-text
+//     passes for string_utils.c's 18 bare alias-attribute helpers and
+//     directstate.c's 2 AliasDecl internal aliases -- both families
+//     guarded !__APPLE__ in the vendored tree after CI runs
+//     36805637724/36806869734; loader.h's NOEGL branch gains the
+//     missing LOAD_GLES3_OR_EXT used unguarded by drawing.c/
+//     framebuffers.c). Runtime: renderer
 //     libnggl4es.dylib appended to rendererCandidates (index-stability
 //     rule, after metal), egl_bridge Task206 branch (vgpu-proven flow:
 //     LWJGL dlopens with the game context current; NOEGL Task179

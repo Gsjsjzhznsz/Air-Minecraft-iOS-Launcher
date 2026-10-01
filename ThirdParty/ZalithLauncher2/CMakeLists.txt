@@ -45,6 +45,14 @@
 #     GNU-ld only; LTO (check_ipo_supported) disabled; C++ standard lowered
 #     23 -> 17 (nothing in the 3 .cpp files needs more; matches the house
 #     glsl_optimizer target). Upstream's -O3/-g0 kept as -O2 for CI sanity.
+#  7. src/gl/loader.h (Task206d, CI run 36806869734): LOAD_GLES3_OR_EXT is
+#     only defined in the non-NOEGL branch upstream, but drawing.c and
+#     framebuffers.c use it unguarded; the NOEGL branch now defines it
+#     (proc_address on the host-provided current context, base name
+#     first + EXT fallback, mirroring the non-NOEGL eglGetProcAddress
+#     chain). directstate.c's two AliasDecl internal aliases are guarded
+#     !__APPLE__ (same bare-attribute rejection; emitted by the
+#     generator's raw-text AliasDecl pass instead).
 #  6. src/gl/string_utils.c (Task206b, CI run 36805637724): the 18 bare
 #     `RET NAME(ARGS) __attribute__((alias("gl4es_...")))` helper aliases for
 #     vgpu/shaderconv.c are guarded behind #if !defined(__APPLE__) -- Apple
