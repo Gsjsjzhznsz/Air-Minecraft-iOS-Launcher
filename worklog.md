@@ -1313,3 +1313,15 @@ Stage Summary:
 - ANGLE 方块透明根治待装机验证：装机锚点 "[spvc-shim] Task208: push-constant block rename redirected to the variable id" + Task205 blockIdx 探针 _push_constants 从 4294967295 变 >= 0 + 方块恢复不透明
 - vgpu 不修（既定接替策略）；1.8.9 老版本用户换 NG-GL4ES
 - CI 待推送确认：vendored 树两处改动（CMakeLists flags + hardext.c 守卫）进 dep_nggl4es 编译链，本地已尽语法级预验（本轮教训：commit 后立即 push，防快照回滚）
+---
+Task ID: 208 (续)
+Agent: main (Super Z)
+Task: CI 确认
+
+Work Log:
+- CI run 36841323149（de846f3）completed success（首跑即绿，无拉锯——vendored 两处改动 CMakeLists flags + hardext.c 守卫顺利通过 dep_nggl4es 编译链；对比 Task206 移植轮的 11 连修，本轮是小改动精准命中）
+- 产物：Development build ipa/tipa + dSYM 就绪（Actions artifact）
+
+Stage Summary:
+- Task208 全链闭环：三渲染器根修（NG-GL4ES 时序 + ANGLE 块名 + JVM abort 直通）+ 验证器 24/24 + CI 绿，新 IPA 就绪
+- 装机验证锚点（Task208 编号）：①NG 会话 "[egl_bridge] Task208: NG-GL4ES initialize_gl4es() called post-MakeCurrent (resolver=YES, ...)" + "Initialising Krypton Wrapper" 出现在 Task146 make-current 之后 + 不再崩溃/僵死；②ANGLE 会话 "[spvc-shim] Task208: push-constant block rename redirected to the variable id" + Task205 blockIdx 探针 _push_constants >= 0 + 方块不透明；③1.8.9 老版本材质损坏用户换 NG-GL4ES（vgpu 接替者）
