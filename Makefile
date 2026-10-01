@@ -553,7 +553,7 @@ dep_shader_shims: dep_mg
 		$(SOURCEDIR)/Natives/spvc_shim.c || exit 1
 	echo '[Amethyst v$(VERSION)] dep_shader_shims - end'
 
-dep_nggl4es:
+dep_nggl4es: dep_mg
 	echo '[Amethyst v$(VERSION)] dep_nggl4es - start'
 	# Task206: NG-GL4ES ("Krypton Wrapper", BZLZHH/NG-GL4ES) -- the gl4es used
 	# by ZalithLauncher 2, vendored at ThirdParty/ZalithLauncher2 (see its

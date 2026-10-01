@@ -150,8 +150,8 @@ check("C6 CMakeLists 源列表含别名文件且全部源文件存在",
 # ============ D. Makefile ============
 print("== D. Makefile dep_nggl4es ==")
 mk = rd("Makefile")
-check("D1 dep_nggl4es 目标（四缓存变量 + cmake 交叉配置 + copy 到 WORKINGDIR）",
-      "dep_nggl4es:" in mk
+check("D1 dep_nggl4es 目标（目标级先决 dep_mg——CI run 36804929330 教训：payload 列表在 -j 并行下无序，dep_shader_shims 同款写法 + 四缓存变量 + cmake 交叉配置 + copy 到 WORKINGDIR）",
+      "dep_nggl4es: dep_mg" in mk
       and all(v in mk for v in ["NGGL4ES_GLSLANG_INCLUDE", "NGGL4ES_GLSLANG_LIBS",
                                 "NGGL4ES_SPVC_IMPL", "NGGL4ES_FRAMEWORK_DIR"])
       and "ThirdParty/ZalithLauncher2/" in mk
