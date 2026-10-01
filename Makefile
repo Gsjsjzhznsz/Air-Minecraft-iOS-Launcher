@@ -563,6 +563,10 @@ dep_nggl4es: dep_mg
 	# 15.4 headers were removed so headers and libs cannot drift) and the
 	# prebuilt SPIRV-Cross C API impl dylib (header verified byte-identical).
 	# Output libnggl4es.dylib rides the payload "cp $(WORKINGDIR)/*.dylib".
+	# Task206g（CI 36809835918）：双路径——3rdparty/ 让 <glslang/SPIRV/GlslangToSpv.h>
+	# 落到源码树根的 SPIRV/；3rdparty/glslang 让 <glslang/Public|Include/...> 落到
+	# glslang 子目录（NG 的 vendored 头是安装布局，源码树没有 glslang/SPIRV/）。
+	# 注意：续行链中间不能有无反斜杠的注释行——# 会截止逻辑行（本轮 CI 教训）。
 	mg_bindir=$(WORKINGDIR)/mobileglues/3rdparty/glslang; \
 	mg_spirv_a=$$mg_bindir/SPIRV/libSPIRV.a; \
 	[ -f "$$mg_spirv_a" ] || mg_spirv_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libSPIRV.a -print -quit 2>/dev/null); \
@@ -583,10 +587,6 @@ dep_nggl4es: dep_mg
 	ngg_libs="$$mg_spirv_a;$$mg_glslang_a;$$mg_rl_a$$extra_glslang_libs"; \
 	echo "[nggl4es] linking against glslang statics: $$ngg_libs"; \
 	mkdir -p $(WORKINGDIR)/nggl4es; \
-	# Task206g（CI 36809835918）：双路径——3rdparty/ 让 <glslang/SPIRV/GlslangToSpv.h>
-	# 落到源码树根的 SPIRV/；3rdparty/glslang 让 <glslang/Public|Include/...> 落到
-	# glslang 子目录（NG 的 vendored 头是安装布局，源码树没有 glslang/SPIRV/）。
-	# 注意：续行链中间不能有无反斜杠的注释行——# 会截止逻辑行（本轮 CI 教训）。
 	cd $(WORKINGDIR)/nggl4es && cmake \
 		-DMACOS="1" \
 		-DCMAKE_CROSSCOMPILING=true \
