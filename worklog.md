@@ -1363,3 +1363,24 @@ Work Log:
 Stage Summary:
 - Task209 全链闭环：红鲱鱼退役 + Krypton Wrapper（≤26.2）改名 + 四叉取证探针，verify_task209 26/26 + 级联全绿 + CI 绿，新 IPA 就绪
 - 装机验证锚点（Task209 编号）：①渲染器列表新名生效；②ANGLE 会话日志搜 "Task209 draw: glDrawElements*BaseVertex / Task209 state / Task209 tex / Task209 ESSL dump"——四叉探针数据将定位方块透明真因
+
+---
+Task ID: 210
+Agent: main (Super Z)
+Task: 新拟态全面退役（用户定稿"检索并删除所有新拟态代码和其选项和设置"）+ 实例卡修复（高度裁剪/⋯比例/深浅模式字体/选中纯描边）
+
+Work Log:
+- 需求定稿（AskUserQuestion 七问）：卡底=深浅自适应平贴灰面 / 图标=原始彩色直出 / 选中=纯描边 2pt 原蓝（内缩=省略号间距×1/3 不变） / 按压弹簧动效=全部磁贴移除 / 卡片高度=104pt / ⋯=加大加粗两档（28pt 圆底+16 Black）/ 全局无壁纸卡面=保留平贴灰面（#e0e0e0/#2c2c2e 系，去双阴影）
+- 删除范围：UIKit+NativeSurface 的 AmeNeumorphShadowView 三层引擎 + 规格色族/度量 + ame_applyNeumorphSurface/FlatWithRadius/removeNeumorphShadow/CardOpacity/PinnedCornerRadius 全部原语；BackgroundManager 的 cardsNeumorphEnabled/cardsNeumorphOpacity（defaults 键一并退役）；壁纸设置页"新拟态界面"开关行 + "新拟态透明度"滑条行（无壁纸时 section 0 整段隐藏 0 行）；六语言 background.cards.neumorph.* 双键（2419 -> 2417）；MinecraftNews 圆角钉住调用
+- 保留（改名）：AmeCardSurfaceColor / AmeCardPrimaryTextColor(#333333/#f5f5f5) / AmeCardSecondaryTextColor(#888888/#a0a0a0) + AmeBadgeLabel；applyNeumorphCardEffectToView -> applyCardEffectToView（VersionCardCell/Terracotta/ModLoaderInstall 三落点）
+- 实例卡（VMVersionCardCell）：去渐变卡底（其 alpha 曾跟随透明度滑条 = "卡片平时透明"根源）改全局平贴灰面；图标原始彩色直出；名称/版本 AmeCard 双色（深浅自适应"深色和灰色"）；⋯ 28pt+16Black+labelColor 12% 底；选中环纯 2pt accent 描边无光晕；行高 104（iPad 满档 sp 内容 86pt 超出旧 84 = 裁字根源）；VMTileBaseCell 三段弹簧缩放整链删除（FAB 出场动画无关保留）
+- 级联：announcements 31->32（task210@2，task169 钉 1 不动，task206-nggl4es 尾锚保持）+ version.h REVISION 18 Task210 附录 + SEP 收口归一（76 等号）；task210_docs.py 机械 +1 位移 14 个 verify 的 anns[N]/ann[N]/["announcements"][N]（N>=2，排除已手锚的 168/170）+ len(ann)==31->32 + 窗口常数 165 min24->25 / 167 min22->23
+- verify 家族维护：纯新拟态脚本退役三件（173b_neumorph/177/178 git rm）；混合脚本外科手术——160 D 组/163 17 检查/164 C1/168 A+B 组重写/170 A+B+C+E 组重写（F1 按真实现位重写：task179@10..task168@20）/171 D2 D3 诚实重锚/172 H2/173 I5/174 A2-A5b+B1 B4+C1 C3 C4+D1 D2/175 F2-F5+G1 G2 G4+H2 级联清单/180 A B C D 四组 25 检查+G 组/184 A B 组 6 检查/190 A 组+G 计数/193 M 计数/136 6 检查/137 7 检查+G3 l10n 放行/141 A3/196-201 E 计数/202 F 计数/206 F1 F2+G2/202-J 门无需扩容（168 全绿自愈）；91 C2 白字配额 2->1（实例卡白字退役，保留位 countBadge）；151 H 元扫描期望 2417；task168_cascade_baseline.json 补 134-E4b + 156-G 组存量行
+- 事故两起：①重锚正则吞闭括号（ann[N]["id"] -> ann[N["id"]，\] 未入捕获组）波及 14 脚本——python 语法门 14/14 修复复证；②环境对 scripts/verify_task190.py 出现读写竞态疑云（heredoc 写入后 rg 读不到、随后恢复）——按 Task208 快照回滚教训改用 Edit 工具落盘并即时验证
+- 验证：verify_task210 41/41；202 ALL GREEN（J 门免扩容）；168 34/34；170 32/32；171 30/0；175 41/0（基线 38/3）；176 42/0；180 120/0；184 全绿；190/193 86/0/196-201 51/51/203/206/207/208/209 全绿；91 74/0；165 34/34/166 64/64/167 31/31/129 47/47/130 59/59/131 37/37/141 36/0/137 47/0；存量漂移零新增（136 C4、149 33/35、156 49/3、132 47/53、135 30/33、134 66/68、151 尾部路径崩溃——基线 worktree 对拍逐笔一致）
+- 教训：机械重锚的正则必须把闭括号写进替换串或捕获组，跑完立即 ast.parse 全部被改脚本；批量 sed 前先 dump 命中行；环境快照回滚风险下"改一个文件 → Edit 工具 → rg 即时验证"比 heredoc 批处理可恢复
+
+Stage Summary:
+- 新拟态全链退役：引擎/偏好/选项/l10n/承载视图零残留；无壁纸卡面 = 平贴灰面（深浅自适应），有壁纸毛玻璃/半透明原样；文字色族 AmeCard* 深浅自适应
+- 实例卡：104pt 修裁剪、原色图标、深浅模式字体、纯 2pt 原蓝内缩描边（无光晕无整卡变色无按压动效）、⋯ 28pt/16 Black 自适应；点卡选用/⋯编辑/长按三件套不变
+- 装机锚点：无壁纸进壁纸设置 = UI 效果区段整体隐藏；实例卡字体任何字号无裁剪；点卡片立即切换选用且仅出现内缩蓝框

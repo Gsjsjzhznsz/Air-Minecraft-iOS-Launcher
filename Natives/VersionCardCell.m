@@ -46,10 +46,10 @@
         self.cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
         [self.contentView addSubview:self.cardContainer];
 
-        // 应用原生卡片效果（Task163：applyNeumorphCardEffectToView 检测切换：
+        // 应用原生卡片效果（Task163：applyCardEffectToView 检测切换：
         // 有背景照片时转调毛玻璃/半透明旧管线，无背景时挂新拟态规格双阴影
         // ——用户实测"下载页面版本选项一点没改"的修复落点）
-        [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:self.cardContainer];
+        [[BackgroundManager sharedManager] applyCardEffectToView:self.cardContainer];
 
         // ----- 左侧图标容器：40x40 圆角方块，类型色背景 -----
         self.iconContainer = [[UIView alloc] init];
@@ -72,7 +72,7 @@
         self.versionLabel = [[UILabel alloc] init];
         self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.versionLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-        self.versionLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
+        self.versionLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
         self.versionLabel.adjustsFontSizeToFitWidth = YES;
         // Task141：缩小下限 = 12/16 = 0.75 —— 用户实测"主标题字号比时间灰字还小"
         // 根因：旧下限 0.7 允许标题缩到 11.2pt < 日期 12pt；现在标题最小渲染尺寸
@@ -109,7 +109,7 @@
         self.dateLabel = [[UILabel alloc] init];
         self.dateLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.dateLabel.font = [UIFont systemFontOfSize:12];
-        self.dateLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+        self.dateLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
         self.dateLabel.adjustsFontSizeToFitWidth = YES;
         self.dateLabel.minimumScaleFactor = 0.7;
         self.dateLabel.lineBreakMode = NSLineBreakByTruncatingTail;

@@ -150,42 +150,28 @@ print("D. 新拟态引擎（Task160 CSS 规格原生实现）")
 print("=" * 72)
 nsm = read('Natives/UIKit+NativeSurface.m')
 nsh = read('Natives/UIKit+NativeSurface.h')
-check("D1  规格动态色五件套（表面/暗影/高光/主文字/次文字）",
-      all(f"AmeNeumorph{x}Color(void)" in nsm for x in
-          ["Surface", "Shadow", "Highlight", "PrimaryText", "SecondaryText"]))
-check("D2  CSS 色值核对（Task177 重锚：暗影 bebebe -> bigbear-ui d6d6d6；渐变端 e6e6e6/ffffff 入列）",
-      all(hexv in nsm for hexv in
-          ["0xE0/255.0", "0x2C/255.0", "0xD6/255.0", "0x1E/255.0", "0x3A/255.0",
-           "0x33/255.0", "0xF5/255.0", "0x88/255.0", "0xA0/255.0", "0xE6/255.0"]))
-check("D3  度量（Task177 重锚：圆角仍 340 基准等比 clamp[8,50]；偏移/模糊改固定档 4/8（小件 2/4）——20/60 等比放大退役）",
-      "AmeNeumorphBaseDimension = 340.0" in nsm
-      and "MAX(8.0, 50.0 * scale)" in nsm
-      and "? 2.0 : 4.0" in nsm
-      and "? 4.0 : 8.0" in nsm)
-check("D4  双阴影承载视图（Task177 重锚：暗影右下 + 高光左上维持；透明承载层改三层结构——投影对垫底 + 不透明渐变表面盖内侧）",
-      "AmeNeumorphShadowView : UIView" in nsh
-      and "CGSizeMake(offset, offset)" in nsm
-      and "CGSizeMake(-offset, -offset)" in nsm
-      and "ame177_surfaceLayer" in nsm and "shadowOpacity = 1.0" in nsm)
-check("D5  深浅色切换自动重刷（traitCollectionDidChange）",
-      "traitCollectionDidChange:" in nsm
-      and "AmeNeumorphDynamicColor" in nsm)
-check("D6  表面方法路由（Task184 重锚：Panel 单签名转发 Flat；Card/Raised 仍走新拟态）",
-      nsm.count("[self ame_applyNeumorphSurface];") == 2
-      and "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm
-      and "[self ame_applyPanelSurfaceWithRadius:cornerRadius opacity:" not in nsm)
-check("D7  cell 平贴版（无阴影层，防列表裁剪互叠）",
-      "- (void)ame_applyNeumorphSurfaceFlatWithRadius:(CGFloat)cornerRadius {" in nsm
-      and "self.layer.masksToBounds = YES;" in nsm)
-check("D8  宿主放行阴影（masksToBounds = NO，Task137 裁剪教训）",
-      "self.layer.masksToBounds = NO; // Task137 教训：YES 会裁掉外阴影" in nsm)
-check("D9  文字色规格化落点（主页磁贴/公告卡/新闻卡/版本卡/VM header/Hero/Toast/右面板）",
-      read('Natives/LauncherNewsViewController.m').count("AmeNeumorphSecondaryTextColor(); // Task160 新闻卡简介") == 1
-      and "AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read('Natives/VersionCardCell.m')
-      and "AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read('Natives/VersionManagerViewController.m')
-      and "AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read('Natives/NMToast.m')
-      and "AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read('Natives/LauncherRightPanelViewController.m')
-      and "titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read('Natives/ProfileSettingsViewController.m'))
+def _strip_line_comments(t):
+    return "\n".join(l.split("//")[0] for l in t.split("\n"))
+check("D1  Task210：新拟态引擎退役（五件套/度量/承载视图/深浅重刷零残留；注释留档不计）",
+      all(sym not in _strip_line_comments(nsm) and sym not in _strip_line_comments(nsh) for sym in
+          ["AmeNeumorphShadowView", "AmeNeumorphShadowColor", "AmeNeumorphHighlightColor",
+           "AmeNeumorphSurfaceGradientStartColor", "AmeNeumorphMetricsForSide",
+           "AmeNeumorphBaseDimension", "ame_applyNeumorphSurface", "traitCollectionDidChange:"]))
+check("D2  Task210：改名保留三函数（表面 + 主/次文字，色值逐字节沿用）",
+      all(f"AmeCard{x}Color(void)" in nsm for x in ["Surface", "PrimaryText", "SecondaryText"])
+      and "0xE0/255.0" in nsm and "0x2C/255.0" in nsm
+      and "0x33/255.0" in nsm and "0xF5/255.0" in nsm
+      and "0x88/255.0" in nsm and "0xA0/255.0" in nsm)
+check("D3  Task210：表面方法路由（Panel 单签名转发 Card；无 Raised）",
+      nsm.count("[self ame_applyCardSurfaceWithRadius:cornerRadius];") == 1
+      and "- (void)ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius" in nsm
+      and "Raised" not in nsm and "opacity:" not in nsm)
+check("D4  Task210：平贴语义（表面色 + clamp[8,50] + 保裁剪，无阴影）",
+      "self.layer.cornerRadius = MAX(8.0, MIN(cornerRadius, 50.0));" in nsm
+      and "self.layer.masksToBounds = YES;" in nsm
+      and "shadowOpacity" not in nsm)
+check("D5  Task210：深浅自适应动态色保留（colorWithDynamicProvider）",
+      "colorWithDynamicProvider" in nsm and "AmeCardDynamicColor" in nsm)
 check("D10 Hero 卡旧黑影/白边框/半透明白底移除",
       "heroCard.layer.shadowColor = [UIColor blackColor].CGColor;" not in read('Natives/ProfileSettingsViewController.m')
       and "heroCard.layer.shadowColor = [UIColor blackColor].CGColor;" not in read('Natives/LauncherPreferencesViewController.m'))

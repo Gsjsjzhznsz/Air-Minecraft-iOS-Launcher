@@ -301,7 +301,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     self.usernameLabel = [[UILabel alloc] init];
     self.usernameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.usernameLabel.font = [UIFont boldSystemFontOfSize:16];
-    self.usernameLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
+    self.usernameLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
     self.usernameLabel.textAlignment = NSTextAlignmentCenter;
     // iPhone 上侧栏宽度更窄，开启字号自适应避免长用户名被截断
     self.usernameLabel.adjustsFontSizeToFitWidth = YES;
@@ -317,7 +317,7 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     self.progressLabel = [[UILabel alloc] init];
     self.progressLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.progressLabel.font = [UIFont systemFontOfSize:12];
-    self.progressLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+    self.progressLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
     self.progressLabel.textAlignment = NSTextAlignmentCenter;
     self.progressLabel.text = @"";
     self.progressLabel.hidden = YES;
@@ -1107,8 +1107,8 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
         self.progressLabel.textColor = [customColor colorWithAlphaComponent:0.75];
     } else {
         // 未设置自定义字体颜色时，恢复系统自适应颜色
-        self.usernameLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
-        self.progressLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+        self.usernameLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
+        self.progressLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
         // 信息卡正文颜色随深浅色自动切换（动态色），不参与自定义文字色
     }
 }

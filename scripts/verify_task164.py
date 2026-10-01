@@ -73,11 +73,11 @@ check("B7 文件括号平衡",
 
 print("== C. 壁纸首启默认值（BackgroundManager.m）==")
 bm = rd("Natives/BackgroundManager.m")
-check("C1 键判定（Task184 重锚：效果/透明度/模糊 三键 ame164 直读 + 新拟态透明度 standardUserDefaults 判定；180 双键退役）",
+check("C1 键判定（Task184 重锚 + Task210 重锚：效果/透明度/模糊 三键 ame164 直读；新拟态键随退役删除）",
       "[defaults objectForKey:kBackgroundUIEffectKey]" in bm
       and "[defaults objectForKey:kBackgroundUIOpacityKey]" in bm
       and "[defaults objectForKey:kBackgroundBlurIntensityKey]" in bm
-      and "objectForKey:kBackgroundCardsNeumorphOpacityKey]" in bm)
+      and "kBackgroundCardsNeumorphOpacityKey" not in bm)
 check("C2 nil → BackgroundUIEffectBlur（默认毛玻璃）",
       "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm)
 check("C3 nil → 0.6 / 1.0（Task184 重锚：180 双滑条撤销，回归 uiOpacity 0.6 / blur 1.0 Task162 形态）",

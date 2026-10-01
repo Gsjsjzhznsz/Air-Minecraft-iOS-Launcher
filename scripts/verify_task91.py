@@ -98,7 +98,7 @@ changed_to_theme = {
     "Natives/LauncherPreferencesViewController.m": 0,
     "Natives/BackgroundSettingsViewController.m": 0,
     "Natives/MultiplayerViewController.m": 0,
-    "Natives/VersionManagerViewController.m": 2,  # Task207 重锚：渐变卡 name 白字 + 头部 countBadge（旧 isolatedBadge 随卡退役；version 白75 为双括号写法不入正则计数）
+    "Natives/VersionManagerViewController.m": 1,  # Task210 重锚：实例卡 name/version 改 AmeCard 深浅自适应色（白字退役），仅剩头部 countBadge 白字（彩色徽章底）
     "Natives/CustomControlsViewController.m": 0,
 }
 for path, allowed in changed_to_theme.items():
@@ -125,7 +125,7 @@ check("偏好页 textField 底色原生化（tertiarySystemFillColor；Task137 �
 keep_checks = [
     ("Natives/LauncherRightPanelViewController.m", "self.launchButton setTitleColor:[UIColor whiteColor]", None),
     ("Natives/VersionCardCell.m", "self.typeLabel.textColor = [UIColor whiteColor];", None),
-    ("Natives/VersionManagerViewController.m", "self.nameLabel.textColor = [UIColor whiteColor];", None),  # Task207 重锚：渐变卡白字位（旧 isolatedBadge 退役）
+    ("Natives/VersionManagerViewController.m", "self.countBadge.textColor = [UIColor whiteColor];", None),  # Task210 重锚：头部彩色 countBadge 白字位（实例卡白字随渐变卡退役）
     ("Natives/GameMenuOverlayView.m", "self.statsLabel.textColor = [UIColor whiteColor];", None),
     ("Natives/PLLogOutputView.m", "cell.textLabel.textColor = UIColor.whiteColor;", None),
     ("Natives/CurseForgeAPIKeyViewController.m", "return [UIColor whiteColor];", None),

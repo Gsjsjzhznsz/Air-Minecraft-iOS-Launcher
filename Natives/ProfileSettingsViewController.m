@@ -362,7 +362,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = self.profile[@"name"] ?: self.originalName ?: @"New Profile";
     titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
-    titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
+    titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
     titleLabel.adjustsFontSizeToFitWidth = YES;
     titleLabel.minimumScaleFactor = 0.8;
     [heroCard addSubview:titleLabel];
@@ -396,7 +396,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     NSString *instanceName = getPrefObject(@"general.game_directory") ?: @"default";
     subtitleLabel.text = [NSString stringWithFormat:@"%@ → /instances/%@", gameDir, instanceName];
     subtitleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+    subtitleLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
     subtitleLabel.adjustsFontSizeToFitWidth = YES;
     subtitleLabel.minimumScaleFactor = 0.7;
     [heroCard addSubview:subtitleLabel];

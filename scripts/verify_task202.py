@@ -145,8 +145,8 @@ langs = {}
 for lg in ("zh-Hans", "zh-Hant", "en", "zh-CN"):
     keys = re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M)
     langs[lg] = set(keys)
-check("F", "四主表键集一致且 2419（2408 + 10 ame202）",
-      len(langs["zh-Hans"]) == len(langs["zh-Hant"]) == len(langs["en"]) == len(langs["zh-CN"]) == 2419
+check("F", "四主表键集一致且 2417（2408 + 10 ame202 - 2 Task210 退役）",
+      len(langs["zh-Hans"]) == len(langs["zh-Hant"]) == len(langs["en"]) == len(langs["zh-CN"]) == 2417
       and langs["zh-Hans"] == langs["zh-Hant"] == langs["en"] == langs["zh-CN"])
 ame202_keys = {k for k in langs["zh-Hans"] if k.startswith("ame202.")}
 check("F", "恰 10 个 ame202.* 键（partial + surface×2 + ai×6 + copy）",
@@ -194,10 +194,10 @@ check("H", "version.h REVISION 18 附录（Task202 八节 + no bump 理由）",
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))["announcements"]
 check("H", "公告 31 条且末位仍是 task206-nggl4es（Task209@2 插入 +1）",
       # Task209 重锚：task209@2 插入（30→31）；task202 锚顺延 [28]。
-      len(ann) == 31 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
-      and ann[28]["id"] == "task202-october-fix-wave")
+      len(ann) == 32 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+      and ann[29]["id"] == "task202-october-fix-wave")
 check("H", "公告索引锚（Task209 重锚：[4]=task196 / [5]=task193 / [0]=server）",
-      ann[4]["id"] == "task196-quad-fixes-2026-09-29" and ann[5]["id"] == "task193-app-icon-replace-2026-09-28"
+      ann[5]["id"] == "task196-quad-fixes-2026-09-29" and ann[6]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[0]["id"].startswith("server-recommend"))
 check("H", "两份调查报告在位（Task201 gitignore 丢失重建）",
       os.path.isfile(os.path.join(REPO, "docs/surveys/2026-09-29-upstream-sync-survey.md"))

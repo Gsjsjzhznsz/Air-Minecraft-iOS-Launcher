@@ -25,6 +25,9 @@ ROOT = os.environ.get('TASK163_REPO',
 PASS, FAIL = 0, 0
 
 
+def _strip_lc(t):
+    return "\n".join(l.split("//")[0] for l in t.split("\n"))
+
 def read(rel):
     return open(f'{ROOT}/{rel}', encoding='utf-8').read()
 
@@ -90,13 +93,13 @@ nsm = read('Natives/UIKit+NativeSurface.m')
 nsh = read('Natives/UIKit+NativeSurface.h')
 root = read('Natives/LauncherRootViewController.m')
 
-check("A1  Panel 方法转 Flat 路由（Task184 重锚：单签名转发回归；NeumorphSurface 直调仅剩 Card/Raised 两处）",
-      "[self ame_applyNeumorphSurfaceFlatWithRadius:cornerRadius];" in nsm
+check("A1  Panel 方法转 Card 平贴路由（Task210 重锚：单签名转发回归；NeumorphSurface 零残留）",
+      "[self ame_applyCardSurfaceWithRadius:cornerRadius];" in nsm
       and "opacity:(CGFloat)opacity;" not in open('Natives/UIKit+NativeSurface.h').read()
-      and nsm.count("[self ame_applyNeumorphSurface];") == 2,
-      "Panel 实现必须单签名转发 Flat；NeumorphSurface 直调仅剩 Card/Raised 两处")
-check("A2  Panel 注释留档（Task177 重锚：退役阴影语义延续到新注释——全屏大容器不挂阴影承载层）",
-      "平贴面板退役阴影" in nsm
+      and "ame_applyNeumorphSurface" not in nsm,
+      "Panel 实现必须单签名转发 Card 平贴；NeumorphSurface 随 Task210 零残留")
+check("A2  Panel 注释留档（Task210 重锚：平贴语义延续——全屏大容器不挂阴影承载层）",
+      "大面板平贴" in nsm
       and "ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius {" in nsm)
 check("A3  调用点保持 Panel 语义（Task184 重锚：LauncherRoot 无壁纸分支回归单签名恒定底）",
       "[self.sidebarContainer ame_applyPanelSurfaceWithRadius:16];" in root
@@ -106,9 +109,9 @@ check("A4  maskedCorners/创建态裁剪不被触碰（侧栏外侧两角圆角�
       "kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner" in root
       and "kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner" in root
       and "self.sidebarContainer.layer.masksToBounds = YES;" in root)
-check("A5  头文件 Panel 契约注释更新（Task163 语义修订）",
+check("A5  头文件 Panel 契约在位（Task163 语义修订 + Task210 平贴注释）",
       "ame_applyPanelSurfaceWithRadius:(CGFloat)cornerRadius;" in nsh
-      and "Task163 语义修订" in nsh)
+      and "平贴面板表面" in nsh)
 
 print()
 print("=" * 72)
@@ -118,41 +121,37 @@ bm = read('Natives/BackgroundManager.m')
 bh = read('Natives/BackgroundManager.h')
 vcc = read('Natives/VersionCardCell.m')
 
-check("B1  引擎新增 ame_removeNeumorphShadow（h 声明 + m 实现）",
-      "- (void)ame_removeNeumorphShadow;" in nsh
-      and "- (void)ame_removeNeumorphShadow {" in nsm
-      and "objc_setAssociatedObject(self, kAmeNeumorphShadowViewKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);" in nsm)
-check("B2  CollectionViewCell 无壁纸分支挂双阴影（Flat -> NeumorphSurface）",
-      "[target ame_applyNeumorphSurface];" in bm
-      and "[target ame_applyNeumorphSurfaceFlatWithRadius:radius];" not in bm)
-check("B3  宿主链放行裁剪（Task190 重锚：泛型方法 contentView 参数化——cell.clipsToBounds=NO + contentView masks=NO 语义不变）",
-      "cell.clipsToBounds = NO;" in bm
-      and "contentView.layer.masksToBounds = NO;" in bm)
-check("B3b 表格卡片行的 Flat 形态裁剪不受影响（Task184 重锚：clips=YES 保留，Flat 单签名回归）",
-      "cell.clipsToBounds = YES;" in bm
-      and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
-check("B4  壁纸分支清残留阴影（applyEffectToView + CollectionViewCell 双入口）",
-      bm.count("[view ame_removeNeumorphShadow];") >= 1
-      and "[contentView ame_removeNeumorphShadow];" in bm  # Task190 重锚：泛型方法 contentView 参数化
-      and "[cardTarget ame_removeNeumorphShadow];" in bm)
-check("B5  新管线 applyNeumorphCardEffectToView（h 声明 + m 实现）",
-      "- (void)applyNeumorphCardEffectToView:(UIView *)view;" in bh
-      and "- (void)applyNeumorphCardEffectToView:(UIView *)view {" in bm)
-check("B6  新管线分支语义（有壁纸转调旧管线，无壁纸挂凸起表面）",
-      "if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;" in bm
-      and bm.count("ame_applyNeumorphSurface];") >= 1)
-check("B7  VersionCardCell 换调新管线",
-      "applyNeumorphCardEffectToView:self.cardContainer];" in vcc
-      and "applyEffectToView:self.cardContainer];" not in vcc)
+check("B1  Task210：ame_removeNeumorphShadow 随引擎退役（h/m 零残留）",
+      "ame_removeNeumorphShadow" not in _strip_lc(nsh)
+      and "ame_removeNeumorphShadow" not in _strip_lc(nsm))
+check("B2  Task210：CollectionViewCell 无壁纸分支走平贴灰面（applyEffectToView 尾部 AmeCardSurfaceColor）",
+      "view.backgroundColor = AmeCardSurfaceColor();" in bm
+      and "ame_applyNeumorphSurface" not in _strip_lc(bm))
+check("B3  Task210：阴影放行裁剪语义随双阴影退役（ON 分支整链删除，无 clips=NO 残留）",
+      "contentView.clipsToBounds = NO;" not in bm
+      and "contentView.layer.masksToBounds = NO;" not in bm)
+check("B3b Task210：表格卡片行走单路径管线（applyEffectToCell 直转，Flat 特调退役）",
+      "cell.clipsToBounds = YES;" not in bm.split("- (void)applyCardEffectToCell")[1].split("@end")[0] if "- (void)applyCardEffectToCell" in bm else False)
+check("B4  Task210：残留阴影清理原语随引擎退役（零调用点）",
+      "ame_removeNeumorphShadow" not in _strip_lc(bm))
+check("B5  Task210：管线改名 applyCardEffectToView（h 声明 + m 实现）",
+      "- (void)applyCardEffectToView:(UIView *)view;" in bh
+      and "- (void)applyCardEffectToView:(UIView *)view {" in bm)
+check("B6  Task210：管线单路径语义（恒转调 applyEffectToView，无开关无凸起）",
+      bm.count("- (void)applyCardEffectToView:(UIView *)view {") == 1
+      and "[self applyEffectToView:view];" in bm[bm.index("- (void)applyCardEffectToView"):bm.index("- (void)applyEffectToSearchBar")])
+check("B7  VersionCardCell 换调改名后管线（Task210）",
+      "applyCardEffectToView:self.cardContainer];" in vcc
+      and "applyNeumorphCardEffectToView" not in vcc)
 check("B8  HomeTileBaseCell 基类结构未动（磁贴圆角/容器创建保持）",
       "self.contentView.layer.cornerRadius = 16;" in read('Natives/LauncherNewsViewController.m')
       and "applyEffectToCollectionViewCell:self];" in read('Natives/LauncherNewsViewController.m'))
-check("B9  表格卡片行 applyCardEffectToCell 保持 Flat（Task184 重锚：Flat 家族恒定底；调用点维持）",
-      "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
-check("B10 引擎凸起契约幸存（Task177 重锚：双阴影方向维持；透明承载层改投影对+不透明渐变表面三层结构）",
-      "CGSizeMake(offset, offset)" in nsm
-      and "CGSizeMake(-offset, -offset)" in nsm
-      and "ame177_darkLayer" in nsm and "ame177_surfaceLayer" in nsm)
+check("B9  Task210：表格卡片行恒走 applyEffectToCell（Flat 特调行退役）",
+      "ame_applyNeumorphSurfaceFlatWithRadius" not in bm
+      and "[self applyEffectToCell:cell];" in bm[bm.index("- (void)applyCardEffectToCell"):bm.index("- (void)applyCardEffectToView")])
+check("B10 Task210：凸起契约退役（引擎/双阴影/三层结构零残留，平贴灰面接棒）",
+      "ame177_darkLayer" not in nsm and "ame177_surfaceLayer" not in nsm
+      and "AmeCardSurfaceColor" in nsm)
 
 print()
 print("=" * 72)
@@ -186,23 +185,22 @@ print("=" * 72)
 print("D. 回归锚点")
 print("=" * 72)
 
-check("D1  引擎五色动态函数幸存（Task160 规格）",
-      all(f"AmeNeumorph{x}Color" in nsm for x in
-          ["Surface", "Shadow", "Highlight", "PrimaryText", "SecondaryText"]))
-check("D2  度量幸存（Task177 重锚：340 基准圆角等比保留；偏移/模糊改固定档 4/8（小件 2/4））",
-      "AmeNeumorphBaseDimension = 340.0" in nsm
-      and "MAX(8.0, 50.0 * scale)" in nsm
-      and "? 2.0 : 4.0" in nsm
-      and "? 4.0 : 8.0" in nsm)
-check("D3  traitCollectionDidChange 深浅色重刷幸存",
-      "traitCollectionDidChange:" in nsm)
+check("D1  Task210：三色动态函数幸存（Surface/PrimaryText/SecondaryText 改名保留）",
+      all(f"AmeCard{x}Color" in nsm for x in ["Surface", "PrimaryText", "SecondaryText"]))
+check("D2  Task210：等比度量退役，平贴 clamp[8,50] 幸存",
+      "AmeNeumorphBaseDimension" not in nsm
+      and "MAX(8.0, MIN(cornerRadius, 50.0))" in nsm)
+check("D3  Task210：深浅自适应幸存（动态 provider，无需手动重刷）",
+      "colorWithDynamicProvider" in nsm)
 check("D4  NMToast/DownloadVC 的 Card 表面不受影响（仍凸起）",
       "[self.cardView ame_applyCardSurfaceWithRadius:kNMToastCornerRadius];"
       in read('Natives/NMToast.m')
       and "[self.contentContainer ame_applyCardSurfaceWithRadius:8];"
       in read('Natives/DownloadViewController.m'))
-check("D5  版本卡文字色规格化幸存（Task160 D9 口径）",
-      "AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in vcc)
+check("D5  Task210：版本卡（VMVersionCardCell）文字色深浅自适应（AmeCard 双色）",
+      "AmeCardPrimaryTextColor();" in read('Natives/VersionManagerViewController.m')
+      and "AmeCardSecondaryTextColor();" in read('Natives/VersionManagerViewController.m')
+      and "[UIColor whiteColor]" not in read('Natives/VersionManagerViewController.m').split("@implementation VMVersionCardCell")[1].split("@end")[0])
 check("D6  分辨率行 clamp 25~150 幸存（Task160/159 口径）",
       "if (ame159_value > 150) ame159_value = 150;" in ps
       and "if (ame159_value < 25) ame159_value = 25;" in ps)

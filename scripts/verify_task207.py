@@ -77,37 +77,39 @@ edit_seg = segment(vm, "- (void)editProfile:(NSString *)profileName {", "- (void
 
 # ============ A. 卡结构 ============
 print("== A. 快捷指令卡结构 ==")
-check("A", "VMVersionCardCell 新属性齐备（icon/⋯钮/渐变宿主+层/高亮环/名称/版本/回调）",
+check("A", "VMVersionCardCell 属性齐备（Task210：icon/⋯钮/高亮环/名称/版本/回调；渐变宿主+层退役）",
       all(p in cell_seg for p in [
           "UIImageView *iconView;", "UIButton *ellipsisButton;",
-          "UIView *gradientView;", "CAGradientLayer *gradientLayer;",
           "UIView *selectionRing;", "UILabel *nameLabel;", "UILabel *versionLabel;",
-          "void (^ellipsisAction)(void);"]))
+          "void (^ellipsisAction)(void);"])
+      and "gradientView" not in strip_objc(cell_seg)
+      and "CAGradientLayer" not in strip_objc(cell_seg))
 check("A", "旧五件套在本卡段内退役（iconContainer/selectedBadge/isolatedBadge/lastPlayedLabel/chevronView 零代码引用）",
       all(f"self.{p}" not in strip_objc(cell_seg) for p in
           ["iconContainer", "selectedBadge", "isolatedBadge", "lastPlayedLabel", "chevronView"]),
       "（仅注释中允许出现旧名，strip 后应为零）" if all(f"self.{p}" not in strip_objc(cell_seg) for p in
           ["iconContainer", "selectedBadge", "isolatedBadge", "lastPlayedLabel", "chevronView"]) else "仍有 self. 引用")
-check("A", "渐变卡底：CAGradientLayer 对角线（0,0)->(1,1) + addSublayer 到宿主",
-      "CAGradientLayer layer]" in cell_seg
-      and "startPoint = CGPointMake(0.0, 0.0)" in cell_seg
-      and "endPoint = CGPointMake(1.0, 1.0)" in cell_seg
-      and "[self.gradientView.layer addSublayer:self.gradientLayer];" in cell_seg)
-check("A", "实例图标白色模板渲染（原 loader 图标保留 + AlwaysTemplate + 白 tint）",
+check("A", "Task210：卡底 = 全局管线平贴灰面（本卡零自绘背景，AmeCardSurfaceColor 由 BackgroundManager 铺）",
+      "CAGradientLayer" not in strip_objc(cell_seg)
+      and "addSublayer" not in strip_objc(cell_seg))
+check("A", "Task210 实例图标 = 原始彩色直出（白色模板渲染退役；PNG 不着色 / cube 兜底用强调色）",
       "detectLoaderFromVersionId:" in cell_seg
       and "configureImageView:self.iconView" in cell_seg
-      and "imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]" in cell_seg
-      and "self.iconView.tintColor = [UIColor whiteColor];" in cell_seg)
-check("A", "⋯ 编辑钮：ellipsis 符号 + 白 0.28 圆底 + 复用 i18n_str_1091 无障碍标签",
+      and "imageWithRenderingMode" not in strip_objc(cell_seg)
+      and "self.iconView.tintColor = accentColor();" in cell_seg)
+check("A", "Task210 ⋯ 编辑钮：28pt 自适应圆底 + 16pt Black 三点 + i18n_str_1091 无障碍标签",
       'systemImageNamed:@"ellipsis"' in cell_seg
-      and "[[UIColor whiteColor] colorWithAlphaComponent:0.28]" in cell_seg
+      and "CGFloat ellipsisSize = 28.0;" in cell_seg
+      and "[[UIColor labelColor] colorWithAlphaComponent:0.12]" in cell_seg
+      and "UIFontWeightBlack" in cell_seg
       and 'localize(@"i18n_str_1091", nil)' in cell_seg
       and "ellipsisTapped" in cell_seg)
-check("A", "名称/版本白字双行（sp15 semibold 白 / sp11 白 75%）",
+check("A", "Task210 名称/版本深浅自适应双行（sp15 semibold 主色 / sp11 次色）",
       "[UIFont systemFontOfSize:nameFont weight:UIFontWeightSemibold]" in cell_seg
-      and "self.nameLabel.textColor = [UIColor whiteColor];" in cell_seg
+      and "self.nameLabel.textColor = AmeCardPrimaryTextColor();" in cell_seg
       and "[UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular]" in cell_seg
-      and "[[UIColor whiteColor] colorWithAlphaComponent:0.75]" in cell_seg)
+      and "self.versionLabel.textColor = AmeCardSecondaryTextColor();" in cell_seg
+      and "[UIColor whiteColor]" not in strip_objc(cell_seg))
 check("A", "prepareForReuse 复用卫生（环隐藏 + 回调清空）",
       "- (void)prepareForReuse" in cell_seg
       and "self.selectionRing.hidden = YES;" in cell_seg
@@ -115,29 +117,29 @@ check("A", "prepareForReuse 复用卫生（环隐藏 + 回调清空）",
 
 # ============ B. 布局 ============
 print("== B. 布局常量与密度翻倍 ==")
-check("B", "三常量定稿（行高 84 动态沿用 / 省略号间距 12 / 环描边 2pt）",
-      "static const CGFloat kVMVersionRowHeight = 84.0;" in vm
+check("B", "三常量定稿（Task210：行高 104 修裁剪 / 省略号间距 12 / 环描边 2pt）",
+      "static const CGFloat kVMVersionRowHeight = 104.0;" in vm
       and "static const CGFloat kVMCardEllipsisInset = 12.0;" in vm
       and "static const CGFloat kVMCardRingBorderWidth = 2.0;" in vm)
 check("B", "环内缩动态推导 = 省略号间距 / 3（圆角与四边约束双站点）",
       vm.count("kVMCardEllipsisInset / 3.0") >= 2
       and "CGFloat ringInset = kVMCardEllipsisInset / 3.0;" in cell_seg)
-check("B", "选中环 = accent 描边 + 同色柔光（shadowOpacity 0.45）+ 隐藏默认",
+check("B", "Task210 选中环 = 纯 accent 描边（柔光光晕退役）+ 隐藏默认",
       "self.selectionRing.layer.borderWidth = kVMCardRingBorderWidth;" in cell_seg
-      and "self.selectionRing.layer.shadowColor = accentColor().CGColor;" in cell_seg
-      and "self.selectionRing.layer.shadowOpacity = 0.45;" in cell_seg
+      and "shadowOpacity" not in strip_objc(cell_seg)
+      and "shadowColor" not in strip_objc(cell_seg)
       and "self.selectionRing.hidden = YES;" in cell_seg)
 check("B", "版本区段密度翻倍（iPhone 0.5 双列 / iPad 0.25 四列）+ 行高沿用 kVMVersionRowHeight",
       "CGFloat itemWidth = isiPad ? 0.25 : 0.5;" in vm
       and "CGFloat itemHeight = kVMVersionRowHeight;" in vm)
-check("B", "紧凑卡固定 pt 几何（icon 22 / ⋯钮 24）+ nameClearance 999 静默守卫",
+check("B", "紧凑卡固定 pt 几何（icon 22 / ⋯钮 28）+ nameClearance 999 静默守卫",
       "CGFloat iconSize = 22.0;" in cell_seg
-      and "CGFloat ellipsisSize = 24.0;" in cell_seg
+      and "CGFloat ellipsisSize = 28.0;" in cell_seg
       and "NSLayoutConstraint *nameClearance =" in cell_seg
       and "nameClearance.priority = 999;" in cell_seg)
-check("B", "渐变层 frame 随宿主 + 环柔光 shadowPath 收口（layoutSubviews）",
-      "self.gradientLayer.frame = gradientBounds;" in cell_seg
-      and "bezierPathWithRoundedRect:ringFrame" in cell_seg)
+check("B", "Task210：layoutSubviews 无渐变/柔光收口（两者随引擎退役）",
+      "gradientLayer" not in strip_objc(cell_seg)
+      and "bezierPathWithRoundedRect:ringFrame" not in cell_seg)
 
 # ============ C. 交互 ============
 print("== C. 点卡=选用 / ⋯=纯编辑 / 长按保留 ==")
@@ -164,12 +166,12 @@ check("C", "长按菜单三件套保留（选用/编辑/删除）",
 
 # ============ D. 主题联动 ============
 print("== D. 渐变与主题/透明度联动 ==")
-check("D", "渐变色随 accentColor 即时刷新 + 深端色助手 ame207_darkenedAccent",
-      "self.gradientLayer.colors = @[(id)accent.CGColor," in vm
-      and "ame207_darkenedAccent(accent, 0.72)" in vm
-      and "static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor)" in vm)
-check("D", "卡体透明度滑条语义沿用（gradientView.alpha = cardsNeumorphOpacity）",
-      "self.gradientView.alpha = [[BackgroundManager sharedManager] cardsNeumorphOpacity];" in vm)
+check("D", "Task210：渐变身份面退役（ame207_darkenedAccent 助手零残留；选中环仍随主题即时刷新）",
+      "ame207_darkenedAccent" not in vm
+      and "gradientLayer" not in strip_objc(vm)
+      and "self.selectionRing.layer.borderColor = accentColor().CGColor;" in cell_seg)
+check("D", "Task210：卡体透明度滑条语义退役（cardsNeumorphOpacity 零引用）",
+      "cardsNeumorphOpacity" not in strip_objc(vm))
 check("D", "LauncherAppearanceChanged → reloadData 联动保留（换主题色渐变即时跟随）",
       'name:@"LauncherAppearanceChanged"' in vm
       and "handleAccentColorChanged" in vm)
@@ -181,23 +183,23 @@ check("D", "Task172 管线保留（super setupViews 后追加身份层，不移�
 print("== E. 公告 / version.h / 级联重锚 ==")
 ann = json.loads(io.open(os.path.join(REPO, "announcements.json"), encoding="utf-8").read())["announcements"]
 check("E", "公告 31 条，task209@2 插入后 task207@3，置顶钉位未动，NG-GL4ES 尾锚保持",
-      len(ann) == 31
-      and ann[3]["id"] == "task207-shortcuts-instance-cards-2026-10-01"
+      len(ann) == 32
+      and ann[4]["id"] == "task207-shortcuts-instance-cards-2026-10-01"
       and ann[0]["id"].startswith("server-recommend")
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
 check("E", "公告窗口族顺延（Task209@2 后：task196@4 / task193@5 / task190@6）",
-      ann[4]["id"] == "task196-quad-fixes-2026-09-29"
-      and ann[5]["id"] == "task193-app-icon-replace-2026-09-28"
-      and ann[6]["id"].startswith("task190-"))
+      ann[5]["id"] == "task196-quad-fixes-2026-09-29"
+      and ann[6]["id"] == "task193-app-icon-replace-2026-09-28"
+      and ann[7]["id"].startswith("task190-"))
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E", "version.h Task 207 附录在场（REVISION 18 append-only，无 bump）",
       "Amethyst Task 207" in vh and "#define REVISION 18" in vh
       and "Amethyst Task 206" in vh)  # 并行会话 Task206 渲染器附录共存
 v91 = rd("scripts/verify_task91.py")
-check("E", "verify_task91 C2 重锚（白字直写配额保持 2：isolatedBadge 退役、nameLabel 入列；保留位换锚）",
-      '"Natives/VersionManagerViewController.m": 2,' in v91
-      and '("Natives/VersionManagerViewController.m", "self.nameLabel.textColor = [UIColor whiteColor];", None),' in v91
-      and '"self.isolatedBadge.textColor = [UIColor whiteColor];"' not in v91)
+check("E", "verify_task91 C2 重锚（Task210：配额 2 -> 1，实例卡白字改 AmeCard 语义色；保留位 = countBadge）",
+      '"Natives/VersionManagerViewController.m": 1,' in v91
+      and '("Natives/VersionManagerViewController.m", "self.countBadge.textColor = [UIColor whiteColor];", None),' in v91
+      and '"self.nameLabel.textColor = [UIColor whiteColor];"' not in v91)
 v193 = rd("scripts/verify_task193.py")
 v173 = rd("scripts/verify_task173.py")
 v190 = rd("scripts/verify_task190.py")
@@ -206,13 +208,13 @@ v202 = rd("scripts/verify_task202.py")
 v203 = rd("scripts/verify_task203.py")
 v206t = rd("scripts/verify_task206.py")  # 并行会话的 Task206 渲染器验证器（本轮仅重锚其 F5 长度）
 check("E", "七脚本公告锚全部重锚（Task209@2 后：193/173/190/196-201/202/203 + 并行 v206 F5）",
-      "len(ann) == 31" in v193 and 'ann[5]["id"] == "task193-app-icon-replace-2026-09-28"' in v193
-      and 'ann["announcements"][15]["id"] == "task173-ten-fixes-2026-09-26"' in v173
-      and '["announcements"][6]["id"].startswith("task190-")' in v190
-      and "ann[4][\"id\"] == \"task196-quad-fixes-2026-09-29\"" in v196 and "len(ann) == 31" in v196
-      and "len(ann) == 31" in v202 and 'ann[28]["id"] == "task202-october-fix-wave"' in v202
-      and "len(ann) == 31" in v203
-      and 'len(ann) == 31 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"' in v206t)
+      "len(ann) == 32" in v193 and 'ann[6]["id"] == "task193-app-icon-replace-2026-09-28"' in v193
+      and 'ann["announcements"][16]["id"] == "task173-ten-fixes-2026-09-26"' in v173
+      and '["announcements"][7]["id"].startswith("task190-")' in v190
+      and "ann[5][\"id\"] == \"task196-quad-fixes-2026-09-29\"" in v196 and "len(ann) == 32" in v196
+      and "len(ann) == 32" in v202 and 'ann[29]["id"] == "task202-october-fix-wave"' in v202
+      and "len(ann) == 32" in v203
+      and 'len(ann) == 32 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"' in v206t)
 check("E", "l10n 零新增键（⋯ 钮无障碍复用 i18n_str_1091，strings 文件不含 ame207.*；并行 nggl4es 键不在判定面）",
       'localize(@"i18n_str_1091", nil)' in vm
       and "ame207." not in rd("Natives/resources/en.lproj/Localizable.strings"))
@@ -225,11 +227,11 @@ check("F", "数组字面量内无语句残留（.priority 写法只能出现在�
       ".priority = 999;" not in strip_objc(cell_seg).split("[NSLayoutConstraint activateConstraints")[-1].split("]];")[0]
       or "nameClearance.priority = 999;" in cell_seg)
 # Task173/140/142/160/193 对本文件的历史锚点不被本轮破坏
-check("F", "历史锚点常驻（ame140_shortNames / RENDERER_NAME_VGPU 映射 / FAB a11y / Task160 注释）",
+check("F", "历史锚点常驻（ame140_shortNames / RENDERER_NAME_VGPU 映射 / FAB a11y / Task210 色族落点）",
       "ame140_shortNames" in vm
       and '@ RENDERER_NAME_VGPU: @"VGPU"' in vm
       and 'isEqualToString:localize(@"i18n_str_2027"' in vm
-      and "AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in vm)
+      and "AmeCardPrimaryTextColor(); // Task160 规格主文字" in vm)
 
 print("=" * 72)
 print(f"PASS {len(PASS)}  FAIL {len(FAIL)}")

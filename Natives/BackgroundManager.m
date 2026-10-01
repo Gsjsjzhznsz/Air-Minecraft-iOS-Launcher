@@ -18,8 +18,8 @@ static NSString * const kBackgroundBlurIntensityKey = @"background_blur_intensit
 // Task172：新拟态界面开关（默认 YES = 卡片永远按规格渲染，与壁纸无关；
 // NO = 旧管线毛玻璃/半透明/原生平铺）。Task178：卡片本体透明度滑条恢复
 //（Task170 机制，仅淡卡体不含文字，与 UI 效果类型/模糊度彻底解耦）。
-static NSString * const kBackgroundCardsNeumorphEnabledKey = @"background_cards_neumorph_enabled";
-static NSString * const kBackgroundCardsNeumorphOpacityKey = @"background_cards_neumorph_opacity";
+// Task210：新拟态偏好 defaults 键（background_cards_neumorph_enabled /
+// background_cards_neumorph_opacity）随选项删除一并退役，不再读写。
 // Task151：背景来源标记（"user" = 用户手动设置，"bing" = Bing 每日壁纸自动应用）
 static NSString * const kBackgroundSourceKey = @"background_source";
 static NSString * const kBackgroundsFolder = @"backgrounds";
@@ -217,44 +217,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     [self saveUISettings];
 }
 
-#pragma mark - Task172 新拟态界面开关
+#pragma mark - Task172 新拟态界面开关（Task210 全链退役）
 
-// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链）——读侧
-// 永远拿到最新落盘值。未落盘默认 YES：卡片永远按规格渲染（渐变表面 +
-// 全不透明双阴影，与壁纸/其余 UI 效果选项无关）。Task177：卡片透明度
-// 机制整体退役（用户定稿"不要加任何的透明度"），仅存开关。
-- (BOOL)cardsNeumorphEnabled {
-    if ([[NSUserDefaults standardUserDefaults] objectForKey:kBackgroundCardsNeumorphEnabledKey] == nil) {
-        return YES;
-    }
-    return [[NSUserDefaults standardUserDefaults] boolForKey:kBackgroundCardsNeumorphEnabledKey];
-}
-
-- (void)setCardsNeumorphEnabled:(BOOL)cardsNeumorphEnabled {
-    [[NSUserDefaults standardUserDefaults] setBool:cardsNeumorphEnabled
-                                            forKey:kBackgroundCardsNeumorphEnabledKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
-#pragma mark - Task178 卡片新拟态本体透明度（Task170 机制恢复）
-
-// 直接读写 defaults（不进 loadUISettings/saveUISettings 缓存链，与开关
-// 同家法）——读侧永远拿到最新落盘值。语义见 BackgroundManager.h：只淡
-// 卡体（渐变表面 + 双阴影承载视图整体 alpha），文字/图标恒不透明；
-// UI 效果类型/模糊度/壁纸透明度均不影响新拟态，唯一入口 = 本偏好。
-- (CGFloat)cardsNeumorphOpacity {
-    // 未落盘时默认 1.0 = Task177 规格形态原样（用户已认可的定稿不缩水）
-    if ([[NSUserDefaults standardUserDefaults] objectForKey:kBackgroundCardsNeumorphOpacityKey] == nil) {
-        return 1.0;
-    }
-    return MAX(0.0, MIN(1.0, [[NSUserDefaults standardUserDefaults] doubleForKey:kBackgroundCardsNeumorphOpacityKey]));
-}
-
-- (void)setCardsNeumorphOpacity:(CGFloat)cardsNeumorphOpacity {
-    [[NSUserDefaults standardUserDefaults] setDouble:MAX(0.0, MIN(1.0, cardsNeumorphOpacity))
-                                              forKey:kBackgroundCardsNeumorphOpacityKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
+// Task210：cardsNeumorphEnabled / cardsNeumorphOpacity 存取器随新拟态
+// 选项删除整链退役（原 defaults 直读写实现见 announcements 历史）。
 
 #pragma mark - Global Background Application
 
@@ -1007,48 +973,20 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 }
 
 - (void)refreshUIEffect {
-    // Task175（壁纸共存）+ Task177（规格定稿）：开启分支不收壁纸，反向兜底
-    // ——壁纸容器缺席时原位重建（与关闭分支同款链路），宿主底色维持原生
-    // 系统色作为容器之下的兜底；卡片管线在通知回调里重刷 CSS 参考规格
-    // （渐变表面 + 全不透明固定档双阴影，不再读任何透明度/模糊偏好）。
-    // 关闭分支保持 Task174 语义不变（原位重建 + blur 重挂）。
-    if (self.cardsNeumorphEnabled) {
-        if ([self hasBackground] && !self.globalBackgroundContainer) {
-            if (self.currentSplitVC) {
-                [self applyBackgroundToSplitViewController:self.currentSplitVC];
-            } else if (self.currentWindow) {
-                [self applyBackgroundToWindow:self.currentWindow];
-            }
-        }
-        if (self.currentWindow) {
-            self.currentWindow.backgroundColor = [UIColor systemBackgroundColor];
-        }
+    // Task210：新拟态开关分支删除——恒为单路径（原 Task174 关闭分支语义）：
+    // 壁纸容器缺席时原位重建，有壁纸时透明化 splitVC 并重挂 blur。
+    if ([self hasBackground] && !self.globalBackgroundContainer) {
         if (self.currentSplitVC) {
-            self.currentSplitVC.view.backgroundColor = [UIColor systemBackgroundColor];
+            [self applyBackgroundToSplitViewController:self.currentSplitVC];
+        } else if (self.currentWindow) {
+            [self applyBackgroundToWindow:self.currentWindow];
         }
-        // 壁纸自身的压暗/模糊层照旧重挂（幂等：与关闭分支同款链路；Task178
-        // 灰化退役后三行壁纸效果选项恒可操作，改动只作用于壁纸层，不碰卡片）。
-        if (self.globalBackgroundContainer) {
-            [self addBlurEffectToContainer:self.globalBackgroundContainer];
-        }
-        static dispatch_once_t ame178DecoupleLogOnce;
-        dispatch_once(&ame178DecoupleLogOnce, ^{
-            NSLog(@"[Task178] neumorph decoupled: pinned spec cards + card-body opacity slider, UI effect options stay interactive");
-        });
-    } else {
-        if ([self hasBackground] && !self.globalBackgroundContainer) {
-            if (self.currentSplitVC) {
-                [self applyBackgroundToSplitViewController:self.currentSplitVC];
-            } else if (self.currentWindow) {
-                [self applyBackgroundToWindow:self.currentWindow];
-            }
-        }
-        if (self.currentSplitVC && self.currentType != BackgroundTypeNone) {
-            [self makeSplitViewControllerTransparent:self.currentSplitVC];
-        }
-        if (self.globalBackgroundContainer) {
-            [self addBlurEffectToContainer:self.globalBackgroundContainer];
-        }
+    }
+    if (self.currentSplitVC && self.currentType != BackgroundTypeNone) {
+        [self makeSplitViewControllerTransparent:self.currentSplitVC];
+    }
+    if (self.globalBackgroundContainer) {
+        [self addBlurEffectToContainer:self.globalBackgroundContainer];
     }
 
     // Post notification for other views to refresh
@@ -1060,13 +998,10 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)applyEffectToView:(UIView *)view {
     if (!view) return;
 
-    // Task111：检测并切换——有自定义背景时恢复 Task89 之前的毛玻璃/半透明
-    // 卡片效果（背景图从卡片下方透出）；无背景时维持新拟态凸出表面。
+    // Task111：检测并切换——有自定义背景时毛玻璃/半透明卡片效果
+    // （背景图从卡片下方透出）；无背景时平贴灰面/原生平铺（Task210 单路径）。
     // 防御性移除历史遗留的 blur 子视图在两条分支各自处理。
     if ([self hasBackground]) {
-        // Task163：防御性清掉可能残留的新拟态阴影承载视图（从无壁纸新拟态
-        // 切回的宿主，旧投影会漏在 blur/半透明底外面穿帮）；未挂载时空操作。
-        [view ame_removeNeumorphShadow];
         if (self.uiEffect == BackgroundUIEffectBlur) {
             // 毛玻璃效果 - 创建 UIVisualEffectView 作为子视图
             for (UIView *subview in view.subviews) {
@@ -1122,14 +1057,16 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
         return;
     }
 
-    // Task160：新拟态回归——无自定义背景时按新拟态规格重建表面。
-    // 调用点预置了圆角的（卡片容器）= 规格表面色平贴卡片（无外阴影：
-    // 本 helper 的调用者含 cell/列表场景，阴影会被裁剪互叠，统一平贴）；
-    // 未设圆角的（多数页面的整页 self.view）= systemBackground 平铺整页，
-    // 不加圆角不强制裁剪（原生页面形态）。
+    // Task210：新拟态平贴表面分支删除（用户定稿"保留平贴灰面但去掉双阴影"
+    // 保留表面色本身）——无自定义背景时：调用点预置了圆角的（卡片容器）=
+    // 平贴灰面（AmeCardSurfaceColor，浅 #e0e0e0 / 深 #2c2c2c，无任何自绘
+    // 阴影）；未设圆角的（多数页面的整页 self.view）= systemBackground
+    // 平铺整页，不加圆角不强制裁剪（原生页面形态）。
     CGFloat radius = view.layer.cornerRadius;
     if (radius > 0) {
-        [view ame_applyNeumorphSurfaceFlatWithRadius:radius];
+        view.backgroundColor = AmeCardSurfaceColor();
+        view.layer.cornerRadius = MAX(8.0, MIN(radius, 50.0));
+        view.layer.masksToBounds = YES;
     } else {
         view.backgroundColor = [UIColor systemBackgroundColor];
     }
@@ -1149,75 +1086,17 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     [self ame190_applyCardPipelineToCell:cell contentView:cell.contentView];
 }
 
-// Task190：Task172 三段式卡面管线的泛型实现（原内联于
-// applyEffectToCollectionViewCell:，方法体逐字节原样搬移；开关开启 =
-// 规格表面 + 双阴影的"正常态"，关闭 = 旧管线）。
+// Task190：卡面管线的泛型实现（原内联于 applyEffectToCollectionViewCell:）。
 // CI 修复（run 36403614574 实锤）：UIView 基类没有 contentView 属性
 //（property 'contentView' not found on object of type 'UIView *'）——
-// 泛型参数收窄为 cell + contentView 双参数，由类型化包装点传入，
-// 方法体除 cell.contentView -> contentView 改写外逐字节不变。
+// 泛型参数收窄为 cell + contentView 双参数，由类型化包装点传入。
+// Task210：新拟态三段式开关分支删除，恒为壁纸感知单路径（无壁纸 =
+// 平贴灰面/原生平铺；有壁纸 = 毛玻璃/半透明随其余 UI 效果选项变化）。
 - (void)ame190_applyCardPipelineToCell:(UIView *)cell contentView:(UIView *)contentView {
     if (!cell) return;
 
-    // Task172 重写（用户定稿"用正常的状态重写……不要继续用之前不知道写成
-    // 啥样的壁纸适配代码"）：卡片渲染与新拟态界面开关绑定，三段式——
-    //   开关开启 → 与壁纸完全无关的"正常态"（规格表面色 + 双阴影，即用户
-    //   复现方法"Bing 壁纸开着调 UI 效果再关 Bing 壁纸"的最终落点）；此前
-    //   有壁纸时的"动态卡面（毛玻璃/半透明）+ 阴影承载层"壁纸适配分支正是
-    //   "卡片/按钮边缘晕影很重"的来源（半透明卡面叠 20/60px 双阴影，暗影
-    //   在壁纸上读作重晕影），随本重写整链退役；
-    //   开关关闭 → 旧管线（有壁纸 = 毛玻璃/半透明随其余 UI 效果选项变化；
-    //   无壁纸 = 平贴表面/原生平铺），不挂任何新拟态阴影。
-    if (self.cardsNeumorphEnabled) {
-        // Task152 探测卡片容器（contentView 内第一个带圆角的非文本/控件
-        // 子视图）；无容器时回退 contentView。探测顺带清掉 contentView 层
-        // 的历史 blur 残留；开关开启后壁纸管线不再参与，容器内部的 blur
-        // 残留（此前壁纸毛玻璃插在 cardTarget 里）也要一并清掉。
-        UIView *target = nil;
-        CGFloat radius = 0;
-        for (UIView *sub in contentView.subviews) {
-            if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
-                [sub removeFromSuperview];
-                continue;
-            }
-            if (!target && sub.layer.cornerRadius > 0 &&
-                ![sub isKindOfClass:[UIImageView class]] &&
-                ![sub isKindOfClass:[UILabel class]] &&
-                ![sub isKindOfClass:[UITextView class]] &&
-                ![sub isKindOfClass:[UIControl class]]) {
-                target = sub;
-                radius = sub.layer.cornerRadius;
-            }
-        }
-        if (!target) {
-            target = contentView;
-            radius = contentView.layer.cornerRadius > 0
-                ? contentView.layer.cornerRadius : 12;
-        }
-        for (UIView *sub in [target.subviews copy]) {
-            if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
-                [sub removeFromSuperview];
-            }
-        }
-        cell.backgroundColor = [UIColor clearColor];
-        contentView.backgroundColor = [UIColor clearColor];
-        // 宿主链逐层放行裁剪：阴影必须越出卡片边界投到磁贴间隙——相邻淡
-        // 阴影叠加属新拟态正常形态，collectionView 边界外的阴影由其自身裁剪收口。
-        cell.clipsToBounds = NO;
-        cell.layer.masksToBounds = NO;
-        contentView.clipsToBounds = NO;
-        contentView.layer.masksToBounds = NO;
-        [target ame_applyNeumorphSurface];
-        // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（渐变
-        // 表面 + 双阴影承载视图整体 alpha，引擎原语非宿主 alpha），文字/
-        // 图标不参与；与壁纸状态/模糊度/透明度偏好完全无关，唯一入口 =
-        // cardsNeumorphOpacity 滑条。
-        [target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
-        return;
-    }
-
-    // 开关关闭 + 无壁纸：清残留（阴影承载层/blur 层）后走旧无壁纸尾部
-    // （applyEffectToView：容器圆角 > 0 = 平贴表面，否则原生平铺）。
+    // 无壁纸：清残留 blur 层后走无壁纸尾部
+    //（applyEffectToView：容器圆角 > 0 = 平贴灰面，否则原生平铺）。
     if (![self hasBackground]) {
         UIView *target = nil;
         CGFloat radius = 0;
@@ -1245,18 +1124,14 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 [sub removeFromSuperview];
             }
         }
-        [contentView ame_removeNeumorphShadow];
-        [target ame_removeNeumorphShadow];
         cell.backgroundColor = [UIColor clearColor];
         contentView.backgroundColor = [UIColor clearColor];
         [self applyEffectToView:target];
         return;
     }
 
-    // 开关关闭 + 有壁纸：旧壁纸管线（Task111 检测切换语义）——毛玻璃/半
-    // 透明卡面随设置页其余 UI 效果选项变化；Task168 的"叠加双阴影承载层"
-    // 收口（attachNeumorphShadowOnly + 圆角同步 + 放行裁剪 + 宿主 alpha）
-    // 随 Task172 壁纸适配退役整链删除。
+    // 有壁纸：壁纸管线（Task111 检测切换语义）——毛玻璃/半透明卡面随
+    // 设置页其余 UI 效果选项变化（Task210：无新拟态开关，恒走本分支）。
     {
         // Task152：探测卡片容器（contentView 内第一个带圆角的非文本/控件子视图）。
         // 此前 blur/半透明一律铺满直角 contentView，而 VMTileBaseCell 等的圆角在
@@ -1284,10 +1159,7 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
                 ? contentView.layer.cornerRadius : 12;
         }
 
-        // Task163：切回壁纸管线前清残留阴影承载层（开关刚关闭的场景，
-        // 无壁纸新拟态卡片会挂在 contentView 或卡片容器上）。
-        [contentView ame_removeNeumorphShadow];
-        [cardTarget ame_removeNeumorphShadow];
+        // Task210：残留阴影承载层清理原语随新拟态引擎一并删除（无挂载即无残留）。
 
         if (self.uiEffect == BackgroundUIEffectBlur) {
             // 毛玻璃
@@ -1350,62 +1222,22 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 - (void)applyCardEffectToCell:(UITableViewCell *)cell {
     if (!cell) return;
 
-    // Task172：新拟态界面开关关闭 → 完全回归旧管线 applyEffectToCell
-    // （有壁纸 = 毛玻璃/半透明随其余 UI 效果选项变化；无壁纸 = 标准列表
-    // 外观），与新拟态彻底脱钩。
-    if (!self.cardsNeumorphEnabled) {
-        [self applyEffectToCell:cell];
-        return;
-    }
-
-    // Task160：新拟态退役→回归——开关开启时列表行恒为新拟态卡片行
-    // （规格表面色平贴 + 12pt 圆角，与上级菜单卡片同语言，无自绘阴影；
-    // cell 场景阴影会被裁剪互叠，用 flat 版本）。Task172 壁纸适配退役：
-    // 平贴行无阴影承载层，壁纸开着也不会产生晕影叠加，故不再按
-    // hasBackground 分流。
-    cell.backgroundView = nil;
-    cell.backgroundColor = [UIColor clearColor];
-    cell.clipsToBounds = YES;
-    cell.layer.masksToBounds = NO;
-    [cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];
+    // Task210：新拟态开关分支删除——恒为旧管线 applyEffectToCell
+    //（有壁纸 = 毛玻璃/半透明随其余 UI 效果选项变化；无壁纸 = 平贴灰面
+    // /标准列表外观），与新拟态彻底脱钩。
+    [self applyEffectToCell:cell];
 }
 
-- (void)applyNeumorphCardEffectToView:(UIView *)view {
+- (void)applyCardEffectToView:(UIView *)view {
     if (!view) return;
 
-    // Task172 重写（用户定稿"用正常的状态重写……不要继续用之前不知道写成
-    // 啥样的壁纸适配代码"）：新拟态界面开关开启时，卡片与壁纸完全无关，
-    // 永远渲染"正常态"——规格表面色 + 双阴影。所谓"正常态"= 用户复现方法
-    // （Bing 壁纸开着调一次 UI 效果再关掉 Bing 壁纸后看到的形态）的最终落点，
-    // 即本管线旧的无壁纸分支；此前有壁纸时走"动态卡面（毛玻璃/半透明）+
-    // 阴影承载层"的壁纸适配分支，正是"按钮/卡片边缘晕影很重"的来源
-    // （半透明卡面上叠 20/60px 双阴影，暗影在壁纸上读作重晕影）。该分支
-    // 整链退役：开关开启时不再读 hasBackground、不再插 blur 层。
-    if (!self.cardsNeumorphEnabled) {
-        // 开关关闭：回归旧管线（有壁纸 = 毛玻璃/半透明，随设置页其余
-        // UI 效果选项变化；无壁纸 = 平贴表面/原生平铺），并清掉可能残留
-        // 的阴影承载层防投影穿帮（applyEffectToView 内部亦有防御）。
-        [view ame_removeNeumorphShadow];
-        [self applyEffectToView:view];
-        return;
-    }
-
-    // 开关开启：清掉壁纸管线可能残留的 blur 层（开关切换/管重建场景），
-    // 然后按规格重铺：渐变表面 + 全不透明双阴影（Task177 CSS 参考规格，
-    // 与壁纸状态及模糊度/透明度偏好完全无关）。容器未预置圆角时取 12 兼底；
-    // 调用点（VersionCardCell）容器链已 masksToBounds = NO，阴影可越出
-    // 卡片边界。
-    for (UIView *sub in [view.subviews copy]) {
-        if ([sub isKindOfClass:[UIVisualEffectView class]] && sub.tag == kBackgroundBlurTag) {
-            [sub removeFromSuperview];
-        }
-    }
-    if (view.layer.cornerRadius <= 0) view.layer.cornerRadius = 12;
-    [view ame_applyNeumorphSurface];
-    // Task178（Task170 机制恢复）：卡片本体透明度——只淡卡体（承载视图
-    // 整体 alpha，引擎原语非宿主 alpha），文字/图标恒不透明；与壁纸状态/
-    // 模糊度/透明度偏好完全无关，唯一入口 = cardsNeumorphOpacity 滑条。
-    [view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];
+    // Task210 改名（原 applyNeumorphCardEffectToView:）：新拟态退役后
+    // 恒为壁纸感知单路径——有壁纸 = 毛玻璃/半透明（随设置页其余 UI 效果
+    // 选项变化），无壁纸 = 平贴灰面（AmeCardSurfaceColor）/原生平铺。
+    // 原语（ame_applyNeumorphSurface / ame_applyNeumorphCardOpacity /
+    // ame_removeNeumorphShadow）已随引擎一并删除，此转发与旧"开关关闭"
+    // 分支语义逐字节一致。
+    [self applyEffectToView:view];
 }
 
 - (void)applyEffectToSearchBar:(UISearchBar *)searchBar {

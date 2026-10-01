@@ -3521,3 +3521,29 @@
 //     re-anchor family); task193 tinygl syntax gate re-run clean; gcc
 //     -fsyntax-only on spvc_shim.c clean.
 // ============================================================================
+
+// -----------------------------------------------------------------------------
+// REVISION 18 addendum (Task 210, no bump)
+// -----------------------------------------------------------------------------
+// Task 210 -- neumorphism full retirement + instance-card fixes (user freeze).
+// [Neumorph] AmeNeumorphShadowView three-layer engine (shadow pair + gradient
+//   surface), the AmeNeumorph* palette/metrics, and the ame_applyNeumorph*/
+//   removeNeumorphShadow/CardOpacity/PinnedCornerRadius primitives are DELETED.
+//   BackgroundManager loses cardsNeumorphEnabled/cardsNeumorphOpacity (defaults
+//   keys background_cards_neumorph_enabled/_opacity retired); the wallpaper
+//   settings page drops the toggle + opacity slider rows (section collapses to
+//   zero rows without wallpaper). Six-language keys background.cards.neumorph.*
+//   removed (4 main languages 2419 -> 2417). Kept per user freeze: the flat
+//   gray surface (#e0e0e0 / #2c2c2c, renamed AmeCardSurfaceColor) with NO
+//   self-drawn shadows; wallpaper blur/translucent pipeline untouched; text
+//   palette renamed AmeCardPrimary/SecondaryTextColor (#333333/#888888 light,
+//   #f5f5f5/#a0a0a0 dark).
+// [Cards] VMVersionCardCell: height 84 -> 104pt (clipped labels at iPad full
+//   font scale: content needed 86pt), original-color icons (white-template
+//   rendering retired; PNG un-tinted / SF brand color / cube fallback accent),
+//   mode-adaptive name/version colors, selection = pure 2pt accent inset border
+//   (glow, whole-card tint and the tile-wide press spring-scale all retired),
+//   ellipsis button 24 -> 28pt circle with 16pt Black glyph in adaptive
+//   labelColor (12% plate). Interaction unchanged: tap = use, ... = edit,
+//   long-press menu intact.
+// ============================================================================

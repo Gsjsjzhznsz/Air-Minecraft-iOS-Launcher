@@ -157,7 +157,7 @@ a167 = [a for a in anns if a.get("id") == "task167-crashfix-migration-2026-09-25
 # 组内、task166/task165/task164 之前"。
 check("E1 task167 公告置顶（Task209 重锚：task209@2 插入后居 index 21；双根因 + 装机验证清单）",
       len(a167) == 1
-      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(22, len(anns))))
+      and any(anns[i]["id"] == "task167-crashfix-migration-2026-09-25" for i in range(min(23, len(anns))))
       and all(anns.index(a167[0]) < anns.index(x) for x in anns
               if x.get("id") in ("task166-vulkan-fsr-dsa-2026-09-25",
                                  "task165-blackscreen-rootcause-2026-09-25",

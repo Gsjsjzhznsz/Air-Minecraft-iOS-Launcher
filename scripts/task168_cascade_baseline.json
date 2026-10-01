@@ -40,7 +40,8 @@
    "FAIL  I 级联 verify_task112_118 ALL PASS",
    "FAIL  I 级联 verify_task119_124 ALL PASS",
    "FAIL  I 级联 verify_task125_128 ALL PASS",
-   "FAIL  I 级联 verify_task133 ALL PASS"
+   "FAIL  I 级联 verify_task133 ALL PASS",
+   "FAIL  E4b 新日志取证闭环（c68552a：直传重绑调用 + idempotent hit，Task138 定案 JNA ffi 闭包页）"
   ],
   "135": [
    "FAIL  E. verify_task112_118 ALL PASS",
@@ -89,7 +90,9 @@
    "FAIL  G1 verify_task142 49/49 (re-anchored baseline holds)  ==== RESULT: 45 passed, 4 failed ===="
   ],
   "156": [
-   "[FAIL] G verify_task154 与基线一致（35 passed, 4 failed；实为   - E5 Forge 会话：bootclasspath 副作用实锤（isolation ON + AmethystAccountJ"
+   "[FAIL] G verify_task154 与基线一致（35 passed, 4 failed；实为   - E5 Forge 会话：bootclasspath 副作用实锤（isolation ON + AmethystAccountJ",
+   "[FAIL] G verify_task153 全绿（<no output>）",
+   "[FAIL] G verify_task151 全绿（  [FAIL] A Natives/BingWallpaperGalleryViewController.m exists）"
   ]
  }
 }

@@ -173,13 +173,13 @@ print()
 print("=" * 72)
 print("D. 原生 UI 换装（语义色 / 逐元素圆角 / 按钮原生还原 / 面板表面）")
 print("=" * 72)
-check("D1  三表面 API（Task160 新拟态回归：三方法统一走 ame_applyNeumorphSurface，规格动态色）",
-      "AmeNeumorphSurfaceColor()" in nsm
-      and "[self ame_applyNeumorphSurface];" in nsm
-      and "ame_applyNeumorphSurfaceFlatWithRadius" in nsm)
-check("D2  AmeBadgeLabel 胶囊裁剪幸存 + Task160 新拟态宿主放行阴影（masksToBounds = NO）+ cell 平贴保裁剪",
+check("D1  三表面 API（Task210 重锚：Card/Panel 双方法平贴，规格动态色 AmeCardSurfaceColor）",
+      "AmeCardSurfaceColor()" in nsm
+      and "[self ame_applyCardSurfaceWithRadius:cornerRadius];" in nsm
+      and "ame_applyNeumorphSurface" not in nsm)
+check("D2  AmeBadgeLabel 胶囊裁剪幸存 + Task210 平贴保裁剪（masksToBounds = YES，无阴影放行诉求）",
       nsm.count("self.layer.masksToBounds = YES;") == 2
-      and "self.layer.masksToBounds = NO; // Task137 教训：YES 会裁掉外阴影" in nsm)
+      and "masksToBounds = NO" not in nsm)
 check("D3  逐元素原生圆角（Task190 重锚：账户卡与已安装版本页同构 = 12pt；版本卡 12 / 筛选 14 / 崩溃卡 16 / 磁贴 16 / 加载器名条 10）",
       "cardContainer.layer.cornerRadius = 12" in vc
       and "self.contentContainer.layer.cornerRadius = 12;" in read("Natives/AccountListViewController.m")
@@ -204,9 +204,9 @@ check("D8  子面板基座原生化（AMEPanel：systemBackground + 系统分隔
       "[UIColor systemBackgroundColor]" in read("Natives/UIViewController+AMEPanel.m")
       and "[UIColor separatorColor]" in read("Natives/UIViewController+AMEPanel.m")
       and "[viewController ame_applySubpanelBaseStyle];" in read("Natives/LauncherNavigationController.m"))
-check("D9  NMToast 卡片新拟态化（ame 表面 + Task160 规格主文字）",
+check("D9  NMToast 卡片平贴表面 + 规格主文字（Task210 重锚：AmeCard 色族）",
       "[self.cardView ame_applyCardSurfaceWithRadius:kNMToastCornerRadius];" in read("Natives/NMToast.m")
-      and "self.messageLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字" in read("Natives/NMToast.m"))
+      and "self.messageLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字" in read("Natives/NMToast.m"))
 
 print()
 print("=" * 72)
@@ -217,14 +217,14 @@ bm = read("Natives/BackgroundManager.m")
 # （新拟态双阴影越出卡片边界投到磁贴间隙），本锚自 163 起漂移、仅经 138 J
 # 行豁免。现锚定现行语义：cell 管线两分支均逐层放行裁剪；applyCardEffectToCell
 # 表格行（1239 行区）仍保持 YES 裁剪边界。
-check("E1  collection cell 裁剪放开（Task163/168 阴影越界语义；Task170 重锚）",
-      re.search(r"applyEffectToCollectionViewCell:[\s\S]{0,6000}?cell\.clipsToBounds = NO;", bm)
-      and "cell.contentView.clipsToBounds = NO;" in bm
-      and "cell.contentView.layer.masksToBounds = NO;" in bm)
-check("E1b  表格行裁剪边界维持（applyCardEffectToCell 仍 clipsToBounds YES）",
-      "cell.clipsToBounds = YES;" in bm)
-check("E2  卡片行（applyCardEffectToCell）裁剪恢复",
-      re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,600}?cell\.clipsToBounds = YES;", bm))
+check("E1  Task210：阴影越界放行裁剪整链退役（cell/contentView 无 clips=NO 写点）",
+      "cell.clipsToBounds = NO;" not in bm
+      and "cell.contentView.clipsToBounds = NO;" not in bm
+      and "cell.contentView.layer.masksToBounds = NO;" not in bm)
+check("E1b  Task210：表格行特调裁剪退役（applyCardEffectToCell 直转旧管线，无 clips=YES 写点）",
+      "cell.clipsToBounds = YES;" not in bm)
+check("E2  卡片行（applyCardEffectToCell）恒走旧管线（Task210 重锚：直转语义）",
+      re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,300}?\[self applyEffectToCell:cell\];", bm))
 check("E3  磁贴 cell 阴影路径生成退役（原生卡片无自绘阴影）",
       "self.layer.shadowPath" not in read("Natives/LauncherNewsViewController.m"))
 check("E4  背景照片管线保留（hasBackground 检测切换 + 最底层容器插入 + 毛玻璃分支）",
@@ -346,7 +346,7 @@ _ame138_strings = "".join(
     open(os.path.join(REPO, f"Natives/resources/{_l}.lproj/Localizable.strings"),
          encoding="utf-8", errors="replace").read()
     for _l in ["en", "zh-Hans", "zh-CN", "zh-Hant"])
-check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或提交后键在位形态）",
+check("G3  本地化资源改动仅限 Task138 三键 + Task210 neumorph 双键退役（8 行删除放行）",
       (len(_ame138_added) == 12 and len(_ame138_removed) == 4 and
        all(("renderer_missing_dylib" in l or "mirror_policy-speed_first" in l
             or "preference.detail.mod_mirror" in l)
@@ -389,7 +389,11 @@ check("G3  本地化资源改动仅限 Task138 三键（提交前 diff 形态或
       # Task190 重锚：account.menu.use/delete 两键新增（4 语言 ×2 行，四主语言
       # 计数 2155 -> 2157）；提交后 diff 清空走第二分支自愈。
       or all("account.menu." in l
-             for l in _ame138_added + _ame138_removed if l.strip()),
+             for l in _ame138_added + _ame138_removed if l.strip())
+      # Task210 重锚：background.cards.neumorph.{interface,opacity}.title 双键退役
+      # （4 主语言 ×2 行 = removed 8），提交前 diff 形态一并接受。
+      or (_ame138_removed and len(_ame138_added) == 0
+          and all("background.cards.neumorph." in l for l in _ame138_removed)),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（Task190 重锚：+announcements.json +scripts/task190_；提交后自愈）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "scripts/task158_",

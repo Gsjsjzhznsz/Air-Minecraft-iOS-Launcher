@@ -1717,7 +1717,7 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.text = [self appName];
     titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
-    titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
+    titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
     titleLabel.adjustsFontSizeToFitWidth = YES;
     titleLabel.minimumScaleFactor = 0.8;
     [heroCard addSubview:titleLabel];
@@ -1730,7 +1730,7 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
     NSString *subtitle = [NSString stringWithFormat:@"v%@\n%@ · iOS %@", appVersion, deviceName, systemVersion];
     subtitleLabel.text = subtitle;
     subtitleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+    subtitleLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
     subtitleLabel.numberOfLines = 0;
     [heroCard addSubview:subtitleLabel];
 

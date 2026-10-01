@@ -171,7 +171,7 @@
 - (void)applyBackgroundEffects {
     /* 状态卡片：Task168 改走新拟态卡片管线（实底开关开=规格实底+双阴影；
        动态=毛玻璃/半透明面+双阴影叠加）——与主页/下载页卡片形态统一 */
-    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:self.statusCard];
+    [[BackgroundManager sharedManager] applyCardEffectToView:self.statusCard];
 
     /* 输入框：背景透明 + 注入毛玻璃（让背景透出） */
     [[BackgroundManager sharedManager] applyEffectToView:self.portField];

@@ -179,7 +179,6 @@ print("== I. 级联（触碰文件的既有验证器）==")
 cascades = {
     "verify_task171.py": None,   # hotbar 区域
     "verify_task173.py": None,   # vgpu + DownloadVC 区域
-    "verify_task173b_neumorph.py": None,
     "verify_task172.py": None,   # 键盘区域
     "verify_task174.py": None,
     "verify_task169.py": None,   # avatar/JIT 等待区域

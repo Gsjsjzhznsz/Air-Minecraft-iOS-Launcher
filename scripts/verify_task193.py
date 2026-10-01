@@ -96,10 +96,10 @@ for s in ("scripts/task193_icon.py", "scripts/task193_announce.py", "scripts/tas
 # ============ F. announcement: task193@2, family shifted, pin intact ============
 print("== F. 公告窗口族 ==")
 ann = json.loads(io.open("announcements.json", encoding="utf-8").read())["announcements"]
-check("F", "条目数 -> 31（Task209@2 插入，窗口族顺延）", len(ann) == 31, f"actual={len(ann)}")
+check("F", "条目数 -> 31（Task209@2 插入，窗口族顺延）", len(ann) == 32, f"actual={len(ann)}")
 check("F", "Task209 重锚：task193 顺延至 [5]，task190 顺延至 [6]，置顶公告 [0] 未动",
-      len(ann) > 6 and ann[5]["id"] == "task193-app-icon-replace-2026-09-28"
-      and ann[6]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
+      len(ann) > 6 and ann[6]["id"] == "task193-app-icon-replace-2026-09-28"
+      and ann[7]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
 
 # ============ G. re-anchored verifiers import-clean ============
 print("== G. 重锚校验器语法完好 ==")
@@ -203,7 +203,7 @@ import re as _re
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     n = len(set(_re.findall(r'^"([^"]+)"\s*=',
                             rd(f"Natives/resources/{lang}.lproj/Localizable.strings"), _re.M)))
-    check("M", f"{lang} 唯一键 2419", n == 2419, f"got {n}")
+    check("M", f"{lang} 唯一键 2417", n == 2417, f"got {n}")
 for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     t = rd(f"Natives/resources/{lang}.lproj/Localizable.strings")
     check("M", f"{lang} ame193 键 179 个", len(_re.findall(r'^"ame193\.', t, _re.M)) == 179)

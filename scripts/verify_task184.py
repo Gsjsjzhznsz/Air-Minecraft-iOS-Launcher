@@ -28,8 +28,8 @@ def rd(p):
 
 # ============ A. 安装方式页重写（VersionCardCell 同构 + 白框根修） ============
 ml = rd('installer/ModLoaderInstallViewController.m')
-check('A', '三 cell 均挂凸起管线于内层 cardContainer（init 单次范式）',
-      ml.count('[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];') == 3)
+check('A', '三 cell 均挂平贴管线于内层 cardContainer（Task210 重锚：applyCardEffectToView）',
+      ml.count('[[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];') == 3)
 check('A', 'contentView 直挂/逐帧重铺范式退役',
       'applyNeumorphCardEffectToView:cell.contentView];' not in ml and 'applyEffectToCell:cell];' not in ml)
 check('A', '系统白底清除辅助存在（backgroundView 换装透明空视图）',
@@ -56,13 +56,13 @@ check('A', '品牌色淡底容器（createIconBadge 同源 0.15）',
 check('A', '名称 16 semibold / 状态 12（版本卡文字规格）',
       'systemFontOfSize:16 weight:UIFontWeightSemibold' in ml
       and '_stateLabel.font = [UIFont systemFontOfSize:12];' in ml)
-check('A', '规格文字色（引擎符号）', ml.count('AmeNeumorphPrimaryTextColor()') >= 3
-      and ml.count('AmeNeumorphSecondaryTextColor()') >= 3)
+check('A', '规格文字色（Task210 重锚：AmeCard 色族）', ml.count('AmeCardPrimaryTextColor()') >= 3
+      and ml.count('AmeCardSecondaryTextColor()') >= 3)
 check('A', 'chevron 14x14 tertiary（版本卡规格）',
       '_chevronView.widthAnchor constraintEqualToConstant:14]' in ml
       and 'chevron.right' in ml)
-check('A', '版本子页 cell 同配方（cardContainer + 管线 + 圆角 12）',
-      '_versionLabel.textColor = AmeNeumorphPrimaryTextColor();' in ml)
+check('A', '版本子页 cell 同配方（Task210 重锚：AmeCard 主文字色）',
+      '_versionLabel.textColor = AmeCardPrimaryTextColor();' in ml)
 check('A', '版本子页表无分隔线（画在透明 cell 上会横切卡面）',
       'separatorStyle = UITableViewCellSeparatorStyleNone;' in ml)
 check('A', '主表行高 64 / 子页行高 50（卡 56/42）',
@@ -79,15 +79,16 @@ h = rd('UIKit+NativeSurface.h'); m = rd('UIKit+NativeSurface.m')
 bm = rd('BackgroundManager.m'); bh = rd('BackgroundManager.h')
 check('B', '引擎 opacity 变体退役', 'opacity:(CGFloat)opacity;' not in h)
 check('B', 'BackgroundManager 新属性退役', 'CGFloat backgroundOpacity;' not in bh and 'CGFloat buttonOpacity;' not in bh)
-check('B', 'BackgroundManager 旧属性回归', '@property (nonatomic, assign) CGFloat uiOpacity;' in bh
-      and '@property (nonatomic, assign) CGFloat cardsNeumorphOpacity;' in bh)
-check('B', '旧键回归 / 新键退役',
-      'background_ui_opacity' in bm and 'background_cards_neumorph_opacity' in bm
+check('B', 'Task210：uiOpacity 回归 + cardsNeumorphOpacity 随退役删除（注释留档不计）',
+      '@property (nonatomic, assign) CGFloat uiOpacity;' in bh
+      and 'cardsNeumorphOpacity' not in '\n'.join(l.split('//')[0] for l in bh.split('\n')))
+check('B', 'Task210：旧键 uiOpacity 回归 / neumorph 键随退役删除 / 新键退役',
+      'background_ui_opacity' in bm and 'background_cards_neumorph_opacity' not in bm
       and 'background_bg_opacity' not in bm and 'background_btn_opacity' not in bm)
-check('B', '新拟态挂点喂 cardsNeumorphOpacity',
-      '[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];' in bm)
+check('B', 'Task210：新拟态挂点随退役删除（卡体透明度原语零调用点）',
+      'ame_applyNeumorphCardOpacity' not in '\n'.join(l.split('//')[0] for l in bm.split('\n')))
 st = rd('BackgroundSettingsViewController.m')
-check('B', '设置页回归 500 系滑条 tags', 'slider.tag = 500;' in st and 'slider.tag = 600;' not in st)
+check('B', 'Task210：设置页 500 系滑条随行退役（600 系亦无）', 'slider.tag = 500;' not in st and 'slider.tag = 600;' not in st)
 check('B', '设置页无 ButtonOpacityCell', '@"ButtonOpacityCell"' not in st)
 # 全仓残留扫描（vendor 变更日志除外）
 residual = []

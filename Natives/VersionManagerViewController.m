@@ -24,38 +24,23 @@
 //   3. 完全不调用旧 UI（LauncherPrefGameDirViewController / LauncherProfileEditorViewController）
 //   4. 游戏目录卡片支持长按弹出菜单（切换/删除当前目录）
 //   5. 统一使用 accentColor() 与毛玻璃背景，适配启动器新 UI
-//   6. Task207 实例卡快捷指令化（用户创新定稿）：accent 对角渐变卡底 + 左上白色
-//      实例图标（白色模板渲染）+ 右上 ⋯ 编辑钮 + 左下名称/版本两行白字 +
-//      选中内缩高亮环；版本区段列数翻倍（行高沿用旧版单卡行高）
+//   6. Task210 实例卡修订（用户七问定稿）：深浅自适应平贴灰面卡（Task210 全局
+//      卡面，不再用 accent 渐变）+ 左上原始彩色实例图标（不着色）+ 右上 ⋯
+//      编辑钮（自适应色圆钮、三点 16pt Black）+ 左下名称/版本两行（深浅
+//      自适应主/次文字色）+ 选中纯 2pt 原蓝描边内缩环（无光晕无动效）；
+//      版本区段列数翻倍（行高提至 104pt 修 iPad 满档字号裁剪）
 static NSInteger const kSectionGameDir     = 0;
 static NSInteger const kSectionVersions    = 1;
 
 // Task207：快捷指令实例卡布局常量
-// 旧版实例单卡行高（旧 createLayout 的 84pt 绝对值）——新网格行高动态沿用
-// 此值：一个旧卡位 = 两张新卡（列数翻倍），滚动节奏与旧版一致。
-static const CGFloat kVMVersionRowHeight = 84.0;
+// 旧版实例单卡行高 84pt 在 iPad 满档 sp（×1.15）下内容需 86pt 被裁
+//（用户实测"高度过于矮导致字体被裁减"）；Task210 用户定稿提至 104pt。
+static const CGFloat kVMVersionRowHeight = 104.0;
 // ⋯ 编辑钮到卡片边缘的间距；选中高亮环内缩距 = 此值 / 3（动态推导，用户定稿
 // "高亮边框宽度为卡片边缘距离省略号按钮距离的1/3"，落地方式 = 边框内缩）。
 static const CGFloat kVMCardEllipsisInset = 12.0;
-// 高亮环描边粗细（内缩方案下取常规 2pt，用户定稿）。
+// 高亮环描边粗细（内缩方案下取常规 2pt，用户定稿；Task210 起纯描边无光晕）。
 static const CGFloat kVMCardRingBorderWidth = 2.0;
-
-// Task207：accent 深端色（渐变第二停靠点）——HSB 亮度按系数压暗；
-// 非 HSB 色回退 RGB 等比压暗；两者都失败原样返回。
-static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
-    CGFloat h, s, b, a;
-    if ([color getHue:&h saturation:&s brightness:&b alpha:&a]) {
-        return [UIColor colorWithHue:h
-                          saturation:MIN(1.0, s * 1.05)
-                          brightness:MAX(0.0, b * factor)
-                                alpha:a];
-    }
-    CGFloat r, g, bl, al;
-    if ([color getRed:&r green:&g blue:&bl alpha:&al]) {
-        return [UIColor colorWithRed:r * factor green:g * factor blue:bl * factor alpha:al];
-    }
-    return color;
-}
 
 #pragma mark - Modern Tile Base Cell
 
@@ -113,26 +98,9 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     }
 }
 
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesBegan:touches withEvent:event];
-    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self.transform = CGAffineTransformMakeScale(0.96, 0.96);
-    } completion:nil];
-}
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesEnded:touches withEvent:event];
-    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self.transform = CGAffineTransformIdentity;
-    } completion:nil];
-}
-
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesCancelled:touches withEvent:event];
-    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self.transform = CGAffineTransformIdentity;
-    } completion:nil];
-}
+// Task210（用户定稿"全部磁贴移除"）：点按弹簧缩放动效（touchesBegan/
+// touchesEnded/touchesCancelled 三段 0.96 缩放回弹）整链删除——点击即时
+// 响应，选中反馈只来自实例卡的内缩描边环。
 
 @end
 
@@ -197,29 +165,31 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
 
 @end
 
-#pragma mark - Version Card Cell (Task207 快捷指令样式)
+#pragma mark - Version Card Cell (Task207 快捷指令样式 / Task210 修订)
 
-// 竖卡布局替换旧横向行卡（参照快捷指令 App 卡片 + 用户两张截图）：
-//   左上 = 实例图标（沿用 ModLoaderIconHelper/cube 兜底，一律白色模板渲染，
-//          alpha 通道即形状——"兼容透明度"）；
-//   右上 = ⋯ 半透明圆钮（编辑入口，纯编辑不改选中）；
-//   左下 = 实例名（白 semibold）+ 下一行版本号（白 75%）；
+// 竖卡布局（参照快捷指令 App 卡片 + 用户两张截图，Task210 七问定稿）：
+//   卡底 = 深浅自适应平贴灰面（Task210 全局卡面管线：无壁纸 = AmeCardSurfaceColor
+//          浅 #e0e0e0 / 深 #2c2c2c；有壁纸 = 毛玻璃/半透明。accent 渐变卡底
+//          随 Task210 退役——它曾跟随新拟态透明度滑条导致"卡片平时透明"）；
+//   左上 = 实例图标（沿用 ModLoaderIconHelper 原始彩色直出：PNG 不着色 /
+//          SF symbol 品牌色，cube 兜底用主题强调色）；
+//   右上 = ⋯ 编辑钮（自适应色圆钮：labelColor 12% 底 + labelColor 三点，
+//          三点 16pt Black / 圆底 28pt——Task210 用户定稿"加大加粗两档"）；
+//   左下 = 实例名（AmeCardPrimaryTextColor semibold）+ 下一行版本号
+//          （AmeCardSecondaryTextColor）——深浅模式自适应"深色和灰色"；
 //   选中 = 内缩高亮环：内缩距 = 省略号钮到卡缘间距的 1/3（动态推导），
-//          描边 2pt accentColor（原蓝）+ 同色柔光；
-//   卡底 = 统一主题渐变（accent → 深 accent 对角渐变，白字对比恒定）。
+//          描边 2pt accentColor（原蓝）纯描边——柔光光晕随 Task210 删除
+//          （用户定稿"选择高亮后只有边框蓝色"，整卡变色/光晕/按压动效全退）。
 // 旧 iconContainer/selectedBadge/isolatedBadge/lastPlayedLabel/chevronView
 // 全部退役（用户定稿"纯快捷指令样"）。
 @interface VMVersionCardCell : VMTileBaseCell
-// 左上实例图标（原 loader/兜底图标，白色模板渲染）
+// 左上实例图标（原 loader 彩色直出 / cube 兜底）
 @property (nonatomic, strong) UIImageView *iconView;
 // 右上 ⋯ 编辑钮（纯编辑，不改选中）
 @property (nonatomic, strong) UIButton *ellipsisButton;
-// accent 对角渐变卡底（盖在新拟态表面/壁纸 blur 之上、内容之下）
-@property (nonatomic, strong) UIView *gradientView;
-@property (nonatomic, strong) CAGradientLayer *gradientLayer;
-// 选中内缩高亮环（内缩 = 省略号间距/3，描边 2pt accent + 柔光）
+// 选中内缩高亮环（内缩 = 省略号间距/3，描边 2pt accent，纯描边）
 @property (nonatomic, strong) UIView *selectionRing;
-// 左下名称 + 版本（快捷指令"名称/操作数"位）
+// 左下名称 + 版本（快捷指令"名称/操作数"位，深浅自适应双色）
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *versionLabel;
 // ⋯ 点击回调（VC 在 cellForItem 里捕获 profileName 注入）
@@ -231,51 +201,36 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
 - (void)setupViews {
     [super setupViews];
 
-    // 紧凑竖卡（84pt 固定行高）内的几何量用固定 pt，不随屏宽缩放：
-    // dp 的 iPad 1.3× 会把图标撑到 ~31pt，与底部两行 sp 白字在 84pt 内重叠；
-    // 字体仍走 sp（上限 1.15×），84pt 预算内各机型均不相碰（iPhone 富余 ~6pt，
-    // iPad 满档 1.15× 时仍余 ~1.6pt）。
+    // 紧凑竖卡（104pt 固定行高）内的几何量用固定 pt，不随屏宽缩放：
+    // dp 的 iPad 1.3× 会把图标撑到 ~31pt，与底部两行 sp 字在卡内重叠；
+    // 字体仍走 sp（上限 1.15×）。行高 Task210 定稿 104pt：iPad 满档字号下
+    // 内容 ~86pt 仍余 ~18pt（84pt 时代溢出 2pt 正是"字体被裁减"根源）。
     CGFloat iconSize = 22.0;
     CGFloat nameFont = [ScreenUtils sp:15];
-    CGFloat ellipsisSize = 24.0;
+    CGFloat ellipsisSize = 28.0;   // Task210：24 → 28（加大两档）
 
-    // ----- 渐变卡底（Task207：统一主题渐变）-----
-    // super 的 Task172 管线已挂新拟态表面（AmeNeumorphShadowView 承载视图）
-    // 或壁纸 blur；本卡的身份面 = accent 渐变，addSubview 追加在内容之前
-    // → 自然盖住上述背景层，且位于后续添加的图标/文字/按钮之下。
-    self.gradientView = [[UIView alloc] init];
-    self.gradientView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.gradientView.layer.cornerRadius = 12;
-    self.gradientView.layer.cornerCurve = kCACornerCurveContinuous;
-    self.gradientView.layer.masksToBounds = YES;
-    self.gradientView.userInteractionEnabled = NO;
-    // Task178 卡体透明度滑条语义沿用（旧语义只淡承载视图，渐变卡同步跟随）
-    self.gradientView.alpha = [[BackgroundManager sharedManager] cardsNeumorphOpacity];
-    [self.contentContainer addSubview:self.gradientView];
-
-    self.gradientLayer = [CAGradientLayer layer];
-    self.gradientLayer.startPoint = CGPointMake(0.0, 0.0);
-    self.gradientLayer.endPoint = CGPointMake(1.0, 1.0);
-    [self.gradientView.layer addSublayer:self.gradientLayer];
-
-    // ----- 左上实例图标：白色模板渲染（alpha 即形状，兼容透明原图）-----
+    // ----- 左上实例图标：原始彩色直出（Task210 定稿，白色模板渲染退役）-----
     self.iconView = [[UIImageView alloc] init];
     self.iconView.translatesAutoresizingMaskIntoConstraints = NO;
     self.iconView.contentMode = UIViewContentModeScaleAspectFit;
     self.iconView.image = [UIImage systemImageNamed:@"cube.box.fill"];
-    self.iconView.tintColor = [UIColor whiteColor];
+    // 兜底 cube 为 SF symbol（模板渲染），用主题强调色；loader PNG 由
+    // configureImageView 内部保持原色不着色。
+    self.iconView.tintColor = accentColor();
     [self.contentContainer addSubview:self.iconView];
 
-    // ----- 右上 ⋯ 编辑钮：白 0.28 半透明圆底（参照截图）-----
+    // ----- 右上 ⋯ 编辑钮（Task210：自适应色圆钮 + 16pt Black 三点）-----
+    // 深浅模式自适应：浅色卡 = 深色钮，深色卡 = 白钮（labelColor 动态解析），
+    // 替代旧白 0.28 固定色（浅色平贴灰面上不可见）。
     self.ellipsisButton = [UIButton buttonWithType:UIButtonTypeCustom];
     self.ellipsisButton.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ellipsisButton.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.28];
+    self.ellipsisButton.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.12];
     self.ellipsisButton.layer.cornerRadius = ellipsisSize / 2.0;
     self.ellipsisButton.layer.cornerCurve = kCACornerCurveContinuous;
-    UIImageSymbolConfiguration *ellipsisConfig = [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIFontWeightBold];
+    UIImageSymbolConfiguration *ellipsisConfig = [UIImageSymbolConfiguration configurationWithPointSize:16.0 weight:UIFontWeightBlack];
     [self.ellipsisButton setImage:[UIImage systemImageNamed:@"ellipsis" withConfiguration:ellipsisConfig]
                           forState:UIControlStateNormal];
-    self.ellipsisButton.tintColor = [UIColor whiteColor];
+    self.ellipsisButton.tintColor = [UIColor labelColor];
     // 复用长按菜单的"编辑配置"文案做无障碍标签（不新增 l10n 键）
     self.ellipsisButton.accessibilityLabel = localize(@"i18n_str_1091", nil);
     [self.ellipsisButton addTarget:self
@@ -284,6 +239,8 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     [self.contentContainer addSubview:self.ellipsisButton];
 
     // ----- 选中内缩高亮环（原蓝 accent，用户定稿：内缩 = 省略号间距/3）-----
+    // Task210：纯描边——shadowColor/shadowOpacity/shadowRadius 柔光组删除，
+    // 选中态不再有光晕与整卡变色。
     self.selectionRing = [[UIView alloc] init];
     self.selectionRing.translatesAutoresizingMaskIntoConstraints = NO;
     self.selectionRing.backgroundColor = [UIColor clearColor];
@@ -291,19 +248,16 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     self.selectionRing.layer.borderWidth = kVMCardRingBorderWidth;
     self.selectionRing.layer.cornerRadius = 12.0 - (kVMCardEllipsisInset / 3.0);
     self.selectionRing.layer.cornerCurve = kCACornerCurveContinuous;
-    // 柔光：accent 渐变卡上保证"原蓝"环可辨识（同色系对比由光晕补足）
-    self.selectionRing.layer.shadowColor = accentColor().CGColor;
-    self.selectionRing.layer.shadowOpacity = 0.45;
-    self.selectionRing.layer.shadowRadius = 5.0;
-    self.selectionRing.layer.shadowOffset = CGSizeZero;
     self.selectionRing.hidden = YES;
     [self.contentContainer addSubview:self.selectionRing];
 
-    // ----- 左下名称 + 版本（白字两行，快捷指令位）-----
+    // ----- 左下名称 + 版本（深浅自适应双色两行，快捷指令位）-----
     self.nameLabel = [[UILabel alloc] init];
     self.nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.nameLabel.font = [UIFont systemFontOfSize:nameFont weight:UIFontWeightSemibold];
-    self.nameLabel.textColor = [UIColor whiteColor]; // 彩色渐变卡面白字（Task91 保留语义）
+    // Task210（用户定稿"字体按深浅模式调整深色和灰色"）：白字退役，
+    // 改 AmeCard 主文字色（浅 #333333 / 深 #f5f5f5）。
+    self.nameLabel.textColor = AmeCardPrimaryTextColor();
     self.nameLabel.numberOfLines = 1;
     self.nameLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.nameLabel];
@@ -311,23 +265,19 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     self.versionLabel = [[UILabel alloc] init];
     self.versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.versionLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
-    self.versionLabel.textColor = [[UIColor whiteColor] colorWithAlphaComponent:0.75];
+    // 次要文字色（浅 #888888 / 深 #a0a0a0）——两种模式下都是"灰色"。
+    self.versionLabel.textColor = AmeCardSecondaryTextColor();
     self.versionLabel.numberOfLines = 1;
     self.versionLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.versionLabel];
 
     CGFloat ringInset = kVMCardEllipsisInset / 3.0; // 用户定稿：内缩 = 省略号间距 × 1/3
     // 名称行与图标的最小净距：必选优先级在极端字重/缩放组合下可能无解
-    //（iPad 满档 sp 时余量本就 ~1.6pt），降为 999 静默让位，不产生冲突日志。
+    //（104pt 预算内各机型余量充足，此守卫仅为绝对防御），降为 999 静默让位。
     NSLayoutConstraint *nameClearance =
         [self.nameLabel.topAnchor constraintGreaterThanOrEqualToAnchor:self.iconView.bottomAnchor constant:2];
     nameClearance.priority = 999;
     [NSLayoutConstraint activateConstraints:@[
-        [self.gradientView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor],
-        [self.gradientView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor],
-        [self.gradientView.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor],
-        [self.gradientView.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor],
-
         // 图标/⋯钮：统一 kVMCardEllipsisInset 内缩（截图对齐语义）
         [self.iconView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:kVMCardEllipsisInset],
         [self.iconView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:kVMCardEllipsisInset],
@@ -355,22 +305,6 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     ]];
 }
 
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    // 渐变层铺满宿主（frame-based：CAGradientLayer 无自动布局参与）
-    CGRect gradientBounds = self.gradientView.bounds;
-    if (!CGRectIsEmpty(gradientBounds)) {
-        self.gradientLayer.frame = gradientBounds;
-    }
-    // 高亮环柔光路径随实际 frame 收口（无 shadowPath 的环光按直角 bounds 发散）
-    CGRect ringFrame = self.selectionRing.frame;
-    if (!CGRectIsEmpty(ringFrame)) {
-        self.selectionRing.layer.shadowPath =
-            [UIBezierPath bezierPathWithRoundedRect:ringFrame
-                                       cornerRadius:self.selectionRing.layer.cornerRadius].CGPath;
-    }
-}
-
 /// ⋯ 钮点击 → 转发 VC 注入的编辑回调（纯编辑，不改选中）
 - (void)ellipsisTapped {
     if (self.ellipsisAction) self.ellipsisAction();
@@ -381,9 +315,10 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     self.versionLabel.text = version ?: localize(@"i18n_str_1052", nil);
     self.selectionRing.hidden = !isSelected;
 
-    // 图标 = 原实例图标来源（Task207 定稿"始终为原来的图标"）：
-    // loader 品牌图标经 ModLoaderIconHelper 检出，无 loader 时回退 cube 兜底；
-    // 统一重渲染为白色模板——alpha 通道即形状，任意透明度原图都兼容。
+    // 图标 = 原实例图标来源（Task210 定稿"原始彩色图标"）：
+    // loader 品牌图标经 ModLoaderIconHelper 检出——PNG 保持原色、SF symbol
+    // 用品牌色（原助手内置语义）；无 loader 时回退 cube 兜底（强调色模板）。
+    // Task207 的白色模板重渲染随定稿退役。
     NSString *detectedLoader = [ModLoaderIconHelper detectLoaderFromVersionId:version];
     if (detectedLoader) {
         [ModLoaderIconHelper configureImageView:self.iconView
@@ -391,22 +326,17 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
                                  traitCollection:self.traitCollection];
     } else {
         self.iconView.image = [UIImage systemImageNamed:@"cube.box.fill"];
+        self.iconView.tintColor = accentColor();
     }
-    self.iconView.image = [self.iconView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    self.iconView.tintColor = [UIColor whiteColor];
 
-    // 渐变随主题强调色即时刷新（LauncherAppearanceChanged → reloadData 重走此处）
-    UIColor *accent = accentColor();
-    self.gradientLayer.colors = @[(id)accent.CGColor,
-                                  (id)ame207_darkenedAccent(accent, 0.72).CGColor];
-    self.selectionRing.layer.borderColor = accent.CGColor;
-    self.selectionRing.layer.shadowColor = accent.CGColor;
+    // 选中环随主题强调色即时刷新（LauncherAppearanceChanged → reloadData 重走此处）
+    self.selectionRing.layer.borderColor = accentColor().CGColor;
 }
 
 - (void)prepareForReuse {
     [super prepareForReuse];
     self.iconView.image = [UIImage systemImageNamed:@"cube.box.fill"];
-    self.iconView.tintColor = [UIColor whiteColor];
+    self.iconView.tintColor = accentColor();
     self.nameLabel.text = nil;
     self.versionLabel.text = nil;
     self.selectionRing.hidden = YES;
@@ -699,14 +629,14 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
         self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.titleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:16] weight:UIFontWeightBold];
         // 规范 2.1：强制使用系统色
-        self.titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
+        self.titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
         [self addSubview:self.titleLabel];
 
         self.subtitleLabel = [[UILabel alloc] init];
         self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         self.subtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
         // 规范 2.1：副文字 secondaryLabelColor
-        self.subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+        self.subtitleLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
         self.subtitleLabel.numberOfLines = 0;
         self.subtitleLabel.lineBreakMode = NSLineBreakByWordWrapping;
         [self addSubview:self.subtitleLabel];
@@ -968,7 +898,7 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     titleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:18] weight:UIFontWeightBold];
-    titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 规格主文字
+    titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160 规格主文字
     titleLabel.text = localize(@"i18n_str_1056", nil);
     titleLabel.textAlignment = NSTextAlignmentCenter;
     [self.emptyStateView addSubview:titleLabel];
@@ -977,7 +907,7 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
     UILabel *subtitleLabel = [[UILabel alloc] init];
     subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     subtitleLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:13] weight:UIFontWeightRegular];
-    subtitleLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 规格次要文字
+    subtitleLabel.textColor = AmeCardSecondaryTextColor(); // Task160 规格次要文字
     subtitleLabel.text = localize(@"i18n_str_1057", nil);
     subtitleLabel.textAlignment = NSTextAlignmentCenter;
     subtitleLabel.numberOfLines = 0;
@@ -1338,7 +1268,7 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
             // "原来一张卡的位置显示两张卡"；横向组按剩余宽度自动重复子项，
             // 0.5/0.25 分数宽即每行 2/4 张。
             CGFloat itemWidth = isiPad ? 0.25 : 0.5;
-            // 行高动态沿用旧版单卡行高（kVMVersionRowHeight = 旧 84pt 绝对值）
+            // Task210：行高定稿 104pt（84pt 时代 iPad 满档字号内容 86pt 被裁）
             CGFloat itemHeight = kVMVersionRowHeight;
             NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:itemWidth]
                                                                                        heightDimension:[NSCollectionLayoutDimension absoluteDimension:itemHeight]];

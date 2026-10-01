@@ -10,7 +10,7 @@
 //  三个 cell 类与 VersionCardCell（下载页版本号选择列表，用户认可形态）
 //  完全同构——外层 cell 全透明（含杀掉系统 inset-grouped 白底 = "钉死的
 //  底层白框"根修），视觉由内层 cardContainer（圆角 12 continuous、上下
-//  4pt 内缩）承载，凸起管线 applyNeumorphCardEffectToView 在 init 挂一次
+//  4pt 内缩）承载，凸起管线 applyCardEffectToView 在 init 挂一次
 //  （兼顾新拟态开关）；图标 40x40 圆角 10 品牌色淡底容器，名称 16
 //  semibold / 状态 12 规格文字色，右侧 chevron 14pt，全部 = 版本卡规格。
 //  - 加载器列表每行一独立 section（Task136 保留，行高 64 = 版本卡同款）
@@ -24,7 +24,7 @@
 #import "NeoForgeVersionFetcher.h"
 #import "LauncherPreferences.h"
 #import "BackgroundManager.h"
-#import "../UIKit+NativeSurface.h" // Task184：新拟态规格文字色符号（AmeNeumorphPrimary/SecondaryTextColor）
+#import "../UIKit+NativeSurface.h" // Task210：卡面文字色符号（AmeCardPrimary/SecondaryTextColor，原新拟态色族改名保留）
 #import "ModLoaderIconHelper.h"
 #import "ScreenUtils.h"
 #import <QuartzCore/QuartzCore.h>
@@ -69,7 +69,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
 // 与 VersionCardCell（Natives/VersionCardCell.m，用户认可的版本号选择界面）
 // 同构的构造范式：外层 cell 全透明（含杀掉系统 inset-grouped 白底）→ 内层
 // cardContainer（圆角 12 continuous、上下 4pt 内缩）承载视觉 → 凸起管线
-// applyNeumorphCardEffectToView 在 init 挂一次（开关开 = Task177 渐变卡面 +
+// applyCardEffectToView 在 init 挂一次（开关开 = Task177 渐变卡面 +
 // 双阴影规格，关 = 旧毛玻璃/平贴管线，由 BackgroundManager 内部裁定；出列
 // 不再重铺——引擎 layoutSubviews 按 bounds 自刷，VersionCardCell 同款单次
 // 挂载范式）。
@@ -103,7 +103,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _cardContainer.layer.cornerRadius = 12;
     _cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
     [self.contentView addSubview:_cardContainer];
-    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];
+    [[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];
 
     // ----- 左侧图标容器：40x40 圆角 10 品牌色淡底方块 + 居中图标（版本卡规格）-----
     // 图标内容由 ModLoaderIconHelper.configureImageView 配置（PNG 保原色 /
@@ -126,7 +126,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _nameLabel = [[UILabel alloc] init];
     _nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    _nameLabel.textColor = AmeNeumorphPrimaryTextColor();
+    _nameLabel.textColor = AmeCardPrimaryTextColor();
     _nameLabel.numberOfLines = 1;
     _nameLabel.adjustsFontSizeToFitWidth = YES;
     _nameLabel.minimumScaleFactor = 0.75;
@@ -136,7 +136,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _stateLabel = [[UILabel alloc] init];
     _stateLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _stateLabel.font = [UIFont systemFontOfSize:12];
-    _stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+    _stateLabel.textColor = AmeCardSecondaryTextColor();
     _stateLabel.numberOfLines = 1;
     _stateLabel.adjustsFontSizeToFitWidth = YES;
     _stateLabel.minimumScaleFactor = 0.7;
@@ -217,8 +217,8 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     self.iconContainer.alpha = 1.0;
     self.selectedBadge.hidden = YES;
     self.chevronView.hidden = NO;
-    self.nameLabel.textColor = AmeNeumorphPrimaryTextColor();
-    self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+    self.nameLabel.textColor = AmeCardPrimaryTextColor();
+    self.stateLabel.textColor = AmeCardSecondaryTextColor();
     self.contentView.userInteractionEnabled = YES;
 }
 
@@ -236,8 +236,8 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
         self.contentView.userInteractionEnabled = NO;
     } else {
         // 恢复分支：版本卡规格文字色
-        self.nameLabel.textColor = AmeNeumorphPrimaryTextColor();
-        self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+        self.nameLabel.textColor = AmeCardPrimaryTextColor();
+        self.stateLabel.textColor = AmeCardSecondaryTextColor();
         self.iconView.alpha = 1.0;
         self.iconContainer.alpha = 1.0;
         self.chevronView.hidden = NO;
@@ -254,14 +254,14 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     } else {
         self.stateLabel.hidden = NO;
         self.stateLabel.text = localize(@"i18n_str_1200", nil);
-        self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+        self.stateLabel.textColor = AmeCardSecondaryTextColor();
     }
 }
 
 - (void)clearStatusText {
     self.stateLabel.hidden = NO;
     self.stateLabel.text = localize(@"i18n_str_1201", nil);
-    self.stateLabel.textColor = AmeNeumorphSecondaryTextColor();
+    self.stateLabel.textColor = AmeCardSecondaryTextColor();
 }
 
 - (void)configureWithRow:(ModLoaderRow *)row
@@ -333,13 +333,13 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _cardContainer.layer.cornerRadius = 12;
     _cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
     [self.contentView addSubview:_cardContainer];
-    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];
+    [[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];
 
     // ----- 标题/描述两行（与 RowCell 同款文字规格）-----
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
-    _titleLabel.textColor = AmeNeumorphPrimaryTextColor();
+    _titleLabel.textColor = AmeCardPrimaryTextColor();
     _titleLabel.numberOfLines = 1;
     _titleLabel.adjustsFontSizeToFitWidth = YES;
     _titleLabel.minimumScaleFactor = 0.75;
@@ -349,7 +349,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _descLabel = [[UILabel alloc] init];
     _descLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _descLabel.font = [UIFont systemFontOfSize:12];
-    _descLabel.textColor = AmeNeumorphSecondaryTextColor();
+    _descLabel.textColor = AmeCardSecondaryTextColor();
     _descLabel.numberOfLines = 0;
     _descLabel.lineBreakMode = NSLineBreakByWordWrapping;
     _descLabel.adjustsFontForContentSizeCategory = NO;
@@ -415,12 +415,12 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _cardContainer.layer.cornerRadius = 12;
     _cardContainer.layer.cornerCurve = kCACornerCurveContinuous;
     [self.contentView addSubview:_cardContainer];
-    [[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];
+    [[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];
 
     _versionLabel = [[UILabel alloc] init];
     _versionLabel.translatesAutoresizingMaskIntoConstraints = NO;
     _versionLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    _versionLabel.textColor = AmeNeumorphPrimaryTextColor();
+    _versionLabel.textColor = AmeCardPrimaryTextColor();
     _versionLabel.numberOfLines = 1;
     _versionLabel.adjustsFontSizeToFitWidth = YES;
     _versionLabel.minimumScaleFactor = 0.75;

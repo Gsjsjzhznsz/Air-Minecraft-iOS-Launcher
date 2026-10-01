@@ -217,9 +217,9 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     keys = re.findall(r'^"([^"]+)"\s*=',
                       rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M)
     langs[lg] = keys
-check("F1 四主语言 nggl4es 键在位且唯一键 2419（+1）",
+check("F1 四主语言 nggl4es 键在位且唯一键 2417（Task210 重锚：neumorph 双键退役 2419-2，nggl4es +1 已并入）",
       all("preference.title.renderer.debug.nggl4es" in set(langs[l]) for l in langs)
-      and all(len(set(langs[l])) == 2419 for l in langs))
+      and all(len(set(langs[l])) == 2417 for l in langs))
 
 fleet_2418 = []
 for fn in sorted(os.listdir(os.path.join(REPO, "scripts"))):
@@ -227,8 +227,8 @@ for fn in sorted(os.listdir(os.path.join(REPO, "scripts"))):
         t = rd(f"scripts/{fn}")
         if re.search(r"(?<![\w.])2418(?![\w.])", t):
             fleet_2418.append(fn)
-check("F2 锚扫荡干净（fleet 无独立 2418；task151 H 门期望 2419）",
-      not fleet_2418 and '!= "2419"' in rd("scripts/verify_task151.py"))
+check("F2 锚扫荡干净（fleet 无独立 2418；task151 H 门期望 2417，Task210 重锚）",
+      not fleet_2418 and '!= "2417"' in rd("scripts/verify_task151.py"))
 
 faq_files = [("Natives/resources/help-faq.json", 2), ("help-faq.json", 2),
              ("Natives/resources/zh-CN.lproj/help-faq.json", 2),
@@ -264,14 +264,14 @@ check("F4 渲染器选择条目（Task209 重锚：Krypton Wrapper 新名 + 原�
 
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
 check("F5 公告 31 且末位为 task206-nggl4es-2026-10-01（Task209 重锚：@2 插入 30→31）",
-      len(ann) == 31 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+      len(ann) == 32 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and "NG-GL4ES" in ann[-1]["title"] and "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER" in ann[-1]["content"])
 
 anchor_ok = ('== [12, 4, 7, 15]' in rd("scripts/verify_task202.py")
              and '== [12, 4, 7, 15]' in rd("scripts/verify_task168.py")
-             and "len(ann) == 31" in rd("scripts/verify_task203.py")
-             and "len(ann) == 31" in rd("scripts/verify_task202.py")
-             and "len(ann) == 31" in rd("scripts/verify_task196_197_198_201.py"))
+             and "len(ann) == 32" in rd("scripts/verify_task203.py")
+             and "len(ann) == 32" in rd("scripts/verify_task202.py")
+             and "len(ann) == 32" in rd("scripts/verify_task196_197_198_201.py"))
 check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族；Task209 重锚 30→31）", anchor_ok)
 
 # ============ G. version.h ============
@@ -283,7 +283,7 @@ check("G1 Task206 附录双主题（push-constant + NG-GL4ES + 1273 别名 + 溯
       and "1293 asm aliases" in vh
       and "ThirdParty/ZalithLauncher2" in vh
       and "eba819b" in vh)
-check("G2 尾部 SEP 不变量恢复（append-friendly）",
+check("G2 尾部 SEP 不变量恢复（append-friendly；Task210 附录后重收口）",
       vh.endswith("// ============================================================================\n"))
 
 # ============ H. cascade ============

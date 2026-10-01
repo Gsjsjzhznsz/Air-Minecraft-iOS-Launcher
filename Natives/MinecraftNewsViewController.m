@@ -66,11 +66,8 @@ static const NSInteger kNewsPageSize = 24;
         self.contentView.layer.cornerRadius = kNewsCardCornerRadius;
         self.contentView.layer.cornerCurve = kCACornerCurveContinuous;
         self.contentView.clipsToBounds = YES;
-        // Task178：圆角钉住 12pt——新拟态引擎默认按宿主短边等比改写圆角
-        //（Task160 全局定稿），本卡为双列窄高布局（短边 ~185pt 被算成
-        // ~27pt，"新闻卡片的圆角太圆了"）；钉住后投影/表面/宿主三者
-        // 同步用本卡的显式圆角，不再被等比改写。
-        [self.contentView ame_setNeumorphPinnedCornerRadius:kNewsCardCornerRadius];
+        // Task210：新拟态圆角钉住原语随引擎删除——卡片圆角即本卡显式
+        // 12pt，不再有任何等比改写逻辑参与。
 
         // 缩略图
         _thumbnailView = [[UIImageView alloc] init];

@@ -31,16 +31,19 @@ news = rd("Natives/LauncherNewsViewController.m")
 engine_m = rd("Natives/UIKit+NativeSurface.m")
 
 # ============================================================
-# A. 偏好层：cardsNeumorphOpacity（实底开关退役）
+# A. 偏好层：新拟态透明度偏好退役（Task210 重锚）
 # ============================================================
-check("A1 透明度属性恢复（Task178 重锚：cardsNeumorphOpacity 回归 .h）",
-      "cardsNeumorphOpacity" in bm_h)
-check("A2 落盘键（Task184 重锚：background_ui_opacity/background_cards_neumorph_opacity 旧双键回归）",
-      "kBackgroundUIOpacityKey" in bm_m and "kBackgroundCardsNeumorphOpacityKey" in bm_m)
-check("A3 透明度默认值分支（Task184 重锚：UIOpacityKey nil 判定默认 0.6 + 新拟态透明度 standardUserDefaults 判定 1.0）",
+def _nocomment(t):
+    return "\n".join(l.split("//")[0] for l in t.split("\n"))
+
+check("A1 Task210：cardsNeumorphEnabled/Opacity 属性随退役删除（.h 注释留档不计）",
+      "cardsNeumorphOpacity" not in _nocomment(bm_h) and "cardsNeumorphEnabled" not in _nocomment(bm_h))
+check("A2 Task210：落盘键 background_cards_neumorph_opacity 随退役删除",
+      "kBackgroundCardsNeumorphOpacityKey" not in _nocomment(bm_m)
+      and "kBackgroundUIOpacityKey" in bm_m)
+check("A3 Task210：壁纸透明度默认分支不受影响（uiOpacity 0.6 默认在位）",
       "[defaults objectForKey:kBackgroundUIOpacityKey]" in bm_m
-      and "objectForKey:kBackgroundCardsNeumorphOpacityKey]" in bm_m
-      and "_uiOpacity = 0.6;" in bm_m and "return 1.0;" in bm_m)
+      and "_uiOpacity = 0.6;" in bm_m)
 check("A4 实底开关全链退役（Manager/设置页/defaults 键零残留）",
       "cardsNeumorphSolid" not in bm_m and "cardsNeumorphSolid" not in bm_h
       and "cardsNeumorphSolid" not in bsvc
@@ -49,54 +52,42 @@ check("A4 实底开关全链退役（Manager/设置页/defaults 键零残留）"
       and "solidSwitch" not in bsvc)
 
 # ============================================================
-# B. 管线层：四个终端分支全部按滑条重设宿主 alpha
+# B. 管线层：单路径化（Task210 重锚）
 # ============================================================
-card_fn = bm_m[bm_m.index("- (void)applyNeumorphCardEffectToView"):bm_m.index("- (void)applyEffectToSearchBar")]
+card_fn = bm_m[bm_m.index("- (void)applyCardEffectToView"):bm_m.index("- (void)applyEffectToSearchBar")]
 cell_fn = bm_m[bm_m.index("- (void)applyEffectToCollectionViewCell"):bm_m.index("- (void)applyCardEffectToCell")]
-check("B1 卡片视图管线（Task173 重锚）：开关门 if (!self.cardsNeumorphEnabled) 在先",
-      "if (!self.cardsNeumorphEnabled) {" in card_fn
-      and "self.cardsNeumorphSolid" not in card_fn)
-check("B2 卡片视图管线（Task173 重锚：正常态重写）：壁纸适配分支退役，开关门在先",
-      "if (!self.cardsNeumorphEnabled) {" in card_fn
-      and "if ([self hasBackground])" not in card_fn
-      and "[view ame_attachNeumorphShadowOnly];" not in card_fn)
-check("B3 卡片视图管线尾部 = 规格表面收口（Task184 重锚：本体透明度原语挂点回归读 cardsNeumorphOpacity）",
-      "[view ame_applyNeumorphSurface];" in card_fn
-      and "[view ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];" in card_fn)
-check("B4 cell 管线：开关门在先（Task172：ON 分支最先且壁纸无关）",
-      cell_fn.index("if (self.cardsNeumorphEnabled) {")
-      < cell_fn.index("if (![self hasBackground]) {")
-      and "self.cardsNeumorphSolid" not in cell_fn)
-check("B5 cell 管线 ON 分支尾部 = 规格表面收口（Task184 重锚：挂点回归读 cardsNeumorphOpacity）",
-      "[target ame_applyNeumorphSurface];" in cell_fn
-      and "[target ame_applyNeumorphCardOpacity:self.cardsNeumorphOpacity];" in cell_fn)
-check("B6 宿主整体 alpha 退役（Task173 重锚：卡片本体透明度替代，文字不随淡）",
-      "cardTarget.alpha = self.cardsNeumorphOpacity;" not in cell_fn
-      and "target.alpha = self.cardsNeumorphOpacity;" not in cell_fn
-      and "view.alpha = self.cardsNeumorphOpacity;" not in card_fn)
-check("B7 引擎透明度原语恢复（Task178 重锚：ame_applyNeumorphCardOpacity/shadowView.alpha 回归；重铺复位 1.0 兜底）",
-      "ame_applyNeumorphCardOpacity" in engine_m
-      and "shadowView.alpha = o;" in engine_m
-      and "shadowOpacity = 1.0" in engine_m)
-check("B8 列表行边界维持：applyCardEffectToCell 仍 Flat 平贴（Task184 重锚：单签名恒定底回归）",
-      "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm_m
-      and "applyCardEffectToCell" in bm_m)
+check("B1 Task210：卡片视图管线单路径（改名后无开关门，恒转调 applyEffectToView）",
+      "if (!self.cardsNeumorphEnabled) {" not in card_fn
+      and "[self applyEffectToView:view];" in card_fn)
+check("B2 Task210：管线零新拟态原语（注释留档不计）",
+      "ame_applyNeumorphSurface" not in _nocomment(card_fn)
+      and "ame_applyNeumorphCardOpacity" not in _nocomment(card_fn))
+check("B3 Task210：cell 管线零 ON 分支（无开关门）",
+      "if (self.cardsNeumorphEnabled) {" not in cell_fn
+      and "[target ame_applyNeumorphSurface];" not in cell_fn)
+check("B4 Task210：cell 管线无壁纸分支 = 平贴灰面收口",
+      "if (![self hasBackground]) {" in cell_fn
+      and "view.backgroundColor = AmeCardSurfaceColor();" in bm_m)
+check("B5 Task210：引擎透明度原语退役（ame_applyNeumorphCardOpacity/shadowView.alpha 零残留）",
+      "ame_applyNeumorphCardOpacity" not in engine_m
+      and "shadowView.alpha" not in engine_m)
+check("B6 Task210：列表行走单路径管线（applyEffectToCell 直转）",
+      "[self applyEffectToCell:cell];" in bm_m
+      and "ame_applyNeumorphSurfaceFlatWithRadius" not in bm_m)
 
 # ============================================================
-# C. 设置页：新拟态透明度滑条行
+# C. 设置页：新拟态透明度滑条行退役（Task210 重锚）
 # ============================================================
-check("C1 滑条标题键（Task184 重锚：neumorph.opacity 键回归，button.opacity 退役，开关键保留）",
-      'localize(@"background.cards.neumorph.opacity.title", nil)' in bsvc
-      and 'localize(@"background.cards.neumorph.interface.title", nil)' in bsvc
+check("C1 Task210：neumorph 双键随行退役（button.opacity 亦无）",
+      'background.cards.neumorph' not in bsvc
       and 'localize(@"background.button.opacity.title", nil)' not in bsvc)
-check("C2 滑条行接线（Task184 重锚：新拟态透明度行 tags 500~502 回归，开关行保留）",
+check("C2 Task210：滑条/开关行接线全删（tags 500/410 零残留）",
       '"ButtonOpacityCell"' not in bsvc
-      and "slider.tag = 500;" in bsvc
-      and "cardsNeumorphOpacitySliderChanged" in bsvc
-      and '"CardsNeumorphToggleCell"' in bsvc)
-check("C3 回调（Task184 重锚：cardsNeumorphOpacitySliderChanged 回归，统一刷新链仍在）",
-      "- (void)cardsNeumorphOpacitySliderChanged:" in bsvc
-      and "[[BackgroundManager sharedManager] refreshUIEffect];" in bsvc)
+      and "slider.tag = 500;" not in bsvc
+      and "cardsNeumorphOpacitySliderChanged" not in bsvc
+      and '"CardsNeumorphToggleCell"' not in bsvc)
+check("C3 Task210：刷新链保留（壁纸选项回调仍走 refreshUIEffect）",
+      "[[BackgroundManager sharedManager] refreshUIEffect];" in bsvc)
 check("C4 既有行不受影响（透明度/模糊滑块 + Bing 区仍在位）",
       "opacitySliderChanged:" in bsvc and "blurIntensitySliderChanged:" in bsvc
       and "bingToggleChanged:" in bsvc)
@@ -116,21 +107,16 @@ check("D4 旧间距常量零残留（(0,5,0,5) / (5,15,5,15)）",
       and "NSDirectionalEdgeInsetsMake(5, 15, 5, 15)" not in layout_fn)
 
 # ============================================================
-# E. l10n：键原位换名（计数 1954 不变）
+# E. l10n：neumorph 双键退役（Task210 重锚，计数 2419 -> 2417）
 # ============================================================
-new_key = "background.cards.neumorph.opacity.title"  # Task184 重锚：新拟态透明度键回归
-old_key = "background.cards.neumorph.title"
-vals = {}
-for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
-    s = rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
-    m = re.search(r'^"' + re.escape(new_key) + r'"\s*=\s*"(.*)";\s*$', s, re.M)
-    vals[lg] = m.group(1) if m else None
-check("E1 六语言键全部恢复（Task184 重锚）", all(v is not None for v in vals.values()), str(vals))
-check("E2 六语言旧键退役",
-      all(old_key + '"' not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
+check("E1 Task210：neumorph 双键六语言全退役",
+      all("background.cards.neumorph." not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
-check("E3 四主语言键集一致且计数 = 2228（Task178 重锚：opacity.title 键恢复）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2419
+check("E2 六语言旧键退役",
+      all("background.cards.neumorph.title" not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
+          for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
+check("E3 四主语言键集一致且计数 = 2417（Task210 重锚：双键退役 2419-2）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2417
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -141,21 +127,21 @@ check("E4 四主语言键集逐键一致", keysets[0] == keysets[1] == keysets[2
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("F1 公告（Task185 重锚：并行会话 task184@2 插入后全体非钉位再 +1；179@4、178@5、177@6、175@7、174@8、toggle173@9、ten173@10、172@11、171@12、170@13、168@14；anns[1] task169 pin 不动）且 id 唯一",
+check("F1 公告（Task210 重锚：task210@2 插入后 task179@10 / task178@11 / task177@12 / task175@13 / task174@14 / 双 task173@15,16 / task172@17 / task171@18 / task170@19 / task168@20；anns[1] task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[8]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[9]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[10]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[11]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[12]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[13]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[14]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[15]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[16]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[17]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[18]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[15]
+      and anns[10]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[11]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[12]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[13]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[14]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[15]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[16]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[17]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[18]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[19]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[20]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[19]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]
@@ -213,11 +199,11 @@ check("G4 配平：LauncherNewsViewController.m", balance("Natives/LauncherNewsV
 # Task175 重锚：壁纸共存柔和档把 shadowOpacity 从字面量 1.0 改为变量
 # （darkOpacity/lightOpacity，规格档仍为 1.0，柔和档 0.45/0.5）——"仅追加"
 # 口径随之更新：颜色源 + 规格档默认值 + 柔和档开关原语三锚。
-check("G5 引擎改动保持受控（Task177 重锚：恒 1.0 不透明度 + 柔和档退役 + 渐变表面层在位，Task160 圆角语义未动）",
-      "AmeNeumorphShadowColor()" in engine_m
-      and "shadowOpacity = 1.0" in engine_m
+check("G5 Task210：引擎改动收口（阴影/渐变层/度量零残留，柔和档时代原语亦无）",
+      "AmeNeumorphShadowColor()" not in engine_m
+      and "shadowOpacity" not in engine_m
       and "ame_setNeumorphWallpaperSoft" not in engine_m
-      and "MAX(8.0, 50.0 * scale)" in engine_m)
+      and "MAX(8.0, 50.0 * scale)" not in engine_m)
 
 # ============================================================
 # H. 级联零新增失败（家法：当前失败 ⊆ 提交树基线）

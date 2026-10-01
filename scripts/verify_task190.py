@@ -37,13 +37,13 @@ check("A", "Table 包装 applyEffectToTableViewCell 转发泛型实现",
 _gm = bm.split("- (void)ame190_applyCardPipelineToCell:", 1)[1].split("- (void)applyCardEffectToCell:", 1)[0]
 check("A", "泛型方法体内零 cell.contentView（CI run 36403614574：UIView 基类无此属性）",
       "cell.contentView" not in _gm and "contentView" in _gm)
-check("A", "泛型实现正文保留 Task172 三段式关键调用",
-      "ame_applyNeumorphSurface" in bm.split("ame190_applyCardPipelineToCell", 1)[1]
-      and "cardsNeumorphEnabled" in bm.split("ame190_applyCardPipelineToCell", 1)[1]
-      and "hasBackground" in bm.split("ame190_applyCardPipelineToCell", 1)[1])
+check("A", "泛型实现正文保留壁纸感知单路径（Task210 重锚：新拟态三段式退役；注释留档不计）",
+      "hasBackground" in bm.split("ame190_applyCardPipelineToCell", 1)[1]
+      and "ame_applyNeumorphSurface" not in "\n".join(l.split("//")[0] for l in bm.split("ame190_applyCardPipelineToCell", 1)[1].split("\n"))
+      and "cardsNeumorphEnabled" not in "\n".join(l.split("//")[0] for l in bm.split("\n")))
 _decl = bmh.find("- (void)applyEffectToTableViewCell:(UITableViewCell *)cell;")
 check("A", "头文件声明 + 注释（与 Collection 同一条管线）",
-      _decl >= 0 and "Task172" in bmh[max(0, _decl - 300):_decl])
+      _decl >= 0 and "Task210" in bmh[max(0, _decl - 300):_decl])
 
 # ============ B. 安装方式页间距 = 版本号页 ============
 print("== B. 安装方式页卡间距（净距 12pt = 版本号页） ==")
@@ -181,7 +181,7 @@ for lang, (u, d) in expect.items():
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     check("G", f"{lang} account.menu.use/delete 键值", f'"account.menu.use" = "{u}";' in s
           and f'"account.menu.delete" = "{d}";' in s)
-    check("G", f"{lang} 唯一键总数 == 2419", len(keys) == 2419, f"got {len(keys)}")
+    check("G", f"{lang} 唯一键总数 == 2417", len(keys) == 2417, f"got {len(keys)}")
     check("G", f"{lang} account.switch_role.* 历史键保留",
           'account.switch_role.button' in keys and 'account.switch_role.title' in keys)
 
@@ -232,7 +232,7 @@ for fn in ("Natives/AccountListViewController.m", "Natives/BackgroundManager.m",
             stack.pop()
     check("H", f"{os.path.basename(fn)} 严格栈匹配括号平衡", ok and not stack)
 check("H", "announcements/task190 条目存在（Task209 重锚：@2 插入后顺延至 [6]）",
-      json.loads(rdrepo("announcements.json"))["announcements"][6]["id"].startswith("task190-"))
+      json.loads(rdrepo("announcements.json"))["announcements"][7]["id"].startswith("task190-"))
 
 print("=" * 72)
 print(f"PASS {len(PASS)}  FAIL {len(FAIL)}")

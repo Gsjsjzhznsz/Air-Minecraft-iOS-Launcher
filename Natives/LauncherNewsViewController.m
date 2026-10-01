@@ -440,7 +440,7 @@ static NSString *festivalGreeting(void) {
     self.welcomeLabel = [[UILabel alloc] init];
     self.welcomeLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.welcomeLabel.font = [UIFont systemFontOfSize:21 weight:UIFontWeightBold];
-    self.welcomeLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160
+    self.welcomeLabel.textColor = AmeCardPrimaryTextColor(); // Task160
     self.welcomeLabel.numberOfLines = 1;
     self.welcomeLabel.adjustsFontSizeToFitWidth = YES;
     self.welcomeLabel.minimumScaleFactor = 0.7;
@@ -449,7 +449,7 @@ static NSString *festivalGreeting(void) {
     self.greetingLabel = [[UILabel alloc] init];
     self.greetingLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.greetingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-    self.greetingLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160
+    self.greetingLabel.textColor = AmeCardSecondaryTextColor(); // Task160
     self.greetingLabel.numberOfLines = 1;
     
     // Task136：两行欢迎句组成纵向 stack，整体相对头像纵轴居中
@@ -584,7 +584,7 @@ static NSString *festivalGreeting(void) {
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 公告卡标题
+    self.titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160 公告卡标题
     self.titleLabel.numberOfLines = 1;
     [self.titleRowStack addArrangedSubview:self.titleLabel];
     
@@ -606,7 +606,7 @@ static NSString *festivalGreeting(void) {
     self.summaryLabel = [[UILabel alloc] init];
     self.summaryLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.summaryLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    self.summaryLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 公告卡简介
+    self.summaryLabel.textColor = AmeCardSecondaryTextColor(); // Task160 公告卡简介
     self.summaryLabel.numberOfLines = 0;
     [self.summaryLabel setContentCompressionResistancePriority:750 forAxis:UILayoutConstraintAxisVertical];
     [self.titleRowStack setContentCompressionResistancePriority:998 forAxis:UILayoutConstraintAxisVertical];
@@ -669,7 +669,7 @@ static NSString *festivalGreeting(void) {
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160 新闻卡标题
+    self.titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160 新闻卡标题
     self.titleLabel.numberOfLines = 2;
     [self.contentContainer addSubview:self.titleLabel];
     
@@ -677,7 +677,7 @@ static NSString *festivalGreeting(void) {
     self.summaryLabel = [[UILabel alloc] init];
     self.summaryLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.summaryLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
-    self.summaryLabel.textColor = AmeNeumorphSecondaryTextColor(); // Task160 新闻卡简介
+    self.summaryLabel.textColor = AmeCardSecondaryTextColor(); // Task160 新闻卡简介
     self.summaryLabel.numberOfLines = 2;
     [self.contentContainer addSubview:self.summaryLabel];
     
@@ -747,7 +747,7 @@ static NSString *festivalGreeting(void) {
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
-    self.titleLabel.textColor = AmeNeumorphPrimaryTextColor(); // Task160
+    self.titleLabel.textColor = AmeCardPrimaryTextColor(); // Task160
     self.titleLabel.numberOfLines = 1;
     self.titleLabel.adjustsFontSizeToFitWidth = YES;
     self.titleLabel.minimumScaleFactor = 0.7;

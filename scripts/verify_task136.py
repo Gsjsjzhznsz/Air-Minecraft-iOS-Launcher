@@ -84,8 +84,8 @@ check("A4  CMake 不再登记 Kit 源，登记原生辅助",
       and "UIKit+NativeSurface.m" in read("Natives/CMakeLists.txt"))
 # Task170 诚实重锚：Task160 新拟态回归把卡片表面语义色替换为规格表面色，
 # 本锚自 Task160 起即为漂移失败（此前仅经 138 J 行豁免）。现锚定现行语义。
-check("A5  原生卡片表面 = 新拟态规格表面色（Task160 回归后语义；Task170 重锚）",
-      "AmeNeumorphSurfaceColor" in read("Natives/UIKit+NativeSurface.m"))
+check("A5  原生卡片表面 = 平贴灰面身份色（Task210 重锚：AmeCardSurfaceColor 改名保留）",
+      "AmeCardSurfaceColor" in read("Natives/UIKit+NativeSurface.m"))
 
 print()
 print("=" * 72)
@@ -109,21 +109,22 @@ print("=" * 72)
 bm = read("Natives/BackgroundManager.m")
 bmh = read("Natives/BackgroundManager.h")
 # Task170 诚实重锚：Task160/163 后列表行表面为平贴新拟态（Flat 无阴影）。
-check("C1  applyCardEffectToCell 保留，无背景 → 原生卡片行（contentView 平贴新拟态 12pt；Task170 重锚）",
+check("C1  applyCardEffectToCell 保留（Task210 重锚：单路径直转 applyEffectToCell，Flat 特调行退役）",
       "applyCardEffectToCell" in bmh
-      and "[cell.contentView ame_applyNeumorphSurfaceFlatWithRadius:12];" in bm)
+      and "ame_applyNeumorphSurfaceFlatWithRadius" not in bm)
 # Task173 诚实重锚：行管线被"新拟态界面"开关接管——关闭 → applyEffectToCell
 # 旧管线（有壁纸毛玻璃/半透明、无壁纸标准列表，原 C2 语义并入此门）；开启 →
 # Flat 平贴（壁纸无关）。
-check("C2  applyCardEffectToCell（Task173 重锚：开关门在先；关闭 → applyEffectToCell 同管线）",
-      re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,400}?if \(!self\.cardsNeumorphEnabled\) \{\s*\[self applyEffectToCell:cell\];", bm))
-check("C3  collection cell 无背景分支恢复 cell 级裁剪（原生卡片无需帧外阴影空间）",
-      "cell.clipsToBounds = YES;" in bm and "cell.layer.masksToBounds = NO;" in bm)
+check("C2  applyCardEffectToCell（Task210 重锚：无开关门，恒直转 applyEffectToCell 同管线）",
+      re.search(r"applyCardEffectToCell:\(UITableViewCell \*\)cell \{[\s\S]{0,300}?\[self applyEffectToCell:cell\];", bm))
+check("C3  Task210：无壁纸卡面裁剪由平贴分支收口（masksToBounds = YES，无帧外阴影诉求）",
+      "view.layer.masksToBounds = YES;" in bm
+      and "cell.clipsToBounds = YES;" not in bm)
 check("C4  collection cell 圆角来源保留：优先读 contentView 自身圆角",
       "cell.contentView.layer.cornerRadius > 0" in bm)
 # Task170 诚实重锚：无背景分派在 Task160 后为等比圆角平贴新拟态/整页 systemBackground。
-check("C5  applyEffectToView 无背景 → 原生表面分派（有圆角=平贴新拟态，无圆角=systemBackground；Task170 重锚）",
-      "[view ame_applyNeumorphSurfaceFlatWithRadius:radius];" in bm
+check("C5  applyEffectToView 无背景 → 原生表面分派（有圆角=平贴灰面 AmeCardSurfaceColor，无圆角=systemBackground；Task210 重锚）",
+      "view.backgroundColor = AmeCardSurfaceColor();" in bm
       and "view.backgroundColor = [UIColor systemBackgroundColor];" in bm)
 check("C6  检测并切换架构原样保留（hasBackground 双分支 + SystemThinMaterial 旧管线）",
       bm.count("[self hasBackground]") >= 5 and "SystemThinMaterial" in bm
@@ -222,10 +223,9 @@ check("G1  每个加载器独立 section（insetGrouped 独立圆角卡）",
 check("G2  卡片间距（Task190 重锚：用户要求与版本号页一致——section 头 10->4，净距 = 4 下内缩 + 4 头 + 4 上内缩 = 12pt）",
       "if (section < (NSInteger)_loaders.count) return 4;" in ml
       and "return 0.01;" in ml)
-check("G3  两类 cell 视觉自洽（Task184 重锚：VersionCardCell 同构——cardContainer init 挂凸起管线 ×3，逐帧 effect 调用退役）",
-      ml.count("[[BackgroundManager sharedManager] applyNeumorphCardEffectToView:_cardContainer];") == 3
-      and "applyCardEffectToCell:cell];" not in ml
-      and "applyNeumorphCardEffectToView:cell.contentView];" not in ml)
+check("G3  两类 cell 视觉自洽（Task210 重锚：ModLoaderInstall 卡容器 init 挂 applyCardEffectToView ×3）",
+      ml.count("[[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];") == 3
+      and "applyNeumorphCardEffectToView" not in ml)
 check("G4  nameBar 与上级菜单同语言（Task137 重锚：原生圆角 10 + 原生表面枢纽）",
       "_nameBar.layer.cornerRadius = 10;" in ml)
 check("G5  didSelect 按新 section 语义取行（_loaders[indexPath.section] + 越界守卫）",

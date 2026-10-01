@@ -197,7 +197,7 @@ check("I1 unified row spec table", "ame173_rowSpec" in bg)
 check("I2 centerY anchors", bg.count("centerYAnchor constraintEqualToAnchor:cell.contentView.centerYAnchor") >= 3)
 check("I3 constraint-built sliders", "translatesAutoresizingMaskIntoConstraints = NO" in bg)
 check("I4 no y=0 frames remain", "CGRectMake(150, 0," not in bg and "CGRectMake(165, 0," not in bg)
-check("I5 opacity floor retired (Task180 重锚：用户定稿 0~100% 无下限，旧 0.1 floor 退役)", 'slider.minimumValue = 0.0f;' in bg)
+check("I5 slider floor semantics (Task210 重锚：壁纸透明度行 0.1 下限/模糊行 0.0 起步的三元式在位；新拟态滑条行已删)", 'slider.minimumValue = (indexPath.row == 1) ? 0.1f : 0.0f;' in bg)
 
 print("== J. Forge-JIT restart-and-launch ==")
 jl = rd("Natives/JavaLauncher.m")
@@ -256,18 +256,18 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("M1 version.h addendum", "Task 173" in vh and "desktop-GL completion layer" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
-# Task179 重锚：task179@2 插入，全体非钉位再顺延 +1；task178 自 anns[2] -> anns[3]。
+# Task179 重锚：task179@2 插入，全体非钉位再顺延 +1；task178 自 anns[3] -> anns[4]。
 # Task207 重锚：task207@2 插入，全体非钉位再顺延 +1（184/190/193/196/201/206/207 累计）。
 check("M3 announcement at index 10 (Task209 重锚：task209@2 插入后 ten-fixes@15、toggle-173@14、174@13、175@12、177@11、178@10、179@9、180@8、184@7)",
-      ann["announcements"][15]["id"] == "task173-ten-fixes-2026-09-26"  # Task184+190+193+196+201+207 各 +1
-      and ann["announcements"][14]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann["announcements"][13]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann["announcements"][12]["id"] == "task175-six-fixes-2026-09-26"
-      and ann["announcements"][11]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann["announcements"][10]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and ann["announcements"][9]["id"] == "task179-eight-fixes-2026-09-26"
-      and ann["announcements"][8]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and ann["announcements"][7]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27")
+      ann["announcements"][16]["id"] == "task173-ten-fixes-2026-09-26"  # Task184+190+193+196+201+207 各 +1
+      and ann["announcements"][15]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][14]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann["announcements"][13]["id"] == "task175-six-fixes-2026-09-26"
+      and ann["announcements"][12]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann["announcements"][11]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and ann["announcements"][10]["id"] == "task179-eight-fixes-2026-09-26"
+      and ann["announcements"][9]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and ann["announcements"][8]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")
