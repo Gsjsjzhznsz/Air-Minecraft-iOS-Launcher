@@ -1288,3 +1288,6 @@ Stage Summary:
 - 实例选择页观感=快捷指令：accent 渐变竖卡双列网格（iPad 四列），左上白图标/右上 ⋯/左下名称+版本；点卡即选用、⋯ 纯编辑、选中=内缩原蓝环
 - 装机锚点：点任意非选中实例卡=立即切换选用（⋯ 与长按"编辑"均不改选中）；选中卡四周 12/3=4pt 内缩、2pt 蓝描边+柔光；iPhone 一行两卡、滚动节奏与旧版一致（行高仍 84）
 - 零新增 l10n 键；旧五件套（iconContainer/selectedBadge/isolatedBadge/lastPlayedLabel/chevronView）随卡退役；verify_task207 为本轮常驻门
+
+### Task 207 补记：CI 一次过绿
+run 36829397819（db581fa）success，12m41s，产物 ipa/tipa/dSYM 就绪——UI-only 轮零 CI 拉锯（对比并行 Task206 渲染器轮的 11 连拉）。ccache 三路缓存对本轮全命中。
