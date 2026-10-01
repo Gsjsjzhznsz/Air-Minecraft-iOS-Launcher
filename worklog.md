@@ -1351,3 +1351,15 @@ Stage Summary:
 - 改名生效：渲染器列表显示 "Krypton Wrapper（≤26.2）"，存储与 AI 映射兼容旧名，FAQ/公告同步；装机后用户在 设置→视频设置→渲染器 即见新名
 - 装机验证锚点：①"[tinygl4angle] Task209 draw: glDrawElements*BaseVertex #N ..."（地形提交路径现形）②"[tinygl4angle] Task209 state (...): blend=... mask=... drawFb=..." ③"[tinygl4angle] Task209 tex: glTexImage2D ... ifmt=..." ④"[tinygl4angle] Task209 ESSL dump #N begin (terrain-signature...) >>>"
 - CI 待推送确认
+---
+Task ID: 209 (续)
+Agent: main (Super Z)
+Task: CI 确认
+
+Work Log:
+- CI run 36865701144（fdd1c688）completed success（11m49s，首跑即绿——spvc_shim 重定向移除 + tinygl4angle 四叉探针 + stub 扩枚举全部顺利通过编译链）
+- 产物：com.air-devs.air-ios.ipa / .tipa（211MB×2）+ dSYM 就绪（Actions artifact）
+
+Stage Summary:
+- Task209 全链闭环：红鲱鱼退役 + Krypton Wrapper（≤26.2）改名 + 四叉取证探针，verify_task209 26/26 + 级联全绿 + CI 绿，新 IPA 就绪
+- 装机验证锚点（Task209 编号）：①渲染器列表新名生效；②ANGLE 会话日志搜 "Task209 draw: glDrawElements*BaseVertex / Task209 state / Task209 tex / Task209 ESSL dump"——四叉探针数据将定位方块透明真因
