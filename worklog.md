@@ -1243,3 +1243,28 @@ Stage Summary:
 - NG-GL4ES 上线待装机验证：渲染器列表末位可选；装机锚点 "[egl_bridge] Task206: NG-GL4ES renderer:" + "[JavaLauncher] Task206: NG-GL4ES renderer active (NGG_DIR_PATH=...)" + LIBGL 横幅 "Initialising Krypton Wrapper"；老版本材质损坏用户（1.8.9）首选换它
 - CI 待推送确认：dep_nggl4es 首次进编译链（本地无 cmake/clang 无法预验——生成器守卫 + 结构门已尽本地最大覆盖；失败形态预判：glslang 15.0 头的 API 缺口（已核验无）/框架链接路径/别名 asm 形态（vgpu 同款 CI 实证））
 - vgpu 保留在列表（存量设备兼容），NG-GL4ES 为推荐接替者
+
+---
+Task ID: 206 (续二)
+Agent: main (Super Z)
+Task: CI 十一轮事故根修 → 36815269161 绿 + IPA 就绪
+
+Work Log:
+- 事故一（36804929330）：dep_nggl4es 与 dep_mg 并行竞速（payload 依赖列表在 -j 下无序，glslang 还在 36% 就来找静态库）→ 目标级先决条件 dep_nggl4es: dep_mg（dep_shader_shims 同款家法；守卫本身按设计干净早退）
+- 事故二（36805637724）：string_utils.c 18 个裸 __attribute__((alias)) 被Apple clang 拒（"aliases are not supported on darwin"——attributes.h 退役 AliasExport 的同源病，vendored 树还有第四种方言）→ 声明围栏 !__APPLE__ + 生成器加原文 alias-属性通道（带引号目标形；宏体内的 alias(#name) 不匹配）→ 1273→1291
+- 事故三（36806869734）：directstate.c 2 个 AliasDecl（无 Apple 退役分支）+ drawing.c/framebuffers.c 无守卫使用 NOEGL 分支不存在的 LOAD_GLES3_OR_EXT → 围栏 + 生成器 AliasDecl 通道（exported=arg2 target=arg4 全限定）→ 1291→1293；loader.h NOEGL 分支补定义（proc_address 基名+EXT 兜底，镜像非 NOEGL 的 eglGetProcAddress 链）
+- 事故四（36808113773）：glext.h 的 __APPLE__ 分支 GLhandleARB=void* 与 gles.h 的 unsigned int 在同 TU 相撞 → 对齐 gles.h 约定（代码以 int 语义使用：gl4es_glGetHandle 返回 GLuint；同型重定义 C11 合法，include 顺序免疫）
+- 事故五（36808922924）：texture.c case 标签后直接声明（GCC 扩展，严格 C17 拒绝）→ 花括号包裹（全树带注释跳过扫描仅此一处）
+- 事故六（36809835918）：glx.c system() iOS 不可用 + GLVND 表引用 !NOX11 实现 → xrefresh Apple 退化空操作 + 表 NOX11 围栏；glsl_for_es.cpp 的 glslang include 是安装布局（源码树 SPIRV/ 在根、Public|Include 在 glslang/ 子目录）→ 双路径 NGGL4ES_GLSLANG_INCLUDE=3rdparty;3rdparty/glslang
+- 事故七（36811163951）：Makefile 注释行插在续行链中间且无反斜杠——# 截止逻辑行，cmake 只拿到 -D 链 → 注释移出（本轮教训：链中不能有无反斜杠注释）
+- 事故八（36811929580）：CMake if(NOT VAR) 对分号列表展开为多参数（NOT p1 p2 p3）= NOT-of-invalid = true → 守卫误触 → 引号化 STREQUAL "" 形态 + 报错自带四变量值（下轮立功）
+- 事故九（36812741433）：CMake 无反斜杠续行（if() 跨行天然到闭括号）→ 去 \ 
+- 事故十（36813488794）：注释移出后又落在 mkdir 与 cd 之间——仍在链中！链在注释处断成两个 shell：ngg_libs 是 shell 变量跨 shell 即空（\$(SOURCEDIR) 是 make 变量每个 shell 都展开——完美解释为何只有 LIBS='' 而其余三变量活着）→ 注释移至 mg_bindir 之前 + 机器审计不变量（start 到源路径行之间非注释行全部以 \ 结尾、无链中注释）；中途一次脚本化搬运误入 dep_shader_shims 的同前缀 mg_bindir（前缀搜索陷阱——锚定搜索范围后归位）
+- 事故十一（36814447589）：GLVND 尾部全家（LoadGLXFunction 调 NOX11 区的 glXGetProcAddress + XDefaultDepth/XGetVisualInfo 用 X11 宏）→ #endif 扩至文件尾
+- 终局：36815269161（c9ca935）completed success；产物 com.air-devs.air-ios.ipa/tipa 211.3MB + dSYM 3.9MB——libnggl4es.dylib 完整构建链接（1293 别名 + glslang 15.0 双补丁静态库 + spvc impl dylib + 捆绑框架）
+- ccache 三路缓存命中：本轮 12 连跑后缓存已热，下轮起 dep_nggl4es 增量 <1 分钟
+
+Stage Summary:
+- Task206 全链闭环：ANGLE push-constant 根修 + NG-GL4ES 移植 + 12 轮 CI 收口，IPA 就绪
+- 装机验证锚点：①ANGLE "[spvc-shim] Task206: EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER enabled" + blockIdx _push_constants ≥0 + 方块不透明；②NG-GL4ES 渲染器列表末位可选（"[egl_bridge] Task206: NG-GL4ES renderer:" + "[JavaLauncher] Task206: NG-GL4ES renderer active" + "Initialising Krypton Wrapper" 横幅）；③1.8.9 老版本材质损坏用户换 NG-GL4ES
+- CI 教训沉淀：vendored 移植的"方言考古"清单（裸 alias 三种形态 + NOEGL 宏缺口 + typedef 对齐 + C17 标签声明 + GLVND 围栏 + 安装/源码 include 布局）与 Makefile/CMake 两门各自的三条铁律（链中注释/if 列表语义/无续行符）
