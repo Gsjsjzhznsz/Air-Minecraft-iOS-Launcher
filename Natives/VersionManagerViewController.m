@@ -1164,7 +1164,7 @@ static UIColor *ame207_darkenedAccent(UIColor *color, CGFloat factor) {
         @ RENDERER_NAME_MOBILEGL: @"MobileGL",
         @ RENDERER_NAME_MOBILEGL_GLES: @"MobileGL GLES",
         @ RENDERER_NAME_MITHRIL: @"Mithril",
-        @ RENDERER_NAME_NGGL4ES: @"NG-GL4ES", // Task206：ZL2 的 gl4es（Krypton Wrapper）
+        @ RENDERER_NAME_NGGL4ES: @"Krypton Wrapper", // Task209：用户点名改名（≤26.2 定位；原 NG-GL4ES，ZL2 的 gl4es）
     };
     NSMutableArray *ame140_names = [NSMutableArray array];
     for (NSString *ame140_key in self.rendererKeys) {

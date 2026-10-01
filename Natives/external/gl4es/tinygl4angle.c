@@ -390,10 +390,87 @@ void glGetQueryObjectui64v(GLuint id, GLenum pname, GLuint64 *params) {
     if (ame173_ptr_glGetQueryObjectui64v) ame173_ptr_glGetQueryObjectui64v(id, pname, params);
 }
 
+// ---- Task209（ANGLE 方块透明四叉取证）----
+// 病历（59b4f25 装机日志 88fa3f6）：用户判读"angle方块透明"。PC 红鲱鱼已
+// 清算（spvc_shim Task209 定谳注释：26.3 全部着色器零 push_constant 块，
+// _push_constants NOT FOUND 属正常现象）。编译链全绿（32 shader 全
+// COMPILE_STATUS=1、sodium 的 #version 460 frag 经 option 路径 ES 重写
+// 成功）、UBO 链健康（terrain _uniform_00_00..03 全命中 + uboBind=98
+// 活跃）、零 GL 错误——但该日志的绘制探针只覆盖 glDrawArraysInstanced
+// （全样本 count=3/6 小三角形 = GUI/字形级），Task173 的 BaseVertex 族
+// 转发【零探针】= 地形绘制在普查里完全不可见（无法排除"地形压根没画"）。
+// 本轮四叉：
+//   (a) BaseVertex 族（Elements/RangeElements/ElementsInstanced/
+//       MultiDrawElements 的 BaseVertex 变体）计数+抽样——地形绘制的
+//       存在性与规模直接现形；
+//   (b) 抽样绘制点的状态快照（blend/depth/colorMask/drawFb + 纹理单元
+//       0-3 绑定）——alpha 通路病灶（混合态/遮罩/图集绑定）的黄金证据；
+//   (c) 纹理上传格式法证（glTexImage2D/TexSubImage2D：首 24 次 + 每次
+//       >=1M 像素 + 每 4096 次抽一条——图集/光照图的 internalFormat/
+//       format/type/尺寸全记录）；
+//   (d) 地形族 ESSL 全文 dump（前两个含 sphericalVertexDistance 的源 +
+//       前两个 >=3800 字节的大源，全文带 begin/end 标记——块名/采样器
+//       声明/输出路径全可见）。
+typedef void (*ame209_fn_glGetIntegerv)(GLenum, GLint *);
+static ame209_fn_glGetIntegerv ame209_ptr_getInt;
+typedef void (*ame209_fn_glActiveTexture)(GLenum);
+static ame209_fn_glActiveTexture ame209_ptr_activeTex;
+
+/// Task209 (b)：绘制时刻状态快照（只在抽样命中时调用，查询成本可控；
+/// 纹理单元扫描后恢复原 active texture——纯读操作，不改绘制语义）。
+static void ame209_draw_state(const char *ame209_tag) {
+    AME173_RESOLVE(ame209_ptr_getInt, "glGetIntegerv");
+    if (ame209_ptr_getInt == NULL) return;
+    GLint ame209_blend = 0, ame209_bsrc = 0, ame209_bdst = 0, ame209_depth = 0,
+          ame209_dfunc = 0, ame209_cm[4] = {0, 0, 0, 0}, ame209_fb = 0, ame209_act = 0;
+    ame209_ptr_getInt(GL_BLEND, &ame209_blend);
+    ame209_ptr_getInt(GL_BLEND_SRC_RGB, &ame209_bsrc);
+    ame209_ptr_getInt(GL_BLEND_DST_RGB, &ame209_bdst);
+    ame209_ptr_getInt(GL_DEPTH_TEST, &ame209_depth);
+    ame209_ptr_getInt(GL_DEPTH_FUNC, &ame209_dfunc);
+    ame209_ptr_getInt(GL_COLOR_WRITEMASK, ame209_cm);
+    ame209_ptr_getInt(GL_DRAW_FRAMEBUFFER_BINDING, &ame209_fb);
+    ame209_ptr_getInt(GL_ACTIVE_TEXTURE, &ame209_act);
+    printf("[tinygl4angle] Task209 state (%s): blend=%d src=0x%04X dst=0x%04X "
+           "depth=%d func=0x%04X mask=%d%d%d%d drawFb=%u actUnit=%d\n",
+           ame209_tag, ame209_blend, (unsigned)ame209_bsrc, (unsigned)ame209_bdst,
+           ame209_depth, (unsigned)ame209_dfunc, ame209_cm[0], ame209_cm[1],
+           ame209_cm[2], ame209_cm[3], (unsigned)ame209_fb,
+           (int)(ame209_act - GL_TEXTURE0));
+    AME173_RESOLVE(ame209_ptr_activeTex, "glActiveTexture");
+    if (ame209_ptr_activeTex != NULL) {
+        for (int ame209_u = 0; ame209_u < 4; ++ame209_u) {
+            GLint ame209_tex = 0;
+            ame209_ptr_activeTex(GL_TEXTURE0 + ame209_u);
+            ame209_ptr_getInt(GL_TEXTURE_BINDING_2D, &ame209_tex);
+            printf("[tinygl4angle] Task209 state (%s): unit%d tex2d=%u\n",
+                   ame209_tag, ame209_u, (unsigned)ame209_tex);
+        }
+        ame209_ptr_activeTex((GLenum)ame209_act);
+    }
+}
+
+/// Task209 (a)：BaseVertex 族统一计数（跨函数共享——MC 的地形提交走哪条
+/// 就在哪条现形；no 用于抽样与大规模必采双通道）。
+static unsigned ame209_bv_no = 0;
+static unsigned ame209_bv_big = 0;
+static int ame209_bv_sample(int ame209_big) {
+    ++ame209_bv_no;
+    if (ame209_big) ++ame209_bv_big;
+    return ame209_bv_no <= 8 || (ame209_bv_no % 4000) == 0 ||
+           (ame209_big && (ame209_bv_big <= 12 || (ame209_bv_big % 512) == 0));
+}
+
 typedef void (*ame173_fn_glDrawElementsBaseVertex)(GLenum, GLsizei, GLenum, const void *, GLint);
 static ame173_fn_glDrawElementsBaseVertex ame173_ptr_glDrawElementsBaseVertex;
 void glDrawElementsBaseVertex(GLenum mode, GLsizei count, GLenum type, const void *indices, GLint basevertex) {
     AME173_RESOLVE(ame173_ptr_glDrawElementsBaseVertex, "glDrawElementsBaseVertex");
+    // Task209 (a)：盲区普查（此前零探针）。
+    if (ame209_bv_sample(count >= 1024)) {
+        printf("[tinygl4angle] Task209 draw: glDrawElementsBaseVertex #%u mode=%u count=%d base=%d\n",
+               ame209_bv_no, (unsigned)mode, (int)count, (int)basevertex);
+        ame209_draw_state("DrawElementsBaseVertex");
+    }
     if (ame173_ptr_glDrawElementsBaseVertex) {
         ame173_ptr_glDrawElementsBaseVertex(mode, count, type, indices, basevertex);
     } else {
@@ -405,6 +482,12 @@ typedef void (*ame173_fn_glDrawRangeElementsBaseVertex)(GLenum, GLuint, GLuint, 
 static ame173_fn_glDrawRangeElementsBaseVertex ame173_ptr_glDrawRangeElementsBaseVertex;
 void glDrawRangeElementsBaseVertex(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void *indices, GLint basevertex) {
     AME173_RESOLVE(ame173_ptr_glDrawRangeElementsBaseVertex, "glDrawRangeElementsBaseVertex");
+    // Task209 (a)：盲区普查。
+    if (ame209_bv_sample(count >= 1024)) {
+        printf("[tinygl4angle] Task209 draw: glDrawRangeElementsBaseVertex #%u mode=%u count=%d base=%d\n",
+               ame209_bv_no, (unsigned)mode, (int)count, (int)basevertex);
+        ame209_draw_state("DrawRangeElementsBaseVertex");
+    }
     if (ame173_ptr_glDrawRangeElementsBaseVertex) {
         ame173_ptr_glDrawRangeElementsBaseVertex(mode, start, end, count, type, indices, basevertex);
     } else {
@@ -416,6 +499,12 @@ typedef void (*ame173_fn_glDrawElementsInstancedBaseVertex)(GLenum, GLsizei, GLe
 static ame173_fn_glDrawElementsInstancedBaseVertex ame173_ptr_glDrawElementsInstancedBaseVertex;
 void glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount, GLint basevertex) {
     AME173_RESOLVE(ame173_ptr_glDrawElementsInstancedBaseVertex, "glDrawElementsInstancedBaseVertex");
+    // Task209 (a)：盲区普查（per-section 地形提交的高概率路径）。
+    if (ame209_bv_sample(count >= 1024 || instancecount >= 4)) {
+        printf("[tinygl4angle] Task209 draw: glDrawElementsInstancedBaseVertex #%u mode=%u count=%d inst=%d base=%d\n",
+               ame209_bv_no, (unsigned)mode, (int)count, (int)instancecount, (int)basevertex);
+        ame209_draw_state("DrawElementsInstancedBaseVertex");
+    }
     if (ame173_ptr_glDrawElementsInstancedBaseVertex) {
         ame173_ptr_glDrawElementsInstancedBaseVertex(mode, count, type, indices, instancecount, basevertex);
     } else {
@@ -427,6 +516,15 @@ typedef void (*ame173_fn_glMultiDrawElementsBaseVertex)(GLenum, const GLsizei *,
 static ame173_fn_glMultiDrawElementsBaseVertex ame173_ptr_glMultiDrawElementsBaseVertex;
 void glMultiDrawElementsBaseVertex(GLenum mode, const GLsizei *count, GLenum type, const void *const *indices, GLsizei drawcount, const GLint *basevertex) {
     AME173_RESOLVE(ame173_ptr_glMultiDrawElementsBaseVertex, "glMultiDrawElementsBaseVertex");
+    // Task209 (a)：盲区普查（drawcount + 首批 count——多条绘制路径的规模现形）。
+    {
+        GLsizei ame209_c0 = (count != NULL && drawcount > 0) ? count[0] : 0;
+        if (ame209_bv_sample(ame209_c0 >= 1024 || drawcount >= 16)) {
+            printf("[tinygl4angle] Task209 draw: glMultiDrawElementsBaseVertex #%u mode=%u drawcount=%d count0=%d\n",
+                   ame209_bv_no, (unsigned)mode, (int)drawcount, (int)ame209_c0);
+            ame209_draw_state("MultiDrawElementsBaseVertex");
+        }
+    }
     if (ame173_ptr_glMultiDrawElementsBaseVertex) {
         ame173_ptr_glMultiDrawElementsBaseVertex(mode, count, type, indices, drawcount, basevertex);
     } else if (drawcount > 0) {
@@ -730,9 +828,20 @@ void glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei inst
     AME173_RESOLVE(ame203_ptr_drawArraysInst, "glDrawArraysInstanced");
     static unsigned s_ame203_dai = 0;
     unsigned ame203_no = ++s_ame203_dai;
+    // Task209 (a)+(b)：既有抽样补状态快照 + 大规模必采（count>=1024 的首
+    // 12 次 + 每 512 次——地形绘制若走本函数立即现形，且带全状态）。
     if (ame203_no <= 8 || (ame203_no % 4000) == 0) {
         printf("[tinygl4angle] Task203 draw: glDrawArraysInstanced #%u mode=%u count=%d inst=%d\n",
                ame203_no, (unsigned)mode, (int)count, (int)instancecount);
+        ame209_draw_state("DrawArraysInstanced");
+    } else if (count >= 1024 || instancecount >= 4) {
+        static unsigned s_ame209_daiBig = 0;
+        ++s_ame209_daiBig;
+        if (s_ame209_daiBig <= 12 || (s_ame209_daiBig % 512) == 0) {
+            printf("[tinygl4angle] Task209 draw: glDrawArraysInstanced BIG #%u mode=%u count=%d inst=%d first=%d\n",
+                   s_ame209_daiBig, (unsigned)mode, (int)count, (int)instancecount, (int)first);
+            ame209_draw_state("DrawArraysInstancedBIG");
+        }
     }
     if (ame203_ptr_drawArraysInst) ame203_ptr_drawArraysInst(mode, first, count, instancecount);
 }
@@ -1692,6 +1801,40 @@ void glShaderSource(GLuint shader, GLsizei count, const GLchar * const *string, 
         }
     }
 
+    // Task209 (d)：地形族 ESSL 全文 dump——前两个含 sphericalVertexDistance
+    // 的源（vanilla terrain 的 vert+frag 签名 varying）+ 前两个 >=3800 字节的
+    // 大源（sodium block_layer frag 的量级），全文带 begin/end 标记。块名/
+    // 采样器声明/精度/输出路径全可见——ES 重写若在结构上动了不该动的东西
+    // （Task183 清洗器/精度限定/输出数组复制），此处一眼定谳。上限 4 次
+    // 防刷屏；多段源只 dump 首段（MC 的上传形态 = 单段 NUL 终止）。
+    {
+        static int s_ame209_dumpN = 0;
+        if (string != NULL && count > 0 && string[0] != NULL && s_ame209_dumpN < 4) {
+            const char *ame209_src = string[0];
+            size_t ame209_l0 = (length != NULL && length[0] >= 0)
+                ? (size_t)length[0] : strlen(ame209_src);
+            int ame209_isTerrain = (strstr(ame209_src, "sphericalVertexDistance") != NULL);
+            int ame209_isBig = (ame209_l0 >= 3800);
+            int ame209_do = 0;
+            if (ame209_isTerrain) {
+                static int s_ame209_terrainN = 0;
+                if (s_ame209_terrainN < 2) { ++s_ame209_terrainN; ame209_do = 1; }
+            } else if (ame209_isBig) {
+                static int s_ame209_bigN = 0;
+                if (s_ame209_bigN < 2) { ++s_ame209_bigN; ame209_do = 1; }
+            }
+            if (ame209_do) {
+                ++s_ame209_dumpN;
+                printf("[tinygl4angle] Task209 ESSL dump #%d begin (%s, len=%zu) >>>\n",
+                       s_ame209_dumpN,
+                       ame209_isTerrain ? "terrain-signature" : "large-source",
+                       ame209_l0);
+                fwrite(ame209_src, 1, ame209_l0, stdout);
+                printf("\n[tinygl4angle] Task209 ESSL dump #%d end <<<\n", s_ame209_dumpN);
+            }
+        }
+    }
+
     // get the size of the shader sources and than concatenate in a single string
     int l = 0;
     for (int i=0; i<count; i++) l+=(length && length[i] >= 0)?length[i]:strlen(string[i]);
@@ -1996,6 +2139,21 @@ void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint *p
 void glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *data) {
     LOOKUP_FUNC(glTexImage2D)
 
+    // Task209 (c)：纹理上传格式法证（首 24 次 + 每次 >=1M 像素 + 每 4096
+    // 次——图集/光照图的 internalFormat/format/type/尺寸与 data 空否全
+    // 记录；方块透明若源于图集 alpha 通道异常将在此现形）。
+    {
+        static unsigned s_ame209_texi = 0;
+        unsigned ame209_px = (unsigned)width * (unsigned)height;
+        ++s_ame209_texi;
+        if (s_ame209_texi <= 24 || ame209_px >= 1000000u || (s_ame209_texi % 4096) == 0) {
+            printf("[tinygl4angle] Task209 tex: glTexImage2D #%u target=0x%04X level=%d ifmt=0x%04X fmt=0x%04X type=0x%04X %dx%d data=%s\n",
+                   s_ame209_texi, (unsigned)target, (int)level, (unsigned)internalformat,
+                   (unsigned)format, (unsigned)type, (int)width, (int)height,
+                   (data == NULL) ? "NULL" : "ptr");
+        }
+    }
+
     if (type == GL_UNSIGNED_INT_8_8_8_8_REV) {
         type = GL_UNSIGNED_BYTE;
     }
@@ -2018,6 +2176,18 @@ void glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsizei widt
 
 void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *data) {
     LOOKUP_FUNC(glTexSubImage2D)
+    // Task209 (c)：子图集上传同格式取证（图集拼接的主要路径）。
+    {
+        static unsigned s_ame209_subi = 0;
+        unsigned ame209_px = (unsigned)width * (unsigned)height;
+        ++s_ame209_subi;
+        if (s_ame209_subi <= 24 || ame209_px >= 1000000u || (s_ame209_subi % 4096) == 0) {
+            printf("[tinygl4angle] Task209 tex: glTexSubImage2D #%u target=0x%04X level=%d fmt=0x%04X type=0x%04X %dx%d at(%d,%d) data=%s\n",
+                   s_ame209_subi, (unsigned)target, (int)level, (unsigned)format,
+                   (unsigned)type, (int)width, (int)height, (int)xoffset, (int)yoffset,
+                   (data == NULL) ? "NULL" : "ptr");
+        }
+    }
     if (type == GL_UNSIGNED_INT_8_8_8_8_REV) {
         type = GL_UNSIGNED_BYTE;
     }

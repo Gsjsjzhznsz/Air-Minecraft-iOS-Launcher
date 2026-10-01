@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """verify_task208.py -- Task208 verification (99a61eb three-renderer verdict).
 
-A. ANGLE push-constant block-NAME root fix (rename redirect var<->type)
+A. ANGLE push-constant redirect -- RETIRED by Task209 (red herring: 26.3 has
+   zero PC blocks; see the adjudication comment in spvc_shim.c). A-section now
+   verifies the retirement itself.
 B. NG-GL4ES initialization-timing root fix (NO_INIT_CONSTRUCTOR + host boot)
 C. JVM-fatal abort pass-through (no more wedged-app-after-crash)
 D. version.h addendum + cascade (task206 43/43, syntax gates)
@@ -31,36 +33,44 @@ def run(cmd, timeout=300):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=REPO)
 
 
-# ============ A. ANGLE push-constant 块名根修 ============
-print("== A. ANGLE 方块透明（块名碰撞）根修 ==")
+# ============ A. ANGLE push-constant：Task209 红鲱鱼退役验证 ============
+print("== A. ANGLE push-constant 重定向（Task209 已退役——红鲱鱼）==")
 shim = rd("Natives/spvc_shim.c")
 log = rd("latestlog.old.txt")  # 99a61eb ANGLE 会话
+log2 = rd("latestlog.txt")     # 59b4f25 ANGLE 会话（88fa3f6 上传）
 
-check("A1 装机证据（99a61eb latestlog.old.txt）：选项已装但仍 NOT FOUND",
+check("A1 历史装机证据（99a61eb）：选项已装但仍 NOT FOUND（红鲱鱼的起点）",
       "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER enabled on ES compiler" in log
       and log.count("name='_push_constants') -> 4294967295") >= 5
       and "name='_uniform_00_00') -> 0" in log,
       f"notfound={log.count(chr(39) + '_push_constants')}")
 
-check("A2 扫描器在位（OpTypePointer 32 / OpVariable 59 / storage 9 全字面量）",
-      "static int ame208_find_push_constant" in shim
-      and "op == 32u" in shim and "op == 59u" in shim
-      and "words[off + 2] == 9u" in shim and "words[off + 3] == 9u" in shim)
+check("A2 退役证据（59b4f25 latestlog.txt）：重定向锚点 0 命中 = 从未触发",
+      log2.count("Task208: push-constant block rename redirected") == 0
+      and log2.count("name='_push_constants') -> 4294967295") >= 100
+      and "Commit: 59b4f25" in log2,
+      f"redirectAnchors={log2.count('Task208: push-constant block rename redirected')}")
 
-check("A3 重定向逻辑（pcType 命中改写 pcVar + 计数）",
-      "orig->names[i].id == ame208_pcType" in shim
-      and "real_set_name(es_compiler, ame208_pcVar, orig->names[i].name);" in shim)
+check("A3 重定向代码彻底移除（扫描器/重定向分支/锚点日志三不复存在；注释里的退役记述合法保留）",
+      "ame208_find_push_constant(" not in shim
+      and "ame208_pcVar" not in shim
+      and "ame208_redirected" not in shim
+      and "[spvc-shim] Task208: push-constant block rename redirected" not in shim)
 
-check("A4 装机锚点日志（重定向生效的一次性打点）",
-      "[spvc-shim] Task208: push-constant block rename redirected" in shim)
+check("A4 重放回归纯形态（原样 id 逐条转发 + 无任何 id 改写）",
+      "real_set_name(es_compiler, orig->names[i].id, orig->names[i].name);" in shim
+      and "Task209：纯重放（原样 id）" in shim)
 
-check("A5 扫描器健壮性（字数/畸形早退 + 单块保守门）",
-      "word_count < 5" in shim and "wc == 0 || off + wc > word_count" in shim
-      and "ame208_varPtr != ame208_ptr" in shim)
+check("A5 Task209 定谳注释在位（零 PC 块 + 双命名 + 选项已开 + 反编译出处）",
+      "Task209（红鲱鱼清算）" in shim
+      and "零 push_constant 块" in shim
+      and "_push_constants_instance" in shim
+      and "0x2000021" in shim
+      and "renameDescriptors case 9" in shim)
 
-check("A6 函数头病历（emit_buffer_block_native 碰撞机制 + 复现出处）",
-      "emit_buffer_block_native" in shim and "回退成【PC 变量的原始名】" in shim
-      and "SPIRV-Cross a0fba56" in shim)
+check("A6 Task206 选项保留（未来真 PC 块版本需要；与 MC 桌面选项集一致）",
+      "AME206_OPTION_GLSL_PUSH_CONST_AS_UBO" in shim
+      and '"[spvc-shim] Task206: EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER "' in shim)
 
 # ============ B. NG-GL4ES 初始化时序根修 ============
 print("== B. NG-GL4ES 初始化时序根修 ==")

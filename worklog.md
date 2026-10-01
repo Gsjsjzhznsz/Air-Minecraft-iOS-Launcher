@@ -1325,3 +1325,29 @@ Work Log:
 Stage Summary:
 - Task208 全链闭环：三渲染器根修（NG-GL4ES 时序 + ANGLE 块名 + JVM abort 直通）+ 验证器 24/24 + CI 绿，新 IPA 就绪
 - 装机验证锚点（Task208 编号）：①NG 会话 "[egl_bridge] Task208: NG-GL4ES initialize_gl4es() called post-MakeCurrent (resolver=YES, ...)" + "Initialising Krypton Wrapper" 出现在 Task146 make-current 之后 + 不再崩溃/僵死；②ANGLE 会话 "[spvc-shim] Task208: push-constant block rename redirected to the variable id" + Task205 blockIdx 探针 _push_constants >= 0 + 方块不透明；③1.8.9 老版本材质损坏用户换 NG-GL4ES（vgpu 接替者）
+
+---
+Task ID: 209
+Agent: main (Super Z)
+Task: 88fa3f6 装机日志判读（59b4f25 构建）→ ANGLE 方块透明"PC 红鲱鱼"定谳与退役 + 用户点名改名 NG-GL4ES→Krypton Wrapper（≤26.2）+ 四叉取证探针
+
+Work Log:
+- 判读（88fa3f6 上传 latestlog.txt，11359→11503 行，构建 59b4f25 = Task208 全部修复在场）：ANGLE 26.3 fabric 会话（iris/sodium/ETF 等 20+ 模组），进世界游玩约 25 秒后 FastQuit 退出，fps=60、swapOK=2186、零 GL 错误、32 着色器全 COMPILE_STATUS=1、terrain 程序 _uniform_00_00..03 全命中 + uboBind=98 活跃——编译/UBO 链全绿；但 _push_constants 仍 203×NOT FOUND 且 Task208 重定向锚点 0 命中
+- 红鲱鱼定谳（本轮最大成果，双铁证）：
+  * 铁证一（资产面）：下载 client-263.jar（piston-data e877b6a，sha1 校验过）解包——jar 内 63 个 core shaders + 全部 include（fog/globals/projection/dynamictransforms/terrainglobals/chunksection/light/sample_lightmap/texture_sampling/oit 族）【零 push_constant 声明】；26.3 一切逐绘制数据走 std140 UBO（DynamicTransforms/Projection/Fog/Globals/TerrainUniform/Lighting/ChunkSection）
+  * 铁证二（代码面）：CFR 反编译 GlPipelineRecompiler.decompileShader + SPIRVModule.doReflection + GlslCompiler.compileToSpv——①MC 无条件对每个管线查询 _push_constants 块名（管线布局有 PC 槽位但 26.3 着色器不声明，桌面 GL 同样 NOT FOUND = 正常现象）②MC 的 renameDescriptors case 9 对 PC 是双命名（resource.id→"_push_constants_instance" + base_type_id→"_push_constants"）③MC 自己在桌面编译器上就开 EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER（0x2000021=true）+ 版本 330 + ES=false——结论：Task205 重放（原样 id）+ Task206 选项镜像已与桌面行为完全一致，Task208 的"重定向到变量 id"从前提到结论全错（本地手工复现的"块名碰撞"在真实 MC SPIR-V 上不存在，装机锚点 0 命中正是 SPIR-V 里没有 PC 的直接后果）
+  * 顺带解密：backend=0 编译器 = SPIRVModule.doReflection 的反射专用编译器（每着色器一个 context）；shaderc target_env=0/version=0x402000 = Vulkan1.2；compile#1 len=632 与 gui.vsh 字节数逐位吻合（判读坐标校准）
+- 真实病灶现状（诚实记录）：编译/绑定/错误全绿 + 同整合包在 Zink 上正常 → 病因在 ANGLE 特有路径（ES 重写/桥接/状态），但现有探针全盲：绘制普查只覆盖 glDrawArraysInstanced（全样本 count=3/6 字形级小三角形），Task173 的 BaseVertex 族转发（glDrawElementsBaseVertex/RangeElements/ElementsInstanced/MultiDrawElements 的 BaseVertex 变体 = 地形提交高概率路径）【零探针】——无法排除"地形压根没画"。end_of_frame 后处理警告 = jar 里本就没有该 post effect（桌面同样警告，红鲱鱼#3 排除）
+- 改名（用户点名"把no gl4se改名Krypton Wrappen（≤26.2）"；按上游启动横幅 "Initialising Krypton Wrapper" 判定 Wrappen=Wrapper 笔误，≤26.2 对偶 MoltenVK 的"26.2+"命名惯例）：五面落地——①l10n 四主语言 preference.title.renderer.debug.nggl4es = "Krypton Wrapper（≤26.2）- ZL2 同款 gl4es，老版本首选（原 NG-GL4ES）"（en 用半角括号）②VersionManager 短名表 ③AI 友好名 "Krypton Wrapper/NG-GL4ES (libnggl4es.dylib)" + AI 提示词键表两处带新名（旧名保留供对话兼容）④FAQ 五份（渲染器选择条目 bullet+记法句 + 专属条目改题 "Krypton Wrapper（原 NG-GL4ES）是什么？"，全语言别名保留）⑤存储键 libnggl4es.dylib 不动（零迁移，存量选择零影响）
+- 四叉取证探针（tinygl4angle.c，下轮装机一击定位）：(a) BaseVertex 族统一计数+抽样（首 8 + 每 4000 + 大规模必采首 12 + 每 512）(b) 抽样绘制点状态快照 ame209_draw_state（blend/src/dst/depth/func/colorMask/drawFb + 纹理单元 0-3 绑定，active texture 查后恢复）(c) glTexImage2D/glTexSubImage2D 格式法证（首 24 + ≥1M 像素 + 每 4096，ifmt/fmt/type/尺寸/data 空否）(d) 地形族 ESSL 全文 dump（前两个含 sphericalVertexDistance 的源 + 前两个 ≥3800 字节大源，begin/end 标记，上限 4 次防刷屏）+ glDrawArraysInstanced 大规模通道（count≥1024 必采）；stub gl.h 补九个枚举（值对 vgpu const.h/gles.h 核验：GL_BLEND_SRC_RGB=0x80C9 等；Task205c 同款"stub 缺口"堵截）
+- Task208 幽灵重定向移除（spvc_shim.c）：ame208_find_push_constant 函数 + 重定向分支 + 锚点日志三删，函数头换 Task209 定谳注释（反编译证据全文）；重放回归纯形态；Task206 选项保留
+- 公告 task209-krypton-rename-2026-10-01 @2 插入（30→31，文本级手术保 1 空格缩进；首轮 json.dump 全文件重排事故已回滚重做）：改名通告 + ANGLE 诚实状态（含对使用者的道歉）；version.h REVISION 18 Task209 附录（尾部 SEP 不变量保持）
+- 级联维护（@2 插入的机械 +1 位移，家法）：202（H 计数 31 + [27]→[28] + 索引锚 [3]/[4]→[4]/[5]）/203/196 家族/206（F5/F6 + E4/E6 改名重锚 + F4 FAQ 新名锚）/207（E 门 + 元锚块 + task190@6）全套重锚；**存量断锚顺手修复**（纯净 HEAD 复跑实锤同败，Task208 D1a 先例）：177（D2 l10n 2157→2419 + E1 len 27→31 + E3 ann[11]）、178（E1 len + E2 [10..18]→[11..19] + E3 ann[10] + D2 2419）、168（D1 [18]→[19] + D2 t168=anns[19]，anns[16] 自 Task190 轮起指错位）、174（E1 [8..18]→[9..19] + E2 t174=anns[13]）、165（G1 窗口 23→24）、167（E1 窗口 21→22）
+- 已知存量漂移（纯净 HEAD 同败，非本轮引入）：134 E4b（并行会话日志上传轮换）→ 168 E7/174 G1 的漂移明细只引用该条；177/178 的 G 级联在沙箱累计 CPU 配额下超时（exit=124，直接检查项全绿，Task108 时代已知约束）
+- 验证：verify_task209（A 改名五面 + B 红鲱鱼退役 + C 探针锚点 + D 文档级联）；复跑全绿：206 43/43、208 24/24、202 57/57、203 32/32、196 家族 51/51、193 86/0、207 PASS 32 FAIL 0、165 34/34、166 64/64、167 31/31、173 123/0、190 59/0、177/178 直接项全绿（G 级联沙箱超时）、168 42/43（仅 E7 存量）、174 仅 G1 存量；task193 tinygl 语法门 SYNTAX OK（stub 扩枚举后）；spvc_shim gcc -fsyntax-only 干净
+
+Stage Summary:
+- ANGLE 方块透明：两轮 PC 修复正式定性为红鲱鱼（26.3 零 PC 块 + MC 双命名 + 桌面同选项），本轮移除幽灵代码 + 埋四叉探针（绘制族普查/状态快照/纹理格式/ESSL dump）——下轮装机日志预期一击定位真因（候选：地形未提交绘制/BaseVertex 路径状态异常/图集 alpha 异常/ES 重写结构缺陷）
+- 改名生效：渲染器列表显示 "Krypton Wrapper（≤26.2）"，存储与 AI 映射兼容旧名，FAQ/公告同步；装机后用户在 设置→视频设置→渲染器 即见新名
+- 装机验证锚点：①"[tinygl4angle] Task209 draw: glDrawElements*BaseVertex #N ..."（地形提交路径现形）②"[tinygl4angle] Task209 state (...): blend=... mask=... drawFb=..." ③"[tinygl4angle] Task209 tex: glTexImage2D ... ifmt=..." ④"[tinygl4angle] Task209 ESSL dump #N begin (terrain-signature...) >>>"
+- CI 待推送确认

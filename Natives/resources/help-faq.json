@@ -6,7 +6,7 @@
         {
           "icon": "cpu",
           "title": "渲染器应该怎么选？各渲染器是什么原理？",
-          "description": "渲染器在 设置 → 视频设置 → 渲染器 中选择（游戏未运行时才能改）：\n\n• Zink：把游戏的 OpenGL 转译到系统 Vulkan 栈上运行（GL→Vulkan→Metal），适合 26.x 新版本和装了模组的场景，区块加载更流畅；\n• MobileGlues：OpenGL→Metal 转译层，兼容性好，适合轻量场景和老版本；加载区块时每帧转译开销较大（安卓设备同样如此，属已知特性）；\n• LTW：轻量级 OpenGL 3.3→ES 转译层（与安卓端同源），开销小，适合 1.21.x 及更早的轻量版本；不支持 MC 26.x（见下一条）；\n• NG-GL4ES：ZL2 启动器同款的 gl4es（Krypton Wrapper），着色器经 glslang+SPIRV-Cross 双段转译，官方口径几乎全版本 MC 可跑（老版本到 26.x）；接替 VGPU 的位置——老版本遇到材质损坏、图集错位时优先换它；\n• MoltenVK：独立的渲染器，直接把 Vulkan API 映射到 Metal。MC 26.2+ 可在 游戏内 视频设置 → 图形 切到 Vulkan 后端配合使用（配合帧率解锁可超过屏幕刷新率）；它和 Zink 是两个互相独立的选项——Zink 用的是系统 Vulkan 栈，不等于\"选择 MoltenVK 渲染器\"；\n• 自动：由启动器按版本自动选择。\n\n简单记法：玩新版本/整合包用 Zink；老版本优先 NG-GL4ES（轻量场景也可 MobileGlues/LTW）；需要 Vulkan 后端时选 MoltenVK。"
+          "description": "渲染器在 设置 → 视频设置 → 渲染器 中选择（游戏未运行时才能改）：\n\n• Zink：把游戏的 OpenGL 转译到系统 Vulkan 栈上运行（GL→Vulkan→Metal），适合 26.x 新版本和装了模组的场景，区块加载更流畅；\n• MobileGlues：OpenGL→Metal 转译层，兼容性好，适合轻量场景和老版本；加载区块时每帧转译开销较大（安卓设备同样如此，属已知特性）；\n• LTW：轻量级 OpenGL 3.3→ES 转译层（与安卓端同源），开销小，适合 1.21.x 及更早的轻量版本；不支持 MC 26.x（见下一条）；\n• Krypton Wrapper（≤26.2，原 NG-GL4ES）：ZL2 启动器同款的 gl4es，着色器经 glslang+SPIRV-Cross 双段转译，官方口径几乎全版本 MC 可跑（老版本到 26.x）；接替 VGPU 的位置——老版本遇到材质损坏、图集错位时优先换它；\n• MoltenVK：独立的渲染器，直接把 Vulkan API 映射到 Metal。MC 26.2+ 可在 游戏内 视频设置 → 图形 切到 Vulkan 后端配合使用（配合帧率解锁可超过屏幕刷新率）；它和 Zink 是两个互相独立的选项——Zink 用的是系统 Vulkan 栈，不等于\"选择 MoltenVK 渲染器\"；\n• 自动：由启动器按版本自动选择。\n\n简单记法：玩新版本/整合包用 Zink；老版本优先 Krypton Wrapper（轻量场景也可 MobileGlues/LTW）；需要 Vulkan 后端时选 MoltenVK。"
         },
         {
           "icon": "bolt.trianglebadge.exclamationmark",
@@ -15,8 +15,8 @@
         },
         {
           "icon": "cpu",
-          "title": "NG-GL4ES 是什么？和 VGPU、gl4es 什么关系？",
-          "description": "NG-GL4ES（Krypton Wrapper）是 ZalithLauncher 2 所用的 gl4es 分支：桌面 OpenGL 转译到 OpenGL ES，着色器经 glslang（GLSL→SPIR-V）+ SPIRV-Cross（SPIR-V→ESSL）双段转换，与 VGPU 的内置转换管线不同路。\n\n什么时候选它：\n• 老版本（1.8.9 等 Forge 生态）在 VGPU 下出现材质损坏、图集错位、条纹（该病灶两轮修复未根除，属转译层顽疾）——换 NG-GL4ES 是首选对策；\n• 官方口径几乎全版本 MC 可跑，26.x 新版本也可尝试（不行再换 Zink）；\n• 进阶参数可放 config.json 于游戏目录 ngg/ 下（一般用不到）。\n\n选择路径：设置 → 视频设置 → 渲染器 → NG-GL4ES（游戏未运行时才能改）。"
+          "title": "Krypton Wrapper（原 NG-GL4ES）是什么？和 VGPU、gl4es 什么关系？",
+          "description": "Krypton Wrapper（≤26.2，原名 NG-GL4ES）是 ZalithLauncher 2 所用的 gl4es 分支：桌面 OpenGL 转译到 OpenGL ES，着色器经 glslang（GLSL→SPIR-V）+ SPIRV-Cross（SPIR-V→ESSL）双段转换，与 VGPU 的内置转换管线不同路。\n\n什么时候选它：\n• 老版本（1.8.9 等 Forge 生态）在 VGPU 下出现材质损坏、图集错位、条纹（该病灶两轮修复未根除，属转译层顽疾）——换 Krypton Wrapper 是首选对策；\n• 官方口径几乎全版本 MC 可跑，26.x 新版本也可尝试（不行再换 Zink）；\n• 进阶参数可放 config.json 于游戏目录 ngg/ 下（一般用不到）。\n\n选择路径：设置 → 视频设置 → 渲染器 → Krypton Wrapper（≤26.2）（游戏未运行时才能改）。"
         },
         {
           "icon": "speedometer",

@@ -23,6 +23,18 @@
    "action_title": "",
    "image_url": ""
   },
+ {
+  "id": "task209-krypton-rename-2026-10-01",
+  "title": "渲染器改名：NG-GL4ES → Krypton Wrapper（≤26.2）+ ANGLE 方块透明调查状态",
+  "date": "2026-10-01",
+  "summary": "渲染器列表里的 NG-GL4ES 更名为 Krypton Wrapper（≤26.2）——老版本（1.8.9 等）的首选渲染器，对齐上游启动横幅；存储值不变，已选设备零影响。ANGLE 方块透明：上两轮的 push constants 修复判断有误（26.3 着色器本就没有 push constants 块，查询不到属正常现象），本轮已埋全套绘制/纹理/着色器取证探针，下轮装机日志将直接定位真因。",
+  "content": "## 渲染器改名：NG-GL4ES → Krypton Wrapper（≤26.2）\n\n设置 → 视频设置 → 渲染器 里的 NG-GL4ES 更名为 Krypton Wrapper（≤26.2）（对齐上游启动横幅 \"Initialising Krypton Wrapper\"；存储值不变，已选设备零影响）。它依然是老版本（1.8.9 等 Forge 生态，尤其是 VGPU 下材质损坏/图集错位）的首选渲染器；26.3+ 新版本建议用 Zink / ANGLE / Metal。\n\n## ANGLE 方块透明：诚实状态更新\n\n上两个构建对 ANGLE 方块透明的修复（push constants 块相关）判断有误：经反编译 26.3 客户端定谳，26.3 的全部着色器根本没有 push constants 块，日志里 _push_constants 查询不到是正常现象（红鲱鱼）。本轮已在绘制调用（BaseVertex 族全量普查）、绘制时混合/深度/遮罩状态、纹理上传格式、地形着色器 ES 源码四个方向埋好取证探针——下一轮装机日志将直接定位真实病因。给使用者带来两轮无效修复的困扰，抱歉。\n\n---\n\nThe NG-GL4ES entry in the renderer list is renamed to Krypton Wrapper (<=26.2), matching the upstream boot banner; stored selections are unaffected. Honest status on the ANGLE transparent-blocks issue: the previous two push-constants fixes were chasing a red herring (26.3 shaders contain no push-constant blocks at all -- the failing query is normal). Full diagnostic probes (draw census incl. the BaseVertex family, draw-time blend/depth/mask state, texture upload formats, terrain ESSL source dumps) are now in place; the next device log will pin the real cause.",
+  "priority": null,
+  "action_url": null,
+  "action_title": null,
+  "image_url": null,
+  "pin": false
+ },
   {
    "id": "task207-shortcuts-instance-cards-2026-10-01",
    "title": "实例选择页快捷指令化：竖卡双列网格 + 点卡即选用 + ⋯ 纯编辑 + 内缩高亮环",

@@ -121,3 +121,14 @@ void glGetIntegerv(GLenum pname, GLint *params);
 typedef signed char GLbyte;
 void glVertexAttrib4fv(GLuint index, const GLfloat *v);
 #define GL_VENDOR 0x1F00
+/* Task209: 绘制状态快照探针所需枚举（值对照 vgpu const.h/gles.h 与 GL 规范核验；
+ * 真机构建用 Apple SDK 的 GL/gl.h 自带全部定义——本 stub 补缺防语法门逃逸） */
+#define GL_BLEND_SRC_RGB 0x80C9
+#define GL_BLEND_DST_RGB 0x80C8
+#define GL_DEPTH_TEST 0x0B71
+#define GL_DEPTH_FUNC 0x0B74
+#define GL_COLOR_WRITEMASK 0x0C23
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#define GL_ACTIVE_TEXTURE 0x84E0
+#define GL_TEXTURE0 0x84C0
+#define GL_TEXTURE_BINDING_2D 0x8069

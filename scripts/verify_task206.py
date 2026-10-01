@@ -191,8 +191,8 @@ check("E3 rendererCandidates 末位追加（NGGL4ES 在 METAL 之后 = 索引稳
       and '@ RENDERER_NAME_NGGL4ES,\n          @"name": localize(@"preference.title.renderer.debug.nggl4es", nil),\n          @"file": @ RENDERER_NAME_NGGL4ES}' in lp)
 
 vm = rd("Natives/VersionManagerViewController.m")
-check("E4 VersionManager 短名（NG-GL4ES）",
-      '@ RENDERER_NAME_NGGL4ES: @"NG-GL4ES"' in vm)
+check("E4 VersionManager 短名（Task209 重锚：Krypton Wrapper）",
+      '@ RENDERER_NAME_NGGL4ES: @"Krypton Wrapper"' in vm)
 
 jl = rd("Natives/JavaLauncher.m")
 check("E5 JavaLauncher NGG_DIR_PATH 块（POJAV_HOME/ngg + Task206 日志锚）",
@@ -200,11 +200,11 @@ check("E5 JavaLauncher NGG_DIR_PATH 块（POJAV_HOME/ngg + Task206 日志锚）"
       and "[JavaLauncher] Task206: NG-GL4ES renderer active" in jl)
 
 ai = rd("Natives/AI/AiSettingsTools.m")
-check("E6 AI 双向映射（nggl4es 在 gl4es 之前 = 子串包含序 + friendlyName + 两处 summary）",
+check("E6 AI 双向映射（nggl4es 在 gl4es 之前 = 子串包含序 + friendlyName；Task209 重锚改名后新名在前）",
       0 <= ai.find('containsString:@"nggl4es"') < ai.find('containsString:@"gl4es"])')
       and ai.find('containsString:@"nggl4es"') < ai.find('return @(RENDERER_NAME_GL4ES)')
-      and 'return @"NG-GL4ES/Krypton (libnggl4es.dylib)"' in ai
-      and ai.count("NG-GL4ES") >= 3)
+      and 'return @"Krypton Wrapper/NG-GL4ES (libnggl4es.dylib)"' in ai
+      and ai.count("Krypton Wrapper") >= 3)
 
 check("E7 LWJGL 名字兼容（libnggl4es.dylib 匹配 DYLIB 正则，无连字符陷阱）",
       re.match(r"(?:^|/)lib\w+(?:[.]\d+)*[.]dylib$", "libnggl4es.dylib") is not None
@@ -252,26 +252,27 @@ sel_ok = True
 for rel, _, in [("Natives/resources/help-faq.json", 0)]:
     d = json.load(open(os.path.join(REPO, rel), encoding="utf-8"))
     sel = d["categories"][0]["items"][0]["description"]
-    if "NG-GL4ES" not in sel or "老版本优先 NG-GL4ES" not in sel:
+    # Task209 重锚：条目更名 Krypton Wrapper（≤26.2）后，新名 + 旧名别名 + 记法句三锚
+    if "Krypton Wrapper（≤26.2，原 NG-GL4ES）" not in sel or "老版本优先 Krypton Wrapper" not in sel:
         sel_ok = False
 en_sel = json.load(open(os.path.join(REPO, "Natives/resources/en.lproj/help-faq.json"),
                         encoding="utf-8"))["categories"][0]["items"][0]["description"]
 ht_sel = json.load(open(os.path.join(REPO, "Natives/resources/zh-Hant.lproj/help-faq.json"),
                         encoding="utf-8"))["categories"][0]["items"][0]["description"]
-check("F4 渲染器选择条目更新（NG-GL4ES bullet + 记法句；zh/en/zh-Hant 三语）",
-      sel_ok and "NG-GL4ES first" in en_sel and "老版本優先 NG-GL4ES" in ht_sel)
+check("F4 渲染器选择条目（Task209 重锚：Krypton Wrapper 新名 + 原名别名 + 记法句；zh/en/zh-Hant 三语）",
+      sel_ok and "Krypton Wrapper first" in en_sel and "老版本優先 Krypton Wrapper" in ht_sel)
 
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
-check("F5 公告 30 且末位为 task206-nggl4es-2026-10-01（Task207 重锚：@2 插入 29→30）",
-      len(ann) == 30 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+check("F5 公告 31 且末位为 task206-nggl4es-2026-10-01（Task209 重锚：@2 插入 30→31）",
+      len(ann) == 31 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and "NG-GL4ES" in ann[-1]["title"] and "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER" in ann[-1]["content"])
 
 anchor_ok = ('== [12, 4, 7, 15]' in rd("scripts/verify_task202.py")
              and '== [12, 4, 7, 15]' in rd("scripts/verify_task168.py")
-             and "len(ann) == 30" in rd("scripts/verify_task203.py")
-             and "len(ann) == 30" in rd("scripts/verify_task202.py")
-             and "len(ann) == 30" in rd("scripts/verify_task196_197_198_201.py"))
-check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族；Task207 重锚 29→30）", anchor_ok)
+             and "len(ann) == 31" in rd("scripts/verify_task203.py")
+             and "len(ann) == 31" in rd("scripts/verify_task202.py")
+             and "len(ann) == 31" in rd("scripts/verify_task196_197_198_201.py"))
+check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族；Task209 重锚 30→31）", anchor_ok)
 
 # ============ G. version.h ============
 print("== G. version.h 附录 ==")

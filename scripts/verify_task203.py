@@ -164,8 +164,8 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("H", "version.h Task203 附录（no bump + vtool 病历）",
       "Task 203, no bump" in vh and "vtool" in vh and "ZERO-WIPED" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))['announcements']
-check("H", "公告末位是 task206-nggl4es（Task207 重锚：@2 插入后 29→30）",
-      len(ann) == 30 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01')
+check("H", "公告末位是 task206-nggl4es（Task209 重锚：@2 插入后 30→31）",
+      len(ann) == 31 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01')
 bundled = open(os.path.join(REPO, "Natives/resources/help-faq.json"), 'rb').read()
 rootfaq = open(os.path.join(REPO, "help-faq.json"), 'rb').read()
 check("H", "FAQ 根/随包副本逐字节一致（verify_task168 契约）", bundled == rootfaq)

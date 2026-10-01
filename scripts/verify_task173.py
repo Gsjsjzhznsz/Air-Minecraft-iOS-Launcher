@@ -258,16 +258,16 @@ ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
 # Task179 重锚：task179@2 插入，全体非钉位再顺延 +1；task178 自 anns[2] -> anns[3]。
 # Task207 重锚：task207@2 插入，全体非钉位再顺延 +1（184/190/193/196/201/206/207 累计）。
-check("M3 announcement at index 10 (Task207 重锚：task207@2 插入后 ten-fixes@14、toggle-173@13、174@12、175@11、177@10、178@9、179@8、180@7、184@6)",
-      ann["announcements"][14]["id"] == "task173-ten-fixes-2026-09-26"  # Task184+190+193+196+201+207 各 +1
-      and ann["announcements"][13]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann["announcements"][12]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann["announcements"][11]["id"] == "task175-six-fixes-2026-09-26"
-      and ann["announcements"][10]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann["announcements"][9]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and ann["announcements"][8]["id"] == "task179-eight-fixes-2026-09-26"
-      and ann["announcements"][7]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and ann["announcements"][6]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27")
+check("M3 announcement at index 10 (Task209 重锚：task209@2 插入后 ten-fixes@15、toggle-173@14、174@13、175@12、177@11、178@10、179@9、180@8、184@7)",
+      ann["announcements"][15]["id"] == "task173-ten-fixes-2026-09-26"  # Task184+190+193+196+201+207 各 +1
+      and ann["announcements"][14]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][13]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann["announcements"][12]["id"] == "task175-six-fixes-2026-09-26"
+      and ann["announcements"][11]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann["announcements"][10]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and ann["announcements"][9]["id"] == "task179-eight-fixes-2026-09-26"
+      and ann["announcements"][8]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and ann["announcements"][7]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")

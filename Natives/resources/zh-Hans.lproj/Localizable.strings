@@ -265,7 +265,7 @@
 "preference.title.renderer.debug.mobilegl" = "MobileGL（Vulkan 直呈·默认）- GL→Vulkan→Metal，无逐帧回读";
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL（GLES 后端）- GL→OpenGL ES，实验性";
 "preference.title.renderer.debug.metal" = "Metal (metallum)";
-"preference.title.renderer.debug.nggl4es" = "NG-GL4ES（Krypton Wrapper）- ZL2 同款 gl4es，几乎全版本可用";
+"preference.title.renderer.debug.nggl4es" = "Krypton Wrapper（≤26.2）- ZL2 同款 gl4es，老版本首选（原 NG-GL4ES）";
 
 "preference.detail.renderer" = "更改使用的 OpenGL 渲染器";
 

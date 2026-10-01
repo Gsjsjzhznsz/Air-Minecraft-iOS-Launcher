@@ -3471,3 +3471,53 @@
 //     + bracket balance (egl_bridge/main_hook/spvc_shim) + gcc
 //     -fsyntax-only on spvc_shim.c and the vendored hardext.c all clean.
 // ============================================================================
+
+// REVISION 18 addendum (Amethyst Task 209, 2026-10-01, no bump): renderer
+//     rename + the push-constant red-herring retirement.
+// (1) User-ordered rename: the NG-GL4ES entry is now displayed as
+//     "Krypton Wrapper (<=26.2)" (upstream boot banner parity, matching the
+//     MoltenVK "(26.2+)" convention on the other side of the version line).
+//     Surfaces: four main-language Localizable.strings, the (dormant)
+//     VersionManager short-name table, the AI reverse-mapping friendly name
+//     (new name first, old kept for chat compatibility), and the FAQ
+//     renderer entries across all five copies (alias retained: "formerly
+//     NG-GL4ES"). Storage key libnggl4es.dylib untouched -- zero migration.
+// (2) Red-herring retirement (spvc_shim.c): the Task208 push-constant
+//     rename redirect is REMOVED. Device log 88fa3f6 (build 59b4f25) shows
+//     the redirect anchor firing 0 times while _push_constants probes stay
+//     NOT FOUND x203; decompiling client-263.jar (CFR, task209_decomp)
+//     settles both facts: (a) every 26.3 shader (63 core shaders + all
+//     includes) contains ZERO push-constant blocks -- MC queries the PC
+//     block name unconditionally per pipeline layout, so GL_INVALID_INDEX
+//     is the normal desktop-parity outcome, and Task206's option +
+//     Task208's redirect were both chasing a target that does not exist;
+//     (b) MC's renameDescriptors does DUAL naming (resource.id ->
+//     "_push_constants_instance" + base_type_id -> "_push_constants") and
+//     MC itself sets EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER (0x2000021) on
+//     its desktop compiler -- for any future PC-carrying shader the plain
+//     replay + option already matches desktop exactly, the redirect would
+//     have actively broken the dual naming. The Task205 blockIdx probe
+//     stays (it is what exposed the red herring).
+// (3) ANGLE transparent blocks (STILL OPEN -- honest status): with the PC
+//     theory dead, the 59b4f25 session shows compile chain all green (32
+//     shaders COMPILE_STATUS=1, sodium's #version 460 frag survives the
+//     option-path ES rewrite), UBO chain healthy (terrain
+//     _uniform_00_00..03 resolve + bind), zero GL errors, 60fps -- yet the
+//     draw census only ever sampled count=3/6 glyph-sized
+//     glDrawArraysInstanced calls because the Task173 BaseVertex family
+//     forwarders carry no probes at all (terrain submission is invisible
+//     to the census). Task209 instruments four directions in
+//     tinygl4angle.c: (a) BaseVertex-family draw census with big-count
+//     mandatory sampling; (b) draw-time state snapshots (blend src/dst,
+//     depth func, colorMask, drawFb, texture-unit 0-3 bindings) on every
+//     sampled draw; (c) texture upload forensics (glTexImage2D/
+//     TexSubImage2D internalFormat/format/type/dims -- first 24 + >=1Mpx +
+//     every 4096th); (d) terrain ESSL full-source dumps (first two
+//     sphericalVertexDistance sources + first two >=3800-byte sources,
+//     begin/end markers). Stub gl.h gained the nine enums the state probe
+//     needs (values cross-checked against vgpu const.h/gles.h).
+// Verification: verify_task209 (A rename surfaces, B redirect retirement,
+//     C probe anchors, D docs + cascade incl. the 30->31 announcement
+//     re-anchor family); task193 tinygl syntax gate re-run clean; gcc
+//     -fsyntax-only on spvc_shim.c clean.
+// ============================================================================

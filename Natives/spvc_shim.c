@@ -868,56 +868,28 @@ static char *ame183_sanitize_essl(const char *essl) {
     return c_fixed;
 }
 
-/// Task208：在留存的 SPIR-V 字里定位 push-constant 块的 变量 id 与 类型 id。
-/// 扫描 OpTypePointer(32) 的 storage==PushConstant(9)（result, storage, pointee），
-/// 再扫 OpVariable(59) 的 storage==9（type, result, storage）。仅支持单块形态
-/// （SPIR-V 每入口点至多一个 push-constant 块；变量指针类型与记录的 PC 指针
-/// 类型不匹配时保守放弃）。返回 1 = 找到（*pc_var/*pc_type 有效）。
-static int ame208_find_push_constant(const unsigned *words, size_t word_count,
-                                     unsigned *pc_var, unsigned *pc_type) {
-    if (words == NULL || word_count < 5) return 0;
-    unsigned ame208_ptr = 0, ame208_ptrType = 0, ame208_var = 0, ame208_varPtr = 0;
-    size_t off = 5;
-    while (off < word_count) {
-        unsigned w = words[off];
-        unsigned op = w & 0xffffu;
-        unsigned wc = (w >> 16) & 0xffffu;
-        if (wc == 0 || off + wc > word_count) return 0;  // 畸形：交给真解析器处置
-        if (op == 32u && wc >= 4u) {
-            if (words[off + 2] == 9u) {          // OpTypePointer PushConstant
-                ame208_ptr = words[off + 1];
-                ame208_ptrType = words[off + 3];
-            }
-        } else if (op == 59u && wc >= 4u) {
-            if (words[off + 3] == 9u) {          // OpVariable PushConstant
-                ame208_varPtr = words[off + 1];
-                ame208_var = words[off + 2];
-            }
-        }
-        off += wc;
-    }
-    if (ame208_var == 0 || ame208_ptr == 0) return 0;
-    if (ame208_varPtr != ame208_ptr) return 0;   // 多指针/畸形：保守放弃重定向
-    *pc_var = ame208_var;
-    *pc_type = ame208_ptrType;
-    return 1;
-}
+/// Task209（红鲱鱼清算）：以下 ame208_find_push_constant 与重定向循环已退役。
+/// 59b4f25 装机日志（88fa3f6 上传）+ client-263.jar CFR 反编译双重定谳：
+///   ① MC 26.3 的全部着色器（jar 内 63 个 core shaders + 全部 include）
+///      【零 push_constant 块】——_push_constants 查询返回 GL_INVALID_INDEX
+///      是正常现象（MC 无条件查询管线布局里的 PC 槽位，桌面同样 NOT FOUND），
+///      Task206 选项与 Task208 重定向都在追一个不存在的目标（装机锚点
+///      0 命中 = 扫描在真实 SPIR-V 上永远找不到 PC，与此定谳一致）。
+///   ② 反编译 GlPipelineRecompiler.renameDescriptors case 9：MC 对 PC 是
+///      【双命名】——set_name(resource.id, "_push_constants_instance") +
+///      set_name(resource.base_type_id, "_push_constants")，且 MC 自己在
+///      桌面编译器上也开 EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER（0x2000021）。
+///      emit_buffer_block_native 的块名 = 结构体 alias，无碰撞——重放即
+///      正确；Task208 把结构体重命名改落到变量 id 反而会破坏双命名。
+///      未来若真出现带 PC 块的 MC 版本，重放（不改 id）+ 选项即与桌面
+///      行为完全一致，无需任何重定向。
 
 /// 在同一 context 上重建 ES 编译器并编译；失败返回 NULL（调用方回落原源）。
 /// Task205：新增 orig 参数——把 MC 在【原】编译器上的 spvc_compiler_set_name
 /// 重命名与 set_entry_point 重放到新建的 ES 编译器上（见结构体注释；不重放
 /// 则块名保持原始名，MC 的 glGetUniformBlockIndex 全 -1 → 黑屏）。
-/// Task208：push-constant 块的重命名重定向到【变量 id】——本地复现定谳
-/// （会话本地复现：SPIRV-Cross a0fba56 从 pin 子模块源构建 + 手工编码 MC
-/// 形态 SPIR-V + 逐位镜像本垫片调用序列）：选项
-/// EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER 生效后 PC 块走
-/// emit_buffer_block_native，其块名碰撞检查发现 PC 结构体（先发射、以
-/// set_name 的名字注册进 resource_names）已占用 "_push_constants" → 块名
-/// 回退成【PC 变量的原始名】→ glGetUniformBlockIndex("_push_constants")
-/// 永远 GL_INVALID_INDEX（7c0a021/99a61eb 两轮装机：_uniform_00_XX 全命中、
-/// 唯 _push_constants ×206 NOT FOUND = ANGLE 方块透明的真根因）。
-/// 把重命名落到变量 id 上：回退名恰好等于 MC 的查询名（复现验证：
-/// layout(std140) uniform _push_constants { ... } 正确产出，v1.0/v1.5 同）。
+/// Task208→Task209：原“PC 块重命名重定向到变量 id”已退役（红鲱鱼，
+/// 见上方 Task209 定谳注释——26.3 零 PC 块 + MC 双命名 + 选项路径重放即正确）。
 static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
                                             size_t word_count,
                                             ame175_compiler_entry *orig) {
@@ -1017,32 +989,13 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
         set_entry_fn_t real_set_entry =
             (set_entry_fn_t)ame_spvc_shim_resolve("spvc_compiler_set_entry_point");
         if (real_set_name != NULL) {
-            // Task208：push-constant 定位（重定向见函数头注释）。
-            unsigned ame208_pcVar = 0, ame208_pcType = 0;
-            int ame208_hasPc =
-                ame208_find_push_constant(words, word_count, &ame208_pcVar, &ame208_pcType);
-            int ame208_redirected = 0;
+            // Task209：纯重放（原样 id）。PC 幽灵重定向已退役——见函数头
+            // Task209 定谳注释：26.3 零 PC 块，NOT FOUND 是正常现象；带 PC 的
+            // 版本 MC 自己就是双命名 + 选项开启，重放即与桌面一致。
             for (int i = 0; i < orig->name_count && i < AME205_NAMES_MAX; ++i) {
                 if (orig->names[i].name == NULL) continue;
-                if (ame208_hasPc && orig->names[i].id == ame208_pcType) {
-                    // 重定向：类型 id 的重命名改落到变量 id（回退名 = 查询名）。
-                    real_set_name(es_compiler, ame208_pcVar, orig->names[i].name);
-                    ++ame205_replayed;
-                    ++ame208_redirected;
-                    continue;
-                }
                 real_set_name(es_compiler, orig->names[i].id, orig->names[i].name);
                 ++ame205_replayed;
-            }
-            if (ame208_redirected > 0) {
-                static int s_ame208_pcLogged = 0;
-                if (!s_ame208_pcLogged) {
-                    s_ame208_pcLogged = 1;
-                    fprintf(stderr,
-                            "[spvc-shim] Task208: push-constant block rename redirected "
-                            "to the variable id (emit_buffer_block_native name-collision "
-                            "workaround; _push_constants becomes the emitted block name)\n");
-                }
             }
         }
         if (real_set_entry != NULL && orig->entry_point != NULL) {
