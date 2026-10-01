@@ -318,6 +318,12 @@ char* gl4es_inplace_replace_simple(char* pBuffer, int* size, const char* S, cons
 
 
 // for vgpu/shaderconv.c
+// Task206 (Amethyst iOS port): Apple clang rejects bare alias attributes on
+// darwin (the same reason attributes.h retires the AliasExport family on
+// __APPLE__). The 18 helper aliases are instead emitted as asm branch
+// aliases by scripts/task206_gen_nggl4es_aliases.py (its raw-text
+// alias-attribute pass), so shaderconv.c's references still resolve.
+#if !defined(__APPLE__)
 const char* FindString(const char* pBuffer, const char* S) __attribute__((alias("gl4es_find_string")));
 char* FindStringNC(char* pBuffer, const char* S) __attribute__((alias("gl4es_find_string_nc")));
 int CountString(const char* pBuffer, const char* S) __attribute__((alias("gl4es_count_string")));
@@ -336,3 +342,4 @@ char* NextLine(char* pBuffer) __attribute__((alias("gl4es_next_line")));
 const char* GetNextStr(char* pBuffer) __attribute__((alias("gl4es_get_next_str")));
 int CountStringSimple(char* pBuffer, const char* S) __attribute__((alias("gl4es_countstring_simple")));
 char* InplaceReplaceSimple(char* pBuffer, int* size, const char* S, const char* D) __attribute__((alias("gl4es_inplace_replace_simple")));
+#endif

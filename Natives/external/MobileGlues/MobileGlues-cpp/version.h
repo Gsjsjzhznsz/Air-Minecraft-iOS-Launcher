@@ -3353,7 +3353,7 @@
 //     attributes.h __APPLE__ retirement (AliasExport -> bare prototypes)
 //     would leave the plain gl* names unexported -- the Task204
 //     two-namespaces corruption disease -- so a generated alias file
-//     covers it: scripts/task206_gen_nggl4es_aliases.py, 1273 asm aliases
+//     covers it: scripts/task206_gen_nggl4es_aliases.py, 1291 asm aliases
 //     (preprocessor-evaluated union of every AliasExport/A/_D/_D_1/_M/_V/
 //     _1 declaration + STUB/GL_GET_MAP/THUNK token-paste families + the
 //     NATIVE_FUNCTION_HEAD ARB twins the Apple branch drops; dangling-

@@ -394,6 +394,25 @@ def scan_file(rel):
     full = "\n".join(expanded)
     pairs, plain_defs, native_heads = {}, {}, []
 
+    # ---- 5d. bare alias-attribute declarations (raw text, condition-agnostic).
+    # string_utils.c declares 18 helper aliases as
+    #     RET NAME(ARGS) __attribute__((alias("gl4es_target")));
+    # for vgpu/shaderconv.c. Apple clang rejects the bare alias attribute on
+    # darwin, so the vendored file guards them behind !__APPLE__ (Task206) --
+    # which also hides them from the conditional-filtered scan above. This raw
+    # pass finds them regardless of preprocessor activity: the quoted-target
+    # form only exists there (the attributes.h / glesnative.cpp macro bodies
+    # use alias(#name) -- a hash, not a string -- and never match).
+    for m in re.finditer(
+            r"\b([A-Za-z_]\w*)[ \t]*\(([^;()]*(?:\([^;()]*\)[^;()]*)*)\)"
+            r"[ \t]*__attribute__\(\(alias\(\"([A-Za-z_]\w+)\"\)\)\)[ \t]*;",
+            strip_comments((NG / rel).read_text(errors="replace"))):
+        name, target = m.group(1), m.group(3)
+        if name == "alias" or name.startswith("__"):
+            continue
+        if name not in pairs:
+            pairs[name] = target
+
     # ---- 5a. AliasExport leaf instances (finditer: many per line)
     for m in re.finditer(r"\b(AliasExport(?:_A|_D_1|_D|_M|_V|_1)?)\s*\(", full):
         variant = m.group(1)

@@ -6,7 +6,7 @@
 // nothing. Pattern (CI-proven tinygl4angle/vgpu AliasDecl form):
 //     _name: b _target
 //
-// Coverage: 1273 exports from the preprocessor-evaluated union of
+// Coverage: 1291 exports from the preprocessor-evaluated union of
 // every AliasExport/A/_D/_D_1/_M/_V/_1 declaration + STUB/GL_GET_MAP/THUNK
 // macro families (token-paste expanded at point of use) + the NATIVE_FUNCTION
 // _HEAD ARB twins (Apple branch drops name##ARB) - 0 plain-
@@ -16,6 +16,24 @@
 // Regenerate: python3 scripts/task206_gen_nggl4es_aliases.py
 // ============================================================================
 #if defined(__APPLE__)
+__asm__(".global _Append\n\t_Append: b _gl4es_append\n");
+__asm__(".global _CountLine\n\t_CountLine: b _gl4es_countline\n");
+__asm__(".global _CountString\n\t_CountString: b _gl4es_count_string\n");
+__asm__(".global _CountStringSimple\n\t_CountStringSimple: b _gl4es_countstring_simple\n");
+__asm__(".global _FindString\n\t_FindString: b _gl4es_find_string\n");
+__asm__(".global _FindStringNC\n\t_FindStringNC: b _gl4es_find_string_nc\n");
+__asm__(".global _GetLine\n\t_GetLine: b _gl4es_getline\n");
+__asm__(".global _GetLineFor\n\t_GetLineFor: b _gl4es_getline_for\n");
+__asm__(".global _GetNextStr\n\t_GetNextStr: b _gl4es_get_next_str\n");
+__asm__(".global _InplaceInsert\n\t_InplaceInsert: b _gl4es_inplace_insert\n");
+__asm__(".global _InplaceReplace\n\t_InplaceReplace: b _gl4es_inplace_replace\n");
+__asm__(".global _InplaceReplaceSimple\n\t_InplaceReplaceSimple: b _gl4es_inplace_replace_simple\n");
+__asm__(".global _NextBlank\n\t_NextBlank: b _gl4es_next_blank\n");
+__asm__(".global _NextLine\n\t_NextLine: b _gl4es_next_line\n");
+__asm__(".global _NextStr\n\t_NextStr: b _gl4es_next_str\n");
+__asm__(".global _PrevStr\n\t_PrevStr: b _gl4es_prev_str\n");
+__asm__(".global _ResizeIfNeeded\n\t_ResizeIfNeeded: b _gl4es_resize_if_needed\n");
+__asm__(".global _StrNext\n\t_StrNext: b _gl4es_str_next\n");
 __asm__(".global _glAccum\n\t_glAccum: b _gl4es_glAccum\n");
 __asm__(".global _glActiveTexture\n\t_glActiveTexture: b _gl4es_glActiveTexture\n");
 __asm__(".global _glActiveTextureARB\n\t_glActiveTextureARB: b _gl4es_glActiveTexture\n");

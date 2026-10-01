@@ -117,8 +117,8 @@ check("C1 生成器幂等（重跑 exit 0 + 字节不变）",
       run([sys.executable, "scripts/task206_gen_nggl4es_aliases.py"]).returncode == 0
       and rd(alias_rel) == alias_txt)
 
-check("C2 别名计数 1273 且按名排序",
-      len(globals_n) == 1273
+check("C2 别名计数 1291（1273 + 18 string_utils 裸属性族）且按名排序",
+      len(globals_n) == 1291
       and [n for n, _ in globals_n] == sorted(n for n, _ in globals_n))
 
 names = {n for n, _ in globals_n}
@@ -136,9 +136,9 @@ check("C4 守卫在位（悬空 exit 1 + 裸名碰撞 + 幂等注释）",
       or ("dangling" in gen.lower() and "collision" in gen.lower()),
       "")
 
-check("C5 生成文件头（Task206 标记 + 1273 计数 + 再生成指引）",
+check("C5 生成文件头（Task206 标记 + 1291 计数 + 再生成指引）",
       "Task206 (NG-GL4ES iOS port) -- GENERATED FILE" in alias_txt
-      and "1273 exports" in alias_txt
+      and "1291 exports" in alias_txt
       and "scripts/task206_gen_nggl4es_aliases.py" in alias_txt)
 
 check("C6 CMakeLists 源列表含别名文件且全部源文件存在",
@@ -279,7 +279,7 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("G1 Task206 附录双主题（push-constant + NG-GL4ES + 1273 别名 + 溯源）",
       "REVISION 18 addendum (Amethyst Task 206, no bump)" in vh
       and "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER" in vh
-      and "1273 asm aliases" in vh
+      and "1291 asm aliases" in vh
       and "ThirdParty/ZalithLauncher2" in vh
       and "eba819b" in vh)
 check("G2 尾部 SEP 不变量恢复（append-friendly）",
