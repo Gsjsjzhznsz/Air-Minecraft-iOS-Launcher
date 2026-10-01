@@ -4052,11 +4052,13 @@ GLAPI void APIENTRY glMinSampleShadingARB (GLfloat value);
 
 #ifndef GL_ARB_shader_objects
 #define GL_ARB_shader_objects 1
-#ifdef __APPLE__
-typedef void *GLhandleARB;
-#else
+/* Task206 (Amethyst iOS port, CI run 36808113773): upstream's __APPLE__
+ * branch typedef'd GLhandleARB as void*, which collides with src/gl/gles.h's
+ * unconditional `typedef unsigned int GLhandleARB` in every TU that also
+ * includes GL/gl.h (all of them include gles.h via the gl4es.h chain).
+ * Aligned on the gles.h convention (unsigned int) so the two headers agree
+ * regardless of include order. */
 typedef unsigned int GLhandleARB;
-#endif
 typedef char GLcharARB;
 #define GL_PROGRAM_OBJECT_ARB             0x8B40
 #define GL_SHADER_OBJECT_ARB              0x8B48
