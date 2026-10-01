@@ -100,8 +100,13 @@ set(NGGL4ES_GLSLANG_INCLUDE "" CACHE STRING "glslang include dirs (3rdparty pare
 set(NGGL4ES_GLSLANG_LIBS "" CACHE STRING "semicolon list of glslang/spirv static archives from the dep_mg build tree")
 set(NGGL4ES_SPVC_IMPL "" CACHE FILEPATH "prebuilt libspirv-cross-c-shared.0.impl.dylib (C API)")
 set(NGGL4ES_FRAMEWORK_DIR "" CACHE PATH "Amethyst resources/Frameworks (bundled ANGLE libEGL + libGLESv2)")
-if(NOT NGGL4ES_GLSLANG_INCLUDE OR NOT NGGL4ES_GLSLANG_LIBS OR NOT NGGL4ES_SPVC_IMPL OR NOT NGGL4ES_FRAMEWORK_DIR)
-    message(FATAL_ERROR "dep_nggl4es must pass NGGL4ES_GLSLANG_INCLUDE/NGGL4ES_GLSLANG_LIBS/NGGL4ES_SPVC_IMPL/NGGL4ES_FRAMEWORK_DIR (see Makefile)")
+# NOTE: quoted STREQUAL form -- an unquoted `if(NOT VAR)` on a semicolon
+# list expands to multiple if() arguments (NOT p1 p2 p3), which CMake
+# evaluates as NOT-of-an-invalid-expression = true, firing the guard on
+# perfectly good values (CI run 36811929580 lesson).
+if("${NGGL4ES_GLSLANG_INCLUDE}" STREQUAL "" OR "${NGGL4ES_GLSLANG_LIBS}" STREQUAL "" \
+   OR "${NGGL4ES_SPVC_IMPL}" STREQUAL "" OR "${NGGL4ES_FRAMEWORK_DIR}" STREQUAL "")
+    message(FATAL_ERROR "dep_nggl4es must pass NGGL4ES_GLSLANG_INCLUDE/NGGL4ES_GLSLANG_LIBS/NGGL4ES_SPVC_IMPL/NGGL4ES_FRAMEWORK_DIR (see Makefile); got INCLUDE='${NGGL4ES_GLSLANG_INCLUDE}' LIBS='${NGGL4ES_GLSLANG_LIBS}' SPVC='${NGGL4ES_SPVC_IMPL}' FRAMEWORKS='${NGGL4ES_FRAMEWORK_DIR}'")
 endif()
 
 # Upstream flags kept; visibility hidden makes EXPORT / asm .global the only
