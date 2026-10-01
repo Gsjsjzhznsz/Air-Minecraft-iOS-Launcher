@@ -47,9 +47,10 @@
 #     glsl_optimizer target). Upstream's -O3/-g0 kept as -O2 for CI sanity.
 #  9. src/glx/glx.c (Task206g, CI run 36809835918): xrefresh() degrades to
 #     a no-op on __APPLE__ (system() is not available on iOS); the GLVND
-#     dispatch table __GLXGL_CORE_FUNCTIONS is compiled out under NOX11
-#     (it references !NOX11-only implementations and no GLVND loader
-#     exists on iOS; zero external references).
+#     dispatch table AND the whole GLVND tail (LoadGLXFunction /
+#     XDefaultDepth / XGetVisualInfo / XVisualIDFromVisual) are compiled
+#     out under NOX11 -- they reference !NOX11-only implementations and
+#     X11 macros; no GLVND loader exists on iOS (zero external refs).
 #  8. include/GL/glext.h + src/gl/texture.c (Task206e/f, CI runs
 #     36808113773/36808922924): GLhandleARB aligned to the gles.h
 #     convention (upstream's __APPLE__ void* branch collided with the

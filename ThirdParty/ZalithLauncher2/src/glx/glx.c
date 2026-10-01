@@ -3199,7 +3199,6 @@ __attribute__((visibility("default"))) const __glXGLCoreFunctions __GLXGL_CORE_F
     .ptr_glXWaitGL = gl4es_glXWaitGL,
     .ptr_glXWaitX = gl4es_glXWaitX,
 };
-#endif // !NOX11
 
 typedef void (*__GLXextFuncPtr)(void);
 typedef int glvnd_mutex_t;
@@ -3345,3 +3344,4 @@ __attribute__((visibility("default"))) VisualID XVisualIDFromVisual(Visual* visu
     if (!visual) return (VisualID)0;
     return (VisualID)visual->visualid;
 }
+#endif // !NOX11 (Task206: the whole GLVND tail -- dispatch table, __glXGLLoadGLXFunction, XDefaultDepth/XGetVisualInfo/XVisualIDFromVisual -- is X11 loader machinery; CI run 36814447589)
