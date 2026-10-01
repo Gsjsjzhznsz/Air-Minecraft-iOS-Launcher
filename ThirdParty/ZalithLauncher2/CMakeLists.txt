@@ -45,6 +45,11 @@
 #     GNU-ld only; LTO (check_ipo_supported) disabled; C++ standard lowered
 #     23 -> 17 (nothing in the 3 .cpp files needs more; matches the house
 #     glsl_optimizer target). Upstream's -O3/-g0 kept as -O2 for CI sanity.
+#  9. src/glx/glx.c (Task206g, CI run 36809835918): xrefresh() degrades to
+#     a no-op on __APPLE__ (system() is not available on iOS); the GLVND
+#     dispatch table __GLXGL_CORE_FUNCTIONS is compiled out under NOX11
+#     (it references !NOX11-only implementations and no GLVND loader
+#     exists on iOS; zero external references).
 #  8. include/GL/glext.h + src/gl/texture.c (Task206e/f, CI runs
 #     36808113773/36808922924): GLhandleARB aligned to the gles.h
 #     convention (upstream's __APPLE__ void* branch collided with the
@@ -86,7 +91,12 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # --- cache inputs filled in by the Makefile dep_nggl4es target ------------
-set(NGGL4ES_GLSLANG_INCLUDE "" CACHE PATH "pinned glslang source dir (headers must match the static libs)")
+# NOTE: pass BOTH the 3rdparty parent and the glslang repo root (semicolon
+# list): <glslang/SPIRV/GlslangToSpv.h> resolves via the parent (source
+# layout has SPIRV/ at the repo root), <glslang/Public|Include/...> via
+# the repo root (the glslang/ subdirectory). The deleted vendored headers
+# used the INSTALLED layout, which the source tree does not mirror.
+set(NGGL4ES_GLSLANG_INCLUDE "" CACHE STRING "glslang include dirs (3rdparty parent + repo root, semicolon list)")
 set(NGGL4ES_GLSLANG_LIBS "" CACHE STRING "semicolon list of glslang/spirv static archives from the dep_mg build tree")
 set(NGGL4ES_SPVC_IMPL "" CACHE FILEPATH "prebuilt libspirv-cross-c-shared.0.impl.dylib (C API)")
 set(NGGL4ES_FRAMEWORK_DIR "" CACHE PATH "Amethyst resources/Frameworks (bundled ANGLE libEGL + libGLESv2)")

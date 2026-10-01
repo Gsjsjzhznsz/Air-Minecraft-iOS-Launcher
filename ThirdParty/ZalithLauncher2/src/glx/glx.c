@@ -489,7 +489,15 @@ static void init_vsync() {
 }
 
 static void xrefresh() {
+    // Task206 (Amethyst iOS port, CI run 36809835918): system() is not
+    // available on iOS; xrefresh is an X11 concept anyway (no-op here --
+    // globals4es.xrefresh is only set by the LIBGL_XREFRESH env var).
+#if defined(__APPLE__)
+    (void)0;
+#else
     int dummy = system("xrefresh");
+    (void)dummy;
+#endif
 }
 
 #ifdef PANDORA
@@ -3103,6 +3111,10 @@ AliasExport(void, glXWaitGL, , ());
 AliasExport(void, glXWaitX, , ());
 AliasExport(void, glXReleaseBuffersMESA, , ());
 
+// Task206 (Amethyst iOS port, CI run 36809835918): the GLVND dispatch table
+// references gl4es_glX* implementations that live in the !NOX11 region; no
+// GLVND loader exists on iOS, so the table is compiled out entirely.
+#if !defined(NOX11)
 typedef struct {
     GLXFBConfig* (*ptr_glXChooseFBConfig)(Display* dpy, int screen, const int* attrib_list, int* nelements);
     XVisualInfo* (*ptr_glXChooseVisual)(Display* dpy, int screen, int* attribList);
@@ -3187,6 +3199,7 @@ __attribute__((visibility("default"))) const __glXGLCoreFunctions __GLXGL_CORE_F
     .ptr_glXWaitGL = gl4es_glXWaitGL,
     .ptr_glXWaitX = gl4es_glXWaitX,
 };
+#endif // !NOX11
 
 typedef void (*__GLXextFuncPtr)(void);
 typedef int glvnd_mutex_t;

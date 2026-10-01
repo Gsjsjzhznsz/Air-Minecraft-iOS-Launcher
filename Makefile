@@ -593,7 +593,10 @@ dep_nggl4es: dep_mg
 		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
 		-DCMAKE_C_FLAGS="-arch arm64" \
 		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-		-DNGGL4ES_GLSLANG_INCLUDE="$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang" \
+		# Task206g（CI 36809835918）：双路径——3rdparty/ 让 <glslang/SPIRV/GlslangToSpv.h>
+		# 落到源码树根的 SPIRV/；3rdparty/glslang 让 <glslang/Public|Include/...> 落到
+		# glslang 子目录（NG 的 vendored 头是安装布局，源码树没有 glslang/SPIRV/）
+		-DNGGL4ES_GLSLANG_INCLUDE="$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty;$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang" \
 		-DNGGL4ES_GLSLANG_LIBS="$$ngg_libs" \
 		-DNGGL4ES_SPVC_IMPL="$(SOURCEDIR)/Natives/resources/Frameworks/libspirv-cross-c-shared.0.impl.dylib" \
 		-DNGGL4ES_FRAMEWORK_DIR="$(SOURCEDIR)/Natives/resources/Frameworks" \
