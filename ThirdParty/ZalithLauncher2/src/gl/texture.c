@@ -734,7 +734,9 @@ static void* swizzle_texture(GLsizei width, GLsizei height, GLenum* format, GLen
             break;
         case GL_DEPTH32F_STENCIL8:
         case GL_DEPTH24_STENCIL8:
-        case GL_DEPTH_STENCIL:
+        case GL_DEPTH_STENCIL: {  // Task206 (Amethyst iOS port, CI run
+            // 36808922924): braces -- a label cannot directly precede a
+            // declaration in strict C17 (clang rejects; GCC-only extension).
             // if (hardext.depthtex && hardext.depthstencil) {
             const int is32F = *format == GL_DEPTH32F_STENCIL8;
             *format = dest_format = GL_DEPTH_STENCIL;
@@ -743,6 +745,7 @@ static void* swizzle_texture(GLsizei width, GLsizei height, GLenum* format, GLen
             //}
             // else convert = 1;
             break;
+        }
         case GL_DEPTH_COMPONENT:
             check = 0;
             // if (hardext.depthtex) {

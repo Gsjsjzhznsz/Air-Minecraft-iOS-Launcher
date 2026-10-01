@@ -45,6 +45,11 @@
 #     GNU-ld only; LTO (check_ipo_supported) disabled; C++ standard lowered
 #     23 -> 17 (nothing in the 3 .cpp files needs more; matches the house
 #     glsl_optimizer target). Upstream's -O3/-g0 kept as -O2 for CI sanity.
+#  8. include/GL/glext.h + src/gl/texture.c (Task206e/f, CI runs
+#     36808113773/36808922924): GLhandleARB aligned to the gles.h
+#     convention (upstream's __APPLE__ void* branch collided with the
+#     unconditional unsigned-int typedef in every TU including GL/gl.h);
+#     one label-before-declaration wrapped in braces (strict C17).
 #  7. src/gl/loader.h (Task206d, CI run 36806869734): LOAD_GLES3_OR_EXT is
 #     only defined in the non-NOEGL branch upstream, but drawing.c and
 #     framebuffers.c use it unguarded; the NOEGL branch now defines it
