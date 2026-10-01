@@ -103,8 +103,10 @@ set(NGGL4ES_FRAMEWORK_DIR "" CACHE PATH "Amethyst resources/Frameworks (bundled 
 # NOTE: quoted STREQUAL form -- an unquoted `if(NOT VAR)` on a semicolon
 # list expands to multiple if() arguments (NOT p1 p2 p3), which CMake
 # evaluates as NOT-of-an-invalid-expression = true, firing the guard on
-# perfectly good values (CI run 36811929580 lesson).
-if("${NGGL4ES_GLSLANG_INCLUDE}" STREQUAL "" OR "${NGGL4ES_GLSLANG_LIBS}" STREQUAL "" \
+# perfectly good values (CI run 36811929580 lesson); and CMake has NO
+# backslash line continuation -- if() spans lines naturally until the
+# closing paren (CI run 36812741433 lesson).
+if("${NGGL4ES_GLSLANG_INCLUDE}" STREQUAL "" OR "${NGGL4ES_GLSLANG_LIBS}" STREQUAL ""
    OR "${NGGL4ES_SPVC_IMPL}" STREQUAL "" OR "${NGGL4ES_FRAMEWORK_DIR}" STREQUAL "")
     message(FATAL_ERROR "dep_nggl4es must pass NGGL4ES_GLSLANG_INCLUDE/NGGL4ES_GLSLANG_LIBS/NGGL4ES_SPVC_IMPL/NGGL4ES_FRAMEWORK_DIR (see Makefile); got INCLUDE='${NGGL4ES_GLSLANG_INCLUDE}' LIBS='${NGGL4ES_GLSLANG_LIBS}' SPVC='${NGGL4ES_SPVC_IMPL}' FRAMEWORKS='${NGGL4ES_FRAMEWORK_DIR}'")
 endif()
