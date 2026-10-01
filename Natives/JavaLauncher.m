@@ -1616,6 +1616,23 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             NSLog(@"[JavaLauncher] LTW renderer active: using LTW defaults (same as Android)");
         }
 
+        // Task206：NG-GL4ES（"Krypton Wrapper"，ZL2 的 gl4es）。NGG_DIR_PATH
+        // 指向 POJAV_HOME 下的 ngg/（上游默认 /sdcard/NGG 在 iOS 必然 fopen
+        // 失败——config_refresh 对缺失文件静默返回，无 config.json 时行为与
+        // 默认完全一致；指到可写目录只是让高级用户可以放 config.json 调参）。
+        // 其余零环境需求：EGL 由宿主 gl_bridge 提供，dylib 由 LWJGL 作为
+        // opengl.libname 在游戏上下文 current 后加载（vgpu 同款流）。
+        if ([renderer isEqualToString:@ RENDERER_NAME_NGGL4ES]) {
+            const char *ame206_home = getenv("POJAV_HOME");
+            if (ame206_home && *ame206_home) {
+                char ame206_path[1024];
+                snprintf(ame206_path, sizeof(ame206_path), "%s/ngg", ame206_home);
+                setenv("NGG_DIR_PATH", ame206_path, 1);
+            }
+            NSLog(@"[JavaLauncher] Task206: NG-GL4ES renderer active (NGG_DIR_PATH=%s)",
+                  getenv("NGG_DIR_PATH") ?: "<unset>");
+        }
+
         // Apply MobileGL-specific environment variables
         // MobileGL（MobileGL-Dev，LGPL-3.0）两个变体共用同一个 libMobileGL.dylib 二进制，
         // 靠 MOBILEGL_BACKEND_TYPE 在运行时选择后端：

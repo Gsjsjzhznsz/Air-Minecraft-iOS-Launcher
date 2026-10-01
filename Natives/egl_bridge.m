@@ -469,6 +469,21 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         NSLog(@"[egl_bridge] LTW renderer: preloading ANGLE as host EGL before LTW init");
         dlopen("@rpath/" RENDERER_NAME_MTL_ANGLE, RTLD_GLOBAL);
         set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_NGGL4ES]) {
+        // Task206：NG-GL4ES（"Krypton Wrapper"，ZL2 的 gl4es）。与 gl4es/vgpu
+        // 同族同流：EGL 全部由宿主 gl_bridge 从 ANGLE 框架提供（本分支零
+        // EGL 动作）；dylib 由 LWJGL 作为 opengl.libname 在游戏上下文已
+        // current 的渲染线程上 dlopen（RTLD_GLOBAL，依赖闭包把捆绑
+        // libEGL/libGLESv2 框架带入全局作用域）——constructor(101)
+        // initialize_gl4es 的 GetHardwareExtensions 探测因此落在真上下文上
+        //（vgpu 同款装机实证流，NOEGL 语义 = 探测当前上下文、零临时 EGL）。
+        // 后端惰性解析走 proc_address 的 Apple 分支 dlsym(RTLD_DEFAULT)，
+        // 依赖闭包可见性覆盖；宿主升级通道是导出的 set_getprocaddress
+        //（Task204 ame204_gl4esProcResolver 同款），如装机日志显示解析
+        // 缺口再启用（hooked dlopen 钉扎或预引导块），本轮保持最小侵入。
+        NSLog(@"[egl_bridge] Task206: NG-GL4ES renderer: gl4es-family GL-on-ES "
+              "translation (glslang+SPIRV-Cross shader pipeline, ZL2 Krypton Wrapper)");
+        set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MITHRIL]) {
         // Mithril 渲染器：EGL 1.5 + GL 3.3 Core 全部由 libmithril.dylib 提供
         // （Vulkan backend，经 MoltenVK 到 Metal）。

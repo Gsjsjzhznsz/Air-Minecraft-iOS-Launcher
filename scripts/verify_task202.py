@@ -145,8 +145,8 @@ langs = {}
 for lg in ("zh-Hans", "zh-Hant", "en", "zh-CN"):
     keys = re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M)
     langs[lg] = set(keys)
-check("F", "四主表键集一致且 2418（2408 + 10 ame202）",
-      len(langs["zh-Hans"]) == len(langs["zh-Hant"]) == len(langs["en"]) == len(langs["zh-CN"]) == 2418
+check("F", "四主表键集一致且 2419（2408 + 10 ame202）",
+      len(langs["zh-Hans"]) == len(langs["zh-Hant"]) == len(langs["en"]) == len(langs["zh-CN"]) == 2419
       and langs["zh-Hans"] == langs["zh-Hant"] == langs["en"] == langs["zh-CN"])
 ame202_keys = {k for k in langs["zh-Hans"] if k.startswith("ame202.")}
 check("F", "恰 10 个 ame202.* 键（partial + surface×2 + ai×6 + copy）",
@@ -182,8 +182,8 @@ check("G", "属性声明在位",
       "@property(nonatomic) BOOL ame202ScrollGestureActive;" in sv)
 
 # ============ H. 文档 ============
-check("H", "FAQ 计数 37（[11,4,7,15]）且双份同步",
-      [len(c['items']) for c in faq['categories']] == [11, 4, 7, 15]
+check("H", "FAQ 计数 38（[12,4,7,15]，Task206 重锚：+NG-GL4ES 条目）且双份同步",
+      [len(c['items']) for c in faq['categories']] == [12, 4, 7, 15]
       and json.load(open(os.path.join(REPO, "Natives/resources/help-faq.json"), encoding='utf-8')) == faq)
 check("H", "FAQ Metal 崩溃指引条目",
       any("metallum" in i["title"].lower() and "AGX" in i["description"] for i in allit))
@@ -195,7 +195,7 @@ ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8')
 check("H", "公告 28 条且末位是 Task203（零索引位移）",
       # Task203 重锚：task202 末位追加后 task203 又末位追加（27→28）；
       # 历史锚（[2]=task196 / [3]=task193 / [0]=server）不变。
-      len(ann) == 28 and ann[-1]["id"] == "task203-october-fix-wave"
+      len(ann) == 29 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and ann[26]["id"] == "task202-october-fix-wave")
 check("H", "公告索引锚保持（[2]=task196 / [3]=task193 / [0]=server）",
       ann[2]["id"] == "task196-quad-fixes-2026-09-29" and ann[3]["id"] == "task193-app-icon-replace-2026-09-28"
@@ -266,8 +266,8 @@ st = subprocess.run(["git", "-C", REPO, "status", "--short"], capture_output=Tru
 # TAB 绝对基线 484（= 481 基线 + Task202 的 3 行；本轮 Makefile 零改动）。
 # （本轮工作树亦不再改 Makefile，HEAD 同含该行。）
 mk_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 484）",
-      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 484,
+check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 531，Task206 重锚）",
+      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 531,
       f"tabs={mk_tab}")
 
 # strings 表语法门：每行引号配对

@@ -121,7 +121,7 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]:
     l10n_vals[lg] = m.group(1) if m else None
 check("B7 六语言键全部在位（Task184 重锚）", all(v is not None for v in l10n_vals.values()), str(l10n_vals))
 check("B8 四主语言键集一致且计数 = 2228（Task178 重锚：opacity.title 键恢复，净增 1）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2418
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2419
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -137,12 +137,12 @@ faq = json.loads(root_bytes.decode("utf-8"))
 cats = faq.get("categories", [])
 check("C2 结构：四分类且组名正确",
       [c["name"] for c in cats] == ["渲染与性能", "输入与控制", "安装与数据", "故障排除"])
-check("C3 条数口径（11/4/7/15，总 37 —— Task202 重锚：故障排除 +2 ="
-      " Metal(metallum) 崩溃指引 + Forge/OptiFine 不兼容定性；Task176 重锚："
-      "用户并行编辑 3d36ea5/407b710 把「内存分配建议」拆成两条，安装与数据 6→7；"
+check("C3 条数口径（12/4/7/15，总 38 —— Task206 重锚：渲染与性能 +1 = NG-GL4ES 条目；"
+      "Task202 重锚：故障排除 +2 = Metal(metallum) 崩溃指引 + Forge/OptiFine 不兼容定性；"
+      "Task176 重锚：用户并行编辑 3d36ea5/407b710 把「内存分配建议」拆成两条，安装与数据 6→7；"
       "Task82-166 硬编码时代的 34 已过时）",
-      [len(c["items"]) for c in cats] == [11, 4, 7, 15]
-      and sum(len(c["items"]) for c in cats) == 37)
+      [len(c["items"]) for c in cats] == [12, 4, 7, 15]
+      and sum(len(c["items"]) for c in cats) == 38)
 allit = [i for c in cats for i in c["items"]]
 check("C4 每条 icon/title/description 三字段全非空",
       all(i.get("icon") and i.get("title") and i.get("description") for i in allit))

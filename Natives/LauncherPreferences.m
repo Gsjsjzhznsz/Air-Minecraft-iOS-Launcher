@@ -384,7 +384,16 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         // JavaLauncher 的 mcMajor>=26 门控负责跳过）。
         @{@"key": @ RENDERER_NAME_METAL,
           @"name": localize(@"preference.title.renderer.debug.metal", nil),
-          @"file": @ RENDERER_NAME_METAL}
+          @"file": @ RENDERER_NAME_METAL},
+        // Task206：NG-GL4ES（"Krypton Wrapper"，ZL2 的 gl4es——glslang+SPIRV-Cross
+        // 着色器管线，官方口径几乎全版本可跑；vgpu 的接替者）。刻意追加在表末
+        // （与上方 metal 条目同规则）：已有 profile/全局偏好存的 renderer 值在
+        // pick 控件里按下标配对，插到中间会让存量值显示错位。dylib 由 Makefile
+        // 的 dep_nggl4es 目标随包构建——rendererLibraryExists 的存在性过滤天然
+        // 处理裁剪场景（vgpu 表项同理保留：存量设备仍可选，仅不再推荐）。
+        @{@"key": @ RENDERER_NAME_NGGL4ES,
+          @"name": localize(@"preference.title.renderer.debug.nggl4es", nil),
+          @"file": @ RENDERER_NAME_NGGL4ES}
         // Task 132（MG 三端合并，用户明令）：MobileGL 家族三后端条目从本表
         // 退役，合并为 MobileGlues 分区的单一 pick 行（typePickField 悬浮
         // 浮窗，选项 MobileGlues (Vulkan 直连) / (GLES 后端) / (OpenGL 4.0

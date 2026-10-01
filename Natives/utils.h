@@ -71,6 +71,19 @@ extern "C" {
 //   - Fragment shader 编译失败时忽略错误，让 BSL/Mellow 等光影包能运行
 #define RENDERER_NAME_LTW "libltw.dylib"
 
+// NG-GL4ES（"Krypton Wrapper"，BZLZHH/NG-GL4ES）—— ZalithLauncher 2 所用的
+// gl4es（ptitSeb/gl4es + PojavLauncherTeam/gl4es-114-extra 进化 fork，MIT）。
+// 着色器转换走 glslang GLSL→SPIR-V + SPIRV-Cross SPIR-V→ESSL（glsl_for_es.cpp），
+// 官方口径"几乎全版本 MC 可跑"（上游 README）。Task206 从上游 main 分支
+// vendor 到 ThirdParty/ZalithLauncher2（源码、适配 CMake、生成式 darwin 别名
+// 见 scripts/task206_gen_nggl4es_aliases.py）；构建走 Makefile 的 dep_nggl4es
+// 目标（glslang 静态库复用 dep_mg 的 15.0.0 + 双崩溃补丁树，SPIRV-Cross 复用
+// 随包预编译 impl dylib）。与 gl4es/vgpu 同族：导出全套桌面 GL API，运行时
+// 经 NOEGL 的 proc_address 解析后端（宿主用导出的 set_getprocaddress 钉
+// ame204_gl4esProcResolver——Task204 同款通道，见 egl_bridge.m Task206 块）。
+// 用户的 vgpu（1.8.9 材质损坏，Task204/205 两轮根修未愈）由此接替。
+#define RENDERER_NAME_NGGL4ES "libnggl4es.dylib"
+
 // Mithril 渲染器 - OpenGL 3.3 Core → Vulkan/Metal 转译层（libmithril.dylib）。
 // 自带完整的 EGL 1.5 + GL 实现（Vulkan backend，经 MoltenVK 到 Metal），
 // 必须从自身 dylib 解析 EGL 符号：若复用 ANGLE 的 EGL，会创建 ANGLE 的 Metal

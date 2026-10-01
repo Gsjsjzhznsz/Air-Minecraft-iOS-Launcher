@@ -11,9 +11,6 @@
 [submodule "Natives/external/ZeroTierFramework"]
 	path = Natives/external/ZeroTierFramework
 	url = https://github.com/zerotier/zerotier-sockets-apple-framework.git
-[submodule "ThirdParty/ZalithLauncher2"]
-	url = https://github.com/ZalithLauncher/ZalithLauncher2.git
-	path = ThirdParty/ZalithLauncher2
 [submodule "Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang"]
 	path = Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang
 	url = https://github.com/KhronosGroup/glslang.git

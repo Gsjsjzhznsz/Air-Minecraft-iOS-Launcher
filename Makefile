@@ -553,6 +553,55 @@ dep_shader_shims: dep_mg
 		$(SOURCEDIR)/Natives/spvc_shim.c || exit 1
 	echo '[Amethyst v$(VERSION)] dep_shader_shims - end'
 
+dep_nggl4es:
+	echo '[Amethyst v$(VERSION)] dep_nggl4es - start'
+	# Task206: NG-GL4ES ("Krypton Wrapper", BZLZHH/NG-GL4ES) -- the gl4es used
+	# by ZalithLauncher 2, vendored at ThirdParty/ZalithLauncher2 (see its
+	# CMakeLists PROVENANCE header). Built as its own cmake tree against the
+	# dep_mg glslang statics (pinned f5f664d 15.0.0 + lvalue-nullguard +
+	# pool-zero/size-guards -- inheriting the crash-family fixes; NG's vendored
+	# 15.4 headers were removed so headers and libs cannot drift) and the
+	# prebuilt SPIRV-Cross C API impl dylib (header verified byte-identical).
+	# Output libnggl4es.dylib rides the payload "cp $(WORKINGDIR)/*.dylib".
+	mg_bindir=$(WORKINGDIR)/mobileglues/3rdparty/glslang; \
+	mg_spirv_a=$$mg_bindir/SPIRV/libSPIRV.a; \
+	[ -f "$$mg_spirv_a" ] || mg_spirv_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libSPIRV.a -print -quit 2>/dev/null); \
+	mg_glslang_a=$$mg_bindir/glslang/libglslang.a; \
+	[ -f "$$mg_glslang_a" ] || mg_glslang_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libglslang.a -print -quit 2>/dev/null); \
+	mg_rl_a=$$mg_bindir/glslang/libglslang-default-resource-limits.a; \
+	[ -f "$$mg_rl_a" ] || mg_rl_a=$$(find $(WORKINGDIR)/mobileglues -type f -name libglslang-default-resource-limits.a -print -quit 2>/dev/null); \
+	if [ -z "$$mg_spirv_a" ] || [ ! -f "$$mg_spirv_a" ] || [ -z "$$mg_glslang_a" ] || [ ! -f "$$mg_glslang_a" ] || [ -z "$$mg_rl_a" ] || [ ! -f "$$mg_rl_a" ]; then \
+		echo "ERROR: glslang static libs unresolved (spirv=$$mg_spirv_a glslang=$$mg_glslang_a rl=$$mg_rl_a) - dep_mg must run first"; \
+		exit 1; \
+	fi; \
+	extra_glslang_libs=""; \
+	for l in libOGLCompiler.a libOSDependent.a; do \
+		if [ -f "$$mg_bindir/glslang/$$l" ]; then \
+			extra_glslang_libs="$$extra_glslang_libs;$$mg_bindir/glslang/$$l"; \
+		fi; \
+	done; \
+	ngg_libs="$$mg_spirv_a;$$mg_glslang_a;$$mg_rl_a$$extra_glslang_libs"; \
+	echo "[nggl4es] linking against glslang statics: $$ngg_libs"; \
+	mkdir -p $(WORKINGDIR)/nggl4es; \
+	cd $(WORKINGDIR)/nggl4es && cmake \
+		-DMACOS="1" \
+		-DCMAKE_CROSSCOMPILING=true \
+		-DCMAKE_SYSTEM_NAME=Darwin \
+		-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+		-DCMAKE_OSX_SYSROOT="$(SDKPATH)" \
+		-DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+		-DCMAKE_C_FLAGS="-arch arm64" \
+		-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+		-DNGGL4ES_GLSLANG_INCLUDE="$(SOURCEDIR)/Natives/external/MobileGlues/MobileGlues-cpp/3rdparty/glslang" \
+		-DNGGL4ES_GLSLANG_LIBS="$$ngg_libs" \
+		-DNGGL4ES_SPVC_IMPL="$(SOURCEDIR)/Natives/resources/Frameworks/libspirv-cross-c-shared.0.impl.dylib" \
+		-DNGGL4ES_FRAMEWORK_DIR="$(SOURCEDIR)/Natives/resources/Frameworks" \
+		$(SOURCEDIR)/ThirdParty/ZalithLauncher2/ || exit 1
+	cmake --build $(WORKINGDIR)/nggl4es --config RelWithDebInfo -j$(JOBS) --target nggl4es || exit 1
+	cp $(WORKINGDIR)/nggl4es/libnggl4es.dylib $(WORKINGDIR)/ || exit 1
+	echo '[Amethyst v$(VERSION)] dep_nggl4es - end'
+
 dep_angle_freeze:
 	echo '[Amethyst v$(VERSION)] dep_angle_freeze - start'
 	# Task 57 (hua-mian-fen-lie gen-zhi): 8-byte machine-code patch -- ANGLE Metal
@@ -585,7 +634,7 @@ dep_sdl3_guard:
 		$(SOURCEDIR)/Natives/resources/Frameworks/libSDL3.dylib || exit 1
 	echo '[Amethyst v$(VERSION)] dep_sdl3_guard - end'
 
-payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_angle_freeze dep_sdl3_guard
+payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_angle_freeze dep_sdl3_guard
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)

@@ -37,7 +37,7 @@
     if ([self.internalName isEqualToString:@"list_settings"]) {
         return @"列出启动器支持的设置键与取值说明。"
                "\n无参数。"
-               "\n返回键表：video.renderer（渲染器，实例级：auto/GL4ES/ANGLE/MobileGlues/Zink/MoltenVK/LTW）、"
+               "\n返回键表：video.renderer（渲染器，实例级：auto/GL4ES/NG-GL4ES/ANGLE/MobileGlues/Zink/MoltenVK/LTW）、"
                "video.graphics_api（图形 API，实例级，MC 26.2+ 生效：default/prefer_vulkan/prefer_opengl）、"
                "java.allocated_memory（游戏内存 MB，全局）、java.auto_ram（自动分配内存，全局，true/false）、"
                "java.java_args（JVM 参数，全局+实例级覆盖）、general.download_source（下载源，全局：official/bmclapi）、"
@@ -52,7 +52,7 @@
     return @"修改启动器设置。"
            "\n参数：key（string，必填）、value（string/number/boolean，必填）、instance（string，可选，缺省修改当前选中实例或全局）。"
            "\n说明：video.renderer / video.graphics_api 为实例级设置（写入指定实例的 profile）；"
-           "其余键为全局设置。渲染器可传友好名（MoltenVK/Zink/MobileGlues/GL4ES/ANGLE/auto），内部自动映射为存储键。"
+           "其余键为全局设置。渲染器可传友好名（MoltenVK/Zink/MobileGlues/GL4ES/NG-GL4ES/ANGLE/auto），内部自动映射为存储键。"
            "\n写成功后返回新值并广播刷新通知。除 YOLO 模式外执行前会请求用户确认。";
 }
 
@@ -83,6 +83,9 @@
     if ([lower containsString:@"angle"] || [lower containsString:@"tinygl4"]) return @(RENDERER_NAME_MTL_ANGLE);
     // 必须排在 angle 之后："MetalANGLE" 同样含 "metal" 子串（Task201 随上游同步）
     if ([lower containsString:@"metallum"] || [lower containsString:@"metal"]) return @(RENDERER_NAME_METAL);
+    // 必须排在 gl4es 之前："nggl4es" 同样含 "gl4es" 子串（Task206；krypton =
+    // 上游别名 Krypton Wrapper）
+    if ([lower containsString:@"nggl4es"] || [lower containsString:@"krypton"]) return @(RENDERER_NAME_NGGL4ES);
     if ([lower containsString:@"gl4es"]) return @(RENDERER_NAME_GL4ES);
     if ([lower containsString:@"ltw"]) return @(RENDERER_NAME_LTW);
     return nil;
@@ -98,6 +101,7 @@
     if ([storageKey isEqualToString:@(RENDERER_NAME_METAL)]) return @"Metal (libmetallum.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_GL4ES)]) return @"GL4ES (libgl4es_114.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_LTW)]) return @"LTW (libltw.dylib)";
+    if ([storageKey isEqualToString:@(RENDERER_NAME_NGGL4ES)]) return @"NG-GL4ES/Krypton (libnggl4es.dylib)";
     return storageKey;
 }
 

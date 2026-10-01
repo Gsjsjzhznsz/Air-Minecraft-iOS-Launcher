@@ -265,6 +265,18 @@
    "pinned": false,
    "summary": "1.8.9 的 gl4es 与 vgpu 崩溃均已根治（补丁工艺与钉扎门控两处根修）；帮助/FAQ 页面新增英文与繁简中文内容；Forge 26.x 启动弹窗抑制。ANGLE 黑屏诊断仪表已上线，下一轮日志定谳。",
    "content": "## 本轮修复\n\n**1.8.9 两个渲染器的崩溃（根治）**\n\n- **gl4es**：上一轮的二进制垫片被 CI 打包环节的 vtool 重打标静默清零（节间隙不属于任何节，重序列化时被抹掉），执行到垫片即 SIGILL。本轮改为直接在两个查询调用点上原地改写为\"空串指针装载\"，补丁全部落在真实代码节内，vtool 不可能再破坏。\n- **vgpu**：上一轮的符号钉扎层误把 vgpu 会话的 GL 调用劫持到休眠的 ANGLE 镜像，vgpu 的惰性初始化永不触发，首次矩阵调用即崩溃。钉扎现在只在 ANGLE 会话生效。\n\n**帮助 / FAQ 页面国际化**\n\n- \"使用问题\"页面此前只有中文；现在英文为全量翻译（37 条），繁体中文完整转换，简体同步；其余语言沿用中文基线（与主界面回退一致）。\n\n**Forge 26.x 启动弹窗**\n\n- Forge 进度小窗在转译层上初始化失败后的 \"missing software!\" 弹窗提示，已通过默认禁用进度小窗抑制（更新后不再出现）。\n\n**ANGLE 黑屏**\n\n- 本轮装上了完整的渲染流量仪表（状态查询 / 矩阵上传 / 绘制调用全部记名），下一份装机日志可直接定谳黑屏发生在哪一环。\n\n---\n\nOctober fix wave: both 1.8.9 renderer crashes root-fixed (a binary-patch technique rework and a pin-scope fix); the help/FAQ page gains English (full 37-entry translation) and traditional/simplified Chinese; Forge 26.x early-display prompt suppressed. ANGLE black-screen traffic instrumentation is live -- the next device log adjudicates the failing stage directly."
+  },
+  {
+   "id": "task206-nggl4es-2026-10-01",
+   "title": "新渲染器 NG-GL4ES 上线 + ANGLE 方块透明修复",
+   "date": "2026-10-01",
+   "summary": "ZL2 同款 gl4es（NG-GL4ES/Krypton Wrapper）正式加入渲染器列表，老版本材质损坏的首选对策；ANGLE 后端方块透明的根因（push constants 块丢失）已修复，下个构建生效。",
+   "content": "## 新渲染器：NG-GL4ES（Krypton Wrapper）\n\nZalithLauncher 2 所用的 gl4es 分支正式移植完成——桌面 OpenGL 转译到 OpenGL ES，着色器经 glslang + SPIRV-Cross 双段转换，上游口径几乎全版本 MC 可跑（1.8.9 老版本到 26.x）。\n\n- 老版本（1.8.9 等 Forge 生态）在 VGPU 下出现材质损坏、图集错位、条纹的，换 NG-GL4ES 是首选对策（该病灶两轮修复未根除，属转译层顽疾）；\n- 26.x 新版本也可以尝试（不行再换 Zink）；\n- 选择路径：设置 → 视频设置 → 渲染器 → NG-GL4ES（游戏未运行时才能改）。\n\n## ANGLE 后端：方块透明已定位并修复\n\n26.x + ANGLE 会话里方块渲染为透明，根因是 SPIRV-Cross 的 ES 着色器输出没有把 push constants 块作为可查询的 uniform block（glGetUniformBlockIndex 永远 NOT FOUND，逐绘制的颜色/alpha 数据从不绑定）。修复已入下一个构建，装机日志锚点：`[spvc-shim] Task206: EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER enabled`。\n\n---\n\nNew renderer NG-GL4ES (the gl4es used by ZalithLauncher 2, a.k.a. Krypton Wrapper) is now in the renderer list -- first choice when legacy versions show corrupted textures under VGPU, and worth a try on 26.x too. The ANGLE transparent-blocks bug is also root-caused and fixed (the push-constants block was never emitted as a queryable uniform block); the fix ships in the next build.",
+   "priority": "normal",
+   "action_url": "",
+   "action_title": "",
+   "image_url": "",
+   "pin": false
   }
  ]
 }

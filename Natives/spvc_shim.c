@@ -82,10 +82,23 @@ static void *ame_spvc_shim_resolve(const char *sym);
 // 枚举值钉 vendored spirv_cross_c.h：SPVC_COMPILER_OPTION_GLSL_VERSION =
 // 8 | 0x2000000，SPVC_COMPILER_OPTION_GLSL_ES = 9 | 0x2000000；
 // SPVC_BACKEND_GLSL = 1；SPVC_CAPTURE_MODE_TAKE_OWNERSHIP = 1。
+// Task206：SPVC_COMPILER_OPTION_GLSL_EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER
+// = 33 | 0x2000000（本仓 MobileGlues-cpp/include/spirv_cross/spirv_cross_c.h
+// 665 行钉值；与随包 impl dylib 同源）。
 // ============================================================================
 
 #define AME175_OPTION_GLSL_VERSION (8u | 0x2000000u)
 #define AME175_OPTION_GLSL_ES (9u | 0x2000000u)
+// Task206（ANGLE 方块透明根修）：不开此项时 SPIRV-Cross 的 GLSL 后端把
+// PushConstant 存储类的块输出为【散装 uniform】而非 uniform block——
+// glGetUniformBlockIndex("_push_constants") 永远返回 GL_INVALID_INDEX。
+// 装机证据（7c0a021 latestlog.old，26.3 fabric + ANGLE 会话）：Task205
+// 重放生效后 _uniform_00_00/01 块全部命中（idx 0/1）且 UBO 绑定链激活
+// （glUniformBlockBinding + glBindBufferRange），唯独 _push_constants
+// NOT FOUND ×206——MC 逐绘制数据（颜色/alpha 调制）从不绑定 = 方块透明。
+// MC 桌面 GL 路径自己会开此项（否则它不会按块名查询 push constants），
+// 我们的 ES 编译器必须镜像。
+#define AME206_OPTION_GLSL_PUSH_CONST_AS_UBO (33u | 0x2000000u)
 #define AME175_BACKEND_GLSL 1
 #define AME175_CAPTURE_TAKE_OWNERSHIP 1
 // Task183：96 -> 1024。病历（59d4b48 装机 latestlog.txt，ANGLE 26.3 FO
@@ -905,6 +918,8 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
         if (opts != NULL) {
             new_set_opt(opts, AME175_OPTION_GLSL_VERSION, 300u);
             new_set_opt(opts, AME175_OPTION_GLSL_ES, 1u);
+            // Task206：push-constant 块以 UBO 形态输出（见常量区病历）
+            new_set_opt(opts, AME206_OPTION_GLSL_PUSH_CONST_AS_UBO, 1u);
             if (new_install(es_compiler, opts) == 0) options_ok = 1;
         }
     }
@@ -923,11 +938,26 @@ static const char *ame175_compile_es_source(void *ctx, const unsigned *words,
             if (old_create_opts(es_compiler, &opts) == 0 && opts != NULL) {
                 old_set_uint(opts, AME175_OPTION_GLSL_VERSION, 300u);
                 old_set_bool(opts, AME175_OPTION_GLSL_ES, 1);
+                // Task206：push-constant 块以 UBO 形态输出（见常量区病历）
+                old_set_bool(opts, AME206_OPTION_GLSL_PUSH_CONST_AS_UBO, 1);
                 if (old_install(es_compiler, opts) == 0) options_ok = 1;
             }
         }
     }
     if (!options_ok) return NULL;  // ES 编译器留在 ctx 上随 destroy 释放
+
+    // Task206 装机锚点：push-constant-as-UBO 已装（下轮日志与 blockIdx
+    // 探针对账：_push_constants 应从 4294967295 变为 >= 0）。
+    {
+        static int s_ame206_pcLogged = 0;
+        if (!s_ame206_pcLogged) {
+            s_ame206_pcLogged = 1;
+            fprintf(stderr,
+                    "[spvc-shim] Task206: EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER "
+                    "enabled on ES compiler (_push_constants becomes a queryable "
+                    "uniform block)\n");
+        }
+    }
 
     // Task205：重放重命名 + 入口点。SPIR-V result id 在同一份字上确定性
     // 一致，直接按记录的 id 重放到新编译器即可。任一步失败不阻断——

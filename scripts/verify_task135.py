@@ -139,7 +139,7 @@ vals = set(base.values())
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first），
 # 唯一键基线 1916 -> 1918
 check("D3 四语言唯一键集一致且为 Task151 基线 2228（Task178 重锚：opacity.title 键恢复）",
-      vals == {2418}, str(base))
+      vals == {2419}, str(base))
 r2 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_sdl3_eventfilter_guard.py"),
                      os.path.join(REPO, "Natives/resources/Frameworks/libSDL3.dylib")],
                     capture_output=True, text=True, timeout=60)
@@ -162,10 +162,10 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
 # Task138 重锚：Task135 的 14 个 TAB 行已随提交入 HEAD，"+14" 形态在
 # 提交后恒假；长期不变量 = 工作树与 HEAD 一致 + dep_sdl3_guard 目标在位。
-check("E10 Makefile TAB 基线 = 绝对 484 且双守卫在位（Task203 重锚：+3 已随 64fdaf2 入 HEAD）",
+check("E10 Makefile TAB 基线 = 绝对 531 且双守卫在位（Task206 重锚：dep_nggl4es +47）",
       # Task202 的 "+3" 对拍口径在 64fdaf2 提交后恒假（+3 已入 HEAD）；
-      # Task203 起转绝对基线（本轮 Makefile 零改动）。
-      cur_tab == 484 and head_tab == 484 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      # Task203 起转绝对基线；Task206 重锚 531 = 484 + 47（dep_nggl4es 目标）。
+      cur_tab == 531 and head_tab == 531 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 

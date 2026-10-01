@@ -76,8 +76,8 @@ mk = rd("Makefile")
 check("A", "Makefile 接线保持（ggstr 在 rtld 之后）",
       "patch_gl4es_ggstr_nullguard.py" in mk
       and mk.find("patch_gl4es_ggstr_nullguard.py") > mk.find("patch_gl4es_rtld_default.py"))
-check("A", "Makefile TAB 基线未漂移（本轮零改动）",
-      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 484)
+check("A", "Makefile TAB 基线（Task206 重锚：dep_nggl4es +47 = 531）",
+      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 531)
 
 # ============ B. 钉扎门控（vgpu 崩溃根修） ============
 mh = rd("Natives/main_hook.m")
@@ -127,7 +127,7 @@ ht = json.load(open(os.path.join(REPO, "Natives/resources/zh-Hant.lproj/help-faq
 cn = json.load(open(os.path.join(REPO, "Natives/resources/zh-CN.lproj/help-faq.json"), encoding='utf-8'))
 src = json.load(open(os.path.join(REPO, "help-faq.json"), encoding='utf-8'))
 n_src = sum(len(c['items']) for c in src['categories'])
-check("E", "三语件在场且条目数对齐（37）",
+check("E", "三语件在场且条目数对齐（38，Task206 重锚）",
       sum(len(c['items']) for c in en['categories']) == n_src
       and sum(len(c['items']) for c in ht['categories']) == n_src
       and sum(len(c['items']) for c in cn['categories']) == n_src)
@@ -165,7 +165,7 @@ check("H", "version.h Task203 附录（no bump + vtool 病历）",
       "Task 203, no bump" in vh and "vtool" in vh and "ZERO-WIPED" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))['announcements']
 check("H", "公告末位追加（27→28，索引锚保全）",
-      len(ann) == 28 and ann[-1]['id'] == 'task203-october-fix-wave')
+      len(ann) == 29 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01')
 bundled = open(os.path.join(REPO, "Natives/resources/help-faq.json"), 'rb').read()
 rootfaq = open(os.path.join(REPO, "help-faq.json"), 'rb').read()
 check("H", "FAQ 根/随包副本逐字节一致（verify_task168 契约）", bundled == rootfaq)

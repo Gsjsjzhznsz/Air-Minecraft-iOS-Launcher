@@ -58,8 +58,8 @@ check("A8 Makefile dep_openal_shim 目标（re-export + LC_ID 修正）",
       "dep_openal_shim:" in mk
       and "-Wl,-reexport_library,$(WORKINGDIR)/libopenal_impl.dylib" in mk
       and "install_name_tool -id @rpath/libopenal_impl.dylib" in mk)
-check("A9 payload 依赖链接入 dep_openal_shim（Task157 重锚：并行 Task156 在 payload 行插入 dep_mithril_glshim）",
-      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_angle_freeze" in mk)
+check("A9 payload 依赖链接入 dep_openal_shim（Task157 重锚；Task206 重锚：并行插入 dep_nggl4es）",
+      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_angle_freeze" in mk)
 check("A10 Task112 钉子保留（绝对路径直载）",
       '-Dorg.lwjgl.openal.libname=%@' in jl and 'stringByAppendingPathComponent:@"libopenal.dylib"' in jl)
 check("A11 JavaLauncher Task129 论断修正入档",
@@ -265,7 +265,7 @@ for lang in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     sets.append(ks)
 # Task138 重锚：+2 键（renderer_missing_dylib + mirror_policy-speed_first）
 check("I3 四语言键集一致（Task138 基线 2228 = Task134 的 1916 + 2）",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2418,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2419,
       f"counts={[len(s) for s in sets]}")
 
 # Makefile TAB 完整性（9e6fc27/129 双教训）
@@ -273,13 +273,13 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("I4 Makefile TAB 完整（Task203 重锚：绝对基线 484 + 双守卫在位）",
+check("I4 Makefile TAB 完整（Task206 重锚：绝对基线 531 + 双守卫在位）",
       # Task138 重锚：Task135 的 dep_sdl3_guard 14 个 TAB 行已随提交入 HEAD，
       # "+14" 形态自此恒假；Task202 重锚曾用 cur == head + 3（垫片接线
       # +3 TAB），Task203 起 +3 已随 64fdaf2 入 HEAD——对拍口径转为绝对
-      # 基线（本轮 Makefile 零改动，484 = 481 基线 + Task202 的 3 行）；
+      # 基线；Task206 重锚：dep_nggl4es 目标 +47 TAB 行（531 = 484 + 47）；
       # 守卫目标（dep_sdl3_guard + patch_gl4es_ggstr_nullguard）双在位。
-      cur_tab == 484 and head_tab == 484 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      cur_tab == 531 and head_tab == 531 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 

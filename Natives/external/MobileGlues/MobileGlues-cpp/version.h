@@ -3322,3 +3322,54 @@
 //     group counts the ame204 resolver family); task193_tinygl_syntax
 //     green; verify_task75/179 stash-diff zero-new-failures (stale
 //     anchors identical on HEAD); derived harness task179_inc resynced.
+
+// REVISION 18 addendum (Amethyst Task 206, no bump): two renderer topics.
+// (1) ANGLE 'blocks render transparent' ROOT CAUSE + FIX. Device log
+//     7c0a021 latestlog.old (26.3 fabric + ANGLE): after Task205's rename
+//     replay the _uniform_00_XX blocks all resolve (idx 0/1/2/...) and the
+//     UBO bind chain is live (glUniformBlockBinding + glBindBufferRange
+//     firing) -- but _push_constants returns GL_INVALID_INDEX 4294967295
+//     206 times. SPIRV-Cross's GLSL backend emits PushConstant-storage
+//     blocks as LOOSE uniforms (not a uniform block) unless
+//     SPVC_COMPILER_OPTION_GLSL_EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER is
+//     set -- so glGetUniformBlockIndex can never find it and MC's
+//     per-draw data (color/alpha modulation) never binds = transparent
+//     blocks. Fix: ame175_compile_es_source now sets the option (enum
+//     33 | 0x2000000, pinned against the vendored spirv_cross_c.h) on
+//     BOTH option-API paths. Device anchor: '[spvc-shim] Task206:
+//     EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER enabled' + blockIdx probe
+//     _push_constants -> >= 0.
+// (2) NG-GL4ES ('Krypton Wrapper', BZLZHH/NG-GL4ES -- the gl4es used by
+//     ZalithLauncher 2) ported as the vgpu successor (user-reported 1.8.9
+//     material corruption survived two root-cause rounds; upstream claims
+//     almost all MC versions run). Vendored at ThirdParty/ZalithLauncher2
+//     (dead ZalithLauncher2 submodule de-registered, pin eba819b, zero
+//     build references). Build: dep_nggl4es Makefile target, own cmake
+//     tree, glslang STATIC from the dep_mg build (15.0.0 + both crash
+//     patches; NG's vendored 15.4 headers removed so headers cannot drift
+//     from the linked libs; audited: glsl_for_es.cpp only uses stable
+//     pre-15.0 APIs), SPIRV-Cross via the prebuilt impl dylib (vendored
+//     spirv_cross_c.h byte-identical to the impl's build header). The
+//     attributes.h __APPLE__ retirement (AliasExport -> bare prototypes)
+//     would leave the plain gl* names unexported -- the Task204
+//     two-namespaces corruption disease -- so a generated alias file
+//     covers it: scripts/task206_gen_nggl4es_aliases.py, 1273 asm aliases
+//     (preprocessor-evaluated union of every AliasExport/A/_D/_D_1/_M/_V/
+//     _1 declaration + STUB/GL_GET_MAP/THUNK token-paste families + the
+//     NATIVE_FUNCTION_HEAD ARB twins the Apple branch drops; dangling-
+//     target and bare-collision guards; idempotent). Runtime: renderer
+//     libnggl4es.dylib appended to rendererCandidates (index-stability
+//     rule, after metal), egl_bridge Task206 branch (vgpu-proven flow:
+//     LWJGL dlopens with the game context current; NOEGL Task179
+//     semantics), JavaLauncher NGG_DIR_PATH -> POJAV_HOME/ngg, VersionMgr
+//     short name, AI mapping (nggl4es matched BEFORE gl4es -- substring),
+//     l10n key + 2418->2419 unique-key sweep (the +34 raw-line delta is
+//     pre-existing duplicate keys since Task202; verifiers count unique),
+//     FAQ 38 items + announcements.json 29.
+// Verification: verify_task206 (A ANGLE fix, B vendored tree + provenance,
+//     C alias generator idempotence/coverage, D Makefile wiring + TAB,
+//     E runtime wiring, F l10n/AI/FAQ/announcement, G version.h, H
+//     cascade); TAB baselines re-anchored 484 -> 531 (129/135/202/203),
+//     payload-line anchor 129-A9, FAQ counts (168/202/203), announcement
+//     counts (193/202/203/196-family).
+// ============================================================================

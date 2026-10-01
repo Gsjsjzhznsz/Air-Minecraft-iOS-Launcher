@@ -130,7 +130,7 @@ check("E2 六语言旧键退役",
       all(old_key + '"' not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
 check("E3 四主语言键集一致且计数 = 2228（Task178 重锚：opacity.title 键恢复）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2418
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2419
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]

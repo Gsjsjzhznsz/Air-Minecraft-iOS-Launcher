@@ -63,7 +63,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ccache-macos14-v1-${{ hashFiles('Makefile', 'Natives/CMakeLists.txt', 'Natives/external/vgpu/src/**') }}
+          # Task206: +ThirdParty/ZalithLauncher2/src/**（dep_nggl4es 编译面，
+          # 与 vgpu 同款入桶口径；内容哈希自失效，桶键只为配置漂移换桶）
+          key: ccache-macos14-v1-${{ hashFiles('Makefile', 'Natives/CMakeLists.txt', 'Natives/external/vgpu/src/**', 'ThirdParty/ZalithLauncher2/src/**') }}
           restore-keys: |
             ccache-macos14-v1-
 

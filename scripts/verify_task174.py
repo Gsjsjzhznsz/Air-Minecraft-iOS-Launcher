@@ -138,8 +138,8 @@ check("C4 卡片本体透明度原语（Task184 重锚：管线双挂点回归�
 # ============================================================
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
-check("D1 四主语言键集一致且计数 = 2418（Task205 重锚；Task178 时代为 2157，Task174 零新增；十症状并行会话并入后 1954->2157）",
-      all(len(k) == 2418 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
+check("D1 四主语言键集一致且计数 = 2419（Task205 重锚；Task178 时代为 2157，Task174 零新增；十症状并行会话并入后 1954->2157）",
+      all(len(k) == 2419 for k in KEYSETS) and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 check("D2 开关键六语言在位（Task184 重锚：neumorph.opacity 键回归，button.opacity 退役，interface.title 保留）",
       "background.cards.neumorph.interface.title" in KEYSETS[0]
       and "background.cards.neumorph.opacity.title" in KEYSETS[0]
