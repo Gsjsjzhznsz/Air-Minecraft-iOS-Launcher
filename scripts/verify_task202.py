@@ -266,8 +266,8 @@ st = subprocess.run(["git", "-C", REPO, "status", "--short"], capture_output=Tru
 # TAB 绝对基线 484（= 481 基线 + Task202 的 3 行；本轮 Makefile 零改动）。
 # （本轮工作树亦不再改 Makefile，HEAD 同含该行。）
 mk_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 534，Task206 重锚）",
-      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 534,
+check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 535，Task206 重锚）",
+      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 535,
       f"tabs={mk_tab}")
 
 # strings 表语法门：每行引号配对

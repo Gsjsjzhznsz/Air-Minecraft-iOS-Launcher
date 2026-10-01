@@ -162,8 +162,8 @@ check("D2 payload 行接线（mithril 之后、angle_freeze 之前）",
       and mk.find("dep_nggl4es dep_angle_freeze") > mk.find("dep_mithril_glshim dep_nggl4es"))
 
 cur_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("D3 TAB 基线 534（484 + 47 + 3 Task206g 注释行）且无空格缩进 recipe",
-      cur_tab == 534
+check("D3 TAB 基线 535（484 + 47 + 4 注释行）且无空格缩进 recipe",
+      cur_tab == 535
       and not any(l.startswith("    ") for l in mk.split("\n")),
       f"cur={cur_tab}")
 
@@ -305,8 +305,8 @@ r = run([sys.executable, "scripts/verify_task129.py"], timeout=600)
 fails129 = [l for l in r.stdout.splitlines() if "FAIL" in l and "RESULT" not in l]
 # head tracks the last commit's baseline (531 after Task206f, 534 after this
 # round); only cur is stable to assert pre-commit
-dirty_ok = all("I4 Makefile TAB" in l and "cur=534" in l for l in fails129) and len(fails129) <= 1
-check("H verify_task129 仅剩脏树 I4（cur=534，head 随提交基线走，提交后自愈）", dirty_ok, str(fails129))
+dirty_ok = all("I4 Makefile TAB" in l and "cur=535" in l for l in fails129) and len(fails129) <= 1
+check("H verify_task129 仅剩脏树 I4（cur=535，head 随提交基线走，提交后自愈）", dirty_ok, str(fails129))
 
 r = run([sys.executable, "scripts/verify_task174.py"], timeout=600)
 f174 = [l for l in r.stdout.splitlines() if l.strip().startswith(("- [")) or "FAIL" in l]

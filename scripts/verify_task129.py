@@ -273,13 +273,13 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("I4 Makefile TAB 完整（Task206 重锚：绝对基线 534 + 双守卫在位）",
+check("I4 Makefile TAB 完整（Task206 重锚：绝对基线 535 + 双守卫在位）",
       # Task138 重锚：Task135 的 dep_sdl3_guard 14 个 TAB 行已随提交入 HEAD，
       # "+14" 形态自此恒假；Task202 重锚曾用 cur == head + 3（垫片接线
       # +3 TAB），Task203 起 +3 已随 64fdaf2 入 HEAD——对拍口径转为绝对
       # 基线；Task206 重锚：dep_nggl4es 目标 +47 TAB 行（531 = 484 + 47）；
       # 守卫目标（dep_sdl3_guard + patch_gl4es_ggstr_nullguard）双在位。
-      cur_tab == 534 and head_tab == 534 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      cur_tab == 535 and head_tab == 535 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 

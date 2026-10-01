@@ -165,7 +165,7 @@ head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
 check("E10 Makefile TAB 基线 = 绝对 531 且双守卫在位（Task206 重锚：dep_nggl4es +47）",
       # Task202 的 "+3" 对拍口径在 64fdaf2 提交后恒假（+3 已入 HEAD）；
       # Task203 起转绝对基线；Task206 重锚 531 = 484 + 47（dep_nggl4es 目标）。
-      cur_tab == 534 and head_tab == 534 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      cur_tab == 535 and head_tab == 535 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" in mk,
       f"head={head_tab} cur={cur_tab}")
 
