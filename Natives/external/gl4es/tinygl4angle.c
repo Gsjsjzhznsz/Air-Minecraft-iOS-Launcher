@@ -525,13 +525,26 @@ void glMultiDrawElementsBaseVertex(GLenum mode, const GLsizei *count, GLenum typ
             ame209_draw_state("MultiDrawElementsBaseVertex");
         }
     }
-    if (ame173_ptr_glMultiDrawElementsBaseVertex) {
-        ame173_ptr_glMultiDrawElementsBaseVertex(mode, count, type, indices, drawcount, basevertex);
-    } else if (drawcount > 0) {
-        // 降级：逐批 DrawElements（首批的 basevertex 应用于全部——极少路径）
-        for (GLsizei i = 0; i < drawcount; i++) {
-            glDrawElements(mode, count[i], type, indices[i]);
+    // Task211（ANGLE 方块透明决战）：multidraw 一律拆解为逐 draw 提交。
+    // 病历（17c51003 装机日志，Task209 四叉取证链定谳）：地形绘制提交完全
+    // 健康（sodium 的 chunk 多绘制在跑、drawcount=6-7、状态快照干净、零
+    // GL 错误），唯独方块不可见——与安卓端 Espryt/MobileGlues-ES 系同族
+    // 病灶（Task156 家族病形）：批提交在翻译层→驱动段被整体丢弃。本地无
+    // 复现条件，经验疗法 = 拆解为逐 draw（安卓端同族修复正是如此）。逐
+    // draw 走本文件自己的包装 = Task209 普查自动覆盖拆解后的每个子绘制
+    // （下轮装机日志全可见）。指针解析保留（符号解析证据链不变），但不再
+    // 用它提交。
+    {
+        static unsigned s_task211_mdebv = 0;
+        ++s_task211_mdebv;
+        if (s_task211_mdebv <= 8 || (s_task211_mdebv % 2048) == 0) {
+            printf("[tinygl4angle] Task211 decompose: glMultiDrawElementsBaseVertex #%u drawcount=%d -> per-draw\n",
+                   s_task211_mdebv, (int)drawcount);
         }
+    }
+    for (GLsizei i = 0; i < drawcount; i++) {
+        glDrawElementsBaseVertex(mode, count[i], type, indices[i],
+                                 (basevertex != NULL) ? basevertex[i] : 0);
     }
 }
 
@@ -539,9 +552,17 @@ typedef void (*ame173_fn_glMultiDrawArrays)(GLenum, const GLint *, const GLsizei
 static ame173_fn_glMultiDrawArrays ame173_ptr_glMultiDrawArrays;
 void glMultiDrawArrays(GLenum mode, const GLint *first, const GLsizei *count, GLsizei drawcount) {
     AME173_RESOLVE(ame173_ptr_glMultiDrawArrays, "glMultiDrawArrays");
-    if (ame173_ptr_glMultiDrawArrays) {
-        ame173_ptr_glMultiDrawArrays(mode, first, count, drawcount);
-    } else if (drawcount > 0) {
+    // Task211：同 glMultiDrawElementsBaseVertex 的拆解决战（指针解析保留
+    // 作证据链，提交一律逐 draw）。
+    {
+        static unsigned s_task211_mda = 0;
+        ++s_task211_mda;
+        if (s_task211_mda <= 8 || (s_task211_mda % 2048) == 0) {
+            printf("[tinygl4angle] Task211 decompose: glMultiDrawArrays #%u drawcount=%d -> per-draw\n",
+                   s_task211_mda, (int)drawcount);
+        }
+    }
+    if (first != NULL && count != NULL) {
         for (GLsizei i = 0; i < drawcount; i++) {
             glDrawArrays(mode, first[i], count[i]);
         }
@@ -552,9 +573,16 @@ typedef void (*ame173_fn_glMultiDrawElements)(GLenum, const GLsizei *, GLenum, c
 static ame173_fn_glMultiDrawElements ame173_ptr_glMultiDrawElements;
 void glMultiDrawElements(GLenum mode, const GLsizei *count, GLenum type, const void *const *indices, GLsizei drawcount) {
     AME173_RESOLVE(ame173_ptr_glMultiDrawElements, "glMultiDrawElements");
-    if (ame173_ptr_glMultiDrawElements) {
-        ame173_ptr_glMultiDrawElements(mode, count, type, indices, drawcount);
-    } else if (drawcount > 0) {
+    // Task211：同 glMultiDrawElementsBaseVertex 的拆解决战。
+    {
+        static unsigned s_task211_mde = 0;
+        ++s_task211_mde;
+        if (s_task211_mde <= 8 || (s_task211_mde % 2048) == 0) {
+            printf("[tinygl4angle] Task211 decompose: glMultiDrawElements #%u drawcount=%d -> per-draw\n",
+                   s_task211_mde, (int)drawcount);
+        }
+    }
+    if (count != NULL && indices != NULL) {
         for (GLsizei i = 0; i < drawcount; i++) {
             glDrawElements(mode, count[i], type, indices[i]);
         }
@@ -805,6 +833,19 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
     if (ame203_no <= 8 || (ame203_no % 4000) == 0) {
         printf("[tinygl4angle] Task203 draw: glDrawArrays #%u mode=%u first=%d count=%d\n",
                ame203_no, (unsigned)mode, (int)first, (int)count);
+    }
+    // Task211 (b)：全屏四边形普查。MC post 链的最终合成（blit_screen →
+    // fb0）是一次全屏 glDrawArrays（mode=TRIANGLES/STRIP/FAN、count
+    // 3-6）——Task209 探针只采样 BaseVertex 族，最终合成的可见度为零
+    // （四叉链没切开的原因之一）。这里对“四边形形状”的 draw 计数+抽样，
+    // 下轮装机日志直接回答“最终合成有没有被提交”。
+    if ((mode == 4u || mode == 5u || mode == 6u) && count >= 3 && count <= 6) {
+        static unsigned s_task211_fsq = 0;
+        ++s_task211_fsq;
+        if (s_task211_fsq <= 12 || (s_task211_fsq % 4096) == 0) {
+            printf("[tinygl4angle] Task211 fsq: fullscreen-quad candidate #%u mode=%u first=%d count=%d (final-blit census; drawArrays #%u so far)\n",
+                   s_task211_fsq, (unsigned)mode, (int)first, (int)count, ame203_no);
+        }
     }
     if (ame203_ptr_drawArrays) ame203_ptr_drawArrays(mode, first, count);
 }

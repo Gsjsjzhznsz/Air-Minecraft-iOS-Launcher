@@ -3547,3 +3547,57 @@
 //   labelColor (12% plate). Interaction unchanged: tap = use, ... = edit,
 //   long-press menu intact.
 // ============================================================================
+
+// -----------------------------------------------------------------------------
+// REVISION 18 addendum (Task 211, no bump)
+// -----------------------------------------------------------------------------
+// Task 211 -- exit-"crash" root fix + CurseForge 403 fix + ANGLE
+//   transparent-blocks counterattack + ZL2 classic gl4es port (user asks from
+//   the 17c5100 log reading; authored under the dead session's "Task210"
+//   numbering, renumbered after the parallel UI round took 210).
+// [Exit] MC 26.3's new ClientShutdownWatchdog force-reports a crash whenever
+//   the JVM lingers past main(); our bundled metallum_agent.jar (Task201)
+//   started metallum-state/metallum-dump WITHOUT setDaemon(true), so every
+//   quit inside ~120s of JVM start hung DestroyJavaVM and tripped the
+//   watchdog. Bytecode surgery on the jar (scripts/task211_metallum_daemon_
+//   patch.java: dup+iconst_1+setDaemon(true) before each premain Thread.start,
+//   COMPUTE_MAXS only so StackMapTables stay valid; E2E gate T211Probe):
+//   patched = daemon=true + instant exit 0; original control = daemon=false +
+//   hang (timeout kill). Device anchor: quit produces NO crash report.
+// [CF] The stored runtime key was the compile-time placeholder "((void *)0)"
+//   (11 chars, the unset-secret literal; the root KeyViewController pre-filled
+//   the RAW macro @CONFIG_CURSEFORGE_API_KEY and save/test wrote it into the
+//   runtime preference -- which outranks the Task169-guarded compiled macro).
+//   Three layers: CurseForgeAPI getter/isAPIKeyConfigured reject the
+//   placeholder family (shared CFAIsGarbageAPIKey / +isPlaceholderAPIKey:),
+//   BOTH KeyViewControllers sanitize prefill and gate save/test, and 403s
+//   mentioning "API key" surface a readable message instead of the JSON
+//   parser's format error. Plus ame211_migrateCfSourceToModrinth (main.m,
+//   sentinel general.task211_cf_source_migrated): clears a stored placeholder
+//   key and flips keyless devices' seven download_source_* curseforge values
+//   to modrinth (user decision: default source Modrinth; CF remains usable
+//   via the keyless mirror and can be switched back manually).
+// [ANGLE] Task209's four-pronged forensics proved terrain draws submitted
+//   healthy yet invisible -- the same symptom family as Android-side
+//   Espryt/MobileGlues-ES multidraw silently dropping draws (Task156 family).
+//   tinygl4angle.c: glMultiDrawElementsBaseVertex / glMultiDrawArrays /
+//   glMultiDrawElements now ALWAYS decompose into per-draw wrapper calls
+//   (the Task209 census sees every sub-draw; symbol resolution logs kept),
+//   plus two decisive probes: a fullscreen-quad census in glDrawArrays
+//   (final-blit visibility; the old probes only sampled the BaseVertex
+//   family) and a 5-point in-world readback in gl_bridge.m (center + 4
+//   corners at swapIndex >= 900, <= 2 per session, 1x1 independent reads per
+//   the Task75 SIGBUS lesson) -- any nonzero pixel => content reached fb0.
+// [gl4es] ZL2's CLASSIC gl4es (PojavLauncherTeam branch, gl4es_extra_extra)
+//   vendored and built from source as a THIRD gl4es-flavour renderer
+//   (holy gl4es prebuilt and Krypton Wrapper NG port untouched).
+// [l10n] Krypton Wrapper display name shortened to "Krypton Wrapper (<=26.2)"
+//   in the four languages that carry the key. virglrenderer scoped honestly:
+//   needs a fresh Mesa build with the virgl driver (the bundled OSMesa has
+//   only the socket-name string) -- a separate multi-round project, NOT in
+//   this round.
+// Verification: verify_task211 + task211_syntax_gate (A tinygl4angle decompose
+//   regions + B swap-forensics 5-point block, g++/gcc -fsyntax-only; 10-file
+//   bracket balance) + announcement cascade re-anchor (32 -> 33, index +1
+//   family) + metallum E2E A/B.
+// =============================================================================

@@ -21,6 +21,11 @@ extern NSString *const CurseForgeResponseSnippetKey;
 /// baseURL 强制落 MCIM 镜像（免 key，实测 200），源对所有人可用。
 + (BOOL)isSourceAvailable;
 
+/// Task211：占位 API Key 判定（编译期 NULL 字面量字符串化产物家族，如
+/// "((void *)0)"）。KeyViewController 的预填净化与保存门使用，与 apiKey getter 的
+/// 运行时拒绝共用同一张垃圾表。
++ (BOOL)isPlaceholderAPIKey:(NSString *)key;
+
 // ========== 同步方法（兼容旧代码，注意会阻塞线程） ==========
 /// 搜索项目（同步，内部使用 dispatch_group_wait，建议在后台队列调用）
 - (NSMutableArray *)searchModWithFilters:(NSDictionary<NSString *, NSString *> *)searchFilters

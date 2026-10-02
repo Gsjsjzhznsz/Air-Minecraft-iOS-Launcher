@@ -31,9 +31,12 @@ static NSString *CFKCompiledAPIKey(void) {
     if (compiledKey.length >= 2 && [compiledKey hasPrefix:@"\""] && [compiledKey hasSuffix:@"\""]) {
         compiledKey = [compiledKey substringWithRange:NSMakeRange(1, compiledKey.length - 2)];
     }
-    // 宏未定义时预处理器字符串化后得到宏名本身 "CONFIG_CURSEFORGE_API_KEY"
-    if ([compiledKey isEqualToString:@"nil"] || compiledKey.length == 0 ||
-        [compiledKey isEqualToString:@"CONFIG_CURSEFORGE_API_KEY"]) {
+    // 宏未定义时预处理器字符串化后得到宏名本身 "CONFIG_CURSEFORGE_API_KEY"；
+    // Task211：占位家族统一交给 CurseForgeAPI 的共享判定（"((void *)0)" /
+    // "(nil)" / "NULL" / "0" / 宏名 / "((void" 前缀——装机 17c51003 实测
+    // CI secret 未配置时宏字面展开为 "((void *)0)"，旧守卫漏掉它，预填-
+    // 保存链把垃圾写进运行时偏好 → x-api-key 403 → “未知错误”）
+    if (compiledKey.length == 0 || [CurseForgeAPI isPlaceholderAPIKey:compiledKey]) {
         return @"";
     }
     return compiledKey;
@@ -529,6 +532,14 @@ static UIColor *CFKErrorColor(void) {
     NSString *key = [_apiKeyTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (key.length == 0) {
         [PLPreferences setCurseForgeAPIKey:nil];
+    } else if ([CurseForgeAPI isPlaceholderAPIKey:key]) {
+        // Task211：占位键拒绝入库（垃圾家族清单见 CurseForgeAPI.m 的
+        // CFAIsGarbageAPIKey——同一张表也护着 apiKey getter）。清掉历史
+        // 垃圾并提示；不新增 l10n 键（计数锚点零波及）。
+        [PLPreferences setCurseForgeAPIKey:nil];
+        [self loadInitialValue];
+        [self setStatusText:@"✗ 占位/无效的 Key 不予保存（留空即可走免 Key 镜像）" success:NO];
+        return;
     } else {
         [PLPreferences setCurseForgeAPIKey:key];
     }
@@ -549,8 +560,15 @@ static UIColor *CFKErrorColor(void) {
     if (_isTesting) {
         return;
     }
-    // 1. 先保存当前输入的 Key 到偏好
+    // 1. 先保存当前输入的 Key 到偏好（Task211：占位键同 saveButtonTapped
+    //    拒绝——测试一个垃圾键只会复现 403）
     NSString *key = [_apiKeyTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (key.length > 0 && [CurseForgeAPI isPlaceholderAPIKey:key]) {
+        [PLPreferences setCurseForgeAPIKey:nil];
+        [self loadInitialValue];
+        [self setStatusText:@"✗ 占位/无效的 Key 不予测试（留空即可走免 Key 镜像）" success:NO];
+        return;
+    }
     [PLPreferences setCurseForgeAPIKey:key.length > 0 ? key : nil];
 
     if (key.length == 0) {

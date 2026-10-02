@@ -49,6 +49,26 @@ static NSString *CFACompiledAPIKey(void) {
     return compiledKey;
 }
 
+// Task211（CF 403 根治）：占位 Key 判定。病历（17c51003 装机 latestlog.txt）：
+// CI secret 未配置时 CONFIG_CURSEFORGE_API_KEY 字面展开为 "((void *)0)"
+// （11 字符，与日志 prefix=((void *... 完全一致），它随 x-api-key 发往官方
+// API 必得 403 Forbidden: API Key missing or invalid，且 isAPIKeyConfigured
+// =YES 阻断 keyless 镜像回退（Task162/171 语义）。Task169 的守卫只护了
+// 编译时宏这一层；运行时偏好（优先级最高）此前无守卫，KeyViewController
+// 的预填-保存链把同一垃圾写进了设备。本判定供 getter / isAPIKeyConfigured /
+// +isPlaceholderAPIKey:（两个 KeyViewController 的预填净化与保存门）共用，
+// 垃圾家族与 CFACompiledAPIKey 的表保持一致并加前缀兜底。
+static BOOL CFAIsGarbageAPIKey(NSString *key) {
+    if (![key isKindOfClass:NSString.class] || key.length == 0) return YES;
+    return ([key isEqualToString:@"((void *)0)"] ||
+            [key isEqualToString:@"(nil)"] ||
+            [key isEqualToString:@"NULL"] ||
+            [key isEqualToString:@"nil"] ||
+            [key isEqualToString:@"0"] ||
+            [key isEqualToString:@"CONFIG_CURSEFORGE_API_KEY"] ||
+            [key hasPrefix:@"((void"]);
+}
+
 @interface CurseForgeAPI ()
 @property (nonatomic, strong) NSURLSession *session;   // 用于异步请求
 // 错误诊断辅助方法：将 HTTP 响应信息封装进 NSError userInfo
@@ -165,13 +185,21 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 #pragma mark - API Key 和 Headers
 
 - (NSString *)apiKey {
-    // 1. 运行时偏好（优先级最高）
+    // 1. 运行时偏好（优先级最高；Task211：占位垃圾键视为未配置——装机实测
+    // 它随 x-api-key 发出即 403，且阻断 keyless 镜像回退）
     NSString *runtimeKey = [PLPreferences curseForgeAPIKey];
-    if ([runtimeKey isKindOfClass:NSString.class] && runtimeKey.length > 0) {
+    if ([runtimeKey isKindOfClass:NSString.class] && runtimeKey.length > 0 &&
+        !CFAIsGarbageAPIKey(runtimeKey)) {
         NSLog(@"[CurseForgeAPI] API Key source: runtime preference (length=%lu, prefix=%@...)",
               (unsigned long)runtimeKey.length,
               runtimeKey.length >= 8 ? [runtimeKey substringToIndex:8] : runtimeKey);
         return runtimeKey;
+    }
+    static BOOL s_task211GarbageLogged = NO;
+    if (!s_task211GarbageLogged && [runtimeKey isKindOfClass:NSString.class] && runtimeKey.length > 0) {
+        s_task211GarbageLogged = YES;
+        NSLog(@"[CurseForgeAPI] Task211: runtime preference holds a placeholder key (length=%lu) -- rejected as unset, falling through to compile-time macro / Info.plist / keyless mirror",
+              (unsigned long)runtimeKey.length);
     }
     // 2. 编译时宏（使用字符串化宏方案，避免 @nil 边界问题）
     NSString *compiledKey = CFACompiledAPIKey();
@@ -222,8 +250,10 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 
 + (BOOL)isAPIKeyConfigured {
     // 与 apiKey getter 保持一致的三层 fallback，避免 UI 门控与实际请求判断不一致
+    // Task211：占位垃圾键不算已配置（与 getter 的运行时拒绝同表）
     NSString *runtimeKey = [PLPreferences curseForgeAPIKey];
-    if ([runtimeKey isKindOfClass:NSString.class] && runtimeKey.length > 0) {
+    if ([runtimeKey isKindOfClass:NSString.class] && runtimeKey.length > 0 &&
+        !CFAIsGarbageAPIKey(runtimeKey)) {
         return YES;
     }
     NSString *compiledKey = CFACompiledAPIKey();
@@ -246,6 +276,13 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
 // The API key settings entry is retained: devices with a key configured can go official via the mirror policy.
 + (BOOL)isSourceAvailable {
     return YES;
+}
+
+/// Task211：占位 API Key 判定（编译期 NULL 字面量字符串化产物家族，如
+/// "((void *)0)"）。KeyViewController 的预填净化与保存门使用，与 apiKey
+/// getter 的运行时拒绝共用同一张垃圾表（CFAIsGarbageAPIKey）。
++ (BOOL)isPlaceholderAPIKey:(NSString *)key {
+    return CFAIsGarbageAPIKey(key);
 }
 
 - (NSError *)missingAPIKeyError {
@@ -287,6 +324,16 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
     }
     if (snippet.length > 0) {
         userInfo[CurseForgeResponseSnippetKey] = snippet;
+    }
+
+    // Task211（403 友好化）：装机实测 403 以 text/plain 返回 "Forbidden:
+    // API Key missing or invalid"，先死在 JSON 解析上——用户看到的是解析
+    // 器的"未能读取数据，因为它的格式不正确。"（即"未知错误"）。把
+    // API-Key 类 403 翻译成可读信息并指路设置页；其余 403 保持原语义。
+    if (statusCode == 403 && [snippet rangeOfString:@"api key"
+                                           options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        userInfo[NSLocalizedDescriptionKey] =
+            @"CurseForge 拒绝了请求：API Key 缺失或无效（403）。请到「设置 → CurseForge API Key」检查；留空即可自动走免 Key 镜像，无需注册。";
     }
 
     // 打印诊断日志

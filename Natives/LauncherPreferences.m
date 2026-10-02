@@ -4,6 +4,7 @@
 #import "PLPreferences.h"
 #import "PLProfiles.h"   // Task120: ame_effective_renderer 需要（CI 35458985232 教训：此前从别处传递可见）
 #import "PLMirrorCenter.h"  // Task138: loadPreferences 末尾的测速预热
+#import "installer/modpack/CurseForgeAPI.h"  // Task211: ame211_migrateCfSourceToModrinth 的 isPlaceholderAPIKey/isAPIKeyConfigured
 #import "NMToast.h"    // Task138: 渲染器 dylib 缺失回退的用户提示
 #import "UIKit+hook.h"
 #import <CoreFoundation/CoreFoundation.h>
@@ -178,6 +179,62 @@ void ame166_migrateMgDsaBlackScreen(void) {
     // 执行过，而非又一个从未触发的挂载点）。
     NSLog(@"[Preferences] Task167 MG DSA black-screen migration ran (stored=%@, flipped=%d)", dsa, dsaOn);
     setPrefObject(@"mobileglues.task166_dsa_blackscreen_migrated", @YES);
+}
+
+// Task211：CurseForge 源一次性迁回 Modrinth（用户定案"默认源改为
+// Modrinth"，CF 修复后仍可随时手动切回）。
+// 病历（装机 17c51003 latestlog.txt）：设备把 download_source_mod 存成了
+// curseforge，而运行时偏好里的 Key 是占位垃圾 "((void *)0)"（11 字符，
+// CI secret 未配置时编译期宏的字面展开，被 KeyViewController 预填-保存
+// 链写进设备）→ 每次请求 x-api-key 带垃圾 → 403 Forbidden: API Key
+// missing or invalid → UI"未知错误"。Task211 已修三层（CurseForgeAPI
+// getter/isAPIKeyConfigured 拒收占位 Key + 两个 KeyViewController 预填
+// 净化与保存门 + 403 友好化）。本迁移做存量治愈：
+//   0) 清掉运行时偏好里的历史垃圾 Key（若存在）；
+//   1) 无有效 Key 的设备，把七个 download_source_* 里的 curseforge 一次性
+//      拨回 modrinth（有真 Key 的设备不动；keyless 镜像路径 Task162/171
+//      起对所有人可用，此后手动切回 CF 也能用）。
+// 哨兵 general.task211_cf_source_migrated（PLPreferences 默认表）保证只跑
+// 一次；常跑点在 main.m（toggleIsolatedPref 之后——Task167 教训：不能挂
+// 场景会话回调）。
+void ame211_migrateCfSourceToModrinth(void) {
+    if ([getPrefObject(@"general.task211_cf_source_migrated") boolValue]) return;
+
+    // 0) 历史垃圾 Key 清理（占位家族 = CurseForgeAPI 的 CFAIsGarbageAPIKey）
+    NSString *storedKey = [PLPreferences curseForgeAPIKey];
+    if ([storedKey isKindOfClass:NSString.class] && storedKey.length > 0 &&
+        [CurseForgeAPI isPlaceholderAPIKey:storedKey]) {
+        [PLPreferences setCurseForgeAPIKey:nil];
+        NSLog(@"[Preferences] Task211: cleared placeholder CurseForge API key from runtime preference (length=%lu)",
+              (unsigned long)storedKey.length);
+    }
+
+    setPrefObject(@"general.task211_cf_source_migrated", @YES);
+
+    // 1) 无有效 Key 的设备：curseforge 源拨回 modrinth
+    if ([CurseForgeAPI isAPIKeyConfigured]) {
+        NSLog(@"[Preferences] Task211: CF source migration skipped (valid API key configured; keeping stored source choice)");
+        return;
+    }
+    NSArray *task211SourceKeys = @[
+        @"general.download_source_mod",
+        @"general.download_source_shader",
+        @"general.download_source_resourcepack",
+        @"general.download_source_datapack",
+        @"general.download_source_modpack",
+        @"general.download_source_world",
+        @"general.download_source_server"
+    ];
+    NSUInteger task211Flipped = 0;
+    for (NSString *k in task211SourceKeys) {
+        id v = getPrefObject(k);
+        if ([v isKindOfClass:NSString.class] && [v isEqualToString:@"curseforge"]) {
+            setPrefObject(k, @"modrinth");
+            task211Flipped++;
+        }
+    }
+    NSLog(@"[Preferences] Task211: no valid CF key -- flipped %lu curseforge source(s) to modrinth (CF still usable via keyless mirror; switch back manually any time)",
+          (unsigned long)task211Flipped);
 }
 
 id getPrefObject(NSString *key) {

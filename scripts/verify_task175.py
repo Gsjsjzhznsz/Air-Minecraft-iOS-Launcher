@@ -242,17 +242,17 @@ anns = json.loads(rd("announcements.json"))["announcements"]
 check("G1 公告 task175@8（Task190 重锚：Task184 轮漏顺延的陈旧锚对齐现实——task190@2/task184@3/task180@4/task179@5/task178@6/task177@7/task175@8/task174@9/172@12/168@15；server/task169 pin 不动）",
       anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[7]["id"] == "task190-account-card-installer-spacing-2026-09-28"
-      and anns[8]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"
-      and anns[9]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and anns[10]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[11]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[12]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[13]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[14]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[17]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[20]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t175 = anns[13]
+      and anns[8]["id"] == "task190-account-card-installer-spacing-2026-09-28"
+      and anns[9]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"
+      and anns[10]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and anns[11]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[12]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[13]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[14]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[15]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[18]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[21]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t175 = anns[14]
 check("G2 公告内容六条全列 + EN 尾注 + 装机锚点",
       all(k in t175["content"] for k in
           ["ANGLE", "下载量", "头像", "物品栏", "Forge", "壁纸", "[Task175]"])

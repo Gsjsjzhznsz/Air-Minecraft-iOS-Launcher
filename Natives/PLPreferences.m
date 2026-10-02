@@ -44,6 +44,10 @@ NSString *const PREF_MOD_MIRROR = @"general.mod_mirror";
             @"download_source_server": @"modrinth",
             // CurseForge API Key：空串代表使用编译时内置的默认 key
             @"curseforge_api_key": @"",
+            // Task211：CF 源一次性迁移哨兵（ame211_migrateCfSourceToModrinth，
+            // 见 LauncherPreferences.h 的 Task211 注释——无有效 Key 的设备把
+            // 存量的 curseforge 源拨回 modrinth，用户定案"默认源改为 Modrinth"）
+            @"task211_cf_source_migrated": @NO,
             // Mod 更新时是否保留旧文件（默认 YES）
             @"mod_update_keep_old": @YES,
             // 模组镜像源（Task138：设置行已移入 download 分区，选择写

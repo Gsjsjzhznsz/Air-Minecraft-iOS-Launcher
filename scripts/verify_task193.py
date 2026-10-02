@@ -96,10 +96,10 @@ for s in ("scripts/task193_icon.py", "scripts/task193_announce.py", "scripts/tas
 # ============ F. announcement: task193@2, family shifted, pin intact ============
 print("== F. 公告窗口族 ==")
 ann = json.loads(io.open("announcements.json", encoding="utf-8").read())["announcements"]
-check("F", "条目数 -> 31（Task209@2 插入，窗口族顺延）", len(ann) == 32, f"actual={len(ann)}")
+check("F", "条目数 -> 32（Task211@2 插入，窗口族顺延）", len(ann) == 33, f"actual={len(ann)}")
 check("F", "Task209 重锚：task193 顺延至 [5]，task190 顺延至 [6]，置顶公告 [0] 未动",
-      len(ann) > 6 and ann[6]["id"] == "task193-app-icon-replace-2026-09-28"
-      and ann[7]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
+      len(ann) > 6 and ann[7]["id"] == "task193-app-icon-replace-2026-09-28"
+      and ann[8]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
 
 # ============ G. re-anchored verifiers import-clean ============
 print("== G. 重锚校验器语法完好 ==")

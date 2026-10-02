@@ -36,6 +36,19 @@ void ame130_migrateMgPerfDefaults(void);
 /// 仍可在偏好分区手动开回（mobileglues.enable_ext_direct_state_access）。
 void ame166_migrateMgDsaBlackScreen(void);
 
+/// Task211 一次性迁移：CurseForge 源迁回 Modrinth + 历史垃圾 Key 清理。
+/// 病历（装机 17c51003）：CI secret 未配置时编译期宏字面展开为
+/// "((void *)0)"（11 字符占位串），经 KeyViewController 预填-保存链写进
+/// 运行时偏好，随 x-api-key 发出即 403（UI"未知错误"），且
+/// isAPIKeyConfigured=YES 阻断 keyless 镜像回退。本迁移：①清运行时偏好
+/// 里的占位 Key（CurseForgeAPI +isPlaceholderAPIKey 家族表）；②无有效
+/// Key 的设备把七个 general.download_source_* 存量 curseforge 拨回
+/// modrinth（用户定案"默认源改为 Modrinth"；有真 Key 的设备不动，此后
+/// 手动切回 CF 仍可用——keyless 镜像 Task162/171 起人人可用）。
+/// 哨兵键 general.task211_cf_source_migrated 保证只执行一次；常跑点在
+/// main.m（toggleIsolatedPref 之后——Task167 教训：不能挂场景会话回调）。
+void ame211_migrateCfSourceToModrinth(void);
+
 id getPrefObject(NSString *key);
 BOOL getPrefBool(NSString *key);
 float getPrefFloat(NSString *key);

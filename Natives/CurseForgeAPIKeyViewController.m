@@ -18,7 +18,9 @@
 
 #import "CurseForgeAPIKeyViewController.h"
 #import "PLPreferences.h"
-#import "CurseForgeAPI.h"
+// Task211：修正失效导入——Natives/ 下并无 CurseForgeAPI.h（本文件不在
+// CMake 目标列表里，旧导入从未被编译发现；真被编入时用完整路径）
+#import "installer/modpack/CurseForgeAPI.h"
 #import "config.h"
 #import "BackgroundManager.h"
 
@@ -486,9 +488,18 @@ static UIColor *CFKErrorColor(void) {
 
 - (void)loadInitialValue {
     // 优先级：运行时偏好 -> 编译时宏 -> Info.plist
+    // Task211（CF 403 根治）：预填净化。CI secret 未配置时
+    // @CONFIG_CURSEFORGE_API_KEY 字面展开为 "((void *)0)"（11 字符），
+    // 旧代码把它预填进输入框，“保存/测试”再原样写进运行时偏好——装机
+    // 17c51003 实测该垃圾随 x-api-key 发出即 403（“未知错误”）。预填
+    // 阶段就把占位家族归空（与 CurseForgeAPI +isPlaceholderAPIKey 同表）。
     NSString *runtimeKey = [PLPreferences curseForgeAPIKey];
+    if ([CurseForgeAPI isPlaceholderAPIKey:runtimeKey]) {
+        runtimeKey = @"";
+    }
     NSString *compiledKey = @CONFIG_CURSEFORGE_API_KEY;
-    if ([compiledKey isEqualToString:@"nil"]) {
+    if ([compiledKey isEqualToString:@"nil"] ||
+        [CurseForgeAPI isPlaceholderAPIKey:compiledKey]) {
         compiledKey = @"";
     }
     NSString *infoPlistKey = [NSBundle.mainBundle.infoDictionary[@"CurseForgeAPIKey"] isKindOfClass:NSString.class]
@@ -518,6 +529,12 @@ static UIColor *CFKErrorColor(void) {
     NSString *key = [_apiKeyTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
     if (key.length == 0) {
         [PLPreferences setCurseForgeAPIKey:nil];
+    } else if ([CurseForgeAPI isPlaceholderAPIKey:key]) {
+        // Task211：占位键拒绝入库（同 installer 侧 VC 的保存门）
+        [PLPreferences setCurseForgeAPIKey:nil];
+        [self loadInitialValue];
+        [self setStatusText:@"✗ 占位/无效的 Key 不予保存（留空即可走免 Key 镜像）" success:NO];
+        return;
     } else {
         [PLPreferences setCurseForgeAPIKey:key];
     }
@@ -527,9 +544,10 @@ static UIColor *CFKErrorColor(void) {
 
 - (void)clearButtonTapped {
     [PLPreferences setCurseForgeAPIKey:nil];
-    // 清空后回显到编译时默认值，便于用户参考
+    // 清空后回显到编译时默认值，便于用户参考（Task211：占位家族归空）
     NSString *compiledKey = @CONFIG_CURSEFORGE_API_KEY;
-    if ([compiledKey isEqualToString:@"nil"]) {
+    if ([compiledKey isEqualToString:@"nil"] ||
+        [CurseForgeAPI isPlaceholderAPIKey:compiledKey]) {
         compiledKey = @"";
     }
     _apiKeyTextField.text = compiledKey.length > 0 ? compiledKey : @"";
@@ -541,8 +559,14 @@ static UIColor *CFKErrorColor(void) {
     if (_isTesting) {
         return;
     }
-    // 1. 先保存当前输入的 Key 到偏好
+    // 1. 先保存当前输入的 Key 到偏好（Task211：占位键同 saveButtonTapped 拒绝）
     NSString *key = [_apiKeyTextField.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (key.length > 0 && [CurseForgeAPI isPlaceholderAPIKey:key]) {
+        [PLPreferences setCurseForgeAPIKey:nil];
+        [self loadInitialValue];
+        [self setStatusText:@"✗ 占位/无效的 Key 不予测试（留空即可走免 Key 镜像）" success:NO];
+        return;
+    }
     [PLPreferences setCurseForgeAPIKey:key.length > 0 ? key : nil];
 
     if (key.length == 0) {

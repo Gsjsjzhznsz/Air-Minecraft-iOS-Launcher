@@ -192,8 +192,8 @@ check("D", "applyCardEffectToCell 直转 applyEffectToCell（Flat 特调行退�
 print("== E. 公告 / version.h / 级联 ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 check("E", "公告 32 条，task210@2，置顶钉位未动，NG-GL4ES 尾锚保持",
-      len(ann) == 32
-      and ann[2]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
+      len(ann) == 33
+      and ann[3]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
       and ann[0]["id"].startswith("server-recommend")
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")

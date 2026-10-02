@@ -855,6 +855,47 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             }
             NSLog(@"[RenderDiag] Task188 fb: alphaBits=%d depthBits=%d readbackDone=%d uboAlign=%d uboBind=%d (alphaBits=8 => premultiplied-black composite hypothesis live; uboBind=0 at swap => MC never binds UBO, matrix-upload path broken)",
                   ame188_alphaBits, ame188_depthBits, (int)ame188_readOK, ame191_uboAlign, ame191_uboBind);
+            // ============================================================
+            // Task211（ANGLE 方块透明，in-world 五点回读）：帧内容"是否已
+            // 进入默认帧缓冲"的决定性二分。Task188 的 1x1 中心回读配额 3 次
+            // 几乎总被加载屏消耗（88fa3f6/17c51003 两会话 in-world 采样数
+            // 均为零）。本探针以 swapIndex >= 900（约 15s+，越过后加载期）
+            // 为门做五点读（中心 + 四角内缩 8px）：任一角非黑 => post 内容
+            // 已进 fb0（最终合成已落地，病灶在合成的上游）；全黑 => 最终
+            // 合成未提交/未落地（blit 链方向）。五次 1x1 独立小读（Task75
+            // SIGBUS 教训：全屏 BGRA 回读路径禁用）；每会话至多 2 轮。
+            // ============================================================
+            {
+                static int s_task211_5pt = 0;
+                if (drawFb == 0 && viewport[2] > 16 && viewport[3] > 16 &&
+                    es.readPixels != NULL && swapIndex >= 900 && s_task211_5pt < 2) {
+                    s_task211_5pt++;
+                    while (es.getError()) {}
+                    const int ame211_xs[5] = {
+                        viewport[0] + viewport[2] / 2, viewport[0] + 8,
+                        viewport[0] + viewport[2] - 8, viewport[0] + 8,
+                        viewport[0] + viewport[2] - 8
+                    };
+                    const int ame211_ys[5] = {
+                        viewport[1] + viewport[3] / 2, viewport[1] + 8,
+                        viewport[1] + 8, viewport[1] + viewport[3] - 8,
+                        viewport[1] + viewport[3] - 8
+                    };
+                    unsigned char ame211_px[5][4] = {{0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}};
+                    for (int ame211_i = 0; ame211_i < 5; ++ame211_i) {
+                        es.readPixels(ame211_xs[ame211_i], ame211_ys[ame211_i], 1, 1,
+                                      0x1908 /*GL_RGBA*/, 0x1401 /*GL_UNSIGNED_BYTE*/, ame211_px[ame211_i]);
+                    }
+                    unsigned int ame211_rbErr = es.getError();
+                    NSLog(@"[RenderDiag] Task211 5-point in-world readback #%d swapIndex=%lu vp=(%d,%d %dx%d) center=(%d,%d,%d,%d) TL=(%d,%d,%d,%d) TR=(%d,%d,%d,%d) BL=(%d,%d,%d,%d) BR=(%d,%d,%d,%d) glErr=0x%x -- any nonzero => content reached fb0 (final blit ran; look upstream of compositing); all-black => final composite never landed",
+                          s_task211_5pt, (unsigned long)swapIndex, viewport[0], viewport[1], viewport[2], viewport[3],
+                          ame211_px[0][0], ame211_px[0][1], ame211_px[0][2], ame211_px[0][3],
+                          ame211_px[1][0], ame211_px[1][1], ame211_px[1][2], ame211_px[1][3],
+                          ame211_px[2][0], ame211_px[2][1], ame211_px[2][2], ame211_px[2][3],
+                          ame211_px[3][0], ame211_px[3][1], ame211_px[3][2], ame211_px[3][3],
+                          ame211_px[4][0], ame211_px[4][1], ame211_px[4][2], ame211_px[4][3], ame211_rbErr);
+                }
+            }
         }
     }
     // Task 76：退役 while(es.getError() != 0) 清错循环——它会把底层 ANGLE

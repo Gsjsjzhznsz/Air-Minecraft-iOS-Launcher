@@ -24,6 +24,17 @@
       "image_url": ""
     },
     {
+      "id": "task211-exit-cf-angle-gl4es-2026-10-02",
+      "date": "2026-10-02",
+      "title": "退出“崩溃”根治 + CurseForge 403 修复 + ANGLE 方块透明攻坚 + 新渲染器 gl4es（ZL2 经典版）",
+      "summary": "退出游戏不再误报崩溃；CurseForge 源 403 根治且默认源改为 Modrinth；ANGLE 方块透明上拆解修复与决定性探针；按用户点名从源码移植 ZL2 经典版 gl4es。",
+      "content": "Task 211 五主题（装机日志 17c5100 判读定案）。\n\n一、退出游戏“崩溃”根治。MC 26.3 新增退出监视器：JVM 在 main 返回后若仍被非后台线程拖住，就会强制生成“退出时崩溃”报告。元凶是启动器自带的 metallum 监控 agent——它的 premain 启动的metallum-state/metallum-dump 两个线程没有标记为后台线程。已对 metallum_agent.jar 做字节码手术（两处 Thread.start 前插入 setDaemon(true)，本地 A/B 实证：补丁版秒退、原版完整复现挂死）。退出游戏将干净利落，不再出现崩溃报告。\n\n二、CurseForge 源 403 根治 + 默认源改为 Modrinth。根因：CI 构建的 API Key 占位串（((void *)0)，11 字符）被设置页预填并保存进设备，每次请求都带着这个垃圾 Key 打官方 API，必得 403（界面显示“未知错误”）。修复三层：请求层拒收占位 Key（自动走免 Key 镜像）、设置页预填净化 + 保存门（占位键不予保存）、403 报错友好化（指路设置页）。另按用户要求做一次性迁移：没有有效 Key 的设备把 CurseForge 源拨回 Modrinth（CF 修好后随时可手动切回）。\n\n三、ANGLE 方块透明攻坚。Task209 四叉取证定谳：地形绘制提交完全健康（sodium 多绘制在跑、状态健全、零 GL 错误），唯独方块不可见——与安卓端同族翻译层的已知病灶“多维绘制静默丢绘制”病形一致。本轮上了修复（把 MultiDraw 一律拆解为逐 draw 提交）+ 两个决定性探针（in-world 帧缓冲五点像素回读 + 最终合成四边形普查），下轮装机日志一锤定音。\n\n四、新渲染器「gl4es（ZL2 经典版）」上线（用户点名移植）。ZL2 的经典版 gl4es（PojavLauncherTeam 分支）现从源码构建随包提供，渲染器列表与 holy gl4es、Krypton Wrapper 三者并存互为备选。\n\n五、显示名收短。Krypton Wrapper 渲染器条目收短为「Krypton Wrapper（≤26.2）」。另：virglrenderer 渲染器已完成评估排期（需要重建一份带 virgl 驱动的 Mesa，独立多轮工程，未包含在本轮）。",
+      "priority": "normal",
+      "action_url": "",
+      "action_title": "",
+      "image_url": ""
+    },
+    {
       "id": "task210-neumorph-retirement-card-fixes-2026-10-02",
       "date": "2026-10-02",
       "title": "新拟态全面退役 + 实例卡修复（Task 210）",

@@ -470,6 +470,9 @@ int main(int argc, char *argv[]) {
     // 幂等，与 AppDelegate 的保留调用点互为冗余。装机锚点：
     // "[Preferences] Task167 MG DSA black-screen migration ran (stored=1, flipped=1)"。
     ame130_migrateMgPerfDefaults();
+    // Task211：CF 源迁 Modrinth + 垃圾 Key 清理（同位置的幂等一次性迁移；
+    // 装机锚点 "[Preferences] Task211: ..."，详见 LauncherPreferences.h）
+    ame211_migrateCfSourceToModrinth();
     [PLProfiles updateCurrent];
     init_setupAccounts();
     init_setupCustomControls();
