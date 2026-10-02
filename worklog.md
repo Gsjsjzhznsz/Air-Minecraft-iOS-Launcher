@@ -1450,3 +1450,19 @@ Stage Summary:
 - 环境教训两笔：①本机 rg 显示输出会被全局配置静默改写（@[header] 显示成 @eader]——字节真相只用 python 复核，本轮两次险些误判文件损坏）②文本模式改写会静默降 CRLF 为 LF（development.yml 354 行 CRLF 被 R10 破坏，205 D3 拦截，恢复后全库行尾审计通过）
 - 装机锚点（下轮日志逐条对账）：①实例卡 128pt 视觉与快捷指令卡同档、无字裁 ②长按实例卡=确认删除弹窗（无三件套菜单）③目录卡=实例卡同款（蓝 folder/大小小字/叉号钮），点叉号=确认删除弹窗，长按目录无响应 ④"使用问题"在默认卡片布局下正常呼出 ⑤安装器加载器列表与版本列表行距一致（50pt）⑥账号卡大头像 68pt+绿徽章 ⑦主屏图标名/设置页/系统权限弹窗显示 Prisma ⑧设置内存限制说明=新文案+付费开发者证书按钮跳 b23.tv/WtgrPJM ⑨新包名 com.air-devs.prisma（iOS 视为全新应用，旧装数据不迁移——用户已知情）
 - 风险移交：GitHub 仓库若同步改名，需同步 UpdateChecker.m/PLPreferences.m/AnnouncementService.m/ControlRepoViewController.m 内仓库地址；公告内历史条目的仓库 URL 保持旧名（历史事实）
+
+---
+Task ID: 213（CI 续记）
+Agent: main (Super Z)
+Task: Task 213 主提交（92b909b，原编 212）推送后的 CI 收尾——撞号让号、双插入合并、三笔 SDK 热修至绿
+
+Work Log:
+- 撞号：并行会话先推其 "Task 212"（a4a4c77 ANGLE 探针决战 + CF 筛选加固 + holy gl4es 整体退役 + ZL2 更名 gl4es(≤26.2) + VirGL 起步 + b842b67 级联尾）；本轮按家法让号重编 213
+- rebase 合并态：公告 35 条（task213@2 本轮 + task212@3 并行 + task169 钉 [1]）；两轮 +1 扫叠加（anns[]/ann[]/items[]/["announcements"][N] 四形态）+ len 35 + 165/167 窗口 28/26；对方 find-by-id 140/142、git-pinned G 组、自含 A5、退役化 202/203 原样保留；本轮规格重锚（190/207/210）保己侧 + 叠加 +1；两条官方验证器（their verify_task212 与 mine verify_task213 85/85）在合并树上双绿；168/174 的级联基线补录并行轮文档化的 132-135 漂移簇 + 138 的 2228→2418 陈旧 + 136 存量 C4
+- CI 三连修（每笔都由 15.4 SDK 实锤、本地静态门无 clang 不可见）：①AccountListViewController 补 UIKit+NativeSurface.h import（AmeCard 色函数未声明 ×6）②VM 目录分支 weakSelf 双声明合一③ame212_migrateHolyGl4es 内 PLProfiles 对象与 int 计数器同名（并行轮自带的病，其 b842b67 红门同根）——对象改名 ame212_store
+- 终局：run 3ff684a7 completed success（~10 分钟），ipa/tipa/dSYM 就绪；supersede 链：92b909b 首跑被 poller 提交取消（家法常规）
+- 教训三笔：rebase checkout 语义 ours=上游/theirs=被重放（首轮取侧反了，J 组内容检查当场抓获）；本地无 clang 的静态门拦不住声明面/重定义类（SDK 门是唯一裁判）；rg 显示改写坑之外再添两条——文本模式 CRLF 降级（205 D3 拦截）与本轮的 SDK 门（CI 拦截）
+
+Stage Summary:
+- 主链：92b909b（主轮）→ 9cc9d1b（poller）→ 5e2a389（import 热修）→ 0100516（weakSelf 热修）→ 3ff684a（ame212 改名热修）——全部 HEAD:main 推送（本地分支名 task210 与远端 main 不同名的坑：git push origin main 推的是陈旧本地 main，前三笔拒绝皆此因）
+- CI：3ff684a 绿，产物就绪；并行轮 b842b67 的红门由本轮 3ff684a 掩护恢复
