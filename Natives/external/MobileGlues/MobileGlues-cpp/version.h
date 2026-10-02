@@ -3713,4 +3713,41 @@
 //   tail-truncated long memory strings ("MEM: 328..."): now shrink-to-fit
 //   (adjustsFontSizeToFitWidth, minimumScaleFactor 0.5) per user order --
 //   shrink, never ellipsize.
+
+// REVISION 19 addendum (Task 215, no bump): VirGLRenderer(≤26.2) lands --
+// ported from ZalithLauncher2 onto our ANGLE infrastructure (the round the
+// user ordered with the renderer named exactly VirGLRenderer(≤26.2); task
+// number yielded to the parallel UI round that took 214). Guest =
+// libOSMesaVirgl.dylib (Mesa 25.0.7, CI-downloaded tarball +
+// patches/mesa-215-osmesa-virgl.patch: osmesa_create_screen honors
+// GALLIUM_DRIVER=virgl via virgl_vtest_winsys_wrap(null_sw_create()) +
+// virgl_create_screen(), because upstream osmesa hardcodes swrast; the
+// libdrm-dependent DRM winsys is gated off so darwin/iOS configures clean,
+// and darwin symbol visibility switches to default or the whole
+// gl*/OSMesa* export set would be swallowed). Server = libvtestserver.dylib
+// (vendored virglrenderer 1.3.0, whose upstream vtest_server.c already
+// exports vtest_main and carries --no-loop-or-fork/--use-gles with no epoll
+// anywhere; only vtest_shm.c needed a memfd->mkstemp fallback) statically
+// linking vendored libepoxy (patched to dlopen our ANGLE frameworks under
+// __ENVIRONMENT_IPHONE_OS__). New Natives/ctxbridges/virgl_server.m owns the
+// bootstrap: POJAV_HOME/.virgl_test socket + VTEST_SOCKET_NAME /
+// GALLIUM_DRIVER=virgl env, a raw-ANGLE 1x1 pbuffer ES3 host context, and a
+// detached 16MB-stack server thread entering vtest_main with an explicit
+// --socket-path. egl_bridge's VirGL branch sits BEFORE the libOSMesa prefix
+// branch (zink) that would otherwise swallow libOSMesaVirgl.dylib and reuses
+// set_osm_bridge_tbl, so the present path is the battle-tested zink chain
+// (glReadPixels authoritative readback; server-side vtest_swap_buffers
+// remains a documented follow-up if the socket transfer shows in the frame
+// budget). JavaLauncher logs the active renderer and excludes virgl from the
+// zink env block; the AI mapping puts the virgl match ahead of the osmesa
+// substring match for the same swallow reason. CI gains
+// meson/ninja/bison(>2.3, keg-only PATH injection)/mako. Same round, ANGLE
+// "transparent blocks": tinygl4angle.c now intercepts glClearDepth (records
+// the value) and glClear -- DEPTH bit + value ~1.0 first triggers an explicit
+// glClearBufferfv(GL_DEPTH) (MobileGlues Mode2, zero shader deps) before the
+// regular clear, auto-on with AME_TINYGL4_DEPTH_CLEAR_FIX=0 to disable; this
+// targets the documented ANGLE-Metal depth-clear silent failure and runs
+// orthogonally to Task 212's probe kit (both read out in the next device
+// log). Missing virgl dylibs degrade gracefully: the renderer picker hides
+// entries whose file is absent.
 // ============================================================================

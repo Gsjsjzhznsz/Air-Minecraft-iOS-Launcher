@@ -117,17 +117,17 @@ void(*gles_glTexImage2D)(GLenum target, GLint level, GLint internalformat, GLsiz
 void(*gles_glTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *data);
 void(*gles_glTexParameterfv)(GLenum target, GLenum pname, const GLfloat *params);
 
-// Task 214 前置声明（定义在下方 Task214 块，引用在此处之前）
-static float ame214_clear_depth = 1.0f;
-static int ame214_depth_fix_state = -1;
+// Task 215 前置声明（定义在下方 Task215 块，引用在此处之前）
+static float ame215_clear_depth = 1.0f;
+static int ame215_depth_fix_state = -1;
 
 void glClearDepth(GLdouble depth) {
-    ame214_clear_depth = (float)depth;
+    ame215_clear_depth = (float)depth;
     glClearDepthf(depth);
 }
 
 // ============================================================================
-// Task 214: ANGLE-Metal 深度清除 workaround（ANGLE 渲染器“方块透明/透视”修复）
+// Task 215: ANGLE-Metal 深度清除 workaround（ANGLE 渲染器“方块透明/透视”修复）
 //
 // 病灶：ANGLE(Metal) 的 glClear(GL_DEPTH_BUFFER_BIT) 在部分帧缓冲上静默失效，
 // 深度缓冲残留上一帧数据 → 地形片元深度测试错误失败 → 方块成片“透明/消失”
@@ -149,18 +149,18 @@ void(*gles_glClearBufferfv)(GLenum buffer, GLint drawbuffer, const GLfloat *valu
 void glClear(GLbitfield mask) {
     LOOKUP_FUNC(glClear)
     if (mask & 0x00000100 /*GL_DEPTH_BUFFER_BIT*/) {
-        if (ame214_depth_fix_state < 0) {
-            const char *ame214_env = getenv("AME_TINYGL4_DEPTH_CLEAR_FIX");
-            ame214_depth_fix_state = (ame214_env && !strcmp(ame214_env, "0")) ? 0 : 1;
-            if (ame214_depth_fix_state) {
-                printf("[tinygl4angle] Task214 ANGLE-Metal depth-clear workaround armed (stale-depth x-ray fix; AME_TINYGL4_DEPTH_CLEAR_FIX=0 to disable)\n");
+        if (ame215_depth_fix_state < 0) {
+            const char *ame215_env = getenv("AME_TINYGL4_DEPTH_CLEAR_FIX");
+            ame215_depth_fix_state = (ame215_env && !strcmp(ame215_env, "0")) ? 0 : 1;
+            if (ame215_depth_fix_state) {
+                printf("[tinygl4angle] Task215 ANGLE-Metal depth-clear workaround armed (stale-depth x-ray fix; AME_TINYGL4_DEPTH_CLEAR_FIX=0 to disable)\n");
             }
         }
-        if (ame214_depth_fix_state == 1 && fabsf(ame214_clear_depth - 1.0f) <= 0.001f) {
+        if (ame215_depth_fix_state == 1 && fabsf(ame215_clear_depth - 1.0f) <= 0.001f) {
             LOOKUP_FUNC(glClearBufferfv)
             if (gles_glClearBufferfv) {
-                const GLfloat ame214_d = ame214_clear_depth;
-                gles_glClearBufferfv(0x0180 /*GL_DEPTH*/, 0, &ame214_d);
+                const GLfloat ame215_d = ame215_clear_depth;
+                gles_glClearBufferfv(0x0180 /*GL_DEPTH*/, 0, &ame215_d);
             }
         }
     }

@@ -61,9 +61,9 @@ check("A3 AI 面（友好名新名在前 + 提示词键表两处 + 子串包含�
       'return @"Krypton Wrapper/NG-GL4ES (libnggl4es.dylib)"' in ai
       and "auto/GL4ES/Krypton Wrapper" in ai
       and "GL4ES/Krypton Wrapper/NG-GL4ES/gl4es ZL2/ANGLE" in ai
-      and 0 <= ai.find('containsString:@"nggl4es"') < ai.find('containsString:@"gl4es"])')
-      and ai.find('containsString:@"nggl4es"') < ai.find('return @(RENDERER_NAME_GL4ES)')
-      and ai.find('containsString:@"gl4eszl2"') < ai.find('containsString:@"gl4es"])'))
+      and 0 <= ai.find('containsString:@"nggl4es"') < ai.find('containsString:@"gl4es"]')
+      and ai.find('containsString:@"nggl4es"') < ai.find('return @(RENDERER_NAME_GL4ESZL2)')
+      and ai.find('containsString:@"gl4eszl2"') < ai.find('containsString:@"gl4es"]'))
 
 faq_files = [("Natives/resources/help-faq.json", 2), ("help-faq.json", 2),
              ("Natives/resources/zh-CN.lproj/help-faq.json", 2),
@@ -196,9 +196,9 @@ check("D1 version.h Task209 附录（改名 + 红鲱鱼 + 探针 + 尾部 SEP）
       and vh.rstrip().endswith("// ============================================================================"))
 
 ann = json.loads(rd("announcements.json"))["announcements"]
-a209 = ann[7] if len(ann) > 2 else {}  # Task212 重锚：task212@2 插入顺延
+a209 = ann[8] if len(ann) > 2 else {}  # Task212 重锚：task212@2 插入顺延
 check("D2 公告 task209@2（Task212 重锚：34 条 + 末位 task206 不动 + 内容双主题）",
-      len(ann) == 36 and a209.get("id") == "task209-krypton-rename-2026-10-01"
+      len(ann) == 37 and a209.get("id") == "task209-krypton-rename-2026-10-01"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and "Krypton Wrapper" in a209.get("title", "")
       and "红鲱鱼" in a209.get("content", "")
@@ -225,8 +225,8 @@ check("D6 verify_task202 级联 57/57（公告 31 + 索引顺延重锚后）",
       r202.stdout[-160:] if r202.returncode != 0 else "")
 
 r193 = run([sys.executable, "scripts/verify_task193.py"], timeout=600)
-check("D7 verify_task193 级联 86 PASS / 0 FAIL",
-      r193.returncode == 0 and "86 PASS / 0 FAIL" in r193.stdout,
+check("D7 verify_task193 级联 84 PASS / 0 FAIL（Task215 重锚：并行 214 的 N-gate 重排净 -2）",
+      r193.returncode == 0 and "84 PASS / 0 FAIL" in r193.stdout,
       r193.stdout[-160:] if r193.returncode != 0 else "")
 
 r165 = run([sys.executable, "scripts/verify_task165.py"], timeout=280)

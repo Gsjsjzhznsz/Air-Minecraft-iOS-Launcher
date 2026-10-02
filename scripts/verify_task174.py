@@ -154,17 +154,17 @@ check("E1 公告（Task212 重锚：task212@2 插入后全体非钉位再 +1；�
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[14]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[15]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[16]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[17]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[18]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[19]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[21]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[22]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[23]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[24]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t174 = anns[18]  # Task212 重锚：task212@2 插入后 174 实居 [16]（旧 anns[14] 自 Task190 轮起已错位=存量）
+      and anns[15]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[16]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[17]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[18]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[19]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[20]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[22]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[23]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[24]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[25]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t174 = anns[19]  # Task212 重锚：task212@2 插入后 174 实居 [16]（旧 anns[14] 自 Task190 轮起已错位=存量）
 check("E2 公告内容锚（晕影根因=壁纸垫底/画布接管/百分比实时回显 + EN 尾注）",
       "晕影" in t174["summary"] and "画布接管" in t174["summary"]
       and "壁纸" in t174["content"] and "实时回显" in t174["content"]

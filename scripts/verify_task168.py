@@ -147,8 +147,8 @@ ids = [a["id"] for a in anns]
 check("D1 公告顺延（Task212 重锚：task212@2 插入后 task168 顺延至 anns[24]；task169 钉死 anns[1] 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[24]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t168 = anns[24]  # Task212 重锚：task212@2 插入后 task168 实居 21
+      and anns[25]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t168 = anns[25]  # Task212 重锚：task212@2 插入后 task168 实居 21
 check("D2 公告内容：根因叙述 + 双形态 + 两个维护路径",
       "447a677" in t168["content"] and "透明度/模糊" in t168["content"]
       and "announcements.json" in t168["content"] and "help-faq.json" in t168["content"]

@@ -632,11 +632,11 @@ dep_gl4eszl2:
 	cp $(WORKINGDIR)/gl4eszl2/libgl4eszl2.dylib $(WORKINGDIR)/ || exit 1
 	echo '[Amethyst v$(VERSION)] dep_gl4eszl2 - end'
 
-# Task 214: VirGLRenderer(≤26.2)（ZL2 移植，Task212 预留 stage 2 的落地）三件套：
+# Task 215: VirGLRenderer(≤26.2)（ZL2 移植，Task212 预留 stage 2 的落地）三件套：
 #  1. libepoxy          —— vendored Natives/external/libepoxy（iOS 补丁：dlopen 指向 ANGLE 框架）
 #  2. libvtestserver.dylib —— vendored virglrenderer 1.3.0（vtest server + vrend，静态链 epoxy；
 #     上游 vtest_server.c 本身导出 vtest_main，vtest_main.c 的 main 不参与链接）
-#  3. libOSMesaVirgl.dylib —— Mesa 25.0.7（下载 tar.xz + patches/mesa-214-osmesa-virgl.patch，
+#  3. libOSMesaVirgl.dylib —— Mesa 25.0.7（下载 tar.xz + patches/mesa-215-osmesa-virgl.patch，
 #     virgl 驱动 + softpipe 回退，osmesa 前端导出全量 gl*；GALLIUM_DRIVER=virgl 经
 #     VTEST_SOCKET_NAME 连接进程内 vtest server）
 # 快路径：三个 dylib 已 commit-back 到 Frameworks 时跳过整链构建；
@@ -702,7 +702,7 @@ dep_virgl:
 	# ---- 3. Mesa virgl guest（下载 + 补丁 + 构建）----
 	mkdir -p $(SOURCEDIR)/depends/virgl
 	cd $(SOURCEDIR)/depends/virgl; \
-		if [ ! -f mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task214_patched ]; then \
+		if [ ! -f mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task215_patched ]; then \
 			wget_ok=0; \
 			for attempt in 1 2 3 4 5; do \
 				if wget "https://archive.mesa3d.org/mesa-$(VIRGL_MESA_VERSION).tar.xz" --timeout=90 --tries=2 --retry-connrefused -O mesa-$(VIRGL_MESA_VERSION).tar.xz; then wget_ok=1; break; fi; \
@@ -710,10 +710,10 @@ dep_virgl:
 			done; \
 			[ "$$wget_ok" = "1" ] || { echo '[virgl] FATAL: mesa download failed'; exit 1; }; \
 			rm -rf mesa-$(VIRGL_MESA_VERSION) && tar xf mesa-$(VIRGL_MESA_VERSION).tar.xz; \
-			( cd mesa-$(VIRGL_MESA_VERSION) && patch -p1 < $(SOURCEDIR)/patches/mesa-214-osmesa-virgl.patch \
-			  && touch src/gallium/targets/osmesa/.task214_patched ) || exit 1; \
+			( cd mesa-$(VIRGL_MESA_VERSION) && patch -p1 < $(SOURCEDIR)/patches/mesa-215-osmesa-virgl.patch \
+			  && touch src/gallium/targets/osmesa/.task215_patched ) || exit 1; \
 		fi
-	test -f $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task214_patched || { echo 'ERROR: mesa patch not applied'; exit 1; }
+	test -f $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task215_patched || { echo 'ERROR: mesa patch not applied'; exit 1; }
 	rm -rf $(WORKINGDIR)/virgl-mesa
 	cd $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION) && meson setup $(WORKINGDIR)/virgl-mesa \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \

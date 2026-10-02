@@ -74,12 +74,17 @@ check("A6 Task206 选项保留（未来真 PC 块版本需要；与 MC 桌面选
 
 # ============ B. NG-GL4ES 初始化时序根修 ============
 print("== B. NG-GL4ES 初始化时序根修 ==")
-nglog = rd("latestlog.old.txt")  # 99a61eb NG-GL4ES 崩溃会话
+# Task215 git 钉证据：用户上传轮换会持续替换工作区的 latestlog.old.txt
+# （当前工作区已是 c7079e1 ANGLE 会话），改从 99a61eb4 提交读取——
+# 与 verify_task140 G 组 / Task209 的 git-pinned 惯例同款。
+import subprocess as _sp215
+nglog = _sp215.run(["git", "show", "de846f3d:latestlog.old"],
+                   capture_output=True, text=True, cwd=REPO).stdout
 cml = rd("ThirdParty/ZalithLauncher2/CMakeLists.txt")
 eb = rd("Natives/egl_bridge.m")
 hardext = rd("ThirdParty/ZalithLauncher2/src/glx/hardext.c")
 
-check("B1 装机证据（99a61eb latestlog.old）：构造器期 strstr SIGSEGV + 事后卡死",
+check("B1 装机证据（99a61eb4:latestlog.old，git 钉版）：构造器期 strstr SIGSEGV + 事后卡死",
       "_platform_strstr" in nglog and "GetHardwareExtensions" in nglog
       and "initialize_gl4es" in nglog
       and "STILL blocked at org.lwjgl.system.JNI.invokePP" in nglog

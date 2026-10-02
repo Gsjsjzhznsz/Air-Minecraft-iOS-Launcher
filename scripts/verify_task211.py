@@ -66,7 +66,10 @@ check("A4 仓库 jar 已变更（对比 Task201 原版字节）",
 # E2E 行为门（java 可用时）：补丁版 = daemon=true + 即退 0
 # Task212 修：探针类改为现场编译（旧会话曾依赖 /tmp/t211 的预编译产物，
 # 沙箱重置即蒸发——A5 因此误报）。自包含后任何环境可复跑。
-have_java = run(["bash", "-lc", "command -v java"]).returncode == 0
+# Task215 修正：双在位门（仅查 java 时 JRE 即过，javac 缺失 → FileNotFoundError
+# 落进 except 被记 FAIL——环境性误报；沙箱瘦身后仅剩 JRE 属实）
+have_java = (run(["bash", "-lc", "command -v java"]).returncode == 0
+              and run(["bash", "-lc", "command -v javac"]).returncode == 0)
 if have_java:
     try:
         import tempfile as _tf
@@ -181,14 +184,14 @@ check("E1 version.h Task211 附录（五主题 + 尾部 SEP）",
       and re.search(r"// ={70,}\s*$", vh) is not None)
 ann = json.loads(rd("announcements.json"))["announcements"]
 check("E2 公告 task211@3（Task212 重锚：34 条 + task212@2 插入顺延 + 尾锚）",
-      len(ann) == 36 and ann[5]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
+      len(ann) == 37 and ann[6]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[4]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
-      and ann[6]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
+      and ann[5]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
+      and ann[7]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
 check("E3 公告内容五主题齐备",
-      all(k in ann[5]["content"] for k in
+      all(k in ann[6]["content"] for k in
           ("退出", "CurseForge", "Modrinth", "拆解", "ZL2 经典版", "virglrenderer")))
 
 # ============ F. 语法门 + 级联 ============

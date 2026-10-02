@@ -78,7 +78,7 @@
     }
     if ([lower isEqualToString:@"auto"] || [lower containsString:@"自动"]) return @"auto";
     if ([lower containsString:@"moltenvk"] || [lower containsString:@"vulkan"]) return @(RENDERER_NAME_VULKAN);
-    // Task 214：VirGL 匹配必须在 zink/osmesa 之前（libOSMesaVirgl 同样含 osmesa 字样）
+    // Task 215：VirGL 匹配必须在 zink/osmesa 之前（libOSMesaVirgl 同样含 osmesa 字样）
     if ([lower containsString:@"virgl"] || [lower containsString:@"virgil"]) return @(RENDERER_NAME_VIRGL);
     if ([lower containsString:@"zink"] || [lower containsString:@"mesa"] || [lower containsString:@"osmesa"]) return @(RENDERER_NAME_VK_ZINK);
     if ([lower containsString:@"mobileglues"] || [lower isEqualToString:@"mg"]) return @(RENDERER_NAME_MOBILEGLUES);
@@ -106,7 +106,7 @@
     if ([storageKey isEqualToString:@(RENDERER_NAME_LTW)]) return @"LTW (libltw.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_NGGL4ES)]) return @"Krypton Wrapper/NG-GL4ES (libnggl4es.dylib)"; // Task209：改名后新名在前，旧名保留供 AI 对话兼容
     if ([storageKey isEqualToString:@(RENDERER_NAME_GL4ESZL2)]) return @"gl4es(≤26.2) (libgl4eszl2.dylib)"; // Task211 引入；Task212 用户定名
-    // Task 214：VirGLRenderer(≤26.2)（ZL2 移植，libOSMesaVirgl guest + 进程内 vtest server）
+    // Task 215：VirGLRenderer(≤26.2)（ZL2 移植，libOSMesaVirgl guest + 进程内 vtest server）
     if ([storageKey isEqualToString:@(RENDERER_NAME_VIRGL)]) return @"VirGLRenderer(≤26.2) (libOSMesaVirgl.dylib)";
     return storageKey;
 }

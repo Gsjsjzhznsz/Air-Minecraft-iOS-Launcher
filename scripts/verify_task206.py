@@ -157,13 +157,13 @@ check("D1 dep_nggl4es 目标（目标级先决 dep_mg——CI run 36804929330 �
       and "ThirdParty/ZalithLauncher2/" in mk
       and "cp $(WORKINGDIR)/nggl4es/libnggl4es.dylib $(WORKINGDIR)/" in mk)
 
-check("D2 payload 行接线（mithril 之后、angle_freeze 之前）",
-      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_angle_freeze dep_sdl3_guard" in mk
+check("D2 payload 行接线（mithril 之后、angle_freeze 之前；Task215 重锚：dep_virgl 插于 gl4eszl2 与 angle_freeze 之间）",
+      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_virgl dep_angle_freeze dep_sdl3_guard" in mk
       and mk.find("dep_nggl4es dep_gl4eszl2") > mk.find("dep_mithril_glshim dep_nggl4es"))
 
 cur_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("D3 TAB 基线 561（Task212 重锚：559 + holy 退役净 +2：删 2 补丁行、增 4 注释行）且无空格缩进 recipe",
-      cur_tab == 561
+check("D3 TAB 基线 644（Task215 重锚：dep_virgl +83）（Task212 重锚：559 + holy 退役净 +2：删 2 补丁行、增 4 注释行）且无空格缩进 recipe",
+      cur_tab == 644
       and not any(l.startswith("    ") for l in mk.split("\n")),
       f"cur={cur_tab}")
 
@@ -267,14 +267,14 @@ check("F4 渲染器选择条目（Task209 重锚：Krypton Wrapper 新名 + 原�
 
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
 check("F5 公告 34 且末位为 task206-nggl4es-2026-10-01（Task212 重锚：task212@2 插入后 34）",
-      len(ann) == 36 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+      len(ann) == 37 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and "NG-GL4ES" in ann[-1]["title"] and "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER" in ann[-1]["content"])
 
 anchor_ok = ('== [12, 4, 7, 15]' in rd("scripts/verify_task202.py")
              and '== [12, 4, 7, 15]' in rd("scripts/verify_task168.py")
-             and "len(ann) == 36" in rd("scripts/verify_task203.py")
-             and "len(ann) == 36" in rd("scripts/verify_task202.py")
-             and "len(ann) == 36" in rd("scripts/verify_task196_197_198_201.py"))
+             and "len(ann) == 37" in rd("scripts/verify_task203.py")
+             and "len(ann) == 37" in rd("scripts/verify_task202.py")
+             and "len(ann) == 37" in rd("scripts/verify_task196_197_198_201.py"))
 check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族；Task212 重锚 33→34）", anchor_ok)
 
 # ============ G. version.h ============
@@ -309,7 +309,7 @@ r = run([sys.executable, "scripts/verify_task129.py"], timeout=600)
 fails129 = [l for l in r.stdout.splitlines() if "FAIL" in l and "RESULT" not in l]
 # head tracks the last commit's baseline (531 after Task206f, 534 after this
 # round); only cur is stable to assert pre-commit
-dirty_ok = all("I4 Makefile TAB" in l and "head=559 cur=561" in l for l in fails129) and len(fails129) <= 1
+dirty_ok = all("I4 Makefile TAB" in l and "head=561 cur=644" in l for l in fails129) and len(fails129) <= 1
 check("H verify_task129 仅剩脏树 I4（Task212 重锚：cur=561，head 随提交基线走，提交后自愈）", dirty_ok, str(fails129))
 
 r = run([sys.executable, "scripts/verify_task174.py"], timeout=600)

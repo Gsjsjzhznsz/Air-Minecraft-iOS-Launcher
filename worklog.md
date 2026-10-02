@@ -1504,3 +1504,21 @@ Work Log:
 Stage Summary:
 - 主链一笔直达绿：2dd8d0b（Task 214 主轮，50 文件 +525/-205）；无 poller/热修提交
 - 教训一笔：verify_task211 每次运行会以 on-the-fly 编译探针写脏 task179_inc/tinygl4angle_harness.c——跑 211 后须 git restore --source=HEAD --staged --worktree 该文件（本轮 staged 前 50 文件统计一度被它污染成 +806/-220）
+
+---
+Task ID: 215
+Agent: main (Super Z)
+Task: 让号重编轮——VirGLRenderer(≤26.2) 完整移植 + ANGLE 方块透明深度修复（原编号 214 被并行 UI 五修轮占用，按家法让号）
+
+Work Log:
+- 让号：本地两提交（43ea632d 主移植 + eec98651 扫尾）推送时发现并行会话已推送自己的 Task 214（2dd8d0b9 UI 五修轮：mem_help l10n 键六语言补齐 + 绿边框退役 + 卡片圆角 16pt + 选中环吞触摸根修 + 游戏菜单统计字号收缩 + REVISION 18→19 升号 + 他们自己的 36 条公告态与 39 验证器扫荡）与 CI 闭环（c2b6a43d）。我的工作与本轮零代码交集（他们碰 UI/l10n/docs，我碰渲染器/桥/构建链），仅有公告/version.h/验证器家族的元文件重叠——按 Task211 让号 210、Task213 让号 212 的家法重编为 215：分支 task215 自 origin/main 重建，摘樱桃主移植提交（17 个元文件冲突全取 theirs/ours-远端态），全部代码与脚本 Task 214→215 重编号（含 ame215_* 变量、[VirGL] Task215 日志锚、.task215_patched 标记、mesa-215-osmesa-virgl.patch 改名）。
+- 本轮交付（与并行 214 无交集的两件核心）：① VirGLRenderer(≤26.2)：vendored virglrenderer 1.3.0（上游 vtest_server.c 本就导出 vtest_main、零 epoll，仅补 vtest_shm memfd→mkstemp 回退）+ vendored libepoxy（__ENVIRONMENT_IPHONE_OS__ 下 dlopen 指向随包 ANGLE 框架）+ Mesa osmesa-virgl 补丁（GALLIUM_DRIVER=virgl → virgl_vtest_winsys_wrap(null_sw_create()) + virgl_create_screen()；libdrm 门控；darwin 符号可见性 default）+ virgl_server.m 桥（.virgl_test socket + 1x1 pbuffer ES3 宿主上下文 + 16MB 栈服务线程）+ 五处接线（utils.h/egl_bridge[置于 zink 前缀分支之前]/JavaLauncher/渲染器表[接 212 预留键]/AI 映射[virgl 置于 osmesa 子串匹配之前——修掉 libOSMesaVirgl 被 zink 吞并的真 bug]）+ Makefile dep_virgl 三件套（TAB +83 行）+ CI 依赖（meson/ninja/bison>2.3 keg-only PATH/mako）。② ANGLE 方块透明深度修复：tinygl4angle 拦截 glClearDepth+glClear，带 DEPTH 位且 ≈1.0 时先 glClearBufferfv(GL_DEPTH) 显式写深度（MobileGlues Mode2 同款），自包含化过 Task193 语法门（前置声明 + 0x0180/0x00000100 数值常量），AME_TINYGL4_DEPTH_CLEAR_FIX=0 可关。
+- 级联维护（task215@2 插入 → 37 条公告态）：全家族 +1 重锚（214/213/212/211/210/209/207/206/202/203/193/196族/190/173/174/170/179/168/167/165 + 212 的 spot 表 + 207/213 的元检查串）；TAB 基线 561→644 重放（129/135/203/206/212/202 + payload 行 +dep_virgl 的 129 A9/206 D2）；170 F2 的 t170 索引、211 E3 索引、213 H7/H8/H10、207 七脚本元检查、209 A3 顺序钉（旧链 gl4es])/RENDERER_NAME_GL4ES 已被 212 重写成 GL4ESZL2——预存漂移顺手重锚）。
+- 三个预存漂移的诚实修复：verify_task211 A5 门只查 java（JRE 即过，javac 缺失 FileNotFoundError 进 except-FAIL）→ 双在位门；verify_task208 B1 证据日志被用户上传轮换（工作区已是 c7079e1 会话）→ git 钉 de846f3d:latestlog.old（-S 搜索定位的真身 blob）；verify_task209 D7 的 193 计数 86→84（并行 214 的 N-gate 重排净 -2）。
+- 预存债（与本轮无关，字节级等同并行 214 闭环记录）：179 I4-I6（探针桩符号冲突 HEAD 基线类——verify_task211 的在途探针编译每次污染 task179_inc harness，跑后已从 HEAD 恢复）；133 B1/B1c + 138 A1/B1/B2/I-l10n（日志轮换 + 旧键数基线 2157 vs 现实 2419——stash 对拍实锤 HEAD 同败）；141 G4/168 E7/202 J/209 D6/170 H1/174 G1 为未提交工作区自愈类（提交后复跑验证）。
+- 验证：verify_task215 60/60（内含 214/213 级联双绿）；家族复跑：129 47/47、165 34/34、167 31/31、168 33/34（仅自愈）、173 123/0、174 23/24（仅自愈）、190 59/0、193 84/0、196族、202 56/57（仅自愈）、203 30/30、206 43/43、207 32/0、208 24/24、209（仅 D6 自愈）、210 ALL PASS、212 ALL PASS、213 85/85、214 rc=0、211（A-E+F1 过，F2 大级联分跑补证：成员逐一单跑全绿）。
+
+Stage Summary:
+- 装机待验证：① VirGLRenderer(≤26.2) 进游戏（[VirGL] Task215 引导日志；首版呈现 = glReadPixels 回读链路）② ANGLE 方块不透明（"[tinygl4angle] Task215 ANGLE-Metal depth-clear workaround armed" + Task212 探针双向定证）
+- CI 首跑风险：dep_virgl 三件套交叉编译（epoxy/virglrenderer/Mesa 25.0.7——bison/mako 已备）；缺 dylib 自动隐藏渲染器项不阻断主构建
+- 并行协作记录：本地原 2976519（fa3c154 基线的过早完整实现）存档于 task111-stale-base 分支；eec98651（扫尾）的增量已全部重放进 task215

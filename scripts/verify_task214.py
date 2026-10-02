@@ -141,15 +141,15 @@ check("F5 Task212/213 addenda untouched",
 print("== G. announcement task214@2 (36 items) ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in ann]
-check("G1 36 items, id-unique", len(ann) == 36 and len(ids) == len(set(ids)))
-check("G2 task214@2 (mine)", ids[2] == "task214-five-fixes-2026-10-02")
+check("G1 37 items, id-unique (Task215@2 insert)", len(ann) == 37 and len(ids) == len(set(ids)))
+check("G2 task214@3 (Task215@2 insert shifted +1)", ids[3] == "task214-five-fixes-2026-10-02")
 check("G3 task213@3 + parallel task212@4 shifted intact",
-      ids[3].startswith("task213-") and ids[4].startswith("task212-angle"))
+      ids[4].startswith("task213-") and ids[5].startswith("task212-angle"))
 check("G4 pins intact (server@0 pin, task169@1)",
       ann[0].get("pin") is True and ids[1] == "task169-four-fixes-2026-09-25")
 check("G5 tail anchor task206 intact",
       ids[-1] == "task206-nggl4es-2026-10-01")
-a214 = ann[2]
+a214 = ann[3]
 check("G6 task214 entry metadata complete",
       a214["date"] == "2026-10-02" and "付费开发者证书" in a214["summary"]
       and "缩小字号" in a214["summary"] and "选中卡片" in a214["title"])
@@ -165,11 +165,11 @@ check("H1 v213 B5 re-anchored to kVMCardCornerRadius ring formula",
       has("scripts/verify_task213.py",
           "vm.count('kVMCardCornerRadius - (kVMCardEllipsisInset / 3.0)') >= 2"))
 check("H2 v213 H1/H7/H8 shifted to 36",
-      "len(ids) == 36" in rd("scripts/verify_task213.py")
+      "len(ids) == 37" in rd("scripts/verify_task213.py")
       and "'== 36' in v207 and '== 35' not in v207" in rd("scripts/verify_task213.py"))
 check("H3 v165/167 windows lifted to 29/27",
-      "range(min(29, len(anns)))" in rd("scripts/verify_task165.py")
-      and "range(min(27, len(anns)))" in rd("scripts/verify_task167.py"))
+      "range(min(30, len(anns)))" in rd("scripts/verify_task165.py")
+      and "range(min(28, len(anns)))" in rd("scripts/verify_task167.py"))
 check("H4 v193 N-gate follows REVISION 19",
       "#define REVISION 19" in rd("scripts/verify_task193.py"))
 check("H5 v207 D-gate accepts corner-radius preamble before super",
@@ -180,8 +180,8 @@ check("H6 v190/180 AccountList pairing semantics (Task213 hotfix re-anchor)",
 check("H7 v172 G2 retry-count 3 -> 4 (Task212 CF hardening backfill)",
       "cf.count(\"ame172_retrySearchRequest:request\") == 4" in rd("scripts/verify_task172.py"))
 check("H8 v170 F1 re-anchored to true positions (179@14..168@24)",
-      'anns[14]["id"] == "task179-eight-fixes-2026-09-26"' in rd("scripts/verify_task170.py")
-      and 'anns[24]["id"] == "task168-neumorph-faq-json-2026-09-25"' in rd("scripts/verify_task170.py"))
+      'anns[15]["id"] == "task179-eight-fixes-2026-09-26"' in rd("scripts/verify_task170.py")
+      and 'anns[25]["id"] == "task168-neumorph-faq-json-2026-09-25"' in rd("scripts/verify_task170.py"))
 check("H9 l10n 2419 family swept (spot: 129/133/151/206)",
       all("2419" in rd(f) for f in
           ("scripts/verify_task129.py", "scripts/verify_task133.py",
