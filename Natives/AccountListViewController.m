@@ -10,6 +10,10 @@
 #import "LauncherPreferences.h"
 #import "UIImageView+AFNetworking.h"
 #import "BackgroundManager.h"
+// Task213：AmeCard 主/次文字色函数声明处（安装器同构卡配色依赖；CI 15.4 SDK
+// 实锤"call to undeclared function 'AmeCardPrimaryTextColor'"——本地无 clang
+// 的静态门没拦住，装机绿门在此收口）
+#import "UIKit+NativeSurface.h"
 #import "ScreenUtils.h"
 #import "ios_uikit_bridge.h"
 #import "utils.h"
