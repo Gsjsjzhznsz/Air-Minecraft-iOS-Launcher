@@ -632,6 +632,101 @@ dep_gl4eszl2:
 	cp $(WORKINGDIR)/gl4eszl2/libgl4eszl2.dylib $(WORKINGDIR)/ || exit 1
 	echo '[Amethyst v$(VERSION)] dep_gl4eszl2 - end'
 
+# Task 214: VirGLRenderer(≤26.2)（ZL2 移植，Task212 预留 stage 2 的落地）三件套：
+#  1. libepoxy          —— vendored Natives/external/libepoxy（iOS 补丁：dlopen 指向 ANGLE 框架）
+#  2. libvtestserver.dylib —— vendored virglrenderer 1.3.0（vtest server + vrend，静态链 epoxy；
+#     上游 vtest_server.c 本身导出 vtest_main，vtest_main.c 的 main 不参与链接）
+#  3. libOSMesaVirgl.dylib —— Mesa 25.0.7（下载 tar.xz + patches/mesa-214-osmesa-virgl.patch，
+#     virgl 驱动 + softpipe 回退，osmesa 前端导出全量 gl*；GALLIUM_DRIVER=virgl 经
+#     VTEST_SOCKET_NAME 连接进程内 vtest server）
+# 快路径：三个 dylib 已 commit-back 到 Frameworks 时跳过整链构建；
+# 任一环节失败不阻断主构建：渲染器表按 dylib 存在性自动隐藏该选项。
+VIRGL_MESA_VERSION ?= 25.0.7
+dep_virgl:
+	@if [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesaVirgl.dylib" ] && \
+	    [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libvtestserver.dylib" ] && \
+	    [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libepoxy.dylib" ]; then \
+		echo '[Amethyst v$(VERSION)] dep_virgl - cached (Frameworks prebuilts present)'; \
+		cp $(SOURCEDIR)/Natives/resources/Frameworks/libOSMesaVirgl.dylib \
+		   $(SOURCEDIR)/Natives/resources/Frameworks/libvtestserver.dylib \
+		   $(SOURCEDIR)/Natives/resources/Frameworks/libepoxy.dylib $(WORKINGDIR)/; \
+		exit 0; \
+	fi
+	echo '[Amethyst v$(VERSION)] dep_virgl - start'
+	# ---- 0. meson 交叉文件（本地生成，SDK 路径随机器变化）----
+	printf '%s\n' \
+		'[binaries]' \
+		'c = clang' \
+		'cpp = clang++' \
+		'ar = ar' \
+		'strip = strip' \
+		'' \
+		'[properties]' \
+		"c_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
+		"cpp_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
+		"c_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" \
+		"cpp_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" \
+		'' \
+		'[host_machine]' \
+		'system = darwin' \
+		'cpu_family = aarch64' \
+		'cpu = aarch64' \
+		'endian = little' \
+		> $(WORKINGDIR)/virgl-cross.txt
+	# ---- 1. libepoxy（静态，装进 libvtestserver.dylib）----
+	rm -rf $(WORKINGDIR)/virgl-epoxy $(WORKINGDIR)/virgl-prefix
+	meson setup $(WORKINGDIR)/virgl-epoxy $(SOURCEDIR)/Natives/external/libepoxy \
+		--cross-file $(WORKINGDIR)/virgl-cross.txt \
+		-Dglx=no -Degl=yes -Dx11=false -Dtests=false \
+		-Ddefault_library=static --prefix=$(WORKINGDIR)/virgl-prefix || exit 1
+	ninja -C $(WORKINGDIR)/virgl-epoxy install || exit 1
+	test -f $(WORKINGDIR)/virgl-prefix/lib/libepoxy.a || { echo 'ERROR: libepoxy.a missing'; exit 1; }
+	# ---- 2. virglrenderer（静态 + 链接 libvtestserver.dylib）----
+	rm -rf $(WORKINGDIR)/virgl-renderer
+	PKG_CONFIG_PATH=$(WORKINGDIR)/virgl-prefix/lib/pkgconfig \
+	meson setup $(WORKINGDIR)/virgl-renderer $(SOURCEDIR)/Natives/external/virglrenderer \
+		--cross-file $(WORKINGDIR)/virgl-cross.txt \
+		-Dplatforms=egl -Dvenus=false -Dvulkan-dload=false -Dtests=false \
+		-Ddefault_library=static || exit 1
+	ninja -C $(WORKINGDIR)/virgl-renderer || exit 1
+	test -f $(WORKINGDIR)/virgl-renderer/vtest/libvtest.a || { echo 'ERROR: libvtest.a missing'; exit 1; }
+	test -f $(WORKINGDIR)/virgl-renderer/libvirglrenderer.a || { echo 'ERROR: libvirglrenderer.a missing'; exit 1; }
+	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
+		-install_name @rpath/libvtestserver.dylib \
+		-o $(WORKINGDIR)/libvtestserver.dylib \
+		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/vtest/libvtest.a \
+		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/libvirglrenderer.a \
+		$(WORKINGDIR)/virgl-prefix/lib/libepoxy.a \
+		-lc++ || exit 1
+	install_name_tool -id @rpath/libvtestserver.dylib $(WORKINGDIR)/libvtestserver.dylib || exit 1
+	# ---- 3. Mesa virgl guest（下载 + 补丁 + 构建）----
+	mkdir -p $(SOURCEDIR)/depends/virgl
+	cd $(SOURCEDIR)/depends/virgl; \
+		if [ ! -f mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task214_patched ]; then \
+			wget_ok=0; \
+			for attempt in 1 2 3 4 5; do \
+				if wget "https://archive.mesa3d.org/mesa-$(VIRGL_MESA_VERSION).tar.xz" --timeout=90 --tries=2 --retry-connrefused -O mesa-$(VIRGL_MESA_VERSION).tar.xz; then wget_ok=1; break; fi; \
+				echo '[virgl] mesa download failed (attempt '$$attempt'/5), retry in 15s'; sleep 15; \
+			done; \
+			[ "$$wget_ok" = "1" ] || { echo '[virgl] FATAL: mesa download failed'; exit 1; }; \
+			rm -rf mesa-$(VIRGL_MESA_VERSION) && tar xf mesa-$(VIRGL_MESA_VERSION).tar.xz; \
+			( cd mesa-$(VIRGL_MESA_VERSION) && patch -p1 < $(SOURCEDIR)/patches/mesa-214-osmesa-virgl.patch \
+			  && touch src/gallium/targets/osmesa/.task214_patched ) || exit 1; \
+		fi
+	test -f $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task214_patched || { echo 'ERROR: mesa patch not applied'; exit 1; }
+	rm -rf $(WORKINGDIR)/virgl-mesa
+	cd $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION) && meson setup $(WORKINGDIR)/virgl-mesa \
+		--cross-file $(WORKINGDIR)/virgl-cross.txt \
+		-Dgallium-drivers=virgl,softpipe -Dvulkan-drivers=[] \
+		-Dosmesa=true -Dllvm=disabled -Dglx=disabled -Degl=disabled -Dgbm=disabled \
+		-Dplatforms=[] -Dshared-glapi=disabled -Dvideo-codecs=[] \
+		-Dbuild-tests=false -Dtools=[] || exit 1
+	ninja -C $(WORKINGDIR)/virgl-mesa || exit 1
+	test -f $(WORKINGDIR)/virgl-mesa/src/gallium/targets/osmesa/libOSMesa.8.dylib || { echo 'ERROR: libOSMesa.8.dylib (virgl guest) missing'; exit 1; }
+	cp $(WORKINGDIR)/virgl-mesa/src/gallium/targets/osmesa/libOSMesa.8.dylib $(WORKINGDIR)/libOSMesaVirgl.dylib
+	install_name_tool -id @rpath/libOSMesaVirgl.dylib $(WORKINGDIR)/libOSMesaVirgl.dylib || exit 1
+	echo '[Amethyst v$(VERSION)] dep_virgl - end'
+
 dep_angle_freeze:
 	echo '[Amethyst v$(VERSION)] dep_angle_freeze - start'
 	# Task 57 (hua-mian-fen-lie gen-zhi): 8-byte machine-code patch -- ANGLE Metal
@@ -664,7 +759,7 @@ dep_sdl3_guard:
 		$(SOURCEDIR)/Natives/resources/Frameworks/libSDL3.dylib || exit 1
 	echo '[Amethyst v$(VERSION)] dep_sdl3_guard - end'
 
-payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_angle_freeze dep_sdl3_guard
+payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_virgl dep_angle_freeze dep_sdl3_guard
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)
@@ -799,4 +894,4 @@ clean:
 	rm -rf $(OUTPUTDIR)
 	echo '[Amethyst v$(VERSION)] clean - end'
 
-.PHONY: all clean check native java jre package dsym deploy help
+.PHONY: all clean check native java jre package dsym deploy help dep_virgl

@@ -19,6 +19,8 @@
 #include "glfw_keycodes.h"
 #include "ctxbridges/bridge_tbl.h"
 #include "ctxbridges/osmesa_internal.h"
+// Task 214：VirGLRenderer(≤26.2)（ZL2 移植，Task212 预留的 stage 2）—— vtest 服务端引导桥
+#include "ctxbridges/virgl_server.h"
 #include "utils.h"
 
 // 默认 GL 路径，pojavInit() 会重新设置
@@ -514,6 +516,20 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         NSLog(@"[egl_bridge] MobileGL renderer: backend=%s",
             getenv("MOBILEGL_BACKEND_TYPE") ?: "<unset>");
         set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_VIRGL]) {
+        // Task 214：VirGLRenderer(≤26.2)（ZL2 移植，Task212 stage 2 落地）
+        // guest = libOSMesaVirgl.dylib（Mesa 25.0.7 virgl 驱动，GALLIUM_DRIVER=virgl）
+        // 经 VTEST_SOCKET_NAME 连接进程内 vtest server（libvtestserver.dylib，
+        // virglrenderer 1.3.0 + libepoxy，宿主 GL = ANGLE/Metal）。
+        // 桥接复用 osm_bridge（zink 同款 OSMesaMakeCurrent + glReadPixels 权威呈现）。
+        // 注意：本分支必须位于 libOSMesa 前缀分支（zink）之前——
+        // libOSMesaVirgl.dylib 同样命中该前缀。
+        NSLog(@"[egl_bridge] VirGL renderer: bootstrapping in-process vtest server (Task 214)");
+        int ame214_vs_rc = ame_virgl_start_server();
+        if (ame214_vs_rc != 0) {
+            NSLog(@"[egl_bridge] VirGL server bootstrap FAILED (rc=%d) -- guest will fail to connect; check [VirGL] logs above", ame214_vs_rc);
+        }
+        set_osm_bridge_tbl();
     } else if ([renderer hasPrefix:@"libOSMesa"]) {
         setenv("GALLIUM_DRIVER","zink",1);
         set_osm_bridge_tbl();

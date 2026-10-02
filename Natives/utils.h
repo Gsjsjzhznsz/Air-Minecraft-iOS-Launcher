@@ -56,6 +56,8 @@ extern "C" {
 #define RENDERER_NAME_VGPU "libvgpu.dylib"
 #define RENDERER_NAME_MOBILEGLUES "libmobileglues.dylib"
 #define RENDERER_NAME_VK_ZINK "libOSMesa.8.dylib"
+// Task 214：VirGLRenderer(≤26.2)（ZL2 移植，Task212 预留）—— Mesa virgl guest + 进程内 vtest server
+#define RENDERER_NAME_VIRGL "libOSMesaVirgl.dylib"
 #define RENDERER_NAME_VULKAN "libMoltenVK.dylib"
 // Metal 渲染器（metallum / MetalUniversal，Task201 随上游同步移植）：图形后端
 // 由 metallum agent（javaagent 注入）走原生 Metal（直接 MTLDevice），不经 EGL

@@ -452,6 +452,10 @@ add_executable(AngelAuraAmethyst
   ctxbridges/mgl_fsr.mm
   ctxbridges/mgl_metal_fsr.mm
   ctxbridges/vk_bridge.m
+  # Task 214：VirGLRenderer(≤26.2)（ZL2 移植）—— vtest 服务端引导桥
+  # （egl_bridge 渲染器分支调用 ame_virgl_start_server；guest/服务端 dylib
+  #  由 Makefile dep_virgl 产出并随 Frameworks 打包）
+  ctxbridges/virgl_server.m
 
   customcontrols/ControlButton.m
   customcontrols/ControlDrawer.m

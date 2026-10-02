@@ -1585,12 +1585,20 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
         // 残留，Sodium 反 Pojav 检测（env 存在即抛）继续安全。
         unsetenv("POJAV_RENDERER");
 
+        // Task 214：VirGLRenderer(≤26.2)（ZL2 移植）：
+        // GALLIUM_DRIVER/VTEST_SOCKET_NAME 在 egl_bridge 的 ame_virgl_start_server()
+        // 里统一设置（osm_bridge dlopen guest 之前生效即可）；此处仅日志标记，
+        // 并防止下方 zink 的 libOSMesa 前缀分支误伤 virgl。
+        if ([renderer isEqualToString:@ RENDERER_NAME_VIRGL]) {
+            NSLog(@"[JavaLauncher] VirGL renderer active: GALLIUM_DRIVER=virgl + in-process vtest server (Task 214)");
+        }
         // Apply Zink-specific environment variables if Zink renderer is selected
         // Mesa 25.0.7 zink 升级配套：根据设备 GPU 代际自动调优 MESA_GL_VERSION_OVERRIDE、
         // MESA_GLSL_VERSION_OVERRIDE、MESA_EXTENSION_OVERRIDE、mesa_glthread、shader cache 等。
         // ZinkConfig 默认 Auto 级别会保留所有光影所需的 GL 扩展（compute/tessellation/geometry
         // shader 等），仅禁用 MoltenVK 支持不佳的 Transform Feedback，不影响 Iris/OptiFine。
-        if ([renderer hasPrefix:@"libOSMesa"]) {
+        // Task 214：libOSMesaVirgl.dylib（virgl guest）同样命中 libOSMesa 前缀——排除。
+        if ([renderer hasPrefix:@"libOSMesa"] && ![renderer isEqualToString:@ RENDERER_NAME_VIRGL]) {
             [ZinkConfig applyZinkEnvironmentFromPreferences];
             NSString *configSummary = [ZinkConfig activeConfigSummary];
             NSLog(@"[ZinkConfig] ========== Zink Renderer Active (Mesa 25) ==========");

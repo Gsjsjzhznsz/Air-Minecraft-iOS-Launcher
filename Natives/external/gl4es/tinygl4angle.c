@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
+#include <math.h>
 #include <pthread.h>
 
 #define GL_GLEXT_PROTOTYPES
@@ -116,8 +117,54 @@ void(*gles_glTexImage2D)(GLenum target, GLint level, GLint internalformat, GLsiz
 void(*gles_glTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *data);
 void(*gles_glTexParameterfv)(GLenum target, GLenum pname, const GLfloat *params);
 
+// Task 214 前置声明（定义在下方 Task214 块，引用在此处之前）
+static float ame214_clear_depth = 1.0f;
+static int ame214_depth_fix_state = -1;
+
 void glClearDepth(GLdouble depth) {
+    ame214_clear_depth = (float)depth;
     glClearDepthf(depth);
+}
+
+// ============================================================================
+// Task 214: ANGLE-Metal 深度清除 workaround（ANGLE 渲染器“方块透明/透视”修复）
+//
+// 病灶：ANGLE(Metal) 的 glClear(GL_DEPTH_BUFFER_BIT) 在部分帧缓冲上静默失效，
+// 深度缓冲残留上一帧数据 → 地形片元深度测试错误失败 → 方块成片“透明/消失”
+// （透视效果），天空/实体/UI 因绘制顺序与深度依赖不同而表现正常。
+// 佐证：MobileGlues 对同一 ANGLE 有两级修复（angle_depth_clear_fix_mode，
+// Mode1=z=1 全屏三角重写深度 / Mode2=glClearBufferfv 显式清除），证明该
+// 驱动缺陷在本机真实存在；raw ANGLE（本垫片）路径此前没有任何防护。
+// Task212 的三探针（地形 mega-draw 着陆探针等）保留不动：本修复与它们
+// 正交，装机日志双向定证。
+//
+// 修复（Mode2 同款，零着色器依赖）：拦截 glClear，凡带 DEPTH 位且清除值
+// ≈1.0 时，先用 glClearBufferfv(GL_DEPTH) 显式写深度，再走原 glClear。
+// 开关：AME_TINYGL4_DEPTH_CLEAR_FIX=0 关闭（默认开启）。
+// ============================================================================
+
+void(*gles_glClear)(GLbitfield mask);
+void(*gles_glClearBufferfv)(GLenum buffer, GLint drawbuffer, const GLfloat *value);
+
+void glClear(GLbitfield mask) {
+    LOOKUP_FUNC(glClear)
+    if (mask & 0x00000100 /*GL_DEPTH_BUFFER_BIT*/) {
+        if (ame214_depth_fix_state < 0) {
+            const char *ame214_env = getenv("AME_TINYGL4_DEPTH_CLEAR_FIX");
+            ame214_depth_fix_state = (ame214_env && !strcmp(ame214_env, "0")) ? 0 : 1;
+            if (ame214_depth_fix_state) {
+                printf("[tinygl4angle] Task214 ANGLE-Metal depth-clear workaround armed (stale-depth x-ray fix; AME_TINYGL4_DEPTH_CLEAR_FIX=0 to disable)\n");
+            }
+        }
+        if (ame214_depth_fix_state == 1 && fabsf(ame214_clear_depth - 1.0f) <= 0.001f) {
+            LOOKUP_FUNC(glClearBufferfv)
+            if (gles_glClearBufferfv) {
+                const GLfloat ame214_d = ame214_clear_depth;
+                gles_glClearBufferfv(0x0180 /*GL_DEPTH*/, 0, &ame214_d);
+            }
+        }
+    }
+    gles_glClear(mask);
 }
 
 // ============================================================================

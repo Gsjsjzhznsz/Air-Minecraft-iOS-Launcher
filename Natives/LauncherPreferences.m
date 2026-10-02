@@ -464,6 +464,10 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         @{@"key": @ RENDERER_NAME_VK_ZINK,
           @"name": localize(@"preference.title.renderer.debug.zink", nil),
           @"file": @ RENDERER_NAME_VK_ZINK},
+        // Task 214：VirGLRenderer(≤26.2)（ZL2 移植，Task212 预留的 l10n 键正式接 renderer）
+        @{@"key": @ RENDERER_NAME_VIRGL,
+          @"name": localize(@"preference.title.renderer.debug.virgl", nil),
+          @"file": @ RENDERER_NAME_VIRGL},
         @{@"key": @ RENDERER_NAME_LTW,
           @"name": localize(@"preference.title.renderer.debug.ltw", nil),
           @"file": @ RENDERER_NAME_LTW},

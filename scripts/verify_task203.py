@@ -45,8 +45,8 @@ check("A", "补丁工件保留 + dylib 退役 + Makefile 接线移除（Task212�
 check("A", "Makefile 接线已随 holy 退役移除（Task212 重锚）",
       "patch_gl4es_ggstr_nullguard.py" not in mk
       and "holy gl4es（libgl4es_114.dylib）退役删除" in mk)
-check("A", "Makefile TAB 基线（Task212 重锚：561 = 559 - 2 补丁行 + 4 退役注释行）",
-      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 561)
+check("A", "Makefile TAB 基线（Task214 重锚：644 = 561 + 83 dep_virgl 行）",
+      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 644)
 
 # ============ B. 钉扎门控（vgpu 崩溃根修） ============
 mh = rd("Natives/main_hook.m")

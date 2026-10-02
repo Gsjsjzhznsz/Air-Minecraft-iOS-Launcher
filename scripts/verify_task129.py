@@ -58,8 +58,8 @@ check("A8 Makefile dep_openal_shim 目标（re-export + LC_ID 修正）",
       "dep_openal_shim:" in mk
       and "-Wl,-reexport_library,$(WORKINGDIR)/libopenal_impl.dylib" in mk
       and "install_name_tool -id @rpath/libopenal_impl.dylib" in mk)
-check("A9 payload 依赖链接入 dep_openal_shim（Task157 重锚；Task206 重锚：并行插入 dep_nggl4es）",
-      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_angle_freeze" in mk)
+check("A9 payload 依赖链接入 dep_openal_shim（Task157 重锚；Task206 重锚：并行插入 dep_nggl4es；Task214 重锚：并行插入 dep_virgl）",
+      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_virgl dep_angle_freeze" in mk)
 check("A10 Task112 钉子保留（绝对路径直载）",
       '-Dorg.lwjgl.openal.libname=%@' in jl and 'stringByAppendingPathComponent:@"libopenal.dylib"' in jl)
 check("A11 JavaLauncher Task129 论断修正入档",
@@ -273,13 +273,13 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
                          capture_output=True, text=True).stdout
 cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
-check("I4 Makefile TAB 完整（Task212 重锚：绝对基线 561（Task211 的 559 - 2 holy 补丁行 + 4 退役注释行） + 守卫在位）",
+check("I4 Makefile TAB 完整（Task212 重锚：绝对基线 644（Task214 重锚：561 + 83 dep_virgl 行） + 守卫在位）",
       # Task138 重锚：Task135 的 dep_sdl3_guard 14 个 TAB 行已随提交入 HEAD，
       # "+14" 形态自此恒假；Task202 重锚曾用 cur == head + 3（垫片接线
       # +3 TAB），Task203 起 +3 已随 64fdaf2 入 HEAD——对拍口径转为绝对
       # 基线；Task206 重锚：dep_nggl4es 目标 +47 TAB 行（531 = 484 + 47）；
       # 守卫目标（dep_sdl3_guard + patch_gl4es_ggstr_nullguard）双在位。
-      cur_tab == 561 and head_tab == 561 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      cur_tab == 644 and head_tab == 644 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" not in mk,  # Task212：holy 补丁接线随退役移除
       f"head={head_tab} cur={cur_tab}")
 
