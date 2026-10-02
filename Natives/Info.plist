@@ -9,7 +9,7 @@
         <key>CFBundleDevelopmentRegion</key>
         <string>en</string>
         <key>CFBundleDisplayName</key>
-        <string>Air</string>
+        <string>Prisma</string>
         <key>CFBundleExecutable</key>
         <string>AngelAuraAmethyst</string>
         <key>CFBundleIcons</key>
@@ -88,11 +88,11 @@
                 </dict>
         </dict>
         <key>CFBundleIdentifier</key>
-        <string>com.air-devs.air</string>
+        <string>com.air-devs.prisma</string>
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
         <key>CFBundleName</key>
-        <string>Air</string>
+        <string>Prisma</string>
         <key>CFBundlePackageType</key>
         <string>APPL</string>
         <key>CFBundleShortVersionString</key>
@@ -103,7 +103,7 @@
         <array>
                 <dict>
                         <key>CFBundleURLName</key>
-                        <string>com.air-devs.air.urlscheme</string>
+                        <string>com.air-devs.prisma.urlscheme</string>
                         <key>CFBundleURLSchemes</key>
                         <array>
                                 <string>amethyst</string>
@@ -143,11 +143,11 @@
                 <string>_altserver._tcp</string>
         </array>
         <key>NSLocalNetworkUsageDescription</key>
-        <string>Air uses the local network to find and communicate with AltServer and LAN servers, and to enable multiplayer connectivity via Terracotta (compatible with HMCL/FCL/ZL2).</string>
+        <string>Prisma uses the local network to find and communicate with AltServer and LAN servers, and to enable multiplayer connectivity via Terracotta (compatible with HMCL/FCL/ZL2).</string>
         <key>NSMicrophoneUsageDescription</key>
-        <string>Air uses the microphone to enable support for voice chat mods.</string>
+        <string>Prisma uses the microphone to enable support for voice chat mods.</string>
         <key>NSPhotoLibraryAddUsageDescription</key>
-        <string>Air uses the photo library add-only access to save Bing daily wallpapers you choose to save.</string>
+        <string>Prisma uses the photo library add-only access to save Bing daily wallpapers you choose to save.</string>
         <key>UIApplicationSceneManifest</key>
         <dict>
                 <key>UIApplicationSupportsMultipleScenes</key>

@@ -2,7 +2,7 @@
 //  ModTableViewCell.h
 //  Amethyst
 //
-//  Mod 卡片 Cell（继承 ResourceCardTableViewCell，Air-Design L2 标准卡片）
+//  Mod 卡片 Cell（继承 ResourceCardTableViewCell，Prisma-Design L2 标准卡片）
 //  卡片背景 / 圆角 / 阴影 / 图标容器 / 文字层级 / accessory 插槽均由基类提供，
 //  本类只负责：Mod 专属图标（jar 内嵌图标 / 加载器品牌图标）、
 //  ModItem 内容配置、启用开关、更新徽章与在线模式按钮。

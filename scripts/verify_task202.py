@@ -191,10 +191,10 @@ check("H", "version.h REVISION 18 附录（Task202 八节 + no bump 理由）",
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))["announcements"]
 check("H", "公告 31 条且末位仍是 task206-nggl4es（Task209@2 插入 +1）",
       # Task209 重锚：task209@2 插入（30→31）；task202 锚顺延 [28]。
-      len(ann) == 34 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
-      and ann[31]["id"] == "task202-october-fix-wave")
+      len(ann) == 35 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+      and ann[32]["id"] == "task202-october-fix-wave")
 check("H", "公告索引锚（Task212 重锚：[7]=task196 / [8]=task193 / [0]=server）",
-      ann[7]["id"] == "task196-quad-fixes-2026-09-29" and ann[8]["id"] == "task193-app-icon-replace-2026-09-28"
+      ann[8]["id"] == "task196-quad-fixes-2026-09-29" and ann[9]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[0]["id"].startswith("server-recommend"))
 check("H", "两份调查报告在位（Task201 gitignore 丢失重建）",
       os.path.isfile(os.path.join(REPO, "docs/surveys/2026-09-29-upstream-sync-survey.md"))

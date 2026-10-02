@@ -405,7 +405,7 @@ static NSString *ModsManagerSHA1ForFile(NSString *path) {
             [strongSelf cacheModificationDates];
             [strongSelf applyFilter];
             [strongSelf setLoading:NO];
-            // 首次加载播放连锁进场动画（Air-Design 15.3）
+            // 首次加载播放连锁进场动画（Prisma-Design 15.3）
             if (!strongSelf.hasPlayedInitialAnimation && strongSelf.localMods.count > 0) {
                 strongSelf.hasPlayedInitialAnimation = YES;
                 [strongSelf animateCellsInChain];

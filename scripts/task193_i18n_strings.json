@@ -1547,7 +1547,7 @@
    "Natives/AI/AIMessageCell.m:210"
   ]
  },
- "给 Air 发送消息…": {
+ "给 Prisma 发送消息…": {
   "count": 1,
   "files": [
    "Natives/AI/AIInputBarView.m"
@@ -1576,7 +1576,7 @@
    "Natives/AI/AISystemPromptEditorViewController.m:28"
   ]
  },
- "这会注入到每次对话的最前面，用于约定 Air 助手的行为方式。": {
+ "这会注入到每次对话的最前面，用于约定 Prisma 助手的行为方式。": {
   "count": 1,
   "files": [
    "Natives/AI/AISystemPromptEditorViewController.m"

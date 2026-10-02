@@ -1424,3 +1424,29 @@ Stage Summary:
 - 提交链：e789163f（stage-1 四小修，39 文件）→ 5a4a4818（stage-2 gl4eszl2 移植，233 文件）→ 本轮收尾 docs；两阶段 CI 全绿，新 IPA（36953650449 产物）就绪
 - 装机锚点（下轮日志逐条对账）：①退出游戏无任何崩溃报告（metallum 双线程后台化）②"[CurseForgeAPI] Task211: runtime preference holds a placeholder key ... rejected as unset" 一次性 + "[Preferences] Task211: cleared placeholder ... / flipped N curseforge source(s) to modrinth" + CF 资源页免 Key 可用（镜像）③403 若再现则显示可读中文（指路设置页）④ANGLE：方块应可见（拆解生效）；"[tinygl4angle] Task211 decompose: glMultiDrawElementsBaseVertex ..." 普查行 + "Task211 fsq: fullscreen-quad candidate" 计数 + "[RenderDiag] Task211 5-point in-world readback #1/2 ..."（任一角非黑=合成上游病灶，全黑=blit 未落地——二分定谳）⑤渲染器列表出现「gl4es（ZL2 经典版）」可选，选中后 "[egl_bridge] Task211: ZL2 classic gl4es renderer: ..." + make-current 后 "initialize_gl4es() called post-MakeCurrent (resolver=YES)"
 - 遗留：virglrenderer 已排期待立项；ANGLE 若拆解后仍透明，五点回读+四边形普查的下轮日志直接切开剩余假设空间
+
+---
+Task ID: 213
+Agent: main (Super Z)
+Task: 十项用户指令一轮落地（原编号 212 被并行会话先行占用——a4a4c77/b842b67；按家法让号重编 213 并完成双插入合并态 rebase）——实例卡对照快捷指令再抬一档 + 长按直删、游戏目录卡整类重写为实例卡同构（叉号直删）、两处标题灰字改版、卡片布局"使用问题"呼出失效根修、安装器加载器/版本两表行距统一（第五次重写收口）、账号列表安装器同构重写（头像翻倍）、启动器全面更名 Air -> Prisma、设置页内存限制说明改版、bundle id 更名 com.air-devs.prisma
+
+Work Log:
+- R1 实例卡（VersionManagerViewController）：kVMVersionRowHeight 104 -> 128pt（用户复检"仍比快捷指令卡矮一圈"），左上实例图标 22 -> 28 与右上 28pt 圆钮对角平衡；长按实例卡 = 直接 deleteProfile 确认弹窗，showProfileActions（选择/编辑/删除三件套菜单）整方法退役（选择=点卡、编辑=⋯ 各有直达入口）
+- R2 目录卡：VMGameDirCell 整类重写为 VMVersionCardCell 同构——folder 本色直出（systemBlue，无底色方块）、名称+大小双行（AmeCard 双色）、选中内缩环（省略号间距/3、2pt accent 纯描边）、右上 xmark 16pt Black 28pt 圆钮（SF Symbol 非 x 文字）、点击直接 handleGameDirDeleteTapped（default/current 即时说明，其余进 confirmDeleteGameDir），旧 iconContainer/selectedBadge/chevron/showGameDirActions 全退；目录 section 布局对齐实例卡（同宽公式 (width-32-24)/4 或 (width-32-8)/2、高 128、insets 4,8），小字从 i18n_str_134 占位改为纯目录大小
+- R3/R4 l10n：i18n_str_1071/1073 六语言（en/ja/km/zh-CN/zh-Hans/zh-Hant）改为"点击卡片切换；点击叉号删除"/"点击卡片切换；点击省略号编辑；长按以删除"
+- R5 根因：Task 180 起默认根 = LauncherCardLayoutViewController（general.ui_layout 未写盘走 card），ShowHelpPage 只有旧三栏 LauncherRootViewController 监听——卡片布局点侧栏问号钮通知无人应答。补观察者 + showHelpPage（与 ShowAIPage 同款病灶同款修法）+ import
+- R6 根因收口：加载器主表 64pt vs 版本选择表 50pt——前四轮只对齐卡面配方从未统一行高。主表 64 -> 50，ModLoaderRowCell 图标容器 40x32x8/图标 26->20、文字 16/12 -> 15/11、leading 14 -> 16、top 12 -> 8；SwitchCell 15/11 + top 8；两表 50pt 逐项一致
+- R7 账号卡：AME190AccountCardCell 重写为安装器配方——applyCardEffectToView 平贴（阴影/白 0.08/描边/shadowPath/touches 弹簧三段全退）、头像 dp:34 -> dp:68（用户定稿放大一倍）、字号 sp:15/11 -> sp:16/12（AmeCard 双色）、绿徽章右 -14 垂直居中、左右 ±24 内缩归零（inset-grouped 系统边距即行边距）、头像上下 ≥4pt 不等式驱动自动行高
+- R8 更名清扫（81 文件）：Info.plist Display/Name/三用途描述、54 语言 InfoPlist.strings、7 语言 Localizable（en/zh-CN/zh-Hans/zh-Hant/ru/ja/km）、announcements-fallback、controls/index.json 作者 Air Team、AiSettings 提示词（旧名 Amethyst iOS Remastered 展开随更名撤）、AiAssetTools/AnnouncementService User-Agent Air/1.0 -> Prisma/1.0、AI 头注释族 Air-Design -> Prisma-Design、utils.h/PLMirrorCenter/shaderc_impl_glue/development.yml 注释、双 README 品牌位；保留=GitHub 仓库地址/Bundle Identifier（后按 R10 改）/iPad Air 机型名/worklog 史料
+- R9 内存限制说明：showMemoryLimitHelp 正文按用户定稿重写（扩展内存限制 GetMoreRAM/6GB + 扩展虚拟内存见下/7GB 稳定性 + 推荐付费开发者证书）、按钮 GetMoreRam -> mem_help.button（localize 缺键回退"付费开发者证书"，零 l10n 键增删）、URL github.com/hugeBlack/GetMoreRam -> https://b23.tv/WtgrPJM、mem_help.message 六语言同步（zh-Hant 手工校正 為/啟/空間）、preference.detail.memory_limit_help 六语言去（GetMoreRam）
+- R10 包名：com.air-devs.air -> com.air-devs.prisma 全链 24 处 11 文件（Info.plist 双处含 URL scheme、三份 entitlements、Makefile 产物名 ×7、CI artifact 名+glob ×6、后台下载会话标识、os_log 子系统 ×2、钥匙串服务名、AppDelegate 注释）；Info.plist+MD 残留 air 清零（README/README_CN 品牌位+仓库 slug 按"有 air 就改"执行，iPad Air 保护）
+- 文档级联：公告 task212@2（33 -> 34，task169 钉 [1] 完好）+ 九/十两节；version.h REVISION 18 Task212 附录（尾部 SEP 76 等号归一）；机械重锚 anns[N]/ann[N] N>=2 与 ["announcements"][N] 两种形态 + len==33->34 + 165/167 窗口常数 27/25
+- 验证器级联（真锚点诚实改靶）：210 B/E（128pt+207 内文）、207 B 两查（128/28）、190 B/C 八查（50pt/安装器配方/sp16/12/绿徽章右中/±24->0/弹簧退役）、184 A/B/D 五查（32x32/8、15/11、50=50、B 检查剥注释修存量裸匹配误报、D 安装器管线）、180 G 四查、136 F6（sp12/AmeCard）、179 J1 诚实重锚 items[12]（items[] 形态曾逃过 210/211 的 anns[] 机械重锚）、140 F 组 ann[23]（v6.0.0 发布条目）+ G 组日志轮换重锚（G1 重钉 76e2564 会话同义持久化证据对，G2-G4 证据会话轮出按组内"缺失跳过"口径容错）、142 E1-E4 ann[23]、205 D3 CRLF 修复（R10 文本模式曾把 CRLF yml 降为 LF——已恢复 354 CRLF 并全库行尾审计零同类损伤）、211 A5 跳过条件收紧（java+javac 双在位；沙箱瘦身后仅剩 JRE）、137 G3 白名单追加 Task212 分支（l10n 四键 + Prisma/Air 两侧值改写行）、182 D3 外层 worklog 补记 Task 182 节（历史整理遗失，按 Task168 先例诚实重构造）
+- verify_task212 新建 84 检查（A 实例卡/B 目录卡/C 六语言灰字/D 使用问题/E 安装器间距/F 账号卡/G 更名清扫/H 文档级联/I 括号配平/J 内存说明+包名）84/84 ALL GREEN
+- 舰队收官：本轮作用域全绿（129 47/47、166 64/64、167 31/31、171 30/0、172 51/51、173 123/0、180 120/0、184 34/0、190 59/0、203、205、206、208、210 41/41、140/142/143、179 58/3、182 39/0、91 74/0 env、151 46/0 env、153 29/0 env）；单根传播链 = 141 G4 工作区白名单（脏树类，Task211 已证提交后自愈）牵 168 E7/170 H1/174 G1/175 H2/176 G1/202 J/209 D6/211 D6D9F2/89 E1/137 G4；存量债务 A/B 对拍逐笔一致（88/92/93/95/96/100-104/106-111/71-87 组/132 47/53/134 66/68/135 30/33/149 33/35/156 49/3/133 路径腐/179 I4-I6 harness 漂移——Task209/211 tinygl4angle 演进使旧测试存根重定义，本轮未触碰该文件）
+
+Stage Summary:
+- 十项指令全落地；公告 34 条（task212@2）；version.h REVISION 18 附录 + 76 等号 SEP
+- 环境教训两笔：①本机 rg 显示输出会被全局配置静默改写（@[header] 显示成 @eader]——字节真相只用 python 复核，本轮两次险些误判文件损坏）②文本模式改写会静默降 CRLF 为 LF（development.yml 354 行 CRLF 被 R10 破坏，205 D3 拦截，恢复后全库行尾审计通过）
+- 装机锚点（下轮日志逐条对账）：①实例卡 128pt 视觉与快捷指令卡同档、无字裁 ②长按实例卡=确认删除弹窗（无三件套菜单）③目录卡=实例卡同款（蓝 folder/大小小字/叉号钮），点叉号=确认删除弹窗，长按目录无响应 ④"使用问题"在默认卡片布局下正常呼出 ⑤安装器加载器列表与版本列表行距一致（50pt）⑥账号卡大头像 68pt+绿徽章 ⑦主屏图标名/设置页/系统权限弹窗显示 Prisma ⑧设置内存限制说明=新文案+付费开发者证书按钮跳 b23.tv/WtgrPJM ⑨新包名 com.air-devs.prisma（iOS 视为全新应用，旧装数据不迁移——用户已知情）
+- 风险移交：GitHub 仓库若同步改名，需同步 UpdateChecker.m/PLPreferences.m/AnnouncementService.m/ControlRepoViewController.m 内仓库地址；公告内历史条目的仓库 URL 保持旧名（历史事实）

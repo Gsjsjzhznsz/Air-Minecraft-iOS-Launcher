@@ -141,15 +141,15 @@ ac = rd('AccountListViewController.m')
 # 180 的内联卡（cardView + 凸起管线直挂 + 钉 16 + 自绘阴影退役断言）整体被
 # 同构卡替代：管线换 Task172 三段式泛型入口 applyEffectToTableViewCell，卡面
 # 规格移交 VMTileBaseCell 镜像（12pt 连续圆角 + 0.12/6 阴影 + shadowPath）。
-check('G', '账号 cell 卡面管线（Task190 重锚：同构卡走 Task172 三段式泛型入口）',
-      '[[BackgroundManager sharedManager] applyEffectToTableViewCell:self];' in ac)
+check('G', '账号 cell 卡面管线（Task212 重锚：同构卡走安装器 applyCardEffectToView 调用）',
+      '[[BackgroundManager sharedManager] applyCardEffectToView:self.contentContainer];' in ac)
 check('G', '账号 cell 不再直挂引擎符号/不再 import 引擎头（经 BackgroundManager 转介）',
       '#import "UIKit+NativeSurface.h"' not in ac
       and 'ame_setNeumorphPinnedCornerRadius' not in ac)
-check('G', '账号 cell 同构卡规格（12pt 连续圆角 + VMTile 阴影档 + shadowPath 随帧）',
+check('G', '账号 cell 同构卡规格（Task212 重锚：12pt 连续圆角 + 安装器无阴影平贴）',
       'self.contentContainer.layer.cornerRadius = 12;' in ac
-      and 'self.layer.shadowOpacity = 0.12;' in ac
-      and 'bezierPathWithRoundedRect:shadowRect' in ac)
+      and 'self.layer.shadowOpacity' not in ac.split('@implementation AccountListViewController')[0]
+      and 'applyCardEffectToView' in ac)
 check('G', '账号 cell 裁剪放行（保留）', 'self.contentView.layer.masksToBounds = NO;' in ac)
 check('G', '账号 cell 无旧内联卡残留（cardView/钉 16/白 0.10 零出现）',
       'cardView' not in ac and 'ame_setNeumorphPinnedCornerRadius' not in ac)
@@ -174,8 +174,8 @@ check('G', '安装页系统白底清除辅助（183 新配方）', 'AME184ClearT
 check('G', '安装页选中高亮清除（183 新配方）', 'cell.selectedBackgroundView = clearSel;' in ml)
 check('G', '安装页内层容器圆角 12 continuous（183 同构版本卡）', ml.count('_cardContainer.layer.cornerRadius = 12;') == 3 and ml.count('_cardContainer.layer.cornerCurve = kCACornerCurveContinuous;') == 3)
 check('G', '安装页容器上下内缩 4（183 同构版本卡）', ml.count('constraintEqualToAnchor:self.contentView.topAnchor constant:4]') >= 3)
-check('G', '安装页 40x40 图标容器（183 同构版本卡）', 'widthAnchor constraintEqualToConstant:40],' in ml and 'heightAnchor constraintEqualToConstant:40],' in ml)
-check('G', '安装页 64 行高（版本卡同款）', '_tableView.rowHeight = 64;' in ml)
+check('G', '安装页 32x32 图标容器（Task212 重锚：随 50pt 行压缩）', 'widthAnchor constraintEqualToConstant:32],' in ml and 'heightAnchor constraintEqualToConstant:32],' in ml)
+check('G', '安装页 50 行高（Task212 重锚：与版本选择表统一）', ml.count('_tableView.rowHeight = 50;') == 2)
 check('G', '安装页规格文字色（Task210 重锚：AmeCard 色族，版本卡同款）', ml.count('AmeCardPrimaryTextColor()') >= 3 and ml.count('AmeCardSecondaryTextColor()') >= 3)
 check('G', '安装页版本子页 50 行高 + 无分隔线（183）', '_tableView.rowHeight = 50;' in ml and 'separatorStyle = UITableViewCellSeparatorStyleNone;' in ml)
 check('G', '安装页引擎头 import', '#import "../UIKit+NativeSurface.h"' in ml)

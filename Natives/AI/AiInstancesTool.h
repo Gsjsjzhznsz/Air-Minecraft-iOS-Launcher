@@ -2,7 +2,7 @@
 //  AiInstancesTool.h
 //  Amethyst
 //
-//  Air AI Agent 实例/版本工具：
+//  Prisma AI Agent 实例/版本工具：
 //    - list_instances（只读）：列出启动器的游戏实例（游戏目录/版本）及其资源数量。
 //    - list_game_versions（只读）：拉取真实 MC 版本列表（含 30 分钟缓存）。
 //

@@ -1,2 +1,2 @@
-"NSLocalNetworkUsageDescription" = "Air používá místní síť k vyhledání a komunikaci se servery AltServer a LAN a k povolení hry více hráčů přes Terracotta (kompatibilní s HMCL/FCL/ZL2).";
-"NSMicrophoneUsageDescription" = "Air používá mikrofon pro podporu modů hlasového chatu.";
+"NSLocalNetworkUsageDescription" = "Prisma používá místní síť k vyhledání a komunikaci se servery AltServer a LAN a k povolení hry více hráčů přes Terracotta (kompatibilní s HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Prisma používá mikrofon pro podporu modů hlasového chatu.";

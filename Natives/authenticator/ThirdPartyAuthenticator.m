@@ -210,7 +210,7 @@ static void ame133_downloadAndCacheAvatar(NSString *skinURL,
 // ---------------------------------------------------------------------------
 
 /// Keychain 服务的稳定标识（Bundle identifier 在重签名安装间可能变化，不用它）
-static NSString *const ame131_keychainService = @"com.air-devs.air.ame131.credentials";
+static NSString *const ame131_keychainService = @"com.air-devs.prisma.ame131.credentials";
 
 static NSString *ame131_credentialKey(NSString *authserver, NSString *loginIdentifier) {
     NSString *server = authserver ?: @"";

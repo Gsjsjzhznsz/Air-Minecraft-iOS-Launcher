@@ -3600,6 +3600,19 @@
 //   regions + B swap-forensics 5-point block, g++/gcc -fsyntax-only; 10-file
 //   bracket balance) + announcement cascade re-anchor (32 -> 33, index +1
 //   family) + metallum E2E A/B.
+// REVISION 18 addendum (Task 213, no bump): launcher-wide rebrand Air -> Prisma
+// (display name, 54-language permission strings, AI prompt/persona, HTTP User-Agent,
+// controls-repo author, prefs fallback name, both READMEs) + instance-card parity
+// round: height 104 -> 128pt w/ 28pt icon, long-press = direct delete confirm;
+// game-directory cells rebuilt isomorphic to instance cards (native-color folder
+// icon, size subtitle, xmark delete button tapping straight into the confirm
+// dialog, long-press retired); card-layout root gains the missing ShowHelpPage
+// observer (help page was unopenable on the default layout since Task 180);
+// installer loader-table row height unified with the version table at 50pt;
+// account cards rewritten to the installer recipe with doubled (dp:68) avatars;
+// memory-limit help dialog rewritten (entitlement explainer + paid-dev-cert
+// button -> b23.tv/WtgrPJM); bundle identifier com.air-devs.air ->
+// com.air-devs.prisma across plist/entitlements/Makefile/CI/os_log/keychain.
 // ============================================================================
 // -----------------------------------------------------------------------------
 // REVISION 18 addendum (Task 212, no bump)

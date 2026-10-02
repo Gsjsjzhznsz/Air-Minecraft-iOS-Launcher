@@ -2,7 +2,7 @@
 //  ResourceCardTableViewCell.h
 //  Amethyst
 //
-//  资源管理卡片 Cell 公共基类（Air-Design L2 标准卡片）
+//  资源管理卡片 Cell 公共基类（Prisma-Design L2 标准卡片）
 //  供 Mod / Shader / ResourcePack / DataPack / World / Modpack 六个资源管理界面复用。
 //
 //  卡片结构（参照 VersionCardCell 正面基准）：

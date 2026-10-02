@@ -282,7 +282,7 @@ jobs:
           echo "[ci] MobileGL dylibs committed: libMobileGL.dylib (DirectVulkan), libMobileGL-gles.dylib (DirectGLES)"
 
       - name: Upload MobileGL build log
-        # MobileGL 从源码编译，Air 仓库历史上 9 个提交都没编过。
+        # MobileGL 从源码编译，Prisma 仓库历史上 9 个提交都没编过。
         # payload 里用 `-$(MAKE) dep_mobilegl` 调用，失败不阻断主构建，
         # 因此失败原因会被静默吞掉 —— 这里把 dep_mobilegl 落盘的日志
         # （含诊断信息与真实退出码）无条件上传，便于定位。
@@ -297,15 +297,15 @@ jobs:
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: com.air-devs.air-${{ matrix.platform_name }}.ipa
-          path: artifacts/com.air-devs.air-*-${{ matrix.platform_name }}.ipa
+          name: com.air-devs.prisma-${{ matrix.platform_name }}.ipa
+          path: artifacts/com.air-devs.prisma-*-${{ matrix.platform_name }}.ipa
 
       - name: Upload regular tipa
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: com.air-devs.air-${{ matrix.platform_name }}-trollstore.tipa
-          path: artifacts/com.air-devs.air-*-${{ matrix.platform_name }}-trollstore.tipa
+          name: com.air-devs.prisma-${{ matrix.platform_name }}-trollstore.tipa
+          path: artifacts/com.air-devs.prisma-*-${{ matrix.platform_name }}-trollstore.tipa
 
       - name: Upload PojavLauncher.dSYM
         if: matrix.platform_name == 'ios' && success()
@@ -325,8 +325,8 @@ jobs:
           set -e
           TAG="nightly-sdl3"
           SHORT=$(git rev-parse --short HEAD)
-          IPA=$(ls artifacts/com.air-devs.air-*-ios.ipa 2>/dev/null | head -1 || true)
-          TIPA=$(ls artifacts/com.air-devs.air-*-ios-trollstore.tipa 2>/dev/null | head -1 || true)
+          IPA=$(ls artifacts/com.air-devs.prisma-*-ios.ipa 2>/dev/null | head -1 || true)
+          TIPA=$(ls artifacts/com.air-devs.prisma-*-ios-trollstore.tipa 2>/dev/null | head -1 || true)
           if [ -z "$IPA" ]; then
             echo "No ipa under artifacts/, skip release"
             exit 0

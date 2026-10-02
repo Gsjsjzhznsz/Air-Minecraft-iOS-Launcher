@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// 自定义系统提示词（默认返回 defaultSystemPrompt）
 @property (nonatomic, copy) NSString *systemPrompt;
 
-/// 默认系统提示词（中文），约定 Air 行为
+/// 默认系统提示词（中文），约定 Prisma 行为
 + (NSString *)defaultSystemPrompt;
 
 @end

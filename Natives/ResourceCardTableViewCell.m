@@ -2,7 +2,7 @@
 //  ResourceCardTableViewCell.m
 //  Amethyst
 //
-//  资源管理卡片 Cell 公共基类实现（Air-Design L2 标准卡片，参照 VersionCardCell 正面基准）。
+//  资源管理卡片 Cell 公共基类实现（Prisma-Design L2 标准卡片，参照 VersionCardCell 正面基准）。
 //
 
 #import "ResourceCardTableViewCell.h"
@@ -41,7 +41,7 @@ static NSString * const kResourceCardDefaultIcon = @"doc.fill";
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
 
-        // ----- 外层 cell：不裁剪，承载轻阴影（Air-Design 5.2 轻阴影档：0.10/4/(0,2)）-----
+        // ----- 外层 cell：不裁剪，承载轻阴影（Prisma-Design 5.2 轻阴影档：0.10/4/(0,2)）-----
         // shadowPath 在 layoutSubviews 中随 bounds 更新
         self.layer.masksToBounds = NO;
         self.layer.shadowColor = [UIColor blackColor].CGColor;
@@ -283,7 +283,7 @@ static NSString * const kResourceCardDefaultIcon = @"doc.fill";
         self.selectionTintView.backgroundColor = [accentColor() colorWithAlphaComponent:0.08];
         self.selectionTintView.hidden = NO;
     } else {
-        // 默认态：0.5pt 白 0.10 描边（Air-Design 5.3 边框规格）
+        // 默认态：0.5pt 白 0.10 描边（Prisma-Design 5.3 边框规格）
         self.contentView.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
         self.contentView.layer.borderWidth = 0.5;
         self.selectionTintView.hidden = YES;

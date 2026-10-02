@@ -23,7 +23,7 @@ K = {
     "ame192.ai.no_provider_hint": ("请到 设置 → AI 助手 配置 API 服务", "Go to Settings → AI Assistant to configure an API provider"),
     "ame192.ai.ok": ("好", "OK"),
     "ame192.ai.placeholder_greeting": ("和 AI 助手打个招呼吧", "Say hi to your AI assistant"),
-    "ame192.ai.placeholder_sub": ("向 Air 询问启动器问题或 Minecraft 知识", "Ask about the launcher or anything Minecraft"),
+    "ame192.ai.placeholder_sub": ("向 Prisma 询问启动器问题或 Minecraft 知识", "Ask about the launcher or anything Minecraft"),
     "ame192.ai.request_failed": ("请求失败", "Request Failed"),
     "ame192.ai.unknown_error": ("未知错误", "Unknown error"),
     # --- AiSafetyManager ---

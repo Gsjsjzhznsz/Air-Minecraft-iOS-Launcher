@@ -14,7 +14,7 @@
 #import "DownloadTaskManager.h"
 #import "utils.h"
 
-CGFloat const ResourceListCardSpacing = 4.0;    // space-sm：卡片垂直间距（Air-Design 4.1）
+CGFloat const ResourceListCardSpacing = 4.0;    // space-sm：卡片垂直间距（Prisma-Design 4.1）
 CGFloat const ResourceListCardSideInset = 16.0; // space-3xl：列表左右边距
 
 static CGFloat const kBatchToolbarHeight = 48.0;
@@ -377,7 +377,7 @@ static CGFloat const kBatchToolbarBottomGap = 12.0; // 工具栏与安全区底�
     }
 }
 
-#pragma mark - 连锁进场动画（Air-Design 15.3）
+#pragma mark - 连锁进场动画（Prisma-Design 15.3）
 
 - (void)animateCellsInChain {
     // 首屏 ≤10 个 cell 参与连锁：每项延迟 50ms 从 -40pt 滑入 + 淡入，

@@ -12,10 +12,10 @@
 #import "DownloadViewController.h"
 #import "utils.h"
 
-#pragma mark - ShaderCardCell（光影卡片，Air-Design L2 标准卡片）
+#pragma mark - ShaderCardCell（光影卡片，Prisma-Design L2 标准卡片）
 
 // 光影本地条目卡片：三层卡片背景/图标容器/文字层级均由基类提供。
-// 图标用光影类型语义色（紫 paintbrush.fill，Air-Design 2.4）；
+// 图标用光影类型语义色（紫 paintbrush.fill，Prisma-Design 2.4）；
 // 光影无启用开关（本界面只用于查看/删除），右侧不占 accessory 插槽。
 @interface ShaderCardCell : ResourceCardTableViewCell
 /// 配置本地光影条目：标题=显示名、副标题=文件名、元信息=大小或描述
@@ -32,7 +32,7 @@
     } else if (shader.filePath.length > 0) {
         unsigned long long fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:shader.filePath error:nil] fileSize];
         if (fileSize > 0) {
-            // 文件大小统一用 File 计数风格（Air-Design 3.3）
+            // 文件大小统一用 File 计数风格（Prisma-Design 3.3）
             detail = [NSByteCountFormatter stringFromByteCount:fileSize countStyle:NSByteCountFormatterCountStyleFile];
         }
     }
@@ -79,7 +79,7 @@ static NSString * const kShaderCardCellIdentifier = @"ShaderCardCell";
 
 - (instancetype)init {
     // 兼容既有调用方（[[ShadersManagerViewController alloc] init]）：
-    // 转发到基类便利初始化，注入光影类型图标与语义色（Air-Design 2.4）
+    // 转发到基类便利初始化，注入光影类型图标与语义色（Prisma-Design 2.4）
     return [self initWithTitle:localize(@"resman.shaders.title", nil) resourceTypeIcon:@"paintbrush.fill" iconColor:[UIColor systemPurpleColor]];
 }
 
@@ -193,7 +193,7 @@ static NSString * const kShaderCardCellIdentifier = @"ShaderCardCell";
 
 - (UIButton *)batchDeleteButton {
     if (!_batchDeleteButton) {
-        // 危险操作 pill：红底白字胶囊（高 32 / 圆角 16，Air-Design 7）
+        // 危险操作 pill：红底白字胶囊（高 32 / 圆角 16，Prisma-Design 7）
         _batchDeleteButton = [UIButton buttonWithType:UIButtonTypeSystem];
         [_batchDeleteButton setTitle:localize(@"resman.shaders.delete_selected", nil) forState:UIControlStateNormal];
         [_batchDeleteButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];

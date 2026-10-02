@@ -37,7 +37,7 @@ extern dispatch_group_t fatalExitGroup;
 
     // Task 144：旧包名并存检测（仅日志取证，零 UI 噪音）。
     // 用户报告设备上出现"2 个一模一样的版本"：commit 9659740a（2026-07-24）
-    // 把包名从 org.angelauramcremastered.amethyst 改为 com.air-devs.air，
+    // 把包名从 org.angelauramcremastered.amethyst 改为 com.air-devs.prisma，
     // iOS 按包名视为两个不同 App —— 新 IPA 不再覆盖旧装，主屏并存双图标
     // （旧图标 = 迁移前的旧代码 + 旧偏好容器，行为自然不同）。此非本仓库
     // bug，检测到旧包时打日志便于装机日志分诊；删除旧图标即消除重复。

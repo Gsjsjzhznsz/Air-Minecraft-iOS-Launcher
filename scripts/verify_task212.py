@@ -211,36 +211,36 @@ check("F1 version.h Task212 附录（REVISION 18 addendum + 五主题）",
       and "net-zero swap" in vh)
 
 ann = json.loads(rd("announcements.json"))["announcements"]
-check("F2 公告 task212@2（34 条 + 置顶钉位 + 尾锚）",
-      len(ann) == 34 and ann[2]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
+check("F2 公告 task212@3（35 条 = 并行 task213@2 插入后的合并态 + 置顶钉位 + 尾锚）",
+      len(ann) == 35 and ann[3]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
       and ann[0]["id"].startswith("server-recommend")
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[3]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
+      and ann[4]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
 
 check("F3 公告内容五主题齐备",
-      all(k in ann[2]["content"] for k in
+      all(k in ann[3]["content"] for k in
           ("810", "glDrawArraysInstanced", "重试", "gl4es(≤26.2)", "holy gl4es", "VirGLRenderer(≤26.2)")))
 
 print("== G. 级联抽查（本轮重锚族） ==")
 spot = {
-    "scripts/verify_task206.py": ["cur_tab == 561", 'len(ann) == 34 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"'],
-    "scripts/verify_task211.py": ['len(ann) == 34 and ann[3]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"',
+    "scripts/verify_task206.py": ["cur_tab == 561", 'len(ann) == 35 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"'],
+    "scripts/verify_task211.py": ['len(ann) == 35 and ann[4]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"',
                                   "(swapIndex == 240 || swapIndex == 480 || swapIndex == 720)"],
-    "scripts/verify_task210.py": ['len(ann) == 34\n      and ann[4]["id"] == "task210-neumorph'],
-    "scripts/verify_task209.py": ["a209 = ann[5]", "len(ann) == 34"],
-    "scripts/verify_task203.py": ["len(ann) == 34 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01'"],
-    "scripts/verify_task202.py": ["len(ann) == 34", 'ann[31]["id"] == "task202-october-fix-wave"', "mk_tab == 561"],
-    "scripts/verify_task193.py": ["len(ann) == 34", 'ann[8]["id"] == "task193-app-icon-replace-2026-09-28"'],
+    "scripts/verify_task210.py": ['len(ann) == 35\n      and ann[5]["id"] == "task210-neumorph'],
+    "scripts/verify_task209.py": ["a209 = ann[6]", "len(ann) == 35"],
+    "scripts/verify_task203.py": ["len(ann) == 35 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01'"],
+    "scripts/verify_task202.py": ["len(ann) == 35", 'ann[32]["id"] == "task202-october-fix-wave"', "mk_tab == 561"],
+    "scripts/verify_task193.py": ["len(ann) == 35", 'ann[9]["id"] == "task193-app-icon-replace-2026-09-28"'],
     "scripts/verify_task129.py": ["cur_tab == 561 and head_tab == 561"],
     "scripts/verify_task135.py": ["cur_tab == 561 and head_tab == 561"],
-    "scripts/verify_task173.py": ['ann["announcements"][18]["id"] == "task173-ten-fixes-2026-09-26"'],
-    "scripts/verify_task174.py": ['anns[16]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"'],
-    "scripts/verify_task168.py": ['anns[22]["id"] == "task168-neumorph-faq-json-2026-09-25"'],
-    "scripts/verify_task207.py": ["len(ann) == 34", 'ann[6]["id"] == "task207-shortcuts-instance-cards-2026-10-01"'],
+    "scripts/verify_task173.py": ['ann["announcements"][19]["id"] == "task173-ten-fixes-2026-09-26"'],
+    "scripts/verify_task174.py": ['anns[17]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"'],
+    "scripts/verify_task168.py": ['anns[23]["id"] == "task168-neumorph-faq-json-2026-09-25"'],
+    "scripts/verify_task207.py": ["len(ann) == 35", 'ann[7]["id"] == "task207-shortcuts-instance-cards-2026-10-01"'],
     "scripts/verify_task142.py": ["v6-0-0-release-2026-09-21"],
     "scripts/verify_task140.py": ["f95a2193", "2c668874"],
-    "scripts/verify_task190.py": ['["announcements"][9]["id"].startswith("task190-")'],
+    "scripts/verify_task190.py": ['["announcements"][10]["id"].startswith("task190-")'],  # Task213: two @2 inserts
 }
 g_ok = True
 g_detail = []

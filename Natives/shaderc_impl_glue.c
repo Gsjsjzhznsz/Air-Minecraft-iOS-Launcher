@@ -563,11 +563,11 @@ static glue_result_t *ame_glue_compile(glue_compiler_t *compiler,
     }
 
     /*
-     * IO 映射（对齐上游 shaderc；Air Task201 随 Metallum Metal 渲染器移植）
+     * IO 映射（对齐上游 shaderc；Prisma Task201 随 Metallum Metal 渲染器移植）
      *
      * 上游 shaderc 在 program->link() 成功之后、生成 SPIR-V 之前会执行一次
      * IO 映射（glslang::TProgram::mapIO()），由它解析 uniform / attribute /
-     * SSBO 的 binding 与 location 并写入 intermediate。本自研 impl（Air Task 45）
+     * SSBO 的 binding 与 location 并写入 intermediate。本自研 impl（Prisma Task 45）
      * 之前直接从 link() 走到 SPIRV_generate_with_options()，漏掉了这一步 ——
      * 与上游行为不一致，未映射的 IO 只能拿到默认（0）的 binding / location。
      * Metallum 的 MetalCrossShaderCompiler 消费 SPIR-V 时对 binding/location

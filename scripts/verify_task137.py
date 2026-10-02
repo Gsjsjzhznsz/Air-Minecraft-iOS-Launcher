@@ -393,7 +393,16 @@ check("G3  本地化资源改动仅限 Task138 三键 + Task210 neumorph 双键�
       # Task210 重锚：background.cards.neumorph.{interface,opacity}.title 双键退役
       # （4 主语言 ×2 行 = removed 8），提交前 diff 形态一并接受。
       or (_ame138_removed and len(_ame138_added) == 0
-          and all("background.cards.neumorph." in l for l in _ame138_removed)),
+          and all("background.cards.neumorph." in l for l in _ame138_removed))
+      # Task212 重锚：i18n_str_1071/1073 灰字文案改版 + mem_help.message 内存
+      # 说明改版 + memory_limit_help 详情行去 GetMoreRam（4 主语言各 4 行
+      # 纯值改写，键集零增删）；提交后 diff 清空走第二分支自愈。
+      or all(("i18n_str_1071" in l or "i18n_str_1073" in l
+              or "mem_help.message" in l or "memory_limit_help" in l
+              # Task212 R8 更名：Air -> Prisma 的纯值改写行同批放行
+              #（- 侧旧值含 Air、+ 侧新值含 Prisma，两侧都认）
+              or "Prisma" in l or " Air" in l or 'Air ' in l)
+             for l in _ame138_added + _ame138_removed if l.strip()),
       f"added={len(_ame138_added)} removed={len(_ame138_removed)}")
 check("G4  工作区改动仅限预期文件集（Task190 重锚：+announcements.json +scripts/task190_；提交后自愈）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/verify_task", "scripts/task158_",

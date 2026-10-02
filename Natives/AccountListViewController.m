@@ -21,26 +21,25 @@
 
 @end
 
-#pragma mark - AME190AccountCardCell（Task190：已安装版本页同构账号卡片）
+#pragma mark - AME190AccountCardCell（Task212：安装器卡列表同构账号卡片）
 
-// 用户定稿：账号选项样式 = "已安装的版本"页面（VersionManagerViewController
-// 的 VMTileBaseCell / VMVersionCardCell）同构——
-//   - 外层 cell 全透明 + 卡面阴影规格照搬 VMTileBaseCell（0.12/6/(0,3) +
-//     layoutSubviews 内 shadowPath 随帧更新，Task152 黑直角根修同款）
-//   - contentContainer：12pt 连续圆角 + 白 0.08 基底 + 0.5pt 白 0.10 描边；
-//     选中态换 accent 1.5pt 描边 + accent 0.10 淡底（VMVersionCardCell
-//     规范 9.1 三层选中强化原样镜像）
-//   - 卡面管线：applyEffectToTableViewCell（Task172 三段式泛型管线——与
-//     版本页 applyEffectToCollectionViewCell 为同一条管线，新拟态开关两种
-//     状态下行为逐字节一致；旧 applyEffectToCell: 是无开关旧管线，不采用）
-//   - 左侧 = 圆形头像（用户：卡片左部的图标改成头像（圆形）；尺寸对齐
-//     版本页 iconContainer 的 dp:34）
-//   - 标题 = 账号名正文（版本页 nameLabel 规格 sp:15 semibold 原生 label 色）
-//   - 灰字 = 账号类型（用户：灰字为账号类型；版本页 versionLabel 规格
-//     sp:11 secondary。原 Task136 彩色类型胶囊随重写退役）
-//   - 右侧无箭头（用户：把卡片右部的箭头删掉）；选中徽章 = 20pt accent
-//     圆角方块 + 白勾（VMVersionCardCell selectedBadge 同位 top+10/-14）
-//   - 触摸缩放弹簧动画（VMTileBaseCell 同款 0.96 / 0.25 spring）
+// 用户定稿（Task212 七问之七："账号列表重写为模组加载器列表修正后的样式，
+// 头像放大一倍，字号和样式也改"）——账号卡与 installer/ModLoaderInstall-
+// ViewController 的卡列表（ModLoaderVersionCell/ModLoaderRowCell，Task212
+// 统一 50pt 行距配方）同构：
+//   - 外层 cell 全透明（AME184ClearTableViewCellChrome 同款防御性清镀层语义
+//     由手工清空保留）；旧 VMTileBaseCell 阴影/白 0.08 基底/白 0.10 描边/
+//     shadowPath 随帧更新整组退役——安装器卡列表无阴影平贴
+//   - contentContainer：12pt 连续圆角 + applyCardEffectToView 卡面管线
+//     （与安装器 cell 逐字同一条管线调用），左右 0 内缩（inset-grouped
+//     系统边距即安装器行边距，旧 ±24 内缩退役）
+//   - 左侧 = 圆形头像放大一倍（dp:34 → dp:68，用户定稿"头像要放大一倍"）
+//   - 标题 = 账号名 sp:16 semibold AmeCard 主文字色（旧 sp:15 label 色升级，
+//     "其字号和样式也改"）
+//   - 灰字 = 账号类型 sp:12 AmeCard 次文字色（旧 sp:11 secondary 升级）
+//   - 选中徽章 = 20pt 绿圆角方块 + 白勾、右 -14 垂直居中（安装器
+//     selectedBadge 同位同色；旧 accent top+10 位 + 边框/淡底三层强化退役）
+//   - 触摸缩放弹簧动画删除（Task210"全部磁贴移除"动效冻结的账内清欠）
 //   - 上下 4pt 内缩（版本卡 item contentInsets 语义，相邻卡面净距 8pt =
 //     版本页 iPhone 档）+ 左右 24pt 总边距（版本页 section 16 + item 8）
 @interface AME190AccountCardCell : UITableViewCell
@@ -81,11 +80,7 @@
     clearSel.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.selectedBackgroundView = clearSel;
 
-    // 阴影：VMTileBaseCell 规范 5.2 中阴影档（0.12, 6, (0,3)）
-    self.layer.shadowColor = [UIColor blackColor].CGColor;
-    self.layer.shadowOffset = CGSizeMake(0, 3);
-    self.layer.shadowOpacity = 0.12;
-    self.layer.shadowRadius = 6;
+    // Task212：阴影整组退役（安装器卡列表同款无阴影平贴）
 
     // ----- 卡片容器（VMTileBaseCell 规范 5.1：12pt 连续圆角卡面宿主）-----
     self.contentContainer = [[UIView alloc] init];
@@ -93,17 +88,15 @@
     self.contentContainer.layer.cornerRadius = 12;
     self.contentContainer.layer.cornerCurve = kCACornerCurveContinuous;
     self.contentContainer.layer.masksToBounds = YES;
-    self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-    self.contentContainer.layer.borderWidth = 0.5;
-    self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
     [self.contentView addSubview:self.contentContainer];
 
-    // 卡面管线：Task172 三段式泛型管线（与已安装版本页同一条，Task190
-    // 新入口；管线在 init 单次挂载，引擎 layoutSubviews 按 bounds 自刷）
-    [[BackgroundManager sharedManager] applyEffectToTableViewCell:self];
+    // 卡面管线：Task212 与安装器 cell 同一条调用（applyCardEffectToView，
+    // init 单次挂载即平贴 AmeCardSurfaceColor；旧 Task172 applyEffectTo-
+    // TableViewCell 三段式泛型管线随 VMTileBaseCell 阴影镜像一并退役）
+    [[BackgroundManager sharedManager] applyCardEffectToView:self.contentContainer];
 
-    // ----- 左侧圆形头像（dp:34，占位底色 + DefaultAccount 默认图）-----
-    CGFloat ame190_avatarSize = [ScreenUtils dp:34];
+    // ----- 左侧圆形头像（Task212 用户定稿放大一倍：dp:34 → dp:68）-----
+    CGFloat ame190_avatarSize = [ScreenUtils dp:68];
     self.avatarView = [[UIImageView alloc] init];
     self.avatarView.translatesAutoresizingMaskIntoConstraints = NO;
     self.avatarView.contentMode = UIViewContentModeScaleAspectFill;
@@ -114,33 +107,33 @@
     self.avatarView.image = [UIImage imageNamed:@"DefaultAccount"];
     [self.contentContainer addSubview:self.avatarView];
 
-    // ----- 标题 = 账号名（版本页 nameLabel 规格：sp:15 semibold label 色）-----
+    // ----- 标题 = 账号名（Task212：sp:16 semibold AmeCard 主文字色）-----
     self.usernameLabel = [[UILabel alloc] init];
     self.usernameLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.usernameLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:15] weight:UIFontWeightSemibold];
-    self.usernameLabel.textColor = [UIColor labelColor];
+    self.usernameLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:16] weight:UIFontWeightSemibold];
+    self.usernameLabel.textColor = AmeCardPrimaryTextColor();
     self.usernameLabel.numberOfLines = 1;
     self.usernameLabel.adjustsFontSizeToFitWidth = YES;
     self.usernameLabel.minimumScaleFactor = 0.75;
     self.usernameLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentContainer addSubview:self.usernameLabel];
 
-    // ----- 灰字 = 账号类型（版本页 versionLabel 规格：sp:11 secondary）-----
+    // ----- 灰字 = 账号类型（Task212：sp:12 AmeCard 次文字色）-----
     self.typeLabel = [[UILabel alloc] init];
     self.typeLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.typeLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
-    self.typeLabel.textColor = [UIColor secondaryLabelColor];
+    self.typeLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:12] weight:UIFontWeightRegular];
+    self.typeLabel.textColor = AmeCardSecondaryTextColor();
     self.typeLabel.numberOfLines = 1;
     self.typeLabel.adjustsFontSizeToFitWidth = YES;
     self.typeLabel.minimumScaleFactor = 0.7;
     self.typeLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [self.contentContainer addSubview:self.typeLabel];
 
-    // ----- 选中徽章（VMVersionCardCell selectedBadge 同款：20pt accent 圆角
-    // 方块 + 白勾 9pt bold，top+10 / 右 -14）-----
+    // ----- 选中徽章（Task212：安装器 selectedBadge 同款——20pt 绿圆角方块
+    // + 白勾 9pt bold，右 -14 垂直居中）-----
     self.selectedBadge = [[UIView alloc] init];
     self.selectedBadge.translatesAutoresizingMaskIntoConstraints = NO;
-    self.selectedBadge.backgroundColor = accentColor();
+    self.selectedBadge.backgroundColor = [UIColor systemGreenColor];
     self.selectedBadge.layer.cornerRadius = 10;
     self.selectedBadge.layer.cornerCurve = kCACornerCurveContinuous;
     self.selectedBadge.layer.masksToBounds = YES;
@@ -153,23 +146,26 @@
     checkmark.tintColor = [UIColor whiteColor];
     [self.selectedBadge addSubview:checkmark];
 
-    CGFloat ame190_textLead = 14 + ame190_avatarSize + 10;   // 头像 leading 14 + 直径 + 10pt 间距
+    CGFloat ame190_textLead = 16 + ame190_avatarSize + 12;   // 头像 leading 16 + 直径 + 12pt 间距
     [NSLayoutConstraint activateConstraints:@[
-        // 卡片容器：上下 4 / 左右 24 内缩（版本页 section.contentInsets 16 +
-        // item contentInsets 8 = 24pt 总边距语义）
+        // 卡片容器：上下 4 / 左右 0 内缩（Task212 安装器行边距语义——
+        // inset-grouped 的系统 margins 即行边距，旧 ±24 二次内缩退役）
         [self.contentContainer.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:4],
         [self.contentContainer.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-4],
-        [self.contentContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:24],
-        [self.contentContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-24],
+        [self.contentContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:0],
+        [self.contentContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:0],
 
-        // 头像：左 14，垂直居中，dp:34 圆
-        [self.avatarView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:14],
+        // 头像：左 16，垂直居中，dp:68 圆；上下距卡缘 ≥4pt（行高由头像
+        // 下限驱动：iPhone 76pt 卡 / iPad dp 放大后更高，自动行高自适应）
+        [self.avatarView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:16],
         [self.avatarView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
         [self.avatarView.widthAnchor constraintEqualToConstant:ame190_avatarSize],
         [self.avatarView.heightAnchor constraintEqualToConstant:ame190_avatarSize],
+        [self.avatarView.topAnchor constraintGreaterThanOrEqualToAnchor:self.contentContainer.topAnchor constant:4],
+        [self.avatarView.bottomAnchor constraintLessThanOrEqualToAnchor:self.contentContainer.bottomAnchor constant:-4],
 
-        // 文字块：头像右侧 10；标题顶 16 / 灰字紧跟 3 / 灰字底 16——
-        // 高度链完整，自动行高（约 70pt 卡面 + 8pt 行距 = 版本页同档）
+        // 文字块：头像右侧 12；标题顶 16 / 灰字紧跟 3 / 灰字底 16——
+        // 高度链完整，自动行高（头像 68 + 8pt 呼吸 = 主导高度）
         [self.usernameLabel.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:ame190_textLead],
         [self.usernameLabel.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:16],
         [self.usernameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.selectedBadge.leadingAnchor constant:-8],
@@ -179,25 +175,14 @@
         [self.typeLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.selectedBadge.leadingAnchor constant:-8],
         [self.typeLabel.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-16],
 
-        // 选中徽章：右上（版本页同位）
+        // 选中徽章：右 -14 垂直居中（安装器同位）
         [self.selectedBadge.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14],
-        [self.selectedBadge.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:10],
+        [self.selectedBadge.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
         [self.selectedBadge.widthAnchor constraintEqualToConstant:20],
         [self.selectedBadge.heightAnchor constraintEqualToConstant:20],
         [checkmark.centerXAnchor constraintEqualToAnchor:self.selectedBadge.centerXAnchor],
         [checkmark.centerYAnchor constraintEqualToAnchor:self.selectedBadge.centerYAnchor],
     ]];
-}
-
-// Task152 镜像：阴影路径随卡片实际 frame 更新——透明 cell 的阴影若无
-// shadowPath 会以直角 bounds 绘制，在圆角卡片四角外露出黑色直角
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGRect shadowRect = self.contentContainer.frame;
-    if (!CGRectIsEmpty(shadowRect)) {
-        self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:shadowRect
-                                                           cornerRadius:12.0].CGPath;
-    }
 }
 
 - (void)prepareForReuse {
@@ -209,19 +194,11 @@
     [self ame190_applySelectedAppearance:NO];
 }
 
-// 规范 9.1 三层选中强化（VMVersionCardCell configure 原样镜像：边框 + 徽章 + 底色）
+// Task212：选中态 = 绿徽章显隐（安装器同款；旧 accent 边框 + 淡底的三层
+// 强化随卡面管线统一切换退役，选中反馈只来自徽章）
 - (void)ame190_applySelectedAppearance:(BOOL)selected {
     self.selectedBadge.hidden = !selected;
-    self.selectedBadge.backgroundColor = accentColor();
-    if (selected) {
-        self.contentContainer.layer.borderColor = accentColor().CGColor;
-        self.contentContainer.layer.borderWidth = 1.5;
-        self.contentContainer.backgroundColor = [accentColor() colorWithAlphaComponent:0.10];
-    } else {
-        self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
-        self.contentContainer.layer.borderWidth = 0.5;
-        self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-    }
+    self.selectedBadge.backgroundColor = [UIColor systemGreenColor];
 }
 
 - (void)ame190_configureWithUsername:(NSString *)username
@@ -239,27 +216,8 @@
     [self ame190_applySelectedAppearance:selected];
 }
 
-// 触摸缩放弹簧动画（VMTileBaseCell 同款 0.96 / 0.25 spring）
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesBegan:touches withEvent:event];
-    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self.transform = CGAffineTransformMakeScale(0.96, 0.96);
-    } completion:nil];
-}
-
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesEnded:touches withEvent:event];
-    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self.transform = CGAffineTransformIdentity;
-    } completion:nil];
-}
-
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-    [super touchesCancelled:touches withEvent:event];
-    [UIView animateWithDuration:0.25 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:0.8 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self.transform = CGAffineTransformIdentity;
-    } completion:nil];
-}
+// Task212：触摸缩放弹簧三段退役（Task210"全部磁贴移除"动效冻结的
+// 账号页清欠；安装器卡列表同样无按压动效）。
 
 @end
 
@@ -285,9 +243,9 @@
     // 参照 FCL：卡片式账户列表，去除默认分割线，圆角卡片自带视觉分隔
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     self.tableView.backgroundColor = [UIColor clearColor];
-    // Task190：行高自动维度——卡面 ≈ 16+标题+3+灰字+16 + 上下 4pt 内缩
-    //（约 78pt 行 / 70pt 卡，已安装版本页同档间距）
-    self.tableView.estimatedRowHeight = 78;
+    // Task212：行高自动维度——dp:68 头像 + 上下 4pt 内缩驱动
+    //（iPhone 约 84pt 行 / 76pt 卡；iPad dp 放大后更高，自动行高自适应）
+    self.tableView.estimatedRowHeight = 84;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     // 底部内边距避免最后一个 cell 被浮动按钮遮挡
     self.tableView.contentInset = UIEdgeInsetsMake(8, 0, 80, 0);

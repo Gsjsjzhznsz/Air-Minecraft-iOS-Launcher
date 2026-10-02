@@ -2,7 +2,7 @@
 //  AiLogReader.h
 //  Amethyst
 //
-//  Air AI Agent 日志读取工具（只读）：
+//  Prisma AI Agent 日志读取工具（只读）：
 //    - read_latest_log：读取当前选中实例的 logs/latest.log（截断末尾 4000 字符）。
 //    - read_crash_report：读取最新的崩溃报告 .txt（截断 6000 字符）。
 //

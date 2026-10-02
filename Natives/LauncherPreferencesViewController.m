@@ -1522,7 +1522,7 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
                 @"type": self.typeSwitch
             }
         ], @[
-            // AI 助手 settings（Air AI Agent Phase 2）
+            // AI 助手 settings（Prisma AI Agent Phase 2）
             @{@"icon": @"sparkles"},
             @{@"key": @"provider_config",
               @"title": localize(@"ame193.misc.7", @"提供商配置"),
@@ -1618,7 +1618,7 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
     // 以确保 view 与 tableView 均已就绪。
     [[BackgroundManager sharedManager] makeViewControllerTransparent:self];
 
-    // 顶部 Hero 卡片：App 名 + 版本 + 设备信息（参照 Air-Design v1.2 L3 大卡片规范）
+    // 顶部 Hero 卡片：App 名 + 版本 + 设备信息（参照 Prisma-Design v1.2 L3 大卡片规范）
     // 与搜索栏一起包装为 tableHeaderView，搜索栏在上、Hero 卡片在下
     [self setupHeroHeader];
 
@@ -1664,13 +1664,13 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
 #pragma mark - Hero Header（顶部 App 信息卡片）
 
 - (NSString *)appName {
-    // 优先使用 CFBundleDisplayName（用户可见名称），其次 CFBundleName，兜底 "Air"
+    // 优先使用 CFBundleDisplayName（用户可见名称），其次 CFBundleName，兜底 "Prisma"
     NSDictionary *info = NSBundle.mainBundle.infoDictionary;
     NSString *name = info[@"CFBundleDisplayName"];
     if (name.length == 0) {
         name = info[@"CFBundleName"];
     }
-    return name.length ? name : @"Air";
+    return name.length ? name : @"Prisma";
 }
 
 - (void)setupHeroHeader {
@@ -2012,22 +2012,23 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
 #pragma mark - Memory Limit Help
 
 - (void)showMemoryLimitHelp {
+    // Task212（用户定稿九号指令）：说明文案改版——两种权限各自的效果与预期
+    // 分配量，并推荐付费开发者证书；按钮从 GetMoreRam（GitHub 仓库）改为
+    // "付费开发者证书"（B 站视频教程 b23.tv/WtgrPJM）。
     UIAlertController *alert = [UIAlertController
         alertControllerWithTitle:localize(@"mem_help.title", @"关于内存限制")
                          message:localize(@"mem_help.message",
-                             @"iOS 18 / iOS 26 单实例内存上限约为 1440MB，玩大型整合包时可能因内存不足崩溃。\n\n"
-                              "解决方法：\n"
-                              "使用 GetMoreRam (LiveContainer 插件) 解除内存限制。\n"
-                              "GetMoreRam 仓库：github.com/hugeBlack/GetMoreRam\n\n"
-                              "安装后重启启动器即可生效。\n\n"
-                              "如果不使用 LiveContainer，可尝试降低内存分配（设置 > Java > 内存分配），"
-                              "但部分整合包在内存限制下可能无法正常运行。")
+                             @"·扩展内存限制权限，使用GetMoreRAM开启\n"
+                              "让iOS为启动器分配更多内存空间，通常能分配6GB内存\n\n"
+                              "·扩展虚拟内存权限，开启方式见下\n"
+                              "让iOS为启动器分配更多内存寻址，通常能分配7GB内存并提升稳定性\n\n"
+                              "推荐使用付费开发者证书，安装软件自动开启上述权限且支持开启JIT")
                   preferredStyle:UIAlertControllerStyleAlert];
 
-    [alert addAction:[UIAlertAction actionWithTitle:@"GetMoreRam"
+    [alert addAction:[UIAlertAction actionWithTitle:localize(@"mem_help.button", @"付费开发者证书")
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction *action) {
-        NSURL *url = [NSURL URLWithString:@"https://github.com/hugeBlack/GetMoreRam"];
+        NSURL *url = [NSURL URLWithString:@"https://b23.tv/WtgrPJM"];
         if (@available(iOS 10.0, *)) {
             [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
         }

@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="Natives/Assets.xcassets/AppIcon-Light.appiconset/1024x1024.png" alt="Air 图标" width="120" style="border-radius: 24px;">
+  <img src="Natives/Assets.xcassets/AppIcon-Light.appiconset/1024x1024.png" alt="Prisma 图标" width="120" style="border-radius: 24px;">
 </div>
 
-<h1 align="center">Air</h1>
+<h1 align="center">Prisma</h1>
 <p align="center"><b>一款面向中国用户深度优化的 iOS Minecraft: Java Edition 启动器</b></p>
 <p align="center"><sub>派生自 <a href="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered">Amethyst-iOS-MyRemastered</a></sub></p>
 
 <div align="center">
-  <img alt="构建状态" src="https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions/workflows/development.yml/badge.svg?branch=main">
-  <img alt="下载量" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/total?label=Downloads&style=flat">
-  <img alt="版本" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
-  <img alt="许可证" src="https://img.shields.io/github/license/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
-  <img alt="最后提交" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?color=c78aff&label=last%20commit&style=flat">
+  <img alt="构建状态" src="https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="下载量" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/total?label=Downloads&style=flat">
+  <img alt="版本" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher?style=flat">
+  <img alt="许可证" src="https://img.shields.io/github/license/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher?style=flat">
+  <img alt="最后提交" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher?color=c78aff&label=last%20commit&style=flat">
 </div>
 
 <p align="center">
@@ -20,9 +20,9 @@
 
 ---
 
-## Air 是什么？
+## Prisma 是什么？
 
-**Air** 是 [Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) 的定制 Fork，一款面向 iOS 和 iPadOS 的 Minecraft: Java Edition 高端启动器。本 Fork 聚焦**中国用户体验** -- 提供完整的中文本地化、应用内中英文切换、iOS 26+ JIT 直接启动优化，以及来自上游议题审计的 Bug 修复。
+**Prisma** 是 [Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered) 的定制 Fork，一款面向 iOS 和 iPadOS 的 Minecraft: Java Edition 高端启动器。本 Fork 聚焦**中国用户体验** -- 提供完整的中文本地化、应用内中英文切换、iOS 26+ JIT 直接启动优化，以及来自上游议题审计的 Bug 修复。
 
 > **不知道该用哪个 Fork？** 请查看下方的 [Fork 网络](#fork-网络) 章节，了解各活跃 Fork 的功能对比。
 
@@ -77,7 +77,7 @@ herbrine8403/Amethyst-iOS-MyRemastered       (主要重制版 Fork - UI 重构�
                                             BMCLAPI 支持、多账户、自动渲染器/JVM)
         |
         v
-Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、JIT 优化、
+Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、JIT 优化、
                                             应用内语言切换、Bug 修复、LWJGL 3.4.1)
 ```
 
@@ -85,7 +85,7 @@ Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、J
 
 ## 目录
 
-- [Air 是什么？](#air-是什么)
+- [Prisma 是什么？](#prisma-是什么)
 - [与上游的差异](#与上游的差异)
 - [Fork 谱系](#fork-谱系)
 - [核心特性](#核心特性)
@@ -148,14 +148,14 @@ Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、J
 <details>
 <summary><b>正式版（TrollStore 渠道）</b></summary>
 
-1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases) 下载 `.tipa` 安装包。
+1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/releases) 下载 `.tipa` 安装包。
 2. 通过系统分享菜单，选择用 TrollStore 打开，即可自动完成安装。
 </details>
 
 <details>
 <summary><b>正式版（AltStore / SideStore 渠道）</b></summary>
 
-1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases) 下载 `.ipa` 安装包。
+1. 前往 [Releases](https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/releases) 下载 `.ipa` 安装包。
 2. 按照侧载工具的标准流程导入 IPA 完成安装。
 </details>
 
@@ -165,7 +165,7 @@ Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (本仓库 - 中国用户体验、J
 > [!CAUTION]
 > 测试版可能包含崩溃、无法启动等严重缺陷，仅限开发测试使用。
 
-1. 前往 [GitHub Actions](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions) 页面下载最新 IPA 构建产物。
+1. 前往 [GitHub Actions](https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/actions) 页面下载最新 IPA 构建产物。
 2. 在侧载工具（AltStore、SideStore 等）中导入 IPA 完成安装。
 </details>
 
@@ -195,7 +195,7 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 本项目基于以下 Fork 链构建，特此致谢：
 
 - **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- 最初的 iOS Minecraft 启动器，一切的起点。
-- **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- 主要重制版 Fork，添加了现代化 UI、Mod 管理、BMCLAPI 下载源、多账户、自动渲染器/JVM 选择等功能。这是 Air 的直接上游。
+- **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- 主要重制版 Fork，添加了现代化 UI、Mod 管理、BMCLAPI 下载源、多账户、自动渲染器/JVM 选择等功能。这是 Prisma 的直接上游。
 - **[ZalithLauncher/ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2)** -- Minecraft 26.3+ 使用的 SDL3 窗口嵌入方案借鉴自该项目：其 Android 端 `sdl_hook.c` 兼容层被移植为 iOS 端的 `Natives/sdl3_hook.m`，其 SDL 嵌入补丁也启发了我们针对 SDL uikit 后端的 `patches/sdl3-amethyst.patch`。以 `ThirdParty/ZalithLauncher2` 子模块形式随仓库引用。
 
 ## 第三方组件
@@ -233,10 +233,10 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 
 ## Star History
 
-<a href="https://star-history.com/#Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&Date">
+<a href="https://star-history.com/#Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher&Date">
  <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&type=Date&theme=dark" />
-  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&type=Date" />
-  <img alt="Star history" src="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Air-Minecraft-iOS-Launcher&type=Date" />
+  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher&type=Date&theme=dark" />
+  <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher&type=Date" />
+  <img alt="Star history" src="https://api.star-history.com/svg?repos=Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher&type=Date" />
  </picture>
 </a>

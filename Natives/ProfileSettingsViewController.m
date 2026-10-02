@@ -336,7 +336,7 @@ static NSString * localizeProfileTitle(NSString *title) {
 
 #pragma mark - Hero Card
 
-/// 顶部 Hero 卡片：Profile 名 + 当前版本 pill + 游戏目录（Air-Design v1.2 L3 大卡片）
+/// 顶部 Hero 卡片：Profile 名 + 当前版本 pill + 游戏目录（Prisma-Design v1.2 L3 大卡片）
 - (void)setupHeroCard {
     // ===== Hero 卡片容器（L3：16pt 圆角 + 半透明背景 + 毛玻璃 + 浅边框 + 中阴影）=====
     UIView *heroCard = [[UIView alloc] init];
@@ -612,7 +612,7 @@ static NSString * localizeProfileTitle(NSString *title) {
     // 配置（写 profile touchController=YES → 启动链 ame172_applyProfileTouchController
     // 自动落 UDP 模式 + 屏蔽启动器控件）。
 
-    // 重构（Air-Design v1.2）：5 个 Bento 分组
+    // 重构（Prisma-Design v1.2）：5 个 Bento 分组
     // 顺序与横屏布局对应：左侧（0,1）+ 右侧（2,3,4）
     //   0: 版本信息  - 名称 / 游戏版本 / 游戏目录
     //   1: 资源管理  - 模组 / 光影 / 资源包 / 数据包 / 世界

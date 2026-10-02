@@ -14,7 +14,7 @@
 #import "DownloadViewController.h"
 #import "utils.h"
 
-#pragma mark - 资源包卡片 Cell（继承 Air-Design 卡片基类，本文件内轻量子类）
+#pragma mark - 资源包卡片 Cell（继承 Prisma-Design 卡片基类，本文件内轻量子类）
 
 @interface ResourcePackCardCell : ResourceCardTableViewCell
 /// 启用/禁用开关回调（VC 在 cellForRow 中设置，参数为触发开关的 cell）
@@ -214,7 +214,7 @@
             [self filterLocalItems];
             [self setLoading:NO];
             [self.tableView.refreshControl endRefreshing];
-            // 首屏连锁进场动画（Air-Design 15.3）：只播一次
+            // 首屏连锁进场动画（Prisma-Design 15.3）：只播一次
             if (!self.didPlayChainAnimation && self.filteredLocalItems.count > 0) {
                 self.didPlayChainAnimation = YES;
                 [self animateCellsInChain];
@@ -315,7 +315,7 @@
 }
 
 - (CGFloat)tableView:(UITableView *)tableView heightForHeaderInSection:(NSInteger)section {
-    // 卡片间距（Air-Design space-sm）：顶部留白 + 卡片之间留白
+    // 卡片间距（Prisma-Design space-sm）：顶部留白 + 卡片之间留白
     return ResourceListCardSpacing;
 }
 

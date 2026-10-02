@@ -227,7 +227,7 @@
 "preference.title.jitstreamer_server" = "The server address of JitStreamer";
 "preference.detail.jitstreamer_server" = "This option gives custom access to JitStreamer servers for JIT addresses.";
 "preference.title.enable_altkit" = "Enable JIT using AltKit";
-"preference.detail.enable_altkit" = "When enabled, Air will try to connect to local AltServers to enable JIT.";
+"preference.detail.enable_altkit" = "When enabled, Prisma will try to connect to local AltServers to enable JIT.";
 "preference.title.appicon" = "Set app icon";
 "preference.detail.appicon" = "Allows you to choose between different Home Screen icons for Amethyst.";
 "preference.title.appicon-default" = "Familiar Amethyst light";
@@ -743,7 +743,7 @@
 "preference.title.ai_crash_fix" = "AI Crash Fix";
 "preference.detail.ai_crash_fix" = "Configure and use AI assistant to automatically diagnose and fix game crash issues";
 "preference.title.memory_limit_help" = "Memory Limit Info";
-"preference.detail.memory_limit_help" = "Learn why iOS memory limits cause modpack crashes and how to fix it (GetMoreRam)";
+"preference.detail.memory_limit_help" = "Learn why iOS memory limits cause modpack crashes and how to fix it";
 "preference.title.check_update" = "Check for Updates";
 "preference.detail.check_update" = "Check GitHub Releases for the latest stable version of Amethyst iOS";
 
@@ -765,7 +765,7 @@
 
 // 内存限制帮助弹窗
 "mem_help.title" = "About Memory Limit";
-"mem_help.message" = "iOS 18 / iOS 26 single-instance memory limit is about 1440MB. Large modpacks may crash due to insufficient memory.\n\nSolution:\nUse GetMoreRam (a LiveContainer plugin) to lift the memory limit.\nGetMoreRam repo: github.com/hugeBlack/GetMoreRam\n\nRestart the launcher after installation to take effect.\n\nIf you don't use LiveContainer, try lowering the memory allocation (Settings > Java > Memory Allocation), but some modpacks may not run under the memory limit.";
+"mem_help.message" = "·Increased Memory Limit entitlement, enable via GetMoreRAM\nlets iOS allocate more memory to the launcher, usually up to 6GB\n\n·Extended Virtual Addressing entitlement, see below for how to enable\ngives iOS more memory addressing for the launcher, usually up to 7GB with improved stability\n\nA paid developer certificate is recommended: installing with it grants both entitlements automatically and supports JIT";
 
 // 下载进度与速率（Phase 6 Task 6.1）
 "download.speed.format" = "%@/s";
@@ -1690,9 +1690,9 @@
 "i18n_str_1068" = "Prefer OpenGL, fall back to Vulkan on failure";
 "i18n_str_1069" = "Last played: %@";
 "i18n_str_1070" = "Game directory (version isolation)";
-"i18n_str_1071" = "Tap to switch · long press to delete the current directory";
+"i18n_str_1071" = "Tap a card to switch; tap the X to delete";
 "i18n_str_1072" = "Installed versions";
-"i18n_str_1073" = "Tap to enter version settings · long press to show the action menu";
+"i18n_str_1073" = "Tap a card to switch; tap the ellipsis to edit; long-press to delete";
 "i18n_str_1074" = "Failed to switch the game directory:\n\n%@";
 "i18n_str_1075" = "New game directory";
 "i18n_str_1076" = "Enter a new directory name (for version isolation)";
@@ -2094,7 +2094,7 @@
 "preference.section.footer.download" = "Download sources and mirror policy for game assets.";
 "preference.section.footer.control" = "Touch, gamepad and virtual control behavior.";
 "preference.section.footer.java" = "Java runtimes and advanced JVM options.";
-"preference.section.footer.ai" = "Model provider and behavior for the Air AI assistant.";
+"preference.section.footer.ai" = "Model provider and behavior for the Prisma AI assistant.";
 
 /* Task 125: auto update check on launch */
 "auto_update.toast.new_version" = "New version %@ available";
@@ -2572,10 +2572,10 @@
 "ame193.ai.5" = "✅ %@ succeeded";
 "ame193.ai.6" = "❌ %@ failed";
 "ame193.ai.7" = "⚙️ Tool: %@";
-"ame193.ai.8" = "Message Air…";
+"ame193.ai.8" = "Message Prisma…";
 "ame193.ai.9" = "System prompt";
 "ame193.ai.10" = "Reset to default";
-"ame193.ai.11" = "This is injected at the beginning of every conversation to define how the Air assistant behaves.";
+"ame193.ai.11" = "This is injected at the beginning of every conversation to define how the Prisma assistant behaves.";
 "ame193.misc.1" = "All";
 "ame193.misc.2" = "All versions";
 "ame193.misc.3" = "Release";

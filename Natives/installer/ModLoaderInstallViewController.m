@@ -105,13 +105,14 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     [self.contentView addSubview:_cardContainer];
     [[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];
 
-    // ----- 左侧图标容器：40x40 圆角 10 品牌色淡底方块 + 居中图标（版本卡规格）-----
+    // ----- 左侧图标容器：32x32 圆角 8 品牌色淡底方块 + 居中图标（Task212：
+    // 随主表行高 64→50 压缩，与版本选择表行距逐项一致；原 40x40/圆角 10）-----
     // 图标内容由 ModLoaderIconHelper.configureImageView 配置（PNG 保原色 /
     // SF Symbol 着品牌色），容器底色 = 品牌色 0.15 淡底（与该助手的
     // createIconBadgeForLoader 徽章规格同源）。
     _iconContainer = [[UIView alloc] init];
     _iconContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    _iconContainer.layer.cornerRadius = 10;
+    _iconContainer.layer.cornerRadius = 8;
     _iconContainer.layer.cornerCurve = kCACornerCurveContinuous;
     _iconContainer.layer.masksToBounds = YES;
     _iconContainer.backgroundColor = [UIColor systemGreenColor];
@@ -122,10 +123,11 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     _iconView.contentMode = UIViewContentModeScaleAspectFit;
     [_iconContainer addSubview:_iconView];
 
-    // ----- 名称/状态两行（版本卡"版本号 16 semibold + 日期 12"同款文字规格）-----
+    // ----- 名称/状态两行（Task212：15 semibold + 11，与版本表 cell 文字规格
+    // 同档；顶 8 / 间距 2 在 42pt 卡内垂直居中）-----
     _nameLabel = [[UILabel alloc] init];
     _nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _nameLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    _nameLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     _nameLabel.textColor = AmeCardPrimaryTextColor();
     _nameLabel.numberOfLines = 1;
     _nameLabel.adjustsFontSizeToFitWidth = YES;
@@ -135,7 +137,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
 
     _stateLabel = [[UILabel alloc] init];
     _stateLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _stateLabel.font = [UIFont systemFontOfSize:12];
+    _stateLabel.font = [UIFont systemFontOfSize:11];
     _stateLabel.textColor = AmeCardSecondaryTextColor();
     _stateLabel.numberOfLines = 1;
     _stateLabel.adjustsFontSizeToFitWidth = YES;
@@ -172,25 +174,25 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
         [_cardContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:0],
         [_cardContainer.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-4],
 
-        // 图标容器：左 14，垂直居中，40x40；图标 26x26 居中
-        [_iconContainer.leadingAnchor constraintEqualToAnchor:_cardContainer.leadingAnchor constant:14],
+        // 图标容器：左 16，垂直居中，32x32；图标 20x20 居中（Task212 压缩版）
+        [_iconContainer.leadingAnchor constraintEqualToAnchor:_cardContainer.leadingAnchor constant:16],
         [_iconContainer.centerYAnchor constraintEqualToAnchor:_cardContainer.centerYAnchor],
-        [_iconContainer.widthAnchor constraintEqualToConstant:40],
-        [_iconContainer.heightAnchor constraintEqualToConstant:40],
+        [_iconContainer.widthAnchor constraintEqualToConstant:32],
+        [_iconContainer.heightAnchor constraintEqualToConstant:32],
         [_iconView.centerXAnchor constraintEqualToAnchor:_iconContainer.centerXAnchor],
         [_iconView.centerYAnchor constraintEqualToAnchor:_iconContainer.centerYAnchor],
-        [_iconView.widthAnchor constraintEqualToConstant:26],
-        [_iconView.heightAnchor constraintEqualToConstant:26],
+        [_iconView.widthAnchor constraintEqualToConstant:20],
+        [_iconView.heightAnchor constraintEqualToConstant:20],
 
-        // 名称：紧跟图标右侧 +14，顶部 12（行高 64 = 卡 56，内容顶部锚定，
+        // 名称：紧跟图标右侧 +12，顶 8（行高 50 = 卡 42，内容顶部锚定，
         // 不设底部约束——与固定行高组合零冲突）
-        [_nameLabel.leadingAnchor constraintEqualToAnchor:_iconContainer.trailingAnchor constant:14],
-        [_nameLabel.topAnchor constraintEqualToAnchor:_cardContainer.topAnchor constant:12],
+        [_nameLabel.leadingAnchor constraintEqualToAnchor:_iconContainer.trailingAnchor constant:12],
+        [_nameLabel.topAnchor constraintEqualToAnchor:_cardContainer.topAnchor constant:8],
         [_nameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:_chevronView.leadingAnchor constant:-8],
 
-        // 状态行：与名称左对齐，紧跟下方 +3
+        // 状态行：与名称左对齐，紧跟下方 +2
         [_stateLabel.leadingAnchor constraintEqualToAnchor:_nameLabel.leadingAnchor],
-        [_stateLabel.topAnchor constraintEqualToAnchor:_nameLabel.bottomAnchor constant:3],
+        [_stateLabel.topAnchor constraintEqualToAnchor:_nameLabel.bottomAnchor constant:2],
         [_stateLabel.trailingAnchor constraintLessThanOrEqualToAnchor:_chevronView.leadingAnchor constant:-8],
 
         // chevron：右 -14，垂直居中，14x14
@@ -335,10 +337,10 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
     [self.contentView addSubview:_cardContainer];
     [[BackgroundManager sharedManager] applyCardEffectToView:_cardContainer];
 
-    // ----- 标题/描述两行（与 RowCell 同款文字规格）-----
+    // ----- 标题/描述两行（Task212：15/11 与 RowCell 同步压缩）-----
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    _titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     _titleLabel.textColor = AmeCardPrimaryTextColor();
     _titleLabel.numberOfLines = 1;
     _titleLabel.adjustsFontSizeToFitWidth = YES;
@@ -348,7 +350,7 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
 
     _descLabel = [[UILabel alloc] init];
     _descLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    _descLabel.font = [UIFont systemFontOfSize:12];
+    _descLabel.font = [UIFont systemFontOfSize:11];
     _descLabel.textColor = AmeCardSecondaryTextColor();
     _descLabel.numberOfLines = 0;
     _descLabel.lineBreakMode = NSLineBreakByWordWrapping;
@@ -366,11 +368,11 @@ static void AME184ClearTableViewCellChrome(UITableViewCell *cell) {
         [_cardContainer.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-4],
 
         [_titleLabel.leadingAnchor constraintEqualToAnchor:_cardContainer.leadingAnchor constant:16],
-        [_titleLabel.topAnchor constraintEqualToAnchor:_cardContainer.topAnchor constant:12],
+        [_titleLabel.topAnchor constraintEqualToAnchor:_cardContainer.topAnchor constant:8],
         [_titleLabel.trailingAnchor constraintLessThanOrEqualToAnchor:_switchControl.leadingAnchor constant:-12],
 
         [_descLabel.leadingAnchor constraintEqualToAnchor:_titleLabel.leadingAnchor],
-        [_descLabel.topAnchor constraintEqualToAnchor:_titleLabel.bottomAnchor constant:3],
+        [_descLabel.topAnchor constraintEqualToAnchor:_titleLabel.bottomAnchor constant:2],
         [_descLabel.trailingAnchor constraintLessThanOrEqualToAnchor:_switchControl.leadingAnchor constant:-12],
 
         [_switchControl.trailingAnchor constraintEqualToAnchor:_cardContainer.trailingAnchor constant:-14],
@@ -1332,9 +1334,12 @@ static NSString *ame185ShowAllRow(NSInteger hiddenCount) {
     _tableView.backgroundView = nil;
     _tableView.dataSource = self;
     _tableView.delegate = self;
-    // Task184：64pt 行高 = 版本卡同款（卡 56 + 上下 4pt 内缩）
-    _tableView.rowHeight = 64;
-    _tableView.estimatedRowHeight = 64;
+    // Task212（用户四次重写仍"与选择游戏版本列表样式不同（间距不同）"的根因收口）：
+    // 间距差异的真正来源 = 加载器主表行高 64pt vs 版本选择表 50pt——Task183/184
+    // 每轮重写都对齐了卡面配方却从未统一行高。现加载器表与版本表同用 50pt 行
+    //（卡 42 = 50 - 上下 4pt 内缩），RowCell/SwitchCell 内部几何同步压缩。
+    _tableView.rowHeight = 50;
+    _tableView.estimatedRowHeight = 50;
     _tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     _tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAutomatic;
     // extendedLayoutIncludesOpaqueBars / edgesForExtendedLayout 是 UIViewController 的属性，

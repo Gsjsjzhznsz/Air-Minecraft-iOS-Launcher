@@ -267,14 +267,14 @@ check("F4 渲染器选择条目（Task209 重锚：Krypton Wrapper 新名 + 原�
 
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
 check("F5 公告 34 且末位为 task206-nggl4es-2026-10-01（Task212 重锚：task212@2 插入后 34）",
-      len(ann) == 34 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+      len(ann) == 35 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
       and "NG-GL4ES" in ann[-1]["title"] and "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER" in ann[-1]["content"])
 
 anchor_ok = ('== [12, 4, 7, 15]' in rd("scripts/verify_task202.py")
              and '== [12, 4, 7, 15]' in rd("scripts/verify_task168.py")
-             and "len(ann) == 34" in rd("scripts/verify_task203.py")
-             and "len(ann) == 34" in rd("scripts/verify_task202.py")
-             and "len(ann) == 34" in rd("scripts/verify_task196_197_198_201.py"))
+             and "len(ann) == 35" in rd("scripts/verify_task203.py")
+             and "len(ann) == 35" in rd("scripts/verify_task202.py")
+             and "len(ann) == 35" in rd("scripts/verify_task196_197_198_201.py"))
 check("F6 计数锚重锚一致（FAQ 168/202 + 公告 193/202/203/196 家族；Task212 重锚 33→34）", anchor_ok)
 
 # ============ G. version.h ============

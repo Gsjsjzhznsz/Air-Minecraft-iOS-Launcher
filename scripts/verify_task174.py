@@ -150,21 +150,21 @@ check("D2 Task210：neumorph 双键六语言退役（button.opacity 亦无）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("E1 公告（Task212 重锚：task212@2 插入后全体非钉位再 +1；本条（task174）顺延 anns[16]；server/task169 pin 不动）且 id 唯一",
+check("E1 公告（Task212 重锚：task212@2 插入后全体非钉位再 +1；本条（task174）顺延 anns[17]；server/task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[12]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[13]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[14]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[15]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[16]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[17]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[19]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[20]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[21]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[22]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t174 = anns[16]  # Task212 重锚：task212@2 插入后 174 实居 [16]（旧 anns[12] 自 Task190 轮起已错位=存量）
+      and anns[13]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[14]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[15]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[16]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[17]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[18]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[20]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[21]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[22]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[23]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t174 = anns[17]  # Task212 重锚：task212@2 插入后 174 实居 [16]（旧 anns[13] 自 Task190 轮起已错位=存量）
 check("E2 公告内容锚（晕影根因=壁纸垫底/画布接管/百分比实时回显 + EN 尾注）",
       "晕影" in t174["summary"] and "画布接管" in t174["summary"]
       and "壁纸" in t174["content"] and "实时回显" in t174["content"]
@@ -254,6 +254,13 @@ SANDBOX_EXCEPTIONS = {
     "135": ("E. verify_task130", "E. verify_task131", "E. verify_task132",
             "E. verify_task133", "E. verify_task134", "G4 级联六验证器"),
     "156": ("G verify_task154",),
+    # Task213 补录（与 verify_task168 同款）：并行 Task212 文档化的 132-135
+    # 家族漂移 + 138 的 2228 基线陈旧 + 136 存量 C4 一笔（62/1）。
+    "133": ("B1 崩溃证据链在位", "B1c 成功会话对照"),
+    "138": ("A1 崩溃日志证据", "B1 mod 侧 XML 解析失败证据",
+            "B2 启动器侧 plist 写入病灶证据", "I-l10n 四语言键集一致",
+            "J verify_task135 ALL PASS", "J verify_task136 ALL PASS",
+            "J verify_task137 ALL PASS"),
 }
 new_failures = {}
 for tid in CASCADES:

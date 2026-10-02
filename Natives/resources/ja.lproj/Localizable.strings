@@ -210,7 +210,7 @@
 "preference.title.jitstreamer_server" = "JitStreamer サーバー IP";
 "preference.detail.jitstreamer_server" = "自己ホストインスタンスなどのカスタムJitStreamerサーバーIPに変更できます。 デフォルトのJitStreamerサーバーを使用している場合は、このオプションを残すことができます。";
 "preference.title.enable_altkit" = "Enable JIT using AltKit";
-"preference.detail.enable_altkit" = "When enabled, Air will try to connect to local AltServers to enable JIT.";
+"preference.detail.enable_altkit" = "When enabled, Prisma will try to connect to local AltServers to enable JIT.";
 "preference.title.appicon" = "アプリアイコンを設定";
 "preference.detail.appicon" = "Amethystの異なるホーム画面アイコンから選択できます。";
 "preference.title.appicon-default" = "おなじみのAmethyst ライトテーマ";
@@ -694,7 +694,7 @@
 "preference.title.ai_crash_fix" = "AI Crash Fix";
 "preference.detail.ai_crash_fix" = "Configure and use AI assistant to automatically diagnose and fix game crash issues";
 "preference.title.memory_limit_help" = "Memory Limit Info";
-"preference.detail.memory_limit_help" = "Learn why iOS memory limits cause modpack crashes and how to fix it (GetMoreRam)";
+"preference.detail.memory_limit_help" = "Learn why iOS memory limits cause modpack crashes and how to fix it";
 "preference.title.check_update" = "Check for Updates";
 "preference.detail.check_update" = "Check GitHub Releases for the latest stable version of Amethyst iOS";
 
@@ -716,7 +716,7 @@
 
 // 内存限制帮助弹窗
 "mem_help.title" = "About Memory Limit";
-"mem_help.message" = "iOS 18 / iOS 26 single-instance memory limit is about 1440MB. Large modpacks may crash due to insufficient memory.\\n\\nSolution:\\nUse GetMoreRam (a LiveContainer plugin) to lift the memory limit.\\nGetMoreRam repo: github.com/hugeBlack/GetMoreRam\\n\\nRestart the launcher after installation to take effect.\\n\\nIf you don't use LiveContainer, try lowering the memory allocation (Settings > Java > Memory Allocation), but some modpacks may not run under the memory limit.";
+"mem_help.message" = "·拡張メモリ制限エンタイトルメント：GetMoreRAM で有効化\niOS がランチャーへより多くのメモリを割り当て、通常 6GB まで拡張\n\n·拡張仮想メモリエンタイトルメント：有効化方法は下記参照\niOS がより多くのメモリアドレスを割り当て、通常 7GB まで拡張し安定性も向上\n\n有料開発者証明書の利用を推奨：インストール時に両エンタイトルメントが自動で有効になり、JIT も使用可能";
 
 // 下载进度与速率（Phase 6 Task 6.1）
 "download.speed.format" = "%@/s";
@@ -1631,9 +1631,9 @@
 "i18n_str_1068" = "Prefer OpenGL, fall back to Vulkan on failure";
 "i18n_str_1069" = "Last played: %@";
 "i18n_str_1070" = "Game directory (version isolation)";
-"i18n_str_1071" = "Tap to switch · long press to delete the current directory";
+"i18n_str_1071" = "カードをタップで切り替え；×マークで削除";
 "i18n_str_1072" = "Installed versions";
-"i18n_str_1073" = "Tap to enter version settings · long press to show the action menu";
+"i18n_str_1073" = "カードをタップで切り替え；⋯で編集；長押しで削除";
 "i18n_str_1074" = "Failed to switch the game directory:\\n\\n%@";
 "i18n_str_1075" = "New game directory";
 "i18n_str_1076" = "Enter a new directory name (for version isolation)";

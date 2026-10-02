@@ -1,2 +1,2 @@
-"NSLocalNetworkUsageDescription" = "Air utilise le réseau local pour trouver et communiquer avec AltServer et les serveurs LAN, et activer le multijoueur via Terracotta (compatible HMCL/FCL/ZL2).";
-"NSMicrophoneUsageDescription" = "Air utilise le microphone pour prendre en charge les mods de chat vocal.";
+"NSLocalNetworkUsageDescription" = "Prisma utilise le réseau local pour trouver et communiquer avec AltServer et les serveurs LAN, et activer le multijoueur via Terracotta (compatible HMCL/FCL/ZL2).";
+"NSMicrophoneUsageDescription" = "Prisma utilise le microphone pour prendre en charge les mods de chat vocal.";

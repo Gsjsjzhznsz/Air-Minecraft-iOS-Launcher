@@ -63,7 +63,7 @@
     // 提示文案
     UILabel *hintLabel = [[UILabel alloc] init];
     hintLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    hintLabel.text = localize(@"ame193.ai.11", @"这会注入到每次对话的最前面，用于约定 Air 助手的行为方式。");
+    hintLabel.text = localize(@"ame193.ai.11", @"这会注入到每次对话的最前面，用于约定 Prisma 助手的行为方式。");
     hintLabel.font = [UIFont systemFontOfSize:12];
     hintLabel.textColor = [UIColor secondaryLabelColor];
     hintLabel.numberOfLines = 0;

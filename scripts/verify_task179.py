@@ -303,8 +303,8 @@ check("I6 tinygl4angle delivery harness (ES300 byte-identical upload)",
 # ---------------- J. Docs ----------------
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))
 items = ann["announcements"]
-check("J1 announcements task179 at index 4 (Task184 重锚：task183@2 插入，历史再顺延)",
-      len(items) > 4 and items[5]["id"] == "task179-eight-fixes-2026-09-26")
+check("J1 announcements task179 honest re-anchor (Task212：@2 家族历代插入后真位 12；items[] 形态曾逃过 Task210/211 的 anns[] 机械重锚)",
+      len(items) > 13 and items[13]["id"] == "task179-eight-fixes-2026-09-26")
 check("J2 pinned entries intact (server/task169 at 0/1)",
       items[0]["id"].startswith("server-") and items[1]["id"] == "task169-four-fixes-2026-09-25")
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")

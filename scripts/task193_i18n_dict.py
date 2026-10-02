@@ -161,10 +161,10 @@ T = {
 "⚙️ 工具：%@": {"en": "⚙️ Tool: %@", "ru": "⚙️ Инструмент: %@"},
 "✅ %@ 执行成功": {"en": "✅ %@ succeeded", "ru": "✅ %@ выполнен успешно"},
 "❌ %@ 执行失败": {"en": "❌ %@ failed", "ru": "❌ %@ не удалось выполнить"},
-"给 Air 发送消息…": {"en": "Message Air…", "ru": "Написать Air…"},
+"给 Prisma 发送消息…": {"en": "Message Prisma…", "ru": "Написать Prisma…"},
 "系统提示词": {"en": "System prompt", "ru": "Системный промпт"},
 "恢复默认": {"en": "Reset to default", "ru": "Восстановить по умолчанию"},
-"这会注入到每次对话的最前面，用于约定 Air 助手的行为方式。": {"en": "This is injected at the beginning of every conversation to define how the Air assistant behaves.", "ru": "Добавляется в начало каждого диалога и задаёт поведение ассистента Air."},
+"这会注入到每次对话的最前面，用于约定 Prisma 助手的行为方式。": {"en": "This is injected at the beginning of every conversation to define how the Prisma assistant behaves.", "ru": "Добавляется в начало каждого диалога и задаёт поведение ассистента Prisma."},
 
 # ===== PLCrashView =====
 "删除该实例并重新导入整合包（建议换个下载源重试）%@": {"en": "Delete this instance and re-import the modpack (consider retrying with a different download source) %@", "ru": "Удалите этот инстанс и заново импортируйте модпак (лучше через другой источник загрузки) %@"},

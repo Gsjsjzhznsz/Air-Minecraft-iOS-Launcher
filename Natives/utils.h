@@ -102,7 +102,7 @@ extern "C" {
 // 必须从自身 dylib 解析 EGL 符号：若复用 ANGLE 的 EGL，会创建 ANGLE 的 Metal
 // 上下文而非 Mithril 的 swapchain，且 eglChooseConfig 在 Mithril 的属性组合下
 // 可能返回 0 个配置，触发 gl_init_context 的 assert(bundle->config)。
-// 参考：Uniaball/Mithril-Wrapper 仓库 launcher-patch/ 下对 Air 的接入方式。
+// 参考：Uniaball/Mithril-Wrapper 仓库 launcher-patch/ 下对 Prisma 的接入方式。
 #define RENDERER_NAME_MITHRIL "libmithril.dylib"
 
 // MobileGL - MobileGL-Dev 的桌面 OpenGL 实现（LGPL-3.0）。

@@ -24,6 +24,8 @@
 #import "AccountListViewController.h"
 #import "AI/AIViewController.h"
 #import "AI/AiSessionStore.h"
+// Task212：使用问题 FAQ 页（侧边栏问号按钮）在卡片布局下的落地依赖
+#import "LauncherHelpViewController.h"
 
 // 布局常量（iPad/宽屏基准值；iPhone 上通过 traitCollection 适配后会变窄）
 static const CGFloat kSidebarWidthPad = 70.0;      // iPad 左侧边栏卡片宽度
@@ -461,6 +463,17 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
                                              selector:@selector(showAIPage)
                                                  name:@"ShowAIPage"
                                                object:nil];
+    // Task212（使用问题页呼出失效根修，用户报障"无法点击按钮以呼出，已经
+    // 存在了一周"）：Task 180 起默认根 = 卡片布局（general.ui_layout 未写盘
+    // 即走 card），而 ShowHelpPage 通知只有旧三栏 LauncherRootViewController
+    // 监听——卡片布局下点侧边栏"使用问题"（questionmark.circle，菜单
+    // index 5）通知发出后无人响应，按钮点了没反应。与 ShowAIPage 同款
+    // 病灶（当时修过 AI 侧，help 侧漏了），本次补齐观察者 + showHelpPage，
+    // 与 VS 布局行为对齐。
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(showHelpPage)
+                                                 name:@"ShowHelpPage"
+                                               object:nil];
     // 首页快捷瓷砖触发：切到对应内容区子页面（不再 FormSheet 弹窗）
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(showModsManager)
@@ -613,6 +626,15 @@ static CGFloat LauncherCardLayoutRightPanelWidth(UITraitCollection *trait) {
     // 包装在导航控制器中，使其子页面能够正常导航
     UINavigationController *navVC = [[UINavigationController alloc] initWithRootViewController:vc];
     navVC.navigationBar.prefersLargeTitles = YES;
+    [self setContentViewController:navVC animated:YES];
+}
+
+// Task212："使用问题"FAQ 页（侧边栏新增标签；与 LauncherRootViewController
+// showHelpPage 逐字对齐——包在导航控制器里保持标题栏一致）。
+- (void)showHelpPage {
+    LauncherHelpViewController *vc = [[LauncherHelpViewController alloc] init];
+    UINavigationController *navVC = [[UINavigationController alloc] initWithRootViewController:vc];
+    navVC.navigationBar.prefersLargeTitles = NO;
     [self setContentViewController:navVC animated:YES];
 }
 

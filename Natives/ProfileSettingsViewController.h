@@ -4,7 +4,7 @@
 // 合并了原 LauncherProfileEditorViewController 的版本选择和重命名功能
 // 参照 FCL 风格，作为统一的 Edit Profile 页面
 //
-// 重构（Air-Design v1.2）：
+// 重构（Prisma-Design v1.2）：
 //   - 顶部 Hero 卡片：Profile 名 + 当前版本 pill + 游戏目录
 //   - 5 个 Bento 分组：版本信息 / 资源管理 / 组件安装 / 高级设置 / 服务器
 //   - 横屏双列布局：左侧（版本信息、资源管理）+ 右侧（组件安装、高级设置、服务器）

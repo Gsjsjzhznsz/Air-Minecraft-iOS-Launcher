@@ -56,7 +56,7 @@ check("B", "注释写明净距 12pt 推导（4 下内缩 + 4 头 + 4 上内缩�
 check("B", "卡片上下内缩 4pt 语义未动（版本卡同款）",
       ml.count("self.contentView.topAnchor constant:4]") >= 3
       and ml.count("self.contentView.bottomAnchor constant:-4]") >= 3)
-check("B", "行高 64 不变（卡 56 + 内缩 4+4）", "_tableView.rowHeight = 64;" in ml)
+check("B", "行高 50（Task212 重锚：与版本选择表统一；卡 42 + 内缩 4+4）", "_tableView.rowHeight = 50;" in ml)
 check("B", "版本号页基准仍在（minimumLineSpacing 4 + 内缩 4/4 + item 64）",
       "layout.minimumLineSpacing = 4;" in dv
       and "layout.itemSize = CGSizeMake(360, 64);" in dv
@@ -69,42 +69,44 @@ vm = rdrepo("Natives/VersionManagerViewController.m")
 check("C", "AME190AccountCardCell 类存在并注册",
       "@interface AME190AccountCardCell : UITableViewCell" in ac
       and '[self.tableView registerClass:AME190AccountCardCell.class forCellReuseIdentifier:@"accountCardCell"];' in ac)
-check("C", "VMTileBaseCell 阴影规格镜像（0.12/6/(0,3) + shadowPath 随帧）",
-      "self.layer.shadowOpacity = 0.12;" in ac and "self.layer.shadowRadius = 6;"
-      in ac and "bezierPathWithRoundedRect:shadowRect" in ac)
-check("C", "contentContainer = 12pt 连续圆角 + 白 0.08 + 0.5pt 白 0.10（版本卡同款）",
+check("C", "Task212 重锚：安装器卡列表同构（无阴影平贴 + applyCardEffectToView 管线）",
+      "[[BackgroundManager sharedManager] applyCardEffectToView:self.contentContainer];" in ac
+      and "self.layer.shadowOpacity" not in ac.split("@implementation AccountListViewController")[0])
+check("C", "contentContainer = 12pt 连续圆角（Task212 重锚：卡面移交管线，白 0.08 基底与白 0.10 描边退役）",
       ac.count("self.contentContainer.layer.cornerRadius = 12;") >= 1
       and "self.contentContainer.layer.cornerCurve = kCACornerCurveContinuous;" in ac
-      and "[[UIColor whiteColor] colorWithAlphaComponent:0.08]" in ac
-      and "[[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor" in ac)
-check("C", "卡面管线 = applyEffectToTableViewCell（Task172 三段式，版本页同管线）",
-      "[[BackgroundManager sharedManager] applyEffectToTableViewCell:self];" in ac
+      and "[[UIColor whiteColor] colorWithAlphaComponent:0.08]" not in ac.split("@implementation AccountListViewController")[0]
+      and "[[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor" not in ac.split("@implementation AccountListViewController")[0])
+check("C", "卡面管线 = applyCardEffectToView（Task212 重锚：安装器 cell 同一条调用）",
+      "[[BackgroundManager sharedManager] applyCardEffectToView:self.contentContainer];" in ac
       and "applyNeumorphCardEffectToView:cardView]" not in ac)
-check("C", "圆形头像（dp:34 = 版本页 iconContainer 档；cornerRadius = 直径/2；AspectFill）",
-      "[ScreenUtils dp:34]" in ac and "self.avatarView.layer.cornerRadius = ame190_avatarSize / 2;" in ac
+check("C", "圆形头像（Task212 重锚：放大一倍 dp:68；cornerRadius = 直径/2；AspectFill）",
+      "[ScreenUtils dp:68]" in ac and "self.avatarView.layer.cornerRadius = ame190_avatarSize / 2;" in ac
       and "UIViewContentModeScaleAspectFill" in ac)
-check("C", "标题 = 正文（版本页 nameLabel 规格 sp:15 semibold label 色）",
-      "[UIFont systemFontOfSize:[ScreenUtils sp:15] weight:UIFontWeightSemibold]" in ac
-      and "self.usernameLabel.textColor = [UIColor labelColor];" in ac)
-check("C", "灰字 = 账号类型（版本页 versionLabel 规格 sp:11 secondary）",
-      "[UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular]" in ac
-      and "self.typeLabel.textColor = [UIColor secondaryLabelColor];" in ac
+check("C", "标题 = 正文（Task212 重锚：sp:16 semibold AmeCard 主文字色）",
+      "[UIFont systemFontOfSize:[ScreenUtils sp:16] weight:UIFontWeightSemibold]" in ac
+      and "self.usernameLabel.textColor = AmeCardPrimaryTextColor();" in ac)
+check("C", "灰字 = 账号类型（Task212 重锚：sp:12 AmeCard 次文字色）",
+      "[UIFont systemFontOfSize:[ScreenUtils sp:12] weight:UIFontWeightRegular]" in ac
+      and "self.typeLabel.textColor = AmeCardSecondaryTextColor();" in ac
       and "ame190_accountTypeTextForAccount:" in ac)
 check("C", "右侧无箭头（chevron 零出现）", "chevron" not in ac.lower())
-check("C", "选中徽章 = 版本页同款（20pt accent 圆角方块 + 白勾 9pt bold，top+10/右-14）",
+check("C", "选中徽章 = 安装器同款（Task212 重锚：20pt 绿圆角方块 + 白勾 9pt bold，右-14 垂直居中）",
       "self.selectedBadge.widthAnchor constraintEqualToConstant:20]" in ac
-      and "self.selectedBadge.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:10]" in ac
+      and "self.selectedBadge.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor]" in ac
       and "self.selectedBadge.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-14]" in ac
       and "configurationWithPointSize:9 weight:UIFontWeightBold]" in ac)
-check("C", "选中态三层强化（accent 1.5 边框 + 0.10 淡底，VMVersionCardCell 镜像）",
-      "self.contentContainer.layer.borderWidth = 1.5;" in ac
-      and "[accentColor() colorWithAlphaComponent:0.10]" in ac)
-check("C", "几何：上下 4 内缩 + 左右 24 总边距（版本页 section 16 + item 8 语义）",
+check("C", "选中态 = 绿徽章显隐（Task212 重锚：安装器同款，accent 边框/淡底三层强化退役）",
+      "self.selectedBadge.hidden = !selected;" in ac
+      and "self.selectedBadge.backgroundColor = [UIColor systemGreenColor];" in ac
+      and "self.contentContainer.layer.borderWidth = 1.5;" not in ac)
+check("C", "几何：上下 4 内缩 + 左右 0（Task212 重锚：inset-grouped 系统边距即行边距，±24 二次内缩退役）",
       ac.count("self.contentView.topAnchor constant:4]") >= 1
-      and "constant:24]" in ac and "constant:-24]" in ac)
-check("C", "触摸缩放弹簧（VMTileBaseCell 同款 0.96/0.25）",
-      "CGAffineTransformMakeScale(0.96, 0.96);" in ac
-      and "usingSpringWithDamping:0.7 initialSpringVelocity:0.8" in ac)
+      and "self.contentContainer.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:0]" in ac
+      and "self.contentContainer.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:0]" in ac)
+check("C", "触摸缩放弹簧退役（Task212 重锚：Task210 全磁贴动效冻结的账内清欠）",
+      "CGAffineTransformMakeScale(0.96, 0.96);" not in ac
+      and "touchesBegan:(NSSet<UITouch *> *)touches" not in ac.split("@implementation AccountListViewController")[0])
 check("C", "正规复用（出列拆光重建退役）",
       "for (UIView *sub in cell.contentView.subviews)" not in ac
       and "- (void)prepareForReuse" in ac)
@@ -231,8 +233,8 @@ for fn in ("Natives/AccountListViewController.m", "Natives/BackgroundManager.m",
                 break
             stack.pop()
     check("H", f"{os.path.basename(fn)} 严格栈匹配括号平衡", ok and not stack)
-check("H", "announcements/task190 条目存在（Task212 重锚：task212@2 插入后顺延至 [9]）",
-      json.loads(rdrepo("announcements.json"))["announcements"][9]["id"].startswith("task190-"))
+check("H", "announcements/task190 条目存在（Task209 重锚：@2 插入后顺延至 [6]）",
+      json.loads(rdrepo("announcements.json"))["announcements"][10]["id"].startswith("task190-"))
 
 print("=" * 72)
 print(f"PASS {len(PASS)}  FAIL {len(FAIL)}")

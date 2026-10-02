@@ -26,7 +26,7 @@ static NSString *const kPrefLegacyDownloadSource = @"general.download_source";
 
 /// BMCLAPI 官方前缀 → 镜像前缀映射表（顺序敏感：最长前缀优先）
 ///
-/// 参考 ZalithLauncher 2 BMCLAPI.kt 的 REPLACE_MIRROR_HOLDERS 与 Air 现有
+/// 参考 ZalithLauncher 2 BMCLAPI.kt 的 REPLACE_MIRROR_HOLDERS 与 Prisma 现有
 /// MinecraftResourceDownloadTask.m replaceURLWithDownloadSource:forceSource: 的已验证行为。
 + (NSArray<NSArray<NSString *> *> *)bmclapiPrefixPairs {
     static NSArray<NSArray<NSString *> *> *pairs = nil;
@@ -38,12 +38,12 @@ static NSString *const kPrefLegacyDownloadSource = @"general.download_source";
             @[@"https://piston-meta.mojang.com", PLMirrorBMCLAPIRootURL],
             @[@"https://piston-data.mojang.com", PLMirrorBMCLAPIRootURL],
             @[@"https://launcher.mojang.com", PLMirrorBMCLAPIRootURL],
-            // Mojang 库文件 → /maven（Air 现有已验证行为）
+            // Mojang 库文件 → /maven（Prisma 现有已验证行为）
             @[@"https://libraries.minecraft.net", [PLMirrorBMCLAPIRootURL stringByAppendingString:@"/maven"]],
             // Mojang 资产资源 → /assets（数量巨大，MirrorFirst 时仍强制官方优先以减轻镜像压力）
             @[@"http://resources.download.minecraft.net", [PLMirrorBMCLAPIRootURL stringByAppendingString:@"/assets"]],
             @[@"https://resources.download.minecraft.net", [PLMirrorBMCLAPIRootURL stringByAppendingString:@"/assets"]],
-            // Forge：Air 现有行为整体替换到根，官方 /maven 路径自然映射到根下 /maven
+            // Forge：Prisma 现有行为整体替换到根，官方 /maven 路径自然映射到根下 /maven
             @[@"https://files.minecraftforge.net", PLMirrorBMCLAPIRootURL],
             @[@"http://files.minecraftforge.net", PLMirrorBMCLAPIRootURL],
             @[@"https://maven.minecraftforge.net", [PLMirrorBMCLAPIRootURL stringByAppendingString:@"/maven"]],
@@ -64,7 +64,7 @@ static NSString *const kPrefLegacyDownloadSource = @"general.download_source";
 
 /// MCIM 官方前缀 → 镜像前缀映射表
 ///
-/// 保持 Air MCIMMirror.m 现有精确行为：API 域名加平台前缀（/modrinth、/curseforge），
+/// 保持 Prisma MCIMMirror.m 现有精确行为：API 域名加平台前缀（/modrinth、/curseforge），
 /// CDN 域名做简单主机替换到 MCIM 根（无平台前缀，参考 ZL2 MCIMMirror.kt）。
 + (NSArray<NSArray<NSString *> *> *)mcimPrefixPairs {
     static NSArray<NSArray<NSString *> *> *pairs = nil;

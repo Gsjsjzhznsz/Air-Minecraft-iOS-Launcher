@@ -1,17 +1,17 @@
 <div align="center">
-  <img src="Natives/Assets.xcassets/AppIcon-Light.appiconset/1024x1024.png" alt="Air Icon" width="120" style="border-radius: 24px;">
+  <img src="Natives/Assets.xcassets/AppIcon-Light.appiconset/1024x1024.png" alt="Prisma Icon" width="120" style="border-radius: 24px;">
 </div>
 
-<h1 align="center">Air</h1>
+<h1 align="center">Prisma</h1>
 <p align="center"><b>A polished Minecraft: Java Edition launcher for iOS, optimized for Chinese users.</b></p>
 <p align="center"><sub>Forked from <a href="https://github.com/herbrine8403/Amethyst-iOS-MyRemastered">Amethyst-iOS-MyRemastered</a></sub></p>
 
 <div align="center">
-  <img alt="Build Status" src="https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions/workflows/development.yml/badge.svg?branch=main">
-  <img alt="Downloads" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/total?label=Downloads&style=flat">
-  <img alt="Release" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
-  <img alt="License" src="https://img.shields.io/github/license/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?style=flat">
-  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher?color=c78aff&label=last%20commit&style=flat">
+  <img alt="Build Status" src="https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/actions/workflows/development.yml/badge.svg?branch=main">
+  <img alt="Downloads" src="https://img.shields.io/github/downloads/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/total?label=Downloads&style=flat">
+  <img alt="Release" src="https://img.shields.io/github/v/release/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher?style=flat">
+  <img alt="License" src="https://img.shields.io/github/license/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher?style=flat">
+  <img alt="Last Commit" src="https://img.shields.io/github/last-commit/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher?color=c78aff&label=last%20commit&style=flat">
 </div>
 
 <p align="center">
@@ -20,9 +20,9 @@
 
 ---
 
-## What is Air?
+## What is Prisma?
 
-**Air** is a customized fork of [Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered), a premium Minecraft: Java Edition launcher for iOS and iPadOS. This fork focuses on the **Chinese user experience** -- delivering robust Chinese localization, in-app language switching, streamlined JIT handling for iOS 26+, and bug fixes sourced from upstream issue audits.
+**Prisma** is a customized fork of [Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered), a premium Minecraft: Java Edition launcher for iOS and iPadOS. This fork focuses on the **Chinese user experience** -- delivering robust Chinese localization, in-app language switching, streamlined JIT handling for iOS 26+, and bug fixes sourced from upstream issue audits.
 
 > **Not sure which fork to use?** See the [Fork Network](#fork-network) section below for a comparison of active forks and their unique features.
 
@@ -74,7 +74,7 @@ herbrine8403/Amethyst-iOS-MyRemastered       (Major remastered fork - UI overhau
                                             BMCLAPI support, multi-account, auto renderer/JVM)
         |
         v
-Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (THIS REPO - Chinese UX, JIT optimization,
+Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher       (THIS REPO - Chinese UX, JIT optimization,
                                             in-app language switch, bug fixes, LWJGL 3.4.1)
 ```
 
@@ -82,7 +82,7 @@ Gsjsjzhznsz/Air-Minecraft-iOS-Launcher       (THIS REPO - Chinese UX, JIT optimi
 
 ## Table of Contents
 
-- [What is Air?](#what-is-air)
+- [What is Prisma?](#what-is-prisma)
 - [What's Different from Upstream](#whats-different-from-upstream)
 - [Fork Lineage](#fork-lineage)
 - [Core Features](#core-features)
@@ -148,14 +148,14 @@ Prioritize tools that support permanent signing and automatic JIT enablement:
 <details>
 <summary><b>Official Release (TrollStore)</b></summary>
 
-1. Download the `.tipa` package from [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases).
+1. Download the `.tipa` package from [Releases](https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/releases).
 2. Open the file with TrollStore via the system share menu to complete installation.
 </details>
 
 <details>
 <summary><b>Official Release (AltStore / SideStore)</b></summary>
 
-1. Download the `.ipa` package from [Releases](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/releases).
+1. Download the `.ipa` package from [Releases](https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/releases).
 2. Import the IPA into your sideloading tool following its standard installation procedure.
 </details>
 
@@ -165,7 +165,7 @@ Prioritize tools that support permanent signing and automatic JIT enablement:
 > [!CAUTION]
 > Nightly builds may contain critical bugs including crashes and startup failures. Use only for development and testing purposes.
 
-1. Navigate to the [GitHub Actions](https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher/actions) page and download the latest IPA artifact.
+1. Navigate to the [GitHub Actions](https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher/actions) page and download the latest IPA artifact.
 2. Import the IPA into your sideloading tool (AltStore, SideStore, etc.) to install.
 </details>
 
@@ -195,7 +195,7 @@ JIT (Just-In-Time compilation) is essential for smooth gameplay. Choose the appr
 This project would not exist without the following fork chain:
 
 - **[PojavLauncherTeam/PojavLauncher_iOS](https://github.com/PojavLauncherTeam/PojavLauncher_iOS)** -- The original iOS Minecraft launcher that started it all.
-- **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- The major remastered fork that added the modern UI, mod management, BMCLAPI support, multi-account, and auto renderer/JVM selection. This is the direct upstream of Air.
+- **[herbrine8403/Amethyst-iOS-MyRemastered](https://github.com/herbrine8403/Amethyst-iOS-MyRemastered)** -- The major remastered fork that added the modern UI, mod management, BMCLAPI support, multi-account, and auto renderer/JVM selection. This is the direct upstream of Prisma.
 - **[ZalithLauncher/ZalithLauncher2](https://github.com/ZalithLauncher/ZalithLauncher2)** -- The SDL3 window-embedding approach used for Minecraft 26.3+ was borrowed from this project: its Android-side `sdl_hook.c` compatibility layer was ported to iOS as `Natives/sdl3_hook.m`, and its SDL embedding patches informed our `patches/sdl3-amethyst.patch` against the SDL uikit backend. Vendored as the `ThirdParty/ZalithLauncher2` submodule for reference.
 
 ## About Translations

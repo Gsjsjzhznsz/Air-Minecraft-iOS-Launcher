@@ -141,8 +141,8 @@ check("B", "选中 = 纯 2pt accent 内缩描边（内缩 = 省略号间距/3；
       and vm.count("kVMCardEllipsisInset / 3.0") >= 2
       and "shadowOpacity" not in strip_objc(cell_seg)
       and "shadowPath" not in strip_objc(cell_seg))
-check("B", "行高 104pt（84pt 时代 iPad 满档字号内容 86pt 被裁）+ 密度翻倍保持",
-      "static const CGFloat kVMVersionRowHeight = 104.0;" in vm
+check("B", "行高 128pt（Task212 重锚：对照快捷指令卡再抬一档）+ 密度翻倍保持",
+      "static const CGFloat kVMVersionRowHeight = 128.0;" in vm
       and "CGFloat itemWidth = isiPad ? 0.25 : 0.5;" in vm
       and "CGFloat itemHeight = kVMVersionRowHeight;" in vm)
 check("B", "全部磁贴按压弹簧缩放退役（touchesBegan/Ended/Cancelled 零实现；0.96 按压模式清零——FAB 出场动画无关）",
@@ -150,12 +150,11 @@ check("B", "全部磁贴按压弹簧缩放退役（touchesBegan/Ended/Cancelled 
       and "touchesEnded" not in strip_objc(vm)
       and "touchesCancelled" not in strip_objc(vm)
       and "MakeScale(0.96" not in strip_objc(vm))
-check("B", "交互不回潮：点卡 = 选用 / ⋯ = 纯编辑 / 长按三件套保留",
+check("B", "交互不回潮（Task212 重锚）：点卡 = 选用 / ⋯ = 纯编辑 / 长按 = 直接呼出确认删除弹窗",
       "[self selectProfileNamed:profileName];" in vm
       and "cell.ellipsisAction = ^{" in vm
-      and 'localize(@"i18n_str_1090", nil)' in vm
-      and 'localize(@"i18n_str_1091", nil)' in vm
-      and 'localize(@"i18n_str_306", nil)' in vm)
+      and "[self deleteProfile:self.profileList[indexPath.item]];" in vm
+      and "- (void)showProfileActions" not in vm)
 
 # ============ C. 设置页 ============
 print("== C. 壁纸设置页 ==")
@@ -191,9 +190,9 @@ check("D", "applyCardEffectToCell 直转 applyEffectToCell（Flat 特调行退�
 # ============ E. 文档与级联 ============
 print("== E. 公告 / version.h / 级联 ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
-check("E", "公告 34 条（Task212 重锚：task212@2 插入顺延），task210@4，置顶钉位未动，NG-GL4ES 尾锚保持",
-      len(ann) == 34
-      and ann[4]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
+check("E", "公告 32 条，task210@2，置顶钉位未动，NG-GL4ES 尾锚保持",
+      len(ann) == 35
+      and ann[5]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
       and ann[0]["id"].startswith("server-recommend")
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
@@ -203,8 +202,8 @@ check("E", "version.h Task210 附录在场（REVISION 18 append-only，无 bump�
       and "AmeCardSurfaceColor" in vh
       and vh.endswith("// ============================================================================\n"))
 v207 = rd("scripts/verify_task207.py")
-check("E", "verify_task207 重锚（行高 104 / AmeCard 色族 / 纯描边 / 91 配额 1）",
-      "kVMVersionRowHeight = 104.0" in v207
+check("E", "verify_task207 重锚（Task212 重锚：行高 128 / AmeCard 色族 / 纯描边 / 91 配额 1）",
+      "kVMVersionRowHeight = 128.0" in v207
       and "AmeCardPrimaryTextColor()" in v207
       and '"Natives/VersionManagerViewController.m": 1,' in rd("scripts/verify_task91.py"))
 check("E", "级联计数族重锚（206 F1 / 202 F / 193 M / 190 G / 151 H = 2418）",

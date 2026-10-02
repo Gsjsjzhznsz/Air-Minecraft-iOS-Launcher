@@ -181,7 +181,7 @@ static NSString * const kLegacyAnnouncementURL =
 
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"GET"];
-    [request setValue:@"Air/1.0 (iOS)" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"Prisma/1.0 (iOS)" forHTTPHeaderField:@"User-Agent"];
     // 单源 10s：两级源最坏 20s 内必出结果（原单源 15s），下拉刷新不会久等
     request.timeoutInterval = 10.0;
 

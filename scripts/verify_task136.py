@@ -204,10 +204,10 @@ check("F4  计数徽章（游戏目录/已安装版本）= AmeBadgeLabel：高 2
       and "sp:12" in vm)
 check("F5  计数徽章右侧 18pt 安全边距保留",
       "countBadge.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-18" in vm)
-check("F6  账户类型标识（Task190 重锚：用户定稿灰字为账号类型——类型判别口径保留，彩色胶囊退役）",
+check("F6  账户类型标识（Task212 重锚：安装器同构——类型判别口径保留，sp:12 AmeCard 次文字色）",
       "ame190_accountTypeTextForAccount:" in read("Natives/AccountListViewController.m")
-      and '[UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular]' in read("Natives/AccountListViewController.m")
-      and "self.typeLabel.textColor = [UIColor secondaryLabelColor];" in read("Natives/AccountListViewController.m"))
+      and '[UIFont systemFontOfSize:[ScreenUtils sp:12] weight:UIFontWeightRegular]' in read("Natives/AccountListViewController.m")
+      and "self.typeLabel.textColor = AmeCardSecondaryTextColor();" in read("Natives/AccountListViewController.m"))
 check("F7  模组下载列表的下载按钮回归 Task89 之前原生样式（accent 底白字胶囊；Task137 重锚）",
       "_downloadButton.backgroundColor = accentColor();" in read("Natives/ModTableViewCell.m")
       and "_downloadButton.layer.cornerRadius = 13.0" in read("Natives/ModTableViewCell.m"))

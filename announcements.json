@@ -24,6 +24,17 @@
       "image_url": ""
     },
     {
+      "id": "task213-card-parity-ux-sweep-2026-10-02",
+      "date": "2026-10-02",
+      "title": "实例卡对齐快捷指令 + 目录卡同构重写 + 使用问题页修复 + 全局更名 Prisma+ 内存说明改版 + 包名 prisma（Task 213）",
+      "summary": "实例卡再抬一档并长按直删；游戏目录卡与实例卡完全同构（叉号点击删除）；“使用问题”页在默认卡片布局下修复呼出；安装器两种列表间距统一；账号列表重写并放大头像；启动器全面更名为 Prisma。",
+      "content": "Task 213 十项用户指令一轮落地。\n\n一、实例卡（已安装的版本）：卡片高度 104 → 128pt（对照快捷指令卡片再抬一档，左上实例图标 22 → 28pt 同步放大）；长按卡片不再弹“选择/编辑/删除”菜单，改为直接呼出确认删除弹窗（选择仍点卡片、编辑仍点右上 ⋯，两个直达入口保留）。\n\n二、游戏目录（版本隔离）卡整类重写为实例卡完全同构：标题 = 目录名称，小字 = 目录大小，folder 图标以本色直出（旧蓝底白图标方块退役），右上省略号改为叉号标识（SF Symbol 图标），点击叉号直接呼出确认删除目录的弹窗（默认目录/使用中的目录会即时说明），长按功能删除。目录卡尺寸与实例卡逐项一致（同宽同高同间距）。\n\n三/四、两处标题灰字更新：游戏目录 = “点击卡片切换；点击叉号删除”；已安装的版本 = “点击卡片切换；点击省略号编辑；长按以删除”。\n\n五、“启动器使用问题”页呼出失效根修：Task 180 起默认根为卡片式布局，而 ShowHelpPage 通知只有旧三栏布局在监听——补齐监听后侧栏问号按钮恢复呼出（与 AI 页同款病灶同款修法）。\n\n六、下载页安装流程的模组加载器选择列表与选择游戏版本列表行距统一（64 → 50pt，图标/字号同步压缩）——前四轮只对齐了卡面配方、未统一行高，本轮收口。\n\n七、账号列表重写为安装器卡列表同构：头像放大一倍（34 → 68pt），字号升级 16/12，选中徽章右中绿章，去阴影去按压动效。\n\n八、启动器全面更名：所有 UI 与技术角落的启动器名 Prisma 改为 Prisma——应用显示名、系统权限用途说明（54 语言）、欢迎语、AI 助手提示词与占位文案、网络 User-Agent、控件仓库作者、设置页兜底名与双 README 品牌位。GitHub 仓库地址、Bundle Identifier 与 iPad Air 机型名等技术标识保持不变（更新/安装数据延续性）。\n\n九、设置页“内存限制说明”改版：正文改为两条权限说明——扩展内存限制权限（GetMoreRAM 开启，通常可分配 6GB）、扩展虚拟内存权限（开启方式见下，通常可分配 7GB 并提升稳定性），并推荐使用付费开发者证书（安装即自动带权限且支持 JIT）；按钮由 GetMoreRam 改为“付费开发者证书”，跳转 B 站教程 b23.tv/WtgrPJM。\n\n十、启动器包名更名 com.air-devs.air → com.air-devs.prisma（Info.plist、三份 entitlements、Makefile 产物名、CI artifact 名、后台下载会话标识、os_log 子系统、钥匙串服务名全链路同步）；Info.plist 与仓库 MD 内残留的 air 全部改为 prisma。注意：包名变更后 iOS 视为全新应用，旧安装不覆盖、数据不迁移；GitHub 仓库地址与代码内更新检查地址暂保持不变，仓库若同步改名需一并更新。",
+      "priority": "normal",
+      "action_url": "https://github.com/Gsjsjzhznsz/Air-Minecraft-iOS-Launcher",
+      "action_title": "了解 Prisma",
+      "image_url": ""
+    },
+    {
       "id": "task212-angle-cf-renderers-virgl-2026-10-02",
       "date": "2026-10-02",
       "title": "ANGLE 方块透明决战探针 + CF 筛选加固 + 渲染器更名「gl4es(≤26.2)」+ holy gl4es 退役 + VirGLRenderer(≤26.2) 移植启动",
@@ -81,7 +92,7 @@
     },
     {
       "id": "task193-app-icon-replace-2026-09-28",
-      "title": "启动器图标换新：上游 Amethyst 六边形 → 草方块立方体（Air 定制品牌第一步）",
+      "title": "启动器图标换新：上游 Amethyst 六边形 → 草方块立方体（Prisma 定制品牌第一步）",
       "date": "2026-09-28",
       "summary": "应用图标由上游遗留的浅蓝六边形替换为草方块立方体（用户上传素材）。仅替换实际生效的 Light 家族（1024×3 + 120 + 152）；Dark/Development 备用图标与 AppLogo-Vector 等上游资产按约定保持不动。",
       "content": "## 启动器图标换新\n\n- **新图标**：草方块立方体（绿顶棕底，用户上传的 IMG_9288.jpeg，690→LANCZOS 出 1024/152/120 全尺寸）\n- **替换范围（最小触碰）**：AppIcon-Light.appiconset 三张（universal/dark/tinted 外观同图三份，与上游做法一致）+ AppIcon-Light60x60@2x（iPhone 主图标）+ AppIcon-Light76x76@2x~ipad（iPad 主图标）+ README 顶部展示图自动跟随\n- **保持不动**：AppIcon-Dark / AppIcon-Development 备用三套、AppLogo-Vector、无引用的无后缀 AppIcon60x60/76x76 —— 全部为上游 2022/2025 遗留资产（blob 哈希与上游逐字节一致，本轮已查证归档）\n- **零代码改动**：图标为纯位图资源，仅文件名被引用（Contents.json/Info.plist 未动一行），同名覆盖即生效\n\nEN: The launcher icon is now the user-supplied grass-block cube (was the upstream Amethyst hexagon). Only the actually-served Light family was replaced (1024×3 + 120 + 152); Dark/Development alternates and AppLogo-Vector stay pristine upstream assets.\n\n---\n\n装机锚点：重装后桌面图标 = 草方块立方体（iPhone/iPad 一致，浅色/深色/着色外观同图）；设置页关于图标无变化（未动）。",

@@ -130,18 +130,18 @@ ids = [a["id"] for a in anns]
 check("F1 公告（Task210 重锚：task210@2 插入后 task179@10 / task178@11 / task177@12 / task175@13 / task174@14 / 双 task173@15,16 / task172@17 / task171@18 / task170@19 / task168@20；anns[1] task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[11]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[12]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[13]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[14]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[15]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[16]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[17]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[18]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[19]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[20]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[21]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[20]
+      and anns[12]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[13]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[14]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[15]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[16]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[17]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[18]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[19]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[20]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[21]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[22]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[21]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]

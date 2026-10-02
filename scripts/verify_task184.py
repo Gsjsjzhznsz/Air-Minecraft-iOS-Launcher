@@ -46,16 +46,16 @@ check('A', '内层容器圆角 12 continuous ×3（版本卡同款）',
 check('A', '容器上下内缩 4pt（版本卡 sectionInset 语义）',
       ml.count('self.contentView.topAnchor constant:4]') >= 3
       and ml.count('self.contentView.bottomAnchor constant:-4]') >= 3)
-check('A', '图标容器 40x40 圆角 10 masksToBounds（版本卡规格）',
-      'widthAnchor constraintEqualToConstant:40],' in ml
-      and 'heightAnchor constraintEqualToConstant:40],' in ml
-      and '_iconContainer.layer.cornerRadius = 10;' in ml
+check('A', '图标容器 32x32 圆角 8 masksToBounds（Task212 重锚：随 50pt 行压缩）',
+      'widthAnchor constraintEqualToConstant:32],' in ml
+      and 'heightAnchor constraintEqualToConstant:32],' in ml
+      and '_iconContainer.layer.cornerRadius = 8;' in ml
       and '_iconContainer.layer.masksToBounds = YES;' in ml)
 check('A', '品牌色淡底容器（createIconBadge 同源 0.15）',
       'colorWithAlphaComponent:0.15];' in ml and 'brandColorForLoader' in ml)
-check('A', '名称 16 semibold / 状态 12（版本卡文字规格）',
-      'systemFontOfSize:16 weight:UIFontWeightSemibold' in ml
-      and '_stateLabel.font = [UIFont systemFontOfSize:12];' in ml)
+check('A', '名称 15 semibold / 状态 11（Task212 重锚：与版本表文字同档）',
+      'systemFontOfSize:15 weight:UIFontWeightSemibold' in ml
+      and '_stateLabel.font = [UIFont systemFontOfSize:11];' in ml)
 check('A', '规格文字色（Task210 重锚：AmeCard 色族）', ml.count('AmeCardPrimaryTextColor()') >= 3
       and ml.count('AmeCardSecondaryTextColor()') >= 3)
 check('A', 'chevron 14x14 tertiary（版本卡规格）',
@@ -65,8 +65,8 @@ check('A', '版本子页 cell 同配方（Task210 重锚：AmeCard 主文字色�
       '_versionLabel.textColor = AmeCardPrimaryTextColor();' in ml)
 check('A', '版本子页表无分隔线（画在透明 cell 上会横切卡面）',
       'separatorStyle = UITableViewCellSeparatorStyleNone;' in ml)
-check('A', '主表行高 64 / 子页行高 50（卡 56/42）',
-      '_tableView.rowHeight = 64;' in ml and '_tableView.rowHeight = 50;' in ml)
+check('A', '主表行高 50 = 子页行高 50（Task212 重锚：两表统一；卡 42/42）',
+      ml.count('_tableView.rowHeight = 50;') == 2 and '_tableView.rowHeight = 64;' not in ml)
 check('A', '开关行 cell 同配方（标题 16 + 描述 12 + switch 右 -14）',
       ml.count('@interface ModLoaderSwitchCell : UITableViewCell') == 1
       and '_switchControl.trailingAnchor constraintEqualToAnchor:_cardContainer.trailingAnchor constant:-14]' in ml)
@@ -82,8 +82,8 @@ check('B', 'BackgroundManager 新属性退役', 'CGFloat backgroundOpacity;' not
 check('B', 'Task210：uiOpacity 回归 + cardsNeumorphOpacity 随退役删除（注释留档不计）',
       '@property (nonatomic, assign) CGFloat uiOpacity;' in bh
       and 'cardsNeumorphOpacity' not in '\n'.join(l.split('//')[0] for l in bh.split('\n')))
-check('B', 'Task210：旧键 uiOpacity 回归 / neumorph 键随退役删除 / 新键退役',
-      'background_ui_opacity' in bm and 'background_cards_neumorph_opacity' not in bm
+check('B', 'Task210：旧键 uiOpacity 回归 / neumorph 键随退役删除 / 新键退役（Task212 修正：注释留档不计——退役注释里的键名曾裸匹配误报）',
+      'background_ui_opacity' in bm and 'background_cards_neumorph_opacity' not in '\n'.join(l.split('//')[0] for l in bm.split('\n'))
       and 'background_bg_opacity' not in bm and 'background_btn_opacity' not in bm)
 check('B', 'Task210：新拟态挂点随退役删除（卡体透明度原语零调用点）',
       'ame_applyNeumorphCardOpacity' not in '\n'.join(l.split('//')[0] for l in bm.split('\n')))
@@ -117,8 +117,8 @@ check('C', 'RightPanel 按钮透明度接线已撤（底色恒定）',
 
 # ============ D. 保留项（180 重写 + 默认值） ============
 ac = rd('AccountListViewController.m')
-check('D', '账号卡（Task190 重锚：与已安装版本页同构 AME190AccountCardCell——旧 Task180 内联卡面退役，管线换 Task172 三段式泛型入口）',
-      'applyEffectToTableViewCell:self];' in ac
+check('D', '账号卡（Task212 重锚：安装器卡列表同构 AME190AccountCardCell——管线换 applyCardEffectToView，无阴影平贴）',
+      'applyCardEffectToView:self.contentContainer];' in ac
       and 'AME190AccountCardCell' in ac
       and 'self.contentView.layer.masksToBounds = NO;' in ac)  # Task190：新 cell 类内为 self. 前缀
 ba = rd('authenticator/BaseAuthenticator.m')

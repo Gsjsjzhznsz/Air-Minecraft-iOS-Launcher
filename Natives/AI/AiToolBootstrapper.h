@@ -2,7 +2,7 @@
 //  AiToolBootstrapper.h
 //  Amethyst
 //
-//  Air AI Agent 内置工具装配器：集中把 3a 阶段实现的内置工具注册进 AiToolRegistry。
+//  Prisma AI Agent 内置工具装配器：集中把 3a 阶段实现的内置工具注册进 AiToolRegistry。
 //  3b 阶段的工具将在此文件追加注册（见 registerBuiltinTools 内的「3b 在此追加」注释）。
 //
 

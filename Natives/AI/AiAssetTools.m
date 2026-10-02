@@ -2,7 +2,7 @@
 //  AiAssetTools.m
 //  Amethyst
 //
-//  Air AI Agent 资源/网络工具（Phase 3b）实现：
+//  Prisma AI Agent 资源/网络工具（Phase 3b）实现：
 //  - AiAssetSearchTool：Modrinth 搜索（search_mods / search_resourcepacks / search_shaders /
 //    search_datapacks / search_modpacks / search_worlds）。
 //  - AiAssetInstallTool：直接安装（HMCL AE 式全自动）：
@@ -1026,7 +1026,7 @@ static BOOL aiIsLatestAlias(NSString *s) {
     }
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"GET"];
-    [request setValue:@"Air/1.0 (iOS)" forHTTPHeaderField:@"User-Agent"];
+    [request setValue:@"Prisma/1.0 (iOS)" forHTTPHeaderField:@"User-Agent"];
     request.timeoutInterval = 20.0;
 
     NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {

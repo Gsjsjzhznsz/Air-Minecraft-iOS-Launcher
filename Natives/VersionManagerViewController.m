@@ -22,7 +22,7 @@
 //      设置只对该版本生效（FCL 风格）；Task207 起交互拆分：点卡片 = 选用实例，
 //      卡片右上 ⋯ 钮 = 进入该页编辑（快捷指令语义，⋯ 只编辑不运行）
 //   3. 完全不调用旧 UI（LauncherPrefGameDirViewController / LauncherProfileEditorViewController）
-//   4. 游戏目录卡片支持长按弹出菜单（切换/删除当前目录）
+//   4. 游戏目录卡片长按菜单已退役（Task212）：删除入口 = 卡片右上叉号钮；
 //   5. 统一使用 accentColor() 与毛玻璃背景，适配启动器新 UI
 //   6. Task210 实例卡修订（用户七问定稿）：深浅自适应平贴灰面卡（Task210 全局
 //      卡面，不再用 accent 渐变）+ 左上原始彩色实例图标（不着色）+ 右上 ⋯
@@ -34,8 +34,10 @@ static NSInteger const kSectionVersions    = 1;
 
 // Task207：快捷指令实例卡布局常量
 // 旧版实例单卡行高 84pt 在 iPad 满档 sp（×1.15）下内容需 86pt 被裁
-//（用户实测"高度过于矮导致字体被裁减"）；Task210 用户定稿提至 104pt。
-static const CGFloat kVMVersionRowHeight = 104.0;
+//（用户实测"高度过于矮导致字体被裁减"）；Task210 用户定稿提至 104pt；
+// Task212 用户复检"实例卡片实际效果比快捷指令卡片仍矮一圈"再抬一档至
+// 128pt（图标同步 22→28 与右上 28pt 圆钮对角平衡，其余定稿几何不动）。
+static const CGFloat kVMVersionRowHeight = 128.0;
 // ⋯ 编辑钮到卡片边缘的间距；选中高亮环内缩距 = 此值 / 3（动态推导，用户定稿
 // "高亮边框宽度为卡片边缘距离省略号按钮距离的1/3"，落地方式 = 边框内缩）。
 static const CGFloat kVMCardEllipsisInset = 12.0;
@@ -201,11 +203,11 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 - (void)setupViews {
     [super setupViews];
 
-    // 紧凑竖卡（104pt 固定行高）内的几何量用固定 pt，不随屏宽缩放：
-    // dp 的 iPad 1.3× 会把图标撑到 ~31pt，与底部两行 sp 字在卡内重叠；
-    // 字体仍走 sp（上限 1.15×）。行高 Task210 定稿 104pt：iPad 满档字号下
-    // 内容 ~86pt 仍余 ~18pt（84pt 时代溢出 2pt 正是"字体被裁减"根源）。
-    CGFloat iconSize = 22.0;
+    // 紧凑竖卡（128pt 固定行高）内的几何量用固定 pt，不随屏宽缩放：
+    // dp 的 iPad 1.3× 会把图标撑到与底部两行 sp 字在卡内重叠；
+    // 字体仍走 sp（上限 1.15×）。行高 Task212 定稿 128pt（Task210 的
+    // 104pt 用户复检"仍比快捷指令卡矮一圈"）；图标 22→28 同步放大。
+    CGFloat iconSize = 28.0;
     CGFloat nameFont = [ScreenUtils sp:15];
     CGFloat ellipsisSize = 28.0;   // Task210：24 → 28（加大两档）
 
@@ -345,15 +347,33 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 
 @end
 
-#pragma mark - Game Directory Cell (FCL 风格版本隔离卡片)
+#pragma mark - Game Directory Cell (Task212：实例卡完全同构版本隔离卡片)
 
+// Task212 用户定稿"游戏目录卡片的样式改成实例卡片完全相同的"：
+// VMGameDirCell 整类重写为 VMVersionCardCell 同构（旧 FCL 横排卡——蓝底白
+// folder 方块 + 对勾徽章 + chevron——整体退役）：
+//   卡底 = 同一条 Task210 全局卡面管线（VMTileBaseCell 承载，无差异）；
+//   左上 = folder 图标"图标本身的颜色"（systemBlue 模板直出，无底色方块，
+//          与实例卡的 loader 彩色直出同语义）；
+//   右上 = 叉号删除钮（28pt 圆底 + 16pt Black xmark，几何/配色与实例卡
+//          ⋯ 钮逐项一致——用 SF Symbol 图标而非文字 x）；点击 → 直接呼出
+//          确认删除弹窗（不走长按菜单；目录长按功能随本类重写删除）；
+//   左下 = 目录名称（主色）+ 下一行目录大小（次色）；
+//   选中 = 内缩高亮环（内缩 = 省略号间距/3、2pt accent 纯描边，同实例卡）；
+//   "新建目录"加号卡保留绿色描边语义（绿色 plus 直出 + 绿 0.6 描边 +
+//   绿 0.08 淡底），布局仍走同一套新几何。
 @interface VMGameDirCell : VMTileBaseCell
-@property (nonatomic, strong) UIView *iconContainer;
+// 左上目录图标（folder 原色直出 / 加号卡为绿色 plus）
 @property (nonatomic, strong) UIImageView *iconView;
+// 右上叉号删除钮（纯删除入口，不改选中；加号卡隐藏）
+@property (nonatomic, strong) UIButton *deleteButton;
+// 选中内缩高亮环（同实例卡：内缩 = 省略号间距/3，描边 2pt accent）
+@property (nonatomic, strong) UIView *selectionRing;
+// 左下目录名 + 目录大小（快捷指令"名称/操作数"位，深浅自适应双色）
 @property (nonatomic, strong) UILabel *nameLabel;
 @property (nonatomic, strong) UILabel *detailLabel;
-@property (nonatomic, strong) UIView *selectedBadge;
-@property (nonatomic, strong) UIImageView *chevronView;
+// 叉号点击回调（VC 在 cellForItem 里捕获目录名注入）
+@property (nonatomic, copy) void (^deleteAction)(void);
 @end
 
 @implementation VMGameDirCell
@@ -361,134 +381,147 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 - (void)setupViews {
     [super setupViews];
 
-    CGFloat iconBoxSize = [ScreenUtils dp:28];
-    CGFloat iconSize = [ScreenUtils dp:16];
-    CGFloat nameFont = [ScreenUtils sp:13];
+    // 几何量与 VMVersionCardCell 逐项一致（固定 pt，不随屏宽缩放）
+    CGFloat iconSize = 28.0;
+    CGFloat nameFont = [ScreenUtils sp:15];
+    CGFloat deleteSize = 28.0;
 
-    // 规范 8.2：图标容器
-    self.iconContainer = [[UIView alloc] init];
-    self.iconContainer.translatesAutoresizingMaskIntoConstraints = NO;
-    self.iconContainer.layer.cornerRadius = 8;
-    self.iconContainer.layer.cornerCurve = kCACornerCurveContinuous;
-    self.iconContainer.backgroundColor = [UIColor systemBlueColor];
-    [self.contentContainer addSubview:self.iconContainer];
-
+    // ----- 左上目录图标：folder 本色直出（无底色方块，Task212 定稿）-----
     self.iconView = [[UIImageView alloc] init];
     self.iconView.translatesAutoresizingMaskIntoConstraints = NO;
     self.iconView.contentMode = UIViewContentModeScaleAspectFit;
     self.iconView.image = [UIImage systemImageNamed:@"folder.fill"];
-    self.iconView.tintColor = [UIColor whiteColor];
-    [self.iconContainer addSubview:self.iconView];
+    self.iconView.tintColor = [UIColor systemBlueColor];
+    [self.contentContainer addSubview:self.iconView];
 
+    // ----- 右上叉号删除钮（与实例卡 ⋯ 钮同构：自适应色圆底 + 16pt Black）-----
+    self.deleteButton = [UIButton buttonWithType:UIButtonTypeCustom];
+    self.deleteButton.translatesAutoresizingMaskIntoConstraints = NO;
+    self.deleteButton.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.12];
+    self.deleteButton.layer.cornerRadius = deleteSize / 2.0;
+    self.deleteButton.layer.cornerCurve = kCACornerCurveContinuous;
+    UIImageSymbolConfiguration *xConfig = [UIImageSymbolConfiguration configurationWithPointSize:16.0 weight:UIFontWeightBlack];
+    [self.deleteButton setImage:[UIImage systemImageNamed:@"xmark" withConfiguration:xConfig]
+                       forState:UIControlStateNormal];
+    self.deleteButton.tintColor = [UIColor labelColor];
+    self.deleteButton.accessibilityLabel = localize(@"i18n_str_1083", nil);
+    [self.deleteButton addTarget:self
+                          action:@selector(deleteTapped)
+                forControlEvents:UIControlEventTouchUpInside];
+    [self.contentContainer addSubview:self.deleteButton];
+
+    // ----- 选中内缩高亮环（同实例卡：accent 纯描边，无光晕）-----
+    self.selectionRing = [[UIView alloc] init];
+    self.selectionRing.translatesAutoresizingMaskIntoConstraints = NO;
+    self.selectionRing.backgroundColor = [UIColor clearColor];
+    self.selectionRing.layer.borderColor = accentColor().CGColor;
+    self.selectionRing.layer.borderWidth = kVMCardRingBorderWidth;
+    self.selectionRing.layer.cornerRadius = 12.0 - (kVMCardEllipsisInset / 3.0);
+    self.selectionRing.layer.cornerCurve = kCACornerCurveContinuous;
+    self.selectionRing.hidden = YES;
+    [self.contentContainer addSubview:self.selectionRing];
+
+    // ----- 左下目录名 + 大小（深浅自适应双色两行，与实例卡同位同规格）-----
     self.nameLabel = [[UILabel alloc] init];
     self.nameLabel.translatesAutoresizingMaskIntoConstraints = NO;
     self.nameLabel.font = [UIFont systemFontOfSize:nameFont weight:UIFontWeightSemibold];
-    // 规范 2.1：系统色
-    self.nameLabel.textColor = [UIColor labelColor];
+    self.nameLabel.textColor = AmeCardPrimaryTextColor();
     self.nameLabel.numberOfLines = 1;
     self.nameLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.nameLabel];
 
     self.detailLabel = [[UILabel alloc] init];
     self.detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.detailLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:10] weight:UIFontWeightRegular];
-    // 规范 2.1：副文字 secondaryLabelColor
-    self.detailLabel.textColor = [UIColor secondaryLabelColor];
-    self.detailLabel.numberOfLines = 0;
-    self.detailLabel.lineBreakMode = NSLineBreakByWordWrapping;
+    self.detailLabel.font = [UIFont systemFontOfSize:[ScreenUtils sp:11] weight:UIFontWeightRegular];
+    self.detailLabel.textColor = AmeCardSecondaryTextColor();
+    self.detailLabel.numberOfLines = 1;
     self.detailLabel.adjustsFontForContentSizeCategory = NO;
     [self.contentContainer addSubview:self.detailLabel];
 
-    self.selectedBadge = [[UIView alloc] init];
-    self.selectedBadge.translatesAutoresizingMaskIntoConstraints = NO;
-    self.selectedBadge.backgroundColor = accentColor();
-    self.selectedBadge.layer.cornerRadius = 9;
-    self.selectedBadge.layer.cornerCurve = kCACornerCurveContinuous;
-    self.selectedBadge.hidden = YES;
-    [self.contentContainer addSubview:self.selectedBadge];
-
-    UIImageView *checkmark = [[UIImageView alloc] init];
-    checkmark.translatesAutoresizingMaskIntoConstraints = NO;
-    checkmark.image = [UIImage systemImageNamed:@"checkmark" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:8 weight:UIFontWeightBold]];
-    checkmark.tintColor = [UIColor whiteColor];
-    [self.selectedBadge addSubview:checkmark];
-
-    // 规范 9.4：chevron 暗示可点击
-    self.chevronView = [[UIImageView alloc] init];
-    self.chevronView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.chevronView.image = [UIImage systemImageNamed:@"chevron.right" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIFontWeightSemibold]];
-    self.chevronView.tintColor = [UIColor tertiaryLabelColor];
-    [self.contentContainer addSubview:self.chevronView];
-
+    CGFloat ringInset = kVMCardEllipsisInset / 3.0; // 同实例卡：内缩 = 钮间距 × 1/3
+    NSLayoutConstraint *nameClearance =
+        [self.nameLabel.topAnchor constraintGreaterThanOrEqualToAnchor:self.iconView.bottomAnchor constant:2];
+    nameClearance.priority = 999;
     [NSLayoutConstraint activateConstraints:@[
-        [self.iconContainer.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:10],
-        [self.iconContainer.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
-        [self.iconContainer.widthAnchor constraintEqualToConstant:iconBoxSize],
-        [self.iconContainer.heightAnchor constraintEqualToConstant:iconBoxSize],
-        [self.iconView.centerXAnchor constraintEqualToAnchor:self.iconContainer.centerXAnchor],
-        [self.iconView.centerYAnchor constraintEqualToAnchor:self.iconContainer.centerYAnchor],
+        // 图标/叉号钮：统一 kVMCardEllipsisInset 内缩（与实例卡逐项对齐）
+        [self.iconView.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:kVMCardEllipsisInset],
+        [self.iconView.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:kVMCardEllipsisInset],
         [self.iconView.widthAnchor constraintEqualToConstant:iconSize],
         [self.iconView.heightAnchor constraintEqualToConstant:iconSize],
-        [self.nameLabel.leadingAnchor constraintEqualToAnchor:self.iconContainer.trailingAnchor constant:8],
-        [self.nameLabel.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:8],
-        [self.nameLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-6],
+        [self.deleteButton.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-kVMCardEllipsisInset],
+        [self.deleteButton.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:kVMCardEllipsisInset],
+        [self.deleteButton.widthAnchor constraintEqualToConstant:deleteSize],
+        [self.deleteButton.heightAnchor constraintEqualToConstant:deleteSize],
+
+        // 选中环：四边内缩 ringInset（同实例卡）
+        [self.selectionRing.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:ringInset],
+        [self.selectionRing.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:ringInset],
+        [self.selectionRing.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-ringInset],
+        [self.selectionRing.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-ringInset],
+
+        // 名称/大小：左下角两行，大小行距底 10pt（同实例卡）
+        nameClearance,
+        [self.nameLabel.leadingAnchor constraintEqualToAnchor:self.contentContainer.leadingAnchor constant:kVMCardEllipsisInset],
+        [self.nameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.deleteButton.leadingAnchor constant:-8],
         [self.detailLabel.leadingAnchor constraintEqualToAnchor:self.nameLabel.leadingAnchor],
         [self.detailLabel.topAnchor constraintEqualToAnchor:self.nameLabel.bottomAnchor constant:2],
-        [self.detailLabel.trailingAnchor constraintEqualToAnchor:self.chevronView.leadingAnchor constant:-6],
-        [self.detailLabel.bottomAnchor constraintLessThanOrEqualToAnchor:self.contentContainer.bottomAnchor constant:-8],
-        [self.selectedBadge.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-10],
-        [self.selectedBadge.topAnchor constraintEqualToAnchor:self.contentContainer.topAnchor constant:8],
-        [self.selectedBadge.widthAnchor constraintEqualToConstant:18],
-        [self.selectedBadge.heightAnchor constraintEqualToConstant:18],
-        [self.chevronView.trailingAnchor constraintEqualToAnchor:self.contentContainer.trailingAnchor constant:-10],
-        [self.chevronView.centerYAnchor constraintEqualToAnchor:self.contentContainer.centerYAnchor],
-        [self.chevronView.widthAnchor constraintEqualToConstant:11],
-        [self.chevronView.heightAnchor constraintEqualToConstant:11],
-        [checkmark.centerXAnchor constraintEqualToAnchor:self.selectedBadge.centerXAnchor],
-        [checkmark.centerYAnchor constraintEqualToAnchor:self.selectedBadge.centerYAnchor]
+        [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.deleteButton.leadingAnchor constant:-8],
+        [self.detailLabel.bottomAnchor constraintEqualToAnchor:self.contentContainer.bottomAnchor constant:-10]
     ]];
+}
+
+/// 叉号点击 → 转发 VC 注入的删除回调（直接呼出确认删除弹窗）
+- (void)deleteTapped {
+    if (self.deleteAction) self.deleteAction();
 }
 
 - (void)configureWithName:(NSString *)name detail:(NSString *)detail isSelected:(BOOL)isSelected isAddButton:(BOOL)isAddButton {
     if (isAddButton) {
+        // "新建目录"加号卡：绿色语义保留（plus 直出 + 绿描边 + 绿淡底），
+        // 布局走同一套新几何；叉号与选中环都无意义，隐藏。
         self.iconView.image = [UIImage systemImageNamed:@"plus"];
-        self.iconView.tintColor = [UIColor whiteColor];
-        self.iconContainer.backgroundColor = [UIColor systemGreenColor];
+        self.iconView.tintColor = [UIColor systemGreenColor];
         self.nameLabel.text = localize(@"i18n_str_1053", nil);
         self.detailLabel.text = localize(@"i18n_str_1054", nil);
-        self.selectedBadge.hidden = YES;
-        self.chevronView.hidden = YES;
-        // 规范 5.3：推荐态描边 1.0pt accentColor 0.4
+        self.deleteButton.hidden = YES;
+        self.selectionRing.hidden = YES;
         self.contentContainer.layer.borderColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.6].CGColor;
         self.contentContainer.layer.borderWidth = 1.0;
         self.contentContainer.backgroundColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.08];
         return;
     }
 
-    self.chevronView.hidden = NO;
+    // 目录卡：folder 本色直出 + 名称 + 大小；选中 = 内缩环（同实例卡）。
+    // 卡底回归 VMTileBaseCell 默认（旧 accent 1.5pt 描边 + accent 0.10 淡底
+    // 的"三层选中强化"退役——选中态只由内缩环表达）。
+    self.deleteButton.hidden = NO;
     self.iconView.image = [UIImage systemImageNamed:@"folder.fill"];
-    self.iconView.tintColor = [UIColor whiteColor];
-    self.iconContainer.backgroundColor = [UIColor systemBlueColor];
+    self.iconView.tintColor = [UIColor systemBlueColor];
     self.nameLabel.text = name;
     self.detailLabel.text = detail ?: @"";
-    self.selectedBadge.hidden = !isSelected;
-    self.selectedBadge.backgroundColor = accentColor();
+    self.selectionRing.hidden = !isSelected;
+    self.selectionRing.layer.borderColor = accentColor().CGColor;
+    self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
+    self.contentContainer.layer.borderWidth = 0.5;
+    self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
+}
 
-    // 规范 9.1：选中态三层强化
-    if (isSelected) {
-        self.contentContainer.layer.borderColor = accentColor().CGColor;
-        self.contentContainer.layer.borderWidth = 1.5;
-        self.contentContainer.backgroundColor = [accentColor() colorWithAlphaComponent:0.10];
-        self.chevronView.tintColor = accentColor();
-    } else {
-        self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
-        self.contentContainer.layer.borderWidth = 0.5;
-        self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
-        self.chevronView.tintColor = [UIColor tertiaryLabelColor];
-    }
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    self.iconView.image = [UIImage systemImageNamed:@"folder.fill"];
+    self.iconView.tintColor = [UIColor systemBlueColor];
+    self.nameLabel.text = nil;
+    self.detailLabel.text = nil;
+    self.selectionRing.hidden = YES;
+    self.deleteButton.hidden = NO;
+    self.deleteAction = nil;
+    self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
+    self.contentContainer.layer.borderWidth = 0.5;
+    self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
 }
 
 @end
+
 
 #pragma mark - Renderer Card Cell (图形 API 选择卡片，FCL 风格)
 
@@ -856,7 +889,7 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     return nil;
 }
 
-/// 长按手势：游戏目录卡片弹出操作菜单（切换/删除），版本卡片弹出选择/编辑/删除
+/// 长按手势：实例卡片直接呼出确认删除弹窗（Task212；目录卡片不再响应长按）
 - (void)setupLongPressGesture {
     UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc]
         initWithTarget:self action:@selector(handleLongPress:)];
@@ -995,14 +1028,16 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     if (!indexPath) return;
 
     if (indexPath.section == kSectionGameDir) {
-        // 游戏目录区段：长按弹出切换/删除菜单（不含"新建目录"按钮项）
-        if (indexPath.item >= (NSInteger)self.gameDirList.count) return;
-        NSString *dirName = self.gameDirList[indexPath.item];
-        [self showGameDirActions:dirName];
+        // Task212（用户定稿）：游戏目录长按功能删除——切换 = 点卡片，
+        // 删除 = 点叉号钮；长按不再响应任何菜单。
+        return;
     } else if (indexPath.section == kSectionVersions) {
-        // 版本卡片区段：长按弹出操作菜单（选择/删除）
+        // Task212（用户定稿）：长按实例卡片 = 直接呼出确认删除弹窗
+        //（旧"选择/编辑/删除"操作菜单退役：选择 = 点卡片本体，
+        // 编辑 = 卡片右上 ⋯ 钮，两个入口仍在，菜单纯属冗余）；
+        // deleteProfile 内含最后一个实例不可删守卫 + 二次确认。
         if (indexPath.item >= (NSInteger)self.profileList.count) return;
-        [self showProfileActions:self.profileList[indexPath.item]];
+        [self deleteProfile:self.profileList[indexPath.item]];
     }
 }
 
@@ -1243,14 +1278,18 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 
         if (sectionIndex == kSectionGameDir) {
             // 游戏目录区段：横向滚动卡片列表
-            // 规范 4.1：卡片宽度 160pt（iPad 180pt），高度 70pt（给图标容器留呼吸空间）
-            CGFloat itemWidth = isiPad ? 180 : 160;
-            CGFloat itemHeight = 70;
+            // Task212：目录卡与实例卡"完全相同"——卡宽 = 同屏实例卡的整卡宽
+            //（iPad 四分之 / iPhone 二分之一屏宽，扣除与版本区段相同的 16pt
+            // 边距 + 8pt 列间距），卡高 = kVMVersionRowHeight（128pt），上下
+            // 内缩 4pt、左右 8pt 与版本区段逐项一致（旧 160/180×70pt 矮卡退役）。
+            // 横向滚动语义保留：目录多时左右滑，不挤压版面。
+            CGFloat itemWidth = isiPad ? ((width - 32 - 3 * 8) / 4.0) : ((width - 32 - 8) / 2.0);
+            CGFloat itemHeight = kVMVersionRowHeight;
             NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension absoluteDimension:itemWidth]
                                                                                        heightDimension:[NSCollectionLayoutDimension absoluteDimension:itemHeight]];
             NSCollectionLayoutItem *item = [NSCollectionLayoutItem itemWithLayoutSize:itemSize];
-            // 规范 4.1：卡片间距 8pt（上下各 4pt）
-            item.contentInsets = NSDirectionalEdgeInsetsMake(4, 5, 4, 5);
+            // 规范 4.1：卡片间距 8pt（上下各 4pt），左右 8pt（与版本区段一致）
+            item.contentInsets = NSDirectionalEdgeInsetsMake(4, 8, 4, 8);
 
             NSCollectionLayoutSize *groupSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension absoluteDimension:itemWidth]
                                                                                           heightDimension:[NSCollectionLayoutDimension absoluteDimension:itemHeight]];
@@ -1268,7 +1307,7 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
             // "原来一张卡的位置显示两张卡"；横向组按剩余宽度自动重复子项，
             // 0.5/0.25 分数宽即每行 2/4 张。
             CGFloat itemWidth = isiPad ? 0.25 : 0.5;
-            // Task210：行高定稿 104pt（84pt 时代 iPad 满档字号内容 86pt 被裁）
+            // Task212：行高定稿 128pt（Task210 的 104pt 复检仍矮一圈，再抬一档）
             CGFloat itemHeight = kVMVersionRowHeight;
             NSCollectionLayoutSize *itemSize = [NSCollectionLayoutSize sizeWithWidthDimension:[NSCollectionLayoutDimension fractionalWidthDimension:itemWidth]
                                                                                        heightDimension:[NSCollectionLayoutDimension absoluteDimension:itemHeight]];
@@ -1351,7 +1390,8 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
         NSString *dirName = self.gameDirList[indexPath.item];
         BOOL isSelected = [dirName isEqualToString:self.currentGameDir];
 
-        // 异步计算目录大小
+        // 异步计算目录大小（Task212：小字 = 目录大小本体，旧 i18n_str_134
+        // 占位文案退役——初始为空，算完即填）
         __weak typeof(self) weakSelf = self;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             unsigned long long folderSize = 0;
@@ -1366,7 +1406,13 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
             });
         });
 
-        [cell configureWithName:dirName detail:localize(@"i18n_str_134", nil) isSelected:isSelected isAddButton:NO];
+        [cell configureWithName:dirName detail:nil isSelected:isSelected isAddButton:NO];
+        // Task212：叉号钮 = 删除入口（点击直接呼出确认删除弹窗；默认目录/
+        // 当前目录在回调内先行拦截并说明，不走旧长按菜单）
+        __weak typeof(self) weakSelf = self;
+        cell.deleteAction = ^{
+            [weakSelf handleGameDirDeleteTapped:dirName];
+        };
         return cell;
     } else {
         VMVersionCardCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"VersionCell" forIndexPath:indexPath];
@@ -1465,7 +1511,8 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
         }
     } else if (indexPath.section == kSectionVersions) {
         // Task207：点卡片 = 选用该实例（快捷指令"点击即运行"语义）；
-        // 编辑入口移到卡片右上 ⋯ 钮（长按菜单保留选择/编辑/删除三件套不变）。
+        // Task212：编辑 = 卡片右上 ⋯ 钮；长按 = 直接呼出确认删除弹窗
+        //（旧长按"选择/编辑/删除"三件套菜单退役）。
         NSString *profileName = self.profileList[indexPath.item];
         [self selectProfileNamed:profileName];
     }
@@ -1541,41 +1588,19 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     [self switchGameDirTo:name];
 }
 
-/// 长按游戏目录卡片弹出操作菜单：切换/删除当前目录
-- (void)showGameDirActions:(NSString *)dirName {
-    BOOL isSelected = [dirName isEqualToString:self.currentGameDir];
-    BOOL isDefault = [dirName isEqualToString:@"default"];
-
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:dirName
-                                                                   message:isSelected ? localize(@"i18n_str_2029", nil) : localize(@"i18n_str_1081", nil)
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-
-    if (!isSelected) {
-        [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_1081", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-            [self switchGameDirTo:dirName];
-        }]];
+/// Task212：目录卡叉号点击 → 直接呼出确认删除弹窗（旧长按操作菜单整体
+/// 退役：切换 = 点卡片本体，删除 = 叉号钮，无需中间层菜单）。默认目录
+/// 与正在使用的目录不可删，点击时即时说明（不先弹确认再拒）。
+- (void)handleGameDirDeleteTapped:(NSString *)dirName {
+    if ([dirName isEqualToString:@"default"]) {
+        [self showAlert:localize(@"i18n_str_1087", nil)];
+        return;
     }
-
-    // 删除目录（默认目录禁止删除，正在使用的目录需要先切换才能删除）
-    if (!isDefault) {
-        NSString *deleteTitle = isSelected ? localize(@"i18n_str_2030", nil) : localize(@"i18n_str_1083", nil);
-        [alert addAction:[UIAlertAction actionWithTitle:deleteTitle style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
-            if (isSelected) {
-                [self showAlert:localize(@"i18n_str_1084", nil)];
-                return;
-            }
-            [self confirmDeleteGameDir:dirName];
-        }]];
+    if ([dirName isEqualToString:self.currentGameDir]) {
+        [self showAlert:localize(@"i18n_str_1084", nil)];
+        return;
     }
-
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
-
-    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        alert.popoverPresentationController.sourceView = self.view;
-        alert.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
-        alert.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
-    }
-    [self presentViewController:alert animated:YES completion:nil];
+    [self confirmDeleteGameDir:dirName];
 }
 
 /// 二次确认删除游戏目录
@@ -1739,41 +1764,10 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 
 #pragma mark - Profile Actions
 
-- (void)showProfileActions:(NSString *)profileName {
-    NSDictionary *profile = PLProfiles.current.profiles[profileName];
-    BOOL isSelected = [profileName isEqualToString:self.selectedProfile];
-
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:profileName
-                                                                   message:profile[@"lastVersionId"]
-                                                            preferredStyle:UIAlertControllerStyleActionSheet];
-
-    if (!isSelected) {
-        [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_1090", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-            PLProfiles.current.selectedProfileName = profileName;
-            [PLProfiles.current save];
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"SelectedProfileChanged" object:nil];
-            [self loadProfiles];
-            [self.collectionView reloadData];
-        }]];
-    }
-
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_1091", nil) style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-        [self editProfile:profileName];
-    }]];
-
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"i18n_str_306", nil) style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
-        [self deleteProfile:profileName];
-    }]];
-
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
-
-    if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
-        alert.popoverPresentationController.sourceView = self.view;
-        alert.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 1, 1);
-        alert.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
-    }
-    [self presentViewController:alert animated:YES completion:nil];
-}
+// Task212：showProfileActions（实例卡长按"选择/编辑/删除"操作菜单）整体
+// 退役——长按 = 直接呼出确认删除弹窗（handleLongPress → deleteProfile），
+// 选择 = 点卡片本体（selectProfileNamed），编辑 = 卡片右上 ⋯ 钮
+//（editProfile）；三个动作各有直达入口，中间层菜单纯属冗余。
 
 - (void)editProfile:(NSString *)profileName {
     // Task207：纯编辑——⋯ 钮/长按菜单进入编辑页不再顺带把该实例设为当前选中

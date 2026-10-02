@@ -36,7 +36,7 @@ FOUNDATION_EXPORT NSString *const PLMirrorMCIMRootURL;
 ///
 /// 收敛全工程的镜像 URL 映射与策略读取，替代散落在
 /// MinecraftResourceDownloadTask / MCIMMirror / 各 installer 中的重写逻辑：
-///   - GameFile / ModLoader → BMCLAPI（参考 ZalithLauncher 2 REPLACE_MIRROR_HOLDERS + Air 现有行为）
+///   - GameFile / ModLoader → BMCLAPI（参考 ZalithLauncher 2 REPLACE_MIRROR_HOLDERS + Prisma 现有行为）
 ///   - AssetSearch / AssetDownload → MCIM（保持 MCIMMirror.m 现有精确行为）
 ///
 /// 策略偏好键（值 official_first / mirror_first）：

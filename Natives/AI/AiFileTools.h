@@ -2,7 +2,7 @@
 //  AiFileTools.h
 //  Amethyst
 //
-//  Air AI Agent 文件工具：list_files / read_file / grep_files（只读）、
+//  Prisma AI Agent 文件工具：list_files / read_file / grep_files（只读）、
 //  write_file / edit_file（受控写入）、delete_file（危险写入）。
 //  所有文件操作经沙盒路径安全检查（resolveSafely）限定在 App 沙盒内。
 //

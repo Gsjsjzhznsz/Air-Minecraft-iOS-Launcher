@@ -2,7 +2,7 @@
 //  AiAssetTools.h
 //  Amethyst
 //
-//  Air AI Agent 资源/网络工具（Phase 3b）：
+//  Prisma AI Agent 资源/网络工具（Phase 3b）：
 //  - AiAssetSearchTool：Modrinth 搜索类（search_mods / search_resourcepacks / search_shaders /
 //    search_datapacks / search_modpacks / search_worlds），权限 ExternalNetwork。
 //  - AiAssetInstallTool：安装类（install_mod / install_resourcepack / install_shader /

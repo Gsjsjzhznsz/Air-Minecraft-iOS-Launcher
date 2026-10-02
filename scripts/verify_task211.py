@@ -181,14 +181,14 @@ check("E1 version.h Task211 附录（五主题 + 尾部 SEP）",
       and re.search(r"// ={70,}\s*$", vh) is not None)
 ann = json.loads(rd("announcements.json"))["announcements"]
 check("E2 公告 task211@3（Task212 重锚：34 条 + task212@2 插入顺延 + 尾锚）",
-      len(ann) == 34 and ann[3]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
+      len(ann) == 35 and ann[4]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[2]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
-      and ann[4]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
+      and ann[3]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
+      and ann[5]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
 check("E3 公告内容五主题齐备",
-      all(k in ann[3]["content"] for k in
+      all(k in ann[4]["content"] for k in
           ("退出", "CurseForge", "Modrinth", "拆解", "ZL2 经典版", "virglrenderer")))
 
 # ============ F. 语法门 + 级联 ============
