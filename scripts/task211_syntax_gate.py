@@ -166,11 +166,23 @@ files = [
     'Natives/LauncherPreferences.m',
     'Natives/LauncherPreferences.h',
     'Natives/main.m',
+    # Task211 stage 2 (gl4eszl2 移植触碰面)
+    'Natives/egl_bridge.m',
+    'Natives/utils.h',
+    'Natives/LauncherPreferences.m',
+    'Natives/VersionManagerViewController.m',
+    'Natives/AI/AiSettingsTools.m',
+    'ThirdParty/gl4es_extra_extra/src/glx/hardext.c',
+    'ThirdParty/gl4es_extra_extra/src/gl/init.c',
+    'ThirdParty/gl4es_extra_extra/src/gl/wrap/gl4eszl2_darwin_aliases.c',
 ]
 for fp in files:
     txt = open(fp, encoding='utf-8', errors='replace').read()
-    # 去掉整行注释与字符串字面量（C 源码的保守近似——历史门同款口径）
-    txt_nc = '\n'.join(l for l in txt.split('\n') if not l.strip().startswith('//'))
+    # 剥离顺序（避免撇号陷阱——Task211 实战教训：注释里的 host's...NG's
+    # 会被字符字面量近似当成 '...' 吞掉中间的括号）：
+    #   ① 块注释 /* */（非贪婪、跨行） ② 整行 // 注释 ③ 字符串 ④ 字符
+    txt_nc = re.sub(r'/\*.*?\*/', ' ', txt, flags=re.S)
+    txt_nc = '\n'.join(l for l in txt_nc.split('\n') if not l.strip().startswith('//'))
     txt_nc = re.sub(r'"(?:[^"\\]|\\.)*"', '""', txt_nc)
     txt_nc = re.sub(r"'(?:[^'\\]|\\.)*'", "''", txt_nc)
     for op, cl, name in (('{', '}', 'braces'), ('(', ')', 'parens')):

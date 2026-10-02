@@ -336,6 +336,65 @@ static void ame208_nggl4es_boot(void) {
           ame208_resolver ? @"YES" : @"NO(egpa-missing)", ame208_ng);
 }
 
+// Task211：ZL2 经典版 gl4es 的初始化点——ame208_nggl4es_boot 的同构镜像
+// （同一棵 vendored 树的同一套 Task208 三件套：NO_INIT_CONSTRUCTOR +
+// MakeCurrent 后显式 initialize_gl4es + set_getprocaddress 钉 Task204
+// resolver）。与 NG 唯一差异：dylib 名。非本渲染器时立即返回（一次
+// getenv 比较，零副作用）；幂等门 s_ame211_done。
+static void ame211_gl4eszl2_boot(void) {
+    static volatile int s_ame211_done = 0;
+    if (s_ame211_done) return;
+    const char *ame211_renderer = getenv("AMETHYST_RENDERER");
+    if (ame211_renderer == NULL || strcmp(ame211_renderer, RENDERER_NAME_GL4ESZL2) != 0) return;
+
+    void *ame211_g4 = dlopen("@rpath/" RENDERER_NAME_GL4ESZL2, RTLD_NOW | RTLD_NOLOAD | RTLD_GLOBAL);
+    if (ame211_g4 == NULL) {
+        NSLog(@"[egl_bridge] Task211: ZL2 classic gl4es image not loaded (RTLD_NOLOAD) -- initialize_gl4es NOT called");
+        return;
+    }
+
+    // 后端钉扎（Task204 resolver 复用，与 NG 帧同一套全局句柄）。
+    if (ame204_gl4esEgpa == NULL) {
+        ame204_gl4esGles2 = dlopen("@executable_path/Frameworks/libGLESv2.framework/libGLESv2",
+                                   RTLD_NOW | RTLD_LOCAL);
+        ame204_gl4esEgl = dlopen("@executable_path/Frameworks/libEGL.framework/libEGL",
+                                 RTLD_NOW | RTLD_LOCAL);
+        ame204_gl4esEgpa = ame204_gl4esEgl
+            ? (void *(*)(const char *))dlsym(ame204_gl4esEgl, "eglGetProcAddress")
+            : NULL;
+    }
+    int ame211_resolver = 0;
+    if (ame204_gl4esEgpa != NULL) {
+        void (*ame211_sgpa)(void *(*)(const char *)) =
+            (void (*)(void *(*)(const char *)))dlsym(ame211_g4, "set_getprocaddress");
+        if (ame211_sgpa != NULL) {
+            ame211_sgpa(ame204_gl4esProcResolver);
+            ame211_resolver = 1;
+        }
+    }
+
+    // 门：确认线程上确有 current 上下文（经由捆绑 ANGLE EGL 查询）。
+    if (ame204_gl4esEgl != NULL) {
+        void *(*ame211_getCurCtx)(void) =
+            (void *(*)(void))dlsym(ame204_gl4esEgl, "eglGetCurrentContext");
+        if (ame211_getCurCtx != NULL && ame211_getCurCtx() == NULL) {
+            NSLog(@"[egl_bridge] Task211: ZL2 classic gl4es boot deferred -- no current EGL context on this thread");
+            return;
+        }
+    }
+
+    void (*ame211_init)(void) = (void (*)(void))dlsym(ame211_g4, "initialize_gl4es");
+    if (ame211_init == NULL) {
+        NSLog(@"[egl_bridge] Task211: initialize_gl4es symbol missing -- ZL2 classic gl4es cannot init");
+        return;
+    }
+    ame211_init();   // 上下文已 current：硬件探测/能力缓存全部落真上下文
+    s_ame211_done = 1;
+    NSLog(@"[egl_bridge] Task211: ZL2 classic gl4es initialize_gl4es() called post-MakeCurrent "
+          "(resolver=%@, handle=%p) -- hardware probe ran on the real game context",
+          ame211_resolver ? @"YES" : @"NO(egpa-missing)", ame211_g4);
+}
+
 static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
     if (s_openGLInited) {
         // 幂等：重复初始化会二次 dlopen 渲染器、二次 br_init()（eglInitialize），
@@ -575,6 +634,18 @@ static int pojavInitOpenGLInternal(BOOL setLwjglProperty) {
         // EGL 仍全部由宿主 gl_bridge 从 ANGLE 框架提供（本分支零 EGL 动作）。
         NSLog(@"[egl_bridge] Task206: NG-GL4ES renderer: gl4es-family GL-on-ES "
               "translation (glslang+SPIRV-Cross shader pipeline, ZL2 Krypton Wrapper)");
+        set_gl_bridge_tbl();
+    } else if ([renderer isEqualToString:@ RENDERER_NAME_GL4ESZL2]) {
+        // Task211：ZL2 经典版 gl4es（PojavLauncherTeam/gl4es_extra_extra，
+        // ZL2 的传统 "gl4es"——用户点名移植，与 holy gl4es / Krypton
+        // Wrapper 三者并存互为备选）。纯 C 字符串改写式着色器转换
+        // （shaderconv.c），无 glslang/spvc。构建带同款 Task208 三件套
+        // （NO_INIT_CONSTRUCTOR + MakeCurrent 后 ame211_gl4eszl2_boot
+        // 显式 initialize_gl4es + set_getprocaddress 钉 Task204 resolver）
+        // + hardext.c 的 NULL 守卫（Task208 同源防御）。EGL 仍全部由宿主
+        // gl_bridge 从 ANGLE 框架提供（本分支零 EGL 动作）。
+        NSLog(@"[egl_bridge] Task211: ZL2 classic gl4es renderer: gl4es-family "
+              "GL-on-ES translation (pure-C string-rewrite shader pipeline)");
         set_gl_bridge_tbl();
     } else if ([renderer isEqualToString:@ RENDERER_NAME_MITHRIL]) {
         // Mithril 渲染器：EGL 1.5 + GL 3.3 Core 全部由 libmithril.dylib 提供
@@ -846,6 +917,9 @@ void pojavMakeCurrent(basic_render_window_t* window) {
     // 非 nggl4es 渲染器时 ame208_nggl4es_boot 立即返回（一次 getenv 比较，
     // 零副作用）。幂等：boot 内部 s_ame208_done 门。
     ame208_nggl4es_boot();
+    // Task211：ZL2 经典版 gl4es 的同构初始化点（同一时机、同一零副作用
+    // 早退、同一幂等门）。
+    ame211_gl4eszl2_boot();
 }
 
 void* pojavCreateContext(basic_render_window_t* contextSrc) {

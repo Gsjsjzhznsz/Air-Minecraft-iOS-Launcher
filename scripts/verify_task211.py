@@ -204,6 +204,105 @@ check("F2 公告级联 18 verify 全绿（重锚面；深级联失败需 ⊆ sta
 
 print()
 fails = [n for n, ok in results if not ok]
-print(f"verify_task211 (stage1): {len(results) - len(fails)}/{len(results)}",
+if not fails:
+    # ============ G. Stage 2: ZL2 classic gl4es port ============
+    print("== G. ZL2 经典版 gl4es 移植 ==")
+    gtree = "ThirdParty/gl4es_extra_extra"
+    cmk = rd(f"{gtree}/CMakeLists.txt")
+    check("G1 vendored 树 + PROVENANCE（上游/快照/裁剪清单 + 4 适配项）",
+          "PojavLauncherTeam/gl4es_extra_extra" in cmk
+          and "codeload tarball refs/heads/master, fetched 2026-10-02" in cmk
+          and "traces/ (46MB apitrace dumps)" in cmk
+          and "adaptations vs the upstream build (4)" in cmk
+          and os.path.isdir(os.path.join(REPO, gtree, "src/gl/wrap"))
+          and not os.path.exists(os.path.join(REPO, gtree, "traces")))
+    check("G2 自建 CMakeLists（纯 C 独立目标：无 glslang/spvc 变量 + 同款 flags + hardext + 生成别名入列）",
+          "project(gl4eszl2 LANGUAGES C)" in cmk
+          and "GL4ESZL2_GLSLANG" not in cmk and "GL4ESZL2_SPVC" not in cmk
+          and '-DNO_GBM -DDEFAULT_ES=2 -DNOX11 -DNOEGL -DNO_INIT_CONSTRUCTOR' in cmk
+          and "-fvisibility=hidden" in cmk
+          and "src/glx/hardext.c" in cmk
+          and "src/gl/wrap/gl4eszl2_darwin_aliases.c" in cmk
+          and '"${GL4ESZL2_FRAMEWORK_DIR}" STREQUAL ""' in cmk)
+    check("G3 源适配两处（hardext NULL 守卫 + init.c set_getprocaddress EXPORT）",
+          "Amethyst Task211 (adaptation 4" in rd(f"{gtree}/src/glx/hardext.c")
+          and 'if (!Exts) {' in rd(f"{gtree}/src/glx/hardext.c")
+          and "Amethyst Task211 (adaptation 3" in rd(f"{gtree}/src/gl/init.c")
+          and 'EXPORT\nvoid set_getprocaddress' in rd(f"{gtree}/src/gl/init.c")
+          and '#include "attributes.h"' in rd(f"{gtree}/src/gl/init.c"))
+    r = run(["python3", "scripts/task211_gen_gl4eszl2_aliases.py"])
+    alias = rd(f"{gtree}/src/gl/wrap/gl4eszl2_darwin_aliases.c")
+    check("G4 别名生成器（1214 个 + 幂等 + 悬空/撞名守卫 + 关键名在位）",
+          r.returncode == 0 and "unchanged (1214 aliases)" in r.stdout
+          and alias.count("__asm__") == 1214
+          and '.global _glActiveTexture' in alias
+          and '.global _glColor3b' in alias and '_glColor3b: b _gl4es_glColor3b' in alias
+          and '.global _glFogCoordd' in alias
+          and '.global _glVertexAttrib4Nubv' in alias
+          and alias.rstrip().endswith("#endif"))
+    mk = rd("Makefile")
+    import subprocess as _sp
+    _cur_tab = sum(1 for l in mk.splitlines() if l.startswith("\t"))
+    check("G5 Makefile dep_gl4eszl2（独立目标 + 接线 payload + TAB 基线 559）",
+          "dep_gl4eszl2:" in mk and "dep_gl4eszl2: dep_mg" not in mk
+          and "dep_gl4eszl2 dep_angle_freeze" in mk
+          and "ThirdParty/gl4es_extra_extra/" in mk
+          and _cur_tab == 559)
+    check("G6 运行时五面（utils.h/渲染器表/egl_bridge boot+branch+MakeCurrent/VersionManager/AI 序）",
+          '#define RENDERER_NAME_GL4ESZL2 "libgl4eszl2.dylib"' in rd("Natives/utils.h")
+          and '@ RENDERER_NAME_GL4ESZL2,' in rd("Natives/LauncherPreferences.m")
+          and "ame211_gl4eszl2_boot();" in rd("Natives/egl_bridge.m")
+          and '[renderer isEqualToString:@ RENDERER_NAME_GL4ESZL2]' in rd("Natives/egl_bridge.m")
+          and '@ RENDERER_NAME_GL4ESZL2: @"gl4es (ZL2)"' in rd("Natives/VersionManagerViewController.m"))
+    ai = rd("Natives/AI/AiSettingsTools.m")
+    check("G6b AI 映射序（gl4eszl2 先于 holy gl4es 子串匹配 + 友好名 + 键表两处）",
+          ai.index('containsString:@"gl4eszl2"]') < ai.index('containsString:@"gl4es"]')
+          and 'return @"gl4es ZL2 经典版 (libgl4eszl2.dylib)"' in ai
+          and "gl4es（ZL2 经典版）" in ai and "gl4es ZL2" in ai)
+    l10n_expect = {"zh-Hans": "gl4es（ZL2 经典版）", "zh-CN": "gl4es（ZL2 经典版）",
+                   "zh-Hant": "gl4es（ZL2 經典版）", "en": "gl4es (ZL2 classic)"}
+    ok_g7 = True
+    for lg, want in l10n_expect.items():
+        s = rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
+        if f'"preference.title.renderer.debug.gl4eszl2" = "{want}";' not in s:
+            ok_g7 = False
+    check("G7 l10n 四语言新键（2418 唯一键，Task210 基线 2417+1）", ok_g7)
+    import re as _re
+    _zh = rd("Natives/resources/zh-CN.lproj/Localizable.strings")
+    _keys = _re.findall(r'^"([^"]+)"\s*=', _zh, _re.M)
+    check("G7b 唯一键计数 2418（四语一致）",
+          len(set(_keys)) == 2418
+          and all(len(set(_re.findall(r'^"([^"]+)"\s*=',
+              rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), _re.M))) == 2418
+              for lg in ("en", "zh-Hant", "zh-Hans")))
+    import json as _json
+    _faq_zh = _json.loads(rd("Natives/resources/zh-CN.lproj/help-faq.json"))
+    _sel = _faq_zh["categories"][0]["items"][0]["description"]
+    _faq_en = _json.loads(rd("Natives/resources/en.lproj/help-faq.json"))["categories"][0]["items"][0]["description"]
+    _faq_ht = _json.loads(rd("Natives/resources/zh-Hant.lproj/help-faq.json"))["categories"][0]["items"][0]["description"]
+    check("G8 FAQ 渲染器选择条目新增 ZL2 经典版 bullet（三语 + 根孪生字节一致 + 条数 38 不变）",
+          "• gl4es（ZL2 经典版）" in _sel and "不行再试 gl4es（ZL2 经典版）" in _sel
+          and "gl4es (ZL2 classic)" in _faq_en and "then try gl4es (ZL2 classic)" in _faq_en
+          and "• gl4es（ZL2 經典版）" in _faq_ht
+          and sum(len(c.get("items", [])) for c in _faq_zh["categories"]) == 38
+          and open(os.path.join(REPO, "Natives/resources/help-faq.json"), "rb").read()
+          == open(os.path.join(REPO, "Natives/resources/zh-CN.lproj/help-faq.json"), "rb").read())
+    # 级联：本轮重锚的直接受影响者（TAB 基线族 + l10n 计数族 + Krypton 名族）
+    gc = ["verify_task129.py", "verify_task135.py", "verify_task151.py",
+          "verify_task202.py", "verify_task203.py", "verify_task206.py",
+          "verify_task209.py"]
+    g_ok, g_detail = True, []
+    for c in gc:
+        rr = run(["python3", f"scripts/{c}"], timeout=540)
+        if rr.returncode != 0:
+            g_ok = False
+            g_detail.append(f"{c}:exit{rr.returncode}")
+            print(f"    G-cascade FAIL {c}:\n" + "\n".join(
+                l for l in rr.stdout.split("\n") if "FAIL" in l)[:500])
+    check("G9 级联（TAB 基线 559 族 + l10n 2418 族 + Krypton 收短重锚族）", g_ok, "; ".join(g_detail))
+
+print()
+fails = [n for n, ok in results if not ok]
+print(f"verify_task211 (full): {len(results) - len(fails)}/{len(results)}",
       ("ALL PASS" if not fails else "FAILED: " + ", ".join(fails)))
 sys.exit(1 if fails else 0)

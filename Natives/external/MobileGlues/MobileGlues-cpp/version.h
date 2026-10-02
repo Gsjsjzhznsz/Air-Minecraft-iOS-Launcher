@@ -3600,4 +3600,4 @@
 //   regions + B swap-forensics 5-point block, g++/gcc -fsyntax-only; 10-file
 //   bracket balance) + announcement cascade re-anchor (32 -> 33, index +1
 //   family) + metallum E2E A/B.
-// =============================================================================
+// ============================================================================

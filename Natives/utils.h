@@ -84,6 +84,16 @@ extern "C" {
 // 用户的 vgpu（1.8.9 材质损坏，Task204/205 两轮根修未愈）由此接替。
 #define RENDERER_NAME_NGGL4ES "libnggl4es.dylib"
 
+// Task211：ZL2 经典版 gl4es（PojavLauncherTeam/gl4es_extra_extra——ZL2 的
+// 传统 "gl4es" 渲染器，ZL2 随包的 libgl4es_114.so 即此源码树）。纯 C 的
+// 字符串改写式 GLSL→ESSL 转换器（shaderconv.c），无 glslang/SPIRV-Cross
+// 依赖（dep_gl4eszl2 独立目标，不排 glslang 静态库）。与 holy gl4es
+// （预构建 libgl4es_114.dylib）和 Krypton Wrapper（NG 改写版）三者并存
+// 互为备选——用户点名要的 ZL2 同款。运行时同族：NOEGL 的 proc_address
+// 后端解析 + 宿主 set_getprocaddress 钉 resolver（Task204 通道）+ 上下文
+// current 后显式 initialize_gl4es（Task208 时机，ame211_gl4eszl2_boot）。
+#define RENDERER_NAME_GL4ESZL2 "libgl4eszl2.dylib"
+
 // Mithril 渲染器 - OpenGL 3.3 Core → Vulkan/Metal 转译层（libmithril.dylib）。
 // 自带完整的 EGL 1.5 + GL 实现（Vulkan backend，经 MoltenVK 到 Metal），
 // 必须从自身 dylib 解析 EGL 符号：若复用 ANGLE 的 EGL，会创建 ANGLE 的 Metal

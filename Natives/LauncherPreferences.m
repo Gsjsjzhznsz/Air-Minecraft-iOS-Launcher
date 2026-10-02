@@ -450,7 +450,15 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         // 处理裁剪场景（vgpu 表项同理保留：存量设备仍可选，仅不再推荐）。
         @{@"key": @ RENDERER_NAME_NGGL4ES,
           @"name": localize(@"preference.title.renderer.debug.nggl4es", nil),
-          @"file": @ RENDERER_NAME_NGGL4ES}
+          @"file": @ RENDERER_NAME_NGGL4ES},
+        // Task211：ZL2 经典版 gl4es（PojavLauncherTeam/gl4es_extra_extra，
+        // ZL2 的传统 "gl4es"——用户点名移植）。与 holy gl4es / Krypton
+        // Wrapper 三者并存互为备选。同规则追加在表末（存量 renderer 值的
+        // pick 对位不漂移）；dylib 由 Makefile 的 dep_gl4eszl2 独立目标
+        // 随包构建（纯 C，无 glslang/spvc 依赖）。
+        @{@"key": @ RENDERER_NAME_GL4ESZL2,
+          @"name": localize(@"preference.title.renderer.debug.gl4eszl2", nil),
+          @"file": @ RENDERER_NAME_GL4ESZL2}
         // Task 132（MG 三端合并，用户明令）：MobileGL 家族三后端条目从本表
         // 退役，合并为 MobileGlues 分区的单一 pick 行（typePickField 悬浮
         // 浮窗，选项 MobileGlues (Vulkan 直连) / (GLES 后端) / (OpenGL 4.0

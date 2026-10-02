@@ -207,12 +207,12 @@ check("E", "verify_task207 重锚（行高 104 / AmeCard 色族 / 纯描边 / 91
       "kVMVersionRowHeight = 104.0" in v207
       and "AmeCardPrimaryTextColor()" in v207
       and '"Natives/VersionManagerViewController.m": 1,' in rd("scripts/verify_task91.py"))
-check("E", "级联计数族重锚（206 F1 / 202 F / 193 M / 190 G / 151 H = 2417）",
-      "== 2417" in rd("scripts/verify_task206.py")
-      and "== 2417" in rd("scripts/verify_task202.py")
-      and "唯一键 2417" in rd("scripts/verify_task193.py")
-      and "唯一键总数 == 2417" in rd("scripts/verify_task190.py")
-      and '!= "2417"' in rd("scripts/verify_task151.py"))
+check("E", "级联计数族重锚（206 F1 / 202 F / 193 M / 190 G / 151 H = 2418）",
+      "== 2418" in rd("scripts/verify_task206.py")
+      and "== 2418" in rd("scripts/verify_task202.py")
+      and "唯一键 2418" in rd("scripts/verify_task193.py")
+      and "唯一键总数 == 2418" in rd("scripts/verify_task190.py")
+      and '!= "2418"' in rd("scripts/verify_task151.py"))
 check("E", "纯新拟态验证器退役（173b_neumorph/177/178 不在 scripts）",
       all(not os.path.exists(f"scripts/verify_task{n}.py")
           for n in ["173b_neumorph", "177", "178"]))

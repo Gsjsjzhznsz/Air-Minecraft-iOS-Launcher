@@ -37,10 +37,11 @@ def run(cmd, timeout=300):
 # ============ A. 改名五面 ============
 print("== A. NG-GL4ES -> Krypton Wrapper（<=26.2）五面 ==")
 l10n_expect = {
-    "zh-Hans": "Krypton Wrapper（≤26.2）- ZL2 同款 gl4es，老版本首选（原 NG-GL4ES）",
-    "zh-CN": "Krypton Wrapper（≤26.2）- ZL2 同款 gl4es，老版本首选（原 NG-GL4ES）",
-    "zh-Hant": "Krypton Wrapper（≤26.2）- ZL2 同款 gl4es，舊版本首選（原 NG-GL4ES）",
-    "en": "Krypton Wrapper (≤26.2) - ZalithLauncher 2 gl4es, first choice for legacy versions (formerly NG-GL4ES)",
+    # Task211 重锚：显示名收短（用户定案）——长尾描述退役
+    "zh-Hans": "Krypton Wrapper（≤26.2）",
+    "zh-CN": "Krypton Wrapper（≤26.2）",
+    "zh-Hant": "Krypton Wrapper（≤26.2）",
+    "en": "Krypton Wrapper (≤26.2)",
 }
 ok_a1 = True
 for lg, want in l10n_expect.items():
@@ -48,7 +49,7 @@ for lg, want in l10n_expect.items():
     line = f'"preference.title.renderer.debug.nggl4es" = "{want}";'
     if line not in s or s.count("preference.title.renderer.debug.nggl4es") != 1:
         ok_a1 = False
-check("A1 l10n 四主语言新值（≤26.2 + 原名别名）", ok_a1)
+check("A1 l10n 四主语言新值（≤26.2；Task211 起收短）", ok_a1)
 
 vm = rd("Natives/VersionManagerViewController.m")
 check("A2 VersionManager 短名 = Krypton Wrapper（渲染器键值映射不动）",

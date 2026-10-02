@@ -266,6 +266,7 @@
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL (GLES backend) - GL to OpenGL ES, experimental";
 "preference.title.renderer.debug.metal" = "Metal (metallum)";
 "preference.title.renderer.debug.nggl4es" = "Krypton Wrapper (≤26.2)";
+"preference.title.renderer.debug.gl4eszl2" = "gl4es (ZL2 classic)";
 
 "preference.detail.renderer" = "Change the OpenGL render engine to use. Zink is temporarily disabled on iOS 16 and later to diagnose issues.";
 

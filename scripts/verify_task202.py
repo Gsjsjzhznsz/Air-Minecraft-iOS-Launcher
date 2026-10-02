@@ -145,8 +145,8 @@ langs = {}
 for lg in ("zh-Hans", "zh-Hant", "en", "zh-CN"):
     keys = re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M)
     langs[lg] = set(keys)
-check("F", "四主表键集一致且 2417（2408 + 10 ame202 - 2 Task210 退役）",
-      len(langs["zh-Hans"]) == len(langs["zh-Hant"]) == len(langs["en"]) == len(langs["zh-CN"]) == 2417
+check("F", "四主表键集一致且 2418（2408 + 10 ame202 - 2 Task210 退役）",
+      len(langs["zh-Hans"]) == len(langs["zh-Hant"]) == len(langs["en"]) == len(langs["zh-CN"]) == 2418
       and langs["zh-Hans"] == langs["zh-Hant"] == langs["en"] == langs["zh-CN"])
 ame202_keys = {k for k in langs["zh-Hans"] if k.startswith("ame202.")}
 check("F", "恰 10 个 ame202.* 键（partial + surface×2 + ai×6 + copy）",
@@ -265,8 +265,8 @@ st = subprocess.run(["git", "-C", REPO, "status", "--short"], capture_output=Tru
 # TAB 绝对基线 484（= 481 基线 + Task202 的 3 行；本轮 Makefile 零改动）。
 # （本轮工作树亦不再改 Makefile，HEAD 同含该行。）
 mk_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 535，Task206 重锚）",
-      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 535,
+check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 559，Task206 重锚）",
+      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 559,
       f"tabs={mk_tab}")
 
 # strings 表语法门：每行引号配对

@@ -158,12 +158,12 @@ check("D1 dep_nggl4es 目标（目标级先决 dep_mg——CI run 36804929330 �
       and "cp $(WORKINGDIR)/nggl4es/libnggl4es.dylib $(WORKINGDIR)/" in mk)
 
 check("D2 payload 行接线（mithril 之后、angle_freeze 之前）",
-      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_angle_freeze dep_sdl3_guard" in mk
-      and mk.find("dep_nggl4es dep_angle_freeze") > mk.find("dep_mithril_glshim dep_nggl4es"))
+      "payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_angle_freeze dep_sdl3_guard" in mk
+      and mk.find("dep_nggl4es dep_gl4eszl2") > mk.find("dep_mithril_glshim dep_nggl4es"))
 
 cur_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("D3 TAB 基线 535（484 + 47 + 4 注释行）且无空格缩进 recipe",
-      cur_tab == 535
+check("D3 TAB 基线 559（484 + 47 + 4 注释行）且无空格缩进 recipe",
+      cur_tab == 559
       and not any(l.startswith("    ") for l in mk.split("\n")),
       f"cur={cur_tab}")
 
@@ -217,18 +217,21 @@ for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]:
     keys = re.findall(r'^"([^"]+)"\s*=',
                       rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M)
     langs[lg] = keys
-check("F1 四主语言 nggl4es 键在位且唯一键 2417（Task210 重锚：neumorph 双键退役 2419-2，nggl4es +1 已并入）",
+check("F1 四主语言 nggl4es 键在位且唯一键 2418（Task210 重锚：neumorph 双键退役 2419-2，nggl4es +1 已并入）",
       all("preference.title.renderer.debug.nggl4es" in set(langs[l]) for l in langs)
-      and all(len(set(langs[l])) == 2417 for l in langs))
+      and all(len(set(langs[l])) == 2418 for l in langs))
 
-fleet_2418 = []
+# Task211 重锚：本轮 gl4eszl2 键 +1 后全 fleet 计数 = 2418（2417 一代旧值
+# 清零；守卫精神不变——fleet 与 task151 H 门计数一致，无独立旧值残留。
+# v211 自身的历史基线叙述（2417+1）豁免。）
+fleet_stale = []
 for fn in sorted(os.listdir(os.path.join(REPO, "scripts"))):
-    if fn.startswith("verify_task") and fn.endswith(".py") and fn != "verify_task206.py":
+    if fn.startswith("verify_task") and fn.endswith(".py") and fn not in ("verify_task206.py", "verify_task211.py"):
         t = rd(f"scripts/{fn}")
-        if re.search(r"(?<![\w.])2418(?![\w.])", t):
-            fleet_2418.append(fn)
-check("F2 锚扫荡干净（fleet 无独立 2418；task151 H 门期望 2417，Task210 重锚）",
-      not fleet_2418 and '!= "2417"' in rd("scripts/verify_task151.py"))
+        if re.search(r"(?<![\w.])2417(?![\w.])", t):
+            fleet_stale.append(fn)
+check("F2 锚扫荡干净（fleet 无残留 2417 旧值；task151 H 门期望 2418，Task211 重锚）",
+      not fleet_stale and '!= "2418"' in rd("scripts/verify_task151.py"))
 
 faq_files = [("Natives/resources/help-faq.json", 2), ("help-faq.json", 2),
              ("Natives/resources/zh-CN.lproj/help-faq.json", 2),
@@ -306,8 +309,8 @@ r = run([sys.executable, "scripts/verify_task129.py"], timeout=600)
 fails129 = [l for l in r.stdout.splitlines() if "FAIL" in l and "RESULT" not in l]
 # head tracks the last commit's baseline (531 after Task206f, 534 after this
 # round); only cur is stable to assert pre-commit
-dirty_ok = all("I4 Makefile TAB" in l and "cur=535" in l for l in fails129) and len(fails129) <= 1
-check("H verify_task129 仅剩脏树 I4（cur=535，head 随提交基线走，提交后自愈）", dirty_ok, str(fails129))
+dirty_ok = all("I4 Makefile TAB" in l and "cur=559" in l for l in fails129) and len(fails129) <= 1
+check("H verify_task129 仅剩脏树 I4（cur=559，head 随提交基线走，提交后自愈）", dirty_ok, str(fails129))
 
 r = run([sys.executable, "scripts/verify_task174.py"], timeout=600)
 f174 = [l for l in r.stdout.splitlines() if l.strip().startswith(("- [")) or "FAIL" in l]

@@ -1095,6 +1095,7 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
         @ RENDERER_NAME_MOBILEGL_GLES: @"MobileGL GLES",
         @ RENDERER_NAME_MITHRIL: @"Mithril",
         @ RENDERER_NAME_NGGL4ES: @"Krypton Wrapper", // Task209：用户点名改名（≤26.2 定位；原 NG-GL4ES，ZL2 的 gl4es）
+        @ RENDERER_NAME_GL4ESZL2: @"gl4es (ZL2)", // Task211：ZL2 经典版 gl4es（与 holy gl4es / Krypton Wrapper 三存）
     };
     NSMutableArray *ame140_names = [NSMutableArray array];
     for (NSString *ame140_key in self.rendererKeys) {

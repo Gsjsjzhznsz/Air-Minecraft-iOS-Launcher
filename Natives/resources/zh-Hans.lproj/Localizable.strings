@@ -266,6 +266,7 @@
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL（GLES 后端）- GL→OpenGL ES，实验性";
 "preference.title.renderer.debug.metal" = "Metal (metallum)";
 "preference.title.renderer.debug.nggl4es" = "Krypton Wrapper（≤26.2）";
+"preference.title.renderer.debug.gl4eszl2" = "gl4es（ZL2 经典版）";
 
 "preference.detail.renderer" = "更改使用的 OpenGL 渲染器";
 

@@ -606,6 +606,32 @@ dep_nggl4es: dep_mg
 	cp $(WORKINGDIR)/nggl4es/libnggl4es.dylib $(WORKINGDIR)/ || exit 1
 	echo '[Amethyst v$(VERSION)] dep_nggl4es - end'
 
+dep_gl4eszl2:
+	echo '[Amethyst v$(VERSION)] dep_gl4eszl2 - start'
+	# Task211: ZL2 CLASSIC gl4es (PojavLauncherTeam/gl4es_extra_extra,
+	# ZL2's legacy renderer 'gl4es', prebuilt by ZL2 as libgl4es_114.so)
+	# -- vendored at ThirdParty/gl4es_extra_extra (see its CMakeLists
+	# PROVENANCE header). Pure C: the classic converter is the string-
+	# rewriting shaderconv.c, NO glslang / NO SPIRV-Cross, so this target
+	# is STANDALONE (no dep_mg ordering, cannot race the glslang statics).
+	# Output libgl4eszl2.dylib rides the payload "cp $(WORKINGDIR)/*.dylib".
+	mkdir -p $(WORKINGDIR)/gl4eszl2; \
+	cd $(WORKINGDIR)/gl4eszl2 && cmake \
+	-DMACOS="1" \
+	-DCMAKE_CROSSCOMPILING=true \
+	-DCMAKE_SYSTEM_NAME=Darwin \
+	-DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+	-DCMAKE_OSX_SYSROOT="$(SDKPATH)" \
+	-DCMAKE_OSX_ARCHITECTURES=arm64 \
+	-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 \
+	-DCMAKE_C_FLAGS="-arch arm64" \
+	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DGL4ESZL2_FRAMEWORK_DIR="$(SOURCEDIR)/Natives/resources/Frameworks" \
+	$(SOURCEDIR)/ThirdParty/gl4es_extra_extra/ || exit 1
+	cmake --build $(WORKINGDIR)/gl4eszl2 --config RelWithDebInfo -j$(JOBS) --target gl4eszl2 || exit 1
+	cp $(WORKINGDIR)/gl4eszl2/libgl4eszl2.dylib $(WORKINGDIR)/ || exit 1
+	echo '[Amethyst v$(VERSION)] dep_gl4eszl2 - end'
+
 dep_angle_freeze:
 	echo '[Amethyst v$(VERSION)] dep_angle_freeze - start'
 	# Task 57 (hua-mian-fen-lie gen-zhi): 8-byte machine-code patch -- ANGLE Metal
@@ -638,7 +664,7 @@ dep_sdl3_guard:
 		$(SOURCEDIR)/Natives/resources/Frameworks/libSDL3.dylib || exit 1
 	echo '[Amethyst v$(VERSION)] dep_sdl3_guard - end'
 
-payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_angle_freeze dep_sdl3_guard
+payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mithril_glshim dep_nggl4es dep_gl4eszl2 dep_angle_freeze dep_sdl3_guard
 	echo '[Amethyst v$(VERSION)] payload - start'
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs)
 	$(call METHOD_DIRCHECK,$(WORKINGDIR)/AngelAuraAmethyst.app/libs_caciocavallo)

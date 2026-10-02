@@ -77,7 +77,7 @@ check("A", "Makefile 接线保持（ggstr 在 rtld 之后）",
       "patch_gl4es_ggstr_nullguard.py" in mk
       and mk.find("patch_gl4es_ggstr_nullguard.py") > mk.find("patch_gl4es_rtld_default.py"))
 check("A", "Makefile TAB 基线（Task206 重锚：dep_nggl4es +47 = 531）",
-      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 535)
+      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 559)
 
 # ============ B. 钉扎门控（vgpu 崩溃根修） ============
 mh = rd("Natives/main_hook.m")
