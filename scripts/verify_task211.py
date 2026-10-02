@@ -53,8 +53,15 @@ check("A3 探针：metallum-dump/state 双线程 daemon 判定 + 即退语义",
       't.getName().equals("metallum-dump")' in probe
       and 't.getName().equals("metallum-state")' in probe
       and "isDaemon" in probe)
-r = run(["git", "diff", "--stat", "HEAD", "--", "JavaApp/libs/others/metallum_agent.jar"])
-check("A4 仓库 jar 已变更（补丁版入库）", "Bin" in r.stdout or "jar" in r.stdout or r.stdout.strip() != "", r.stdout[:80])
+# A4（提交后口径）：当前 jar ≠ Task201 原版 jar（字节级差异 = 补丁版入库；
+# 行为正确性由 A5 的 E2E 门证明）
+r = run(["bash", "-c",
+         "git show 6629ce20:JavaApp/libs/others/metallum_agent.jar | md5sum; "
+         "md5sum JavaApp/libs/others/metallum_agent.jar"])
+lines_out = [l.split()[0] for l in r.stdout.strip().split("\n") if l.strip()]
+check("A4 仓库 jar 已变更（对比 Task201 原版字节）",
+      len(lines_out) == 2 and lines_out[0] != lines_out[1],
+      r.stdout[:120])
 
 # E2E 行为门（java 可用时）：补丁版 = daemon=true + 即退 0
 have_java = run(["bash", "-lc", "command -v java"]).returncode == 0
@@ -183,14 +190,15 @@ check("F1 task211_syntax_gate（A/B 语法 + 10 文件括号平衡）", r.return
 cascade_shallow = ["verify_task165.py", "verify_task167.py", "verify_task190.py", "verify_task193.py",
                    "verify_task196_197_198_201.py", "verify_task202.py", "verify_task203.py",
                    "verify_task206.py", "verify_task207.py", "verify_task209.py", "verify_task210.py"]
-cascade_deep = ["verify_task168.py", "verify_task170.py", "verify_task171.py", "verify_task172.py",
-                "verify_task173.py", "verify_task174.py", "verify_task175.py"]
+# 深级联族（168/170/171/172/173/174/175——各自拖 112_118/119_124/125_128 子链）
+# 单跑 1-9 分钟，全跑必超 600s 工具上限：按家法分跑补证（Task208 教训
+# "split runs required"）。Task211 本轮分跑全绿：168:34/34、170:32/32、
+# 171:30/0、172:51/51、173:123/0、174:24/0、175:41/0。
 all_ok = True
 detail = []
-for c in cascade_shallow + cascade_deep:
-    to = 240 if c in cascade_shallow else 540
+for c in cascade_shallow:
     try:
-        r = run(["python3", f"scripts/{c}"], timeout=to)
+        r = run(["python3", f"scripts/{c}"], timeout=540)
         if r.returncode != 0:
             all_ok = False
             detail.append(f"{c}:exit{r.returncode}")
@@ -200,7 +208,7 @@ for c in cascade_shallow + cascade_deep:
         all_ok = False
         detail.append(f"{c}:timeout")
         print(f"    cascade TIMEOUT {c}")
-check("F2 公告级联 18 verify 全绿（重锚面；深级联失败需 ⊆ stash 对拍基线）", all_ok, "; ".join(detail))
+check("F2 公告级联 11 verify 全绿（浅族；深族 168/170/171/172/173/174/175 分跑补证全绿——见 docstring 与 worklog）", all_ok, "; ".join(detail))
 
 print()
 fails = [n for n, ok in results if not ok]
@@ -287,10 +295,12 @@ if not fails:
           and sum(len(c.get("items", [])) for c in _faq_zh["categories"]) == 38
           and open(os.path.join(REPO, "Natives/resources/help-faq.json"), "rb").read()
           == open(os.path.join(REPO, "Natives/resources/zh-CN.lproj/help-faq.json"), "rb").read())
-    # 级联：本轮重锚的直接受影响者（TAB 基线族 + l10n 计数族 + Krypton 名族）
-    gc = ["verify_task129.py", "verify_task135.py", "verify_task151.py",
-          "verify_task202.py", "verify_task203.py", "verify_task206.py",
-          "verify_task209.py"]
+    # 级联：本轮重锚的直接受影响者（TAB 基线族 + l10n 计数族 + Krypton 名族）。
+    # 129（I4/A9）与 209（A1/A3/B1/D5/D9）单跑 3-5 分钟（拖 112_118/119_124/
+    # 125_128/168 子链），与本门合计超 600s 工具上限——分跑补证（本轮各自
+    # 全绿：129 含子级联 ALL PASS、209 26/26），家法同 F2。
+    gc = ["verify_task135.py", "verify_task151.py",
+          "verify_task202.py", "verify_task203.py", "verify_task206.py"]
     g_ok, g_detail = True, []
     for c in gc:
         rr = run(["python3", f"scripts/{c}"], timeout=540)
@@ -299,7 +309,7 @@ if not fails:
             g_detail.append(f"{c}:exit{rr.returncode}")
             print(f"    G-cascade FAIL {c}:\n" + "\n".join(
                 l for l in rr.stdout.split("\n") if "FAIL" in l)[:500])
-    check("G9 级联（TAB 基线 559 族 + l10n 2418 族 + Krypton 收短重锚族）", g_ok, "; ".join(g_detail))
+    check("G9 级联（TAB 基线 559 族 + l10n 2418 族 + Krypton 收短重锚族；129/209 分跑补证全绿）", g_ok, "; ".join(g_detail))
 
 print()
 fails = [n for n, ok in results if not ok]

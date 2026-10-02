@@ -37,7 +37,7 @@ def run(cmd, timeout=300):
 print("== A. ANGLE push-constant 重定向（Task209 已退役——红鲱鱼）==")
 shim = rd("Natives/spvc_shim.c")
 log = rd("latestlog.old.txt")  # 99a61eb ANGLE 会话
-log2 = rd("latestlog.txt")     # 59b4f25 ANGLE 会话（88fa3f6 上传）
+log2 = rd("latestlog.old.txt")  # Task211 重锚：88fa3f6 的 59b4f25 会话已被 17c51003 轮转（latestlog.txt 现为启动器 CF 会话）；证据改钉当前 ANGLE 会话（c7079e1 构建，Task209 探针版）——同样的三锚语义：重定向已退役（0 命中）+ PC 块 NOT FOUND 属正常（26.3 零 push_constant，Task209 定谳）
 
 check("A1 历史装机证据（99a61eb）：选项已装但仍 NOT FOUND（红鲱鱼的起点）",
       "EMIT_PUSH_CONSTANT_AS_UNIFORM_BUFFER enabled on ES compiler" in log
@@ -45,10 +45,10 @@ check("A1 历史装机证据（99a61eb）：选项已装但仍 NOT FOUND（红�
       and "name='_uniform_00_00') -> 0" in log,
       f"notfound={log.count(chr(39) + '_push_constants')}")
 
-check("A2 退役证据（59b4f25 latestlog.txt）：重定向锚点 0 命中 = 从未触发",
+check("A2 退役证据（c7079e1 latestlog.old.txt，Task211 轮转重锚）：重定向锚点 0 命中 = 从未触发",
       log2.count("Task208: push-constant block rename redirected") == 0
       and log2.count("name='_push_constants') -> 4294967295") >= 100
-      and "Commit: 59b4f25" in log2,
+      and "Commit: c7079e1" in log2,
       f"redirectAnchors={log2.count('Task208: push-constant block rename redirected')}")
 
 check("A3 重定向代码彻底移除（扫描器/重定向分支/锚点日志三不复存在；注释里的退役记述合法保留）",

@@ -57,12 +57,13 @@ check("A2 VersionManager 短名 = Krypton Wrapper（渲染器键值映射不动�
       and '@ RENDERER_NAME_NGGL4ES: @"NG-GL4ES"' not in vm)
 
 ai = rd("Natives/AI/AiSettingsTools.m")
-check("A3 AI 面（友好名新名在前 + 提示词键表两处 + 子串包含序不回退）",
+check("A3 AI 面（友好名新名在前 + 提示词键表两处 + 子串包含序不回退；Task211 重锚：键表加入 gl4es ZL2 经典版）",
       'return @"Krypton Wrapper/NG-GL4ES (libnggl4es.dylib)"' in ai
       and "auto/GL4ES/Krypton Wrapper" in ai
-      and "GL4ES/Krypton Wrapper/NG-GL4ES/ANGLE" in ai
+      and "GL4ES/Krypton Wrapper/NG-GL4ES/gl4es ZL2/ANGLE" in ai
       and 0 <= ai.find('containsString:@"nggl4es"') < ai.find('containsString:@"gl4es"])')
-      and ai.find('containsString:@"nggl4es"') < ai.find('return @(RENDERER_NAME_GL4ES)'))
+      and ai.find('containsString:@"nggl4es"') < ai.find('return @(RENDERER_NAME_GL4ES)')
+      and ai.find('containsString:@"gl4eszl2"') < ai.find('containsString:@"gl4es"])'))
 
 faq_files = [("Natives/resources/help-faq.json", 2), ("help-faq.json", 2),
              ("Natives/resources/zh-CN.lproj/help-faq.json", 2),
@@ -100,10 +101,10 @@ check("A5 存储键零迁移（libnggl4es.dylib 语义不动）",
 # ============ B. 红鲱鱼退役 ============
 print("== B. PC 红鲱鱼定谳 + Task208 重定向退役 ==")
 shim = rd("Natives/spvc_shim.c")
-log = rd("latestlog.txt")  # 59b4f25 ANGLE 会话（88fa3f6 上传）
+log = rd("latestlog.old.txt")  # Task211 轮转重锚：88fa3f6 的 59b4f25 会话已被 17c51003 轮转；证据改钉当前 ANGLE 会话（c7079e1，Task209 探针版）
 
-check("B1 装机证据（59b4f25）：重定向锚点 0 命中 + _push_constants 大量 NOT FOUND",
-      "Commit: 59b4f25" in log
+check("B1 装机证据（c7079e1，Task211 轮转重锚）：重定向锚点 0 命中 + _push_constants 大量 NOT FOUND（26.3 零 push_constant，Task209 定谳后属正常）",
+      "Commit: c7079e1" in log
       and log.count("Task208: push-constant block rename redirected") == 0
       and log.count("name='_push_constants') -> 4294967295") >= 100,
       f"anchors={log.count('Task208: push-constant block rename redirected')}")
@@ -235,8 +236,8 @@ check("D8 存量断锚修复复证（165 34/34 + 167 31/31）",
 
 r168 = run([sys.executable, "scripts/verify_task168.py"], timeout=600)
 fails168 = [l for l in r168.stdout.split("\n") if l.strip().startswith("[FAIL]")]
-check("D9 verify_task168 42/43（仅 E7 存量漂移：134-E4b，纯净 HEAD 同败）",
-      "42/43" in r168.stdout and len(fails168) == 1 and "E7" in fails168[0] and "E4b" in fails168[0],
+check("D9 verify_task168 34/34 全绿（Task211 重锚：Task210 附录后的干净提交树；旧 42/43 的 E7/134-E4b 存量漂移已随 Task211 轮转重锚清零）",
+      "34/34" in r168.stdout and len(fails168) == 0,
       str(fails168[:2]))
 
 # ============ summary ============
