@@ -1390,9 +1390,12 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
         NSString *dirName = self.gameDirList[indexPath.item];
         BOOL isSelected = [dirName isEqualToString:self.currentGameDir];
 
+        // Task213 hotfix：weakSelf 在本分支只声明一次（异步大小块与叉号回调
+        // 共用）——CI 实锤双声明 redefinition（本地静态门无 clang 未拦）。
+        __weak typeof(self) weakSelf = self;
+
         // 异步计算目录大小（Task212：小字 = 目录大小本体，旧 i18n_str_134
         // 占位文案退役——初始为空，算完即填）
-        __weak typeof(self) weakSelf = self;
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             unsigned long long folderSize = 0;
             NSString *directory = [NSString stringWithFormat:@"%s/instances/%@", getenv("POJAV_HOME"), dirName];
@@ -1409,7 +1412,6 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
         [cell configureWithName:dirName detail:nil isSelected:isSelected isAddButton:NO];
         // Task212：叉号钮 = 删除入口（点击直接呼出确认删除弹窗；默认目录/
         // 当前目录在回调内先行拦截并说明，不走旧长按菜单）
-        __weak typeof(self) weakSelf = self;
         cell.deleteAction = ^{
             [weakSelf handleGameDirDeleteTapped:dirName];
         };
