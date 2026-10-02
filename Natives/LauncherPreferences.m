@@ -251,9 +251,12 @@ void ame212_migrateHolyGl4es(void) {
         setPrefObject(@"video.renderer", @"libgl4eszl2.dylib");
         ame212_global = 1;
     }
-    PLProfiles *ame212_profiles = [PLProfiles current];
+    // Task213 hotfix：对象改名 ame212_store——原名与上方 int 计数器同名
+    //（'redefinition of ame212_profiles with a different type'，CI 15.4 SDK
+    // 实锤；并行轮 b842b67 的红门同根）。
+    PLProfiles *ame212_store = [PLProfiles current];
     NSDictionary<NSString *, NSMutableDictionary<NSString *, NSString *> *> *ame212_all =
-        ame212_profiles.profiles;
+        ame212_store.profiles;
     if ([ame212_all isKindOfClass:NSDictionary.class]) {
         for (NSString *ame212_name in ame212_all) {
             NSMutableDictionary *ame212_p = ame212_all[ame212_name];
@@ -265,7 +268,7 @@ void ame212_migrateHolyGl4es(void) {
                 ame212_profiles++;
             }
         }
-        if (ame212_profiles > 0) [ame212_profiles save];
+        if (ame212_profiles > 0) [ame212_store save];
     }
     if (ame212_global > 0 || ame212_profiles > 0) {
         NSLog(@"[Preferences] Task212: migrated holy gl4es renderer (global=%d, profiles=%d) -> libgl4eszl2.dylib",
