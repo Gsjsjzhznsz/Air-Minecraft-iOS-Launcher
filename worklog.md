@@ -1466,3 +1466,27 @@ Work Log:
 Stage Summary:
 - 主链：92b909b（主轮）→ 9cc9d1b（poller）→ 5e2a389（import 热修）→ 0100516（weakSelf 热修）→ 3ff684a（ame212 改名热修）——全部 HEAD:main 推送（本地分支名 task210 与远端 main 不同名的坑：git push origin main 推的是陈旧本地 main，前三笔拒绝皆此因）
 - CI：3ff684a 绿，产物就绪；并行轮 b842b67 的红门由本轮 3ff684a 掩护恢复
+
+---
+Task ID: 214
+Agent: main (Super Z)
+Task: Task 213 Prisma 构建用户实测反馈五连修——内存弹窗按钮键名直出、目录卡绿框、卡片圆角微调、选中卡片无法编辑（关键）、FPS/MEM 悬浮窗省略号；补 REVISION bump 欠账
+
+Work Log:
+- R1 内存限制弹窗按钮：showMemoryLimitHelp 用 mem_help.button 键但六语言 strings 全缺 -> 按钮直出键名；六语言补齐（en/km "Paid Developer Certificate"、zh-CN/Hans 付费开发者证书、zh-Hant 付費開發者證書（随 message 用词）、ja 有料開発者証明書）；四主语言键集 2418 -> 2419
+- R2 加号卡绿框：configureWithName isAddButton 分支的绿 0.6 1pt 描边退役、描边回归默认白 0.10/0.5pt（prepareForReuse 链既有恢复逻辑本就一致）；绿 plus 直出与绿 0.08 淡底按用户字面保留
+- R3 圆角微调：kVMCardCornerRadius = 16.0 新常量；VMTileBaseCell 增 cardCornerRadius 属性（默认 12），setupViews/shadowPath 走属性；VMVersionCardCell/VMGameDirCell 在 super 前覆写 16（连续曲率不变）；磁贴/渲染器卡不覆写保持 12（"其他都别改"）；两 ring 半径公式随动 kVMCardCornerRadius - inset/3
+- R4 选中卡无法编辑（用户标"最重要"）根因：selectionRing 是普通 UIView 且在省略号/叉钮之后 addSubview（层级更高），选中后透明环身拦截整卡 hitTest -> touchUpInside 永远到不了按钮——精确解释"未选择的才可以"；修复 = 两 cell 的 ring userInteractionEnabled = NO（命中穿透），点卡片切换选中的交互不受影响（touch 冒泡至 collectionView）
+- R5 FPS/MEM 悬浮窗：GameMenuOverlayView statsLabel 固定 130pt 宽 + 默认 tail 截断 -> "MEM: 328…"；按用户指令改缩小而非省略：adjustsFontSizeToFitWidth = YES + minimumScaleFactor 0.5（frame 保持 130x24，缩字代替加宽）
+- F REVISION 欠账：Task212/213 八项需求第 8 条明确指令的 rebrand 轮 bump（18 -> 19）交付轮遗漏，本轮补付（bundle id/URL scheme/os_log subsystem/钥匙串/54 语言权限串随更名全变身份，缓存纪元跟随）；version.h 尾部追加 Task214 addendum（bump 理由 + 五修明细），尾部 SEP 76 等号不变
+- 文档级联：公告 task214@2（35 -> 36，pin server@0/task169@1 完好，尾锚 task206[-1] 不变）；机械重锚 ann/anns/ids/items/["announcements"][N] N>=2 全形态 +1 ×39 验证器 + len(ann/ids)==35->36 + l10n 2418->2419 全族 + verify_task193/196/207 的 #define REVISION 18->19 锚
+- 漏锚考古三笔（本轮顺手偿还的前轮欠账）：①verify_task170 F1/F2 在 HEAD 态即红（Task212/213 两次 @2 插入漏锚，断言停在 anns[12..22]，实际 14..24）——补第二档至真位 179@14..168@24 + t170=anns[23]；②同款 171 D2/D3（anns[22]）、172 H2（task172@21）——各自补至真位；③verify_task172 G2：Task212 CF 加固把 retrySearchRequest 调用点 3 -> 4（transient/empty 分支重用）漏锚——3 -> 4
+- 断言语义诚实化两笔：verify_task190 H / verify_task180 G 的"AccountList 不用引擎符号且不 import"旧锚与 Task213 SDK 热修（AmeCard 色函数 + 引擎头 import）直接冲突——按 Task180 教训本义重锚为"符号/引擎头配对"（用则必带 import）；verify_task207 D 的 "setupViews {\n [super..." 紧邻锚因 R3 合法前导行失配——正则放宽为"允许 cardCornerRadius 覆写行插在 super 之前"
+- 工作区考古一笔：scripts/task179_inc/tinygl4angle_harness.c 存在 +296 行未提交 Task209 四叉探针（前身会话遗留半成品），致 verify_task179 I4/I5/I6 重定义编译红——还原至 HEAD（工作区归零），179 I 组红与收官基线一致（Task209 探针与 179 stub 的符号冲突，211 已有 on-the-fly 替代）
+- 验证：verify_task214 新建 53 检查 ALL GREEN；触改族全绿——129 47/47、130 59/59、131 37/37、134 本体 67/68、141 36/36、142 49/0、143 31/0、150 43/43、157/159/202 57/57、203 30/30、165 34/34、167 31/31、168 34/34、171 30/0、172 51/51、174 24/0、180 120/0、190 59/0、191 45/0、192 49/0、193 84/0、196族 34/34、206 43/43、207 32/32、209、210 41/41、211 等效（A-E+F1 过 + cascade 四子 206/207/209/210 单独全绿）、212 36/36、213 85/85；170 31/32（唯一红 = H1 对拍含 133/138 存量）；175 等效全绿（H1 语法门过 + H2 清单 12 子全单独绿）；存量红族对拍零新增（81 27/32 REVISION-17 时代断言、132 48/53、133 40/44、135 48/53、151/156 外部镜像 FileNotFoundError、179 I4-I6 harness 存根冲突）
+
+Stage Summary:
+- 五项反馈全落地 + REVISION 19 补账；公告 36 条（task214@2）；l10n 四主语言 2419
+- 选中卡无法编辑的根因（透明环身拦截触摸）已注释进两 cell 代码，装机验证点：选中实例卡后点省略号应弹编辑、选中目录卡点叉号应弹删除确认、未选中卡行为不变
+- 装机锚点：①内存限制说明按钮显示"付费开发者证书"（非 mem_help.button）②新建目录卡无绿框（绿加号+淡绿底保留）③实例卡/目录卡圆角 16pt 更圆 ④FPS/MEM 悬浮窗 MEM 长值缩字完整显示无省略号
+- 存量债务（与 Task212/213 收官记录逐笔一致，本轮零新增）：81/132/133/135（session 锚旋转 + REVISION-17 时代断言 + 2228 老锚）、151/156（外部镜像脚本沙箱丢失）、179 I4-I6（harness 存根冲突，HEAD 态即红）

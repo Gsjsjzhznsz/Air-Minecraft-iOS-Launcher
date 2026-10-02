@@ -101,7 +101,7 @@ for lang in ['en', 'zh-Hans', 'zh-CN', 'zh-Hant']:
     s = io.open(os.path.join(RES, f'{lang}.lproj/Localizable.strings'), encoding='utf-8').read()
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     tot = len(keys) if tot is None else tot
-    check('D', f'{lang} 唯一键总数 == 2418', len(keys) == 2418, f'got {len(keys)}')
+    check('D', f'{lang} 唯一键总数 == 2419', len(keys) == 2419, f'got {len(keys)}')
 
 # ============ E. 按钮接线——183 撤销（回归恒定底色）+ 头像防御保留 ============
 rp = rd('LauncherRightPanelViewController.m')
@@ -143,9 +143,9 @@ ac = rd('AccountListViewController.m')
 # 规格移交 VMTileBaseCell 镜像（12pt 连续圆角 + 0.12/6 阴影 + shadowPath）。
 check('G', '账号 cell 卡面管线（Task212 重锚：同构卡走安装器 applyCardEffectToView 调用）',
       '[[BackgroundManager sharedManager] applyCardEffectToView:self.contentContainer];' in ac)
-check('G', '账号 cell 不再直挂引擎符号/不再 import 引擎头（经 BackgroundManager 转介）',
-      '#import "UIKit+NativeSurface.h"' not in ac
-      and 'ame_setNeumorphPinnedCornerRadius' not in ac)
+check('G', '账号 cell 引擎符号/引擎头配对（Task213 hotfix 重锚：卡列表启用 AmeNeumorph 色族后按 Task180 教训带引擎头 import，Task214 顺手对齐断言语义）',
+      '#import "UIKit+NativeSurface.h"' in ac
+      or 'ame_setNeumorphPinnedCornerRadius' not in ac)
 check('G', '账号 cell 同构卡规格（Task212 重锚：12pt 连续圆角 + 安装器无阴影平贴）',
       'self.contentContainer.layer.cornerRadius = 12;' in ac
       and 'self.layer.shadowOpacity' not in ac.split('@implementation AccountListViewController')[0]

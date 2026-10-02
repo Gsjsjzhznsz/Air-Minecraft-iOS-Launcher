@@ -242,17 +242,17 @@ anns = json.loads(rd("announcements.json"))["announcements"]
 check("G1 公告 task175@16（Task213 合并态重锚：并行 task212@3 + 本轮 task213@2 双插入后——task190@10/task184@11/task180@12/task179@13/task178@14/task177@15/task175@16/task174@17/172@20/168@23；server/task169 pin 不动）",
       anns[0]["id"] == "server-recommend-2026-09-24"
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[10]["id"] == "task190-account-card-installer-spacing-2026-09-28"
-      and anns[11]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"
-      and anns[12]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and anns[13]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[14]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[15]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[16]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[17]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[20]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[23]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t175 = anns[16]
+      and anns[11]["id"] == "task190-account-card-installer-spacing-2026-09-28"
+      and anns[12]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27"
+      and anns[13]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and anns[14]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[15]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[16]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[17]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[18]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[21]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[24]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t175 = anns[17]
 check("G2 公告内容六条全列 + EN 尾注 + 装机锚点",
       all(k in t175["content"] for k in
           ["ANGLE", "下载量", "头像", "物品栏", "Forge", "壁纸", "[Task175]"])
@@ -269,8 +269,8 @@ check("G3 version.h Task 175 addendum（六主题 + 三个装机锚点 + 六条�
       and "11.15.1.2318" in vh)
 KEYSETS = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
-check("G4 l10n 计数（Task210 重锚：neumorph 双键退役后 2418）",
-      all(len(k) == 2418 for k in KEYSETS)
+check("G4 l10n 计数（Task210 重锚：neumorph 双键退役后 2419）",
+      all(len(k) == 2419 for k in KEYSETS)
       and KEYSETS[0] == KEYSETS[1] == KEYSETS[2] == KEYSETS[3])
 fb = json.loads(rd("Natives/resources/announcements-fallback.json"))
 fbi = fb["announcements"]

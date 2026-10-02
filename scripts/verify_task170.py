@@ -107,7 +107,7 @@ check("D4 旧间距常量零残留（(0,5,0,5) / (5,15,5,15)）",
       and "NSDirectionalEdgeInsetsMake(5, 15, 5, 15)" not in layout_fn)
 
 # ============================================================
-# E. l10n：neumorph 双键退役（Task210 重锚，计数 2419 -> 2418）
+# E. l10n：neumorph 双键退役（Task210 重锚，计数 2419 -> 2419）
 # ============================================================
 check("E1 Task210：neumorph 双键六语言全退役",
       all("background.cards.neumorph." not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
@@ -115,8 +115,8 @@ check("E1 Task210：neumorph 双键六语言全退役",
 check("E2 六语言旧键退役",
       all("background.cards.neumorph.title" not in rd(f"Natives/resources/{lg}.lproj/Localizable.strings")
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant", "ja", "km"]))
-check("E3 四主语言键集一致且计数 = 2418（Task210 重锚：双键退役 2419-2）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2418
+check("E3 四主语言键集一致且计数 = 2419（Task210 重锚：双键退役 2419-2）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2419
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -127,21 +127,21 @@ check("E4 四主语言键集逐键一致", keysets[0] == keysets[1] == keysets[2
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("F1 公告（Task210 重锚：task210@2 插入后 task179@10 / task178@11 / task177@12 / task175@13 / task174@14 / 双 task173@15,16 / task172@17 / task171@18 / task170@19 / task168@20；anns[1] task169 pin 不动）且 id 唯一",
+check("F1 公告（Task214 重锚：task214@2 插入 + Task212/213 漏锚补偿后 task179@14 / task178@15 / task177@16 / task175@17 / task174@18 / 双 task173@19,20 / task172@21 / task171@22 / task170@23 / task168@24；anns[1] task169 pin 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[12]["id"] == "task179-eight-fixes-2026-09-26"
-      and anns[13]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and anns[14]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and anns[15]["id"] == "task175-six-fixes-2026-09-26"
-      and anns[16]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and anns[17]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and anns[18]["id"] == "task173-ten-fixes-2026-09-26"
-      and anns[19]["id"] == "task172-six-fixes-2026-09-25"
-      and anns[20]["id"] == "task171-seven-fixes-2026-09-25"
-      and anns[21]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
-      and anns[22]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t170 = anns[21]
+      and anns[14]["id"] == "task179-eight-fixes-2026-09-26"
+      and anns[15]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and anns[16]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and anns[17]["id"] == "task175-six-fixes-2026-09-26"
+      and anns[18]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and anns[19]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and anns[20]["id"] == "task173-ten-fixes-2026-09-26"
+      and anns[21]["id"] == "task172-six-fixes-2026-09-25"
+      and anns[22]["id"] == "task171-seven-fixes-2026-09-25"
+      and anns[23]["id"] == "task170-neumorph-opacity-spacing-2026-09-25"
+      and anns[24]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t170 = anns[23]
 check("F2 公告内容：滑条语义（整个卡片/晕影调低）+ 间距统一 + EN 尾注",
       "0% ~ 100%" in t170["content"] and "整个卡片" in t170["content"]
       and "晕影" in t170["content"] and "20pt" in t170["content"]

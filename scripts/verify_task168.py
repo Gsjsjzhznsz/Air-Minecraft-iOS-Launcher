@@ -79,7 +79,7 @@ check("A9 边界维持：侧栏/右面板仍走 applyEffectToView（Task163 平�
       and "applyEffectToView:self.rightPanelContainer]" in rd("Natives/LauncherRootViewController.m"))
 
 # ============================================================
-# B. l10n 键集（Task210 重锚：双键退役，计数 2419 -> 2418）
+# B. l10n 键集（Task210 重锚：双键退役，计数 2419 -> 2419）
 # ============================================================
 bsvc = rd("Natives/BackgroundSettingsViewController.m")
 
@@ -92,8 +92,8 @@ check("B2 Task210：settings sections[0] = 纯壁纸效果三行（无 neumorph 
       and 'localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil)' in bsvc)
 check("B3 Task210：无壁纸时 section 0 整段隐藏（numberOfRows 0 行 + 页脚同步隐藏）",
       "if (section == 0 && ![[BackgroundManager sharedManager] hasBackground]) {\n        return 0;" in bsvc.replace('\n', '\n'))
-check("B4 四主语言键集一致且计数 = 2418（Task210 重锚：neumorph 双键退役，2419-2）",
-      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2418
+check("B4 四主语言键集一致且计数 = 2419（Task210 重锚：neumorph 双键退役，2419-2）",
+      all(len(set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))) == 2419
           for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]))
 keysets = [set(re.findall(r'^"([^"]+)"\s*=', rd(f"Natives/resources/{lg}.lproj/Localizable.strings"), re.M))
            for lg in ["en", "zh-Hans", "zh-CN", "zh-Hant"]]
@@ -144,11 +144,11 @@ check("C10 抽取/幂等脚本入库（可重跑再生成）",
 # ============================================================
 anns = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in anns]
-check("D1 公告顺延（Task212 重锚：task212@2 插入后 task168 顺延至 anns[23]；task169 钉死 anns[1] 不动）且 id 唯一",
+check("D1 公告顺延（Task212 重锚：task212@2 插入后 task168 顺延至 anns[24]；task169 钉死 anns[1] 不动）且 id 唯一",
       len(ids) == len(set(ids))
       and anns[1]["id"] == "task169-four-fixes-2026-09-25"
-      and anns[23]["id"] == "task168-neumorph-faq-json-2026-09-25")
-t168 = anns[23]  # Task212 重锚：task212@2 插入后 task168 实居 21
+      and anns[24]["id"] == "task168-neumorph-faq-json-2026-09-25")
+t168 = anns[24]  # Task212 重锚：task212@2 插入后 task168 实居 21
 check("D2 公告内容：根因叙述 + 双形态 + 两个维护路径",
       "447a677" in t168["content"] and "透明度/模糊" in t168["content"]
       and "announcements.json" in t168["content"] and "help-faq.json" in t168["content"]
@@ -240,7 +240,7 @@ SANDBOX_EXCEPTIONS = {
     "156": ("G verify_task154",),
     # Task213 补录：并行 Task212（a4a4c77/b842b67）文档化的 132-135 家族
     # 漂移（OSMesa/controlify 会话日志轮换类）+ 138 的 Task157 时代 2228
-    # l10n 基线陈旧（现 2418）——与该轮 b842b67 提交说明逐条对账。
+    # l10n 基线陈旧（现 2419）——与该轮 b842b67 提交说明逐条对账。
     "133": ("B1 崩溃证据链在位", "B1c 成功会话对照"),
     "138": ("A1 崩溃日志证据", "B1 mod 侧 XML 解析失败证据",
             "B2 启动器侧 plist 写入病灶证据", "I-l10n 四语言键集一致",

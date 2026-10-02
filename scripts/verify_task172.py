@@ -161,8 +161,8 @@ check("G1 5xx 判定助手（>= 500，4xx 不重试）",
       and "statusCode >= 500" in cf)
 # Task179 重锚：无 data 数组分支新增第三处重试（Task179 no-data hardening），
 # 调用点 2 -> 3；原两处（空体 5xx + 5xx 非 JSON）保持原位。
-check("G2 异步搜索两分支重试（空体 + JSON 解析失败；Task179 重锚：+无 data 数组分支共 3 处）",
-      cf.count("ame172_retrySearchRequest:request") == 3)
+check("G2 异步搜索重试链（Task212 CF 加固漏锚补偿：transient/empty 分支重用后调用点 3 -> 4）",
+      cf.count("ame172_retrySearchRequest:request") == 4)
 check("G3 重试上限 attempt < 2 + 2s 退避",
       "attempt < 2" in cf and "2.0 * NSEC_PER_SEC" in cf)
 check("G4 同步 getEndpoint failure 分支 5xx 包装 code 543（既有重试循环接管）",
@@ -178,9 +178,9 @@ check("H1 version.h REVISION 17 addendum (Task 172)",
 import os
 import json
 anns = json.load(open(f"{REPO}/announcements.json"))["announcements"]
-# Task185 重锚：并行会话 task184@2 插入，task172 再顺延 anns[14] -> anns[15]。
-check("H2 announcements task172@17（Task210 重锚：task210@2 插入后顺延；server-pin/task169 钉 0/1）",
-      anns[19].get("id") == "task172-six-fixes-2026-09-25"
+# Task185 重锚：并行会话 task184@2 插入，task172 再顺延 anns[15] -> anns[16]。
+check("H2 announcements task172@21（Task214 重锚：task214@2 插入 + 漏锚补偿；server-pin/task169 钉 0/1）",
+      anns[21].get("id") == "task172-six-fixes-2026-09-25"
       and anns[0].get("id") == "server-recommend-2026-09-24"
       and "task169" in anns[1].get("id", ""))
 

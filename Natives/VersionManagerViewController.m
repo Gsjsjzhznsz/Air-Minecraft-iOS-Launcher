@@ -43,11 +43,17 @@ static const CGFloat kVMVersionRowHeight = 128.0;
 static const CGFloat kVMCardEllipsisInset = 12.0;
 // 高亮环描边粗细（内缩方案下取常规 2pt，用户定稿；Task210 起纯描边无光晕）。
 static const CGFloat kVMCardRingBorderWidth = 2.0;
+// Task214（用户反馈"快捷指令卡片圆角稍微直了一点，微调一下"）：实例卡与
+// 游戏目录卡圆角 12→16pt（更贴近真机快捷指令卡片的连续大圆角，其余几何
+// 不动）；磁贴/渲染器卡等其他 VMTileBaseCell 子类保持 12pt（"其他都别改"）。
+static const CGFloat kVMCardCornerRadius = 16.0;
 
 #pragma mark - Modern Tile Base Cell
 
 @interface VMTileBaseCell : UICollectionViewCell
 @property (nonatomic, strong) UIView *contentContainer;
+// 卡片圆角半径（默认 12pt L2 标准；快捷指令卡族在子类里覆写为 16pt，Task214）
+@property (nonatomic, assign) CGFloat cardCornerRadius;
 - (void)setupViews;
 @end
 
@@ -56,6 +62,7 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
+        self.cardCornerRadius = 12.0; // 默认 L2 标准 12pt；快捷指令卡族子类覆写
         [self setupViews];
     }
     return self;
@@ -74,8 +81,9 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 
     self.contentContainer = [[UIView alloc] initWithFrame:self.contentView.bounds];
     self.contentContainer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    // 规范 5.1：L2 标准卡片 12pt 圆角 + 连续圆角
-    self.contentContainer.layer.cornerRadius = 12;
+    // 规范 5.1：L2 标准卡片圆角 + 连续圆角（Task214：半径可被子类覆写——
+    // 快捷指令卡族 16pt / 其余默认 12pt）
+    self.contentContainer.layer.cornerRadius = self.cardCornerRadius;
     self.contentContainer.layer.cornerCurve = kCACornerCurveContinuous;
     self.contentContainer.layer.masksToBounds = YES;
     // 规范 6.2：第 1 层浅色半透明基底
@@ -96,7 +104,7 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     CGRect shadowRect = self.contentContainer.frame;
     if (!CGRectIsEmpty(shadowRect)) {
         self.layer.shadowPath = [UIBezierPath bezierPathWithRoundedRect:shadowRect
-                                                           cornerRadius:12.0].CGPath;
+                                                           cornerRadius:self.cardCornerRadius].CGPath;
     }
 }
 
@@ -201,6 +209,8 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 @implementation VMVersionCardCell
 
 - (void)setupViews {
+    // Task214：实例卡圆角 12→16pt（用户"圆角稍微直了一点"微调定稿）
+    self.cardCornerRadius = kVMCardCornerRadius;
     [super setupViews];
 
     // 紧凑竖卡（128pt 固定行高）内的几何量用固定 pt，不随屏宽缩放：
@@ -243,12 +253,16 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     // ----- 选中内缩高亮环（原蓝 accent，用户定稿：内缩 = 省略号间距/3）-----
     // Task210：纯描边——shadowColor/shadowOpacity/shadowRadius 柔光组删除，
     // 选中态不再有光晕与整卡变色。
+    // Task214（用户："已选择的卡片无法编辑，未选择的才可以"根因）：环是
+    // 普通 UIView 且在 ⋯ 钮之后 addSubview（层级更高），选中后透明环身
+    // 拦截整卡触摸 → ⋯/叉钮收不到 touchUpInside。环改为不参与触摸命中。
     self.selectionRing = [[UIView alloc] init];
     self.selectionRing.translatesAutoresizingMaskIntoConstraints = NO;
     self.selectionRing.backgroundColor = [UIColor clearColor];
+    self.selectionRing.userInteractionEnabled = NO; // Task214：命中穿透（根因修复）
     self.selectionRing.layer.borderColor = accentColor().CGColor;
     self.selectionRing.layer.borderWidth = kVMCardRingBorderWidth;
-    self.selectionRing.layer.cornerRadius = 12.0 - (kVMCardEllipsisInset / 3.0);
+    self.selectionRing.layer.cornerRadius = kVMCardCornerRadius - (kVMCardEllipsisInset / 3.0);
     self.selectionRing.layer.cornerCurve = kCACornerCurveContinuous;
     self.selectionRing.hidden = YES;
     [self.contentContainer addSubview:self.selectionRing];
@@ -360,8 +374,9 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 //          确认删除弹窗（不走长按菜单；目录长按功能随本类重写删除）；
 //   左下 = 目录名称（主色）+ 下一行目录大小（次色）；
 //   选中 = 内缩高亮环（内缩 = 省略号间距/3、2pt accent 纯描边，同实例卡）；
-//   "新建目录"加号卡保留绿色描边语义（绿色 plus 直出 + 绿 0.6 描边 +
-//   绿 0.08 淡底），布局仍走同一套新几何。
+//   "新建目录"加号卡：绿色 plus 直出 + 绿 0.08 淡底保留，绿色 1pt 描边随
+//   Task214 用户定稿（"删除添加目录卡片的绿色边框"）退役，描边回归基类
+//   默认（白 0.10 / 0.5pt），布局仍走同一套新几何。
 @interface VMGameDirCell : VMTileBaseCell
 // 左上目录图标（folder 原色直出 / 加号卡为绿色 plus）
 @property (nonatomic, strong) UIImageView *iconView;
@@ -379,6 +394,8 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 @implementation VMGameDirCell
 
 - (void)setupViews {
+    // Task214：目录卡圆角与实例卡同步 12→16pt（同属"快捷指令卡片"族）
+    self.cardCornerRadius = kVMCardCornerRadius;
     [super setupViews];
 
     // 几何量与 VMVersionCardCell 逐项一致（固定 pt，不随屏宽缩放）
@@ -411,12 +428,14 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     [self.contentContainer addSubview:self.deleteButton];
 
     // ----- 选中内缩高亮环（同实例卡：accent 纯描边，无光晕）-----
+    // Task214 同实例卡：环不参与触摸命中（透明环身曾拦截叉号钮触摸）。
     self.selectionRing = [[UIView alloc] init];
     self.selectionRing.translatesAutoresizingMaskIntoConstraints = NO;
     self.selectionRing.backgroundColor = [UIColor clearColor];
+    self.selectionRing.userInteractionEnabled = NO; // Task214：命中穿透（根因修复）
     self.selectionRing.layer.borderColor = accentColor().CGColor;
     self.selectionRing.layer.borderWidth = kVMCardRingBorderWidth;
-    self.selectionRing.layer.cornerRadius = 12.0 - (kVMCardEllipsisInset / 3.0);
+    self.selectionRing.layer.cornerRadius = kVMCardCornerRadius - (kVMCardEllipsisInset / 3.0);
     self.selectionRing.layer.cornerCurve = kCACornerCurveContinuous;
     self.selectionRing.hidden = YES;
     [self.contentContainer addSubview:self.selectionRing];
@@ -477,16 +496,17 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
 
 - (void)configureWithName:(NSString *)name detail:(NSString *)detail isSelected:(BOOL)isSelected isAddButton:(BOOL)isAddButton {
     if (isAddButton) {
-        // "新建目录"加号卡：绿色语义保留（plus 直出 + 绿描边 + 绿淡底），
-        // 布局走同一套新几何；叉号与选中环都无意义，隐藏。
+        // "新建目录"加号卡：Task214（用户"删除添加目录卡片的绿色边框"）——
+        // 绿色 1pt 描边退役，描边回归基类默认（白 0.10 / 0.5pt）；绿色 plus
+        // 直出与绿 0.08 淡底保留；布局走同一套新几何；叉号与选中环隐藏。
         self.iconView.image = [UIImage systemImageNamed:@"plus"];
         self.iconView.tintColor = [UIColor systemGreenColor];
         self.nameLabel.text = localize(@"i18n_str_1053", nil);
         self.detailLabel.text = localize(@"i18n_str_1054", nil);
         self.deleteButton.hidden = YES;
         self.selectionRing.hidden = YES;
-        self.contentContainer.layer.borderColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.6].CGColor;
-        self.contentContainer.layer.borderWidth = 1.0;
+        self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
+        self.contentContainer.layer.borderWidth = 0.5;
         self.contentContainer.backgroundColor = [[UIColor systemGreenColor] colorWithAlphaComponent:0.08];
         return;
     }

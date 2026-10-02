@@ -765,6 +765,7 @@
 // 内存限制帮助弹窗
 "mem_help.title" = "关于内存限制";
 "mem_help.message" = "·扩展内存限制权限，使用GetMoreRAM开启\n让iOS为启动器分配更多内存空间，通常能分配6GB内存\n\n·扩展虚拟内存权限，开启方式见下\n让iOS为启动器分配更多内存寻址，通常能分配7GB内存并提升稳定性\n\n推荐使用付费开发者证书，安装软件自动开启上述权限且支持开启JIT";
+"mem_help.button" = "付费开发者证书";
 
 // 下载进度与速率（Phase 6 Task 6.1）
 "download.speed.format" = "%@/s";

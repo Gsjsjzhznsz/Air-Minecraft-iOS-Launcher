@@ -183,7 +183,7 @@ for lang, (u, d) in expect.items():
     keys = set(re.findall(r'^"([^"]+)" =', s, re.M))
     check("G", f"{lang} account.menu.use/delete 键值", f'"account.menu.use" = "{u}";' in s
           and f'"account.menu.delete" = "{d}";' in s)
-    check("G", f"{lang} 唯一键总数 == 2418", len(keys) == 2418, f"got {len(keys)}")
+    check("G", f"{lang} 唯一键总数 == 2419", len(keys) == 2419, f"got {len(keys)}")
     check("G", f"{lang} account.switch_role.* 历史键保留",
           'account.switch_role.button' in keys and 'account.switch_role.title' in keys)
 
@@ -203,8 +203,8 @@ for fn in ['installer/ModLoaderInstallViewController.m', 'AccountListViewControl
     if uses_engine_symbols(s) and 'UIKit+NativeSurface.h' not in s:
         bad.append(fn)
 check("H", "引擎符号文件全部带引擎头 import（Task180 G 组教训常驻）", not bad, str(bad))
-check("H", "AccountList 已不用引擎符号且不再 import 引擎头（经 BackgroundManager 转介）",
-      not uses_engine_symbols(ac) and '#import "UIKit+NativeSurface.h"' not in ac)
+check("H", "AccountList 引擎符号/引擎头配对（Task213 hotfix 重锚：账号卡列表启用 AmeNeumorph 色族后按 Task180 教训带引擎头 import，Task214 顺手对齐断言语义）",
+      not uses_engine_symbols(ac) or '#import "UIKit+NativeSurface.h"' in ac)
 _stray = []
 for _root, _dirs, _fs in os.walk(N):
     for _f in _fs:
@@ -234,7 +234,7 @@ for fn in ("Natives/AccountListViewController.m", "Natives/BackgroundManager.m",
             stack.pop()
     check("H", f"{os.path.basename(fn)} 严格栈匹配括号平衡", ok and not stack)
 check("H", "announcements/task190 条目存在（Task209 重锚：@2 插入后顺延至 [6]）",
-      json.loads(rdrepo("announcements.json"))["announcements"][10]["id"].startswith("task190-"))
+      json.loads(rdrepo("announcements.json"))["announcements"][11]["id"].startswith("task190-"))
 
 print("=" * 72)
 print(f"PASS {len(PASS)}  FAIL {len(FAIL)}")

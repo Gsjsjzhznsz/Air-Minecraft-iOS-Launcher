@@ -49,8 +49,8 @@ check('B3 dir icon native color (systemBlue folder, no container)',
 check('B4 old FCL chrome retired (iconContainer/selectedBadge/chevron in GameDirCell)',
       not re.search(r'@interface VMGameDirCell[^\n]*\n(?!.*iconContainer).*selectedBadge', vm) and
       'chevronView' not in vm.split('#pragma mark - Renderer Card Cell')[0].split('VMGameDirCell : VMTileBaseCell')[1])
-check('B5 dir selection ring isomorphic (inset = ellipsis/3)',
-      vm.count('12.0 - (kVMCardEllipsisInset / 3.0)') >= 2)
+check('B5 dir selection ring isomorphic (inset = ellipsis/3; Task214 re-anchor: radius = kVMCardCornerRadius - inset/3 after the 12->16 corner bump)',
+      vm.count('kVMCardCornerRadius - (kVMCardEllipsisInset / 3.0)') >= 2)
 check('B6 deleteAction wiring in cellForItem',
       'cell.deleteAction = ^{' in vm and 'handleGameDirDeleteTapped:dirName' in vm)
 seg7 = vm.split('- (void)handleGameDirDeleteTapped')[1][:900]
@@ -186,24 +186,24 @@ check('G14 AI header comments rebranded',
 # ============ H. docs cascade ============
 data = json.load(open('announcements.json', encoding='utf-8'))
 ids = [e['id'] for e in data['announcements']]
-check('H1 announcements 35 items (two @2 inserts: task213 + the parallel session\'s task212)', len(ids) == 35)
-check('H2 task213@2 inserted (mine)', ids[2].startswith('task213-'))
-check('H2b parallel task212@3 (their ANGLE/CF/VirGL round)', ids[3].startswith('task212-angle'))
+check('H1 announcements 35 items (two @2 inserts: task213 + the parallel session\'s task212)', len(ids) == 36)
+check('H2 task213@2 inserted (mine)', ids[3].startswith('task213-'))
+check('H2b parallel task212@3 (their ANGLE/CF/VirGL round)', ids[4].startswith('task212-angle'))
 check('H3 task169 pin @1 intact', ids[1].startswith('task169-'))
-check('H4 task211 shifted to @4', ids[4].startswith('task211-'))
+check('H4 task211 shifted to @4', ids[5].startswith('task211-'))
 vh = rd('Natives/external/MobileGlues/MobileGlues-cpp/version.h')
 check('H5 version.h Task213 addendum present', 'REVISION 18 addendum (Task 213, no bump)' in vh)
 check('H6 trailing SEP = 76 equals', re.search(r'\n//\s(={76})\s*$', vh) is not None)
 v207 = rd('scripts/verify_task207.py')
 v211 = rd('scripts/verify_task211.py')
-check('H7 207 length gate shifted 35', '== 35' in v207 and '== 34' not in v207)
-check('H8 211 length gate shifted 35', '== 35' in v211)
+check('H7 207 length gate shifted 36', '== 36' in v207 and '== 35' not in v207)
+check('H8 211 length gate shifted 36', '== 36' in v211)
 check('H9 211 announcement anchors (task211@4 + parallel task212@3 + mine task213@2)',
-      'ann[4]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"' in v211 and
-      'ann[3]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"' in v211)
-check('H10 window constants shifted (165/167, two-insert merged state)',
-      'range(min(28, len(anns)))' in rd('scripts/verify_task165.py') and
-      'range(min(26, len(anns)))' in rd('scripts/verify_task167.py'))
+      'ann[5]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"' in v211 and
+      'ann[4]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"' in v211)
+check('H10 window constants shifted (165/167, Task214 three-insert merged state)',
+      'range(min(29, len(anns)))' in rd('scripts/verify_task165.py') and
+      'range(min(27, len(anns)))' in rd('scripts/verify_task167.py'))
 
 
 # ============ J. R9 memory-limit dialog + R10 bundle id ============

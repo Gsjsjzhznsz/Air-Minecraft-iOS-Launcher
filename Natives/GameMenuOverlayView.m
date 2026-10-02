@@ -107,6 +107,11 @@ static const CGFloat kDragThreshold = 10.0;
     self.statsLabel.numberOfLines = 1;
     // 使用纯 frame 布局，位置通过 center 手动设置并持久化
     self.statsLabel.frame = CGRectMake(0, 0, 130, 24);
+    // Task214（用户："窗口太窄，一直显示成 MEM: 328…"）：固定 130pt 宽度装不下
+    // 长统计串时曾被 tail 截断成省略号；改按宽度自动缩字（最小缩到 50%）
+    // —— 显示不下就缩小，而不是省略。
+    self.statsLabel.adjustsFontSizeToFitWidth = YES;
+    self.statsLabel.minimumScaleFactor = 0.5;
 
     // 拖拽手势
     UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handleStatsLabelPan:)];

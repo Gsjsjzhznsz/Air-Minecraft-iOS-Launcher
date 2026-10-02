@@ -766,6 +766,7 @@
 // 内存限制帮助弹窗
 "mem_help.title" = "About Memory Limit";
 "mem_help.message" = "·Increased Memory Limit entitlement, enable via GetMoreRAM\nlets iOS allocate more memory to the launcher, usually up to 6GB\n\n·Extended Virtual Addressing entitlement, see below for how to enable\ngives iOS more memory addressing for the launcher, usually up to 7GB with improved stability\n\nA paid developer certificate is recommended: installing with it grants both entitlements automatically and supports JIT";
+"mem_help.button" = "Paid Developer Certificate";
 
 // 下载进度与速率（Phase 6 Task 6.1）
 "download.speed.format" = "%@/s";

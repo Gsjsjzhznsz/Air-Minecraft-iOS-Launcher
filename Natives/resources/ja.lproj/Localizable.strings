@@ -717,6 +717,7 @@
 // 内存限制帮助弹窗
 "mem_help.title" = "About Memory Limit";
 "mem_help.message" = "·拡張メモリ制限エンタイトルメント：GetMoreRAM で有効化\niOS がランチャーへより多くのメモリを割り当て、通常 6GB まで拡張\n\n·拡張仮想メモリエンタイトルメント：有効化方法は下記参照\niOS がより多くのメモリアドレスを割り当て、通常 7GB まで拡張し安定性も向上\n\n有料開発者証明書の利用を推奨：インストール時に両エンタイトルメントが自動で有効になり、JIT も使用可能";
+"mem_help.button" = "有料開発者証明書";
 
 // 下载进度与速率（Phase 6 Task 6.1）
 "download.speed.format" = "%@/s";

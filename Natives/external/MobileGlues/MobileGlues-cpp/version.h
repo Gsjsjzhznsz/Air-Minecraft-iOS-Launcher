@@ -518,7 +518,16 @@
 // reports transport health) ("[OSMBridge] Task100" anchors). FAQ content
 // refreshed in place (macMenuStub/fsrCorner, count stays 32). Launcher-side
 // only, REVISION stays 17.
-#define REVISION 18
+#define REVISION 19
+// REVISION 19 (Task 214): the rebrand-round bump the user ordered in the
+// Task212/213 eight-item brief ("REVISION bump, Task 210 era = 18") that the
+// delivery round missed: bundle identifier com.air-devs.air -> com.air-devs.
+// prisma, os_log subsystems, keychain service and 54-language permission
+// strings all changed identity with the Air -> Prisma rename, so the cache
+// epoch follows. Task 214 itself is launcher-side UI only (memory-limit
+// dialog l10n key, card corner radius, selection-ring hitTest passthrough,
+// stats-label shrink-to-fit) -- no converter output changed beyond the epoch
+// bump itself.
 // REVISION 18: upstream 2.0.0-release sync + FSR1 compatibility audit.
 // (1) Ported upstream 0f1e10b ([Fix] multidraw: grow-only resize for the
 //     indirect command staging vector) -- prepare_indirect_buffer's staged
@@ -3673,4 +3682,35 @@
 //   gate, task103 swap gate REPAIRED this round -- it had been stale-failing
 //   since br_get_current/ame139 entered osm_swap_buffers; stubs added) +
 //   bracket-balance (Task212-touched files, HEAD-parity confirmed).
+// ============================================================================
+// ---------------------------------------------------------------------------
+// REVISION 18->19 bump addendum (Task 214, launcher side only)
+// ---------------------------------------------------------------------------
+// (1) The bump itself: the Task212/213 eight-item brief explicitly ordered a
+//   REVISION bump for the Air -> Prisma rebrand round ("REVISION bump, after
+//   Task 210 it is 18"); the delivery round shipped the rename without it.
+//   Caught and paid here: 18 -> 19. Rationale: bundle identifier, URL scheme,
+//   os_log subsystems, keychain service and 54-language permission strings
+//   all changed identity -- the cache epoch follows the app identity.
+// (2) Launcher-side five-fix round on the Task213 build (all UI, no MG surface
+//   beyond the epoch): (a) mem_help.button l10n key was missing from ALL six
+//   languages so the paid-dev-cert alert button rendered as the raw key name
+//   -- key added everywhere (en/km "Paid Developer Certificate", zh-CN/Hans
+//   付费开发者证书, zh-Hant 付費開發者證書, ja 有料開発者証明書);
+//   (b) the add-directory card's green 1pt border retired per user order
+//   (green plus icon + green 0.08 tint kept, border back to the 0.5pt default);
+//   (c) instance + game-directory card corner radius 12 -> 16pt continuous
+//   (user: "corners read a touch too straight"; quick-action tiles and
+//   renderer cells deliberately stay 12);
+//   (d) THE selection bug root-caused: the selection ring is a plain UIView
+//   added AFTER the ellipsis/xmark buttons (higher sibling order), so on a
+//   selected card its transparent body swallowed every touch -- hitTest
+//   returned the ring, touchUpInside never reached the buttons. That is why
+//   only UNSELECTED cards were editable. Fix: userInteractionEnabled = NO on
+//   both rings (VMVersionCardCell + VMGameDirCell); card taps still work
+//   (touch bubbles to the collection view), buttons now receive their events;
+//   (e) game-menu overlay stats label (FPS/MEM) shrank to a fixed 130pt and
+//   tail-truncated long memory strings ("MEM: 328..."): now shrink-to-fit
+//   (adjustsFontSizeToFitWidth, minimumScaleFactor 0.5) per user order --
+//   shrink, never ellipsize.
 // ============================================================================

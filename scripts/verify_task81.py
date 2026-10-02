@@ -101,7 +101,7 @@ check("A7b driver confirm borrow retained",
 check("A8 version.h addendum + no bump",
       "REVISION 17 addendum (Amethyst Task 81, no bump)" in ver
       and re.search(r"#define REVISION 17\b", ver) is not None
-      and re.search(r"#define REVISION 18\b", ver) is None)
+      and re.search(r"#define REVISION 19\b", ver) is None)
 
 # A9 stale comments updated.
 check("A9 stale 'does not net to zero' comment replaced",
