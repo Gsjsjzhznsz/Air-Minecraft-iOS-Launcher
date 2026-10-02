@@ -949,6 +949,16 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
         if (error) {
             // 网络错误：透传原 NSError 并附带 HTTP 诊断信息（如可获取）
             NSLog(@"[CurseForgeAPI] searchModWithFilters network error: %@", error.localizedDescription);
+            // Task212：瞬态网络错误（超时/连接重置/DNS）自动退避重试一次。
+            // 2026-10-02 沙盒直连 MCIM 镜像实测：同一合法查询时好时坏（一次
+            // 网络错误、重发即成功）。旧逻辑直接浮出错误 = 用户视角
+            // "筛选/搜索时好时坏"。仅 NSURLErrorDomain（传输层瞬态）重试；其余域例如自定义
+            // 取消错误仍直接浮出。
+            if (attempt < 1 && [error.domain isEqualToString:NSURLErrorDomain]) {
+                [self ame172_retrySearchRequest:request attempt:attempt projectType:projectType completion:completion
+                                        reason:[NSString stringWithFormat:@"transient network error %ld", (long)error.code]];
+                return;
+            }
             [self debugLogRequest:request response:response data:data jsonError:nil];
             NSError *diagnosticError = [self errorWithResponse:response data:data originalError:error snippet:nil];
             if (completion) completion(nil, diagnosticError);
@@ -958,8 +968,10 @@ static NSString *CFA169NormalizeGameVersion(NSString *v) {
             // 响应数据为空：返回包含 HTTP 状态码的 NSError
             NSLog(@"[CurseForgeAPI] searchModWithFilters empty response");
             [self debugLogRequest:request response:response data:data jsonError:nil];
+            // Task212：空体本身就是镜像瞬态波动（沙盒实测命中
+            // 过一次空 200）——不再要求 5xx 才重试，任意状态码的空体都退避一次。
             // Task172：5xx 空体也是镜像瞬态——同 502 HTML 页待遇，退避重试
-            if ([self ame172_isTransientServerStatus:response] && attempt < 2) {
+            if (attempt < 1 || ([self ame172_isTransientServerStatus:response] && attempt < 2)) {
                 [self ame172_retrySearchRequest:request attempt:attempt projectType:projectType completion:completion reason:@"empty 5xx body"];
                 return;
             }

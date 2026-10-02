@@ -42,31 +42,28 @@ check("A", "幂等 + 漂移拒绝 + --verify 三件套",
       "PATCH PRESENT" in ps and "binary drift" in ps and "--verify" in ps)
 
 mk = rd("Makefile")
-check("A", "Makefile 接线（RTLD 补丁行之后紧跟 ggstr 补丁行）",
-      "patch_gl4es_ggstr_nullguard.py" in mk
-      and mk.find("patch_gl4es_ggstr_nullguard.py") > mk.find("patch_gl4es_rtld_default.py"))
+check("A", "Makefile 接线已随 holy 退役移除（Task212 重锚：两补丁行删除 + 退役注释在场）",
+      "patch_gl4es_ggstr_nullguard.py" not in mk
+      and "patch_gl4es_rtld_default.py" not in mk
+      and "holy gl4es（libgl4es_114.dylib）退役删除" in mk)
 check("A", "Makefile TAB 完整性（无空格缩进 recipe 行）",
       not any(l.startswith("    ") for l in mk.split("\n")))
 
 eb = rd("Natives/egl_bridge.m")
-check("A", "egl_bridge Task193 块入口锚点（四锚全缺盲区修补）",
-      "Task202: Task193 gl4es bootstrap block ENTERED" in eb)
+check("A", "egl_bridge Task193 块随 holy 退役收档（Task212 重锚：入口锚点退役 + 改道注释在场）",
+      "Task202: Task193 gl4es bootstrap block ENTERED" not in eb
+      and "holy gl4es（libgl4es_114.dylib）整体退役" in eb)
 
 mh = rd("Natives/main_hook.m")
 check("A", "main_hook gl4es 基址记录 + musttail 逃逸修正",
       "Task202: libgl4es_114 image base" in mh and "needsGl4esRecord" in mh)
 
-# patch script lifecycle on a scratch copy
-import shutil, tempfile
-tmp = tempfile.mktemp(suffix=".dylib")
-shutil.copy(os.path.join(REPO, "Natives/resources/Frameworks/libgl4es_114.dylib"), tmp)
-r1 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"), tmp],
-                    capture_output=True, text=True)
-r2 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"), tmp],
-                    capture_output=True, text=True)
-os.unlink(tmp)
-check("A", "补丁全生命周期（pristine PATCHED -> 再跑 PATCH PRESENT）",
-      r1.returncode == 0 and "PATCHED" in r1.stdout and r2.returncode == 0 and "PATCH PRESENT" in r2.stdout)
+# Task212 重锚：dylib 已随 holy gl4es 退役删除——补丁生命周期实测退位为
+# 工件在位断言（脚本保留作历史法证；仓库不再携带该二进制）。
+import os as _os
+check("A", "补丁脚本工件保留 + dylib 已退役（Task212）",
+      _os.path.exists(os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"))
+      and not _os.path.exists(os.path.join(REPO, "Natives/resources/Frameworks/libgl4es_114.dylib")))
 
 # ============ B. Metal 首帧信号 ============
 check("B", "CAMetalLayer nextDrawable 交换（install + hook 双函数）",
@@ -194,10 +191,10 @@ check("H", "version.h REVISION 18 附录（Task202 八节 + no bump 理由）",
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))["announcements"]
 check("H", "公告 31 条且末位仍是 task206-nggl4es（Task209@2 插入 +1）",
       # Task209 重锚：task209@2 插入（30→31）；task202 锚顺延 [28]。
-      len(ann) == 33 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
-      and ann[30]["id"] == "task202-october-fix-wave")
-check("H", "公告索引锚（Task209 重锚：[4]=task196 / [5]=task193 / [0]=server）",
-      ann[6]["id"] == "task196-quad-fixes-2026-09-29" and ann[7]["id"] == "task193-app-icon-replace-2026-09-28"
+      len(ann) == 34 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"
+      and ann[31]["id"] == "task202-october-fix-wave")
+check("H", "公告索引锚（Task212 重锚：[7]=task196 / [8]=task193 / [0]=server）",
+      ann[7]["id"] == "task196-quad-fixes-2026-09-29" and ann[8]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[0]["id"].startswith("server-recommend"))
 check("H", "两份调查报告在位（Task201 gitignore 丢失重建）",
       os.path.isfile(os.path.join(REPO, "docs/surveys/2026-09-29-upstream-sync-survey.md"))
@@ -265,8 +262,8 @@ st = subprocess.run(["git", "-C", REPO, "status", "--short"], capture_output=Tru
 # TAB 绝对基线 484（= 481 基线 + Task202 的 3 行；本轮 Makefile 零改动）。
 # （本轮工作树亦不再改 Makefile，HEAD 同含该行。）
 mk_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
-check("I", "Makefile 未被 TAB 化破坏（接线在位 + TAB 基线 559，Task206 重锚）",
-      mk.count("patch_gl4es_ggstr_nullguard") == 1 and mk_tab == 559,
+check("I", "Makefile 未被 TAB 化破坏（Task212 重锚：接线退役 + TAB 基线 561）",
+      mk.count("patch_gl4es_ggstr_nullguard") == 0 and mk_tab == 561,
       f"tabs={mk_tab}")
 
 # strings 表语法门：每行引号配对

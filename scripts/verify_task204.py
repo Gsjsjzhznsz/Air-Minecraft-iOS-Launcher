@@ -37,86 +37,31 @@ check("A1 resolver 定义（gl* 走 eglGetProcAddress→框架句柄；gl* 禁�
       and "ame204_gl4esEgpa(name)" in eb
       and "dlsym(ame204_gl4esGles2, name)" in eb
       and "绝不回落 RTLD_DEFAULT" in eb)
-check("A2 _egl 槽经 dlsym（导出符号）",
-      'dlsym(ame193_gl4es, "egl")' in eb)
-check("A3 _gles 槽布局锚（base+0x1de038；_egl==base+0x1de040 + -1 双指纹）",
-      "0x1de038" in eb and "0x1de040" in eb and "0xFFFFFFFFFFFFFFFFULL" in eb)
-check("A4 set_getprocaddress 注入（resolver_global 通道）",
-      'dlsym(ame193_gl4es, "set_getprocaddress")' in eb
-      and "ame204_sgpa(ame204_gl4esProcResolver)" in eb)
-check("A5 注入位于 Task193 引导块 dlopen 之后（时序锚）",
-      0 < eb.find('dlopen("@rpath/libgl4es_114.dylib"') < eb.find("ame204_sgpa(ame204_gl4esProcResolver)"))
-check("A6 装机锚点行（Task204 backend pin 日志）",
-      "[egl_bridge] Task204: gl4es backend pin" in eb)
-check("A7 失败安全（frameworks 缺失时不写槽不设 resolver）",
-      "if (ame204_gl4esGles2 != NULL && ame204_gl4esEgl != NULL)" in eb)
-
-# ---- binary forensics: the repo's prebuilt libgl4es_114.dylib must still
-# match the offline layout the runtime anchor relies on (CI ships THIS file).
-blob = open("Natives/resources/Frameworks/libgl4es_114.dylib", "rb").read()
-magic, cputype, cpusub, filetype, ncmds, sizeofcmds, flags, reserved = struct.unpack("<8I", blob[:32])
-off = 32
-symtab = None
-segs = []
-for i in range(ncmds):
-    cmd, cmdsize = struct.unpack("<II", blob[off:off+8])
-    if cmd == 0x19:
-        vmaddr, vmsize, fileoff, filesize = struct.unpack("<4Q", blob[off+24:off+24+32])
-        segs.append((vmaddr, vmsize, fileoff, filesize))
-    elif cmd == 0x2:
-        symoff, nsyms, stroff, strsize = struct.unpack("<4I", blob[off+8:off+24])
-        symtab = (symoff, nsyms, stroff, strsize)
-    off += cmdsize
-symoff, nsyms, stroff, strsize = symtab
-strtab = blob[stroff:stroff+strsize]
-sym = {}
-for i in range(nsyms):
-    e = blob[symoff+i*16:symoff+i*16+16]
-    n_strx, n_type, n_sect, n_desc, n_value = struct.unpack("<IBBHQ", e)
-    name = strtab[n_strx:strtab.index(b"\x00", n_strx)].decode(errors="replace")
-    if name:
-        sym[name] = (n_value, n_type)
-
-def vm2file(vm):
-    for va, vs, fo, fs in segs:
-        if va <= vm < va + vs:
-            return fo + (vm - va)
-    return None
-
-GLES_VM, EGL_VM = 0x1de038, 0x1de040
-check("A8 二进制布局指纹（_gles@0x1de038 与 _egl@0x1de040 初值均为 -1=RTLD_NEXT）",
-      "_gles" in sym and "_egl" in sym
-      and sym["_gles"][0] == GLES_VM and sym["_egl"][0] == EGL_VM
-      and blob[vm2file(GLES_VM):vm2file(GLES_VM)+8] == b"\xff"*8
-      and blob[vm2file(EGL_VM):vm2file(EGL_VM)+8] == b"\xff"*8)
-check("A9 导出面（_egl 与 set_getprocaddress 导出；_gles 为 PEXT 私有——运行时布局锚的前提）",
-      (sym["_egl"][1] & 0x01) == 1 and (sym["_set_getprocaddress"][1] & 0x01) == 1
-      and (sym["_gles"][1] & 0x01) == 0)
-# proc_address: reads resolver_global from [0x1E3F98] and calls it with ONE arg
-# (name); set_getprocaddress stores its argument into the SAME slot.
-pa = sym.get("_proc_address", (0x136DA4, 0))[0]
-sgpa = sym["_set_getprocaddress"][0]
-dis = blob[vm2file(pa):vm2file(pa)+0x40]
-check("A10 proc_address 读 0x1E3F98 槽（resolver_global；与 set_getprocaddress 写同槽）",
-      dis[0x14:0x1c] == bytes.fromhex("09008052") or b"\x88\xd9\x93" in blob[vm2file(pa):vm2file(pa)+0x40]
-      or True)  # structural check done below via byte pattern
-# adrp x8, #0x1e3000 ; ldr x8, [x8, #0xf98]  => 0x1E3F98
-pat_pa = bytes.fromhex("08008052" .replace(" ", ""))
-# robust: search the adrp+ldr pair by encoding (adrp x8 to page 0x1e3000 = 0x9000_0D08? we verify via set_getprocaddress instead)
-sgpa_code = blob[vm2file(sgpa):vm2file(sgpa)+0x24]
-# set_getprocaddress: adrp x9,#0x1e3000; add x9,x9,#0xf98; str x8,[x9] => store slot 0x1E3F98
-found_slot = False
-code = blob[vm2file(pa):vm2file(pa)+0x50]
-for i in range(0, len(code)-8, 4):
-    w1 = struct.unpack("<I", code[i:i+4])[0]
-    w2 = struct.unpack("<I", code[i+4:i+8])[0] if i+8 <= len(code) else 0
-    # adrp xN, page ; ldr xN, [xN, #0xf98]  (ldr imm12 unsigned offset 0xf98/8 = 0x1f3)
-    if (w1 & 0x9F000000) == 0x90000000 and (w2 & 0xFFC00000) == 0xF9400000:
-        imm = ((w2 >> 10) & 0xFFF) * 8
-        if imm == 0xF98:
-            found_slot = True
-check("A11 proc_address resolver_global 槽位 = 0x1E3F98（adrp+ldr #0xf98 对）", found_slot)
-
+# Task212 重锚：holy gl4es（libgl4es_114.dylib）整体退役——egl_bridge 的
+# Task204 注入链（A2-A7）与离线二进制布局法证（A8 起）全部随 dylib 退役。
+# resolver 函数（ame204_gl4esProcResolver）与全局句柄存续：由 NG-GL4ES 的
+# ame208_nggl4es_boot 与 ZL2 经典版的 ame211_gl4eszl2_boot 复用（各自
+# set_getprocaddress 钉扎——Task204 的"通道"在两个源码构建渲染器上延续）。
+def _strip_comments(text):
+    import re as _re
+    text = _re.sub(r"/\*.*?\*/", "", text, flags=_re.S)
+    text = _re.sub(r"//[^\n]*", "", text)
+    return text
+_eb_code = _strip_comments(eb)
+check("A2 egl_bridge 注入链随 holy 退役收档（Task212：注入代码清零；文档注释里的历史偏移合法保留）",
+      "holy gl4es（libgl4es_114.dylib）整体退役" in eb
+      and "0x1de038" not in _eb_code and "0x1de040" not in _eb_code
+      and "Task204: gl4es backend pin" not in eb)
+check("A3 resolver 函数存续（NG/ZL2 双 boot 复用同一通道）",
+      "ame204_gl4esProcResolver" in eb
+      and eb.count("ame204_gl4esProcResolver") >= 3)
+check("A4 接棒 boot 的 resolver 钉扎（ame211_gl4eszl2_boot 内 set_getprocaddress）",
+      "ame211_sgpa(ame204_gl4esProcResolver)" in eb)
+check("A5 dylib 已从仓库移除（Task212 退役）",
+      not os.path.exists("Natives/resources/Frameworks/libgl4es_114.dylib"))
+check("A6 补丁脚本保留为历史工件（rtld_default + ggstr_nullguard）",
+      os.path.exists("scripts/patch_gl4es_rtld_default.py")
+      and os.path.exists("scripts/patch_gl4es_ggstr_nullguard.py"))
 print("== B. vgpu darwin aliases (collision-aware regeneration) ==")
 gen = rd("scripts/task204_vgpu_gen_aliases.py")
 al = rd("Natives/external/vgpu/src/gl/wrap/vgpu_darwin_aliases.c")

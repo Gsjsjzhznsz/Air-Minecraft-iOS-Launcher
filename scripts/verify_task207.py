@@ -182,15 +182,15 @@ check("D", "Task172 管线保留（super setupViews 后追加身份层，不移�
 # ============ E. 文档与级联 ============
 print("== E. 公告 / version.h / 级联重锚 ==")
 ann = json.loads(io.open(os.path.join(REPO, "announcements.json"), encoding="utf-8").read())["announcements"]
-check("E", "公告 31 条，task209@2 插入后 task207@3，置顶钉位未动，NG-GL4ES 尾锚保持",
-      len(ann) == 33
-      and ann[5]["id"] == "task207-shortcuts-instance-cards-2026-10-01"
+check("E", "公告 34 条，task212@2 插入后 task207@6，置顶钉位未动，NG-GL4ES 尾锚保持",
+      len(ann) == 34
+      and ann[6]["id"] == "task207-shortcuts-instance-cards-2026-10-01"
       and ann[0]["id"].startswith("server-recommend")
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
-check("E", "公告窗口族顺延（Task209@2 后：task196@4 / task193@5 / task190@6）",
-      ann[6]["id"] == "task196-quad-fixes-2026-09-29"
-      and ann[7]["id"] == "task193-app-icon-replace-2026-09-28"
-      and ann[8]["id"].startswith("task190-"))
+check("E", "公告窗口族顺延（Task212@2 后：task196@7 / task193@8 / task190@9）",
+      ann[7]["id"] == "task196-quad-fixes-2026-09-29"
+      and ann[8]["id"] == "task193-app-icon-replace-2026-09-28"
+      and ann[9]["id"].startswith("task190-"))
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E", "version.h Task 207 附录在场（REVISION 18 append-only，无 bump）",
       "Amethyst Task 207" in vh and "#define REVISION 18" in vh
@@ -207,14 +207,14 @@ v196 = rd("scripts/verify_task196_197_198_201.py")
 v202 = rd("scripts/verify_task202.py")
 v203 = rd("scripts/verify_task203.py")
 v206t = rd("scripts/verify_task206.py")  # 并行会话的 Task206 渲染器验证器（本轮仅重锚其 F5 长度）
-check("E", "七脚本公告锚全部重锚（Task209@2 后：193/173/190/196-201/202/203 + 并行 v206 F5）",
-      "len(ann) == 33" in v193 and 'ann[7]["id"] == "task193-app-icon-replace-2026-09-28"' in v193
-      and 'ann["announcements"][17]["id"] == "task173-ten-fixes-2026-09-26"' in v173
-      and '["announcements"][8]["id"].startswith("task190-")' in v190
-      and "ann[6][\"id\"] == \"task196-quad-fixes-2026-09-29\"" in v196 and "len(ann) == 33" in v196
-      and "len(ann) == 33" in v202 and 'ann[30]["id"] == "task202-october-fix-wave"' in v202
-      and "len(ann) == 33" in v203
-      and 'len(ann) == 33 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"' in v206t)
+check("E", "七脚本公告锚全部重锚（Task212@2 后：193/173/190/196-201/202/203 + 并行 v206 F5）",
+      "len(ann) == 34" in v193 and 'ann[8]["id"] == "task193-app-icon-replace-2026-09-28"' in v193
+      and 'ann["announcements"][18]["id"] == "task173-ten-fixes-2026-09-26"' in v173
+      and '["announcements"][9]["id"].startswith("task190-")' in v190
+      and "ann[7][\"id\"] == \"task196-quad-fixes-2026-09-29\"" in v196 and "len(ann) == 34" in v196
+      and "len(ann) == 34" in v202 and 'ann[31]["id"] == "task202-october-fix-wave"' in v202
+      and "len(ann) == 34" in v203
+      and 'len(ann) == 34 and ann[-1]["id"] == "task206-nggl4es-2026-10-01"' in v206t)
 check("E", "l10n 零新增键（⋯ 钮无障碍复用 i18n_str_1091，strings 文件不含 ame207.*；并行 nggl4es 键不在判定面）",
       'localize(@"i18n_str_1091", nil)' in vm
       and "ame207." not in rd("Natives/resources/en.lproj/Localizable.strings"))

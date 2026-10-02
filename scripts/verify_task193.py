@@ -96,10 +96,10 @@ for s in ("scripts/task193_icon.py", "scripts/task193_announce.py", "scripts/tas
 # ============ F. announcement: task193@2, family shifted, pin intact ============
 print("== F. 公告窗口族 ==")
 ann = json.loads(io.open("announcements.json", encoding="utf-8").read())["announcements"]
-check("F", "条目数 -> 32（Task211@2 插入，窗口族顺延）", len(ann) == 33, f"actual={len(ann)}")
-check("F", "Task209 重锚：task193 顺延至 [5]，task190 顺延至 [6]，置顶公告 [0] 未动",
-      len(ann) > 6 and ann[7]["id"] == "task193-app-icon-replace-2026-09-28"
-      and ann[8]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
+check("F", "条目数 -> 34（Task212@2 插入，窗口族顺延）", len(ann) == 34, f"actual={len(ann)}")
+check("F", "Task212 重锚：task193 顺延至 [8]，task190 顺延至 [9]，置顶公告 [0] 未动",
+      len(ann) > 6 and ann[8]["id"] == "task193-app-icon-replace-2026-09-28"
+      and ann[9]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
 
 # ============ G. re-anchored verifiers import-clean ============
 print("== G. 重锚校验器语法完好 ==")
@@ -137,16 +137,17 @@ check("H", "首调用基线 + 前 8 错误调用日志（装机锚点）",
 # ============ I. gl4es 构造器临时上下文引导 ============
 print("== I. gl4es 构造器临时上下文引导 ==")
 egl = rd("Natives/egl_bridge.m")
-check("I", "Task193 引导块存在 + 一次性守卫",
-      "Task193：gl4es 构造器崩溃根修" in egl and "s_ame193_gl4esDone" in egl)
-check("I", "临时 pbuffer + ES3 上下文（与游戏上下文同版本）",
-      "EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE" in egl and "ame193_createPbuffer" in egl)
-check("I", "构造器在有上下文环境运行（显式 dlopen libgl4es_114）",
-      'dlopen("@rpath/libgl4es_114.dylib", RTLD_NOW | RTLD_GLOBAL)' in egl)
-check("I", "临时资源释放（makeCurrent NO + destroy ctx/surface）",
-      "ame193_makeCurrent(ame193_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)" in egl)
-check("I", "失败安全锚点（bootstrap FAILED 日志）",
-      "gl4es constructor bootstrap FAILED" in egl)
+# Task212 重锚：holy gl4es 退役——Task193 的构造器引导链（pbuffer+ES3 铺垫、
+# 显式 dlopen、资源释放、失败安全）整体随 dylib 删除，由 egl_bridge 的退役
+# 注释收档；接棒者 gl4eszl2 走 ame211_gl4eszl2_boot（MakeCurrent 后显式
+# initialize_gl4es，构造器不存在）。本节断言退役态而非在场。
+check("I", "Task193 引导块随 holy gl4es 退役收档（Task212 重锚）",
+      "holy gl4es（libgl4es_114.dylib）整体退役" in egl and "s_ame193_gl4esDone" not in egl)
+check("I", "退役后无残留引导符号（pbuffer/显式 dlopen 全清）",
+      "ame193_createPbuffer" not in egl
+      and 'dlopen("@rpath/libgl4es_114.dylib", RTLD_NOW | RTLD_GLOBAL)' not in egl)
+check("I", "接棒路径在场（gl4eszl2 的 MakeCurrent 后初始化 = 构造器问题的终态解）",
+      "ame211_gl4eszl2_boot();" in egl and "initialize_gl4es" in egl)
 
 # ============ J. gl_bridge 同 layer 表面复用 ============
 print("== J. gl_bridge 同 layer 表面复用 ==")

@@ -1084,7 +1084,6 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
     NSDictionary *ame140_shortNames = @{
         @"auto": @"Auto",
         @ RENDERER_KEY_MG: @"MobileGlues",
-        @ RENDERER_NAME_GL4ES: @"GL4ES",
         @ RENDERER_NAME_MTL_ANGLE: @"ANGLE",
         @ RENDERER_NAME_VGPU: @"VGPU", // Task173：旧版 MC 专用渲染器
         @ RENDERER_NAME_MOBILEGLUES: @"MobileGlues",
@@ -1095,7 +1094,7 @@ static const CGFloat kVMCardRingBorderWidth = 2.0;
         @ RENDERER_NAME_MOBILEGL_GLES: @"MobileGL GLES",
         @ RENDERER_NAME_MITHRIL: @"Mithril",
         @ RENDERER_NAME_NGGL4ES: @"Krypton Wrapper", // Task209：用户点名改名（≤26.2 定位；原 NG-GL4ES，ZL2 的 gl4es）
-        @ RENDERER_NAME_GL4ESZL2: @"gl4es (ZL2)", // Task211：ZL2 经典版 gl4es（与 holy gl4es / Krypton Wrapper 三存）
+        @ RENDERER_NAME_GL4ESZL2: @"gl4es(≤26.2)", // Task211 引入；Task212 用户定名（holy gl4es 已退役）
     };
     NSMutableArray *ame140_names = [NSMutableArray array];
     for (NSString *ame140_key in self.rendererKeys) {

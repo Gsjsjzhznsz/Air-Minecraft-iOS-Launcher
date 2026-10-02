@@ -162,11 +162,11 @@ head_mk = subprocess.run(["git", "-C", REPO, "show", "HEAD:Makefile"],
 head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
 # Task138 重锚：Task135 的 14 个 TAB 行已随提交入 HEAD，"+14" 形态在
 # 提交后恒假；长期不变量 = 工作树与 HEAD 一致 + dep_sdl3_guard 目标在位。
-check("E10 Makefile TAB 基线 = 绝对 531 且双守卫在位（Task206 重锚：dep_nggl4es +47）",
-      # Task202 的 "+3" 对拍口径在 64fdaf2 提交后恒假（+3 已入 HEAD）；
-      # Task203 起转绝对基线；Task206 重锚 531 = 484 + 47（dep_nggl4es 目标）。
-      cur_tab == 559 and head_tab == 559 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
-      and "patch_gl4es_ggstr_nullguard.py" in mk,
+check("E10 Makefile TAB 基线 = 绝对 561 且双守卫在位（Task212 重锚：holy 退役净 +2）",
+      # Task203 起绝对基线；Task206 重锚 559；Task212 重锚 561 = 559 - 2 补丁行 + 4 退役注释行
+      # （holy gl4es 的两个二进制补丁接线随 dylib 退役删除）。
+      cur_tab == 561 and head_tab == 561 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      and "patch_gl4es_ggstr_nullguard.py" not in mk,
       f"head={head_tab} cur={cur_tab}")
 
 print(f"\n==== RESULT: {'ALL PASS' if FAIL == 0 else 'FAILED'} ({PASS}/{PASS+FAIL}) ====")

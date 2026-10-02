@@ -131,7 +131,6 @@
 "preference.title.done.reset_settings" = "Wszystkie ustawienia zostały wyzerowane.";
 
 "preference.title.renderer" = "Silnik renderujący";
-"preference.title.renderer.debug.gl4es" = "gl4es 1.1.4 - eksportuje OpenGL 2.1";
 "preference.title.renderer.debug.zink" = "Zink (Mesa 25.0.7) - eksportuje OpenGL 4.1";
 
 "preference.detail.renderer" = "Zmień używany silnik renderujący OpenGL";

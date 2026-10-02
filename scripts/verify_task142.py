@@ -24,7 +24,7 @@ check("A1 RENDERER_KEY_MG define in header",
       '#define RENDERER_KEY_MG "mg"' in prefh)
 check("A2 \"mg\" candidate entry in rendererCandidates (after auto, always listed)",
       re.search(r'@\{@"key": @ RENDERER_KEY_MG,\n\s*@"name": localize\(@"preference\.title\.renderer\.debug\.mgfamily", nil\),\n\s*@"file": @""\}', prefm) is not None and
-      prefm.index('@{@"key": @"auto"') < prefm.index('@ RENDERER_KEY_MG,') < prefm.index('@ RENDERER_NAME_GL4ES,'))
+      prefm.index('@{@"key": @"auto"') < prefm.index('@ RENDERER_KEY_MG,') < prefm.index('@ RENDERER_NAME_MTL_ANGLE,'))  # Task212 重锚：holy gl4es 表项退役，后继锚改为 ANGLE
 check("A3 ame_effective_renderer head calls the migration",
       prefm.index('ame142_migrateRendererStorage();') < prefm.index('NSString *ame142_backend = ame142_effective_backend_key();'))
 check("A4 mg branch resolves backend + dylib guard with default-backend fallback",
@@ -143,7 +143,8 @@ check("D5 Task150: four-language key sets identical (1952 = Task150 1928 + Task1
 print("== E. Publish assets ==")
 import json
 ann = json.load(open('announcements.json', encoding='utf-8'))
-e = ann['announcements'][0]
+e = next((a for a in ann['announcements'] if a.get('id') == 'v6-0-0-release-2026-09-21'), None)
+assert e is not None, 'v6-0-0-release entry missing'  # Task212 重锚：按 id 定位（公告序在 Task209/211/212 三轮 @2 插入后已非首位）
 check("E1 announcements summary mentions mg single entry",
       'mg 单入口' in e['summary'])
 check("E2 Task150: announcements bullet describes per-game mandatory selection + sodium install",

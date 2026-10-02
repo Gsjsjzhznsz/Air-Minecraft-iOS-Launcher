@@ -31,53 +31,22 @@ check("A", "v2 脚本在位（双调用点 + vtool 病历 + 自校验解码器�
       "SITE_EXTS_PC   = 0x1BC2B0" in ps and "SITE_VENDOR_PC = 0x1BDE4C" in ps
       and "vtool" in ps and "decode_adrp_target" in ps and "decode_add_imm12" in ps)
 
-# 本地实测：patch -> idempotence -> verify -> drift 全链
-import struct, tempfile, shutil
+# Task212 重锚：holy gl4es（libgl4es_114.dylib）退役删除——补丁全生命周期实测
+# 退位为工件在位断言（脚本保留作历史法证与复现记录；仓库不再携带该 dylib，
+# Makefile 接线随退役移除）。
 src = os.path.join(REPO, "Natives/resources/Frameworks/libgl4es_114.dylib")
-tmp = tempfile.mktemp(suffix=".dylib")
-shutil.copy(src, tmp)
-r1 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"), tmp],
-                    capture_output=True, text=True)
-r2 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"), tmp],
-                    capture_output=True, text=True)
-r3 = subprocess.run([sys.executable, os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"), tmp, "--verify"],
-                    capture_output=True, text=True)
-check("A", "patch 全生命周期（PATCHED → PATCH PRESENT → VERIFY OK）",
-      r1.returncode == 0 and r2.returncode == 0 and r3.returncode == 0
-      and "PATCHED" in r1.stdout and "PATCH PRESENT" in r2.stdout and "VERIFY OK" in r3.stdout,
-      f"{r1.stdout}{r1.stderr}{r2.stdout}{r2.stderr}{r3.stdout}{r3.stderr}")
-
-# 产物字节核验：两个调用点均为 ADRP+ADD 且指向 0x1CE9A2 的 NUL 字节
-blob = open(tmp, 'rb').read()
-def word(off):
-    return struct.unpack_from("<I", blob, off)[0]
-def adrp_target(w, pc):
-    immlo = (w >> 29) & 3
-    immhi = (w >> 5) & 0x7FFFF
-    imm21 = (immhi << 2) | immlo
-    if imm21 & (1 << 20):
-        imm21 -= 1 << 21
-    return (pc & ~0xFFF) + (imm21 << 12)
-ok_sites = True
-for pc in (0x1BC2B0, 0x1BDE4C):
-    w1, w2 = word(pc), word(pc + 4)
-    if (w1 >> 31) & 1 != 1 or (w1 >> 24) & 0x1F != 0x10:
-        ok_sites = False
-    if (w2 >> 24) & 0xFF != 0x91:
-        ok_sites = False
-    if adrp_target(w1, pc) != 0x1CE000 or ((w2 >> 10) & 0xFFF) != 0x9A2:
-        ok_sites = False
-check("A", "产物反汇编核验（双点 ADRP→0x1CE000 + ADD #0x9A2 = 空串）", ok_sites)
-check("A", "空串锚字节 = NUL 且 needle 前缀在场",
-      blob[0x1CE9A2] == 0 and blob[0x1CE981:0x1CE981+10] == b"GL_APPLE_t")
-os.unlink(tmp)
-
+import os as _os
 mk = rd("Makefile")
-check("A", "Makefile 接线保持（ggstr 在 rtld 之后）",
-      "patch_gl4es_ggstr_nullguard.py" in mk
-      and mk.find("patch_gl4es_ggstr_nullguard.py") > mk.find("patch_gl4es_rtld_default.py"))
-check("A", "Makefile TAB 基线（Task206 重锚：dep_nggl4es +47 = 531）",
-      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 559)
+check("A", "补丁工件保留 + dylib 退役 + Makefile 接线移除（Task212）",
+      _os.path.exists(os.path.join(REPO, "scripts/patch_gl4es_ggstr_nullguard.py"))
+      and not _os.path.exists(src)
+      and "patch_gl4es_ggstr_nullguard.py" not in mk)
+
+check("A", "Makefile 接线已随 holy 退役移除（Task212 重锚）",
+      "patch_gl4es_ggstr_nullguard.py" not in mk
+      and "holy gl4es（libgl4es_114.dylib）退役删除" in mk)
+check("A", "Makefile TAB 基线（Task212 重锚：561 = 559 - 2 补丁行 + 4 退役注释行）",
+      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 561)
 
 # ============ B. 钉扎门控（vgpu 崩溃根修） ============
 mh = rd("Natives/main_hook.m")
@@ -164,8 +133,8 @@ vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("H", "version.h Task203 附录（no bump + vtool 病历）",
       "Task 203, no bump" in vh and "vtool" in vh and "ZERO-WIPED" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))['announcements']
-check("H", "公告末位是 task206-nggl4es（Task209 重锚：@2 插入后 30→31）",
-      len(ann) == 33 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01')
+check("H", "公告末位是 task206-nggl4es（Task212 重锚：task212@2 插入后 34）",
+      len(ann) == 34 and ann[-1]['id'] == 'task206-nggl4es-2026-10-01')
 bundled = open(os.path.join(REPO, "Natives/resources/help-faq.json"), 'rb').read()
 rootfaq = open(os.path.join(REPO, "help-faq.json"), 'rb').read()
 check("H", "FAQ 根/随包副本逐字节一致（verify_task168 契约）", bundled == rootfaq)

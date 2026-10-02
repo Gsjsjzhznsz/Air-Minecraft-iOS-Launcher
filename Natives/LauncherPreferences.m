@@ -237,6 +237,42 @@ void ame211_migrateCfSourceToModrinth(void) {
           (unsigned long)task211Flipped);
 }
 
+/// Task212：holy gl4es 渲染器退役迁移（用户明令删除 libgl4es_114.dylib）。
+/// 存量设备若全局 video.renderer 或任一 profile 的 renderer 键存着
+/// "libgl4es_114.dylib"，一次性拨到接棒者 "libgl4eszl2.dylib"（同 gl4es
+/// 1.1.4 血统、源码构建，Task211 移植）。幂等：全部拨完后无匹配即零动作。
+/// 装机锚点："[Preferences] Task212: migrated holy gl4es renderer (global=%d,
+/// profiles=%d) -> libgl4eszl2.dylib"。
+void ame212_migrateHolyGl4es(void) {
+    int ame212_global = 0, ame212_profiles = 0;
+    id ame212_globalRenderer = getPrefObject(@"video.renderer");
+    if ([ame212_globalRenderer isKindOfClass:NSString.class] &&
+        [ame212_globalRenderer isEqualToString:@"libgl4es_114.dylib"]) {
+        setPrefObject(@"video.renderer", @"libgl4eszl2.dylib");
+        ame212_global = 1;
+    }
+    PLProfiles *ame212_profiles = [PLProfiles current];
+    NSDictionary<NSString *, NSMutableDictionary<NSString *, NSString *> *> *ame212_all =
+        ame212_profiles.profiles;
+    if ([ame212_all isKindOfClass:NSDictionary.class]) {
+        for (NSString *ame212_name in ame212_all) {
+            NSMutableDictionary *ame212_p = ame212_all[ame212_name];
+            if (![ame212_p isKindOfClass:NSDictionary.class]) continue;
+            id ame212_r = ame212_p[@"renderer"];
+            if ([ame212_r isKindOfClass:NSString.class] &&
+                [ame212_r isEqualToString:@"libgl4es_114.dylib"]) {
+                ame212_p[@"renderer"] = @"libgl4eszl2.dylib";
+                ame212_profiles++;
+            }
+        }
+        if (ame212_profiles > 0) [ame212_profiles save];
+    }
+    if (ame212_global > 0 || ame212_profiles > 0) {
+        NSLog(@"[Preferences] Task212: migrated holy gl4es renderer (global=%d, profiles=%d) -> libgl4eszl2.dylib",
+              ame212_global, ame212_profiles);
+    }
+}
+
 id getPrefObject(NSString *key) {
     return [pref getObject:key];
 }
@@ -407,9 +443,9 @@ static NSArray<NSDictionary *> *rendererCandidates(void) {
         @{@"key": @ RENDERER_KEY_MG,
           @"name": localize(@"preference.title.renderer.debug.mgfamily", nil),
           @"file": @""},
-        @{@"key": @ RENDERER_NAME_GL4ES,
-          @"name": localize(@"preference.title.renderer.debug.gl4es", nil),
-          @"file": @ RENDERER_NAME_GL4ES},
+        // Task212：holy gl4es 表项退役删除（用户明令；dylib 已移除，存量
+        // video.renderer=libgl4es_114.dylib 由 main.m ame212_migrateHolyGl4es
+        // 一次性迁移到 libgl4eszl2.dylib——同血统源码构建版接棒）。
         @{@"key": @ RENDERER_NAME_MTL_ANGLE,
           @"name": localize(@"preference.title.renderer.debug.angle", nil),
           @"file": @ RENDERER_NAME_MTL_ANGLE},

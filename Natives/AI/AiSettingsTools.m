@@ -84,11 +84,11 @@
     // 必须排在 angle 之后："MetalANGLE" 同样含 "metal" 子串（Task201 随上游同步）
     if ([lower containsString:@"metallum"] || [lower containsString:@"metal"]) return @(RENDERER_NAME_METAL);
     // 必须排在 gl4es 之前："nggl4es" 同样含 "gl4es" 子串（Task206；krypton =
-    // 上游别名 Krypton Wrapper）；"gl4eszl2" 同理必须先于 holy gl4es 匹配
-    // （Task211；zl2classic/zl2 经典版 同义）。
+    // 上游别名 Krypton Wrapper）。Task212：holy gl4es 退役后，裸 "gl4es"
+    // 一词由 ZL2 经典版（gl4es(≤26.2)）接棒匹配。
     if ([lower containsString:@"nggl4es"] || [lower containsString:@"krypton"]) return @(RENDERER_NAME_NGGL4ES);
-    if ([lower containsString:@"gl4eszl2"] || [lower containsString:@"zl2classic"] || [lower containsString:@"zl2 经典"]) return @(RENDERER_NAME_GL4ESZL2);
-    if ([lower containsString:@"gl4es"]) return @(RENDERER_NAME_GL4ES);
+    if ([lower containsString:@"gl4eszl2"] || [lower containsString:@"zl2classic"] ||
+        [lower containsString:@"gl4es"] || [lower containsString:@"zl2 经典"]) return @(RENDERER_NAME_GL4ESZL2);
     if ([lower containsString:@"ltw"]) return @(RENDERER_NAME_LTW);
     return nil;
 }
@@ -101,10 +101,9 @@
     if ([storageKey isEqualToString:@(RENDERER_NAME_MOBILEGLUES)]) return @"MobileGlues (libmobileglues.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_MTL_ANGLE)]) return @"ANGLE/MetalANGLE (libtinygl4angle.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_METAL)]) return @"Metal (libmetallum.dylib)";
-    if ([storageKey isEqualToString:@(RENDERER_NAME_GL4ES)]) return @"GL4ES (libgl4es_114.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_LTW)]) return @"LTW (libltw.dylib)";
     if ([storageKey isEqualToString:@(RENDERER_NAME_NGGL4ES)]) return @"Krypton Wrapper/NG-GL4ES (libnggl4es.dylib)"; // Task209：改名后新名在前，旧名保留供 AI 对话兼容
-    if ([storageKey isEqualToString:@(RENDERER_NAME_GL4ESZL2)]) return @"gl4es ZL2 经典版 (libgl4eszl2.dylib)"; // Task211
+    if ([storageKey isEqualToString:@(RENDERER_NAME_GL4ESZL2)]) return @"gl4es(≤26.2) (libgl4eszl2.dylib)"; // Task211 引入；Task212 用户定名
     return storageKey;
 }
 

@@ -2030,11 +2030,13 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
                 NSLog(@"[JavaLauncher] Auto renderer resolved to %s (modern MC, MobileGL Vulkan direct; config+ctx fixes active)", glLibName);
             } else {
                 NSString *ame173_gl4esPath = [NSBundle.mainBundle.bundlePath
-                    stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_GL4ES]];
+                    stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_GL4ESZL2]];
                 if ([NSFileManager.defaultManager fileExistsAtPath:ame173_gl4esPath]) {
-                    glLibName = RENDERER_NAME_GL4ES;
+                    // Task212：legacy 默认随 holy gl4es 退役改道 ZL2 经典版
+                    // gl4es（gl4es(≤26.2)——同 1.1.4 血统、源码构建）。
+                    glLibName = RENDERER_NAME_GL4ESZL2;
                     setenv("AMETHYST_RENDERER", glLibName, 1);
-                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (legacy MC, gl4es; Task173 change from ANGLE; minVersion=%d)",
+                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (legacy MC, ZL2 classic gl4es; Task212 holy retirement; minVersion=%d)",
                           glLibName, minVersion);
                 } else {
                     glLibName = RENDERER_NAME_MTL_ANGLE;

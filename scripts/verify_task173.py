@@ -245,10 +245,11 @@ check("L2 mgfamily annotated (en)", '"preference.title.renderer.debug.mgfamily" 
 s_zh = rd("Natives/resources/zh-Hans.lproj/Localizable.strings")
 check("L3 auto label zh", '"preference.title.renderer.debug.auto" = "自动";' in s_zh)
 check("L4 mgfamily zh", '"preference.title.renderer.debug.mgfamily" = "MobileGlues (1.17+)";' in s_zh)
-legacy_branch = """glLibName = RENDERER_NAME_GL4ES;
-                    setenv("AMETHYST_RENDERER", glLibName, 1);
-                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (legacy MC, gl4es; Task173 change from ANGLE; minVersion=%d)","""
-check("L5 auto legacy branch -> gl4es", legacy_branch.split("NSLog")[0] in jl)
+legacy_branch = """glLibName = RENDERER_NAME_GL4ESZL2;
+                    setenv("AMETHYST_RENDERER", glLibName, 1);"""
+check("L5 auto legacy branch -> ZL2 classic gl4es (Task212 重锚：holy gl4es 退役改道)",
+      legacy_branch.split("NSLog")[0] in jl
+      and "ZL2 classic gl4es; Task212 holy retirement" in jl)
 check("L6 gl4es-missing ANGLE fallback retained", "gl4es missing, ANGLE fallback" in jl)
 
 print("== M. docs ==")
@@ -258,16 +259,16 @@ ann = json.load(open(os.path.join(REPO, "announcements.json")))
 check("M2 announcement present", any(a["id"] == "task173-ten-fixes-2026-09-26" for a in ann["announcements"]))
 # Task179 重锚：task179@2 插入，全体非钉位再顺延 +1；task178 自 anns[4] -> anns[5]。
 # Task207 重锚：task207@2 插入，全体非钉位再顺延 +1（184/190/193/196/201/206/207 累计）。
-check("M3 announcement at index 10 (Task209 重锚：task209@2 插入后 ten-fixes@15、toggle-173@14、174@13、175@12、177@11、178@10、179@9、180@8、184@7)",
-      ann["announcements"][17]["id"] == "task173-ten-fixes-2026-09-26"  # Task184+190+193+196+201+207 各 +1
-      and ann["announcements"][16]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
-      and ann["announcements"][15]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
-      and ann["announcements"][14]["id"] == "task175-six-fixes-2026-09-26"
-      and ann["announcements"][13]["id"] == "task177-neumorph-css-spec-2026-09-26"
-      and ann["announcements"][12]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
-      and ann["announcements"][11]["id"] == "task179-eight-fixes-2026-09-26"
-      and ann["announcements"][10]["id"] == "task180-opacity-dual-slider-2026-09-26"
-      and ann["announcements"][9]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27")
+check("M3 announcement at index 11 (Task212 重锚：task212@2 插入后 ten-fixes@16、toggle-173@15、174@14、175@13、177@12、178@11、179@10、180@9、184@8)",
+      ann["announcements"][18]["id"] == "task173-ten-fixes-2026-09-26"  # Task184+190+193+196+201+207+212 各 +1
+      and ann["announcements"][17]["id"] == "task173-neumorph-rewrite-toggle-2026-09-25"
+      and ann["announcements"][16]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"
+      and ann["announcements"][15]["id"] == "task175-six-fixes-2026-09-26"
+      and ann["announcements"][14]["id"] == "task177-neumorph-css-spec-2026-09-26"
+      and ann["announcements"][13]["id"] == "task178-neumorph-decouple-opacity-2026-09-26"
+      and ann["announcements"][12]["id"] == "task179-eight-fixes-2026-09-26"
+      and ann["announcements"][11]["id"] == "task180-opacity-dual-slider-2026-09-26"
+      and ann["announcements"][10]["id"] == "task184-revert-180-ui-whitespace-fix-2026-09-27")
 check("M4 server pin still first", ann["announcements"][0]["id"].startswith("server-recommend"))
 
 print("== N. no-regression: balance gates ==")

@@ -3601,3 +3601,63 @@
 //   bracket balance) + announcement cascade re-anchor (32 -> 33, index +1
 //   family) + metallum E2E A/B.
 // ============================================================================
+// -----------------------------------------------------------------------------
+// REVISION 18 addendum (Task 212, no bump)
+// -----------------------------------------------------------------------------
+// [ANGLE] The 99d8122e device log adjudicated the Task211 probes: the MultiDraw
+//   decompose IS engaged (drawcount 2-14 -> per-draw) yet blocks remain
+//   transparent, and BOTH decisive probes fired ZERO times -- the 5-point
+//   readback was gated at swapIndex >= 900 while the whole session ran ~810
+//   swaps (90 short of the gate!), and the fsq census watched glDrawArrays
+//   while MC 26.3's final composite actually draws via glDrawArraysInstanced
+//   (log-proven: mode=4 count=6 inst=1 fullscreen pairs, #4000+ in-world).
+//   Task212 evidence kit: (a) 5-point gate lowered to rounds at swapIndex
+//   240/480/720 (<= 3 per session), (b) instanced fsq census with draw-state
+//   snapshots for the first 4 candidates, (c) a terrain mega-draw landing
+//   probe -- after any glDrawElementsInstancedBaseVertex with count >= 100000
+//   (the log's recurring 222534-vertex chunk-target draws), a 1x1 center
+//   readback from the current framebuffer: nonzero rgb => terrain landed in
+//   the chunk target (look downstream at compositing), black => draw dropped,
+//   nonzero rgb with alpha=0 => the alpha path is broken (SRC_ALPHA blending
+//   renders terrain invisible). <= 2 per session, 1x1 independent reads.
+// [CF] Sandbox-verified the keyless MCIM mirror directly: gameVersion /
+//   modLoaderType / sortField / searchFilter all honoured (4681 hits for
+//   26.3, 4188 for 26.3+fabric), but one transient empty response was
+//   reproduced (same query succeeded on retry). Task212: transient network
+//   errors and empty bodies now auto-retry once (was: only 5xx); the filter
+//   chain gains anchor logs (source switch + reload print tab/source/version/
+//   loader/sort) so the next device log reconciles "what the UI picked" vs
+//   "what the request sent"; the version-tab picker popover anchor no longer
+//   binds to a button inside the hidden sidebar container. A display-layer
+//   lesson is recorded: "[m" sequences in tool output can be eaten as ANSI
+//   reset remnants -- the suspected "sgView dismiss];" source corruption was
+//   a phantom (bytes are "[msgView dismiss];", hex 5b6d); always verify with
+//   byte-level hex before trusting a corruption verdict.
+// [RENDERERS] User-ordered naming and retirement: the ZL2 classic gl4es is
+//   now displayed EXACTLY as "gl4es(<=26.2)" (settings picker, version
+//   manager short name, AI mapping, FAQ x5 copies), and holy gl4es
+//   (libgl4es_114.dylib, prebuilt) is RETIRED entirely per the user's order:
+//   dylib deleted, renderer table entry removed, its Task192/193/202/204
+//   constructor-bootstrap chain retired with it (the successor needs no
+//   pre-dlopen scaffolding: NO_INIT_CONSTRUCTOR + ame211_gl4eszl2_boot),
+//   Makefile binary-patch invocations dropped, and stored selections
+//   (global video.renderer + per-profile renderer) migrate one-shot to
+//   libgl4eszl2.dylib (ame212_migrateHolyGl4es, main.m, before
+//   PLProfiles updateCurrent). l10n key count stays 2418: the
+//   preference.title.renderer.debug.gl4es key was removed from every
+//   language while preference.title.renderer.debug.virgl (the upcoming
+//   renderer's display string "VirGLRenderer(<=26.2)") took its place in
+//   the four full languages -- a deliberate net-zero swap that keeps the
+//   whole 2418-count verifier family untouched.
+// [VIRGL] The port is STARTED (user-ordered; "VirGLRenderer(<=26.2)").
+//   Architecture from ZL2's own integration: guest = Mesa 21.2 virgl build
+//   (PojavLauncherTeam/mesa branch 21.2-virgl, osmesa+virgl, llvm off),
+//   server = virglrenderer vtest (PojavLauncherTeam fork; both repos ship
+//   ios-aarch64 meson cross files + ios.yml recipes), host GL = ANGLE ES3
+//   context on our EGL window surface. Multi-round delivery begins this
+//   task; the display name is already reserved in l10n.
+// Verification: verify_task212 + syntax gates (task193 tinygl real-source
+//   gate, task103 swap gate REPAIRED this round -- it had been stale-failing
+//   since br_get_current/ame139 entered osm_swap_buffers; stubs added) +
+//   bracket-balance (Task212-touched files, HEAD-parity confirmed).
+// ============================================================================

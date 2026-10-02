@@ -495,6 +495,41 @@ void glDrawRangeElementsBaseVertex(GLenum mode, GLuint start, GLuint end, GLsize
     }
 }
 
+/// Task212（ANGLE 方块透明，巨型地形绘制落地探针）：76e2564 装机日志
+/// 实证 in-world 期存在 count=222534 的 glDrawElementsInstancedBaseVertex
+/// 常驻巨型绘制（drawFb=3 = sodium chunk 目标）。在其提交后从【当前帧
+/// 缓冲】做 1x1 中心回读：非黑 rgb => 地形像素已落地 chunk 目标（病灶在
+/// 其后的合成链）；全黑 => 绘制被丢弃/未光栅化；rgb 非黑但 alpha=0 =>
+/// alpha 通路坏（SRC_ALPHA 混合下地形整体透明——与“方块透明”病形直
+/// 接对号）。每会话至多 2 次（Task75 SIGBUS 纪律：1x1 独立小读）。
+static void ame212_terrain_landing_probe(GLsizei count) {
+    if (count < 100000) return;
+    static int s_ame212_tl = 0;
+    if (s_ame212_tl >= 2) return;
+    s_ame212_tl++;
+    AME173_RESOLVE(ame209_ptr_getInt, "glGetIntegerv");
+    typedef void (*ame212_fn_readpx)(int, int, GLsizei, GLsizei, unsigned, unsigned, void *);
+    static ame212_fn_readpx ame212_readpx = NULL;
+    AME173_RESOLVE(ame212_readpx, "glReadPixels");
+    typedef unsigned (*ame212_fn_geterr)(void);
+    static ame212_fn_geterr ame212_geterr = NULL;
+    AME173_RESOLVE(ame212_geterr, "glGetError");
+    if (ame209_ptr_getInt == NULL || ame212_readpx == NULL) return;
+    GLint ame212_vp[4] = {0, 0, 0, 0}, ame212_fb = 0;
+    ame209_ptr_getInt(0x0BA2 /*GL_VIEWPORT*/, ame212_vp);
+    ame209_ptr_getInt(0x8CA6 /*GL_FRAMEBUFFER_BINDING (Task204: 0x8CAA 被 ANGLE 拒绝)*/, &ame212_fb);
+    if (ame212_vp[2] < 2 || ame212_vp[3] < 2) return;
+    while (ame212_geterr && ame212_geterr()) {}
+    unsigned char ame212_px[4] = {0, 0, 0, 0};
+    ame212_readpx(ame212_vp[0] + ame212_vp[2] / 2, ame212_vp[1] + ame212_vp[3] / 2,
+                  1, 1, 0x1908 /*GL_RGBA*/, 0x1401 /*GL_UNSIGNED_BYTE*/, ame212_px);
+    unsigned ame212_err = ame212_geterr ? ame212_geterr() : 0;
+    printf("[tinygl4angle] Task212 terrain landing probe #%d count=%d fb=%u vp=(%d,%d %dx%d) center=(%d,%d,%d,%d) glErr=0x%x -- nonzero rgb => terrain landed in chunk target (look downstream at compositing); black => draw dropped/never rasterized; rgb nonzero with alpha=0 => alpha path broken (SRC_ALPHA blend makes terrain invisible)\n",
+           s_ame212_tl, (int)count, (unsigned)ame212_fb,
+           ame212_vp[0], ame212_vp[1], ame212_vp[2], ame212_vp[3],
+           ame212_px[0], ame212_px[1], ame212_px[2], ame212_px[3], ame212_err);
+}
+
 typedef void (*ame173_fn_glDrawElementsInstancedBaseVertex)(GLenum, GLsizei, GLenum, const void *, GLsizei, GLint);
 static ame173_fn_glDrawElementsInstancedBaseVertex ame173_ptr_glDrawElementsInstancedBaseVertex;
 void glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount, GLint basevertex) {
@@ -510,6 +545,9 @@ void glDrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLenum type, 
     } else {
         glDrawElementsInstanced(mode, count, type, indices, instancecount);
     }
+    // Task212：巨型绘制提交后立即回读当前目标（见函数头注释；放提交后
+    // 才能读到本绘制的输出）。
+    ame212_terrain_landing_probe(count);
 }
 
 typedef void (*ame173_fn_glMultiDrawElementsBaseVertex)(GLenum, const GLsizei *, GLenum, const void *const *, GLsizei, const GLint *);
@@ -882,6 +920,22 @@ void glDrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei inst
             printf("[tinygl4angle] Task209 draw: glDrawArraysInstanced BIG #%u mode=%u count=%d inst=%d first=%d\n",
                    s_ame209_daiBig, (unsigned)mode, (int)count, (int)instancecount, (int)first);
             ame209_draw_state("DrawArraysInstancedBIG");
+        }
+    }
+    // Task212（合成普查补盲）：76e2564 装机日志实证 MC 26.3 的最终合成/
+    // blit 走 glDrawArraysInstanced（mode=TRIANGLES(4)、count=6、inst=1 的
+    // 全屏双三角，in-world 期 #4000+ 常驻），Task211 的 glDrawArrays 版
+    // fsq 普查全程零命中——普查对象搞错了入口。这里补 instanced 版：计数
+    // + 首批样本带状态快照（drawFb/混合态/纹理单元——合成 pass 的目标与
+    // 输入一次性现形）。
+    if ((mode == 4u || mode == 5u || mode == 6u) && count >= 3 && count <= 6 &&
+        instancecount >= 1 && instancecount <= 4) {
+        static unsigned s_ame212_fsq = 0;
+        ++s_ame212_fsq;
+        if (s_ame212_fsq <= 12 || (s_ame212_fsq % 4096) == 0) {
+            printf("[tinygl4angle] Task212 fsq-instanced: fullscreen-quad candidate #%u mode=%u first=%d count=%d inst=%d (composite census; drawArraysInstanced #%u so far)\n",
+                   s_ame212_fsq, (unsigned)mode, (int)first, (int)count, (int)instancecount, ame203_no);
+            if (s_ame212_fsq <= 4) ame209_draw_state("Task212FSQInstanced");
         }
     }
     if (ame203_ptr_drawArraysInst) ame203_ptr_drawArraysInst(mode, first, count, instancecount);

@@ -473,6 +473,9 @@ int main(int argc, char *argv[]) {
     // Task211：CF 源迁 Modrinth + 垃圾 Key 清理（同位置的幂等一次性迁移；
     // 装机锚点 "[Preferences] Task211: ..."，详见 LauncherPreferences.h）
     ame211_migrateCfSourceToModrinth();
+    // Task212：holy gl4es 退役——存量渲染器值迁移到 ZL2 经典版（须在
+    // updateCurrent 之前，profile 解析拿到的即迁移后的值）。
+    ame212_migrateHolyGl4es();
     [PLProfiles updateCurrent];
     init_setupAccounts();
     init_setupCustomControls();

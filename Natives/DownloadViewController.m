@@ -1749,6 +1749,9 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     }
 
     [PLPreferences setDownloadSource:@"curseforge" forType:type];
+    // Task212：筛选链路锚点——源切换落库即打印（与 reload 锚点、CF 侧
+    // starting request 锚点三方对账）。
+    NSLog(@"[DownloadVC] Task212 source switch: type=%@ %@ -> curseforge (keyless mirror eligible)", type, currentSource);
     [self updateSourceSwitchButtonsForType:type];
     [self reloadCurrentList];
 }
@@ -1761,6 +1764,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
     NSString *currentSource = [PLPreferences currentDownloadSourceForType:type];
     if ([currentSource isEqualToString:@"modrinth"]) return;
 
+    NSLog(@"[DownloadVC] Task212 source switch: type=%@ %@ -> modrinth", type, currentSource);
     [PLPreferences setDownloadSource:@"modrinth" forType:type];
     [self updateSourceSwitchButtonsForType:type];
     [self reloadCurrentList];
@@ -2664,8 +2668,10 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
 
-    // iPad popover sourceView 优先使用侧边栏按钮（filterButton 在非版本 tab 隐藏）
-    UIView *sourceView = self.sidebarVersionButton.hidden ? self.filterButton : self.sidebarVersionButton;
+    // iPad popover sourceView：版本 tab 上侧边栏容器整体隐藏但按钮自身
+    // hidden=NO（Task212 修：旧逻辑查 sidebarVersionButton.hidden 永假，
+    // popover 锚到不可见容器内的按钮上，位置漂移）——改查容器可见性。
+    UIView *sourceView = self.filterSidebarContainer.hidden ? self.filterButton : self.sidebarVersionButton;
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         alert.popoverPresentationController.sourceView = sourceView;
         alert.popoverPresentationController.sourceRect = sourceView.bounds;
@@ -2761,7 +2767,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
 
-    UIView *sourceView = self.sidebarSortButton.hidden ? self.filterButton : self.sidebarSortButton;
+    UIView *sourceView = self.filterSidebarContainer.hidden ? self.filterButton : self.sidebarSortButton;  // Task212: 容器可见性
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         alert.popoverPresentationController.sourceView = sourceView;
         alert.popoverPresentationController.sourceRect = sourceView.bounds;
@@ -2797,7 +2803,7 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
 
-    UIView *sourceView = self.sidebarLoaderButton.hidden ? self.filterButton : self.sidebarLoaderButton;
+    UIView *sourceView = self.filterSidebarContainer.hidden ? self.filterButton : self.sidebarLoaderButton;  // Task212: 容器可见性
     if (UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad) {
         alert.popoverPresentationController.sourceView = sourceView;
         alert.popoverPresentationController.sourceRect = sourceView.bounds;
@@ -2821,6 +2827,19 @@ typedef NS_ENUM(NSInteger, ModernAssetType) {
 
 - (void)reloadCurrentList {
     NSInteger tabIndex = self.tabSegment.selectedSegmentIndex;
+    // Task212：筛选链路锚点日志（用户报"CF 筛选功能无法使用"，99d8122e
+    // 装机日志无下载页活动、无法直接取证）——每次列表重载时打印
+    // tab/源/版本/加载器/排序 + 搜索词，下轮装机日志直接对账
+    // "UI 选了什么 vs 请求发了什么"。
+    {
+        NSString *ame212_type = [self typeForTag:(NSInteger)tabIndex];
+        NSString *ame212_src = [PLPreferences currentDownloadSourceForType:ame212_type];
+        NSLog(@"[DownloadVC] Task212 reload: tab=%ld type=%@ source=%@ version=%@ loader=%@ sort=%@",
+              (long)tabIndex, ame212_type, ame212_src,
+              self.currentGameVersion ?: @"(all)",
+              self.currentModLoader ?: @"(all)",
+              self.currentSortField ?: @"(default)");
+    }
     // 切换 API 源时对当前列表做淡出→加载→淡入，避免瞬间清空的生硬感
     UITableView *targetTable = nil;
     if (tabIndex == 1) {

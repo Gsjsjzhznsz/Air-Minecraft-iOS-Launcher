@@ -105,38 +105,22 @@ patch_src = read("scripts/patch_gl4es_rtld_default.py")
 check("C1 补丁脚本在位（RTLD_NEXT→RTLD_DEFAULT）",
       "0x92800020" in patch_src and "RTLD_DEFAULT" in patch_src)
 mk = read("Makefile")
-check("C2 payload 阶段接线补丁",
-      "patch_gl4es_rtld_default.py $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/libgl4es_114.dylib" in mk)
-# 幂等 + 字节验证（副本上实测）
-tmpd = tempfile.mkdtemp()
-try:
-    dylib_copy = os.path.join(tmpd, "libgl4es_114.dylib")
-    shutil.copy("Natives/resources/Frameworks/libgl4es_114.dylib", dylib_copy)
-    r1 = subprocess.run([sys.executable, "scripts/patch_gl4es_rtld_default.py", dylib_copy, "--verify"],
-                        capture_output=True, text=True)
-    check("C3 原件未打补丁（verify 模式识别 pristine）", "NOT PATCHED" in r1.stdout, r1.stdout[-100:])
-    r2 = subprocess.run([sys.executable, "scripts/patch_gl4es_rtld_default.py", dylib_copy],
-                        capture_output=True, text=True)
-    check("C4 副本打补丁成功", r2.returncode == 0 and "PATCHED" in r2.stdout, r2.stdout[-100:])
-    with open(dylib_copy, "rb") as f:
-        blob = f.read()
-    w = _s.unpack("<I", blob[0x136DEC:0x136DEC+4])[0]
-    check("C5 补丁字节 = mov x0, #-2 (0x92800020)", w == 0x92800020, hex(w))
-    r3 = subprocess.run([sys.executable, "scripts/patch_gl4es_rtld_default.py", dylib_copy],
-                        capture_output=True, text=True)
-    check("C6 幂等（二次运行识别已打）", "PATCH PRESENT" in r3.stdout, r3.stdout[-100:])
-finally:
-    shutil.rmtree(tmpd, ignore_errors=True)
-# 仓库原件必须保持 pristine（补丁只在 payload 打）
-with open("Natives/resources/Frameworks/libgl4es_114.dylib", "rb") as f:
-    orig = f.read()
-w0 = _s.unpack("<I", orig[0x136DEC:0x136DEC+4])[0]
-check("C7 仓库原件保持 pristine (0x92800000)", w0 == 0x92800000, hex(w0))
+# Task212 重锚：holy gl4es（libgl4es_114.dylib）整体退役——补丁接线随 dylib 移除，
+# 补丁脚本作为历史工件保留在 scripts/（源码法证与复现记录），仓库不再随包该 dylib。
+check("C2 payload 接线已随退役移除（Task212 重锚）",
+      "patch_gl4es_rtld_default.py" not in mk
+      and "holy gl4es（libgl4es_114.dylib）退役删除" in mk)
+import os as _os
+check("C3 仓库不再携带 holy gl4es dylib（Task212 退役）",
+      not _os.path.exists("Natives/resources/Frameworks/libgl4es_114.dylib"))
+check("C4 补丁脚本作为历史工件保留（可复现记录）",
+      _os.path.exists("scripts/patch_gl4es_rtld_default.py"))
 
 egl = read("Natives/egl_bridge.m")
-check("C8 egl_bridge gl4es 分支 RTLD_GLOBAL 预载（Task193 重锚：+1 = 临时上下文引导的显式 dlopen）",
-      "Task192: preloading ANGLE frameworks RTLD_GLOBAL" in egl and
-      egl.count('RTLD_NOW | RTLD_GLOBAL') == 3)
+check("C8 egl_bridge 引导链随退役收档（Task212 重锚：Task192/193/202/204 的 holy 构造器铺垫退役，改道 ame211_gl4eszl2_boot）",
+      "holy gl4es（libgl4es_114.dylib）整体退役" in egl and
+      "ame211_gl4eszl2_boot" in egl and
+      "Task212: renderer '%@' -> ZL2 classic gl4es" in egl)
 
 # ============================== D. 控件仓库崩溃 ==============================
 print("== D. CCMenu picker guards ==")

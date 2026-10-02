@@ -255,7 +255,7 @@
 "preference.title.renderer.release.zink" = "Zink";
 
 "preference.title.renderer.debug.auto" = "自动";
-"preference.title.renderer.debug.gl4es" = "holy gl4es - OpenGL 2.1";
+"preference.title.renderer.debug.virgl" = "VirGLRenderer(≤26.2)";
 "preference.title.renderer.debug.angle" = "ANGLE（1.17+）- OpenGL 3.2";
 "preference.title.renderer.debug.mg" = "MobileGlues（1.17+）- OpenGL 4.0~4.6";
 "preference.title.renderer.debug.zink" = "Zink（Mesa 25.0.7）- OpenGL 4.1";
@@ -266,7 +266,7 @@
 "preference.title.renderer.debug.mobilegl_gles" = "MobileGL（GLES 后端）- GL→OpenGL ES，实验性";
 "preference.title.renderer.debug.metal" = "Metal (metallum)";
 "preference.title.renderer.debug.nggl4es" = "Krypton Wrapper（≤26.2）";
-"preference.title.renderer.debug.gl4eszl2" = "gl4es（ZL2 经典版）";
+"preference.title.renderer.debug.gl4eszl2" = "gl4es(≤26.2)";
 
 "preference.detail.renderer" = "更改使用的渲染器";
 

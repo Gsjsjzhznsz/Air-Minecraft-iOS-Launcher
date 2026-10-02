@@ -48,6 +48,9 @@ void ame166_migrateMgDsaBlackScreen(void);
 /// 哨兵键 general.task211_cf_source_migrated 保证只执行一次；常跑点在
 /// main.m（toggleIsolatedPref 之后——Task167 教训：不能挂场景会话回调）。
 void ame211_migrateCfSourceToModrinth(void);
+/// Task212：holy gl4es 退役迁移（video.renderer/profile renderer 存量
+/// libgl4es_114.dylib -> libgl4eszl2.dylib）。幂等；main.m 常跑点调用。
+void ame212_migrateHolyGl4es(void);
 
 id getPrefObject(NSString *key);
 BOOL getPrefBool(NSString *key);

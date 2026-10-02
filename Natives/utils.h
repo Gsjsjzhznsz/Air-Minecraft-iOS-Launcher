@@ -45,7 +45,10 @@ extern "C" {
 #define GLFW_FOCUSED 0x00020001
 #define GLFW_VISIBLE 0x00020004
 
-#define RENDERER_NAME_GL4ES "libgl4es_114.dylib"
+// Task212：holy gl4es（libgl4es_114.dylib）已退役删除。历史存量值由
+// main.m 的 ame212_migrateHolyGl4es 一次性迁移到 ZL2 经典版
+// （RENDERER_NAME_GL4ESZL2）；egl_bridge/JavaLauncher 的 auto 兜底同步
+// 改道。迁移判定用字面量 "libgl4es_114.dylib"（宏已随渲染器退役）。
 #define RENDERER_NAME_MTL_ANGLE "libtinygl4angle.dylib"
 // Task173：VGPU 渲染器（PojavLauncherTeam/VGPU，gl4es 分支 + 强化着色器
 // 语法转换，旧版 MC <1.13 生态；FCL 同款可选渲染器，iOS 移植见

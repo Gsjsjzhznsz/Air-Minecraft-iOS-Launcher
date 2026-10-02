@@ -676,10 +676,12 @@ payload: native dep_mg java jre assets dep_shader_shims dep_openal_shim dep_mith
 	# libEGL/libGLESv2 框架（它们是 gl4es 的依赖，加载在它之前）→ 构造器
 	# 内 egl_* 全 NULL → 调 NULL → SIGSEGV pc=0（956ea9b 装机 latestlog.old）。
 	# 改为 RTLD_DEFAULT（全局作用域可见这些框架）。补丁幂等 + 指纹防漂移。
-	python3 $(SOURCEDIR)/scripts/patch_gl4es_rtld_default.py $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/libgl4es_114.dylib || exit 1
 	# Task202——gl4es 构造器崩溃免疫：GetHardwareExtensions 的 glGetString(GL_EXTENSIONS) 无上下文时返回 NULL，
 	# 首个 strstr(NULL) 峻 SIGSEGV（e4d704e 装机 latestlog.1 反盘；垫片把 NULL 换成空串，构造器完整跑完）
-	python3 $(SOURCEDIR)/scripts/patch_gl4es_ggstr_nullguard.py $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/libgl4es_114.dylib || exit 1
+	# Task212：holy gl4es（libgl4es_114.dylib）退役删除——Task192 的 RTLD_DEFAULT
+	# 补丁与 Task202 的 ggstr NULL 守卫两个二进制手术随 dylib 一并移除：接棒者
+	# ZL2 经典版 gl4es（libgl4eszl2.dylib，dep_gl4eszl2 目标）从源码构建，
+	# 构建期即带 Task208 三件套，无需任何 post-build 二进制补丁。
 	cp $(WORKINGDIR)/*.dylib $(WORKINGDIR)/AngelAuraAmethyst.app/Frameworks/ || exit 1
 	# spirv-cross 软链接（防御性兜底）：若 MobileGlues 构建产出 libspirv-cross-c-shared.0.dylib，
 	# 创建 libspirv-cross.dylib 软链接，兼容按 macOS 默认名加载的 native 代码。

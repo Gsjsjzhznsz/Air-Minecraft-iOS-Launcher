@@ -64,16 +64,25 @@ check("A4 仓库 jar 已变更（对比 Task201 原版字节）",
       r.stdout[:120])
 
 # E2E 行为门（java 可用时）：补丁版 = daemon=true + 即退 0
+# Task212 修：探针类改为现场编译（旧会话曾依赖 /tmp/t211 的预编译产物，
+# 沙箱重置即蒸发——A5 因此误报）。自包含后任何环境可复跑。
 have_java = run(["bash", "-lc", "command -v java"]).returncode == 0
 if have_java:
     try:
-        r = subprocess.run(["timeout", "30", "java", "-javaagent:JavaApp/libs/others/metallum_agent.jar",
-                            "-cp", "/tmp/t211", "T211Probe"],
-                           capture_output=True, text=True, timeout=45, cwd=REPO)
-        ok = (r.returncode == 0 and "metallum-dump daemon=true" in r.stdout
-              and "metallum-state daemon=true" in r.stdout)
-        check("A5 E2E 行为门（仓库 jar as -javaagent）", ok,
-              f"exit={r.returncode} out={r.stdout[:200]}")
+        import tempfile as _tf
+        _t211dir = _tf.mkdtemp(prefix="t211probe_")
+        _rc = subprocess.run(["javac", "-d", _t211dir, "scripts/task211_metallum_probe.java"],
+                             capture_output=True, text=True, timeout=60, cwd=REPO)
+        if _rc.returncode != 0:
+            check("A5 E2E 行为门（仓库 jar as -javaagent）", False, f"javac: {_rc.stderr[:160]}")
+        else:
+            r = subprocess.run(["timeout", "30", "java", "-javaagent:JavaApp/libs/others/metallum_agent.jar",
+                                "-cp", _t211dir, "T211Probe"],
+                               capture_output=True, text=True, timeout=45, cwd=REPO)
+            ok = (r.returncode == 0 and "metallum-dump daemon=true" in r.stdout
+                  and "metallum-state daemon=true" in r.stdout)
+            check("A5 E2E 行为门（仓库 jar as -javaagent）", ok,
+                  f"exit={r.returncode} out={r.stdout[:200]}")
     except Exception as e:
         check("A5 E2E 行为门（仓库 jar as -javaagent）", False, str(e)[:120])
 else:
@@ -144,9 +153,9 @@ check("C3 全屏四边形普查（final-blit 可见性）",
       "Task211 fsq: fullscreen-quad candidate" in tg
       and "(mode == 4u || mode == 5u || mode == 6u) && count >= 3 && count <= 6" in tg)
 gb = rd("Natives/ctxbridges/gl_bridge.m")
-check("C4 五点 in-world 回读（swapIndex>=900 门 + 中心/四角 + 1x1 独立小读）",
+check("C4 五点 in-world 回读（Task212 降门 240/480/720 三轮 + 中心/四角 + 1x1 独立小读）",
       "Task211 5-point in-world readback" in gb
-      and "swapIndex >= 900" in gb and "s_task211_5pt < 2" in gb
+      and "(swapIndex == 240 || swapIndex == 480 || swapIndex == 720)" in gb and "s_task211_5pt < 3" in gb
       and "ame211_xs[5]" in gb and "0x1908 /*GL_RGBA*/, 0x1401 /*GL_UNSIGNED_BYTE*/" in gb)
 check("C5 五点门与 Task188 同界（drawFb==0 + viewport 有效）且 Task75 纪律注释在场",
       "drawFb == 0 && viewport[2] > 16 && viewport[3] > 16" in gb
@@ -171,14 +180,15 @@ check("E1 version.h Task211 附录（五主题 + 尾部 SEP）",
       and "ALWAYS decompose into per-draw" in vh
       and re.search(r"// ={70,}\s*$", vh) is not None)
 ann = json.loads(rd("announcements.json"))["announcements"]
-check("E2 公告 task211@2（33 条 + 钉死不动 + task210 顺延 + 尾锚）",
-      len(ann) == 33 and ann[2]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
+check("E2 公告 task211@3（Task212 重锚：34 条 + task212@2 插入顺延 + 尾锚）",
+      len(ann) == 34 and ann[3]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[3]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
+      and ann[2]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"
+      and ann[4]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
       and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
 check("E3 公告内容五主题齐备",
-      all(k in ann[2]["content"] for k in
+      all(k in ann[3]["content"] for k in
           ("退出", "CurseForge", "Modrinth", "拆解", "ZL2 经典版", "virglrenderer")))
 
 # ============ F. 语法门 + 级联 ============

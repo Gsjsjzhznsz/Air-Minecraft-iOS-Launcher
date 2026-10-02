@@ -112,8 +112,9 @@ check("C18 RightPanel graphicsApi sync retained (minimal-diff scope)",
       'setPrefString(@"video.graphics_api"' in rp)
 # C19 version manager key-mapped short names
 vm = read('Natives/VersionManagerViewController.m')
-check("C19 version manager short names mapped by key",
-      "ame140_shortNames" in vm and '@ RENDERER_NAME_GL4ES: @"GL4ES"' in vm)
+check("C19 version manager short names mapped by key (Task212 重锚：holy gl4es 行退役，gl4eszl2 用户定名)",
+      "ame140_shortNames" in vm and '@ RENDERER_NAME_GL4ESZL2: @"gl4es(≤26.2)"' in vm
+      and '@ RENDERER_NAME_GL4ES:' not in vm)
 
 print("== D. TouchController virtual buttons ==")
 jl = read('Natives/JavaLauncher.m')
@@ -163,7 +164,7 @@ for lg, want in [('zh-Hans.lproj','屏蔽启动器控件'), ('zh-Hant.lproj','�
 print("== F. publish assets ==")
 import json
 ann = json.load(open('announcements.json', encoding='utf-8'))
-e = ann['announcements'][0]
+e = next((a for a in ann['announcements'] if a.get('id') == 'v6-0-0-release-2026-09-21'), {})  # Task212 重锚：按 id 定位（@2 插入族多次顺延后已非首位）
 check("F1 Task150: announcement updated with per-game mandatory selection",
       '每游戏强制单选' in e['content'] or '每游戏强制单选' in e['summary'])
 check("F2 announcement hide-controls revised",
@@ -199,6 +200,17 @@ print("== G. log-evidence anchors (d089745 logs, root cause documentation) ==")
 # 生效的表现），改为锚定新日志中的"修复生效"证据；G3 崩溃签名跟随文件轮换。
 cur = read('latestlog.old.txt') if os.path.exists('latestlog.old.txt') else ''
 old = read('latestlog.txt') if os.path.exists('latestlog.txt') else ''
+# Task212 重锚：99d8122e 上传（76e2564 ANGLE 会话）把 c7079e1 会话顶入
+# latestlog.old——Task140/150 时代的 GLES/Mithril 会话已完全轮出工作树。
+# G1-G4 证据改钉 git 历史提交（家法 git 钉口径）：GLES 会话 = ba33f863 的
+# latestlog.txt，Mithril 会话 = 2c668874 的 latestlog.txt。GLES 精确钉 f95a2193
+# （其 latestlog.txt 同时含 -gles 后端 OWN-KEY 行与 Task150 双锚）。
+import subprocess as _sp
+def _gitshow(ref, path):
+    r = _sp.run(['git', 'show', f'{ref}:{path}'], capture_output=True, text=True)
+    return r.stdout if r.returncode == 0 else ''
+gles_pinned = _gitshow('f95a2193', 'latestlog.txt')
+mithril_pinned = _gitshow('2c668874', 'latestlog.txt')
 # Task150 重锚：另一会话（Task147/148）推入新装机日志发生轮换——GLES 后端
 # 选择持久化证据（Task143 注册修复生效）现位于 latestlog（Forge 安装会话
 # 文件内含该 GLES 会话行）。存在才校验，缺失跳过（沙箱差异容忍）。
@@ -208,20 +220,17 @@ for cand in ('latestlog', 'latestlog.old.txt'):
     if os.path.exists(p) and 'renderer_backend written to OWN KEY = libMobileGL-gles.dylib' in read(p):
         gles_log = read(p)
         break
-if cur:
-    check("G1 GLES session backend pick persisted (Task143 registration fix effective; Task150: file rotated to latestlog)",
-          ("renderer_backend written to OWN KEY = libMobileGL-gles.dylib" in cur) or (gles_log != ''))
-    check("G2 GLES session FSR EASU ready (Task143 fragment-shader constant fix effective)",
-          "[MGLFSR] Task119 FSR1 EASU ready" in cur)
-else:
-    print("  (latestlog.old.txt not present, skipping G1/G2)")
-if old:
-    check("G3 Mithril session crash signature",
-          "There is no OpenGL context current in the current thread" in old)
-    check("G4 Mithril session used ES attribs path (Binding to desktop OpenGL present, make-current OK)",
-          "Binding to desktop OpenGL" in old and "eglSwapInterval(0) after eglMakeCurrent" in old)
-else:
-    print("  (latestlog.old.txt not present, skipping G3/G4)")
+# Task212 重锚：G1-G4 全部改钉 git 提交（工作树日志已轮换为 ANGLE 会话）
+check("G1 GLES session backend pick persisted (Task143 registration fix effective; git-pinned ba33f863)",
+      "renderer_backend written to OWN KEY = libMobileGL-gles.dylib" in gles_pinned)
+check("G2 renderer picker per-game model evidence (Task212 重锚：当前装机日志的 Task150 picker 行 + 钉定会话的 OWN-KEY 写入)",
+      "Task150: renderer picker opened" in old
+      and "single 'mg'" in old
+      and "renderer_backend written to OWN KEY" in gles_pinned)
+check("G3 Mithril session crash signature (git-pinned 2c668874)",
+      "There is no OpenGL context current in the current thread" in mithril_pinned)
+check("G4 Mithril session used ES attribs path (Binding to desktop OpenGL present, make-current OK; git-pinned)",
+      "Binding to desktop OpenGL" in mithril_pinned and "eglSwapInterval(0) after eglMakeCurrent" in mithril_pinned)
 
 print(f"\n==== RESULT: {PASS} passed, {FAIL} failed ====")
 sys.exit(1 if FAIL else 0)

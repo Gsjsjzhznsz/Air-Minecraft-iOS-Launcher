@@ -24,6 +24,13 @@
       "image_url": ""
     },
     {
+      "id": "task212-angle-cf-renderers-virgl-2026-10-02",
+      "date": "2026-10-02",
+      "title": "ANGLE 方块透明决战探针 + CF 筛选加固 + 渲染器更名「gl4es(≤26.2)」+ holy gl4es 退役 + VirGLRenderer(≤26.2) 移植启动",
+      "summary": "ANGLE 方块透明的两个决定性探针降门补盲（上轮全程未触发）；CurseForge 筛选链路加固与锚点日志；ZL2 经典版 gl4es 按用户定名改为 gl4es(≤26.2)；holy gl4es 渲染器整体退役；virglrenderer（VirGLRenderer(≤26.2)）移植开工。",
+      "content": "Task 212 五主题（装机日志 99d8122 判读 + 用户五项指令）。\n\n一、ANGLE 方块透明决战（探针降门 + 补盲）。上轮装机日志判读：MultiDraw 拆解已生效（drawcount 2-14 逐 draw 提交中），但两个决定性探针全程零触发——五点回读的门设在 swapIndex>=900，而该会话总共只跑了约 810 帧（差 90 帧未到门！）；四边形普查盯的是 glDrawArrays，而 MC 26.3 的最终合成实际走 glDrawArraysInstanced（日志实证 mode=4/count=6 的全屏双三角每帧常驻）。本轮：五点回读降门为 240/480/720 三轮（较短会话也能采到 in-world 数据）；普查补上 instanced 入口并带绘制状态快照；新增地形巨型绘制落地探针（count=222534 的 chunk 目标绘制后立即 1x1 中心回读——非黑=像素已落地看合成链、全黑=绘制被丢、alpha=0=alpha 通路坏，三选一直接定谳）。\n\n二、CurseForge 筛选链路加固。沙盒直连免 Key 镜像实测：版本/加载器/排序/搜索全部参数工作正常，但偶发瞬态空响应（同查询重发即成功）。修复：瞬态网络错误与空响应一律自动退避重试；侧边栏筛选全链路新增锚点日志（源切换/列表重载打印 tab+源+版本+加载器+排序，下轮装机日志直接对账）；修复版本 tab 筛选弹窗锚点漂移。\n\n三、渲染器更名「gl4es(≤26.2)」（用户定名，一字不加）。设置页/版本管理器/AI 助手/帮助页 FAQ 全部同步。\n\n四、holy gl4es 渲染器退役（用户明令删除）。预构建的 libgl4es_114.dylib 及其全部运行时接线和两个二进制补丁一并移除；存量设备的选择自动迁移到同血统的 gl4es(≤26.2)（源码构建版接棒）。\n\n五、VirGLRenderer(≤26.2) 移植开工（用户点名）。ZL2 的 virgl 渲染器：virglrenderer 服务端（vtest）+ 带 virgl 驱动的 guest Mesa + ANGLE 宿主上下文三方架构；上游 PojavLauncherTeam 已有 iOS 交叉编译配方，本轮开始移植，多轮工程分阶段交付。"
+    },
+    {
       "id": "task211-exit-cf-angle-gl4es-2026-10-02",
       "date": "2026-10-02",
       "title": "退出“崩溃”根治 + CurseForge 403 修复 + ANGLE 方块透明攻坚 + 新渲染器 gl4es（ZL2 经典版）",

@@ -88,6 +88,12 @@ static bool ame109_window_active(long f) { (void)f; return false; }
 static bool ame109_trial_gate(bool fsrActive) { (void)fsrActive; return false; }
 static uint64_t mach_absolute_time(void) { return 0; }
 struct osm_bundle_t { uint32_t width, height; void *buffer; void *color_space; };
+// ---- Task212 门修复：补 Task109 之后加入 osm_swap_buffers 的符号桩 ----
+// （bridge_tbl 的 br_get_current 与 Task139 的输入缩放复位钩子；本门
+// 自 Task109 后未随之更新，先于本轮即已 SYNTAX FAIL——git 实证与 Task212
+// 改动无关，这里修复恢复门的守护力。）
+static basic_render_window_stub *br_get_current(void) { return currentBundle; }
+static void ame139_fsr_heal_reset_input_scale(void) {}
 // ---- 桩：CG / Surface / dispatch ----
 static void *dispatch_get_main_queue(void) { return (void *)1; }
 template <typename F> static void dispatch_async(void *, F) {}

@@ -859,16 +859,19 @@ static void ame_task41_swap_forensics(EGLSurface surface, unsigned long swapInde
             // Task211（ANGLE 方块透明，in-world 五点回读）：帧内容"是否已
             // 进入默认帧缓冲"的决定性二分。Task188 的 1x1 中心回读配额 3 次
             // 几乎总被加载屏消耗（88fa3f6/17c51003 两会话 in-world 采样数
-            // 均为零）。本探针以 swapIndex >= 900（约 15s+，越过后加载期）
-            // 为门做五点读（中心 + 四角内缩 8px）：任一角非黑 => post 内容
-            // 已进 fb0（最终合成已落地，病灶在合成的上游）；全黑 => 最终
-            // 合成未提交/未落地（blit 链方向）。五次 1x1 独立小读（Task75
-            // SIGBUS 教训：全屏 BGRA 回读路径禁用）；每会话至多 2 轮。
-            // ============================================================
+            // 均为零）。本探针做五点读（中心 + 四角内缩 8px）：任一角非黑
+            // => post 内容已进 fb0（最终合成已落地，病灶在合成的上游）；
+            // 全黑 => 最终合成未提交/未落地（blit 链方向）。五次 1x1 独立
+            // 小读（Task75 SIGBUS 教训：全屏 BGRA 回读路径禁用）。
+            // Task212（门修）：99d8122e 会话总 swap 数约 810，>=900 的门
+            // 全程未触发（探针零采样）——降门为 240/480/720 三轮（每轮
+            // 均落在 %200 探针帧上），用户较短会话也能拿到 in-world 数据。
             {
                 static int s_task211_5pt = 0;
                 if (drawFb == 0 && viewport[2] > 16 && viewport[3] > 16 &&
-                    es.readPixels != NULL && swapIndex >= 900 && s_task211_5pt < 2) {
+                    es.readPixels != NULL &&
+                    (swapIndex == 240 || swapIndex == 480 || swapIndex == 720) &&
+                    s_task211_5pt < 3) {
                     s_task211_5pt++;
                     while (es.getError()) {}
                     const int ame211_xs[5] = {
