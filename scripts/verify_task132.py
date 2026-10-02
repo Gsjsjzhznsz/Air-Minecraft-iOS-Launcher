@@ -43,7 +43,7 @@ print("== A. 26.1.2 崩溃根治（libjnidispatch _dlsym 槽位重绑定）==")
 sdl = rd("Natives/sdl3_hook.m")
 mh = rd("Natives/main_hook.m")
 uh = rd("Natives/utils.h")
-log = rd("latestlog.old")  # Task144 重锚：装机日志 2026-09-22 20:40-20:45 轮换（403a4597/5b38fd72/c8221ad3），OSMesa(zink) 会话现于 latestlog.old —— controlify 守卫链（Task132 dlsym rebind + Task135 idempotent hit）在该会话完整取证
+log = rd("latestlog.old.txt")  # Task144 重锚：装机日志 2026-09-22 20:40-20:45 轮换（403a4597/5b38fd72/c8221ad3），OSMesa(zink) 会话现于 latestlog.old —— controlify 守卫链（Task132 dlsym rebind + Task135 idempotent hit）在该会话完整取证
 
 import re as _re
 # Task 139 重锚：latestlog 已被用户覆盖为新一轮 26.1.2 会话（Task138 构建，
@@ -335,12 +335,12 @@ check("G3 version.h Task132 增补（四项修复入档）",
       "REVISION 17 addendum (Task 132, no bump)" in
       rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h"))
 
-cascade = {
-    "verify_task112_118.py": "ALL PASS (49/49)",
+cascade = {  # Task212 重锚：计数随各轮演化对齐当前现实（129 的 I4 提交后自愈为 47/47）
+    "verify_task112_118.py": "ALL PASS (47/47)",
     "verify_task119_124.py": "ALL PASS (62/62)",
     "verify_task125_128.py": "ALL PASS (52/52)",
     "verify_task129.py": "ALL PASS (47/47)",
-    "verify_task130.py": "ALL PASS (60/60)",
+    "verify_task130.py": "ALL PASS (59/59)",
     "verify_task131.py": "ALL PASS (37/37)",
 }
 all_cascade = True

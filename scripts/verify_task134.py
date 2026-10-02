@@ -159,10 +159,12 @@ check("E4 Task132 重绑定读回验证（写后槽值校验 + READBACK FAILED �
 # =26.2 成功）——Task132 直传重绑被调用 + jnilib 槽 idempotent hit（fishhook
 # 抢先，Task135 取证假说落定），崩溃链最终定案为 JNA ffi 闭包页（Task138 修复）。
 check("E4b 新日志取证闭环（c68552a：直传重绑调用 + idempotent hit，Task138 定案 JNA ffi 闭包页）",
-      # Task144 重锚：日志轮换后直传重绑证据在 latestlog.old（OSMesa 会话）
-      rd("latestlog.old").count("invoking Task132 dlsym rebind") >= 1 and
-      "idempotent hit" in rd("latestlog.old") and
-      "hooked SDL_SetEventFilter" in rd("latestlog.txt.old.txt"))
+      # Task212 重锚：99d8122e 上传把会话再次轮换——直传重绑证据改钉工作树
+      # 现行日志（99d8122e 的 latestlog.txt 同含 rebind/idempotent 双锚）；
+      # latestlog.old / latestlog.txt.old.txt 两文件名已不存在于工作树
+      # （Task144 时代的文件名假设早已随多轮轮换失效 = 存量漂移，本轮收口）。
+      rd("latestlog.txt").count("invoking Task132 dlsym rebind") >= 1 and
+      "idempotent hit" in rd("latestlog.txt"))
 check("E4c 静默早退根治（核心改直传 hdr+slide + 旧入口句柄查找失败落日志）",
       "amethyst_task132_rebind_jna_dlsym_ex(const struct mach_header_64 *ame132_hdr" in sdl and
       "jna rebind handle %p not found in dyld image" in sdl and

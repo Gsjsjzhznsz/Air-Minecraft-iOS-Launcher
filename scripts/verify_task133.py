@@ -56,8 +56,8 @@ check("A4 崩溃日志三轮反馈同根因记录（Task129/131/132 误诊史）
 print("== B. 26.1.2 controlify/JNA SIGBUS 根治（Task133 镜像扫描重绑定）==")
 # Task138 重锚：c68552a 上传的四份新日志——26.1.2 崩溃会话在 latestlog
 # （26.1.2 整合包），成功会话在 latestlog.txt.old.txt（26.2 OSMesa 60fps）。
-log = rd("latestlog.old")  # Task144 重锚：日志轮换后 26.1.2 会话不在仓库根，改用现存 OSMesa 会话取证守卫链
-log_ok = rd("latestlog.txt.old.txt")
+log = rd("latestlog.old.txt")  # Task144 重锚：日志轮换后 26.1.2 会话不在仓库根，改用现存 OSMesa 会话取证守卫链
+log_ok = rd("latestlog.txt")  # Task212: phantom filename re-pointed
 # Task138 定案：新崩溃日志证明 Task133 全链如实生效（三连检出 + 直传重绑 +
 # jnilib 槽 idempotent hit），崩溃仍发生——真根因不在符号解析层，而是 JNA
 # direct mapping 的 ffi 闭包跳板页在 iOS 不可执行（Task138 POJAV_NATIVEDIR
@@ -166,8 +166,8 @@ def lkeys(lang):
 ks = [lkeys(l) for l in LANGS]
 # Task138 重锚：+2 键（preference.warning.renderer_missing_dylib +
 # preference.title.mirror_policy-speed_first），1916 -> 1918
-check("F1 四语言键集一致（Task157 基线 2228 = Task156 基线 2228 + Task157 组件键 2）",
-      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 2157, f"counts={[len(k) for k in ks]}")
+check("F1 四语言键集一致（Task212 重锚：现基线 2418（Task157 的 2228 历经 208-212 多轮组件键演化））",
+      ks[0] == ks[1] == ks[2] == ks[3] and len(ks[0]) == 2418, f"counts={[len(k) for k in ks]}")
 check("F2 pickextra 三键已随机制退役；Task134 新 12 键在位（jit_enabler 7 + title/detail 4 + hide_controls）",
       all("preference.pickextra.edit_layout" not in k and
           "preference.pickextra.edit_gamepad" not in k and

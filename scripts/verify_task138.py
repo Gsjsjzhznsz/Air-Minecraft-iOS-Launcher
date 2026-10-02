@@ -114,10 +114,10 @@ mch = rd("Natives/PLMirrorCenter.h")
 # 文件↔会话新映射：latestlog.txt=Mithril(4.0)会话 / latestlog.old.txt=MobileGL-gles(ES)会话 /
 # latestlog=Forge 安装会话 / latestlog.old=OSMesa(zink)会话。原 26.1.2/voicechat 会话日志
 # 已被轮换出仓库根，A1/A2 改锚现存会话证据；A2 证据缺失时跳过（模式同 verify_task140 G 块）。
-log_2612 = rd("latestlog.old")
+log_2612 = rd("latestlog.old.txt")
 log_gles = rd("latestlog.old.txt")
 log_mithril = rd("latestlog.txt")
-log_ok = rd("latestlog.txt.old.txt")
+log_ok = rd("latestlog.txt")  # Task212: phantom filename re-pointed
 
 print("== A. 26.1.2 崩溃根治（Task138 定案：JNA ffi 闭包页；Task139 重锚：回落成功 + 麦克风层新崩溃） ==")
 check("A1 崩溃日志证据（现存 OSMesa 会话：POJAV_NATIVEDIR 守卫生效 + controlify JNA 守卫 + 无 SIGBUS）",

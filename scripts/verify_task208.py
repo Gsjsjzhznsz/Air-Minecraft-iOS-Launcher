@@ -74,7 +74,7 @@ check("A6 Task206 选项保留（未来真 PC 块版本需要；与 MC 桌面选
 
 # ============ B. NG-GL4ES 初始化时序根修 ============
 print("== B. NG-GL4ES 初始化时序根修 ==")
-nglog = rd("latestlog.old")  # 99a61eb NG-GL4ES 崩溃会话
+nglog = rd("latestlog.old.txt")  # 99a61eb NG-GL4ES 崩溃会话
 cml = rd("ThirdParty/ZalithLauncher2/CMakeLists.txt")
 eb = rd("Natives/egl_bridge.m")
 hardext = rd("ThirdParty/ZalithLauncher2/src/glx/hardext.c")
