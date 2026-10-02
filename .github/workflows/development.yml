@@ -139,7 +139,12 @@ jobs:
         run: |
           brew install meson ninja bison || true
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
-          python3 -m pip install --user mako || pip3 install --user mako || true
+          # mako 必须装进 brew python3（Mesa 的 find_installation 用 PATH 里的 python3
+          # = brew python；PEP 668 externally-managed 会拒绝 --user 安装，
+          # 因此 --break-system-packages 优先）
+          python3 -m pip install --break-system-packages --user mako 2>/dev/null \
+            || python3 -m pip install --user mako 2>/dev/null \
+            || pip3 install --user mako || true
 
       - name: Remove work folders
         run: |

@@ -656,10 +656,10 @@ dep_virgl:
 	# ---- 0. meson 交叉文件（本地生成，SDK 路径随机器变化）----
 	printf '%s\n' \
 		'[binaries]' \
-		'c = clang' \
-		'cpp = clang++' \
-		'ar = ar' \
-		'strip = strip' \
+		"c = 'clang'" \
+		"cpp = 'clang++'" \
+		"ar = 'ar'" \
+		"strip = 'strip'" \
 		'' \
 		'[properties]' \
 		"c_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
@@ -668,10 +668,10 @@ dep_virgl:
 		"cpp_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" \
 		'' \
 		'[host_machine]' \
-		'system = darwin' \
-		'cpu_family = aarch64' \
-		'cpu = aarch64' \
-		'endian = little' \
+		"system = 'darwin'" \
+		"cpu_family = 'aarch64'" \
+		"cpu = 'aarch64'" \
+		"endian = 'little'" \
 		> $(WORKINGDIR)/virgl-cross.txt
 	# ---- 1. libepoxy（静态，装进 libvtestserver.dylib）----
 	rm -rf $(WORKINGDIR)/virgl-epoxy $(WORKINGDIR)/virgl-prefix

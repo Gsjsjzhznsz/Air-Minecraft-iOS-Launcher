@@ -1522,3 +1522,17 @@ Stage Summary:
 - 装机待验证：① VirGLRenderer(≤26.2) 进游戏（[VirGL] Task215 引导日志；首版呈现 = glReadPixels 回读链路）② ANGLE 方块不透明（"[tinygl4angle] Task215 ANGLE-Metal depth-clear workaround armed" + Task212 探针双向定证）
 - CI 首跑风险：dep_virgl 三件套交叉编译（epoxy/virglrenderer/Mesa 25.0.7——bison/mako 已备）；缺 dylib 自动隐藏渲染器项不阻断主构建
 - 并行协作记录：本地原 2976519（fa3c154 基线的过早完整实现）存档于 task111-stale-base 分支；eec98651（扫尾）的增量已全部重放进 task215
+
+---
+Task ID: 215 (CI 热修 1)
+Agent: main (Super Z)
+Task: dep_virgl 首跑失败修复（run 37055954424）
+
+Work Log:
+- 失败定位（run 37055954424 日志）：`ERROR: Undefined constant 'clang' in machine file variable 'c'` —— meson 机器文件的字符串值必须带引号，我的 printf 生成的是裸 `c = clang`，meson 把裸标识符当机器文件常量引用解析
+- 修复：Makefile dep_virgl 的交叉文件生成块全量加引号（[binaries] 的 c/cpp/ar/strip + [host_machine] 的 system/cpu_family/cpu/endian）；本地用真实 recipe 生成交叉文件过 meson 1.12.1 解析验证（进入编译器探测阶段，"Unknown compiler clang" 系本机无 clang 的预期终点）
+- 顺带加固：CI 的 mako 安装补 PEP 668 处理（brew python 拒绝 --user 安装 → --break-system-packages 优先；mako 必须装进 brew python3——Mesa 的 find_installation 用 PATH 里的 python3）
+- 显示假象教训（与并行 212 的 ANSI 残留教训同族）：工具回显会把 `[host_machine]` 吃成 `ost_machine]`（`[h` 被渲染层吞掉），od 字节级验证内容完好——"corruption 判定前必须 od" 再添一例
+
+Stage Summary:
+- 热修推送后重盯 CI；dep_virgl 链剩余风险面：virglrenderer 的 darwin 交叉编译、Mesa 25.0.7 交叉构建（bison/mako 已备）
