@@ -1490,3 +1490,17 @@ Stage Summary:
 - 选中卡无法编辑的根因（透明环身拦截触摸）已注释进两 cell 代码，装机验证点：选中实例卡后点省略号应弹编辑、选中目录卡点叉号应弹删除确认、未选中卡行为不变
 - 装机锚点：①内存限制说明按钮显示"付费开发者证书"（非 mem_help.button）②新建目录卡无绿框（绿加号+淡绿底保留）③实例卡/目录卡圆角 16pt 更圆 ④FPS/MEM 悬浮窗 MEM 长值缩字完整显示无省略号
 - 存量债务（与 Task212/213 收官记录逐笔一致，本轮零新增）：81/132/133/135（session 锚旋转 + REVISION-17 时代断言 + 2228 老锚）、151/156（外部镜像脚本沙箱丢失）、179 I4-I6（harness 存根冲突，HEAD 态即红）
+
+---
+Task ID: 214（CI 续记）
+Agent: main (Super Z)
+Task: Task 214 主提交（2dd8d0b）推送后的 CI 收尾
+
+Work Log:
+- 推送 2dd8d0b HEAD:main（ab072cc..2dd8d0b），本地分支名 task210 的推送教训沿用
+- GitHub REST API 匿名额度被本 IP 耗尽（60/60，reset ~3h）——CI 盯梢改走 actions 列表页 SSR HTML 解析（aria-label "completed successfully: Run 598 of Development build" + check-circle-fill 实锤）+ workflow badge.svg 轮询双证
+- 终局：Run #598 completed successfully，无热修需要
+
+Stage Summary:
+- 主链一笔直达绿：2dd8d0b（Task 214 主轮，50 文件 +525/-205）；无 poller/热修提交
+- 教训一笔：verify_task211 每次运行会以 on-the-fly 编译探针写脏 task179_inc/tinygl4angle_harness.c——跑 211 后须 git restore --source=HEAD --staged --worktree 该文件（本轮 staged 前 50 文件统计一度被它污染成 +806/-220）
