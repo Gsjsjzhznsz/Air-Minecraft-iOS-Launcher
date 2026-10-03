@@ -55,6 +55,11 @@ static const CGFloat kVMCardCornerRadius = 16.0;
 // 卡片圆角半径（默认 12pt L2 标准；快捷指令卡族在子类里覆写为 16pt，Task214）
 @property (nonatomic, assign) CGFloat cardCornerRadius;
 - (void)setupViews;
+// Task216（CI run 602 病历：方法只写进 @implementation、未进 @interface，
+// 子类调用点返回推断为 id，`0.12 * [self ame216_effectOpacityFactor]` 报
+// "invalid operands to binary expression"——声明提进接口后返回 CGFloat）
+- (CGFloat)ame216_effectOpacityFactor;
+- (void)ame216_rebindCardSurface;
 @end
 
 @implementation VMTileBaseCell

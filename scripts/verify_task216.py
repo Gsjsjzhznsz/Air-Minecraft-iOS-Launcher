@@ -127,6 +127,9 @@ print("=" * 70)
 print("D. 实例卡按钮/阴影与透明度绑定（仅实例卡族）")
 print("=" * 70)
 vm = rd("Natives/VersionManagerViewController.m")
+check("D0 primitives declared in the class interface (CI run 602: undeclared -> id return -> invalid operands error)",
+      "- (CGFloat)ame216_effectOpacityFactor;" in vm and "- (void)ame216_rebindCardSurface;" in vm
+      and vm.index("- (CGFloat)ame216_effectOpacityFactor;") < vm.index("@implementation VMTileBaseCell"))
 check("D1 base-cell opacity factor primitive (blur/translucent/none)",
       "- (CGFloat)ame216_effectOpacityFactor {" in vm
       and "return 0.3 + (manager.blurIntensity * 0.7);" in vm

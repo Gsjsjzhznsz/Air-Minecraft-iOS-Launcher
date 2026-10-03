@@ -1558,3 +1558,17 @@ Stage Summary:
 - 装机待验证：① 半透明拉条全程单调（10%→100% 单向变浓）② 实例卡拖透明度时按钮圆底/阴影与卡面同步 ③ 加载器列表与下载版本表并排对照同规格 ④ 新装默认：跟随系统外观+毛玻璃+100%+75%
 - 包名二段风险面：旧 keychain 凭据不迁移（ame131 credentials 需重登）；ReProvision/LiveContainer 宿主需按新 bundle id 重签
 - CI 风险面：纯 UI/元文件轮，无构建链变更；产物名 com.prisma-devs.prisma-* 已全接线（Makefile/CI 双侧一致）
+
+---
+Task ID: 216 (CI 热修 1)
+Agent: main (Super Z)
+Task: Run 602 Build for ios 失败修复（ame216 方法未声明 → invalid operands）
+
+Work Log:
+- 失败定位（SSR check-step + timeline）：Build for ios 步骤 06:32:03 起 06:36:06 挂（约 4 分钟 = 早期 ObjC 编译单元报错即停）；日志 raw URL 未登录收紧 404，改由步骤时间线 + 代码自审定性
+- 根因：ame216_effectOpacityFactor / ame216_rebindCardSurface 只写进 @implementation VMTileBaseCell、未在 @interface 声明——子类（VMVersionCardCell/VMGameDirCell）调用点 `[self ame216_effectOpacityFactor]` 返回推断为 id，`0.12 * [self ...]` 触发 "invalid operands to binary expression ('double' and 'id')" 编译错误（Task213"SDK gate 是此类失误唯一在案编译器"病历的又一例）
+- 修复：两方法声明提进 @interface VMTileBaseCell 块（返回 CGFloat / void）；verify_task216 新增 D0 门（声明必须在 @implementation 之前且返回类型显式）防复发
+- 本地验证：verify_task216 55/55 ALL GREEN
+
+Stage Summary:
+- 热修推送后重盯 CI；本次为纯 ObjC 声明级修复，无语义变化
