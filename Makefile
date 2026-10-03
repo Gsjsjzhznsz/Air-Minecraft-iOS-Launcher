@@ -717,12 +717,12 @@ dep_virgl_build:
 		-Ddefault_library=static || exit 1
 	ninja -C $(WORKINGDIR)/virgl-renderer || exit 1
 	test -f $(WORKINGDIR)/virgl-renderer/vtest/libvtest.a || { echo 'ERROR: libvtest.a missing'; exit 1; }
-	test -f $(WORKINGDIR)/virgl-renderer/libvirglrenderer.a || { echo 'ERROR: libvirglrenderer.a missing'; exit 1; }
+	test -f $(WORKINGDIR)/virgl-renderer/src/libvirglrenderer.a || { echo 'ERROR: libvirglrenderer.a missing'; exit 1; }
 	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
 		-install_name @rpath/libvtestserver.dylib \
 		-o $(WORKINGDIR)/libvtestserver.dylib \
 		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/vtest/libvtest.a \
-		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/libvirglrenderer.a \
+		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/src/libvirglrenderer.a \
 		$(WORKINGDIR)/virgl-prefix/lib/libepoxy.a \
 		-lc++ || exit 1
 	install_name_tool -id @rpath/libvtestserver.dylib $(WORKINGDIR)/libvtestserver.dylib || exit 1

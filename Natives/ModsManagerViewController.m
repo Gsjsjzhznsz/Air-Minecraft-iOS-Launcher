@@ -12,6 +12,7 @@
 #import "ModService.h"
 #import "ModItem.h"
 #import "ModUpdateService.h"
+#import "ModpackExportService.h" // Task217: parseVersionId（26.x 版本解析）
 #import "ModVersion.h"
 #import "PLDownloadClient.h"
 #import "PLMirrorCenter.h"
