@@ -643,6 +643,14 @@ dep_gl4eszl2:
 # 任一环节失败不阻断主构建：渲染器表按 dylib 存在性自动隐藏该选项。
 # Task216 hotfix 3（run 602/603 实锤兑现上述承诺）：dep_virgl 原实现把 meson 链的 || exit 1 直接暴露给 payload，链上任何一环失败（当前 = CI mac runner 的 meson 交叉工具探测：pkg-config/build-machine compiler/Apple ld 不认 --version）都拖死整个主构建，与设计注释矛盾。改为包装层：dep_virgl_build 全链失败只告警放行（VirGL 项隐藏，装机可辨），meson 链本身的修复留给独立轮次不受主构建节奏裹挟。
 VIRGL_MESA_VERSION ?= 25.0.7
+# Task217 hotfix 2（run 609）：CI 构建步骤的步骤级 env
+# IPHONEOS_DEPLOYMENT_TARGET=14.0 会污染 meson 的 build 机探测——裸 clang
+# （native file 钉的 build 机编译器）编出的 sanity 二进制以 iOS 为平台
+# 目标（sysroot 仍是 MacOSX，-Wincompatible-sysroot 告警），exec 即
+# SIGKILL（run 609 meson-log: sanity -> -9 -> "Compiler for language c
+# for the build machine not found"）。三处 meson setup 前剥部署目标类 env；
+# host（cross）侧不受影响——c_args/c_link_args 显式携带 min-version。
+VIRGL_ENV_CLEAN = env -u IPHONEOS_DEPLOYMENT_TARGET -u MACOSX_DEPLOYMENT_TARGET -u TVOS_DEPLOYMENT_TARGET -u WATCHOS_DEPLOYMENT_TARGET -u XROS_DEPLOYMENT_TARGET -u SDKROOT
 dep_virgl:
 	@$(MAKE) --no-print-directory dep_virgl_build \
 		|| echo '[Amethyst v$(VERSION)] dep_virgl - build failed; VirGL renderer entry hidden (graceful degradation by design)'
@@ -692,7 +700,7 @@ dep_virgl_build:
 		> $(WORKINGDIR)/virgl-native.txt
 	# ---- 1. libepoxy（静态，装进 libvtestserver.dylib）----
 	rm -rf $(WORKINGDIR)/virgl-epoxy $(WORKINGDIR)/virgl-prefix
-	meson setup $(WORKINGDIR)/virgl-epoxy $(SOURCEDIR)/Natives/external/libepoxy \
+	$(VIRGL_ENV_CLEAN) meson setup $(WORKINGDIR)/virgl-epoxy $(SOURCEDIR)/Natives/external/libepoxy \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \
 		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dglx=no -Degl=yes -Dx11=false -Dtests=false \
@@ -702,7 +710,7 @@ dep_virgl_build:
 	# ---- 2. virglrenderer（静态 + 链接 libvtestserver.dylib）----
 	rm -rf $(WORKINGDIR)/virgl-renderer
 	PKG_CONFIG_PATH=$(WORKINGDIR)/virgl-prefix/lib/pkgconfig \
-	meson setup $(WORKINGDIR)/virgl-renderer $(SOURCEDIR)/Natives/external/virglrenderer \
+	$(VIRGL_ENV_CLEAN) meson setup $(WORKINGDIR)/virgl-renderer $(SOURCEDIR)/Natives/external/virglrenderer \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \
 		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dplatforms=egl -Dvenus=false -Dvulkan-dload=false -Dtests=false \
@@ -734,7 +742,7 @@ dep_virgl_build:
 		fi
 	test -f $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION)/src/gallium/targets/osmesa/.task215_patched || { echo 'ERROR: mesa patch not applied'; exit 1; }
 	rm -rf $(WORKINGDIR)/virgl-mesa
-	cd $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION) && meson setup $(WORKINGDIR)/virgl-mesa \
+	cd $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION) && $(VIRGL_ENV_CLEAN) meson setup $(WORKINGDIR)/virgl-mesa \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \
 		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dgallium-drivers=virgl,softpipe -Dvulkan-drivers=[] \
