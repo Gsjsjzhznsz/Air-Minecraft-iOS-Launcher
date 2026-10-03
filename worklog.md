@@ -1572,3 +1572,17 @@ Work Log:
 
 Stage Summary:
 - 热修推送后重盯 CI；本次为纯 ObjC 声明级修复，无语义变化
+
+---
+Task ID: 216 (CI 热修 2)
+Agent: main (Super Z)
+Task: Run 603 复败根因——写入吞字实锤（非显示假象）
+
+Work Log:
+- Run 603 时间线（06:50:34 → 06:56:14，比 602 多活 1.7 分钟）推翻"纯 id 推断"单因论：字节级复查（python 直读，od 同口径）实锤 VersionManagerViewController.m:130 真实损坏——`if (![manager hasBackground]) return 1.0;` 落盘为 `if (!anager hasBackground]) return 1.0;`（`![m` 三字节吞成 `!a`），602/603 共同根因；热修 1 的接口声明仍属正确加固（id 推断风险真实存在，只是未及报错就先撞吞行）
+- 与 Task215 的 "ost_machine]" 显示假象教训区分：那次 od 证明字节完好（纯渲染层吞），本次 python 读文件确认字节真坏（写入层吞）——"吞字"有两层，判定前必须读文件而非看回显
+- 全文件扫描：所有本轮新增行逐行复审（diff + 行级扫描），三类括号平衡归零，其余文件全部干净；"double bracket anomaly"/"bare !" 扫描命中项均为既有代码正常嵌套（isKindOfClass:[[NSString class]] 类），非损坏
+- 修复：损坏行还原；verify_task216 55/55（D0 门 + 全量）复跑绿
+
+Stage Summary:
+- 热修 2 推送（e3e1e2e 之后的下一提交）；CI 盯至绿
