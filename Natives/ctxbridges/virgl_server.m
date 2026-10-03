@@ -48,7 +48,7 @@ typedef void *EGLContext;
 typedef intptr_t EGLNativeDisplayType;
 typedef intptr_t EGLint;
 
-static EGLBoolean (*ame_vs_eglGetDisplay)(EGLNativeDisplayType);
+static EGLDisplay (*ame_vs_eglGetDisplay)(EGLNativeDisplayType);  /* Task216 hotfix 4: return type is EGLDisplay (void*), not EGLBoolean -- clang 15+ promotes -Wint-conversion to error at the ame_vs_display assignment (run 605) */
 static EGLBoolean (*ame_vs_eglInitialize)(EGLDisplay, EGLint *, EGLint *);
 static EGLBoolean (*ame_vs_eglBindAPI)(unsigned int);
 static EGLBoolean (*ame_vs_eglChooseConfig)(EGLDisplay, const EGLint *, EGLConfig *, EGLint, EGLint *);

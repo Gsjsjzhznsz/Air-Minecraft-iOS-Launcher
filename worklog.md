@@ -1603,3 +1603,17 @@ Work Log:
 Stage Summary:
 - dep_virgl meson 链的根治（pkg-config 安装 + 交叉文件 [binaries] pkg-config/build-machine 声明）登记为独立待办，与并行会话协调认领
 - 本轮 UI 六项交付不受影响：602/603 无一条错误指向本轮触碰的文件
+
+---
+Task ID: 216 (CI 热修 4)
+Agent: main (Super Z)
+Task: Run 605——dep_virgl 降级放行生效后主构建暴露 Task215 virgl_server.m 处女编译错误
+
+Work Log:
+- Run 605 结构变化证实 hotfix 3 生效：dep_virgl_build Error 1 出现但不再阻断（gmake[1] 后主构建继续），真正的下一颗雷在 CMake 主构建：Natives/ctxbridges/virgl_server.m:152:20 error（Task215 新文件，602/603 时代 dep_virgl 提前死亡从未编译到它）
+- 根因：ame_vs_eglGetDisplay 函数指针返回类型笔误（EGLBoolean 应为 EGLDisplay）——ame_vs_display（EGLDisplay = void*）被赋 unsigned int，clang 15+ 的 -Wint-conversion 升级为默认 error
+- 修复：返回类型改 EGLDisplay + 行内病历注释；virgl_server.m 全文自查（223 行：函数指针签名/attribs 数组/dlsym 强转/pthread 链路）无其他隐患
+- 215 60/60 + 216 55/55 复跑绿（virgl_server.h 的宏与 CMakeLists 458 注册均在位）
+
+Stage Summary:
+- 推送后继续盯 CI；605 的剩余注解（meson 链）已由包装层放行，不阻断
