@@ -654,6 +654,12 @@ VIRGL_ENV_CLEAN = env -u IPHONEOS_DEPLOYMENT_TARGET -u MACOSX_DEPLOYMENT_TARGET 
 dep_virgl:
 	@$(MAKE) --no-print-directory dep_virgl_build \
 		|| echo '[Amethyst v$(VERSION)] dep_virgl - build failed; VirGL renderer entry hidden (graceful degradation by design)'
+# Task217 热修 5（run 612）：libvtestserver.dylib 链接语义——-force_load 双
+# 静态库撞出 4 份 u_format_table（virglrenderer 的多个内部 target 各自编译
+# 了生成的格式表；ld: duplicate symbol '_util_format_description'）。改用
+# -u _vtest_main 作种子走常规归档拉链：按需拉入 vtest_main 的依赖闭包，
+# 重复定义的表成员休眠不拉；libvtest.a 排前（其表拷贝优先满足引用）。本行
+# 为 make 级注释（列首无 TAB），TAB 基线不动（662 被 7 个验证器锚定）。
 dep_virgl_build:
 	@if [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesaVirgl.dylib" ] && \
 	    [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libvtestserver.dylib" ] && \
@@ -721,8 +727,8 @@ dep_virgl_build:
 	xcrun -sdk iphoneos clang -arch arm64 -dynamiclib \
 		-install_name @rpath/libvtestserver.dylib \
 		-o $(WORKINGDIR)/libvtestserver.dylib \
-		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/vtest/libvtest.a \
-		-Wl,-force_load,$(WORKINGDIR)/virgl-renderer/src/libvirglrenderer.a \
+		-Wl,-u,_vtest_main $(WORKINGDIR)/virgl-renderer/vtest/libvtest.a \
+		$(WORKINGDIR)/virgl-renderer/src/libvirglrenderer.a \
 		$(WORKINGDIR)/virgl-prefix/lib/libepoxy.a \
 		-lc++ || exit 1
 	install_name_tool -id @rpath/libvtestserver.dylib $(WORKINGDIR)/libvtestserver.dylib || exit 1
