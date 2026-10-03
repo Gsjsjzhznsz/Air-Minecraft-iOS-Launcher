@@ -36,24 +36,28 @@ diff --git a/src/gallium/targets/osmesa/meson.build b/src/gallium/targets/osmesa
 index 3c37161..e2aa3a3 100644
 --- a/src/gallium/targets/osmesa/meson.build
 +++ b/src/gallium/targets/osmesa/meson.build
-@@ -1,6 +1,16 @@
+@@ -1,6 +1,20 @@
  # Copyright © 2017 Intel Corporation
  # SPDX-License-Identifier: MIT
  
 +# [Task 111 / Amethyst-iOS] virgl guest 支持：链接 virgl 驱动 + vtest winsys
-+# [Task217 热修 10（run 617）] + libgalliumvl_stub：virgl 的 video 路径引用
-+# vl_* 符号（video-codecs=[] 时由 vl_stubs.c 桡满足；上游 osmesa 只有
-+# swrast 从不引用 vl_*，加 virgl 后必须显式补链）。
++# [Task217 热修 10/11（run 617/618）] virgl 的 video 路径引用 vl_* 符号
++# （video-codecs=[] 时由 vl_stubs.c 桡满足；上游 osmesa 只链 swrast 从不
++# 引用 vl_*）。vl 桡是 StaticLibrary——meson 1.12 的 dependencies
++# kwarg 不收库对象，且常规 link_with 有归档顺序坑（桩
++# 必须排在 virgl 归档之后才能被扫描到）；link_whole
++# 强制编入（单对象文件）零顺序依赖。
 +osmesa_extra_deps = []
++osmesa_link_whole_extra = []
 +if with_gallium_virgl
 +  osmesa_extra_deps += driver_virgl
-+  osmesa_extra_deps += libgalliumvl_stub
++  osmesa_link_whole_extra += libgalliumvl_stub
 +endif
 +
  osmesa_link_with = []
  osmesa_link_args = []
  osmesa_link_deps = []
-@@ -25,7 +31,9 @@ osmesa_def = custom_target(
+@@ -25,7 +39,9 @@
  libosmesa = shared_library(
    osmesa_lib_name,
    'osmesa_target.c',
@@ -64,7 +68,14 @@ index 3c37161..e2aa3a3 100644
    link_args : [ld_args_gc_sections, osmesa_link_args],
    vs_module_defs : osmesa_def,
    include_directories : [
-@@ -39,6 +47,7 @@ libosmesa = shared_library(
+@@ -33,12 +49,13 @@
+     inc_gallium_drivers,
+   ],
+   link_depends : osmesa_link_deps,
+-  link_whole : [libosmesa_st, libglapi_static],
++  link_whole : [libosmesa_st, libglapi_static, osmesa_link_whole_extra],
+   link_with : [
+     libmesa, libgallium, libws_null, osmesa_link_with,
    ],
    dependencies : [
      dep_ws2_32, dep_thread, dep_clock, dep_unwind, driver_swrast, idep_mesautil,
@@ -72,8 +83,6 @@ index 3c37161..e2aa3a3 100644
    ],
    name_prefix : host_machine.system() == 'windows' ? '' : [],  # otherwise mingw will create libosmesa.dll
    soversion : host_machine.system() == 'windows' ? '' : '8',
-diff --git a/src/gallium/targets/osmesa/osmesa_target.c b/src/gallium/targets/osmesa/osmesa_target.c
-index 25985dd..f42f7a0 100644
 --- a/src/gallium/targets/osmesa/osmesa_target.c
 +++ b/src/gallium/targets/osmesa/osmesa_target.c
 @@ -21,9 +21,15 @@
