@@ -36,14 +36,18 @@ diff --git a/src/gallium/targets/osmesa/meson.build b/src/gallium/targets/osmesa
 index 3c37161..e2aa3a3 100644
 --- a/src/gallium/targets/osmesa/meson.build
 +++ b/src/gallium/targets/osmesa/meson.build
-@@ -1,6 +1,12 @@
+@@ -1,6 +1,16 @@
  # Copyright © 2017 Intel Corporation
  # SPDX-License-Identifier: MIT
  
 +# [Task 111 / Amethyst-iOS] virgl guest 支持：链接 virgl 驱动 + vtest winsys
++# [Task217 热修 10（run 617）] + libgalliumvl_stub：virgl 的 video 路径引用
++# vl_* 符号（video-codecs=[] 时由 vl_stubs.c 桡满足；上游 osmesa 只有
++# swrast 从不引用 vl_*，加 virgl 后必须显式补链）。
 +osmesa_extra_deps = []
 +if with_gallium_virgl
 +  osmesa_extra_deps += driver_virgl
++  osmesa_extra_deps += libgalliumvl_stub
 +endif
 +
  osmesa_link_with = []
