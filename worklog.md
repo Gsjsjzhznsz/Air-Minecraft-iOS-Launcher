@@ -1630,3 +1630,27 @@ Work Log:
 
 Stage Summary:
 - Task 216 六项交付全部落地且 CI 绿；装机验证清单见主条目；keychain 凭据不迁移为包名二段已知副作用
+---
+Task ID: 217
+Agent: main (Super Z)
+Task: 八项轮——26.x 组件下载根修 + mod 点击静默失败浮出 + 自动渲染器智能化（崩溃学习）+ FCL 式隔离 + 关于页 + 数据导出/导入 + 过渡包名 com.air-devs + dep_virgl CI 根治（用户口令全录）
+
+Work Log:
+- 沙箱断代开场：本沙箱血统停在 Task 110（外层 worklog 与本地 HEAD 均止步），远程已推进到 e03c8d30（Task 216 收官）——fetch 快进后逐条对账 Task 214-216 归档；用户点名的 virgl "临时删除" = Task 216 降级包装层隐藏 VirGL 条目（dylib 存在性判定），本轮按用户指令根治 meson 交叉链。
+- token 全灭：GitHub API 与 push 均 401（旧凭据彻底失效；fetch 靠公开仓库存活）——本轮全部本地提交（1fad84e0 主轮 + f7ec7b72 跟进），待用户续 token 后推送触发 CI。
+- ① 组件下载根修（用户报告：26.3 Fabric API 装到老版本；26.2 sodium/iris/TouchController 找不到适配版本）：根因 = currentGameVersion 的版本段识别硬编码 hasPrefix "1."——MC 26.x 永不命中，函数回退完整 lastVersionId（如 fabric-loader-0.17.2-26.2），gameVersions 精确匹配全灭：sodium/iris/touch 死于 code-4 not-found，Fabric API 静默退 versions.firstObject——MCIM 镜像 /project/{id}/version 乱序（实测与官方 newest-first 不同），firstObject 命中 2024 时代老版。修复：currentGameVersion 委托 ModpackExportService parseVersionId（前缀/中缀/裸形态，26.x 免疫）+ ame217_modrinthVersionsNewestFirst（客户端 date_published DESC，镜像顺序免疫）+ 两遍选版（release 通道优先）；Fabric API 无匹配诚实报错（不再猜版本）；ModsManager checkForUpdates 换用同解析器（fabric 前缀形态此前落入无版本分支）；ModrinthAPI 检索+版本两端点共享单次 1.5s 延迟重试（MCIM 空响应抖动，Task169 CurseForge 网关同族）。
+- ② mod 点击静默失败（用户："部分 mod 无法点击"）：ModsManager toggle 失败只 NSLog 后 updateToggleState 把开关弹回 = 死点击。失败两族：源文件消失（Files app 更新/替换后 moveItemAtPath ENOENT）与目标名冲突（foo.jar + foo.jar.disabled 并存）。修复：ModService 预检查源存在（201）与目标冲突（202）本地化报错；管理器真实弹窗 + 201 自愈重扫（幽灵条目立即消失）。
+- ③ 自动渲染器智能化（用户口令）：版本基线不动（Task144/173/212：1.17+ MobileGL Vulkan 直连；legacy ZL2 gl4es；可用性回退），抽出 ame217_autoRendererDecide 决策中心 + 决策日志（输入/链/黑名单/选择）；崩溃学习：launchJVM 写 .ame217_session 哨兵（renderer|epoch），下次 auto 启动经 hs_err_pid*.log mtime 裁定上一会话死法（signal 类 JVM 死 vs FastQuit exit(0) 天然可分）；连续 2 崩拉黑该渲染器并自动降级次选；干净会话清零计数；显式选择永远赢且解锁（ame_effective_renderer 逃生舱）。
+- ④ FCL 式版本隔离（用户："同步上游 + FCL 优化 + 旧升级自动迁移"）：上游实为 gameDir 风格 + VersionManager 卡片（无 per-version 目录）；fork 已有上游隔离（文本框）。本轮升级为三态选择器（不隔离 / 隔离至 versions/<lastVersionId> / 自定义路径高级入口）；启用即自动迁移用户数据（存档 mods config resourcepacks shaderpacks options.txt servers.dat usercache.json screenshots，实例根 → 隔离目录），不覆盖已有目标 + moved/skipped 摘要；libraries/assets/versions 保持共享；行 detail 显示状态。
+- ⑤ 关于页（用户口令）：设置 > 通用 新入口（二级菜单）全页——图标/名称/动态 6.5.0 版本、QQ 群 1126547426 一键复制、两个启动器更新项自通用迁入（手动检查 + 启动自动检查，Task125 语义不变）、AGPL-3.0 声明指向根 LICENSE + 第三方许可位置、fork 谱系致谢；右面板"启动器版本"卡改路由 About（原 settings:check_update 深链）。
+- ⑥ 包名 + 数据桥（用户："最终 com.prisma-devs；过渡 com.air-devs"）：身份切至过渡 com.air-devs 全接线（plist bundle id + URL scheme、Makefile 产物×7 含生成 entitlements、CI 产物×6、静态 entitlements×3、os_log 子系统×2 含此前漏网的 ios_transport.c、keychain service、后台 session id）；REVISION 20->21（身份跟随缓存 epoch，Task214 规则）。新增 DataTransferService：导出打包整个 POJAV_HOME（instances/accounts/settings；latestlog*/hs_err*/哨兵垃圾跳过）为 prisma-backup-<stamp>.zip（UnzipKit），系统 Files 选择器 move 语义；导入 asCopy + zip-slip 路径清洗 + 冲突覆盖合并 + 重启提示；awaitingExportDestination 显式状态位分流（扩展无法区分回调来源）。ThirdPartyAuthenticator 旧 keychain 服务回退链（prisma-devs.prisma / air-devs.prisma / air-devs 三时代）读时自迁移——账号在身份折腾中幸存（Task216 收官已知副作用的根治）。
+- ⑦ README 双语：社区（QQ 群）+ 许可（AGPL-3.0、根 LICENSE 即许可内容、第三方位置、上游合规声明）。
+- ⑧ dep_virgl CI 根治（用户："把 CI 修好；现在的绿是降级换来的"）：run 602/603 的 12 条错误注解全在 meson 链（pkg-config for host machine not found / build machine 编译器探测被导出的 CC="ccache clang" 污染 / Apple ld --version 探测噪声）。修复：交叉文件 [binaries] 补 pkg-config 声明 + --native-file 钉裸 clang/clang++（epoxy/virglrenderer/mesa 三处 setup 双文件）+ CI brew 装 pkg-config；本地 meson 1.12.1 验证两文件按精确配方解析并进入编译器探测（预期 Linux 终点，Task215 先例）；warn+pass 包装层保留（更深的源级失败仍隐藏条目不炸构建）。
+- 验证与重锚（1fad84e0）：verify_task217 NEW 59/59；l10n 唯一键基线 2419->2455（+36 键×4 受限语言，两段式扫描含 2419->2454 首过 + export.done 补 1）；公告 38->39 尾窗家族全扫（含单引号形态 203/207/209/210/211/212/214/216；-2/-3 顺延）；TAB 646->662（dep_virgl +16，提交自愈）；REVISION 门->21（193/196/207/214/216）；身份门->过渡 air-devs（213 G2/J5/J7 + 216 B2-B8 含 keychain 链豁免）；更新行迁移重锚（112_118 G1 6.5.0 补账、125_128 A6、156 E7、161 E3）；173/212 链式形态；214 REPO 去硬编码（Task215 先例）。
+- 跟进轮（f7ec7b72，本沙箱 CPU 配额下的舰队收口）：141 G4 白名单 +.gitignore（本轮 gitignore 编辑重触发 141->168->202->209 脏树传播链）；170 豁免同步（Task213 在 168/174 补录 133/138 条目时该分叉漏同步——132-135 家族漂移 + 138 的 2228 老锚，逐条对账后 170 32/32）；嵌套级联去重 TASK209_NESTED=1（Task208 "split runs required" 家法的对偶面：202 的 J 跳 168/193 两腿、208 的 D2 跳内部 206 重跑；209 保持全量直跑保真 D4/D7/D9——全程从 ~700s 压回 600s 工具时限内，26/26 ALL PASS）；211 可达性修复 + G5-G8 陈年锚重锚（F2 重尾在本沙箱每次超时 + G 段在 if-not-fails 之后 = G5-G8 从未在本沙箱执行过：TAB 559->662、payload 行 dep_virgl 插入、Task212 用户定名 gl4es(≤26.2) 全家——42/42 ALL PASS，本沙箱首次跑完）；135 残红 = 外层审计脚本缺失环境债（132/133/135 家族，与 Task212-216 收官记录逐笔一致）。
+- 终态舰队：129 47/47、130 59/59、131 37/37、135 环境债类（40/44 逐笔对账）、141 36/0、168 34/34、170 32/32、174 24/0、202 57/57（独立）+55/55（嵌套）、208 23/23（嵌套）、209 26/26 ALL PASS、211 42/42 ALL PASS、217 59/59；预存债与 214/215/216 收官记录字节一致（81/132/133/138 老锚、151/156 外层镜像脚本、154/156 轮换日志、175 G1/G2）。
+
+Stage Summary:
+- 推送被 token 阻断：本地 1fad84e0 + f7ec7b72 待推；CI 待跑（dep_virgl 双文件链首轮真编译 + 26.2/26.3 组件下载装机验证）
+- 装机待验证锚点：'[JavaLauncher] Task217: auto renderer decision: ...'（每次 auto 启动）/ 'BLACKLISTED after 2 consecutive hs_err sessions'（崩溃学习触发）/ 'Task217: isolation migration moved ...'（启用隔离）/ '[DataTransfer] Task217: export wrote N files' / 'import restored N files' / '[ModrinthAPI] Task217: ... one retry in 1.5s'（镜像抖动）/ 26.2-26.3 组件安装取最新匹配 release
+- 包名三段路线落地两段：com.prisma-devs.prisma（旧）-> com.air-devs（过渡，本轮）-> com.prisma-devs（最终）；keychain 回退链保账号存活
