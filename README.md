@@ -190,6 +190,18 @@ JIT (Just-In-Time compilation) is essential for smooth gameplay. Choose the appr
 - [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod download integration, TouchController optimizations
 - [@Li2548](https://github.com/Li2548) -- Upstream synchronization
 
+## Community
+
+- **QQ Group: 1126547426** -- User support, feedback and build announcements (also shown in the launcher's About page, with one-tap copy).
+
+## License
+
+This launcher is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+- The full license text is the [`LICENSE`](./LICENSE) file at the repository root -- that file **is** the license content.
+- Third-party components keep their own licenses: see the table below and the license/readme files inside `ThirdParty/` and `Natives/external/` (e.g. PojavLauncher lineage GPL-3.0, MobileGlues LGPL-3.0, gl4es MIT).
+- In line with the upstream (AGPL) requirements, this fork keeps the license intact, states where the license content lives, and continues to publish its full source code.
+
 ## Fork Acknowledgments
 
 This project would not exist without the following fork chain:

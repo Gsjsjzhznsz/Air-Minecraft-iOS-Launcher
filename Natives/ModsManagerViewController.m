@@ -825,7 +825,18 @@ static NSString *ModsManagerSHA1ForFile(NSString *path) {
     NSError *error = nil;
     BOOL success = [[ModService sharedService] toggleEnableForMod:mod error:&error];
     if (!success) {
-        NSLog(@"[ModsManager] Error toggling mod: %@", error);
+        // Task217（"部分 Mod 无法点击"根修）：旧实现失败只 NSLog，开关随后被
+        // updateToggleState 按模型状态弹回——用户视角 = 点了完全没反应。
+        // 病灶家族：① 源文件已被移动/删除（更新替换 / 文件 App 整理后的
+        // 陈旧列表项）；② 目标同名冲突（foo.jar 与 foo.jar.disabled 并存）。
+        // 现在：失败一律弹窗给出真实原因；ModServiceError 201（源缺失）
+        // 额外触发自愈重扫，幽灵条目即刻从列表消失。
+        NSLog(@"[ModsManager] Task217: toggle failed for %@ -- %@", mod.filePath, error);
+        [self showDialogWithTitle:localize(@"mods.toggle.failed", nil)
+                          message:error.localizedDescription ?: @"unknown error"];
+        if ([error.domain isEqualToString:@"ModServiceError"] && error.code == 201) {
+            [self loadMods];
+        }
     }
     // 无论成败按服务端状态回滚/刷新开关视觉（失败时 mod.disabled 未变）
     if ([cell isKindOfClass:[ModTableViewCell class]]) {
@@ -889,18 +900,14 @@ static NSString *ModsManagerSHA1ForFile(NSString *path) {
         [self showDialogWithTitle:localize(@"resman.common.notice", nil) message:localize(@"resman.mods.no_version_info", nil)];
         return;
     }
-    NSString *gameVersion = nil;
-    NSString *loader = nil;
-    NSArray<NSString *> *loaders = @[@"forge", @"fabric", @"neoforge", @"quilt"];
-    for (NSString *name in loaders) {
-        NSRange range = [lastVersionId rangeOfString:[NSString stringWithFormat:@"-%@-", name]];
-        if (range.location != NSNotFound) {
-            gameVersion = [lastVersionId substringToIndex:range.location];
-            loader = name;
-            break;
-        }
-    }
-    if (!gameVersion) {
+    // Task217：与 ProfileSettings currentGameVersion 同源——旧内联解析只认
+    // "-<loader>-" 中缀式，fabric 的 "fabric-loader-<loaderVer>-<mcVer>" 前缀式
+    // 直接漏网（gameVersion=nil → "检查更新"对 Fabric 实例永远走无版本分支）。
+    // 改用 ModpackExportService parseVersionId（26.x + 全形态覆盖）。
+    NSDictionary *ame217_parsed = [ModpackExportService parseVersionId:lastVersionId];
+    NSString *gameVersion = ame217_parsed[@"minecraft"];
+    NSString *loader = ame217_parsed[@"loader"];
+    if (![gameVersion isKindOfClass:[NSString class]] || gameVersion.length == 0) {
         // 纯 <mc> 格式，无 loader
         gameVersion = lastVersionId;
         loader = nil;

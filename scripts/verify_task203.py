@@ -46,7 +46,7 @@ check("A", "Makefile 接线已随 holy 退役移除（Task212 重锚）",
       "patch_gl4es_ggstr_nullguard.py" not in mk
       and "holy gl4es（libgl4es_114.dylib）退役删除" in mk)
 check("A", "Makefile TAB 基线（Task214 重锚：644 = 561 + 83 dep_virgl 行）",
-      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 646)
+      sum(1 for l in mk.split("\n") if l.startswith("\t")) == 662)
 
 # ============ B. 钉扎门控（vgpu 崩溃根修） ============
 mh = rd("Natives/main_hook.m")
@@ -134,7 +134,7 @@ check("H", "version.h Task203 附录（no bump + vtool 病历）",
       "Task 203, no bump" in vh and "vtool" in vh and "ZERO-WIPED" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding='utf-8'))['announcements']
 check("H", "公告末位是 task206-nggl4es（Task212 重锚：task212@2 插入后 34）",
-      len(ann) == 38 and ann[-1]['id'] == 'task216-ui-2026-10-03')
+      len(ann) == 39 and ann[-1]['id'] == 'task217-download-fixes-about-isolation-2026-10-03')
 bundled = open(os.path.join(REPO, "Natives/resources/help-faq.json"), 'rb').read()
 rootfaq = open(os.path.join(REPO, "help-faq.json"), 'rb').read()
 check("H", "FAQ 根/随包副本逐字节一致（verify_task168 契约）", bundled == rootfaq)

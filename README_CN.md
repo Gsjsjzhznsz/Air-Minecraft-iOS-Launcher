@@ -190,6 +190,18 @@ JIT（即时编译）是流畅运行游戏的关键。请根据自身环境选�
 - [@WeiErLiTeo](https://github.com/WeiErLiTeo) -- Mod 下载功能集成、TouchController 优化
 - [@Li2548](https://github.com/Li2548) -- 上游同步维护
 
+## 社区
+
+- **QQ 群：1126547426** -- 用户交流、反馈与构建发布通知（启动器的"关于"页也展示群号，支持一键复制）。
+
+## 许可证
+
+本启动器以 **GNU Affero General Public License v3.0（AGPL-3.0）** 授权。
+
+- 完整许可证文本即仓库根目录的 [`LICENSE`](./LICENSE) 文件——**该文件就是许可证内容所在处**。
+- 第三方组件保留各自许可证：见下方表格及 `ThirdParty/`、`Natives/external/` 目录内的许可证/说明文件（如 PojavLauncher 血统 GPL-3.0、MobileGlues LGPL-3.0、gl4es MIT 等）。
+- 依照上游（AGPL）的要求，本 Fork 保持许可证不变、说明许可证内容所在位置，并持续公开全部源代码。
+
 ## Fork 致谢
 
 本项目基于以下 Fork 链构建，特此致谢：

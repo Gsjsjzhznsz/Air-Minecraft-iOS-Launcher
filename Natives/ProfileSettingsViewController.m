@@ -868,8 +868,17 @@ static NSString * localizeProfileTitle(NSString *title) {
             } else if ([title isEqualToString:@"游戏目录"]) {
                 cell.imageView.image = [UIImage systemImageNamed:@"folder"];
                 cell.accessoryView = [self ame163_disclosureChevron];
-                NSString *gameDir = self.profile[@"gameDir"] ?: @".";
-                cell.detailTextLabel.text = gameDir;
+                // Task217：FCL 三态隔离态显示（不隔离/versions/<id>/自定义路径），
+                // 替代旧版裸 gameDir 字符串。
+                NSInteger ame217_state = [self ame217_isolationState];
+                if (ame217_state == 0) {
+                    cell.detailTextLabel.text = localize(@"profile.isolation.state_none", nil);
+                } else if (ame217_state == 1) {
+                    cell.detailTextLabel.text = [NSString stringWithFormat:localize(@"profile.isolation.state_isolated", nil),
+                        self.profile[@"lastVersionId"] ?: @"?"];
+                } else {
+                    cell.detailTextLabel.text = self.profile[@"gameDir"];
+                }
             }
             break;
 
@@ -1403,7 +1412,9 @@ static NSString * localizeProfileTitle(NSString *title) {
                 // 聚焦版本选择器
                 if (self.versionTextField) [self.versionTextField becomeFirstResponder];
             } else if ([title isEqualToString:@"游戏目录"]) {
-                [self editGameDir];
+                // Task217：FCL 风格版本隔离——游戏目录行点击弹三态选择器
+                //（不隔离 / 隔离此版本 / 自定义路径），替代旧版直接弹文本框。
+                [self ame217_showIsolationPicker];
             }
             break;
 
@@ -1487,6 +1498,8 @@ static NSString * localizeProfileTitle(NSString *title) {
 /// 编辑游戏目录（仿 main 分支 LauncherProfileEditorViewController 的 gameDir 文本框）
 /// gameDir="." 表示使用当前 POJAV_GAME_DIR（即"游戏目录切换"选中的实例目录）
 /// 也可以输入相对路径（相对于 POJAV_GAME_DIR）或绝对路径来实现版本隔离
+/// Task217：不再作为游戏目录行的首选交互（改弹 FCL 三态选择器），保留为
+/// 选择器里的"自定义路径（高级）"入口。
 - (void)editGameDir {
     NSString *currentGameDir = self.profile[@"gameDir"] ?: @".";
     NSString *currentInstance = getPrefObject(@"general.game_directory") ?: @"default";
@@ -1537,6 +1550,147 @@ static NSString * localizeProfileTitle(NSString *title) {
     ModsManagerViewController *vc = [[ModsManagerViewController alloc] init];
     vc.profileName = [self currentProfileName];
     [self.navigationController pushViewController:vc animated:YES];
+}
+
+#pragma mark - Task217：FCL 风格版本隔离（三态选择器 + 旧版升级自动迁移）
+
+/// 当前 gameDir 的隔离态归类：0 = 不隔离（"."），1 = 隔离此版本
+/// （versions/<lastVersionId>），2 = 自定义路径。
+- (NSInteger)ame217_isolationState {
+    NSString *gameDir = self.profile[@"gameDir"];
+    if (![gameDir isKindOfClass:[NSString class]] || [gameDir isEqualToString:@"."]) return 0;
+    NSString *expected = [NSString stringWithFormat:@"versions/%@", self.profile[@"lastVersionId"] ?: @""];
+    if ([gameDir isEqualToString:expected]) return 1;
+    return 2;
+}
+
+/// FCL 三态选择器：不隔离 / 隔离此版本（自动迁移）/ 自定义路径（高级）。
+/// 与上游同步的版本隔离语义 + FCL 式交互优化（用户指令：参考 FCL）；
+/// 旧版升级自动迁移 = 从"不隔离"切到"隔离此版本"时，实例根目录下已
+/// 存在的用户数据（存档/模组/配置等）自动搬入隔离目录，绝不丢失。
+- (void)ame217_showIsolationPicker {
+    NSInteger state = [self ame217_isolationState];
+    NSString *lastVersionId = self.profile[@"lastVersionId"];
+    if (![lastVersionId isKindOfClass:[NSString class]] || lastVersionId.length == 0) {
+        [self showComponentAlert:localize(@"i18n_str_899", nil) message:localize(@"i18n_str_901", nil)];
+        return;
+    }
+
+    UIAlertController *sheet = [UIAlertController
+        alertControllerWithTitle:localize(@"profile.isolation.title", nil)
+                         message:[NSString stringWithFormat:localize(@"profile.isolation.subtitle", nil), lastVersionId]
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+
+    NSString *noneMark = (state == 0) ? @" ✓" : @"";
+    [sheet addAction:[UIAlertAction actionWithTitle:[localize(@"profile.isolation.none", nil) stringByAppendingString:noneMark]
+        style:UIAlertActionStyleDefault
+        handler:^(UIAlertAction * _Nonnull action) {
+            if (state == 0) return;
+            self.profile[@"gameDir"] = @".";
+            [self saveSettings];
+            [self reloadAllTableViews];
+            [self updateHeroCard];
+            // 回切不隔离不自动搬回（多隔离版本各自有存档时无法安全合流）；
+            // 数据留在隔离目录，需要时可在文件 App 或自定义路径里取回。
+            [self showComponentAlert:localize(@"profile.isolation.title", nil)
+                              message:localize(@"profile.isolation.disabled_note", nil)];
+        }]];
+
+    NSString *isoMark = (state == 1) ? @" ✓" : @"";
+    [sheet addAction:[UIAlertAction actionWithTitle:[localize(@"profile.isolation.isolate", nil) stringByAppendingString:isoMark]
+        style:UIAlertActionStyleDefault
+        handler:^(UIAlertAction * _Nonnull action) {
+            [self ame217_enableIsolationWithMigration];
+        }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"profile.isolation.custom", nil)
+        style:UIAlertActionStyleDefault
+        handler:^(UIAlertAction * _Nonnull action) {
+            [self editGameDir];
+        }]];
+
+    [sheet addAction:[UIAlertAction actionWithTitle:localize(@"resman.common.cancel", nil) style:UIAlertActionStyleCancel handler:nil]];
+    sheet.popoverPresentationController.sourceView = self.view;
+    sheet.popoverPresentationController.sourceRect = CGRectMake(self.view.bounds.size.width / 2.0, self.view.bounds.size.height / 2.0, 1.0, 1.0);
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+/// 开启隔离 + 旧版升级自动迁移。把实例根目录下的运行时用户数据移入
+/// versions/<lastVersionId>/：目标已存在的条目一律跳过（绝不覆盖）；
+/// libraries/assets/versions 保持共享不迁移（隔离目录只装游戏运行时
+/// 数据——与 FCL/HMCL 的 versions/<id> 隔离口径一致）。
+- (void)ame217_enableIsolationWithMigration {
+    NSString *lastVersionId = self.profile[@"lastVersionId"];
+    if (![lastVersionId isKindOfClass:[NSString class]] || lastVersionId.length == 0) {
+        [self showComponentAlert:localize(@"i18n_str_899", nil) message:localize(@"i18n_str_901", nil)];
+        return;
+    }
+    NSString *instanceRoot = @(getenv("POJAV_GAME_DIR"));
+    if (instanceRoot.length == 0) {
+        [self showComponentAlert:localize(@"profile.isolation.title", nil)
+                          message:[NSString stringWithFormat:localize(@"profile.isolation.migrate_failed", nil),
+                              @"POJAV_GAME_DIR unset"]];
+        return;
+    }
+    NSString *relative = [NSString stringWithFormat:@"versions/%@", lastVersionId];
+    NSString *isoDir = [instanceRoot stringByAppendingPathComponent:relative];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSError *mkErr = nil;
+    if (![fm fileExistsAtPath:isoDir] &&
+        ![fm createDirectoryAtPath:isoDir withIntermediateDirectories:YES attributes:nil error:&mkErr]) {
+        [self showComponentAlert:localize(@"profile.isolation.title", nil)
+                          message:[NSString stringWithFormat:localize(@"profile.isolation.migrate_failed", nil),
+                              mkErr.localizedDescription ?: @"mkdir failed"]];
+        return;
+    }
+
+    // 迁移清单：游戏运行时会读写的用户数据（旧版升级前都在实例根）。
+    // 刻意排除：logs/crash-reports（历史垃圾）、versions/libraries/assets
+    //（共享层，隔离目录里不存在这些概念——启动链从实例根读）。
+    NSArray<NSString *> *ame217_items = @[
+        @"saves", @"mods", @"config", @"resourcepacks", @"shaderpacks",
+        @"options.txt", @"servers.dat", @"servers.dat_old", @"usercache.json",
+        @"screenshots"
+    ];
+    NSInteger moved = 0;
+    NSInteger skipped = 0;
+    NSMutableArray<NSString *> *skipNames = [NSMutableArray array];
+    for (NSString *item in ame217_items) {
+        NSString *src = [instanceRoot stringByAppendingPathComponent:item];
+        NSString *dst = [isoDir stringByAppendingPathComponent:item];
+        if (![fm fileExistsAtPath:src]) continue;
+        if ([fm fileExistsAtPath:dst]) {
+            skipped++;
+            [skipNames addObject:item];
+            continue;
+        }
+        NSError *mvErr = nil;
+        if ([fm moveItemAtPath:src toPath:dst error:&mvErr]) {
+            moved++;
+            NSLog(@"[ProfileSettings] Task217: isolation migration moved '%@' -> %@", item, relative);
+        } else {
+            skipped++;
+            [skipNames addObject:item];
+            NSLog(@"[ProfileSettings] Task217: isolation migration FAILED for '%@': %@", item, mvErr);
+        }
+    }
+
+    self.profile[@"gameDir"] = relative;
+    [self saveSettings];
+    [self reloadAllTableViews];
+    [self updateHeroCard];
+    NSLog(@"[ProfileSettings] Task217: version isolation ON for %@ (gameDir=%@; moved=%ld skipped=%ld)",
+          lastVersionId, relative, (long)moved, (long)skipped);
+
+    NSString *summary;
+    if (moved == 0 && skipped == 0) {
+        summary = [NSString stringWithFormat:localize(@"profile.isolation.migrated_clean", nil), relative];
+    } else {
+        summary = [NSString stringWithFormat:localize(@"profile.isolation.migrated", nil),
+            @(moved), @(skipped),
+            skipNames.count > 0 ? [skipNames componentsJoinedByString:@", "] : @"-"];
+    }
+    [self showComponentAlert:localize(@"profile.isolation.title", nil) message:summary];
 }
 
 - (void)openShadersManager {
@@ -1631,32 +1785,20 @@ static NSString * localizeProfileTitle(NSString *title) {
 - (NSString *)currentGameVersion {
     NSString *lastVersionId = self.profile[@"lastVersionId"];
     if (![lastVersionId isKindOfClass:[NSString class]] || lastVersionId.length == 0) return nil;
-    // 解析 loader 前的游戏版本：1.21.1-forge-47.3.0 → 1.21.1
-    // fabric-loader-0.16.0-1.21 → 1.21
-    NSArray<NSString *> *loaders = @[@"forge", @"fabric", @"neoforge", @"quilt", @"fabric-loader"];
-    NSString *result = lastVersionId;
-    for (NSString *loader in loaders) {
-        NSString *delimiter = [NSString stringWithFormat:@"-%@-", loader];
-        NSRange range = [result rangeOfString:delimiter options:NSCaseInsensitiveSearch];
-        if (range.location != NSNotFound) {
-            result = [result substringToIndex:range.location];
-            break;
-        }
-        // 处理 "fabric-loader-0.16.0-1.21" 形式：取最后一个版本号
-        if ([result.lowercaseString hasPrefix:[NSString stringWithFormat:@"%@-", loader]]) {
-            // fabric-loader-0.16.0-1.21 → 取最后的 "1.21"
-            NSArray *parts = [result componentsSeparatedByString:@"-"];
-            if (parts.count >= 2) {
-                // 找到形如 1.x.x 的部分
-                for (NSString *part in [parts reverseObjectEnumerator]) {
-                    if ([part hasPrefix:@"1."]) {
-                        return part;
-                    }
-                }
-            }
-        }
+    // Task217（26.x 组件下载三连修的共因）：改用 ModpackExportService 的
+    // parseVersionId 单一事实源。旧实现的版本号识别硬编码 hasPrefix:"1."——
+    // MC 26.x（26.2/26.3）全部失配，函数退回完整 lastVersionId 字符串
+    // （如 "fabric-loader-0.17.2-26.2"），下游 gameVersions 精确匹配必然落空：
+    // Sodium+Iris/TouchController 报“找不到适配版本”，Fabric API 则静默
+    // 回退 versions.firstObject（镜像乱序时 = 2024 年的旧版本）。
+    // parseVersionId 的形态覆盖：fabric-loader-<loaderVer>-<mcVer> 前缀式、
+    // <mcVer>-forge/-neoforge-<loaderVer> 中缀式、纯 <mcVer> 三类，26.x 通吃。
+    NSDictionary *ame217_parsed = [ModpackExportService parseVersionId:lastVersionId];
+    NSString *ame217_mc = ame217_parsed[@"minecraft"];
+    if ([ame217_mc isKindOfClass:[NSString class]] && ame217_mc.length > 0) {
+        return ame217_mc;
     }
-    return result;
+    return lastVersionId;
 }
 
 - (void)installFabricAPIStandalone {
@@ -1834,16 +1976,22 @@ static NSString * localizeProfileTitle(NSString *title) {
                         return;
                     }
 
-                    // 找到匹配当前 gameVersion 的版本
-                    ModVersion *matchingVersion = nil;
-                    for (ModVersion *ver in versions) {
-                        if ([ver.gameVersions containsObject:gameVersion]) {
-                            matchingVersion = ver;
-                            break;
-                        }
-                    }
+                    // Task217：找到匹配当前 gameVersion 的【最新】版本。
+                    // 旧实现两处病灶：① “第一个匹配”在 MCIM 镜像上命中任意
+                    // 旧版本（镜像 /project/{id}/version 返回乱序，实测头部
+                    // 是 2024 年的 0.100.7+1.21——26.3 装机“旧版本 API”实锤）；
+                    // ② 无匹配时静默回退 versions.firstObject（再叠加镜像乱序
+                    // = 明确的错版安装）。现改为：客户端 newest-first 排序 +
+                    // release 通道优先；仍无匹配 → 明确报错（不再猜版本）。
+                    ModVersion *matchingVersion = ame217_pickVersionForGameVersion(
+                        ame217_modrinthVersionsNewestFirst(versions), gameVersion, @"fabric");
                     if (!matchingVersion) {
-                        matchingVersion = versions.firstObject;
+                        NSError *failError = [NSError errorWithDomain:@"FabricAPI" code:6 userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.fabricapi.no_match", nil), gameVersion]}];
+                        [[DownloadTaskManager sharedManager] updateTaskWithId:taskId stageAtIndex:0 status:PLTaskStageStatusFailed];
+                        [[DownloadTaskManager sharedManager] updateTaskWithId:taskId error:failError];
+                        [[DownloadTaskManager sharedManager] setTaskWithId:taskId state:DownloadTaskStateFailed];
+                        [strongSelf2 showComponentAlert:localize(@"i18n_str_918", nil) message:failError.localizedDescription];
+                        return;
                     }
 
                     NSDictionary *primaryFile = matchingVersion.primaryFile;
@@ -1917,10 +2065,54 @@ static NSString * localizeProfileTitle(NSString *title) {
 
 #pragma mark - 组件独立安装（Sodium + Iris Shaders + Podium，Task 157）
 
+/// Task217：Modrinth 版本列表客户端排序 + 通道偏好 + 版本匹配的统一实现。
+/// 病历：MCIM 镜像的 /project/{id}/version 返回顺序与官方不同（实测官方
+/// newest-first，镜像近乎乱序，2026-10 实测 fabric-api 镜像头部是
+/// 2024-07 的 0.100.7+1.21）——“取第一个匹配”在镜像源上会命中任意旧版本
+/// （26.3 装 Fabric API 落到 1.21 时代的旧包，用户实锤“旧版本 API”）。
+/// 所有组件安装统一改为：客户端按 date_published 降序排序后再匹配。
+/// ISO 8601 字符串字典序即时间序（镜像与官方的毫秒位数不同，差异只在
+/// 亚秒级，不影响版本先后判定）。通道偏好：release 优先，beta/alpha 仅在
+/// 无 release 适配版时兜底（一键安装的意图是“最新正式适配版”）。
+static NSArray<ModVersion *> *ame217_modrinthVersionsNewestFirst(NSArray<ModVersion *> *versions) {
+    if (versions.count < 2) return versions;
+    return [versions sortedArrayUsingComparator:^NSComparisonResult(ModVersion *a, ModVersion *b) {
+        NSComparisonResult ame217_r = [b.datePublished compare:a.datePublished options:NSLiteralSearch];
+        if (ame217_r == NSOrderedSame) {
+            ame217_r = [b.versionNumber compare:a.versionNumber options:NSNumericSearch];
+        }
+        return ame217_r;
+    }];
+}
+
+/// Task217：两遍匹配——第一遍只认 release 通道，第二遍放开 beta/alpha。
+/// 输入应先经 ame217_modrinthVersionsNewestFirst 排序（匹配到的即最新）。
+static ModVersion *ame217_pickVersionForGameVersion(NSArray<ModVersion *> *versions
+                                                    , NSString *gameVersion
+                                                    , NSString *loader) {
+    for (NSInteger ame217_pass = 0; ame217_pass < 2; ame217_pass++) {
+        BOOL ame217_releaseOnly = (ame217_pass == 0);
+        for (ModVersion *ver in versions) {
+            if (![ver.gameVersions containsObject:gameVersion]) continue;
+            if (ame217_releaseOnly && ![ver.versionType isEqualToString:@"release"]) continue;
+            BOOL ame217_hasLoader = NO;
+            for (NSString *l in ver.loaders) {
+                if ([l.lowercaseString isEqualToString:loader.lowercaseString]) {
+                    ame217_hasLoader = YES;
+                    break;
+                }
+            }
+            if (ame217_hasLoader) return ver;
+        }
+    }
+    return nil;
+}
+
 /// Task 150 引入、Task 157 沿用：Modrinth 搜索 → 标题【精确】匹配 →
 /// 按游戏版本 + 加载器选版本 → primaryFile。与 Fabric API 流程同逻辑，
 /// 但匹配用全等比较——containsString 会误命中 "Sodium Extra" /
-/// "Podium Port" 等衍生项目。
+/// "Podium Port" 等衍生项目。Task217：版本选择改走排序 + 通道偏好统一实现
+/// （镜像乱序免疫 + release 优先）。
 - (void)ame150_fetchModrinthPrimaryFileWithQuery:(NSString *)query
                                       exactTitle:(NSString *)exactTitle
                                      gameVersion:(NSString *)gameVersion
@@ -1959,21 +2151,11 @@ static NSString * localizeProfileTitle(NSString *title) {
                                 [NSString stringWithFormat:@"%@ / %@", gameVersion, loader]]}]);
                         return;
                     }
-                    ModVersion *matchingVersion = nil;
-                    for (ModVersion *ver in versions) {
-                        if (![ver.gameVersions containsObject:gameVersion]) continue;
-                        BOOL ame150_hasLoader = NO;
-                        for (NSString *l in ver.loaders) {
-                            if ([l.lowercaseString isEqualToString:loader.lowercaseString]) {
-                                ame150_hasLoader = YES;
-                                break;
-                            }
-                        }
-                        if (ame150_hasLoader) {
-                            matchingVersion = ver;
-                            break;
-                        }
-                    }
+                    // Task217：客户端 newest-first 排序（镜像乱序免疫）+ 两遍
+                    // 匹配（release 优先）——旧的“第一个匹配”在镜像源上会
+                    // 命中任意旧版本。
+                    ModVersion *matchingVersion = ame217_pickVersionForGameVersion(
+                        ame217_modrinthVersionsNewestFirst(versions), gameVersion, loader);
                     if (!matchingVersion) {
                         completion(nil, nil, [NSError errorWithDomain:@"SodiumComponent" code:4
                             userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"component.sodium.not_found", nil),

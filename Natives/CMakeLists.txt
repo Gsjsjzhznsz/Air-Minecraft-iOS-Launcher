@@ -505,6 +505,8 @@ add_executable(AngelAuraAmethyst
   DownloadHistoryStore.m
   PLDownloadClient.m
   PLMirrorCenter.m
+  DataTransferService.m
+  AboutViewController.m
   AppDelegate.m
   CustomControlsViewController.m
   CustomControlsViewController+UndoManager.m

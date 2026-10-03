@@ -518,7 +518,19 @@
 // reports transport health) ("[OSMBridge] Task100" anchors). FAQ content
 // refreshed in place (macMenuStub/fsrCorner, count stays 32). Launcher-side
 // only, REVISION stays 17.
-#define REVISION 20
+#define REVISION 21
+// REVISION 20->21 bump addendum (Task 217): the bundle identifier changed
+// identity AGAIN -- by explicit user order this is the TEMPORARY migration
+// build (com.prisma-devs.prisma -> com.air-devs, the upstream-family name,
+// across Info.plist/Makefile/CI artifact names/entitlements/os_log
+// subsystems/keychain service/background-session identifier), staged so the
+// interim build can carry the data export/import bridge before the FINAL
+// rename to com.prisma-devs in its own round. Cache epoch follows the app
+// identity (same rule as the Task 214/216 bumps). Task 217 itself is
+// launcher-side only (component-download 26.x fixes, mod-toggle error
+// surfacing, auto-renderer crash learning, FCL-style isolation, About page,
+// data export/import) -- no converter output changed beyond the epoch bump
+// itself.
 // REVISION 19->20 bump addendum (Task 216): the bundle identifier changed
 // identity again with the second rebrand leg the user ordered
 // (com.air-devs.prisma -> com.prisma-devs.prisma across Info.plist/Makefile/

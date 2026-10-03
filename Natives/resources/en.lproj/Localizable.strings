@@ -2602,3 +2602,41 @@
 "ame202.ai.new_session" = "New chat";
 "ame202.common.copy" = "Copy";
 
+
+/* Task217 */
+"profile.isolation.title" = "Version Isolation";
+"profile.isolation.subtitle" = "Choose how this version (%@) stores its game data";
+"profile.isolation.none" = "No isolation (shared instance directory)";
+"profile.isolation.isolate" = "Isolate this version (versions/%@, auto-migrate data)";
+"profile.isolation.custom" = "Custom path… (advanced)";
+"profile.isolation.state_none" = "Not isolated (shared)";
+"profile.isolation.state_isolated" = "Isolated → versions/%@";
+"profile.isolation.disabled_note" = "Isolation turned off. Your data was NOT moved back (multiple isolated versions cannot be merged safely) — it stays in the version's folder and remains reachable via a custom path or the Files app.";
+"profile.isolation.migrated" = "Isolation enabled. Migrated %ld item(s), skipped %ld (already present: %@).";
+"profile.isolation.migrated_clean" = "Isolation enabled at %@. No legacy data needed migration.";
+"profile.isolation.migrate_failed" = "Failed to enable isolation: %@";
+"component.fabricapi.no_match" = "No Fabric API version matches Minecraft %@ yet. Please retry later or download manually from Modrinth.";
+"mods.toggle.failed" = "Could not toggle this mod";
+"mods.toggle.source_missing" = "The mod file no longer exists (it may have been updated or removed outside the launcher): %@. The list will rescan.";
+"mods.toggle.dest_exists" = "A file with the target name already exists: %@. Remove the duplicate (e.g. via the Files app or swipe-delete), then try again.";
+"preference.title.data_export" = "Export data backup";
+"preference.detail.data_export" = "Pack the entire launcher data (instances, saves, mods, accounts, settings) into a zip backup. Save it anywhere via the Files app before migrating to a new app identity.";
+"preference.title.data_import" = "Import from backup";
+"preference.detail.data_import" = "Restore a previously exported backup zip into this launcher. Takes effect after a restart.";
+"preference.title.about" = "About";
+"preference.detail.about" = "Version info, QQ group, launcher updates, license and credits";
+"ame217.export.progress" = "Exporting data backup…";
+"ame217.export.failed" = "Export failed: %@";
+"ame217.export.done" = "Backup saved: %@";
+"ame217.import.progress" = "Importing data backup…";
+"ame217.import.failed" = "Import failed: %@";
+"ame217.import.done" = "Data restored. Please restart the launcher for it to take effect.";
+"about.nav_title" = "About";
+"about.qq.title" = "QQ Group";
+"about.qq.copy" = "Copy group number";
+"about.qq.copied" = "QQ group number copied";
+"about.update.section" = "Launcher Updates";
+"about.license.title" = "License";
+"about.license.body" = "This launcher is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). The full license text is the LICENSE file at the repository root; third-party components are covered by their own licenses under ThirdParty/ and Natives/external/ (PojavLauncher: GPLv3, MobileGlues: LGPL-3.0, and others as noted there). Source code: https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher";
+"about.credits.title" = "Credits";
+"about.credits.body" = "Prisma is a fork of Amethyst-iOS-MyRemastered (herbrine8403), which builds on the official PojavLauncher iOS port (PojavLauncherTeam). SDL3 embedding ported from ZalithLauncher2. Renderer lineage includes gl4es, Zink/Mesa, MobileGlues, ANGLE and virglrenderer. Thanks to every upstream author and contributor.";

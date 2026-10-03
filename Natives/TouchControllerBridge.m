@@ -46,7 +46,7 @@ static os_log_t touchControllerLog = NULL;
 @implementation TouchControllerBridge
 
 + (void)load {
-    touchControllerLog = os_log_create("com.prisma-devs.prisma", "TouchController");
+    touchControllerLog = os_log_create("com.air-devs", "TouchController");
     [self initializeTouchController];
 }
 

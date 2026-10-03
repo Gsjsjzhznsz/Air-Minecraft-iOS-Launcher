@@ -137,7 +137,10 @@ jobs:
       # - mako：Mesa 构建期代码生成（python3 模块）
       - name: Install virgl build deps (meson/ninja/bison/mako)
         run: |
-          brew install meson ninja bison || true
+          # Task217：+pkg-config——meson 交叉构建的 host 机 pkg-config 探测
+          #（run 602/603 实锤 "pkg-config for host machine not found"；
+          #  cross 文件 [binaries] 已同步补 pkg-config 声明）
+          brew install meson ninja bison pkg-config || true
           echo "$(brew --prefix bison)/bin" >> "$GITHUB_PATH"
           # mako 必须装进 brew python3（Mesa 的 find_installation 用 PATH 里的 python3
           # = brew python；PEP 668 externally-managed 会拒绝 --user 安装，
@@ -314,15 +317,15 @@ jobs:
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: com.prisma-devs.prisma-${{ matrix.platform_name }}.ipa
-          path: artifacts/com.prisma-devs.prisma-*-${{ matrix.platform_name }}.ipa
+          name: com.air-devs-${{ matrix.platform_name }}.ipa
+          path: artifacts/com.air-devs-*-${{ matrix.platform_name }}.ipa
 
       - name: Upload regular tipa
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: com.prisma-devs.prisma-${{ matrix.platform_name }}-trollstore.tipa
-          path: artifacts/com.prisma-devs.prisma-*-${{ matrix.platform_name }}-trollstore.tipa
+          name: com.air-devs-${{ matrix.platform_name }}-trollstore.tipa
+          path: artifacts/com.air-devs-*-${{ matrix.platform_name }}-trollstore.tipa
 
       - name: Upload PojavLauncher.dSYM
         if: matrix.platform_name == 'ios' && success()
@@ -342,8 +345,8 @@ jobs:
           set -e
           TAG="nightly-sdl3"
           SHORT=$(git rev-parse --short HEAD)
-          IPA=$(ls artifacts/com.prisma-devs.prisma-*-ios.ipa 2>/dev/null | head -1 || true)
-          TIPA=$(ls artifacts/com.prisma-devs.prisma-*-ios-trollstore.tipa 2>/dev/null | head -1 || true)
+          IPA=$(ls artifacts/com.air-devs-*-ios.ipa 2>/dev/null | head -1 || true)
+          TIPA=$(ls artifacts/com.air-devs-*-ios-trollstore.tipa 2>/dev/null | head -1 || true)
           if [ -z "$IPA" ]; then
             echo "No ipa under artifacts/, skip release"
             exit 0

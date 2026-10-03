@@ -78,29 +78,30 @@ check("B1 marketing + build version 6.5.0",
       re.search(r"<key>CFBundleShortVersionString</key>\s*<string>6\.5\.0</string>", plist) is not None
       and re.search(r"<key>CFBundleVersion</key>\s*<string>6\.5\.0</string>", plist) is not None
       and "<string>6.0.0</string>" not in plist)
-check("B2 bundle id com.prisma-devs.prisma (air-devs retired from plist)",
-      "com.prisma-devs.prisma" in plist and "com.air-devs.prisma" not in plist)
-check("B3 os_log subsystems follow the new id",
-      'os_log_create("com.prisma-devs.prisma"' in rd("Natives/TouchController/ios_transport.c")
-      and 'os_log_create("com.prisma-devs.prisma"' in rd("Natives/TouchControllerBridge.m"))
-check("B4 keychain service + background session follow the new id",
-      "com.prisma-devs.prisma.ame131.credentials" in rd("Natives/authenticator/ThirdPartyAuthenticator.m")
-      and "com.prisma-devs.prisma.MinecraftResourceDownloadTask" in rd("Natives/MinecraftResourceDownloadTask.m"))
+# Task217 re-anchor: interim migration id com.air-devs (user order; final com.prisma-devs later).
+check("B2 bundle id com.air-devs interim (prisma-devs.prisma retired from plist, Task217)",
+      "com.air-devs" in plist and "com.prisma-devs.prisma" not in plist)
+check("B3 os_log subsystems follow the interim id (Task217)",
+      'os_log_create("com.air-devs"' in rd("Natives/TouchController/ios_transport.c")
+      and 'os_log_create("com.air-devs"' in rd("Natives/TouchControllerBridge.m"))
+check("B4 keychain service + background session follow the interim id (Task217; legacy chain exempt)",
+      'static NSString *const ame131_keychainService = @"com.air-devs.ame131.credentials"' in rd("Natives/authenticator/ThirdPartyAuthenticator.m")
+      and "com.air-devs.MinecraftResourceDownloadTask" in rd("Natives/MinecraftResourceDownloadTask.m"))
 mk = rd("Makefile")
-check("B5 Makefile artifact names + generated entitlements (7 sites)",
-      mk.count("com.prisma-devs.prisma") == 7 and "com.air-devs.prisma" not in mk)
+check("B5 Makefile artifact names + generated entitlements (7 sites, Task217 interim)",
+      mk.count("com.air-devs") == 7 and "com.prisma-devs.prisma" not in mk)
 yml = open(".github/workflows/development.yml", "rb").read()
-check("B6 CI artifact names follow (6 sites, CRLF intact)",
-      yml.count(b"com.prisma-devs.prisma") == 6 and b"com.air-devs.prisma" not in yml
+check("B6 CI artifact names follow (6 sites, CRLF intact, Task217 interim)",
+      yml.count(b"com.air-devs") == 6 and b"com.prisma-devs.prisma" not in yml
       and yml.count(b"\r\n") == yml.count(b"\n"))
-check("B7 static entitlements follow (3 files)",
-      all("com.prisma-devs.prisma" in rd(p) and "com.air-devs.prisma" not in rd(p)
+check("B7 static entitlements follow (3 files, Task217 interim)",
+      all("com.air-devs" in rd(p) and "com.prisma-devs.prisma" not in rd(p)
           for p in ["entitlements.codesign.xml", "entitlements.sideload.xml", "entitlements.trollstore.xml"]))
-check("B8 URL scheme name follows the id",
-      "com.prisma-devs.prisma.urlscheme" in plist)
+check("B8 URL scheme name follows the interim id (Task217)",
+      "com.air-devs.urlscheme" in plist)
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("B9 REVISION bumped 19 -> 20 (identity change, Task214 rule)",
-      "#define REVISION 20" in vh and "#define REVISION 19\n" not in vh)
+      "#define REVISION 21" in vh and "#define REVISION 19\n" not in vh)
 check("B10 Task216 bump addendum recorded",
       "REVISION 19->20 bump addendum (Task 216)" in vh and "com.air-devs.prisma -> com.prisma-devs.prisma" in vh)
 check("B11 historic addenda untouched (append-only)",
@@ -192,26 +193,25 @@ print("=" * 70)
 ann = json.loads(rd("announcements.json"))["announcements"]
 ids = [a["id"] for a in ann]
 check("G1 38 items, id-unique (Task216@2 append)",
-      len(ann) == 38 and len(ids) == len(set(ids)))
-check("G2 task216 entry complete at tail",
-      ids[-1] == "task216-ui-2026-10-03" and ann[-1]["date"] == "2026-10-03"
-      and "com.prisma-devs.prisma" in ann[-1]["summary"])
-check("G3 task206 kept at -2 (append semantics)",
-      ids[-2] == "task206-nggl4es-2026-10-01")
+      len(ann) == 39 and len(ids) == len(set(ids)))
+check("G2 task217 entry complete at tail (Task217 re-anchor; task216 one step in)",
+      ids[-1] == "task217-download-fixes-about-isolation-2026-10-03" and ann[-1]["date"] == "2026-10-03")
+check("G3 task216 kept at -2 (append semantics, Task217 re-anchor)",
+      ids[-2] == "task216-ui-2026-10-03" and ids[-3] == "task206-nggl4es-2026-10-01")
 check("G4 pins intact (server@0, task169@1)",
       ann[0].get("pin") is True and ids[1] == "task169-four-fixes-2026-09-25")
 check("G5 historical indices unchanged (task214@3, task213@4, task212@5, task211@6)",
       ids[3].startswith("task214-") and ids[4].startswith("task213-")
       and ids[5].startswith("task212-angle") and ids[6].startswith("task211-"))
-check("G6 v207/211 length gates follow 38",
-      "== 38" in rd("scripts/verify_task207.py") and "== 38" in rd("scripts/verify_task211.py"))
-check("G7 v213 realigned to Task216 anchors",
+check("G6 v207/211 length gates follow 39 (Task217)",
+      "== 39" in rd("scripts/verify_task207.py") and "== 39" in rd("scripts/verify_task211.py"))
+check("G7 v213 realigned to Task217 anchors",
       "'_tableView.rowHeight = 64;' in ml" in rd("scripts/verify_task213.py")
-      and "len(ids) == 38" in rd("scripts/verify_task213.py"))
-check("G8 v214/193/196 REVISION gates follow 20",
-      '#define REVISION 20' in rd("scripts/verify_task214.py")
-      and '#define REVISION 20' in rd("scripts/verify_task193.py")
-      and '#define REVISION 20' in rd("scripts/verify_task196_197_198_201.py"))
+      and "len(ids) == 39" in rd("scripts/verify_task213.py"))
+check("G8 v214/193/196 REVISION gates follow 21 (Task217)",
+      '#define REVISION 21' in rd("scripts/verify_task214.py")
+      and '#define REVISION 21' in rd("scripts/verify_task193.py")
+      and '#define REVISION 21' in rd("scripts/verify_task196_197_198_201.py"))
 check("G9 v215 REPO probe is path-independent (Task216 hardening)",
       "REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))" in rd("scripts/verify_task215.py"))
 

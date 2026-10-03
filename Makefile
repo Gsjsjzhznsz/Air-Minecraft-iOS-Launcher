@@ -145,13 +145,13 @@ METHOD_PACKAGE = \
 	else \
 		IPA_SUFFIX=".ipa"; \
 	fi; \
-	rm -f $(OUTPUTDIR)/com.prisma-devs.prisma-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX; \
-	rm -f $(OUTPUTDIR)/com.prisma-devs.prisma.slimmed-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX; \
+	rm -f $(OUTPUTDIR)/com.air-devs-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX; \
+	rm -f $(OUTPUTDIR)/com.air-devs.slimmed-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX; \
 	if [ '$(SLIMMED_ONLY)' = '0' ]; then \
-		zip --symlinks -r $(OUTPUTDIR)/com.prisma-devs.prisma-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX Payload; \
+		zip --symlinks -r $(OUTPUTDIR)/com.air-devs-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX Payload; \
 	fi; \
 	if [ '$(SLIMMED)' = '1' ] || [ '$(SLIMMED_ONLY)' = '1' ]; then \
-		zip --symlinks -r $(OUTPUTDIR)/com.prisma-devs.prisma.slimmed-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX Payload --exclude='Payload/AngelAuraAmethyst.app/java_runtimes/*'; \
+		zip --symlinks -r $(OUTPUTDIR)/com.air-devs.slimmed-$(VERSION)-$(PLATFORM_NAME)$$IPA_SUFFIX Payload --exclude='Payload/AngelAuraAmethyst.app/java_runtimes/*'; \
 	fi
 
 # Function to download and unpack Java runtimes.
@@ -664,6 +664,7 @@ dep_virgl_build:
 		"cpp = 'clang++'" \
 		"ar = 'ar'" \
 		"strip = 'strip'" \
+		"pkg-config = 'pkg-config'" \
 		'' \
 		'[properties]' \
 		"c_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
@@ -677,10 +678,23 @@ dep_virgl_build:
 		"cpu = 'aarch64'" \
 		"endian = 'little'" \
 		> $(WORKINGDIR)/virgl-cross.txt
+	# ---- 0b. Task217：native file（build 机编译器钉死裸 clang）----
+	# CI 主构建步骤导出 CC="ccache clang"（Task205 ccache 接线），meson 交叉
+	# 构建时会把环境 CC 当作 build 机编译器参与探测——包装器掺和探测链是
+	# run 602/603 三连错的家族根源（"Compiler for language c for the build
+	# machine not found" / Apple ld 对 --version 的探测异常 / pkg-config for
+	# host machine not found）。--native-file 显式声明 build 机工具后，环境
+	# 变量被完全绕开；cross [binaries] 补 pkg-config 消掉第三连错。
+	printf '%s\n' \\
+		'[binaries]' \\
+		"c = 'clang'" \\
+		"cpp = 'clang++'" \\
+		> $(WORKINGDIR)/virgl-native.txt
 	# ---- 1. libepoxy（静态，装进 libvtestserver.dylib）----
 	rm -rf $(WORKINGDIR)/virgl-epoxy $(WORKINGDIR)/virgl-prefix
 	meson setup $(WORKINGDIR)/virgl-epoxy $(SOURCEDIR)/Natives/external/libepoxy \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \
+		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dglx=no -Degl=yes -Dx11=false -Dtests=false \
 		-Ddefault_library=static --prefix=$(WORKINGDIR)/virgl-prefix || exit 1
 	ninja -C $(WORKINGDIR)/virgl-epoxy install || exit 1
@@ -690,6 +704,7 @@ dep_virgl_build:
 	PKG_CONFIG_PATH=$(WORKINGDIR)/virgl-prefix/lib/pkgconfig \
 	meson setup $(WORKINGDIR)/virgl-renderer $(SOURCEDIR)/Natives/external/virglrenderer \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \
+		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dplatforms=egl -Dvenus=false -Dvulkan-dload=false -Dtests=false \
 		-Ddefault_library=static || exit 1
 	ninja -C $(WORKINGDIR)/virgl-renderer || exit 1
@@ -721,6 +736,7 @@ dep_virgl_build:
 	rm -rf $(WORKINGDIR)/virgl-mesa
 	cd $(SOURCEDIR)/depends/virgl/mesa-$(VIRGL_MESA_VERSION) && meson setup $(WORKINGDIR)/virgl-mesa \
 		--cross-file $(WORKINGDIR)/virgl-cross.txt \
+		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dgallium-drivers=virgl,softpipe -Dvulkan-drivers=[] \
 		-Dosmesa=true -Dllvm=disabled -Dglx=disabled -Degl=disabled -Dgbm=disabled \
 		-Dplatforms=[] -Dshared-glapi=disabled -Dvideo-codecs=[] \
@@ -853,9 +869,9 @@ deploy:
 		else \
 			$(call METHOD_PACKAGE); \
 			if [ '$(SLIMMED_ONLY)' = '0' ]; then \
-				open $(OUTPUTDIR)/com.prisma-devs.prisma-$(VERSION)-$(PLATFORM_NAME).ipa; \
+				open $(OUTPUTDIR)/com.air-devs-$(VERSION)-$(PLATFORM_NAME).ipa; \
 			else \
-				open $(OUTPUTDIR)/com.prisma-devs.prisma.slimmed-$(VERSION)-$(PLATFORM_NAME).ipa; \
+				open $(OUTPUTDIR)/com.air-devs.slimmed-$(VERSION)-$(PLATFORM_NAME).ipa; \
 			fi; \
 		fi; \
 	else \
@@ -866,7 +882,7 @@ deploy:
 package: payload
 	echo '[Amethyst v$(VERSION)] package - start'
 	if [ '$(TEAMID)' != '-1' ] && [ '$(SIGNING_TEAMID)' != '-1' ] && [ -f '$(PROVISIONING)' ] && [ '$(DETECTPLAT)' = 'Darwin' ]; then \
-		printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n	<key>application-identifier</key>\n	<string>$(TEAMID).com.prisma-devs.prisma</string>\n	<key>com.apple.developer.team-identifier</key>\n	<string>$(TEAMID)</string>\n	<key>get-task-allow</key>\n	<true/>\n	<key>keychain-access-groups</key>\n	<array>\n	<string>$(TEAMID).*</string>\n	<string>com.apple.token</string>\n	</array>\n	<key>com.apple.developer.kernel.extended-virtual-addressing</key>\n	<true/>\n	<key>com.apple.developer.kernel.increased-memory-limit</key>\n	<true/>\n</dict>\n</plist>' > entitlements.codesign.xml; \
+		printf '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n	<key>application-identifier</key>\n	<string>$(TEAMID).com.air-devs</string>\n	<key>com.apple.developer.team-identifier</key>\n	<string>$(TEAMID)</string>\n	<key>get-task-allow</key>\n	<true/>\n	<key>keychain-access-groups</key>\n	<array>\n	<string>$(TEAMID).*</string>\n	<string>com.apple.token</string>\n	</array>\n	<key>com.apple.developer.kernel.extended-virtual-addressing</key>\n	<true/>\n	<key>com.apple.developer.kernel.increased-memory-limit</key>\n	<true/>\n</dict>\n</plist>' > entitlements.codesign.xml; \
 		$(MAKE) codesign; \
 		rm -rf entitlements.codesign.xml; \
 	else \

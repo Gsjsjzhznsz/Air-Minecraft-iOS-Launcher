@@ -25,6 +25,8 @@
 #import "BackgroundManager.h"
 #import "NMToast.h"
 #import "UpdateChecker.h"
+#import "DataTransferService.h"   // Task217：数据导出/导入（包名迁移配套）
+#import "AboutViewController.h"   // Task217：关于页二级菜单入口
 #import "CurseForgeAPIKeyViewController.h"
 #import "CustomControlsViewController.h"
 #import "AI/AIProviderConfigViewController.h"
@@ -879,21 +881,38 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
                   }
               }
             },
-            @{@"key": @"check_update",
+            // Task217：数据导出（包名迁移配套——旧容器数据全量备份到 zip，
+            // 落点由用户经系统文件选择器决定）。
+            @{@"key": @"data_export",
               @"hasDetail": @YES,
-              @"icon": @"arrow.triangle.2.circlepath",
+              @"icon": @"square.and.arrow.up",
               @"type": self.typeButton,
+              @"enableCondition": whenNotInGame,
               @"action": ^void(){
-                  [self checkForUpdateFromSettings];
+                  [[DataTransferService sharedService] exportDataFromViewController:self];
               }
             },
-            // Task 125：启动时自动检测更新（默认开）。仅在新版本可用时以
-            // 新拟物 toast 非侵入提示（点"查看"打开发布页）；已是最新/网络
-            // 失败一律静默。关闭后仅保留上方手动"检查更新"入口。
-            @{@"key": @"auto_update_check",
+            // Task217：从备份导入（新包名容器直接恢复 zip 备份，重启生效）。
+            @{@"key": @"data_import",
               @"hasDetail": @YES,
-              @"icon": @"sparkles",
-              @"type": self.typeSwitch
+              @"icon": @"square.and.arrow.down",
+              @"type": self.typeButton,
+              @"enableCondition": whenNotInGame,
+              @"action": ^void(){
+                  [[DataTransferService sharedService] importDataFromViewController:self];
+              }
+            },
+            // Task217：关于页入口（二级菜单）。启动器更新的两个选项
+            //（check_update / auto_update_check）已随本项迁往关于页
+            //（用户指令："将启动器更新功能的 2 个选项移动到关于页面"）。
+            @{@"key": @"about",
+              @"hasDetail": @YES,
+              @"icon": @"info.circle",
+              @"type": self.typeButton,
+              @"action": ^void(){
+                  AboutViewController *aboutVC = [[AboutViewController alloc] init];
+                  [self.navigationController pushViewController:aboutVC animated:YES];
+              }
             }
         ], @[
             // Download mirror policy settings（分类镜像策略，由 PLMirrorCenter 统一读取）
@@ -1824,7 +1843,7 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
     // 1——表头行）。旧代码按 prefContents 的全量索引直接
     // scrollToRowAtIndexPath/selectRowAtIndexPath，折叠分区内 r>0 的索引
     // 越界 → UITableView 抛 NSInternalInconsistencyException → 闪退。
-    // 装机实锤：启动器版本卡（check_update）/ JIT 卡（jit_enabler）/
+    // 装机实锤：启动器版本卡（Task217 起改路由 about）/ JIT 卡（jit_enabler）/
     // 内存两卡（memory_limit_help）全部命中；游戏版本卡（versionManager
     // 分支）与设备/系统卡（无深链键不滚动）不炸——与用户报告完全吻合。
     // 修复：命中目标行后先展开所在分区（与搜索结果点击的既有语义一致，
@@ -1934,80 +1953,10 @@ static NSString* ame202_languageDisplayName(NSString *ame202_code) {
 
 #pragma mark - Check For Update
 
-/// 设置页"检查更新"入口：调用 UpdateChecker 检查正式版更新，弹窗显示结果。
-- (void)checkForUpdateFromSettings {
-    /* 显示加载中的 alert */
-    UIAlertController *loadingAlert = [UIAlertController
-        alertControllerWithTitle:localize(@"check_update.checking", @"正在检查更新…")
-                         message:nil
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:loadingAlert animated:YES completion:nil];
-
-    [UpdateChecker checkForUpdateWithCompletion:^(UpdateInfo *info, NSError *error) {
-        [loadingAlert dismissViewControllerAnimated:YES completion:^{
-            if (error || info == nil) {
-                [self showUpdateAlertWithTitle:localize(@"check_update.failed", @"检查更新失败")
-                                         message:error.localizedDescription ?: localize(@"i18n_str_97", nil)
-                                       hasUpdate:NO
-                                          info:nil];
-                return;
-            }
-            if (info.hasUpdate) {
-                [self showUpdateAvailableAlert:info];
-            } else {
-                [self showUpdateAlertWithTitle:localize(@"check_update.up_to_date", @"已是最新版本")
-                                         message:[NSString stringWithFormat:
-                                             localize(@"check_update.current_version", @"当前版本 %@，已是最新正式版。"),
-                                             info.currentVersion]
-                                       hasUpdate:NO
-                                          info:nil];
-            }
-        }];
-    }];
-}
-
-- (void)showUpdateAlertWithTitle:(NSString *)title
-                         message:(NSString *)message
-                       hasUpdate:(BOOL)hasUpdate
-                          info:(nullable UpdateInfo *)info {
-    UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:title
-                         message:message
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"OK", @"好的")
-                                              style:UIAlertActionStyleDefault
-                                            handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
-/// 发现新版本时显示更新详情弹窗（参考 FCL/ZL2 风格）
-- (void)showUpdateAvailableAlert:(UpdateInfo *)info {
-    NSString *title = [NSString stringWithFormat:localize(@"check_update.new_version_title",
-                                                          localize(@"i18n_str_407", nil)), info.latestVersion];
-    /* 更新日志截断显示，太长的话只显示前 500 字符 + 省略号 */
-    NSString *notes = info.releaseNotes ?: @"";
-    if (notes.length > 500) {
-        notes = [[notes substringToIndex:500] stringByAppendingString:@"…"];
-    }
-    NSString *message = [NSString stringWithFormat:@"%@\n\n%@",
-                         localize(@"check_update.new_version_message",
-                                  localize(@"i18n_str_408", nil)),
-                         notes];
-
-    UIAlertController *alert = [UIAlertController
-        alertControllerWithTitle:title
-                         message:message
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"check_update.download", @"前往下载")
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction *action) {
-        [UpdateChecker openReleasePage];
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:localize(@"Cancel", @"取消")
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
+// Task217：checkForUpdateFromSettings / showUpdateAlertWithTitle /
+// showUpdateAvailableAlert 三方法随两个更新选项（check_update、
+// auto_update_check）迁往 AboutViewController（关于页启动器更新区）。
+// 本页不再持有更新入口；UpdateChecker import 保留给其他潜在调用方。
 
 #pragma mark - Memory Limit Help
 

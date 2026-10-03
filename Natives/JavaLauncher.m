@@ -15,6 +15,7 @@
 // god knows why Copilot was trying to add this.
 #import "authenticator/BaseAuthenticator.h"
 #import "authenticator/ThirdPartyAuthenticator.h"
+#import "NMToast.h"
 // 鬼知道为什么copilot要把这玩意加里头……
 
 #import "ios_uikit_bridge.h"
@@ -1297,6 +1298,131 @@ static void ame181_disableLegacyForgeSplash(NSString *gameDir, NSString *version
     }
 }
 
+// ==================== Task 217：自动渲染器智能化（崩溃自学 + 决策留痕） ====================
+//
+// 设计要点（病历与边界）：
+// - 裁决信号选用 hs_err_pid*.log 的 mtime：JVM 收到 SIGSEGV/SIGILL/SIGABRT
+//   等致命信号时由 -XX:ErrorFile 写出（Task 27 定向到 POJAV_HOME）；而
+//   FastQuit / 正常退出走 exit(0)，不落 hs_err——两类死亡天然可区分。
+//   SIGKILL（内存 jetsam）不落 hs_err，会被误判为"干净"——保守方向的
+//   假阴性（宁可漏学不误学），内存类死亡另有诊断链（Task106 病历）。
+// - 计数与拉黑存实例偏好（launcher_preferences.plist，get/setPrefObject
+//   通道）：auto 渲染器本就是 profile 级语义，实例粒度已覆盖单版本实例
+//   的主流形态；多 profile 共实例时共享一份学习状态，方向仍正确。
+// - 显式选择的渲染器永远不经此链（本函数只在 AMETHYST_RENDERER=="auto"
+//   分支被调用）；用户手动显式选回被拉黑的渲染器时，顺手清掉其拉黑态
+//   （逃生舱：学习永不绑架用户意图）。
+// - 连败阈值 2：一次崩溃可能是偶发（mod 冲突/瞬时资源），两次连续信号级
+//   死亡才定性为渲染器问题；干净会话即清零计数。
+
+/// 渲染器在主 bundle Frameworks/ 下的存在性（与 Task144 内联检查同口径）。
+static BOOL ame217_rendererDylibPresent(const char *rendererName) {
+    if (!rendererName || !rendererName[0]) return NO;
+    NSString *path = [NSBundle.mainBundle.bundlePath
+        stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@(rendererName)]];
+    return [NSFileManager.defaultManager fileExistsAtPath:path];
+}
+
+/// Task217：裁决上一会话（崩溃自学的记分员）。在每次 auto 解析前调用。
+/// 读哨兵（.ame217_session："<renderer>|<epoch>"）→ 扫描 POJAV_HOME 下
+/// mtime 晚于哨兵时间的 hs_err_pid*.log：有 = 上一会话信号级死亡 → 该
+/// 渲染器连败 +1（达 2 次即拉黑 + 清计数）；无 = 干净会话 → 清该渲染器
+/// 连败。哨兵读后即删（幂等，单次裁决）。
+static void ame217_autoRendererAdjudicateLastSession(void) {
+    NSString *home = @(getenv("POJAV_HOME"));
+    if (home.length == 0) return;
+    NSString *sentinelPath = [home stringByAppendingPathComponent:@".ame217_session"];
+    NSString *sentinel = [NSString stringWithContentsOfFile:sentinelPath
+        encoding:NSUTF8StringEncoding error:nil];
+    [NSFileManager.defaultManager removeItemAtPath:sentinelPath error:nil];
+    if (sentinel.length == 0) return;
+
+    NSArray<NSString *> *parts = [sentinel componentsSeparatedByString:@"|"];
+    if (parts.count < 2) return;
+    NSString *renderer = parts[0];
+    long long epoch = [parts[1] longLongValue];
+    if (renderer.length == 0 || epoch <= 0) return;
+
+    NSString *failKey = [NSString stringWithFormat:@"ame217.autoRendererFails.%@", renderer];
+    BOOL crashed = NO;
+    NSString *newestHsErr = nil;
+    for (NSString *entry in [NSFileManager.defaultManager contentsOfDirectoryAtPath:home error:nil]) {
+        if (![entry hasPrefix:@"hs_err_pid"] || ![entry hasSuffix:@".log"]) continue;
+        NSDictionary *attrs = [NSFileManager.defaultManager attributesOfItemAtPath:
+            [home stringByAppendingPathComponent:entry] error:nil];
+        NSDate *mtime = attrs.fileModificationDate;
+        if (!mtime) continue;
+        if ([mtime timeIntervalSince1970] >= (NSTimeInterval)(epoch - 2)) {
+            crashed = YES;
+            newestHsErr = entry;
+            break;
+        }
+    }
+
+    if (crashed) {
+        NSInteger fails = getPrefInt(failKey) + 1;
+        if (fails >= 2) {
+            NSString *blacklist = getPrefObject(@"ame217.autoRendererBlacklist");
+            NSString *entry = [NSString stringWithFormat:@",%@", renderer];
+            if (![blacklist isKindOfClass:[NSString class]] ||
+                ![blacklist containsString:renderer]) {
+                NSString *merged = ([blacklist isKindOfClass:[NSString class]] && blacklist.length > 0)
+                    ? [blacklist stringByAppendingString:entry] : renderer;
+                setPrefObject(@"ame217.autoRendererBlacklist", merged);
+                NSLog(@"[JavaLauncher] Task217: auto renderer '%@' BLACKLISTED after %ld consecutive hs_err sessions (last: %@) -- auto falls to next candidate",
+                      renderer, (long)fails, newestHsErr);
+            }
+            setPrefObject(failKey, @0);
+        } else {
+            setPrefObject(failKey, @(fails));
+            NSLog(@"[JavaLauncher] Task217: last session (%@) died with hs_err under auto renderer '%@' -- fail count %ld/2",
+                  newestHsErr, renderer, (long)fails);
+        }
+    } else {
+        if (getPrefInt(failKey) > 0) {
+            NSLog(@"[JavaLauncher] Task217: last session under auto renderer '%@' was clean -- fail count reset", renderer);
+        }
+        setPrefObject(failKey, @0);
+    }
+}
+
+/// Task217：auto 候选链决策。版本基线（Task144/173/212）+ dylib 存在性 +
+/// 拉黑过滤；全部候选不可用时回落链首（保留可用性兜底，不让拉黑把路堵死）。
+static NSString *ame217_autoRendererDecide(NSInteger minVersion) {
+    NSArray<NSString *> *chain = (minVersion > 8)
+        ? @[@ RENDERER_NAME_MOBILEGL, @ RENDERER_NAME_GL4ESZL2, @ RENDERER_NAME_MTL_ANGLE]
+        : @[@ RENDERER_NAME_GL4ESZL2, @ RENDERER_NAME_MTL_ANGLE, @ RENDERER_NAME_MOBILEGL];
+    NSString *blacklist = getPrefObject(@"ame217.autoRendererBlacklist");
+    BOOL hasBlacklist = [blacklist isKindOfClass:[NSString class]] && blacklist.length > 0;
+
+    NSString *picked = nil;
+    NSString *reason = nil;
+    for (NSString *candidate in chain) {
+        if (!ame217_rendererDylibPresent(candidate.UTF8String)) {
+            NSLog(@"[JavaLauncher] Task217: auto candidate %@ skipped (dylib missing from bundle)", candidate);
+            continue;
+        }
+        if (hasBlacklist && [blacklist containsString:candidate]) {
+            NSLog(@"[JavaLauncher] Task217: auto candidate %@ skipped (blacklisted by crash learning)", candidate);
+            continue;
+        }
+        picked = candidate;
+        reason = (minVersion > 8)
+            ? @"modern MC baseline (Task144: 1.17+ MobileGL Vulkan direct)"
+            : @"legacy MC baseline (Task173/212: ZL2 classic gl4es)";
+        break;
+    }
+    if (!picked) {
+        picked = chain.firstObject;
+        reason = @"all candidates unavailable/blacklisted -- availability fallback to chain head";
+    }
+    NSLog(@"[JavaLauncher] Task217: auto renderer decision: minVersion=%ld chain=%@ blacklist=%@ -> %@ (%@)",
+          (long)minVersion, chain, hasBlacklist ? blacklist : @"(none)", picked, reason);
+    return picked;
+}
+
+// ==================== Task 217 结束 ====================
+
 int launchJVM(NSString *accountId, id launchTarget, int width, int height, int minVersion) {
     NSLog(@"[JavaLauncher] Beginning JVM launch");
 
@@ -2019,43 +2145,44 @@ int launchJVM(NSString *accountId, id launchTarget, int width, int height, int m
             // MobileGL Vulkan 直连（用户长期主用的装机验证最快路径；dylib 缺失
             // 或旧版本回退 ANGLE，保持旧行为）。layerClass 侧 auto 与 MobileGL
             // 均返回 CAMetalLayer（GameSurfaceView），Task124 同源约束不受影响。
-            // （rendererLibraryExists 是 LauncherPreferences.m 的 static 助手，
-            //  这里内联同口径检查：主 bundle Frameworks/ 下 dylib 存在性。）
             // Task 173：auto 的旧版本分支从 ANGLE 改为 gl4es（用户指令
             // "会根据游戏版本自动分配渲染器"）。依据：CMakeLists 对
             // tinygl4angle 的定位是 "ANGLE wrapper for 1.17+"（桌面 GL 3.3
             // 语义），旧版 MC（1.8.9-forge 等装机会话）的 legacy GLSL 120/
             // 固定管线在 gl4es（gl4es 1.1.4，legacy 语义翻译的老兵）上才是
             // 验证过的路径——用户在 1.8.9 会话手动选 gl4es 也是这个原因。
-            // ANGLE 仍可显式选择（列表不变）。
-            // 新逻辑：MC 1.17+（minVersion>8）优先 MobileGL Vulkan 直连；
-            // 旧版本 → gl4es（不再是 ANGLE）。
-            NSString *ame144_mglPath = [NSBundle.mainBundle.bundlePath
-                stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_MOBILEGL]];
-            if (minVersion > 8 && [NSFileManager.defaultManager fileExistsAtPath:ame144_mglPath]) {
-                glLibName = RENDERER_NAME_MOBILEGL;
+            // Task 212：legacy 默认随 holy gl4es 退役改道 ZL2 经典版
+            // gl4es（gl4es(≤26.2)——同 1.1.4 血统、源码构建）。
+            //
+            // Task 217（增强自动渲染器智能化）：版本基线保持不变，叠加两层：
+            //   (a) 崩溃自学（hs_err 裁决 + 实例级拉黑）——每次 auto 解析前，
+            //       先裁决上一会话：哨兵文件记录了上次启动的渲染器与时间戳，
+            //       若其后出现新的 hs_err_pid*.log（JVM 信号级死亡，区别于
+            //       FastQuit 的 exit(0)）则该渲染器连败计数 +1，连续 2 次
+            //       即拉黑，auto 沿候选链降档并 toast 告知；干净会话清零。
+            //       显式选择的渲染器永远优先（拉黑只影响 auto 解析）。
+            //   (b) 决策留痕——每次解析打印输入/候选链/拉黑态/结论，装机
+            //       日志可直接复盘 auto 行为，为后续机型/版本维度优化积累证据。
+            // 候选链（版本基线 + dylib 存在性 + 拉黑过滤后的首个可用项）：
+            //   1.17+：MobileGL → gl4es(≤26.2) → ANGLE
+            //   ≤1.16：gl4es(≤26.2) → ANGLE → MobileGL
+            {
+                // ---- (a) 上一会话裁决（崩溃自学）----
+                ame217_autoRendererAdjudicateLastSession();
+                // ---- (b) 候选链决策 ----
+                NSString *ame217_pick = ame217_autoRendererDecide(minVersion);
+                glLibName = ame217_pick.UTF8String;
                 setenv("AMETHYST_RENDERER", glLibName, 1);
-                NSLog(@"[JavaLauncher] Auto renderer resolved to %s (modern MC, MobileGL Vulkan direct; config+ctx fixes active)", glLibName);
-            } else {
-                NSString *ame173_gl4esPath = [NSBundle.mainBundle.bundlePath
-                    stringByAppendingPathComponent:[@"Frameworks" stringByAppendingPathComponent:@ RENDERER_NAME_GL4ESZL2]];
-                if ([NSFileManager.defaultManager fileExistsAtPath:ame173_gl4esPath]) {
-                    // Task212：legacy 默认随 holy gl4es 退役改道 ZL2 经典版
-                    // gl4es（gl4es(≤26.2)——同 1.1.4 血统、源码构建）。
-                    glLibName = RENDERER_NAME_GL4ESZL2;
-                    setenv("AMETHYST_RENDERER", glLibName, 1);
-                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (legacy MC, ZL2 classic gl4es; Task212 holy retirement; minVersion=%d)",
-                          glLibName, minVersion);
-                } else {
-                    glLibName = RENDERER_NAME_MTL_ANGLE;
-                    setenv("AMETHYST_RENDERER", glLibName, 1);
-                    NSLog(@"[JavaLauncher] Auto renderer resolved to %s (gl4es missing, ANGLE fallback: minVersion=%d)",
-                          glLibName, minVersion);
-                }
+                // 哨兵：记录本次 auto 解析的渲染器 + 时间，供下一会话裁决。
+                NSString *ame217_sentinel = [NSString stringWithFormat:@"%@/.ame217_session",
+                    @(getenv("POJAV_HOME"))];
+                [[NSString stringWithFormat:@"%@|%lld", ame217_pick,
+                    (long long)[[NSDate date] timeIntervalSince1970]]
+                    writeToFile:ame217_sentinel atomically:YES encoding:NSUTF8StringEncoding error:nil];
             }
-            // Task 154：auto 解析结果只会是 libMobileGL/ANGLE（见上），两者都是
-            // 全局上下文模型，不导出 POJAV_RENDERER（导出会触发 Sodium
-            // 反 Pojav 检测，见 launchJVM 主导出处 Task145 注释）。
+            // Task 154：auto 解析结果只会是 libMobileGL/gl4es/ANGLE（见上），
+            // 三者都是全局上下文模型，不导出 POJAV_RENDERER（导出会触发
+            // Sodium 反 Pojav 检测，见 launchJVM 主导出处 Task145 注释）。
             // Task 154（Mithril 同步退役 POJAV_RENDERER）：Task145 为激活
             // fixPojavGLContext 而给 Mithril 保留的导出一并移除——7c32bc3
             // Mithril 会话的 mod 列表含 sodium 0.9.2（PostLaunchChecks 检测

@@ -2,7 +2,7 @@
 <plist version="1.0">
 <dict>
     <key>application-identifier</key>
-    <string>com.prisma-devs.prisma</string>
+    <string>com.air-devs</string>
     <key>get-task-allow</key>
     <true/>
 

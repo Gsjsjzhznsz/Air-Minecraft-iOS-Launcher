@@ -147,9 +147,10 @@ check("E5 FSR 详情（Task158：GLES/4.0 后端支持 FSR；Vulkan 直连 → v
       and "分辨率」缩放" in rd("Natives/resources/zh-Hans.lproj/Localizable.strings"))
 check("E6 侧边栏 7 卡全部挂点击路由",
       rpp.count("[self ame156_attachInfoCardTap:") == 7)
-check("E7 深链目标键正确（check_update / jit_enabler / memory_limit_help / versionManager）",
-      'route:@"settings:check_update"' in rpp and 'route:@"settings:jit_enabler"' in rpp
-      and 'route:@"settings:memory_limit_help"' in rpp and 'route:@"versionManager"' in rpp)
+check("E7 深链目标键正确（about / jit_enabler / memory_limit_help / versionManager）（Task217 重锚：启动器版本卡改路由 about）",
+      'route:@"about"' in rpp and 'route:@"settings:jit_enabler"' in rpp
+      and 'route:@"settings:memory_limit_help"' in rpp and 'route:@"versionManager"' in rpp
+      and 'isEqualToString:@"about"' in rpp)
 check("E8 深链实现（ameDeepLinkKey 属性 + 滚动高亮消费）",
       "ameDeepLinkKey" in lph and "scrollToRowAtIndexPath" in lpv
       and "deselectRowAtIndexPath" in lpv)
@@ -168,7 +169,7 @@ for lg in langs:
     sets.append(keys)
     check(f"F[{lg}] footer 键在位", "background.effect.footer" in keys)
 check("F1 四主语言键集一致（1952 = Task157 基线 1948 + Task159 净增 4（新增 5 键，退役 memory.current））",
-      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2419,
+      sets[0] == sets[1] == sets[2] == sets[3] and len(sets[0]) == 2455,
       f"counts={[len(x) for x in sets]}")
 for f in ["Natives/BackgroundSettingsViewController.m", "Natives/JavaLauncher.m",
           "Natives/egl_bridge.m", "Natives/SurfaceViewController.m",

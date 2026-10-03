@@ -2600,3 +2600,41 @@
 "ame202.ai.new_session" = "新会话";
 "ame202.common.copy" = "复制";
 
+
+/* Task217 */
+"profile.isolation.title" = "版本隔离";
+"profile.isolation.subtitle" = "选择此版本（%@）游戏数据的存放方式";
+"profile.isolation.none" = "不隔离（与其他版本共用实例目录）";
+"profile.isolation.isolate" = "隔离此版本（versions/%@，自动迁移数据）";
+"profile.isolation.custom" = "自定义路径…（高级）";
+"profile.isolation.state_none" = "未隔离（共用目录）";
+"profile.isolation.state_isolated" = "已隔离 → versions/%@";
+"profile.isolation.disabled_note" = "已关闭隔离。你的数据【不会】被自动搬回（多个隔离版本各有存档时无法安全合并）——数据保留在该版本目录下，可通过自定义路径或文件 App 访问。";
+"profile.isolation.migrated" = "已开启隔离。迁移 %ld 项，跳过 %ld 项（目标已存在：%@）。";
+"profile.isolation.migrated_clean" = "已在 %@ 开启隔离，无需迁移旧数据。";
+"profile.isolation.migrate_failed" = "开启隔离失败：%@";
+"component.fabricapi.no_match" = "Fabric API 暂无适配 Minecraft %@ 的版本，请稍后重试或到 Modrinth 手动下载。";
+"mods.toggle.failed" = "无法切换此 Mod 状态";
+"mods.toggle.source_missing" = "Mod 文件已不存在（可能已在启动器外被更新或删除）：%@。列表将重新扫描。";
+"mods.toggle.dest_exists" = "目标同名文件已存在：%@。请先清理重名文件（文件 App 或滑动删除），再重试。";
+"preference.title.data_export" = "导出数据备份";
+"preference.detail.data_export" = "把启动器全部数据（实例、存档、模组、账户、设置）打包为 zip 备份。更换应用包名前，先保存到文件 App 任意位置。";
+"preference.title.data_import" = "从备份导入数据";
+"preference.detail.data_import" = "将先前导出的备份 zip 恢复到本启动器，重启后生效。";
+"preference.title.about" = "关于";
+"preference.detail.about" = "版本信息、QQ 群、启动器更新、许可证与致谢";
+"ame217.export.progress" = "正在导出数据备份…";
+"ame217.export.failed" = "导出失败：%@";
+"ame217.export.done" = "备份已保存：%@";
+"ame217.import.progress" = "正在导入数据备份…";
+"ame217.import.failed" = "导入失败：%@";
+"ame217.import.done" = "数据已恢复，请重启启动器后生效。";
+"about.nav_title" = "关于";
+"about.qq.title" = "QQ 群";
+"about.qq.copy" = "复制群号";
+"about.qq.copied" = "QQ 群号已复制";
+"about.update.section" = "启动器更新";
+"about.license.title" = "许可证";
+"about.license.body" = "本启动器以 GNU Affero General Public License v3.0（AGPL-3.0）授权。完整许可证内容见仓库根目录的 LICENSE 文件；第三方组件遵循各自许可证（ThirdParty/ 与 Natives/external/ 目录：PojavLauncher 为 GPLv3、MobileGlues 为 LGPL-3.0 等，详见对应目录）。源代码：https://github.com/Gsjsjzhznsz/Prisma-Minecraft-iOS-Launcher";
+"about.credits.title" = "致谢";
+"about.credits.body" = "Prisma 派生自 Amethyst-iOS-MyRemastered（herbrine8403），后者基于 PojavLauncher 官方 iOS 移植（PojavLauncherTeam）。SDL3 嵌入方案移植自 ZalithLauncher2。渲染器谱系包含 gl4es、Zink/Mesa、MobileGlues、ANGLE 与 virglrenderer。感谢所有上游作者与贡献者。";

@@ -136,12 +136,16 @@ check('F8 accent badge top+10 position retired',
 # ============ G. R8 rebrand sweep ============
 check('G1 Info.plist display name Prisma',
       rd('Natives/Info.plist').count('<string>Prisma</string>') == 2)
-check('G2 Info.plist bundle id renamed (Task216: com.prisma-devs.prisma, full wiring)',
-      'com.prisma-devs.prisma' in rd('Natives/Info.plist')
-      and 'com.air-devs.prisma' not in rd('Natives/Info.plist')
-      and 'com.prisma-devs.prisma' in open('Makefile', encoding='utf-8').read()
-      and 'com.prisma-devs.prisma' in open('.github/workflows/development.yml', encoding='utf-8').read()
-      and 'com.prisma-devs.prisma' in open('entitlements.sideload.xml', encoding='utf-8').read())
+# Task217 re-anchor: the identity moved on AGAIN by user order -- interim
+# migration build com.prisma-devs.prisma -> com.air-devs (upstream-family
+# name; final target com.prisma-devs in its own round). The full-wiring
+# invariant is unchanged, only the literal.
+check('G2 Info.plist bundle id renamed (Task217: interim com.air-devs, full wiring)',
+      'com.air-devs' in rd('Natives/Info.plist')
+      and 'com.prisma-devs.prisma' not in rd('Natives/Info.plist')
+      and 'com.air-devs' in open('Makefile', encoding='utf-8').read()
+      and 'com.air-devs' in open('.github/workflows/development.yml', encoding='utf-8').read()
+      and 'com.air-devs' in open('entitlements.sideload.xml', encoding='utf-8').read())
 check('G3 Info.plist usage descriptions Prisma',
       'Prisma uses the local network' in rd('Natives/Info.plist'))
 res_air = 0
@@ -186,7 +190,7 @@ check('G14 AI header comments rebranded',
 # ============ H. docs cascade ============
 data = json.load(open('announcements.json', encoding='utf-8'))
 ids = [e['id'] for e in data['announcements']]
-check('H1 announcements 38 items (Task216@2 append +1)', len(ids) == 38)
+check('H1 announcements 39 items (Task217 append +1)', len(ids) == 39)
 check('H2 task213@4 (Task215 shift)', ids[4].startswith('task213-'))
 check('H2b parallel task212@5 (their ANGLE/CF/VirGL round; Task215 shift)', ids[5].startswith('task212-angle'))
 check('H3 task169 pin @1 intact', ids[1].startswith('task169-'))
@@ -196,8 +200,8 @@ check('H5 version.h Task213 addendum present', 'REVISION 18 addendum (Task 213, 
 check('H6 trailing SEP = 76 equals', re.search(r'\n//\s(={76})\s*$', vh) is not None)
 v207 = rd('scripts/verify_task207.py')
 v211 = rd('scripts/verify_task211.py')
-check('H7 207 length gate shifted 38 (Task216 append)', '== 38' in v207 and '== 37' not in v207)
-check('H8 211 length gate shifted 38 (Task216 append)', '== 38' in v211)
+check('H7 207 length gate shifted 39 (Task217 append)', '== 39' in v207 and '== 38' not in v207)
+check('H8 211 length gate shifted 39 (Task217 append)', '== 39' in v211)
 check('H9 211 announcement anchors (task211@4 + parallel task212@3 + mine task213@2)',
       'ann[6]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"' in v211 and
       'ann[5]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"' in v211)
@@ -229,16 +233,26 @@ check('J4 detail row drops GetMoreRam parenthetical',
           re.search(r'"preference\.detail\.memory_limit_help" = "([^"]*)";',
                     rd(f'Natives/resources/{l}.lproj/Localizable.strings')).group(1)
           for l in ['en', 'ja', 'km', 'zh-CN', 'zh-Hans', 'zh-Hant']))
-check('J5 bundle id renamed everywhere (Task216 prisma-devs wiring)',
-      all('com.prisma-devs.prisma' in rd(p) and 'com.air-devs.prisma' not in rd(p) for p in
+# Task217 re-anchor: interim migration id com.air-devs (final com.prisma-devs later).
+# The authenticator keeps deliberate LEGACY keychain service references
+# (ame217_legacyKeychainServices migration chain) -- exempt from the
+# "no old id" half of the invariant there.
+check('J5 bundle id renamed everywhere (Task217 interim air-devs wiring)',
+      all('com.air-devs' in rd(p) for p in
           ['Natives/Info.plist', 'entitlements.trollstore.xml', 'entitlements.codesign.xml',
            'entitlements.sideload.xml', 'Makefile', '.github/workflows/development.yml',
            'Natives/MinecraftResourceDownloadTask.m', 'Natives/TouchControllerBridge.m',
-           'Natives/TouchController/ios_transport.c', 'Natives/authenticator/ThirdPartyAuthenticator.m']))
+           'Natives/TouchController/ios_transport.c', 'Natives/authenticator/ThirdPartyAuthenticator.m'])
+      and all('com.prisma-devs.prisma' not in rd(p) for p in
+          ['Natives/Info.plist', 'entitlements.trollstore.xml', 'entitlements.codesign.xml',
+           'entitlements.sideload.xml', 'Makefile', '.github/workflows/development.yml',
+           'Natives/MinecraftResourceDownloadTask.m', 'Natives/TouchControllerBridge.m',
+           'Natives/TouchController/ios_transport.c'])
+      and 'com.prisma-devs.prisma.ame131.credentials' in rd('Natives/authenticator/ThirdPartyAuthenticator.m'))
 check('J6 crash-view suggestions untouched (out of R9 scope)',
       'GetMoreRam (LiveContainer)' in rd('Natives/PLCrashView.m'))
-check('J7 URL scheme registration follows the new id',
-      'com.prisma-devs.prisma.urlscheme' in rd('Natives/Info.plist'))
+check('J7 URL scheme registration follows the new id (Task217 interim)',
+      'com.air-devs.urlscheme' in rd('Natives/Info.plist'))
 
 # ============ I. syntax balance gates (touched ObjC files) ============
 def balance(path):

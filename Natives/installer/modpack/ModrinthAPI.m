@@ -339,27 +339,18 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
         }
         return;
     }
-    
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    request.timeoutInterval = 30.0;
-    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-    [request setValue:@"Amethyst-iOS/1.0" forHTTPHeaderField:@"User-Agent"];
-    
-    NSURLSession *session = [NSURLSession sharedSession];
-    NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        if (error) { if (completion) completion(nil, error); return; }
-        if (!data) { if (completion) completion(nil, [NSError errorWithDomain:@"ModrinthAPIError" code:2 userInfo:@{NSLocalizedDescriptionKey: @"No data"}]); return; }
-        
-        NSError *jsonError = nil;
-        NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
-        if (jsonError || ![json isKindOfClass:[NSDictionary class]]) {
-            if (completion) completion(nil, jsonError ?: [NSError errorWithDomain:@"ModrinthAPIError" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Invalid JSON"}]);
+
+    // Task217：走 ame217 抖动重试取数器（镜像空响应/网关错误单次重试；
+    // 解析主体不变）。completion 仍在后台线程回调，调用方自行切主线程。
+    [self ame217_fetchJSONWithURL:url completion:^(id json, NSError *fetchError) {
+        if (fetchError || ![json isKindOfClass:[NSDictionary class]]) {
+            if (completion) completion(nil, fetchError ?: [NSError errorWithDomain:@"ModrinthAPIError" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Invalid JSON"}]);
             return;
         }
-        
+
         NSArray *hits = json[@"hits"];
         if (![hits isKindOfClass:[NSArray class]]) { if (completion) completion(@[], nil); return; }
-        
+
         NSMutableArray *results = [NSMutableArray array];
         for (NSDictionary *item in hits) {
             if (![item isKindOfClass:[NSDictionary class]]) continue;
@@ -380,7 +371,6 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
         }
         if (completion) completion(results, nil);
     }];
-    [task resume];
 }
 
 - (void)getVersionsForModWithID:(NSString *)modID
@@ -391,24 +381,12 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
         if (completion) completion(nil, [NSError errorWithDomain:@"ModrinthAPIError" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Invalid URL"}]);
         return;
     }
-    
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    request.timeoutInterval = 30.0;
-    [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
-    [request setValue:@"Amethyst-iOS/1.0" forHTTPHeaderField:@"User-Agent"];
-    
-    NSURLSession *session = [NSURLSession sharedSession];
-    NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+    [self ame217_fetchJSONWithURL:url completion:^(id jsonResult, NSError *error) {
         if (error) { if (completion) completion(nil, error); return; }
-        if (!data) { if (completion) completion(nil, [NSError errorWithDomain:@"ModrinthAPIError" code:2 userInfo:@{NSLocalizedDescriptionKey: @"No data"}]); return; }
-        
-        NSError *jsonError = nil;
-        id jsonResult = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
-        if (jsonError || ![jsonResult isKindOfClass:[NSArray class]]) {
-            if (completion) completion(nil, jsonError ?: [NSError errorWithDomain:@"ModrinthAPIError" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Invalid JSON"}]);
+        if (![jsonResult isKindOfClass:[NSArray class]]) {
+            if (completion) completion(nil, [NSError errorWithDomain:@"ModrinthAPIError" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Invalid JSON"}]);
             return;
         }
-        
         NSMutableArray<ModVersion *> *versions = [NSMutableArray array];
         for (NSDictionary *dict in jsonResult) {
             ModVersion *version = [[ModVersion alloc] initWithDictionary:dict];
@@ -416,7 +394,59 @@ static NSString *MRAMirrorResolvedURL(NSString *urlString) {
         }
         if (completion) completion(versions, nil);
     }];
-    [task resume];
+}
+
+/// Task217：MCIM 镜像抖动单次重试（搜索 / 版本列表两入口共享）。
+/// 实测（2026-10）：镜像偶发空响应 / 网关错误（连续两次空 body 后恢复，
+/// 与 Task169 记录的 CurseForge 镜像抖动同源），旧实现一次失败即向
+/// UI 报“未找到项目/版本”——组件安装（Fabric API / Sodium+Iris /
+/// TouchController）在镜像源上随机全军覆没。失败（传输错误 / 解析失败）
+/// 后延迟 1.5s 重试一次，对齐 ame169 CurseForge 的重试语义；有效但为
+/// 空的结果不重试（无法与合法空结果区分）。completion 线程语义与旧
+/// 内联实现一致（任意线程回调，调用方自行切主线程）。
+- (void)ame217_fetchJSONWithURL:(NSURL *)url
+                      completion:(void (^)(id _Nullable, NSError * _Nullable))completion {
+    if (!completion) return;
+    void (^ame217_attempt)(NSInteger) = nil;
+    ame217_attempt = ^(NSInteger attempt) {
+        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+        request.timeoutInterval = 30.0;
+        [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
+        [request setValue:@"Amethyst-iOS/1.0" forHTTPHeaderField:@"User-Agent"];
+        NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+            if (error || !data || data.length == 0) {
+                if (attempt == 0) {
+                    NSLog(@"[ModrinthAPI] Task217: transport failure (%@) -- one retry in 1.5s",
+                          error.localizedDescription ?: @"empty body");
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                                   dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                        ame217_attempt(1);
+                    });
+                    return;
+                }
+                completion(nil, error ?: [NSError errorWithDomain:@"ModrinthAPIError" code:2 userInfo:@{NSLocalizedDescriptionKey: @"No data"}]);
+                return;
+            }
+            NSError *jsonError = nil;
+            id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&jsonError];
+            if (jsonError || !json) {
+                if (attempt == 0) {
+                    NSLog(@"[ModrinthAPI] Task217: JSON parse failure (%@) -- one retry in 1.5s",
+                          jsonError.localizedDescription);
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                                   dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+                        ame217_attempt(1);
+                    });
+                    return;
+                }
+                completion(nil, jsonError ?: [NSError errorWithDomain:@"ModrinthAPIError" code:3 userInfo:@{NSLocalizedDescriptionKey: @"Invalid JSON"}]);
+                return;
+            }
+            completion(json, nil);
+        }];
+        [task resume];
+    };
+    ame217_attempt(0);
 }
 
 #pragma mark - Shader Search (专用方法)

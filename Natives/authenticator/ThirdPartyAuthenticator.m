@@ -210,7 +210,26 @@ static void ame133_downloadAndCacheAvatar(NSString *skinURL,
 // ---------------------------------------------------------------------------
 
 /// Keychain 服务的稳定标识（Bundle identifier 在重签名安装间可能变化，不用它）
-static NSString *const ame131_keychainService = @"com.prisma-devs.prisma.ame131.credentials";
+static NSString *const ame131_keychainService = @"com.air-devs.ame131.credentials";
+
+/// Task217（包名迁移配套）：历史 Keychain 服务名回退链。keychain-access-groups
+/// 授权为 $(TEAMID).* 通配——同签名链下旧服务名里的凭据仍然可读。包名在
+/// 本仓库历史上的多次变更（com.air-devs.air → com.air-devs.prisma →
+/// com.prisma-devs.prisma → 本轮临时 com.air-devs，终态 com.prisma-devs）
+/// 每次都会换服务名；查不到新服务时按链回退读取，读到后回写到新服务名
+/// （自迁移，用户无感）。
+static NSArray<NSString *> *ame217_legacyKeychainServices(void) {
+    static NSArray<NSString *> *ame217_chain = nil;
+    static dispatch_once_t ame217_once;
+    dispatch_once(&ame217_once, ^{
+        ame217_chain = @[
+            @"com.prisma-devs.prisma.ame131.credentials",   // Task216-217 代
+            @"com.air-devs.prisma.ame131.credentials",      // Task213 前后代
+            @"com.air-devs.air.ame131.credentials"          // 上游同源代
+        ];
+    });
+    return ame217_chain;
+}
 
 static NSString *ame131_credentialKey(NSString *authserver, NSString *loginIdentifier) {
     NSString *server = authserver ?: @"";
@@ -243,14 +262,31 @@ static void ame131_storeCredentials(NSString *authserver, NSString *loginIdentif
 
 static NSString *ame131_readCredentials(NSString *authserver, NSString *loginIdentifier) {
     if (loginIdentifier.length == 0) return nil;
+    NSString *account = ame131_credentialKey(authserver, loginIdentifier);
     NSDictionary *query = @{(__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
                             (__bridge id)kSecAttrService: ame131_keychainService,
-                            (__bridge id)kSecAttrAccount: ame131_credentialKey(authserver, loginIdentifier),
+                            (__bridge id)kSecAttrAccount: account,
                             (__bridge id)kSecReturnData: @YES,
                             (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitOne};
     // CF_RETURNS_RETAINED 出参类型是 CFTypeRef*（CFDataRef* 直传 = CI 错误 3）
     CFTypeRef out = NULL;
     if (SecItemCopyMatching((__bridge CFDictionaryRef)query, &out) != errSecSuccess || !out) {
+        // Task217：新服务名未命中 → 历史服务名回退链（包名迁移期间凭据
+        // 仍活在旧服务名下；读到后回写新服务名完成自迁移）。
+        for (NSString *legacy in ame217_legacyKeychainServices()) {
+            NSMutableDictionary *legacyQuery = [query mutableCopy];
+            legacyQuery[(__bridge id)kSecAttrService] = legacy;
+            CFTypeRef legacyOut = NULL;
+            if (SecItemCopyMatching((__bridge CFDictionaryRef)legacyQuery, &legacyOut) == errSecSuccess && legacyOut) {
+                NSString *legacyPw = [[NSString alloc] initWithData:(__bridge_transfer NSData *)legacyOut
+                                                          encoding:NSUTF8StringEncoding];
+                if (legacyPw.length > 0) {
+                    NSLog(@"[ThirdPartyAuthenticator] Task217: credential found under legacy service %@ -- re-storing under current service", legacy);
+                    ame131_storeCredentials(authserver, loginIdentifier, legacyPw);
+                    return legacyPw;
+                }
+            }
+        }
         return nil;
     }
     NSString *pw = [[NSString alloc] initWithData:(__bridge_transfer NSData *)out encoding:NSUTF8StringEncoding];

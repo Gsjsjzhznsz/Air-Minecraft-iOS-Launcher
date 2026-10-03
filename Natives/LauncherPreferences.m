@@ -652,6 +652,26 @@ NSString *ame_effective_renderer(void) {
             }
             return @"auto";
         }
+        // Task217（崩溃自学的逃生舱）：显式选择永远优先于 auto 的拉黑态——
+        // 用户手动选回被拉黑的渲染器 = 明确意图，顺手把它的拉黑与连败记录
+        // 清掉（下次 auto 可再给它机会；学习只作用于 auto 解析，绝不绑架
+        // 用户显式选择）。注：本函数被显示层高频调用，此分支只做一次
+        // 字符串 contains 判断，无 IO。
+        {
+            NSString *ame217_bl = getPrefObject(@"ame217.autoRendererBlacklist");
+            if ([ame217_bl isKindOfClass:[NSString class]] && [ame217_bl containsString:renderer]) {
+                NSMutableArray<NSString *> *ame217_parts = [NSMutableArray array];
+                for (NSString *ame217_seg in [ame217_bl componentsSeparatedByString:@","]) {
+                    if (ame217_seg.length > 0 && ![ame217_seg isEqualToString:renderer]) {
+                        [ame217_parts addObject:ame217_seg];
+                    }
+                }
+                setPrefObject(@"ame217.autoRendererBlacklist",
+                    [ame217_parts componentsJoinedByString:@","]);
+                setPrefObject([NSString stringWithFormat:@"ame217.autoRendererFails.%@", renderer], @0);
+                NSLog(@"[Amethyst] Task217: explicit selection '%@' un-blacklisted (user intent wins; auto crash-learning state cleared)", renderer);
+            }
+        }
         return renderer;
     }
     // (2) auto + MobileGL 后端选项：按档位覆盖（dylib 缺失时守卫回落）。

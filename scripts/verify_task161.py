@@ -154,8 +154,8 @@ check("E1 折叠分区先展开（prefSectionsVisibility[s]=YES + reloadSections
       and "reloadSections:[NSIndexSet indexSetWithIndex:s]" in lpv)
 check("E2 行数防御（numberOfRows 越界只展开不选中）",
       "ame161_visibleRows" in lpv and "expanded only, no selection" in lpv)
-check("E3 闪退机理注释钉住（check_update/jit_enabler/memory_limit_help）",
-      "启动器版本卡（check_update）/ JIT 卡（jit_enabler）/" in lpv)
+check("E3 闪退机理注释钉住（Task217 重锚：启动器版本卡改路由 about 后的措辞）",
+      "启动器版本卡（Task217 起改路由 about）/ JIT 卡（jit_enabler）/" in lpv)
 
 print("== F. 26.2 及以下聊天自动弹键盘 ==")
 ib = rd("Natives/input_bridge_v3.m")

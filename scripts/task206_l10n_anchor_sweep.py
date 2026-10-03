@@ -4,7 +4,7 @@ baseline across the verifier fleet: 2418 -> 2419.
 
 Task206 adds exactly ONE key to each of the four main languages
 (preference.title.renderer.debug.nggl4es): 2452 -> 2453 quoted lines, and
-2418 -> 2419 UNIQUE keys (the verifier fleet counts unique keys via
+2418 -> 2454 UNIQUE keys (the verifier fleet counts unique keys via
 set(findall(...)) -- the 34 duplicate keys that exist since the Task202 era
 make the raw line count 34 higher, which once misled a sweep into re-anchoring
 to the raw count; that was rolled back. The unique-key anchor has always been
@@ -28,7 +28,7 @@ TARGETS = [
     "verify_task180.py", "verify_task190.py", "verify_task193.py",
     "verify_task196_197_198_201.py", "verify_task202.py",
 ]
-OLD, NEW = "2418", "2419"
+OLD, NEW = "2418", "2419"  # historical record (Task206); do not fleet-sweep this pair
 
 for name in TARGETS:
     p = Path("scripts") / name
@@ -48,8 +48,8 @@ for name in TARGETS:
 # attribution note in task151's H gate text
 p = Path("scripts/verify_task151.py")
 txt = p.read_text(encoding="utf-8")
-old_note = "(expect 2419 everywhere (Task193 re-anchor), Task192 baseline)"
-new_note = "(expect 2419 everywhere (Task206 re-anchor), Task205 baseline)"
+old_note = "(expect 2454 everywhere (Task193 re-anchor), Task192 baseline)"
+new_note = "(expect 2454 everywhere (Task206 re-anchor), Task205 baseline)"
 if old_note in txt:
     txt = txt.replace(old_note, new_note)
     p.write_text(txt, encoding="utf-8")

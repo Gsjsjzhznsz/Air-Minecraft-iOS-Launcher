@@ -245,12 +245,15 @@ check("L2 mgfamily annotated (en)", '"preference.title.renderer.debug.mgfamily" 
 s_zh = rd("Natives/resources/zh-Hans.lproj/Localizable.strings")
 check("L3 auto label zh", '"preference.title.renderer.debug.auto" = "自动";' in s_zh)
 check("L4 mgfamily zh", '"preference.title.renderer.debug.mgfamily" = "MobileGlues (1.17+)";' in s_zh)
-legacy_branch = """glLibName = RENDERER_NAME_GL4ESZL2;
-                    setenv("AMETHYST_RENDERER", glLibName, 1);"""
-check("L5 auto legacy branch -> ZL2 classic gl4es (Task212 重锚：holy gl4es 退役改道)",
-      legacy_branch.split("NSLog")[0] in jl
-      and "ZL2 classic gl4es; Task212 holy retirement" in jl)
-check("L6 gl4es-missing ANGLE fallback retained", "gl4es missing, ANGLE fallback" in jl)
+# Task217 重锚：auto 分支重构为 ame217_autoRendererDecide 候选链函数
+#（版本基线语义不变：legacy 首选 ZL2 gl4es、缺档回退 ANGLE——由链序
+#  1.17+ 与 ≤1.16 两行 + 决策留痕日志承载）。
+check("L5 auto legacy branch -> ZL2 classic gl4es (Task217 重锚：候选链函数形态)",
+      "? @[@ RENDERER_NAME_MOBILEGL, @ RENDERER_NAME_GL4ESZL2, @ RENDERER_NAME_MTL_ANGLE]" in jl
+      and ": @[@ RENDERER_NAME_GL4ESZL2, @ RENDERER_NAME_MTL_ANGLE, @ RENDERER_NAME_MOBILEGL]" in jl
+      and "legacy MC baseline (Task173/212: ZL2 classic gl4es)" in jl)
+check("L6 gl4es-missing ANGLE fallback retained (Task217 重锚：可用性兜底措辞)",
+      "all candidates unavailable/blacklisted -- availability fallback to chain head" in jl)
 
 print("== M. docs ==")
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")

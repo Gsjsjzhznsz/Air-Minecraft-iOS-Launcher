@@ -16,6 +16,7 @@
 #import "PLTaskProgressViewController.h"
 #import "ALTServerConnection.h"
 #import "BackgroundManager.h"
+#import "AboutViewController.h"   // Task217：启动器版本卡 about 路由
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 #import "AvatarManager.h"
@@ -501,7 +502,10 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
     // 版本管理页、JIT→设置·JIT 开启工具（深链）、内存两卡→设置·内存分配
     // （深链）、设备/系统→设置首页（无更精确入口）。深链经
     // LauncherPreferencesViewController.ameDeepLinkKey 滚动到行并高亮。
-    [self ame156_attachInfoCardTap:launcherVersionCard route:@"settings:check_update"];
+    // Task217：启动器版本卡改路由 about（关于页）——原 settings:check_update
+    // 深链随"启动器更新两项迁往关于页"一并改道（用户指令："将右侧侧边栏
+    // “启动器版本”入口改为指向关于页面"）。
+    [self ame156_attachInfoCardTap:launcherVersionCard route:@"about"];
     [self ame156_attachInfoCardTap:gameVersionCard       route:@"versionManager"];
     [self ame156_attachInfoCardTap:deviceCard            route:@"settings"];
     [self ame156_attachInfoCardTap:systemCard            route:@"settings"];
@@ -943,6 +947,25 @@ static const CGFloat AmePanelVerticalEdgeInset = 12;
             [host performSelector:@selector(showVersionManager)];
 #pragma clang diagnostic pop
         }
+        return;
+    }
+
+    // Task217：about 路由——关于页（二级菜单：版本/QQ 群/启动器更新/许可证/致谢）。
+    if ([target isEqualToString:@"about"]) {
+        AboutViewController *aboutVC = [[AboutViewController alloc] init];
+        UINavigationController *aboutNav = [[UINavigationController alloc] initWithRootViewController:aboutVC];
+        if ([host respondsToSelector:@selector(setContentViewController:animated:)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            [host performSelector:@selector(setContentViewController:animated:)
+                       withObject:aboutNav
+                       withObject:@(YES)];
+#pragma clang diagnostic pop
+        } else {
+            aboutNav.modalPresentationStyle = UIModalPresentationFormSheet;
+            [self presentViewController:aboutNav animated:YES completion:nil];
+        }
+        NSLog(@"[RightPanel] Task217: info card -> about page");
         return;
     }
 

@@ -487,6 +487,20 @@
 - (BOOL)toggleEnableForMod:(ModItem *)mod error:(NSError **)error {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *currentPath = mod.filePath;
+
+    // Task217（"部分 Mod 无法点击"根修前置）：源文件存在性预检。列表项可能
+    // 因更新替换 / 文件 App 手工整理后指向不存在的路径（moveItemAtPath 的
+    // ENOENT 以前一路裸抛，管理页只 NSLog，开关被 updateToggleState 弹回 =
+    // 用户视角"点了没反应"）。返回明确本地化错误；调用方据此弹窗 + 自愈重扫。
+    BOOL ame217_srcIsDir = NO;
+    if (currentPath.length == 0 ||
+        ![fileManager fileExistsAtPath:currentPath isDirectory:&ame217_srcIsDir] || ame217_srcIsDir) {
+        if (error) *error = [NSError errorWithDomain:@"ModServiceError" code:201
+            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"mods.toggle.source_missing", nil),
+                currentPath.length > 0 ? currentPath.lastPathComponent : @"?"]}];
+        return NO;
+    }
+
     NSString *newPath;
 
     if (mod.disabled) {
@@ -498,6 +512,17 @@
         }
     } else {
         newPath = [currentPath stringByAppendingString:@".disabled"];
+    }
+
+    // Task217：目标同名预检。mods/ 同时存在 foo.jar 与 foo.jar.disabled 时
+    // "启用旧档"必然撞名（更新流程与手工整理的常见残留）；裸 moveItemAtPath
+    // 只会给出不可读的 NSFileWriteFileExists。明确告知冲突文件名，用户可在
+    // 文件 App（本应用已开 UIFileSharing）或滑动删除里自行清理。
+    if ([fileManager fileExistsAtPath:newPath]) {
+        if (error) *error = [NSError errorWithDomain:@"ModServiceError" code:202
+            userInfo:@{NSLocalizedDescriptionKey: [NSString stringWithFormat:localize(@"mods.toggle.dest_exists", nil),
+                newPath.lastPathComponent]}];
+        return NO;
     }
 
     BOOL success = [fileManager moveItemAtPath:currentPath toPath:newPath error:error];

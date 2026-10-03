@@ -31,6 +31,7 @@ def rd(path):
 
 root = rd("Natives/LauncherRootViewController.m")
 uc = rd("Natives/UpdateChecker.m")
+about_vc = rd("Natives/AboutViewController.m")
 lpvc = rd("Natives/LauncherPreferencesViewController.m")
 plp = rd("Natives/PLPreferences.m")
 bridge = rd("Natives/ios_uikit_bridge.m")
@@ -60,8 +61,11 @@ check("A4 非侵入呈现（toast + 查看动作，无 AlertDialog）",
       "NMToast showMessage:msg" in root and "openReleasePage" in root)
 check("A5 冷启动延迟 1.5s（避开启动期 UI 竞争）",
       "1.5 * NSEC_PER_SEC" in root)
-check("A6 设置行 + 默认值（默认开）",
-      '"key": @"auto_update_check"' in lpvc and
+# Task217 重锚：设置行随"更新两项迁往关于页"移入 AboutViewController
+#（开关 + 落键 general.auto_update_check）；默认值仍在 PLPreferences。
+check("A6 关于页开关 + 默认值（默认开）（Task217 重锚：行迁关于页）",
+      'self.autoUpdateSwitch.on = [getPrefObject(@"general.auto_update_check") boolValue]' in about_vc and
+      'setPrefObject(@"general.auto_update_check"' in about_vc and
       '"auto_update_check": @YES' in plp)
 check("A7 l10n 四语言齐备（toast 文案 + 设置 title/detail）",
       all(f'"preference.title.auto_update_check"' in rd(f"Natives/resources/{l}.lproj/Localizable.strings")
