@@ -183,7 +183,7 @@ mk = rd("Makefile")
 check("D7 Makefile 补丁接线退役 + TAB 基线 644（Task215 重锚：dep_virgl +83）",
       "patch_gl4es_rtld_default.py" not in mk and "patch_gl4es_ggstr_nullguard.py" not in mk
       and "holy gl4es（libgl4es_114.dylib）退役删除" in mk
-      and sum(1 for l in mk.split("\n") if l.startswith("\t")) == 644)
+      and sum(1 for l in mk.split("\n") if l.startswith("\t")) == 646)
 
 check("D8 utils.h 宏退役（字面量仅存于迁移判定）",
       '#define RENDERER_NAME_GL4ES "libgl4es_114.dylib"' not in rd("Natives/utils.h"))
@@ -225,16 +225,16 @@ check("F3 公告内容五主题齐备",
 
 print("== G. 级联抽查（本轮重锚族） ==")
 spot = {
-    "scripts/verify_task206.py": ["cur_tab == 644", 'len(ann) == 38 and ann[-1]["id"] == "task216-ui-2026-10-03"'],
+    "scripts/verify_task206.py": ["cur_tab == 646", 'len(ann) == 38 and ann[-1]["id"] == "task216-ui-2026-10-03"'],
     "scripts/verify_task211.py": ['len(ann) == 38 and ann[6]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"',
                                   "(swapIndex == 240 || swapIndex == 480 || swapIndex == 720)"],
     "scripts/verify_task210.py": ['len(ann) == 38\n      and ann[7]["id"] == "task210-neumorph'],
     "scripts/verify_task209.py": ["a209 = ann[8]", "len(ann) == 38"],
     "scripts/verify_task203.py": ["len(ann) == 38 and ann[-1]['id'] == 'task216-ui-2026-10-03'"],
-    "scripts/verify_task202.py": ["len(ann) == 38", 'ann[34]["id"] == "task202-october-fix-wave"', "mk_tab == 644"],
+    "scripts/verify_task202.py": ["len(ann) == 38", 'ann[34]["id"] == "task202-october-fix-wave"', "mk_tab == 646"],
     "scripts/verify_task193.py": ["len(ann) == 38", 'ann[11]["id"] == "task193-app-icon-replace-2026-09-28"'],
-    "scripts/verify_task129.py": ["cur_tab == 644 and head_tab == 644"],
-    "scripts/verify_task135.py": ["cur_tab == 644 and head_tab == 644"],
+    "scripts/verify_task129.py": ["cur_tab == 646 and head_tab == 646"],
+    "scripts/verify_task135.py": ["cur_tab == 646 and head_tab == 646"],
     "scripts/verify_task173.py": ['ann["announcements"][21]["id"] == "task173-ten-fixes-2026-09-26"'],
     "scripts/verify_task174.py": ['anns[19]["id"] == "task174-neumorph-canvas-opacity-label-2026-09-26"'],
     "scripts/verify_task168.py": ['anns[25]["id"] == "task168-neumorph-faq-json-2026-09-25"'],

@@ -641,8 +641,12 @@ dep_gl4eszl2:
 #     VTEST_SOCKET_NAME 连接进程内 vtest server）
 # 快路径：三个 dylib 已 commit-back 到 Frameworks 时跳过整链构建；
 # 任一环节失败不阻断主构建：渲染器表按 dylib 存在性自动隐藏该选项。
+# Task216 hotfix 3（run 602/603 实锤兑现上述承诺）：dep_virgl 原实现把 meson 链的 || exit 1 直接暴露给 payload，链上任何一环失败（当前 = CI mac runner 的 meson 交叉工具探测：pkg-config/build-machine compiler/Apple ld 不认 --version）都拖死整个主构建，与设计注释矛盾。改为包装层：dep_virgl_build 全链失败只告警放行（VirGL 项隐藏，装机可辨），meson 链本身的修复留给独立轮次不受主构建节奏裹挟。
 VIRGL_MESA_VERSION ?= 25.0.7
 dep_virgl:
+	@$(MAKE) --no-print-directory dep_virgl_build \
+		|| echo '[Amethyst v$(VERSION)] dep_virgl - build failed; VirGL renderer entry hidden (graceful degradation by design)'
+dep_virgl_build:
 	@if [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesaVirgl.dylib" ] && \
 	    [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libvtestserver.dylib" ] && \
 	    [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libepoxy.dylib" ]; then \

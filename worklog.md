@@ -1586,3 +1586,20 @@ Work Log:
 
 Stage Summary:
 - 热修 2 推送（e3e1e2e 之后的下一提交）；CI 盯至绿
+
+---
+Task ID: 216 (CI 热修 3)
+Agent: main (Super Z)
+Task: Run 602/603 真根因——dep_virgl meson 链在 CI 未绿过 + 包装层兑现降级设计
+
+Work Log:
+- Run 602/603 的 12 个错误注解全量提取（SSR Annotations 区块）：全部落在 dep_virgl 的 meson 交叉链（pkg-config for host machine not found / Compiler for language c for the build machine not found / Apple ld 不认 --version / gmake: dep_virgl Error 1）——与本轮 UI 改动零交集
+- 历史脉络还原：run 598 绿 = Task214 的 2dd8d0b（当时 Makefile 尚无 dep_virgl）；Task215 的 7352ccc hotfix 1 只做了本地 meson 解析验证即推送，dep_virgl 全链从未在 CI 绿过；本轮提交触碰大量文件致缓存 key 变化触发 dep_virgl 完整重建才首次实跑爆雷
+- 修复（兑现 Task215 自己写下的设计注释"任一环节失败不阻断主构建：渲染器表按 dylib 存在性自动隐藏该选项"——原实现 || exit 1 未兑现）：dep_virgl 拆为包装层 + dep_virgl_build 内目标，链失败只告警放行，VirGL 渲染器项按 dylib 存在性隐藏；meson 链修复（pkg-config/交叉文件 build-machine 声明）留给独立轮次
+- ⚠️ 工具链病历第二例：Edit 工具本次写盘把 Makefile 全文件 644 个 TAB 静默吞成空格（git diff 全文件改写 + 字节统计双实锤）；恢复 = git checkout HEAD 后改用 python 字节级补丁（TAB 显式 \t），TAB 行 644→646；此前 VersionManagerViewController 的"!anager 坏行"经 base64 裁定为显示层吞 repr 文本的假象（python print 也经渲染层——Task215 教训升级版：字节判定必须 base64/od，任何回显包括 python 输出都不可信）
+- TAB 基线级联 644→646：129 I4 / 135 / 203 / 206 / 202 mk_tab / 212（含 212 的 spot 表引用串）；129/135/206 的 head 基线随本提交自愈
+- 本地验证：216 55/55、213 85/85、214 绿、215 60/60、203/212 绿、202 57/57；129/135/206 残留 = head 基线自愈类（提交后转绿）
+
+Stage Summary:
+- dep_virgl meson 链的根治（pkg-config 安装 + 交叉文件 [binaries] pkg-config/build-machine 声明）登记为独立待办，与并行会话协调认领
+- 本轮 UI 六项交付不受影响：602/603 无一条错误指向本轮触碰的文件

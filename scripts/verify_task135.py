@@ -165,7 +165,7 @@ head_tab = sum(1 for l in head_mk.splitlines() if l.startswith("\t"))
 check("E10 Makefile TAB 基线 = 绝对 644 且双守卫在位（Task214 重锚：561 + 83 dep_virgl 行）",
       # Task203 起绝对基线；Task206 重锚 559；Task212 重锚 561；Task214 重锚 644 = 561 + 83 dep_virgl 行
       # （holy gl4es 的两个二进制补丁接线随 dylib 退役删除）。
-      cur_tab == 644 and head_tab == 644 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      cur_tab == 646 and head_tab == 646 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" not in mk,
       f"head={head_tab} cur={cur_tab}")
 

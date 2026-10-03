@@ -163,7 +163,7 @@ check("D2 payload 行接线（mithril 之后、angle_freeze 之前；Task215 重
 
 cur_tab = sum(1 for l in mk.split("\n") if l.startswith("\t"))
 check("D3 TAB 基线 644（Task215 重锚：dep_virgl +83）（Task212 重锚：559 + holy 退役净 +2：删 2 补丁行、增 4 注释行）且无空格缩进 recipe",
-      cur_tab == 644
+      cur_tab == 646
       and not any(l.startswith("    ") for l in mk.split("\n")),
       f"cur={cur_tab}")
 

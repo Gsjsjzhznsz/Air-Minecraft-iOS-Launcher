@@ -279,7 +279,7 @@ check("I4 Makefile TAB 完整（Task212 重锚：绝对基线 644（Task214 重�
       # +3 TAB），Task203 起 +3 已随 64fdaf2 入 HEAD——对拍口径转为绝对
       # 基线；Task206 重锚：dep_nggl4es 目标 +47 TAB 行（531 = 484 + 47）；
       # 守卫目标（dep_sdl3_guard + patch_gl4es_ggstr_nullguard）双在位。
-      cur_tab == 644 and head_tab == 644 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
+      cur_tab == 646 and head_tab == 646 and "dep_sdl3_guard:" in mk and "dep_sdl3_guard" in head_mk
       and "patch_gl4es_ggstr_nullguard.py" not in mk,  # Task212：holy 补丁接线随退役移除
       f"head={head_tab} cur={cur_tab}")
 
