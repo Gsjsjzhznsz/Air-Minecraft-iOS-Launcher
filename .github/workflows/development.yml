@@ -147,9 +147,9 @@ jobs:
           # 因此 --break-system-packages 优先）
           # Task217 热修 2（run 609）：+pyyaml——virglrenderer 自带 gallium 辅件 meson 探测 python3 yaml 模块
           # （src/gallium/meson.build:69 “python3 is missing modules: yaml”），brew python 无它。
-          python3 -m pip install --break-system-packages --user mako pyyaml 2>/dev/null \
-            || python3 -m pip install --user mako pyyaml 2>/dev/null \
-            || pip3 install --user mako pyyaml || true
+          python3 -m pip install --break-system-packages --user mako pyyaml packaging 2>/dev/null \
+            || python3 -m pip install --user mako pyyaml packaging 2>/dev/null \
+            || pip3 install --user mako pyyaml packaging || true
 
       - name: Remove work folders
         run: |
