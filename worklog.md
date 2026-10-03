@@ -1536,3 +1536,25 @@ Work Log:
 
 Stage Summary:
 - 热修推送后重盯 CI；dep_virgl 链剩余风险面：virglrenderer 的 darwin 交叉编译、Mesa 25.0.7 交叉构建（bison/mako 已备）
+
+---
+Task ID: 216
+Agent: main (Super Z)
+Task: 六项 UI 统一轮——加载器列表对齐版本表真基准 + 透明度驼峰根治 + 实例卡绑定 + 默认设置改版 + 6.5.0/包名二段品牌轮
+
+Work Log:
+- 家法开场：fetch 防撞号——远程已有并行会话的 Task 215（VirGL 轮 907c32d + dep_virgl 热修 7352ccc），本地 fast-forward 至 7352ccc 后确认本轮 = Task 216，分支 task216。
+- N1 加载器列表对齐（用户六轮重写仍不满意的真收口）：Task212 曾把加载器表压到 50pt/32 图标并声称"版本选择表 50pt"——但 VersionCardCell（DownloadViewController versionCollectionView，行高 64）才是真基准，每轮重写都对齐了错误基准。现逐项对齐：两表 rowHeight 50→64（ModLoaderInstallViewController 主表 + ModLoaderVersionPickerViewController 子页表）、RowCell 图标容器 32x32 圆角 8 左缘 16→40x40 圆角 10 左缘 14、图标 20→22、图标-文字间距 12→14、名称顶距 8→14、状态行距 2→3、SwitchCell 文字块 8/2→14/3。
+- N2 版本号与包名二段：CFBundleShortVersionString/CFBundleVersion 6.0.0→6.5.0；bundle id com.air-devs.prisma→com.prisma-devs.prisma 全接线（Info.plist 双键、os_log 子系统×2、keychain service、后台任务 session id、Makefile 产物名×7 含生成的 entitlements、CI workflow 产物名×6、静态 entitlements×3）；REVISION 19→20（身份变化缓存 epoch 跟随，Task214 规则）+ version.h append-only 补遗。⚠️ CRLF 教训重演：文本模式 python 写回会把 CRLF 转 LF——development.yml 371 行 CRLF 被静默降级，verify_task215 B40 二进制口径抓住，wb 模式恢复。
+- N3 透明度驼峰根治（用户排查指令）：半透明模式"100→50 越来越透、50→10 反而越来越不透明"拐点恰在 50%——根因 = makeViewControllerTransparent 页面底层 alpha 用 1.0 - uiOpacity（反向语义），而卡面管线用 uiOpacity（正向），两层叠加后壁纸透出率 = (1-o)×o 在 o=0.5 取最大（驼峰曲线与用户实测逐点吻合）。两管线语义互相矛盾 + 毛玻璃模式页面底恒 clearColor 从无此现象——定性为历史遗留 bug 而非有意设计（已在交付说明中向用户报告）。改回正向语义后透出率 = (1-o)² 全程单调。
+- N4 实例卡绑定（用户"先只改实例页面的卡片"）：根因一 = 卡面管线只在 cell init 挂一次（setupViews），复用池 cell 在 reloadData 后永不重铺 → 拖透明度滑条部分卡面 alpha 永远停在首次创建值（"有些按钮始终不变"）；根因二 = cell 层投影固定 0.12 + 按钮圆底固定 0.12 labelColor → 卡面变透时阴影/按钮纹丝不动（"光没了阴影还在"）。修复 = VMTileBaseCell 新增 ame216_effectOpacityFactor（无壁纸 1.0 / 毛玻璃 0.3+blur×0.7 / 半透明 uiOpacity）+ ame216_rebindCardSurface（幂等重铺管线 + shadowOpacity=0.12×factor），VMVersionCardCell/VMGameDirCell 的 configure 开头接入，⋯/叉钮圆底 alpha 同乘因子；VMGameDirCell 普通卡分支的硬编码 white 0.08 底移除（曾盖掉管线实时卡面）；磁贴/渲染器卡不动（用户范围限定）。
+- N5 默认设置四项：uiOpacity 默认 0.6→1.0（含越界兜底）、blurIntensity 1.0→0.75（含兜底）、uiEffect 恒毛玻璃（已满足）；SceneDelegate 一次性迁移改靶——未显式选择设备统一迁回 auto（Task180 曾迁 dark，Task161 家法"显式选择永不覆盖"保留）；恢复默认按钮硬编码 0.7 → 1.0/0.75/毛玻璃同步。
+- N6 页脚换行：BackgroundSettingsViewController section 0 页脚从 titleForFooterInSection（单行截断）改 viewForFooterInSection 多行 label（numberOfLines=0 + boundingRect 预排高度 + 20pt 内缩视觉同规格）。
+- 级联：task216@2 append（37→38 条，历史下标全不动）；机械重锚波：公告 len==37→38（202/203/206/207/209/210/211/212/193/196族 + 213 H1/H7/H8 + 214 G1/G5 + 206/212/207 的元检查串）+ 尾锚 task206→task216（-2 保留）；REVISION 19→20（193 N 门/196 E 门/207 E 门/214 F1/H4）；行高/图标断言（184 A 组/190 B/180 G 组——Task212 的错误基准断言全部对齐 64/40/10）；默认值断言（160 B2/B3/162 D1/D2/164 C3/170 A3/180 C 组/B 组）；迁移断言（161 D3/180 G/184 D：dark→auto）；版本双键（169 G1：6.0.0→6.5.0）；verify_task215 REPO 硬编码路径改脚本位置自动探测（并行会话工作区路径在本沙箱不存在）。
+- 预存漂移诚实修复（本轮全量复跑抓到）：171 D2/D3（anns[22]→[23]）与 172 H2（anns[21]→[22]）——Task215 在 @2 位置插入公告把两者顺延 +1，但 215 收官复跑清单未含 171/172 漏检；本轮 task216@2 为 append 型与该漂移无关，按家法补锚。
+- 验证：verify_task216 NEW 54/54 ALL GREEN（A 加载器对齐×8/B 品牌接线×10/C 单调×3/D 绑定×5/E 默认×6/F 换行×3/G 级联×9/H 语法门×9 + G2 修 summary）；家族复跑绿：129/130/131/135 的红 = 裸括号 HEAD 基线对拍类（工作区未提交，提交后自愈，Task138 惯例），141 G4 同；171/172 补锚后全绿；160/161/162/164/169/180/184/190/193/196族/202/203/206/207/209/210/211/212/213/214/215/168(33/34 仅自愈)/173/174/191/192/142/143/150/157/159 全绿；预存债字节级等同 214/215 收官记录（81 REVISION-17 时代断言、132/133/138 日志轮换类、179 I4-I6 探针桩类）。
+
+Stage Summary:
+- 装机待验证：① 半透明拉条全程单调（10%→100% 单向变浓）② 实例卡拖透明度时按钮圆底/阴影与卡面同步 ③ 加载器列表与下载版本表并排对照同规格 ④ 新装默认：跟随系统外观+毛玻璃+100%+75%
+- 包名二段风险面：旧 keychain 凭据不迁移（ame131 credentials 需重登）；ReProvision/LiveContainer 宿主需按新 bundle id 重签
+- CI 风险面：纯 UI/元文件轮，无构建链变更；产物名 com.prisma-devs.prisma-* 已全接线（Makefile/CI 双侧一致）

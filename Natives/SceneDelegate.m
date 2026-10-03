@@ -114,15 +114,16 @@ extern __weak UIWindow *mainWindow;
         // 只改默认表对这些设备无效；未显式选择过的设备（无
         // general.ui_theme_explicit 标记）若还停在两个历史默认值上，迁移到
         // auto。显式选过的设备永不覆盖（标记在设置页 pick 的 action 里置位）。
+        // Task216：一次性迁移——用户定稿默认初始值回到"跟随系统"。历史
+        // 迁移链：Task161 曾迁 auto/light → auto，Task180 又把 auto/light
+        // 迁到 dark；本轮把未显式选择过的设备（无 general.ui_theme_explicit
+        // 标记，无论停在 dark（Task180 迁移值）/ light（Task160 历史默认））
+        // 统一迁回 auto。显式选过的设备永不覆盖（Task161 家法不变）。
         if (!getPrefBool(@"general.ui_theme_explicit")) {
-            NSString *ame161_legacy = getPrefObject(@"general.ui_theme");
-            if ([ame161_legacy isEqualToString:@"auto"] ||
-                [ame161_legacy isEqualToString:@"light"]) {
-                // Task180：用户定稿默认初始值 = 深色模式——未显式选择过的设备
-                // （停在 auto（Task161 迁移值）/ light 历史默认上）迁移到 dark；
-                // 显式选择过的设备永不覆盖（Task161 家法不变）。
-                setPrefObject(@"general.ui_theme", @"dark");
-                NSLog(@"[SceneDelegate] Task180: ui_theme '%@' was never explicitly chosen -> migrated to 'dark' (user-specified default)", ame161_legacy);
+            NSString *ame216_legacy = getPrefObject(@"general.ui_theme");
+            if (![ame216_legacy isEqualToString:@"auto"]) {
+                setPrefObject(@"general.ui_theme", @"auto");
+                NSLog(@"[SceneDelegate] Task216: ui_theme '%@' was never explicitly chosen -> migrated to 'auto' (follow system, user-specified default)", ame216_legacy);
             }
         }
         NSString *theme = getPrefObject(@"general.ui_theme");

@@ -96,7 +96,7 @@ for s in ("scripts/task193_icon.py", "scripts/task193_announce.py", "scripts/tas
 # ============ F. announcement: task193@2, family shifted, pin intact ============
 print("== F. 公告窗口族 ==")
 ann = json.loads(io.open("announcements.json", encoding="utf-8").read())["announcements"]
-check("F", "条目数 -> 34（Task212@2 插入，窗口族顺延）", len(ann) == 37, f"actual={len(ann)}")
+check("F", "条目数 -> 34（Task212@2 插入，窗口族顺延）", len(ann) == 38, f"actual={len(ann)}")
 check("F", "Task212 重锚：task193 顺延至 [8]，task190 顺延至 [9]，置顶公告 [0] 未动",
       len(ann) > 6 and ann[11]["id"] == "task193-app-icon-replace-2026-09-28"
       and ann[12]["id"].startswith("task190-") and ann[0]["id"].startswith("server-recommend"))
@@ -223,7 +223,7 @@ check("M", "全部 lproj 表解析 OK（task191 tokenizer）",
 print("== N. MobileGlues 2.0.18 ==")
 vh2 = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 md = rd("Natives/external/MobileGlues/MobileGlues-cpp/gl/multidraw.cpp")
-check("N", "REVISION 18", "#define REVISION 19" in vh2)
+check("N", "REVISION 18", "#define REVISION 20" in vh2)
 check("N", "上游 0f1e10b multidraw grow-only 移植",
       "if (staged.size() < static_cast<size_t>(primcount))" in md and
       "Upstream 0f1e10b (2.0.18 sync)" in md)

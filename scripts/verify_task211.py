@@ -184,7 +184,7 @@ check("E1 version.h Task211 附录（五主题 + 尾部 SEP）",
       and re.search(r"// ={70,}\s*$", vh) is not None)
 ann = json.loads(rd("announcements.json"))["announcements"]
 check("E2 公告 task211@3（Task212 重锚：34 条 + task212@2 插入顺延 + 尾锚）",
-      len(ann) == 37 and ann[6]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
+      len(ann) == 38 and ann[6]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"
       and ann[0]["id"] == "server-recommend-2026-09-24"
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
       and ann[5]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"

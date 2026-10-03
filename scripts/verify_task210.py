@@ -161,9 +161,10 @@ print("== C. 壁纸设置页 ==")
 check("C", "sections[0] = 纯壁纸效果三行（无 neumorph 键）",
       'localize(@"i18n_str_57", nil), localize(@"i18n_str_1296", nil), localize(@"i18n_str_1297", nil)' in bsvc
       and "background.cards.neumorph" not in bsvc)
-check("C", "无壁纸时 section 0 整段隐藏（0 行 + 页脚同步隐藏）",
+check("C", "无壁纸时 section 0 整段隐藏（0 行 + 页脚同步隐藏；Task216 重锚：页脚改多行自定义视图）",
       "if (section == 0 && ![[BackgroundManager sharedManager] hasBackground]) {\n        return 0;" in bsvc
-      and 'if (section == 0 && [[BackgroundManager sharedManager] hasBackground]) {' in bsvc)
+      and 'section != 0 || ![[BackgroundManager sharedManager] hasBackground]' in bsvc
+      and "viewForFooterInSection" in bsvc)
 check("C", "壁纸管线滑条行不受影响（opacity/blur 回调单在位 + 刷新链保留）",
       bsvc.count("- (void)opacitySliderChanged:") == 1
       and bsvc.count("- (void)blurIntensitySliderChanged:") == 1
@@ -191,11 +192,12 @@ check("D", "applyCardEffectToCell 直转 applyEffectToCell（Flat 特调行退�
 print("== E. 公告 / version.h / 级联 ==")
 ann = json.loads(rd("announcements.json"))["announcements"]
 check("E", "公告 32 条，task210@2，置顶钉位未动，NG-GL4ES 尾锚保持",
-      len(ann) == 37
+      len(ann) == 38
       and ann[7]["id"] == "task210-neumorph-retirement-card-fixes-2026-10-02"
       and ann[0]["id"].startswith("server-recommend")
       and ann[1]["id"] == "task169-four-fixes-2026-09-25"
-      and ann[-1]["id"] == "task206-nggl4es-2026-10-01")
+      and ann[-1]["id"] == "task216-ui-2026-10-03"
+      and ann[-2]["id"] == "task206-nggl4es-2026-10-01")
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("E", "version.h Task210 附录在场（REVISION 18 append-only，无 bump）+ 尾部 SEP 收口",
       "REVISION 18 addendum (Task 210, no bump)" in vh

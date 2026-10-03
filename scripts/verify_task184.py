@@ -46,10 +46,10 @@ check('A', '内层容器圆角 12 continuous ×3（版本卡同款）',
 check('A', '容器上下内缩 4pt（版本卡 sectionInset 语义）',
       ml.count('self.contentView.topAnchor constant:4]') >= 3
       and ml.count('self.contentView.bottomAnchor constant:-4]') >= 3)
-check('A', '图标容器 32x32 圆角 8 masksToBounds（Task212 重锚：随 50pt 行压缩）',
-      'widthAnchor constraintEqualToConstant:32],' in ml
-      and 'heightAnchor constraintEqualToConstant:32],' in ml
-      and '_iconContainer.layer.cornerRadius = 8;' in ml
+check('A', '图标容器 40x40 圆角 10 masksToBounds（Task216 重锚：对齐版本表规格）',
+      'widthAnchor constraintEqualToConstant:40],' in ml
+      and 'heightAnchor constraintEqualToConstant:40],' in ml
+      and '_iconContainer.layer.cornerRadius = 10;' in ml
       and '_iconContainer.layer.masksToBounds = YES;' in ml)
 check('A', '品牌色淡底容器（createIconBadge 同源 0.15）',
       'colorWithAlphaComponent:0.15];' in ml and 'brandColorForLoader' in ml)
@@ -65,8 +65,8 @@ check('A', '版本子页 cell 同配方（Task210 重锚：AmeCard 主文字色�
       '_versionLabel.textColor = AmeCardPrimaryTextColor();' in ml)
 check('A', '版本子页表无分隔线（画在透明 cell 上会横切卡面）',
       'separatorStyle = UITableViewCellSeparatorStyleNone;' in ml)
-check('A', '主表行高 50 = 子页行高 50（Task212 重锚：两表统一；卡 42/42）',
-      ml.count('_tableView.rowHeight = 50;') == 2 and '_tableView.rowHeight = 64;' not in ml)
+check('A', '主表行高 64 = 子页行高 64（Task216 重锚：两表统一对齐版本表；卡 56/56）',
+      ml.count('_tableView.rowHeight = 64;') == 2 and '_tableView.rowHeight = 50;' not in ml)
 check('A', '开关行 cell 同配方（标题 16 + 描述 12 + switch 右 -14）',
       ml.count('@interface ModLoaderSwitchCell : UITableViewCell') == 1
       and '_switchControl.trailingAnchor constraintEqualToAnchor:_cardContainer.trailingAnchor constant:-14]' in ml)
@@ -125,9 +125,9 @@ ba = rd('authenticator/BaseAuthenticator.m')
 check('D', '账号复制双保险保留（写盘收口 + 读侧去重）',
       'ame180_savedAccountId' in ba and 'ame180_seenIds' in ac)
 sc = rd('SceneDelegate.m')
-check('D', 'card 布局默认 / dark 主题迁移保留（180 定稿）',
+check('D', 'card 布局默认 / 跟随系统主题迁移保留（Task216 改靶：dark -> auto）',
       'if ([layout isEqualToString:@"vs"]) {' in sc
-      and "setPrefObject(@\"general.ui_theme\", @\"dark\");" in sc)
+      and "setPrefObject(@\"general.ui_theme\", @\"auto\");" in sc)
 
 # ============ E. CI 防回归（引擎符号 import 纪律，Task180 G 组教训常驻） ============
 def uses_engine_symbols(s):

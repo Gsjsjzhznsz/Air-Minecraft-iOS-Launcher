@@ -102,14 +102,14 @@ check('D3 import present', '#import "LauncherHelpViewController.h"' in cl)
 
 # ============ E. R6 installer spacing unification ============
 ml = rd('Natives/installer/ModLoaderInstallViewController.m')
-check('E1 loader table rowHeight 50 (was 64)',
-      '_tableView.rowHeight = 50;' in ml and '_tableView.rowHeight = 64;' not in ml)
-check('E2 version table rowHeight 50 unchanged (two 50 sites)',
-      ml.count('_tableView.rowHeight = 50;') == 2)
-check('E3 RowCell geometry compressed (32 icon box / 20 icon)',
-      'constraintEqualToConstant:32],' in ml and 'constraintEqualToConstant:20],' in ml)
+check('E1 loader table rowHeight 64 (Task216 realigned to version table)',
+      '_tableView.rowHeight = 64;' in ml and '_tableView.rowHeight = 50;' not in ml)
+check('E2 both tables rowHeight 64 (two 64 sites)',
+      ml.count('_tableView.rowHeight = 64;') == 2)
+check('E3 RowCell geometry = VersionCardCell (40 icon box / 22 icon)',
+      'constraintEqualToConstant:40],' in ml and 'constraintEqualToConstant:22],' in ml)
 check('E4 RowCell fonts 15/11', 'systemFontOfSize:15 weight:UIFontWeightSemibold' in ml)
-check('E5 SwitchCell fonts 15/11 top 8', '_titleLabel.topAnchor constraintEqualToAnchor:_cardContainer.topAnchor constant:8' in ml)
+check('E5 SwitchCell fonts 15/11 top 14 (Task216)', '_titleLabel.topAnchor constraintEqualToAnchor:_cardContainer.topAnchor constant:14' in ml)
 check('E6 old 64pt comment gone', 'Task184：64pt 行高' not in ml)
 
 # ============ F. R7 account card rewrite ============
@@ -136,12 +136,12 @@ check('F8 accent badge top+10 position retired',
 # ============ G. R8 rebrand sweep ============
 check('G1 Info.plist display name Prisma',
       rd('Natives/Info.plist').count('<string>Prisma</string>') == 2)
-check('G2 Info.plist bundle id renamed (Task212 R10: com.air-devs.prisma, full wiring)',
-      'com.air-devs.prisma' in rd('Natives/Info.plist')
-      and 'com.air-devs.air' not in rd('Natives/Info.plist')
-      and 'com.air-devs.prisma' in open('Makefile', encoding='utf-8').read()
-      and 'com.air-devs.prisma' in open('.github/workflows/development.yml', encoding='utf-8').read()
-      and 'com.air-devs.prisma' in open('entitlements.sideload.xml', encoding='utf-8').read())
+check('G2 Info.plist bundle id renamed (Task216: com.prisma-devs.prisma, full wiring)',
+      'com.prisma-devs.prisma' in rd('Natives/Info.plist')
+      and 'com.air-devs.prisma' not in rd('Natives/Info.plist')
+      and 'com.prisma-devs.prisma' in open('Makefile', encoding='utf-8').read()
+      and 'com.prisma-devs.prisma' in open('.github/workflows/development.yml', encoding='utf-8').read()
+      and 'com.prisma-devs.prisma' in open('entitlements.sideload.xml', encoding='utf-8').read())
 check('G3 Info.plist usage descriptions Prisma',
       'Prisma uses the local network' in rd('Natives/Info.plist'))
 res_air = 0
@@ -186,7 +186,7 @@ check('G14 AI header comments rebranded',
 # ============ H. docs cascade ============
 data = json.load(open('announcements.json', encoding='utf-8'))
 ids = [e['id'] for e in data['announcements']]
-check('H1 announcements 37 items (Task215@2 insert sweeps +1)', len(ids) == 37)
+check('H1 announcements 38 items (Task216@2 append +1)', len(ids) == 38)
 check('H2 task213@4 (Task215 shift)', ids[4].startswith('task213-'))
 check('H2b parallel task212@5 (their ANGLE/CF/VirGL round; Task215 shift)', ids[5].startswith('task212-angle'))
 check('H3 task169 pin @1 intact', ids[1].startswith('task169-'))
@@ -196,8 +196,8 @@ check('H5 version.h Task213 addendum present', 'REVISION 18 addendum (Task 213, 
 check('H6 trailing SEP = 76 equals', re.search(r'\n//\s(={76})\s*$', vh) is not None)
 v207 = rd('scripts/verify_task207.py')
 v211 = rd('scripts/verify_task211.py')
-check('H7 207 length gate shifted 37 (Task215 sweep)', '== 37' in v207 and '== 36' not in v207)
-check('H8 211 length gate shifted 37 (Task215 sweep)', '== 37' in v211)
+check('H7 207 length gate shifted 38 (Task216 append)', '== 38' in v207 and '== 37' not in v207)
+check('H8 211 length gate shifted 38 (Task216 append)', '== 38' in v211)
 check('H9 211 announcement anchors (task211@4 + parallel task212@3 + mine task213@2)',
       'ann[6]["id"] == "task211-exit-cf-angle-gl4es-2026-10-02"' in v211 and
       'ann[5]["id"] == "task212-angle-cf-renderers-virgl-2026-10-02"' in v211)
@@ -229,8 +229,8 @@ check('J4 detail row drops GetMoreRam parenthetical',
           re.search(r'"preference\.detail\.memory_limit_help" = "([^"]*)";',
                     rd(f'Natives/resources/{l}.lproj/Localizable.strings')).group(1)
           for l in ['en', 'ja', 'km', 'zh-CN', 'zh-Hans', 'zh-Hant']))
-check('J5 bundle id renamed everywhere (24-site wiring)',
-      all('com.air-devs.prisma' in rd(p) and 'com.air-devs.air' not in rd(p) for p in
+check('J5 bundle id renamed everywhere (Task216 prisma-devs wiring)',
+      all('com.prisma-devs.prisma' in rd(p) and 'com.air-devs.prisma' not in rd(p) for p in
           ['Natives/Info.plist', 'entitlements.trollstore.xml', 'entitlements.codesign.xml',
            'entitlements.sideload.xml', 'Makefile', '.github/workflows/development.yml',
            'Natives/MinecraftResourceDownloadTask.m', 'Natives/TouchControllerBridge.m',
@@ -238,7 +238,7 @@ check('J5 bundle id renamed everywhere (24-site wiring)',
 check('J6 crash-view suggestions untouched (out of R9 scope)',
       'GetMoreRam (LiveContainer)' in rd('Natives/PLCrashView.m'))
 check('J7 URL scheme registration follows the new id',
-      'com.air-devs.prisma.urlscheme' in rd('Natives/Info.plist'))
+      'com.prisma-devs.prisma.urlscheme' in rd('Natives/Info.plist'))
 
 # ============ I. syntax balance gates (touched ObjC files) ============
 def balance(path):

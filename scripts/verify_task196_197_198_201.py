@@ -192,7 +192,7 @@ check("E", "四语言 metal 键齐备", all("preference.title.renderer.debug.met
 check("E", "四语言键集全同", k4[0] == k4[1] == k4[2] == k4[3])
 check("E", "唯一键计数 2419", len(k4[0]) == 2419, f"got {len(k4[0])}")
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
-check("E", "REVISION 保持 18（不 bump）", "#define REVISION 19" in vh)
+check("E", "REVISION 保持 18（不 bump）", "#define REVISION 20" in vh)
 check("E", "version.h 四任务附录在场",
       "Tasks 196/197/198/201" in vh and "Task 201 (Metallum Metal renderer" in vh)
 ann = json.load(open(os.path.join(REPO, "announcements.json"), encoding="utf-8"))["announcements"]
@@ -204,7 +204,7 @@ check("E", "公告条目在场且四锚点齐备", e196 is not None and all(
 check("E", "公告位置：新条目@2，task193 顺延@3（Task212 重锚：task212@2 插入后再顺延）",
       ann[10]["id"] == "task196-quad-fixes-2026-09-29"
       and ann[11]["id"] == "task193-app-icon-replace-2026-09-28")
-check("E", "公告计数 34（Task212@2 插入，NG-GL4ES 尾锚顺延不变）", len(ann) == 37, f"got {len(ann)}")
+check("E", "公告计数 34（Task212@2 插入，NG-GL4ES 尾锚顺延不变）", len(ann) == 38, f"got {len(ann)}")
 sv = os.path.join(REPO, "docs/surveys")
 check("E", "两份调查报告入仓",
       os.path.isfile(os.path.join(sv, "2026-09-29-upstream-sync-survey.md"))

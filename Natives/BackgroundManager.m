@@ -175,21 +175,21 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
 
     NSNumber *ame164_opacity = [defaults objectForKey:kBackgroundUIOpacityKey];
     if (ame164_opacity == nil) {
-        _uiOpacity = 0.6; // Task162/164：默认透明度 60%
+        _uiOpacity = 1.0; // Task162/164 默认 60%；Task216：默认透明度 100%（用户定稿默认全不透明）
     } else {
         _uiOpacity = [ame164_opacity doubleValue];
         if (_uiOpacity < 0.1 || _uiOpacity > 1.0) {
-            _uiOpacity = 0.6;
+            _uiOpacity = 1.0;
         }
     }
 
     NSNumber *ame164_blur = [defaults objectForKey:kBackgroundBlurIntensityKey];
     if (ame164_blur == nil) {
-        _blurIntensity = 1.0; // Task162/164：默认模糊程度 100%
+        _blurIntensity = 0.75; // Task162/164 默认 100%；Task216：默认模糊程度 75%（用户定稿）
     } else {
         _blurIntensity = [ame164_blur doubleValue];
         if (_blurIntensity < 0.0 || _blurIntensity > 1.0) {
-            _blurIntensity = 1.0;
+            _blurIntensity = 0.75;
         }
     }
 }
@@ -617,11 +617,19 @@ static const NSInteger kAme160GlassBackdropTag = 99994;
     } else {
         // 半透明效果 - semi-transparent background
         // 修复：使用 systemBackgroundColor 替代硬编码黑色，自适应浅色/深色模式
+        // Task216（用户排查指令"100~50 越来越透明、50~10 反而越来越不透明"）：
+        // 旧写法 1.0 - uiOpacity 是反向语义——卡面管线（ame190_applyCardPipeline
+        // /applyEffectToView）用 uiOpacity 正向做 alpha，本层却用 1.0 - uiOpacity，
+        // 两层叠加后壁纸透出率 = (1-o)×o，在 o=0.5 处取最大值：拉条恰好
+        // "100→50 越来越透、50→10 越来越不透明"（驼峰拐点 50%，用户实测吻合）。
+        // 两管线语义互相矛盾，属历史遗留 bug 而非有意设计（毛玻璃模式本层恒为
+        // clearColor，从无此现象）。改回正向语义后透出率 = (1-o)²，全程单调：
+        // 100% 全不透明、越拉越透、10% 最透。与卡面/导航栏/工具栏管线同语义。
         if (@available(iOS 13.0, *)) {
             UIColor *base = [UIColor systemBackgroundColor];
-            viewController.view.backgroundColor = [base colorWithAlphaComponent:1.0 - self.uiOpacity];
+            viewController.view.backgroundColor = [base colorWithAlphaComponent:self.uiOpacity];
         } else {
-            viewController.view.backgroundColor = [UIColor colorWithWhite:0 alpha:1.0 - self.uiOpacity];
+            viewController.view.backgroundColor = [UIColor colorWithWhite:0 alpha:self.uiOpacity];
         }
     }
 

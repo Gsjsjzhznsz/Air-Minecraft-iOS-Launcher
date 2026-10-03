@@ -80,9 +80,9 @@ check("C1 键判定（Task184 重锚 + Task210 重锚：效果/透明度/模糊 
       and "kBackgroundCardsNeumorphOpacityKey" not in bm)
 check("C2 nil → BackgroundUIEffectBlur（默认毛玻璃）",
       "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm)
-check("C3 nil → 0.6 / 1.0（Task184 重锚：180 双滑条撤销，回归 uiOpacity 0.6 / blur 1.0 Task162 形态）",
-      "_uiOpacity = 0.6;" in bm
-      and "_blurIntensity = 1.0;" in bm)
+check("C3 nil → 1.0 / 0.75（Task216 重锚：出厂默认 uiOpacity 1.0 / blur 0.75 用户定稿）",
+      "_uiOpacity = 1.0;" in bm
+      and "_blurIntensity = 0.75;" in bm)
 check("C4 病历注释（范围检查的两个漏洞）",
       "枚举 0 = 半透明" in bm and "默认模糊 0%" in bm)
 check("C5 显式保存值尊重（半透明/0% 可选）——越界兜底仍保留",

@@ -14,7 +14,9 @@ import re
 import subprocess
 import sys
 
-REPO = "/home/z/my-project/Amethyst-iOS-MyRemastered"
+# Task216 重锚：并行会话的硬编码工作区路径改为脚本位置自动探测
+# （scripts/ 位于仓库根下一级，向上找即仓库根；任一 checkout 均可跑）
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 PASS = 0
 FAIL = 0

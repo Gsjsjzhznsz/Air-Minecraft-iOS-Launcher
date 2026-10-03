@@ -113,10 +113,10 @@ bm = read('Natives/BackgroundManager.m')
 check("B1  ui_theme 默认（Task161 重锚：用户指令“外观模式默认跟随系统”，推翻 Task160 的 light 缺省 → auto + 迁移）",
       '@"ui_theme": @"auto",' in plp
       and 'ui_theme_explicit' in plp)
-check("B2  默认透明度 0.6（Task184 重锚：180 双滑条撤销，回归 Task162/164 的 uiOpacity 0.6/下限 0.1 形态）",
-      "_uiOpacity = 0.6;" in bm and "_backgroundOpacity" not in bm and "_buttonOpacity" not in bm)
-check("B3  blurIntensity 默认 1.0（Task184 重锚：180 的模糊 0 默认随透明度体系一并撤销，回归 Task162 的 100%）",
-      "_blurIntensity = 1.0;" in bm and "_blurIntensity = 0.0;" not in bm)
+check("B2  默认透明度 1.0（Task216 重锚：用户定稿出厂默认全不透明/下限 0.1 形态）",
+      "_uiOpacity = 1.0;" in bm and "_backgroundOpacity" not in bm and "_buttonOpacity" not in bm)
+check("B3  blurIntensity 默认 0.75（Task216 重锚：用户定稿出厂默认 75%）",
+      "_blurIntensity = 0.75;" in bm and "_blurIntensity = 0.0;" not in bm)
 check("B4  默认效果仍为毛玻璃（BackgroundUIEffectBlur）",
       "_uiEffect = BackgroundUIEffectBlur;" in bm)
 check("B5  仅初次使用语义注释（存量用户设置不变；Task161 补充：未显式选择的设备历史默认迁移到 auto；Task162 重锚：透明度/模糊注释改口径；Task164 重锚：nil 判定后病历注释承载首次语义）",

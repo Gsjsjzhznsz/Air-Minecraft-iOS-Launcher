@@ -153,10 +153,10 @@ check("C4 头文件声明（Task162 注）",
       "- (BOOL)isBackgroundLiveAttached;" in bh)
 
 print("== D. 壁纸默认值（毛玻璃/60%/100%；Task164 重锚：nil 判定形态）==")
-check("D1 默认透明度 0.6（Task184 重锚：180 双滑条撤销，回归 Task162/164 的 uiOpacity 0.6）",
-      "_uiOpacity = 0.6;" in bm and "_backgroundOpacity" not in bm)
-check("D2 blurIntensity 默认 1.0（Task184 重锚：180 的模糊 0 默认随体系撤销，回归 Task162 的 100%）",
-      "_blurIntensity = 1.0;" in bm)
+check("D1 默认透明度 1.0（Task216 重锚：用户定稿出厂默认 100%）",
+      "_uiOpacity = 1.0;" in bm and "_backgroundOpacity" not in bm)
+check("D2 blurIntensity 默认 0.75（Task216 重锚：用户定稿出厂默认 75%）",
+      "_blurIntensity = 0.75;" in bm)
 check("D3 效果默认毛玻璃保持不变（Task164：未保存键不再误读为枚举 0 半透明）",
       "_uiEffect = BackgroundUIEffectBlur; // Task162/164：默认毛玻璃效果" in bm
       and "[defaults objectForKey:kBackgroundUIEffectKey]" in bm)

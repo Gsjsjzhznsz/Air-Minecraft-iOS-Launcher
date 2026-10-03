@@ -112,6 +112,36 @@ static const CGFloat kVMCardCornerRadius = 16.0;
 // touchesEnded/touchesCancelled 三段 0.96 缩放回弹）整链删除——点击即时
 // 响应，选中反馈只来自实例卡的内缩描边环。
 
+// Task216（用户"按钮其阴影要始终绑定在一起，调整透明度时有些按钮光没了
+// 按钮但是阴影还在，有些按钮始终不变"）：透明度/效果联动三件套——
+//   ① 旧况根因一：卡面管线只在 cell init 时挂一次（setupViews），复用池
+//      cell 在 reloadData 后永不重铺 → 半透明模式下拖动透明度滑条，部分卡
+//      卡面 alpha 永远停在首次创建时的值（"有些按钮始终不变"）；
+//   ② 旧况根因二：cell 层投影 shadowOpacity 固定 0.12，卡面随滑条变透时
+//      阴影纹丝不动（"光没了按钮但是阴影还在"）；
+//   ③ 修复 = configure 时重铺管线（幂等：管线内部先清旧 blur 层再铺新）+
+//      阴影/按钮圆底 alpha 统一乘"有效不透明度因子"，与卡面同升同降。
+//      快捷指令卡族（实例卡/目录卡）启用；磁贴/渲染器卡保持单次挂载
+//      （用户"先只改实例页面的卡片"）。
+// 当前管线有效不透明度因子（0~1）：无壁纸 = 1.0（平贴灰面全量）；
+// 毛玻璃 = blur 层 alpha 同式 0.3 + blurIntensity×0.7；半透明 = uiOpacity。
+- (CGFloat)ame216_effectOpacityFactor {
+    BackgroundManager *manager = [BackgroundManager sharedManager];
+    if (![manager hasBackground]) return 1.0;
+    if (manager.uiEffect == BackgroundUIEffectBlur) {
+        return 0.3 + (manager.blurIntensity * 0.7);
+    }
+    return manager.uiOpacity;
+}
+
+// 重铺卡面管线并把 cell 投影绑定到当前有效不透明度（configure 时调用）。
+// 阴影基准 0.12（规范 5.2 档）× 因子：卡面越透阴影越淡，不再悬空。
+- (void)ame216_rebindCardSurface {
+    [[BackgroundManager sharedManager] applyEffectToCollectionViewCell:self];
+    CGFloat factor = [self ame216_effectOpacityFactor];
+    self.layer.shadowOpacity = 0.12 * factor;
+}
+
 @end
 
 #pragma mark - Quick Action Tile Cell
@@ -327,6 +357,11 @@ static const CGFloat kVMCardCornerRadius = 16.0;
 }
 
 - (void)configureWithName:(NSString *)name version:(NSString *)version isSelected:(BOOL)isSelected {
+    // Task216：configure 时重铺卡面管线 + 阴影绑定透明度（复用 cell 永不重铺
+    // 的根因修复，见基类 ame216_rebindCardSurface 注释）；⋯ 钮圆底同步绑定。
+    [self ame216_rebindCardSurface];
+    self.ellipsisButton.backgroundColor =
+        [[UIColor labelColor] colorWithAlphaComponent:0.12 * [self ame216_effectOpacityFactor]];
     self.nameLabel.text = name;
     self.versionLabel.text = version ?: localize(@"i18n_str_1052", nil);
     self.selectionRing.hidden = !isSelected;
@@ -495,6 +530,11 @@ static const CGFloat kVMCardCornerRadius = 16.0;
 }
 
 - (void)configureWithName:(NSString *)name detail:(NSString *)detail isSelected:(BOOL)isSelected isAddButton:(BOOL)isAddButton {
+    // Task216：configure 时重铺卡面管线 + 阴影绑定透明度（同实例卡根因修复）；
+    // 叉钮圆底同步绑定。加号卡的绿淡底在本调用之后覆盖管线卡面（保持原语义）。
+    [self ame216_rebindCardSurface];
+    self.deleteButton.backgroundColor =
+        [[UIColor labelColor] colorWithAlphaComponent:0.12 * [self ame216_effectOpacityFactor]];
     if (isAddButton) {
         // "新建目录"加号卡：Task214（用户"删除添加目录卡片的绿色边框"）——
         // 绿色 1pt 描边退役，描边回归基类默认（白 0.10 / 0.5pt）；绿色 plus
@@ -512,8 +552,9 @@ static const CGFloat kVMCardCornerRadius = 16.0;
     }
 
     // 目录卡：folder 本色直出 + 名称 + 大小；选中 = 内缩环（同实例卡）。
-    // 卡底回归 VMTileBaseCell 默认（旧 accent 1.5pt 描边 + accent 0.10 淡底
-    // 的"三层选中强化"退役——选中态只由内缩环表达）。
+    // 卡底交由 ame216_rebindCardSurface 重铺的管线决定（半透明/毛玻璃随
+    // 设置页实时同步）——旧硬编码 white 0.08 会盖掉管线卡面随透明度滑条
+    // 的实时变化，随 Task216 移除；描边仍按基类默认（白 0.10 / 0.5pt）。
     self.deleteButton.hidden = NO;
     self.iconView.image = [UIImage systemImageNamed:@"folder.fill"];
     self.iconView.tintColor = [UIColor systemBlueColor];
@@ -523,7 +564,6 @@ static const CGFloat kVMCardCornerRadius = 16.0;
     self.selectionRing.layer.borderColor = accentColor().CGColor;
     self.contentContainer.layer.borderColor = [[UIColor whiteColor] colorWithAlphaComponent:0.10].CGColor;
     self.contentContainer.layer.borderWidth = 0.5;
-    self.contentContainer.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.08];
 }
 
 - (void)prepareForReuse {

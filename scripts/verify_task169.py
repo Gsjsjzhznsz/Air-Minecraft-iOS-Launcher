@@ -227,7 +227,7 @@ check("F7 fallback 同步（v2：内置离线提示原样保留（GitHub 指引�
 # ---------------------------------------------------------------- G. 6.0.0 版本
 print("== G. 6.0.0 版本升级 ==")
 ipl = rd("Natives/Info.plist")
-check("G1 Info.plist 双键 6.0.0", ipl.count("<string>6.0.0</string>") == 2 and "5.1.0" not in ipl)
+check("G1 Info.plist 双键 6.5.0（Task216 重锚：用户定稿 6.5.0）", ipl.count("<string>6.5.0</string>") == 2 and "5.1.0" not in ipl)
 vh = rd("Natives/external/MobileGlues/MobileGlues-cpp/version.h")
 check("G2 version.h Task169 附录", "Task 169" in vh and "6.0.0" in vh)
 

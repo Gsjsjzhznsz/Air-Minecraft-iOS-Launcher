@@ -56,7 +56,7 @@ check("B", "注释写明净距 12pt 推导（4 下内缩 + 4 头 + 4 上内缩�
 check("B", "卡片上下内缩 4pt 语义未动（版本卡同款）",
       ml.count("self.contentView.topAnchor constant:4]") >= 3
       and ml.count("self.contentView.bottomAnchor constant:-4]") >= 3)
-check("B", "行高 50（Task212 重锚：与版本选择表统一；卡 42 + 内缩 4+4）", "_tableView.rowHeight = 50;" in ml)
+check("B", "行高 64（Task216 重锚：对齐版本表真基准 64；卡 56 + 内缩 4+4）", "_tableView.rowHeight = 64;" in ml and "_tableView.rowHeight = 50;" not in ml)
 check("B", "版本号页基准仍在（minimumLineSpacing 4 + 内缩 4/4 + item 64）",
       "layout.minimumLineSpacing = 4;" in dv
       and "layout.itemSize = CGSizeMake(360, 64);" in dv

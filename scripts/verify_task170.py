@@ -41,9 +41,9 @@ check("A1 Task210：cardsNeumorphEnabled/Opacity 属性随退役删除（.h 注�
 check("A2 Task210：落盘键 background_cards_neumorph_opacity 随退役删除",
       "kBackgroundCardsNeumorphOpacityKey" not in _nocomment(bm_m)
       and "kBackgroundUIOpacityKey" in bm_m)
-check("A3 Task210：壁纸透明度默认分支不受影响（uiOpacity 0.6 默认在位）",
+check("A3 壁纸透明度默认分支（Task216 重锚：出厂默认 1.0 在位）",
       "[defaults objectForKey:kBackgroundUIOpacityKey]" in bm_m
-      and "_uiOpacity = 0.6;" in bm_m)
+      and "_uiOpacity = 1.0;" in bm_m)
 check("A4 实底开关全链退役（Manager/设置页/defaults 键零残留）",
       "cardsNeumorphSolid" not in bm_m and "cardsNeumorphSolid" not in bm_h
       and "cardsNeumorphSolid" not in bsvc

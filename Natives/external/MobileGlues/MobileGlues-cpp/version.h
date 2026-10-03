@@ -518,7 +518,17 @@
 // reports transport health) ("[OSMBridge] Task100" anchors). FAQ content
 // refreshed in place (macMenuStub/fsrCorner, count stays 32). Launcher-side
 // only, REVISION stays 17.
-#define REVISION 19
+#define REVISION 20
+// REVISION 19->20 bump addendum (Task 216): the bundle identifier changed
+// identity again with the second rebrand leg the user ordered
+// (com.air-devs.prisma -> com.prisma-devs.prisma across Info.plist/Makefile/
+// CI artifact names/entitlements/os_log subsystems/keychain service/
+// background-session identifier), and the marketing version moved 6.0.0 ->
+// 6.5.0, so the cache epoch follows the app identity (same rule as the Task
+// 214 bump). Task 216 itself is launcher-side UI only (loader-list aligned
+// to the version table, translucency slider monotonicity, instance-card
+// button/shadow opacity binding, default-settings overhaul, footer wrap)
+// -- no converter output changed beyond the epoch bump itself.
 // REVISION 19 (Task 214): the rebrand-round bump the user ordered in the
 // Task212/213 eight-item brief ("REVISION bump, Task 210 era = 18") that the
 // delivery round missed: bundle identifier com.air-devs.air -> com.air-devs.

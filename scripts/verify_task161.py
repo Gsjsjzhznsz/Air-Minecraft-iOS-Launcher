@@ -139,9 +139,9 @@ check("D1 PLPreferences 默认 ui_theme=auto",
       '@"ui_theme": @"auto",' in plp)
 check("D2 显式选择标记键已注册（Setter 硬要求）",
       '@"ui_theme_explicit": @NO,' in plp)
-check("D3 SceneDelegate 历史默认迁移（auto/light → dark（Task180 重锚），仅未显式选择设备）",
+check("D3 SceneDelegate 历史默认迁移（Task216 重锚：未显式选择设备统一迁回 auto 跟随系统）",
       "if (!getPrefBool(@\"general.ui_theme_explicit\")) {" in sd
-      and "migrated to 'dark'" in sd)
+      and "migrated to 'auto'" in sd)
 check("D4 显式选择置标记（设置页 pick action）",
       'setPrefBool(@"general.ui_theme_explicit", YES);' in lpv)
 check("D5 SceneDelegate 三档映射保持（light/dark/auto）",

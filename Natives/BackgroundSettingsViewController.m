@@ -196,10 +196,39 @@
     if (section == 2) {
         return localize(@"bing.footer.hint", nil);
     }
-    if (section == 0 && [[BackgroundManager sharedManager] hasBackground]) {
-        return localize(@"background.effect.footer", nil);
-    }
+    // Task216：section 0 的两滑条语义说明改走 viewForFooterInSection 的
+    // 多行自定义 footer（系统 titleForFooter 的 label 在本页长文案下被
+    // 截断——用户实测"上方透明度……被截断了"），本方法不再返回该段。
     return nil;
+}
+
+// Task216：UI 效果设置页脚 = 多行自动换行 label（用户指令"改成会换行的"）。
+// 高度按当前表宽预排计算（plain footer 不走自动尺寸），与系统 footer 视觉
+// 同规格（footnote + secondaryLabelColor + 20pt 水平内缩）。
+- (UIView *)tableView:(UITableView *)tableView viewForFooterInSection:(NSInteger)section {
+    if (section != 0 || ![[BackgroundManager sharedManager] hasBackground]) return nil;
+    UILabel *footer = [[UILabel alloc] init];
+    footer.text = localize(@"background.effect.footer", nil);
+    footer.font = [UIFont systemFontOfSize:[UIFont smallSystemFontSize]];
+    footer.textColor = [UIColor secondaryLabelColor];
+    footer.numberOfLines = 0;
+    footer.lineBreakMode = NSLineBreakByWordWrapping;
+    footer.textAlignment = NSTextAlignmentNatural;
+    return footer;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForFooterInSection:(NSInteger)section {
+    if (section != 0 || ![[BackgroundManager sharedManager] hasBackground]) {
+        return UITableViewAutomaticDimension;
+    }
+    NSString *text = localize(@"background.effect.footer", nil);
+    CGFloat availableWidth = tableView.bounds.size.width - 40.0; // 20pt 两侧内缩
+    UIFont *font = [UIFont systemFontOfSize:[UIFont smallSystemFontSize]];
+    CGFloat textHeight = [text boundingRectWithSize:CGSizeMake(availableWidth, CGFLOAT_MAX)
+                                            options:NSStringDrawingUsesLineFragmentOrigin
+                                         attributes:@{NSFontAttributeName: font}
+                                            context:nil].size.height;
+    return ceil(textHeight) + 10.0; // 文本高 + 上下呼吸
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -651,10 +680,12 @@
         // 清除背景
         [[BackgroundManager sharedManager] clearBackground];
         
-        // 重置UI效果设置
+        // 重置UI效果设置（Task216：与新的出厂默认同步——透明度 100%、
+        // 模糊程度 75%、毛玻璃；旧 0.7 的硬编码随默认值改版一并对齐）
         BackgroundManager *manager = [BackgroundManager sharedManager];
         manager.uiEffect = BackgroundUIEffectBlur;
-        manager.uiOpacity = 0.7;
+        manager.uiOpacity = 1.0;
+        manager.blurIntensity = 0.75;
         
         [self updatePreview];
         [self.tableView reloadData];

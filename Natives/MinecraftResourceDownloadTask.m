@@ -17,7 +17,7 @@
 #import "ios_uikit_bridge.h"
 #import "utils.h"
 
-NSString * const kMinecraftResourceDownloadBackgroundSessionIdentifier = @"com.air-devs.prisma.MinecraftResourceDownloadTask";
+NSString * const kMinecraftResourceDownloadBackgroundSessionIdentifier = @"com.prisma-devs.prisma.MinecraftResourceDownloadTask";
 
 // 原版安装 6 步的阶段下标（与 PLTaskStagesVanilla() 一致，redesign-download-ui Phase 3 Task 3.1）
 static const NSUInteger kMCStageIndexFetchManifest = 0;
