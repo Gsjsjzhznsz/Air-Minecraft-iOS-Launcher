@@ -685,10 +685,10 @@ dep_virgl_build:
 	# machine not found" / Apple ld 对 --version 的探测异常 / pkg-config for
 	# host machine not found）。--native-file 显式声明 build 机工具后，环境
 	# 变量被完全绕开；cross [binaries] 补 pkg-config 消掉第三连错。
-	printf '%s\n' \\
-		'[binaries]' \\
-		"c = 'clang'" \\
-		"cpp = 'clang++'" \\
+	printf '%s\n' \
+		'[binaries]' \
+		"c = 'clang'" \
+		"cpp = 'clang++'" \
 		> $(WORKINGDIR)/virgl-native.txt
 	# ---- 1. libepoxy（静态，装进 libvtestserver.dylib）----
 	rm -rf $(WORKINGDIR)/virgl-epoxy $(WORKINGDIR)/virgl-prefix

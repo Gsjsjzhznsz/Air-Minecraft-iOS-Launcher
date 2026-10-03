@@ -219,12 +219,12 @@
             // zip-slip 净化：全量条目路径校验（".." / 绝对路径 / 空名）。
             __block BOOL pathOk = YES;
             [archive performOnFilesInArchive:^(UZKFileInfo *fileInfo, BOOL *stop) {
-                NSString *p = fileInfo.filePath;
+                NSString *p = fileInfo.filename;
                 if (p.length == 0 || [p hasPrefix:@"/"] || [p containsString:@"../"] || [p isEqualToString:@".."]) {
                     pathOk = NO;
                     *stop = YES;
                 }
-            }];
+            } error:nil];
             if (!pathOk) {
                 failMsg = @"unsafe entry path in archive";
             } else if (![archive extractFilesTo:staging overwrite:YES error:&err]) {
