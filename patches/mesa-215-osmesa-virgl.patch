@@ -112,3 +112,31 @@ index 25985dd..f42f7a0 100644
     struct sw_winsys *winsys;
     struct pipe_screen *screen;
  
+--- a/src/gallium/drivers/virgl/virgl_context.c
++++ b/src/gallium/drivers/virgl/virgl_context.c
+@@ -21,12 +21,13 @@
+- * USE OR OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-#include <string.h>
+-#ifndef _WIN32
+-#include <libsync.h>
+-#endif
+-
+-#include "pipe/p_shader_tokens.h"
+-
+-#include "compiler/nir/nir.h"
+-#include "pipe/p_context.h"
++ * USE OR OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <string.h>
++/* [Task217 hotfix 8, run 615] libsync.h stripped: iPhoneOS SDK lacks
++ * this macOS-only header (os_sync_wait_on_address family), and this
++ * file references zero libsync symbols -- the include is upstream
++ * vestigial for the iOS port. */
++
++#include "pipe/p_shader_tokens.h"
++
++#include "compiler/nir/nir.h"
++#include "pipe/p_context.h"
