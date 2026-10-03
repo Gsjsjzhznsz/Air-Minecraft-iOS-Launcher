@@ -1617,3 +1617,16 @@ Work Log:
 
 Stage Summary:
 - 推送后继续盯 CI；605 的剩余注解（meson 链）已由包装层放行，不阻断
+
+---
+Task ID: 216 (CI closure)
+Agent: main (Super Z)
+Task: Task 216 CI 闭环确认
+
+Work Log:
+- Run 606（hotfix 4 = 30f6d2d）completed successfully：badge "Development build - passing"；dep_virgl_build 按 hotfix 3 设计告警放行（VirGL 项暂隐，等独立轮根治 meson 交叉链），主构建/打包/上传全链绿
+- 四轮热修时间线：602（主提交 3cb68f3，dep_virgl 首爆 + Edit 工具 Makefile TAB 吞噬潜伏）→ 603（e3e1e2e 接口声明加固，未中根因）→ 605（ad5c52f 降级放行，暴露 virgl_server.m 处女编译雷）→ 606（30f6d2d 返回类型修复）绿
+- 家法沉淀三条：① 显示层吞字教训升级——python print 的 repr 也经渲染层，字节判定只用 base64/od 且必须区分"文件真坏"与"回显假象"（本次两者都真实发生：Makefile TAB 真吞、VersionManager '!anager' 假象）② Edit 工具大文件写盘存在吞字节风险，Makefile/构建链级修改一律走 python 字节补丁 ③ 并行轮次遗留的"注释承诺未兑现"（dep_virgl 降级设计）在 CI 首次实跑时必然爆雷，接手盯 CI 时优先审计上游新增目标的失败语义
+
+Stage Summary:
+- Task 216 六项交付全部落地且 CI 绿；装机验证清单见主条目；keychain 凭据不迁移为包名二段已知副作用
