@@ -1654,3 +1654,31 @@ Stage Summary:
 - 推送被 token 阻断：本地 1fad84e0 + f7ec7b72 待推；CI 待跑（dep_virgl 双文件链首轮真编译 + 26.2/26.3 组件下载装机验证）
 - 装机待验证锚点：'[JavaLauncher] Task217: auto renderer decision: ...'（每次 auto 启动）/ 'BLACKLISTED after 2 consecutive hs_err sessions'（崩溃学习触发）/ 'Task217: isolation migration moved ...'（启用隔离）/ '[DataTransfer] Task217: export wrote N files' / 'import restored N files' / '[ModrinthAPI] Task217: ... one retry in 1.5s'（镜像抖动）/ 26.2-26.3 组件安装取最新匹配 release
 - 包名三段路线落地两段：com.prisma-devs.prisma（旧）-> com.air-devs（过渡，本轮）-> com.prisma-devs（最终）；keychain 回退链保账号存活
+
+---
+Task ID: 217 (CI 闭环)
+Agent: main (Super Z)
+Task: token 续命推送 + 十一连热修——dep_virgl 全链首次 CI 达成（run 619）
+
+Work Log:
+- token 续命：用户提供新 PAT；推送 Task 217 三提交（1fad84e0 + f7ec7b72 + 4fbddc27）
+- 十一连热修全记录（每轮从上轮 CI 实证日志精确归因，零猜测）：
+  - 608 → df5a2df0：Makefile native-file printf 块双反斜杠（`\\`+换行 = 字面反斜杠+命令终止，'[binaries]' 沦为命令 → Error 127）；DataTransferService.m 的 UZKFileInfo 无 filePath（真名 filename）+ performOnFilesInArchive: 漏 error:nil
+  - 609 → 068db4e2：virglrenderer 死于 "python3 is missing modules: yaml"（brew python 无 PyYAML）；同 meson-log 暴露 IPHONEOS_DEPLOYMENT_TARGET 步骤级 env 污染 build 机 sanity（裸 clang 编出 iOS Mach-O，exec 即 SIGKILL）→ VIRGL_ENV_CLEAN（env -u 全部部署目标）前缀三处 meson setup
+  - 610 → 82ba72d2：热修 2 注释行 column 0 落进 run: | 块标量 → workflow 编译失败（jobs=0、日志 404）；补 10 空格缩进
+  - 611 → ff59ccd1：ModsManagerViewController.m:907 漏 import ModpackExportService.h（88% 才编到）；libvirglrenderer.a 实产在 src/ 子目录，test -f 与 force_load 双改
+  - 612 → 9366edf5：-force_load 双静态库撞 4 份 u_format_table（virglrenderer 多内部 target 各自编译生成表）→ -Wl,-u,_vtest_main 种子 + 常规归档拉链；libvtestserver.dylib 首次进包
+  - 613 → 2ae4eb56：mesa meson.build:21 要 objc → 机器文件补 objc = 'clang' + objc_args/link_args 镜像（同行追加，printf 多参数各占一行，行数零增长）
+  - 614 → 7f878a18：mesa 的 mako 检查死于 packaging 模块缺失 + distutils 已从 py3.12 删除（假阳性"缺 mako"）→ pip 链补 packaging
+  - 615 → faab26d4：virgl_context.c:26 'libsync.h' not found（macOS 专属头，iPhoneOS SDK 无；全树零符号引用的遗留 include）→ 215 补丁第五 hunk 剥除
+  - 616 → 5ec8f23c：mesa 904/904 全编译，终链死于 brew 的 macOS 版 libzstd.dylib → -Dzstd=disabled（磁盘缓存压缩，零功能损失）
+  - 617 → 031c078d：osmesa 链接缺 5 个 vl_* 符号（上游 osmesa 只链 swrast，libgalliumvl_stub 全树无消费者）→ 补链
+  - 618 → c7690b70：meson 1.12 严格类型——dependencies kwarg 不收 StaticLibrary；且常规 link_with 有归档顺序坑 → vl 桩改走 link_whole（单对象强制编入，零顺序依赖）；osmesa diff 整段从上游原文件重新生成
+- run 619（c7690b70）：**dep_virgl - end 首次达成**（两次 gmake 均达）；libvtestserver.dylib + libOSMesaVirgl.dylib 双双进包（ipa/tipa 214MB 产物齐全）；零降级消息；VirGL 渲染器条目将随 libOSMesaVirgl.dylib 的存在自动回归（LauncherPreferences rendererLibraryExists 单 dylib 判定）
+- 工艺沉淀（本轮家法新增）：① open('wb') 先截断后求值——payload 必须先物化再 open（run 中 Makefile 清零事故，git 恢复）② 块标量内插行必须继承块缩进 ③ 字节层验证只信 base64（显示层连 python repr 都吞 '[h'）④ meson 补丁修改一律"从上游原文件生成 + 新鲜解包 dry-run/apply 双验证"（增量 hunk 手术两次翻车后升级）⑤ 仿真 harness（printf 块提取执行 + configparser 校验）为提交前标准关卡 ⑥ TAB 基线 662 锚定 7 个验证器——Makefile 行级修改一律同行追加/等行替换，说明走 make 级 column-0 注释
+- 已知遗留（记录在案）：Makefile 三 dylib 缓存快路径检查引用永不产出的 libepoxy.dylib（epoxy 静态链进 libvtestserver）= 死路径；根治 = 未来把预编译 dylib commit-back 进仓库（同时免每轮 ~6 分钟 mesa 重建）
+- 装机验证清单不变（见 Task 217 主条目锚点）+ 新增：VirGL 渲染器条目应出现在设置 > 渲染器（≤26.2 实例）
+
+Stage Summary:
+- Task 217 八项全部落地且 CI 绿：26.x 组件下载根修 / mod 点击浮出 / 自动渲染器崩溃学习 / FCL 式隔离 / 关于页 / 数据导出导入 / 过渡包名 com.air-devs + keychain 回退链 / **dep_virgl CI 根治（用户"把 CI 修好"的完整兑现——不再是降级换来的绿）**
+- 十一连热修链完整因果档案：608 转义 → 609 模块+env → 610 缩进 → 611 import+路径 → 612 重复符号 → 613 objc → 614 packaging → 615 libsync → 616 zstd → 617 vl 符号 → 618 kwarg 类型 → 619 终点
