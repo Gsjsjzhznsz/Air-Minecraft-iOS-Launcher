@@ -660,6 +660,11 @@ dep_virgl:
 # -u _vtest_main 作种子走常规归档拉链：按需拉入 vtest_main 的依赖闭包，
 # 重复定义的表成员休眠不拉；libvtest.a 排前（其表拷贝优先满足引用）。本行
 # 为 make 级注释（列首无 TAB），TAB 基线不动（662 被 7 个验证器锚定）。
+# Task217 热修 9（run 616）：mesa 904/904 全编译后，最终 osmesa 链接死于
+# brew 的 macOS 版 libzstd.dylib（cross [binaries] 的 pkg-config 解析到
+# /opt/homebrew；其余 -lexpat -lz 均来自 iPhoneOS SDK）。-Dzstd=disabled
+# 剥除该依赖——zstd 仅用于磁盘缓存压缩，进程内渲染零功能损失。
+
 dep_virgl_build:
 	@if [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libOSMesaVirgl.dylib" ] && \
 	    [ -f "$(SOURCEDIR)/Natives/resources/Frameworks/libvtestserver.dylib" ] && \
@@ -753,7 +758,7 @@ dep_virgl_build:
 		--native-file $(WORKINGDIR)/virgl-native.txt \
 		-Dgallium-drivers=virgl,softpipe -Dvulkan-drivers=[] \
 		-Dosmesa=true -Dllvm=disabled -Dglx=disabled -Degl=disabled -Dgbm=disabled \
-		-Dplatforms=[] -Dshared-glapi=disabled -Dvideo-codecs=[] \
+		-Dplatforms=[] -Dshared-glapi=disabled -Dvideo-codecs=[] -Dzstd=disabled \
 		-Dbuild-tests=false -Dtools=[] || exit 1
 	ninja -C $(WORKINGDIR)/virgl-mesa || exit 1
 	test -f $(WORKINGDIR)/virgl-mesa/src/gallium/targets/osmesa/libOSMesa.8.dylib || { echo 'ERROR: libOSMesa.8.dylib (virgl guest) missing'; exit 1; }
