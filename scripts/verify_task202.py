@@ -282,7 +282,15 @@ _j_known_drift = {
     # 实锤，非本轮引入）——E7 失败明细只引用该条时同样放行。
     "verify_task168": ("D2", "E4b"),
 }
-for v in ("verify_task196_197_198_201", "verify_task168", "verify_task193"):
+# Task217 去重：被 209 嵌套调用时（TASK209_NESTED=1）跳过 J 循环里的 168 与
+# 193 两腿——209 的 D9/D7 会直接全量跑它们，同一级联舰队在一次 209 全程
+# 里重复跑纯属浪费，且深嵌套（209->202->168->24 子验证器）在本沙箱
+# CPU 配额下必超工具时限（Task208 家法 "split runs required" 的对偶面：
+# 嵌套去重）。独立运行 202 时行为不变（三腿全跑，57/57）。
+_j_cascade = ("verify_task196_197_198_201", "verify_task168", "verify_task193")
+if os.environ.get("TASK209_NESTED") == "1":
+    _j_cascade = tuple(v for v in _j_cascade if v not in ("verify_task168", "verify_task193"))
+for v in _j_cascade:
     r = subprocess.run([sys.executable, os.path.join(REPO, "scripts", f"{v}.py")],
                        capture_output=True, text=True, cwd=REPO)
     # 裁决行三种形态："==== X: N/M ====" / "N PASS / M FAIL" / "RESULT: ALL PASS (N/M)"

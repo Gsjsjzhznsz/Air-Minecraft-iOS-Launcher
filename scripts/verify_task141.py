@@ -255,11 +255,13 @@ check("G3  检测口径护栏零变化（getEntitlementValue ×2 / isJITEnabled(
 # Task175：白名单从 verify_task* 放宽到 scripts/ 全体（task175 法证/语法门
 # 脚本与历届 task167_announcements / task170_announcements / task168_baseline_sweep
 # 同族——"scripts/ 下的一切皆可提交"是历次会话反复学到的同一条教训）。
+# Task217：+.gitignore（仓库卫生轮会正常触碰——本轮 __pycache__ untrack +
+# ignore 规则即触发过 141 G4 -> 168 E7 -> 202 J -> 209 D6 的脏树传播链）。
 check("G4  工作区改动仅限预期文件集（提交后自愈；Task175：scripts/ 全体入白名单；"
       "Task202：docs/surveys/ 入白名单——Task201 报告曾被 /docs gitignore 静默吞掉，"
-      "本轮强制入库）",
+      "本轮强制入库；Task217：+.gitignore）",
       all(ln[3:].strip().startswith(("Natives/", "scripts/", "worklog.md", "announcements.json",
-                                     "JavaApp/", "help-faq.json", "docs/", "Makefile"))
+                                     "JavaApp/", "help-faq.json", "docs/", "Makefile", ".gitignore"))
           for ln in subprocess.run(["git", "-C", REPO, "status", "--porcelain"],
                                    capture_output=True, text=True).stdout.splitlines()
           if ln.strip()))

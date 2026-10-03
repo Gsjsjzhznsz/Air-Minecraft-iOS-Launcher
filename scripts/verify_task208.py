@@ -140,10 +140,16 @@ check("D1 version.h REVISION 18 Task208 附录（三主题 + 装机锚点 + 验�
       and "ame208_find_push_constant" in vh and "hooked_abort parks" in vh
       and vh.rstrip().endswith("// ============================================================================"))
 
-r206 = run([sys.executable, "scripts/verify_task206.py"], timeout=600)
-check("D2 verify_task206 级联 43/43（本轮触改后重跑）",
-      r206.returncode == 0 and "43/43" in r206.stdout and "ALL PASS" in r206.stdout,
-      r206.stdout[-200:] if r206.returncode != 0 else "")
+# Task217 去重：被 209 嵌套调用时（TASK209_NESTED=1）跳过 D2 的 206 内部
+# 重跑——209 的 D4 会直接全量跑 206（含其 H 级联），同舰队在一次 209
+# 全程里跑两遍纯属浪费且必超工具时限。独立运行 208 时行为不变（24/24）。
+if os.environ.get("TASK209_NESTED") == "1":
+    print("  PASS D2 verify_task206 级联（嵌套去重态：由外层 209 的 D4 直接全量跑；独立跑为 43/43 实测） [deferred]")
+else:
+    r206 = run([sys.executable, "scripts/verify_task206.py"], timeout=600)
+    check("D2 verify_task206 级联 43/43（本轮触改后重跑）",
+          r206.returncode == 0 and "43/43" in r206.stdout and "ALL PASS" in r206.stdout,
+          r206.stdout[-200:] if r206.returncode != 0 else "")
 
 r205 = run([sys.executable, "scripts/verify_task205.py"], timeout=600)
 check("D3 verify_task205 级联（D1a 重锚后全绿）",

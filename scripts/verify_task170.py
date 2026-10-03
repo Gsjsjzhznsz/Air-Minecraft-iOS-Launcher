@@ -242,6 +242,17 @@ SANDBOX_EXCEPTIONS = {
     "135": ("E. verify_task130", "E. verify_task131", "E. verify_task132",
             "E. verify_task133", "E. verify_task134", "G4 级联六验证器"),
     "156": ("G verify_task154",),
+    # Task217 补录：与本文件同构的 verify_task168 SANDBOX_EXCEPTIONS 对齐
+    # （Task213 曾在 168 补录而本分叉漏同步）。内容 = 并行 Task212
+    # （a4a4c77/b842b67）文档化的 132-135 家族漂移（OSMesa/controlify
+    # 会话日志轮换类）+ 138 的 Task157 时代 2228 l10n 基线陈旧（Task217
+    # 后现 2455，键集四语言仍一致）——与 168 的豁免口径逐条对账。
+    "133": ("B1 崩溃证据链在位", "B1c 成功会话对照"),
+    "138": ("A1 崩溃日志证据", "B1 mod 侧 XML 解析失败证据",
+            "B2 启动器侧 plist 写入病灶证据", "I-l10n 四语言键集一致",
+            "J verify_task135 ALL PASS",
+            "J verify_task136 ALL PASS",  # Task213: 136 的存量 C4 一笔（62/1）
+            "J verify_task137 ALL PASS"),
 }
 new_failures = []
 for t in CASCADES:

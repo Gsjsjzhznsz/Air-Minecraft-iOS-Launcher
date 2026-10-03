@@ -9,6 +9,13 @@ D. 文档（version.h / 公告 @2 / worklog）+ 级联
 判读坐标：88fa3f6 上传 latestlog.txt（构建 59b4f25）；红鲱鱼定谳的资产/
 代码双铁证（client-263.jar 零 push_constant + CFR 反编译双命名）见
 spvc_shim.c 的 Task209 定谳注释与 worklog.md Task 209 条目。
+
+Task217 嵌套去重（本沙箱 CPU 配额家法）：D5（208）与 D6（202）带
+TASK209_NESTED=1——208 跳其 D2 的 206 内部重跑（209 的 D4 直接跑），
+202 跳其 J 的 168/193 两腿（209 的 D9/D7 直接跑）；独立运行 208/202
+行为不变（24/24、57/57）。去重后 209 全程在本沙箱 600s 工具时限内
+可单跑完成（此前 580s 只到 D8 中段）。深族分跑补证口径见 verify_task211
+F2 同款注释（Task208 教训 "split runs required"）。
 """
 import json
 import os
@@ -30,8 +37,9 @@ def check(name, ok, detail=""):
     print(("  PASS " if ok else "  FAIL ") + name + (f"  -- {detail}" if detail and not ok else ""))
 
 
-def run(cmd, timeout=300):
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=REPO)
+def run(cmd, timeout=300, env=None):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, cwd=REPO,
+                          env=env)
 
 
 # ============ A. 改名五面 ============
@@ -214,14 +222,20 @@ check("D4 verify_task206 级联 43/43（改名重锚 E4/E6/F4 后）",
       r206.returncode == 0 and "43/43" in r206.stdout and "ALL PASS" in r206.stdout,
       r206.stdout[-160:] if r206.returncode != 0 else "")
 
-r208 = run([sys.executable, "scripts/verify_task208.py"], timeout=600)
-check("D5 verify_task208 级联 24/24（A 门退役重锚后）",
-      r208.returncode == 0 and "24/24" in r208.stdout and "ALL PASS" in r208.stdout,
+# Task217 嵌套去重：D5（208）与 D6（202）均带 TASK209_NESTED=1——208 跳过其
+# D2 的 206 内部重跑（由本验证器 D4 直接全量跑），202 跳过其 J 的 168/193
+# 两腿（由 D9/D7 直接全量跑）。同舰队一次全程不重复跑，且深嵌套在本
+# 沙箱 CPU 配额下必超工具时限。独立运行 208/202 时行为不变（24/24、57/57）。
+_nested_env = dict(os.environ)
+_nested_env["TASK209_NESTED"] = "1"
+r208 = run([sys.executable, "scripts/verify_task208.py"], timeout=600, env=_nested_env)
+check("D5 verify_task208 级联 23/23（嵌套去重态：其 D2 的 206 重跑由本验证器 D4 直接跑；独立跑为 24/24；A 门退役重锚后）",
+      r208.returncode == 0 and "23/23" in r208.stdout and "ALL PASS" in r208.stdout,
       r208.stdout[-160:] if r208.returncode != 0 else "")
 
-r202 = run([sys.executable, "scripts/verify_task202.py"], timeout=600)
-check("D6 verify_task202 级联 57/57（公告 31 + 索引顺延重锚后）",
-      r202.returncode == 0 and "57/57" in r202.stdout,
+r202 = run([sys.executable, "scripts/verify_task202.py"], timeout=600, env=_nested_env)
+check("D6 verify_task202 级联 55/55（嵌套去重态：J 跳 168/193 两腿、由 D9/D7 直接跑；独立跑为 57/57；公告 31 + 索引顺延重锚后）",
+      r202.returncode == 0 and "55/55" in r202.stdout and "ALL GREEN" in r202.stdout,
       r202.stdout[-160:] if r202.returncode != 0 else "")
 
 r193 = run([sys.executable, "scripts/verify_task193.py"], timeout=600)
