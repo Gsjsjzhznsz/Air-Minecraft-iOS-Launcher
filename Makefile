@@ -675,16 +675,16 @@ dep_virgl_build:
 	printf '%s\n' \
 		'[binaries]' \
 		"c = 'clang'" \
-		"cpp = 'clang++'" \
+		"cpp = 'clang++'" "objc = 'clang'" \
 		"ar = 'ar'" \
 		"strip = 'strip'" \
 		"pkg-config = 'pkg-config'" \
 		'' \
 		'[properties]' \
 		"c_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
-		"cpp_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
+		"cpp_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" "objc_args = ['-arch','arm64','-miphoneos-version-min=14.0','-fno-common','-isysroot','$(SDKPATH)','-I$(SOURCEDIR)/Natives/external/mesa']" \
 		"c_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" \
-		"cpp_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" \
+		"cpp_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" "objc_link_args = ['-arch','arm64','-miphoneos-version-min=14.0','-isysroot','$(SDKPATH)']" \
 		'' \
 		'[host_machine]' \
 		"system = 'darwin'" \
@@ -702,7 +702,7 @@ dep_virgl_build:
 	printf '%s\n' \
 		'[binaries]' \
 		"c = 'clang'" \
-		"cpp = 'clang++'" \
+		"cpp = 'clang++'" "objc = 'clang'" \
 		> $(WORKINGDIR)/virgl-native.txt
 	# ---- 1. libepoxy（静态，装进 libvtestserver.dylib）----
 	rm -rf $(WORKINGDIR)/virgl-epoxy $(WORKINGDIR)/virgl-prefix
